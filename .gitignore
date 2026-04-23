@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경별 시크릿 파일 — 실제 프로젝트에서는 아래처럼 추가
+# application-prod.yml
+*.env
+.env*
+.env.local
+
+# Querydsl 생성 파일
+build/generated/
+
+# Test reports
+build/reports/
+build/test-results/
+
+# Docker override
+docker-compose.override.yml
+
+# Fly.io
+.fly/
