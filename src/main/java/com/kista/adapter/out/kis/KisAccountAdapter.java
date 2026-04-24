@@ -1,0 +1,106 @@
+package com.kista.adapter.out.kis;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.AccountBalance;
+import com.kista.domain.port.out.KisAccountPort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+@Component
+public class KisAccountAdapter implements KisAccountPort {
+
+    private static final String BALANCE_PATH = "/uapi/overseas-stock/v1/trading/inquire-balance";
+    private static final String PRESENT_PATH  = "/uapi/overseas-stock/v1/trading/inquire-present-balance";
+    private static final String BALANCE_TR_ID = "TTTS3012R";
+    private static final String PRESENT_TR_ID = "CTRP6504R";
+
+    private final KisHttpClient kisHttpClient;
+
+    public KisAccountAdapter(KisHttpClient kisHttpClient) {
+        this.kisHttpClient = kisHttpClient;
+    }
+
+    @Override
+    public AccountBalance getBalance(String token) {
+        String symbol = kisHttpClient.props().symbol();
+        HoldingResult holding = fetchHolding(token, symbol);
+        PresentResult present  = fetchPresent(token);
+
+        BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
+        return new AccountBalance(holding.qty(), avgPrice, present.effectiveAmt(), present.usdDeposit());
+    }
+
+    private HoldingResult fetchHolding(String token, String symbol) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(token, BALANCE_TR_ID);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("CANO", kisHttpClient.props().accountNo());
+        params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
+        params.add("WCRC_FRCR_DVSN_CD", "02");
+        params.add("NATN_CD", "840");
+        params.add("TR_MRCN_AMT", "0");
+        params.add("INQR_DVSN", "00");
+
+        BalanceResponse response = kisHttpClient.get(BALANCE_PATH, headers, params, BalanceResponse.class);
+
+        if (response == null || response.output1() == null) {
+            return new HoldingResult(0, BigDecimal.ZERO);
+        }
+        return response.output1().stream()
+                .filter(o -> symbol.equals(o.pdno()))
+                .findFirst()
+                .map(o -> new HoldingResult(
+                        parseIntSafe(o.cblcQty()),
+                        parseBigDecimalSafe(o.pchsAvgPric())))
+                .orElse(new HoldingResult(0, BigDecimal.ZERO));
+    }
+
+    private PresentResult fetchPresent(String token) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(token, PRESENT_TR_ID);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("WCRC_FRCR_DVSN_CD", "02");
+        params.add("CRCY_CD", "USD");
+
+        PresentBalanceResponse response = kisHttpClient.get(PRESENT_PATH, headers, params, PresentBalanceResponse.class);
+
+        if (response == null || response.output3() == null) {
+            return new PresentResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        PresentBalanceResponse.Output3 out = response.output3();
+        return new PresentResult(
+                parseBigDecimalSafe(out.frcrEvluAmt()),
+                parseBigDecimalSafe(out.frcrDnclAmt()));
+    }
+
+    private static int parseIntSafe(String s) {
+        try { return s == null || s.isBlank() ? 0 : Integer.parseInt(s.trim()); }
+        catch (NumberFormatException e) { return 0; }
+    }
+
+    private static BigDecimal parseBigDecimalSafe(String s) {
+        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
+        catch (NumberFormatException e) { return BigDecimal.ZERO; }
+    }
+
+    record HoldingResult(int qty, BigDecimal avgPrice) {}
+    record PresentResult(BigDecimal effectiveAmt, BigDecimal usdDeposit) {}
+
+    record BalanceResponse(@JsonProperty("output1") List<Output1> output1) {
+        record Output1(
+                @JsonProperty("PDNO") String pdno,
+                @JsonProperty("CBLC_QTY") String cblcQty,
+                @JsonProperty("PCHS_AVG_PRIC") String pchsAvgPric
+        ) {}
+    }
+
+    record PresentBalanceResponse(@JsonProperty("output3") Output3 output3) {
+        record Output3(
+                @JsonProperty("FRCR_EVLU_AMT2") String frcrEvluAmt,
+                @JsonProperty("FRCR_DNCL_AMT_2") String frcrDnclAmt
+        ) {}
+    }
+}
