@@ -21,6 +21,7 @@ cp .env.example .env                       # 환경변수 파일 복사 후 값 
 
 # 테스트
 ./gradlew test                             # 전체 테스트 (병렬 실행)
+./gradlew compileJava                      # 컴파일만 빠르게 확인 (테스트 없이)
 ./gradlew test --tests "com.kista.architecture.*"   # ArchUnit 규칙 테스트만
 ./gradlew test --tests "com.kista.domain.*"         # 도메인 단위 테스트만
 ./gradlew test --rerun-tasks               # 캐시 무시하고 강제 재실행 (UP-TO-DATE 우회)
