@@ -50,8 +50,6 @@ dependencies {
     // Testing
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.archunit.junit5)
-    testImplementation(libs.testcontainers.junit5)
-    testImplementation(libs.testcontainers.postgresql)
 }
 
 // Querydsl Q-class 생성 디렉토리 설정
@@ -79,7 +77,4 @@ tasks.named<Test>("test") {
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
-    environment("DOCKER_HOST", "unix:///var/run/docker.sock")
-    environment("TESTCONTAINERS_RYUK_DISABLED", "true")
-    systemProperty("api.version", "1.44")
 }

@@ -111,4 +111,14 @@ P = A × 1.2  (scale=2, HALF_UP)
 
 ## 테스트 DB
 
-통합 테스트는 Testcontainers PostgreSQL 사용 (`testcontainers-postgresql` 의존성 포함). 실제 KIS API 통합 테스트는 모의투자 계정으로만 실행.
+통합 테스트는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).
+
+```bash
+docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
+```
+
+`application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
+
+### JPA 엔티티 저장 패턴
+- `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
+- `@Transactional` 테스트 내에서 `insertable=false, updatable=false` 필드(예: `createdAt`)는 DB DEFAULT 값이 JPA 1차 캐시에 반영되지 않음 → 해당 필드 `isNotNull()` 단언 금지
