@@ -91,6 +91,9 @@ P = A × 1.2  (scale=2, HALF_UP)
 - `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
+### WSL2 Gradle 설정
+- `gradle.properties`의 `org.gradle.vfs.watch=false` — WSL2에서 Gradle FileHasher가 Windows NTFS 파일 감시 API 호출 시 IOException 발생, 제거 금지
+
 ### KIS API
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
 - 토큰 관리는 `KisTokenAdapter`만 담당
