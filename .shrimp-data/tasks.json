@@ -1,0 +1,486 @@
+{
+  "tasks": [
+    {
+      "id": "d956063d-5fff-44a0-b435-4bab7dc070f4",
+      "name": "Flyway DB 스키마 작성",
+      "description": "PostgreSQL 테이블 3개를 Flyway 마이그레이션으로 정의. V1: trade_histories, V2: portfolio_snapshots, V3: strategy_configs.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "262785a1-a1bb-40bf-a2fc-7b5894a7ba7a"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/resources/db/migration/V1__create_trade_histories.sql",
+          "type": "CREATE",
+          "description": "주문 내역 테이블"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/resources/db/migration/V2__create_portfolio_snapshots.sql",
+          "type": "CREATE",
+          "description": "자산 추이 스냅샷 테이블"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/resources/db/migration/V3__create_strategy_configs.sql",
+          "type": "CREATE",
+          "description": "전략 설정 테이블"
+        }
+      ],
+      "implementationGuide": "V1__create_trade_histories.sql:\n  id UUID PK, trade_date DATE, symbol VARCHAR(20), strategy VARCHAR(50),\n  order_type VARCHAR(10), direction VARCHAR(5), qty INT, price NUMERIC(12,4),\n  amount_usd NUMERIC(12,2), status VARCHAR(10), kis_order_id VARCHAR(30),\n  phase VARCHAR(20), created_at TIMESTAMPTZ DEFAULT now()\n\nV2__create_portfolio_snapshots.sql:\n  id UUID PK, snapshot_date DATE, symbol VARCHAR(20), qty INT,\n  avg_price NUMERIC(12,4), current_price NUMERIC(12,4),\n  market_value_usd NUMERIC(12,2), usd_deposit NUMERIC(12,2),\n  total_asset_usd NUMERIC(12,2), created_at TIMESTAMPTZ DEFAULT now()\n\nV3__create_strategy_configs.sql:\n  id UUID PK, symbol VARCHAR(20), strategy VARCHAR(50),\n  enabled BOOLEAN DEFAULT true, params JSONB,\n  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()",
+      "verificationCriteria": "Testcontainers PostgreSQL 기반으로 ./gradlew test 실행 시 Flyway 마이그레이션 성공. 3개 테이블 생성 확인.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "aad48899-e25b-4913-8886-7ebde3be2282",
+      "name": "도메인 모델 구현",
+      "description": "com.kista.domain.model 패키지에 순수 Java record/class로 모든 도메인 모델 구현. Spring/JPA 어노테이션 없음.",
+      "notes": "모든 모델은 record 사용. @Nullable은 org.springframework.lang.Nullable 대신 jakarta.annotation.Nullable 또는 별도 어노테이션 없이 Javadoc으로 표시.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "262785a1-a1bb-40bf-a2fc-7b5894a7ba7a"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/DstInfo.java",
+          "type": "CREATE",
+          "description": "서머타임 정보"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/AccountBalance.java",
+          "type": "CREATE",
+          "description": "잔고 정보"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/TradingVariables.java",
+          "type": "CREATE",
+          "description": "매매 변수"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/Order.java",
+          "type": "CREATE",
+          "description": "주문"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/TradingReport.java",
+          "type": "CREATE",
+          "description": "일일 결산 리포트"
+        }
+      ],
+      "implementationGuide": "// DstInfo.java\nrecord DstInfo(boolean isDst, Instant locDeadline, Instant postClose) {\n  Duration waitUntilLocDeadline() { return Duration.between(Instant.now(), locDeadline); }\n  Duration waitUntilPostClose()   { return Duration.between(Instant.now(), postClose); }\n}\n\n// AccountBalance.java\nrecord AccountBalance(int soxlQty, @Nullable BigDecimal avgPrice,\n  BigDecimal effectiveAmt, BigDecimal usdDeposit) {\n  boolean shouldSkip() { return soxlQty == 0 && effectiveAmt.compareTo(BigDecimal.TEN) <= 0; }\n}\n\n// TradingVariables.java — A,Q,M,D,B,K,T,S,P,G,currentPrice 필드\n// Order.java — OrderType enum(LOC,MOC,LIMIT), OrderDirection enum(BUY,SELL), OrderStatus enum(PLACED,FILLED,FAILED)\n// Execution.java — 체결 내역\n// TradingReport.java — date, vars, mainOrders, correctionOrders, totalBoughtUsd, totalSoldUsd\n// TradeHistory.java, PortfolioSnapshot.java, StrategyConfig.java — DB 저장용 도메인",
+      "verificationCriteria": "./gradlew compileJava 성공. domain 패키지에 Spring/JPA import 없음. HexagonalArchitectureTest domain 규칙 통과.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "60498e63-1f9e-405f-97ab-6ed423a27e8c",
+      "name": "매매 전략 구현 및 단위 테스트",
+      "description": "SoxlDivisionStrategy (SOXL 분할매매 공식), CorrectionStrategy (미체결 보정) 구현 및 단위 테스트 작성.",
+      "notes": "strategy 패키지는 com.kista.domain.strategy 에 위치. @Component 어노테이션은 허용 (도메인 서비스 성격).",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "aad48899-e25b-4913-8886-7ebde3be2282"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/strategy/TradingStrategy.java",
+          "type": "CREATE",
+          "description": "전략 인터페이스"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/strategy/SoxlDivisionStrategy.java",
+          "type": "CREATE",
+          "description": "SOXL 분할매매 전략"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/strategy/CorrectionStrategy.java",
+          "type": "CREATE",
+          "description": "보정 전략"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/test/java/com/kista/domain/strategy/SoxlDivisionStrategyTest.java",
+          "type": "CREATE",
+          "description": "단위 테스트"
+        }
+      ],
+      "implementationGuide": "// TradingStrategy.java (인터페이스)\nTradingVariables calculate(AccountBalance balance, BigDecimal currentPrice);\n\n// SoxlDivisionStrategy.java (@Component implements TradingStrategy)\nBigDecimal A = balance.avgPrice() != null ? balance.avgPrice() : currentPrice;\nint Q = balance.soxlQty();\nBigDecimal M = A.multiply(valueOf(Q));\nBigDecimal D = balance.effectiveAmt();\nBigDecimal B = D.add(M);\nBigDecimal K = B.divide(valueOf(20), 2, HALF_UP);\nint T = Q == 0 ? 0 : M.divide(K, 0, DOWN).intValue();\nBigDecimal S = valueOf(20 - T * 2).divide(valueOf(100), 4, HALF_UP);\nBigDecimal P = A.multiply(valueOf(1.2)).setScale(2, HALF_UP);\n\n// CorrectionStrategy.java — 체결 내역 기반 미체결 보정 주문 계산\n\n// SoxlDivisionStrategyTest.java\n// 케이스: Q=0, Q=10 (T=1, S=0.18), Q=100 (T=5, S=0.10) 등 검증",
+      "verificationCriteria": "./gradlew test 시 SoxlDivisionStrategyTest 전체 통과. A/Q/M/D/B/K/T/S/P 계산값 정확도 검증.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "28e5baea-9fa5-4313-ba2e-615fd5580547",
+      "name": "Port 인터페이스 전체 정의",
+      "description": "domain.port.in (UseCase) 4개, domain.port.out (Port) 9개 인터페이스 정의.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "aad48899-e25b-4913-8886-7ebde3be2282"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/port/in/ExecuteTradingUseCase.java",
+          "type": "CREATE",
+          "description": "매매 실행 UseCase"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/port/in/ExecuteFidaOrderUseCase.java",
+          "type": "CREATE",
+          "description": "FIDA 주문 UseCase"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/port/out/KisOrderPort.java",
+          "type": "CREATE",
+          "description": "KIS 주문 포트"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/port/out/NotifyPort.java",
+          "type": "CREATE",
+          "description": "알림 포트"
+        }
+      ],
+      "implementationGuide": "// in/ UseCase 인터페이스\nExecuteTradingUseCase: void execute() throws InterruptedException\nExecuteFidaOrderUseCase: void execute(FidaOrderRequest request)\nGetTradeHistoryUseCase: List<TradeHistory> getHistory(LocalDate from, LocalDate to, String symbol)\nGetPortfolioUseCase: PortfolioSnapshot getCurrent(); List<PortfolioSnapshot> getSnapshots(int days)\n\n// out/ Port 인터페이스\nKisTokenPort: String getToken()\nKisHolidayPort: boolean isMarketOpen(String token, LocalDate date)\nKisAccountPort: AccountBalance getBalance(String token)\nKisPricePort: BigDecimal getPrice(String token, String symbol)\nKisOrderPort: Order place(String token, Order order)\nKisExecutionPort: List<Execution> getExecutions(String token)\nTradeHistoryPort: void save(TradeHistory h); List<TradeHistory> findBy(LocalDate from, LocalDate to, String symbol)\nPortfolioSnapshotPort: void save(PortfolioSnapshot s); List<PortfolioSnapshot> findRecent(int days)\nNotifyPort: void notifyReport(TradingReport r); void notifyMarketClosed(); void notifyInsufficientBalance(AccountBalance b)",
+      "verificationCriteria": "port/in 4개, port/out 9개 인터페이스 존재. ./gradlew compileJava 성공.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "c116e9b1-328c-4108-aa85-2f4f432995f7",
+      "name": "KIS 주문·체결 Adapter 구현",
+      "description": "KisOrderAdapter (LOC/MOC/지정가 주문), KisExecutionAdapter (당일 체결 내역 조회) 구현.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "cbabba04-9dcb-4be4-96b2-f6de702607ce"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisOrderAdapter.java",
+          "type": "CREATE",
+          "description": "주문 실행"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisExecutionAdapter.java",
+          "type": "CREATE",
+          "description": "체결 조회"
+        }
+      ],
+      "implementationGuide": "// KisOrderAdapter.java (implements KisOrderPort)\n- POST /uapi/overseas-stock/v1/trading/order\n- LOC: tr_id=TTTS0308U, 가격 필드 없음\n- 지정가: tr_id=TTTS0308U + price 필드\n- 응답 output.ODNO → Order.kisOrderId 설정\n- 주문 실패 시 Order.status = FAILED\n\n// KisExecutionAdapter.java (implements KisExecutionPort)\n- GET /uapi/overseas-stock/v1/trading/inquire-ccnl\n- 당일 SOXL 체결 목록 반환 → List<Execution>\n\n// OrderExecutor (helper, application 레이어 또는 TradingService 내부)\n- executeMain(token, vars): 매수/매도 주문 리스트 실행",
+      "verificationCriteria": "모의투자 계정으로 소액 지정가 주문 1건 실행 후 kisOrderId 반환 확인. 체결 조회 응답 파싱 확인.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "bf0c5aae-f19a-4739-9857-e478be2670eb",
+      "name": "Persistence Adapter 구현",
+      "description": "TradeHistoryPersistenceAdapter, PortfolioSnapshotPersistenceAdapter (Entity + JpaRepository + Adapter) 구현.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "d956063d-5fff-44a0-b435-4bab7dc070f4"
+        },
+        {
+          "taskId": "28e5baea-9fa5-4313-ba2e-615fd5580547"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/persistence/TradeHistoryEntity.java",
+          "type": "CREATE",
+          "description": "주문 내역 Entity"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/persistence/TradeHistoryPersistenceAdapter.java",
+          "type": "CREATE",
+          "description": "주문 내역 Adapter"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/persistence/PortfolioSnapshotEntity.java",
+          "type": "CREATE",
+          "description": "자산 스냅샷 Entity"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/persistence/PortfolioSnapshotPersistenceAdapter.java",
+          "type": "CREATE",
+          "description": "자산 스냅샷 Adapter"
+        }
+      ],
+      "implementationGuide": "// TradeHistoryEntity.java (@Entity @Table(name='trade_histories'))\n- UUID id, LocalDate tradeDate, String symbol, String strategy\n- String orderType, String direction, int qty\n- BigDecimal price, BigDecimal amountUsd, String status\n- String kisOrderId, String phase, Instant createdAt\n\n// TradeHistoryJpaRepository extends JpaRepository<TradeHistoryEntity, UUID>\n- findByTradeDateBetweenAndSymbol(...)\n\n// TradeHistoryPersistenceAdapter implements TradeHistoryPort\n- save(): TradeHistory domain → Entity 변환 후 저장\n- findBy(): Entity → domain 변환 후 반환\n\n// PortfolioSnapshotEntity, PortfolioSnapshotJpaRepository, PortfolioSnapshotPersistenceAdapter 동일 패턴",
+      "verificationCriteria": "Testcontainers 기반 통합 테스트로 save/findBy 동작 확인. Entity 필드와 Flyway DDL 일치.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "4d235246-4ed3-4173-9f9e-f786d57f79d9",
+      "name": "TelegramAdapter(알림) + TradingScheduler + docker-compose 구성",
+      "description": "NotifyPort 구현 (알림 전송), TradingScheduler (@Scheduled 04:00 KST 월~금), docker-compose.yml + .env.example 작성.",
+      "notes": "application.properties에 spring.threads.virtual.enabled=true, spring.task.scheduling.thread-name-prefix=kista-scheduler- 추가.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "0266ea2e-8355-4810-9480-0129b547c7ce"
+        },
+        {
+          "taskId": "bf0c5aae-f19a-4739-9857-e478be2670eb"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/notify/TelegramAdapter.java",
+          "type": "CREATE",
+          "description": "Telegram 알림 Adapter"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/in/schedule/TradingScheduler.java",
+          "type": "CREATE",
+          "description": "매매 스케줄러"
+        },
+        {
+          "path": "/home/user/workspace/kista/docker-compose.yml",
+          "type": "CREATE",
+          "description": "Docker Compose 설정"
+        },
+        {
+          "path": "/home/user/workspace/kista/.env.example",
+          "type": "CREATE",
+          "description": "환경변수 예시"
+        }
+      ],
+      "implementationGuide": "// TelegramAdapter.java (implements NotifyPort)\n- POST https://api.telegram.org/bot{token}/sendMessage\n- RestTemplate 사용\n- notifyReport(): 결산 리포트 포맷팅 전송\n- notifyMarketClosed(), notifyInsufficientBalance() 구현\n\n// TradingScheduler.java (@Component)\n@Scheduled(cron = '0 0 4 * * MON-FRI', zone = 'Asia/Seoul')\nvoid run() { useCase.execute(); }\n\n// docker-compose.yml\nservices:\n  kista: build:., env_file:.env, ports:8080:8080, depends_on:postgres(healthy)\n  postgres: image:postgres:16-alpine, volumes:postgres_data, healthcheck:pg_isready\n\n// .env.example — 모든 필수 환경변수 주석 포함",
+      "verificationCriteria": "docker-compose up 후 kista + postgres 컨테이너 정상 기동. 수동으로 TradingService.execute() 직접 호출 시 Telegram 메시지 수신. ./gradlew build 성공.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "d19a3278-004d-4b96-8d1a-fca3592cf92b",
+      "name": "웹 대시보드 + REST API 구현",
+      "description": "DashboardController (주문내역/포트폴리오 API), TradeHistoryService/PortfolioService, 단순 HTML + Chart.js 프론트엔드.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "bf0c5aae-f19a-4739-9857-e478be2670eb"
+        },
+        {
+          "taskId": "28e5baea-9fa5-4313-ba2e-615fd5580547"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/in/web/DashboardController.java",
+          "type": "CREATE",
+          "description": "대시보드 REST 컨트롤러"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/application/service/TradeHistoryService.java",
+          "type": "CREATE",
+          "description": "주문 내역 서비스"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/application/service/PortfolioService.java",
+          "type": "CREATE",
+          "description": "포트폴리오 서비스"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/resources/static/index.html",
+          "type": "CREATE",
+          "description": "대시보드 HTML"
+        }
+      ],
+      "implementationGuide": "// DashboardController.java\nGET /api/trades?from=&to=&symbol= → List<TradeHistoryResponse>\nGET /api/trades/summary → 기간별 매수/매도 합계\nGET /api/portfolio → PortfolioSnapshot (현재)\nGET /api/portfolio/snapshots?days=30 → List<PortfolioSnapshot>\nGET /api/strategies → List<StrategyConfig>\n\n// TradeHistoryService implements GetTradeHistoryUseCase\n// PortfolioService implements GetPortfolioUseCase\n\n// src/main/resources/static/index.html\n- Chart.js CDN으로 자산 추이 라인 차트\n- 주문 내역 테이블\n- fetch('/api/portfolio/snapshots?days=30') 로 데이터 로드",
+      "verificationCriteria": "GET /api/trades 응답 확인. GET /api/portfolio/snapshots?days=30 응답 확인. http://localhost:8080 에서 Chart.js 차트 렌더링.",
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+    },
+    {
+      "id": "262785a1-a1bb-40bf-a2fc-7b5894a7ba7a",
+      "name": "프로젝트 초기화",
+      "description": "claude-starter-kit을 kista/ 디렉토리 기반으로 재구성. 패키지명 com.starter → com.kista, 프로젝트명 변경, 기존 Item 도메인 코드 제거, ArchUnit 테스트 패키지 경로 업데이트, build.gradle.kts 의존성 추가 (JPA, PostgreSQL, Flyway, Querydsl 유지 + MCP Server 제거).",
+      "notes": "ArchUnit domain 규칙에서 com.kista.domain.strategy 는 @Component 허용 예외 처리 필요. noClasses().that().resideInAPackage('com.kista.domain..').and().resideOutsideOfPackage('com.kista.domain.strategy..') 형태로 분리.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/claude-starter-kit/build.gradle.kts",
+          "type": "REFERENCE",
+          "description": "기반 빌드 파일"
+        },
+        {
+          "path": "/home/user/workspace/claude-starter-kit/src/test/java/com/starter/architecture/HexagonalArchitectureTest.java",
+          "type": "REFERENCE",
+          "description": "ArchUnit 규칙 참조"
+        },
+        {
+          "path": "/home/user/workspace/kista/build.gradle.kts",
+          "type": "CREATE",
+          "description": "kista 빌드 파일"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/KistaApplication.java",
+          "type": "CREATE",
+          "description": "메인 클래스"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/test/java/com/kista/architecture/HexagonalArchitectureTest.java",
+          "type": "CREATE",
+          "description": "ArchUnit 규칙 (domain.strategy 예외 포함)"
+        }
+      ],
+      "implementationGuide": "1. claude-starter-kit 내용을 kista/ 에 복사\n2. settings.gradle.kts: rootProject.name = 'kista'\n3. build.gradle.kts: group = 'com.kista', spring-ai-mcp-server-starter 제거\n4. src/ 하위 com.starter → com.kista 전체 패키지 이동\n5. StarterApplication → KistaApplication 으로 이름 변경\n6. 기존 Item 도메인 관련 파일 전체 삭제\n7. HexagonalArchitectureTest: 패키지 경로 com.kista 로 수정 + domain.strategy 패키지의 @Component 허용을 위해 도메인 Spring 금지 규칙에 strategy 서브패키지 예외 추가\n8. application.yml: spring.application.name=kista, DB_URL 기본값 jdbc:postgresql://localhost:5432/kista",
+      "verificationCriteria": "./gradlew build 성공. com.kista 패키지 확인. Item 관련 파일 없음. HexagonalArchitectureTest 전체 통과 (domain.strategy @Component 예외 허용 포함).",
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+    },
+    {
+      "id": "cbabba04-9dcb-4be4-96b2-f6de702607ce",
+      "name": "KIS API 인프라 구축 (공통·인증·조회)",
+      "description": "KisHttpClient (공통 헤더), KisTokenAdapter (토큰 발급), KisHolidayAdapter (휴장일), KisAccountAdapter (잔고 2종 API), KisPriceAdapter (현재가), DstInfo.calculate() 구현.",
+      "notes": "DST 판단은 ZoneId.of('America/New_York').getRules().isDaylightSavings(Instant) 사용. 수동 날짜 계산 금지.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "28e5baea-9fa5-4313-ba2e-615fd5580547"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisHttpClient.java",
+          "type": "CREATE",
+          "description": "KIS 공통 HTTP 클라이언트"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisTokenAdapter.java",
+          "type": "CREATE",
+          "description": "토큰 발급"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisHolidayAdapter.java",
+          "type": "CREATE",
+          "description": "휴장일 조회"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisAccountAdapter.java",
+          "type": "CREATE",
+          "description": "잔고 조회"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisPriceAdapter.java",
+          "type": "CREATE",
+          "description": "현재가 조회"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/DstInfo.java",
+          "type": "TO_MODIFY",
+          "description": "calculate() 정적 팩토리 추가"
+        }
+      ],
+      "implementationGuide": "// KisHttpClient.java (@Component)\n- Base URL: https://openapi.koreainvestment.com:9443\n- buildHeaders(token, trId): HttpHeaders 반환 (authorization, appkey, appsecret, tr_id, custtype:P)\n\n// KisTokenAdapter.java (implements KisTokenPort)\n- POST /oauth2/tokenP, grant_type=client_credentials\n\n// KisHolidayAdapter.java (implements KisHolidayPort)\n- GET countries-holiday (CTOS5011R), output[] 비어있으면 개장, 오류 시 개장 폴백\n\n// KisAccountAdapter.java (implements KisAccountPort)\n- GET inquire-balance (TTTS3012R) → soxlQty, avgPrice\n- GET inquire-present-balance (CTRP6504R) → effectiveAmt, usdDeposit\n\n// KisPriceAdapter.java (implements KisPricePort)\n\n// DstInfo.calculate() 정적 팩토리 메서드 (domain/model/DstInfo.java 에 추가)\n- ZoneId ny = ZoneId.of('America/New_York')\n- ZonedDateTime now = ZonedDateTime.now(ny)\n- boolean isDst = ny.getRules().isDaylightSavings(now.toInstant())\n- DST: locDeadline=04:30 KST, postClose=05:10 KST\n- 동절기: locDeadline=05:30 KST, postClose=06:10 KST",
+      "verificationCriteria": "모든 Adapter가 해당 Port 인터페이스 구현. DstInfo.calculate() 단위 테스트로 DST/동절기 날짜별 locDeadline 검증. KIS 통합 테스트로 토큰 발급·잔고 조회 확인.",
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+    },
+    {
+      "id": "0266ea2e-8355-4810-9480-0129b547c7ce",
+      "name": "TradingService 구현",
+      "description": "ExecuteTradingUseCase 구현. Thread.sleep() 기반 전체 매매 흐름. n8n 원본 기준 LOC 마감 후 40분 대기(postClose).",
+      "notes": "@Async, CompletableFuture 사용 금지. n8n 원본 Wait 40min 노드 확인됨 — postClose는 locDeadline + 40분으로 설정.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "60498e63-1f9e-405f-97ab-6ed423a27e8c"
+        },
+        {
+          "taskId": "c116e9b1-328c-4108-aa85-2f4f432995f7"
+        },
+        {
+          "taskId": "28e5baea-9fa5-4313-ba2e-615fd5580547"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/trade-kis-n8n/workflows/soxl-main-workflow.json",
+          "type": "REFERENCE",
+          "description": "n8n 원본 Wait 40min 노드 확인"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/application/service/TradingService.java",
+          "type": "CREATE",
+          "description": "매매 서비스"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/DstInfo.java",
+          "type": "TO_MODIFY",
+          "description": "postClose = locDeadline + 40min 반영"
+        }
+      ],
+      "implementationGuide": "@Service TradingService implements ExecuteTradingUseCase {\n  void execute() throws InterruptedException {\n    DstInfo dst = DstInfo.calculate();\n    Thread.sleep(dst.waitUntilLocDeadline());  // LOC 마감까지 대기\n    String token = kisTokenPort.getToken();\n    if (!kisHolidayPort.isMarketOpen(token, today())) {\n      notifyPort.notifyMarketClosed(); return;\n    }\n    AccountBalance balance = kisAccountPort.getBalance(token);\n    if (balance.shouldSkip()) {\n      notifyPort.notifyInsufficientBalance(balance); return;\n    }\n    BigDecimal price = kisPricePort.getPrice(token, 'SOXL');\n    TradingVariables vars = strategy.calculate(balance, price);\n    List<Order> mainOrders = executeMainOrders(token, vars);\n\n    // n8n 원본 Wait 40min 노드 기준: LOC 마감 후 40분 대기\n    Thread.sleep(dst.waitUntilPostClose());  // postClose = locDeadline + 40min\n\n    List<Execution> executions = kisExecutionPort.getExecutions(token);\n    List<Order> corrections = correctionStrategy.calculate(vars, executions, token);\n    TradingReport report = TradingReport.of(vars, mainOrders, corrections);\n    tradeHistoryPort.save(toHistory(mainOrders));\n    tradeHistoryPort.save(toHistory(corrections));\n    portfolioSnapshotPort.save(toSnapshot(balance, price));\n    notifyPort.notifyReport(report);\n  }\n}\n\nDstInfo 필드 수정:\n- DST: locDeadline=04:30 KST, postClose=05:10 KST (LOC+40min)\n- 동절기: locDeadline=05:30 KST, postClose=06:10 KST (LOC+40min)",
+      "verificationCriteria": "TradingService 단위 테스트 (모든 Port mock): 정상 흐름·휴장일·잔고 부족 케이스 통과. DstInfo postClose = locDeadline + 40분 검증.",
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+    },
+    {
+      "id": "c26e1700-2bb5-4673-b251-2dd3adcd7aeb",
+      "name": "Telegram 봇 구현 (FSM)",
+      "description": "capital-manager FSM 패턴 이식. TelegramWebhookController (웹훅 수신), TelegramBotService (명령어 처리). TelegramApiClient는 RestTemplate으로 새로 구현 (WebClient 미사용).",
+      "notes": "capital-manager의 TelegramApiClient는 WebClient 사용 — KISTA는 RestTemplate 통일 방침. spring-boot-starter-webflux 의존성 추가 금지.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "4d235246-4ed3-4173-9f9e-f786d57f79d9"
+        },
+        {
+          "taskId": "bf0c5aae-f19a-4739-9857-e478be2670eb"
+        }
+      ],
+      "createdAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "relatedFiles": [
+        {
+          "path": "/home/user/workspace/capital-manager/src/main/java/capital/manager/enums/BotCommand.java",
+          "type": "REFERENCE",
+          "description": "BotCommand 패턴 참조 (명령어 목록은 재정의)"
+        },
+        {
+          "path": "/home/user/workspace/capital-manager/src/main/java/capital/manager/enums/SessionState.java",
+          "type": "REFERENCE",
+          "description": "FSM 상태 참조"
+        },
+        {
+          "path": "/home/user/workspace/capital-manager/src/main/java/capital/manager/telegram/TelegramApiClient.java",
+          "type": "REFERENCE",
+          "description": "API 구조 참조 (WebClient → RestTemplate 으로 전환)"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/in/telegram/TelegramWebhookController.java",
+          "type": "CREATE",
+          "description": "웹훅 컨트롤러"
+        },
+        {
+          "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/in/telegram/TelegramBotService.java",
+          "type": "CREATE",
+          "description": "봇 명령어 처리"
+        }
+      ],
+      "implementationGuide": "// BotCommand.java (capital-manager 패턴 재사용, 명령어 재정의)\nenum BotCommand { STATUS('/status'), HISTORY('/history'), PORTFOLIO('/portfolio'), HELP('/help') }\nfromToken(), aliases, helpText() 메서드 패턴 유지\n\n// TelegramApiClient.java (RestTemplate 기반, WebClient 불사용)\n- POST https://api.telegram.org/bot{token}/sendMessage\n- RestTemplate.postForObject() 사용\n- capital-manager의 WebClient 기반 구현 참조하되 RestTemplate으로 재구현\n\n// TelegramWebhookController.java\n- POST /webhook/telegram\n- TELEGRAM_WEBHOOK_SECRET 헤더 검증 → 불일치 시 401\n- TelegramBotService.handle(update) 호출\n\n// TelegramBotService.java\n/status → kisAccountPort + kisPricePort 조회 → 현황 메시지\n/history → tradeHistoryPort.findBy(최근 10건)\n/portfolio → portfolioSnapshotPort.findRecent(1)\n/help → BotCommand.helpText()",
+      "verificationCriteria": "/status /history /portfolio /help 명령어 응답 확인. SECRET 헤더 누락 시 401 반환. WebClient 관련 import 없음.",
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+    }
+  ]
+}
