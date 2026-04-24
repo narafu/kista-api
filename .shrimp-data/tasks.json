@@ -4,14 +4,14 @@
       "id": "d956063d-5fff-44a0-b435-4bab7dc070f4",
       "name": "Flyway DB 스키마 작성",
       "description": "PostgreSQL 테이블 3개를 Flyway 마이그레이션으로 정의. V1: trade_histories, V2: portfolio_snapshots, V3: strategy_configs.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "262785a1-a1bb-40bf-a2fc-7b5894a7ba7a"
         }
       ],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-24T07:00:43.430Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/kista/src/main/resources/db/migration/V1__create_trade_histories.sql",
@@ -31,21 +31,23 @@
       ],
       "implementationGuide": "V1__create_trade_histories.sql:\n  id UUID PK, trade_date DATE, symbol VARCHAR(20), strategy VARCHAR(50),\n  order_type VARCHAR(10), direction VARCHAR(5), qty INT, price NUMERIC(12,4),\n  amount_usd NUMERIC(12,2), status VARCHAR(10), kis_order_id VARCHAR(30),\n  phase VARCHAR(20), created_at TIMESTAMPTZ DEFAULT now()\n\nV2__create_portfolio_snapshots.sql:\n  id UUID PK, snapshot_date DATE, symbol VARCHAR(20), qty INT,\n  avg_price NUMERIC(12,4), current_price NUMERIC(12,4),\n  market_value_usd NUMERIC(12,2), usd_deposit NUMERIC(12,2),\n  total_asset_usd NUMERIC(12,2), created_at TIMESTAMPTZ DEFAULT now()\n\nV3__create_strategy_configs.sql:\n  id UUID PK, symbol VARCHAR(20), strategy VARCHAR(50),\n  enabled BOOLEAN DEFAULT true, params JSONB,\n  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()",
       "verificationCriteria": "Testcontainers PostgreSQL 기반으로 ./gradlew test 실행 시 Flyway 마이그레이션 성공. 3개 테이블 생성 확인.",
-      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현.",
+      "summary": "V1~V3 Flyway SQL 마이그레이션 파일 3개 생성 완료. trade_histories(UUID PK, 주문 메타데이터), portfolio_snapshots(자산 스냅샷), strategy_configs(JSONB params 포함) 테이블 정의. ./gradlew test --rerun-tasks BUILD SUCCESSFUL (19s) 확인, Testcontainers PostgreSQL 기반 마이그레이션 정상 적용.",
+      "completedAt": "2026-04-24T07:00:43.424Z"
     },
     {
       "id": "aad48899-e25b-4913-8886-7ebde3be2282",
       "name": "도메인 모델 구현",
       "description": "com.kista.domain.model 패키지에 순수 Java record/class로 모든 도메인 모델 구현. Spring/JPA 어노테이션 없음.",
       "notes": "모든 모델은 record 사용. @Nullable은 org.springframework.lang.Nullable 대신 jakarta.annotation.Nullable 또는 별도 어노테이션 없이 Javadoc으로 표시.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "262785a1-a1bb-40bf-a2fc-7b5894a7ba7a"
         }
       ],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-24T07:03:45.318Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/kista/src/main/java/com/kista/domain/model/DstInfo.java",
@@ -75,7 +77,9 @@
       ],
       "implementationGuide": "// DstInfo.java\nrecord DstInfo(boolean isDst, Instant locDeadline, Instant postClose) {\n  Duration waitUntilLocDeadline() { return Duration.between(Instant.now(), locDeadline); }\n  Duration waitUntilPostClose()   { return Duration.between(Instant.now(), postClose); }\n}\n\n// AccountBalance.java\nrecord AccountBalance(int soxlQty, @Nullable BigDecimal avgPrice,\n  BigDecimal effectiveAmt, BigDecimal usdDeposit) {\n  boolean shouldSkip() { return soxlQty == 0 && effectiveAmt.compareTo(BigDecimal.TEN) <= 0; }\n}\n\n// TradingVariables.java — A,Q,M,D,B,K,T,S,P,G,currentPrice 필드\n// Order.java — OrderType enum(LOC,MOC,LIMIT), OrderDirection enum(BUY,SELL), OrderStatus enum(PLACED,FILLED,FAILED)\n// Execution.java — 체결 내역\n// TradingReport.java — date, vars, mainOrders, correctionOrders, totalBoughtUsd, totalSoldUsd\n// TradeHistory.java, PortfolioSnapshot.java, StrategyConfig.java — DB 저장용 도메인",
       "verificationCriteria": "./gradlew compileJava 성공. domain 패키지에 Spring/JPA import 없음. HexagonalArchitectureTest domain 규칙 통과.",
-      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현.",
+      "summary": "도메인 모델 9개 record 구현 완료. DstInfo/AccountBalance(Unit1), TradingVariables/Order(OrderType·OrderDirection·OrderStatus enum 내장)/Execution(Unit2), TradingReport/TradeHistory/PortfolioSnapshot/StrategyConfig(Unit3). Spring/JPA 어노테이션 없음. ArchUnit 규칙 통과. 3개 단위로 나눠 커밋.",
+      "completedAt": "2026-04-24T07:03:45.310Z"
     },
     {
       "id": "60498e63-1f9e-405f-97ab-6ed423a27e8c",
