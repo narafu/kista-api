@@ -311,10 +311,10 @@
       "name": "프로젝트 초기화",
       "description": "claude-starter-kit을 kista/ 디렉토리 기반으로 재구성. 패키지명 com.starter → com.kista, 프로젝트명 변경, 기존 Item 도메인 코드 제거, ArchUnit 테스트 패키지 경로 업데이트, build.gradle.kts 의존성 추가 (JPA, PostgreSQL, Flyway, Querydsl 유지 + MCP Server 제거).",
       "notes": "ArchUnit domain 규칙에서 com.kista.domain.strategy 는 @Component 허용 예외 처리 필요. noClasses().that().resideInAPackage('com.kista.domain..').and().resideOutsideOfPackage('com.kista.domain.strategy..') 형태로 분리.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "updatedAt": "2026-04-24T05:11:58.397Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/claude-starter-kit/build.gradle.kts",
@@ -344,7 +344,9 @@
       ],
       "implementationGuide": "1. claude-starter-kit 내용을 kista/ 에 복사\n2. settings.gradle.kts: rootProject.name = 'kista'\n3. build.gradle.kts: group = 'com.kista', spring-ai-mcp-server-starter 제거\n4. src/ 하위 com.starter → com.kista 전체 패키지 이동\n5. StarterApplication → KistaApplication 으로 이름 변경\n6. 기존 Item 도메인 관련 파일 전체 삭제\n7. HexagonalArchitectureTest: 패키지 경로 com.kista 로 수정 + domain.strategy 패키지의 @Component 허용을 위해 도메인 Spring 금지 규칙에 strategy 서브패키지 예외 추가\n8. application.yml: spring.application.name=kista, DB_URL 기본값 jdbc:postgresql://localhost:5432/kista",
       "verificationCriteria": "./gradlew build 성공. com.kista 패키지 확인. Item 관련 파일 없음. HexagonalArchitectureTest 전체 통과 (domain.strategy @Component 예외 허용 포함).",
-      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정.",
+      "summary": "프로젝트 초기화 완료. com.kista 패키지, KistaApplication, build.gradle.kts(MCP 제거/JPA·Flyway 포함), settings.gradle.kts, application.yml 모두 정상. Item 도메인 파일 없음. HexagonalArchitectureTest에 domain.strategy @Component 예외 추가. application-test.yml MCP 잔존 설정 제거. ./gradlew build 전체 통과.",
+      "completedAt": "2026-04-24T05:11:58.391Z"
     },
     {
       "id": "cbabba04-9dcb-4be4-96b2-f6de702607ce",
