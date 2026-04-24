@@ -9,5 +9,6 @@ public record KisProperties(
         String appSecret,
         String accountNo,
         String accountType,
-        String symbol
+        String symbol,
+        String exchangeCode
 ) {}

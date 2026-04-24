@@ -62,6 +62,7 @@ kis:
   account-no: ${KIS_ACCOUNT_NO:}
   account-type: ${KIS_ACCOUNT_TYPE:01}
   symbol: ${KIS_SYMBOL:SOXL}
+  exchange-code: ${KIS_EXCHANGE_CODE:AMS}
 
 logging:
   level:

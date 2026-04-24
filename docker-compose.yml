@@ -14,6 +14,7 @@ services:
       KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:}
       KIS_ACCOUNT_TYPE: ${KIS_ACCOUNT_TYPE:01}
       KIS_SYMBOL: ${KIS_SYMBOL:SOXL}
+      KIS_EXCHANGE_CODE: ${KIS_EXCHANGE_CODE:AMS}
     depends_on:
       postgres:
         condition: service_healthy
