@@ -20,6 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew test                             # 전체 테스트 (병렬 실행)
 ./gradlew test --tests "com.kista.architecture.*"   # ArchUnit 규칙 테스트만
 ./gradlew test --tests "com.kista.domain.*"         # 도메인 단위 테스트만
+./gradlew test --rerun-tasks               # 캐시 무시하고 강제 재실행 (UP-TO-DATE 우회)
 
 # 실행
 ./gradlew bootRun --args='--spring.profiles.active=local'
