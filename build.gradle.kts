@@ -79,4 +79,7 @@ tasks.named<Test>("test") {
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
+    environment("DOCKER_HOST", "unix:///var/run/docker.sock")
+    environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+    systemProperty("api.version", "1.44")
 }
