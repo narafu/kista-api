@@ -21,6 +21,7 @@ Thumbs.db
 *.env
 .env*
 .env.local
+!.env.example
 
 # Querydsl 생성 파일
 build/generated/

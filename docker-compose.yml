@@ -6,15 +6,20 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
-      DB_URL: jdbc:postgresql://postgres:5432/starterdb
-      DB_USERNAME: starter
-      DB_PASSWORD: starter
+      DB_URL: jdbc:postgresql://postgres:5432/kistadb
+      DB_USERNAME: kista
+      DB_PASSWORD: kista
+      KIS_APP_KEY: ${KIS_APP_KEY:}
+      KIS_APP_SECRET: ${KIS_APP_SECRET:}
+      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:}
+      KIS_ACCOUNT_TYPE: ${KIS_ACCOUNT_TYPE:01}
+      KIS_SYMBOL: ${KIS_SYMBOL:SOXL}
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - starter-net
+      - kista-net
 
   # ── PostgreSQL ────────────────────────────────────────────────────────────────
   postgres:
@@ -22,18 +27,18 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: starterdb
-      POSTGRES_USER: starter
-      POSTGRES_PASSWORD: starter
+      POSTGRES_DB: kistadb
+      POSTGRES_USER: kista
+      POSTGRES_PASSWORD: kista
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U starter -d starterdb"]
+      test: ["CMD-SHELL", "pg_isready -U kista -d kistadb"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - starter-net
+      - kista-net
 
   # ── Prometheus ────────────────────────────────────────────────────────────────
   prometheus:
@@ -47,7 +52,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=7d"
     networks:
-      - starter-net
+      - kista-net
 
   # ── Grafana ───────────────────────────────────────────────────────────────────
   grafana:
@@ -64,7 +69,7 @@ services:
     depends_on:
       - prometheus
     networks:
-      - starter-net
+      - kista-net
 
 volumes:
   postgres_data:
@@ -72,5 +77,5 @@ volumes:
   grafana_data:
 
 networks:
-  starter-net:
+  kista-net:
     driver: bridge

@@ -55,6 +55,14 @@ server:
   port: 8080
   shutdown: graceful
 
+kis:
+  base-url: ${KIS_BASE_URL:https://openapi.koreainvestment.com:9443}
+  app-key: ${KIS_APP_KEY:}
+  app-secret: ${KIS_APP_SECRET:}
+  account-no: ${KIS_ACCOUNT_NO:}
+  account-type: ${KIS_ACCOUNT_TYPE:01}
+  symbol: ${KIS_SYMBOL:SOXL}
+
 logging:
   level:
     root: INFO
