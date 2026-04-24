@@ -9,12 +9,12 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/kistadb
       DB_USERNAME: kista
       DB_PASSWORD: kista
-      KIS_APP_KEY: ${KIS_APP_KEY:}
-      KIS_APP_SECRET: ${KIS_APP_SECRET:}
-      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:}
-      KIS_ACCOUNT_TYPE: ${KIS_ACCOUNT_TYPE:01}
-      KIS_SYMBOL: ${KIS_SYMBOL:SOXL}
-      KIS_EXCHANGE_CODE: ${KIS_EXCHANGE_CODE:AMS}
+      KIS_APP_KEY: ${KIS_APP_KEY:-}
+      KIS_APP_SECRET: ${KIS_APP_SECRET:-}
+      KIS_ACCOUNT_NO: ${KIS_ACCOUNT_NO:-}
+      KIS_ACCOUNT_TYPE: ${KIS_ACCOUNT_TYPE:-01}
+      KIS_SYMBOL: ${KIS_SYMBOL:-SOXL}
+      KIS_EXCHANGE_CODE: ${KIS_EXCHANGE_CODE:-AMS}
     depends_on:
       postgres:
         condition: service_healthy
