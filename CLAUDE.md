@@ -94,6 +94,7 @@ P = A × 1.2  (scale=2, HALF_UP)
 
 ### WSL2 Gradle 설정
 - `gradle.properties`의 `org.gradle.vfs.watch=false` — WSL2에서 Gradle FileHasher가 Windows NTFS 파일 감시 API 호출 시 IOException 발생, 제거 금지
+- `gradle.properties`의 `org.gradle.native=false` — WSL2 재시작/슬립 후 stale 데몬의 네이티브 파일 핸들이 무효화되어 `createFileHasher()` IOException 발생, 제거 금지
 
 ### KIS API
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
