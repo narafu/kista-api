@@ -196,7 +196,7 @@
       "id": "bf0c5aae-f19a-4739-9857-e478be2670eb",
       "name": "Persistence Adapter 구현",
       "description": "TradeHistoryPersistenceAdapter, PortfolioSnapshotPersistenceAdapter (Entity + JpaRepository + Adapter) 구현.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "d956063d-5fff-44a0-b435-4bab7dc070f4"
@@ -206,7 +206,7 @@
         }
       ],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-27T06:32:04.862Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/persistence/TradeHistoryEntity.java",
@@ -231,7 +231,9 @@
       ],
       "implementationGuide": "// TradeHistoryEntity.java (@Entity @Table(name='trade_histories'))\n- UUID id, LocalDate tradeDate, String symbol, String strategy\n- String orderType, String direction, int qty\n- BigDecimal price, BigDecimal amountUsd, String status\n- String kisOrderId, String phase, Instant createdAt\n\n// TradeHistoryJpaRepository extends JpaRepository<TradeHistoryEntity, UUID>\n- findByTradeDateBetweenAndSymbol(...)\n\n// TradeHistoryPersistenceAdapter implements TradeHistoryPort\n- save(): TradeHistory domain → Entity 변환 후 저장\n- findBy(): Entity → domain 변환 후 반환\n\n// PortfolioSnapshotEntity, PortfolioSnapshotJpaRepository, PortfolioSnapshotPersistenceAdapter 동일 패턴",
       "verificationCriteria": "Testcontainers 기반 통합 테스트로 save/findBy 동작 확인. Entity 필드와 Flyway DDL 일치.",
-      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현.",
+      "summary": "TradeHistoryPersistenceAdapter, PortfolioSnapshotPersistenceAdapter 구현 완료. Entity(package-private, UUID PK, createdAt insertable=false), JpaRepository(TradeHistory: findByTradeDateBetweenAndSymbol, PortfolioSnapshot: @Query DESC 정렬 findRecent), Adapter(toEntity/toDomain 양방향 변환) 모두 구현. 통합 테스트 6개를 @SpringBootTest+실제 PostgreSQL로 PASSED. HexagonalArchitectureTest도 통과하여 레이어 의존성 규칙 준수 검증됨.",
+      "completedAt": "2026-04-27T06:32:04.854Z"
     },
     {
       "id": "4d235246-4ed3-4173-9f9e-f786d57f79d9",
