@@ -416,7 +416,7 @@
       "name": "TradingService 구현",
       "description": "ExecuteTradingUseCase 구현. Thread.sleep() 기반 전체 매매 흐름. n8n 원본 기준 LOC 마감 후 40분 대기(postClose).",
       "notes": "@Async, CompletableFuture 사용 금지. n8n 원본 Wait 40min 노드 확인됨 — postClose는 locDeadline + 40분으로 설정.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "60498e63-1f9e-405f-97ab-6ed423a27e8c"
@@ -429,7 +429,7 @@
         }
       ],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:54:25.745Z",
+      "updatedAt": "2026-04-27T06:48:12.430Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/trade-kis-n8n/workflows/soxl-main-workflow.json",
@@ -449,7 +449,9 @@
       ],
       "implementationGuide": "@Service TradingService implements ExecuteTradingUseCase {\n  void execute() throws InterruptedException {\n    DstInfo dst = DstInfo.calculate();\n    Thread.sleep(dst.waitUntilLocDeadline());  // LOC 마감까지 대기\n    String token = kisTokenPort.getToken();\n    if (!kisHolidayPort.isMarketOpen(token, today())) {\n      notifyPort.notifyMarketClosed(); return;\n    }\n    AccountBalance balance = kisAccountPort.getBalance(token);\n    if (balance.shouldSkip()) {\n      notifyPort.notifyInsufficientBalance(balance); return;\n    }\n    BigDecimal price = kisPricePort.getPrice(token, 'SOXL');\n    TradingVariables vars = strategy.calculate(balance, price);\n    List<Order> mainOrders = executeMainOrders(token, vars);\n\n    // n8n 원본 Wait 40min 노드 기준: LOC 마감 후 40분 대기\n    Thread.sleep(dst.waitUntilPostClose());  // postClose = locDeadline + 40min\n\n    List<Execution> executions = kisExecutionPort.getExecutions(token);\n    List<Order> corrections = correctionStrategy.calculate(vars, executions, token);\n    TradingReport report = TradingReport.of(vars, mainOrders, corrections);\n    tradeHistoryPort.save(toHistory(mainOrders));\n    tradeHistoryPort.save(toHistory(corrections));\n    portfolioSnapshotPort.save(toSnapshot(balance, price));\n    notifyPort.notifyReport(report);\n  }\n}\n\nDstInfo 필드 수정:\n- DST: locDeadline=04:30 KST, postClose=05:10 KST (LOC+40min)\n- 동절기: locDeadline=05:30 KST, postClose=06:10 KST (LOC+40min)",
       "verificationCriteria": "TradingService 단위 테스트 (모든 Port mock): 정상 흐름·휴장일·잔고 부족 케이스 통과. DstInfo postClose = locDeadline + 40분 검증.",
-      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정."
+      "analysisResult": "KISTA 태스크 분석 완료. 수정 사항: (1) n8n 원본 Wait 40min 반영, (2) DST ZoneId 명시, (3) TelegramApiClient RestTemplate으로 명확화, (4) domain.strategy @Component ArchUnit 예외 처리 방향 확정.",
+      "summary": "TradingService(ExecuteTradingUseCase) 구현 완료. LOC 마감 대기 → 토큰 → 휴장일/잔고 체크 → 전략 계산 → LOC 주문 → 40분 대기(postClose) → 체결 조회 → 보정 LIMIT 주문 → 이력 저장 → 스냅샷 → 보고서 전송 흐름 구현. execute(DstInfo) 오버로드로 단위 테스트 sleep 우회. Mockito 단위 테스트 4케이스(정상·이력저장·휴장일·잔고부족) 전부 통과. ArchUnit 규칙 준수.",
+      "completedAt": "2026-04-27T06:48:12.424Z"
     },
     {
       "id": "c26e1700-2bb5-4673-b251-2dd3adcd7aeb",
