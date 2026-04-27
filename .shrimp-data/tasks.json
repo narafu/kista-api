@@ -166,14 +166,14 @@
       "id": "c116e9b1-328c-4108-aa85-2f4f432995f7",
       "name": "KIS 주문·체결 Adapter 구현",
       "description": "KisOrderAdapter (LOC/MOC/지정가 주문), KisExecutionAdapter (당일 체결 내역 조회) 구현.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "cbabba04-9dcb-4be4-96b2-f6de702607ce"
         }
       ],
       "createdAt": "2026-04-23T14:48:52.227Z",
-      "updatedAt": "2026-04-23T14:48:52.227Z",
+      "updatedAt": "2026-04-27T00:55:07.907Z",
       "relatedFiles": [
         {
           "path": "/home/user/workspace/kista/src/main/java/com/kista/adapter/out/kis/KisOrderAdapter.java",
@@ -188,7 +188,9 @@
       ],
       "implementationGuide": "// KisOrderAdapter.java (implements KisOrderPort)\n- POST /uapi/overseas-stock/v1/trading/order\n- LOC: tr_id=TTTS0308U, 가격 필드 없음\n- 지정가: tr_id=TTTS0308U + price 필드\n- 응답 output.ODNO → Order.kisOrderId 설정\n- 주문 실패 시 Order.status = FAILED\n\n// KisExecutionAdapter.java (implements KisExecutionPort)\n- GET /uapi/overseas-stock/v1/trading/inquire-ccnl\n- 당일 SOXL 체결 목록 반환 → List<Execution>\n\n// OrderExecutor (helper, application 레이어 또는 TradingService 내부)\n- executeMain(token, vars): 매수/매도 주문 리스트 실행",
       "verificationCriteria": "모의투자 계정으로 소액 지정가 주문 1건 실행 후 kisOrderId 반환 확인. 체결 조회 응답 파싱 확인.",
-      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현."
+      "analysisResult": "KISTA (KIS Trading Automation) — trade-kis-n8n n8n 자동화를 Spring Boot로 마이그레이션. claude-starter-kit 기반 Hexagonal Architecture, Java 21 Virtual Thread, PostgreSQL + Flyway, KIS REST API 직접 호출, Telegram 봇, 웹 대시보드, FIDA 연동 순서로 구현.",
+      "summary": "KisOrderAdapter(LOC/MOC/LIMIT 주문, KisOrderPort 구현) + KisExecutionAdapter(당일 체결 조회, KisExecutionPort 구현) 완성. 단위 테스트 11개(KisOrderAdapterTest 6개 + KisExecutionAdapterTest 5개) 추가, 전체 PASS. LOC→ORD_DVSN 32, MOC→34, LIMIT→00, BUY/SELL TR_ID 분기, 응답 ODNO→kisOrderId, null/blank 안전 파싱 모두 검증 완료.",
+      "completedAt": "2026-04-27T00:55:07.796Z"
     },
     {
       "id": "bf0c5aae-f19a-4739-9857-e478be2670eb",
