@@ -24,6 +24,7 @@ cp .env.example .env                       # 환경변수 파일 복사 후 값 
 ./gradlew compileJava                      # 컴파일만 빠르게 확인 (테스트 없이)
 ./gradlew test --tests "com.kista.architecture.*"   # ArchUnit 규칙 테스트만
 ./gradlew test --tests "com.kista.domain.*"         # 도메인 단위 테스트만
+./gradlew test --tests "com.kista.adapter.out.kis.*" # KIS Adapter 단위 테스트만
 ./gradlew test --rerun-tasks               # 캐시 무시하고 강제 재실행 (UP-TO-DATE 우회)
 
 # 실행
@@ -99,6 +100,11 @@ P = A × 1.2  (scale=2, HALF_UP)
 - 토큰 관리는 `KisTokenAdapter`만 담당
 - Base URL: `https://openapi.koreainvestment.com:9443`
 
+### KIS Adapter 단위 테스트
+- Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
+- `KisHttpClient` mock 시 `props()`와 `buildHeaders()` 모두 스텁 필요 (`KisProperties` record는 직접 생성)
+- Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능
+
 ---
 
 ## 동시 수정 필요 파일 쌍
@@ -109,6 +115,7 @@ P = A × 1.2  (scale=2, HALF_UP)
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | 매매 공식 변경 | `SoxlDivisionStrategyTest` |
+| 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |
 
 ---
 
