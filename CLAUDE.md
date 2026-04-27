@@ -106,6 +106,10 @@ P = A × 1.2  (scale=2, HALF_UP)
 - `KisHttpClient` mock 시 `props()`와 `buildHeaders()` 모두 스텁 필요 (`KisProperties` record는 직접 생성)
 - Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능
 
+### Mockito 병렬 테스트 주의
+- `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용
+- `AccountBalance(q>0, t>0)` 잔고는 `SoxlDivisionStrategy` 계산 시 BUY+SELL LOC 주문 2건 발생 — 테스트에서 `kisOrderPort.place()` 호출 횟수 주의
+
 ---
 
 ## 동시 수정 필요 파일 쌍
@@ -133,3 +137,10 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ### JPA 엔티티 저장 패턴
 - `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
 - `@Transactional` 테스트 내에서 `insertable=false, updatable=false` 필드(예: `createdAt`)는 DB DEFAULT 값이 JPA 1차 캐시에 반영되지 않음 → 해당 필드 `isNotNull()` 단언 금지
+
+---
+
+## shrimp-task-manager 워크플로
+- 태스크 시작: `execute_task(taskId)` 호출 → `in_progress` 상태로 전환
+- 태스크 완료: `verify_task(taskId, score, summary)` 호출 — `pending` 상태에서 바로 `verify_task` 불가
+- 완료 후 `.shrimp-data/tasks.json` 변경분은 별도 `chore(tasks):` 커밋으로 관리
