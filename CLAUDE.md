@@ -26,6 +26,8 @@ cp .env.example .env                       # 환경변수 파일 복사 후 값 
 ./gradlew test --tests "com.kista.domain.*"         # 도메인 단위 테스트만
 ./gradlew test --tests "com.kista.adapter.out.kis.*" # KIS Adapter 단위 테스트만
 ./gradlew test --rerun-tasks               # 캐시 무시하고 강제 재실행 (UP-TO-DATE 우회)
+# 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
+grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 
 # 실행
 ./gradlew bootRun --args='--spring.profiles.active=local'
@@ -105,6 +107,9 @@ P = A × 1.2  (scale=2, HALF_UP)
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
 - `KisHttpClient` mock 시 `props()`와 `buildHeaders()` 모두 스텁 필요 (`KisProperties` record는 직접 생성)
 - Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능
+
+### @WebMvcTest MockBean 주의
+- `@MockBean` (Spring Boot 3.4+)은 deprecated → 대안: `@MockitoBean` 사용 권장 (경고는 기능 무관, 당장은 무시 가능)
 
 ### Mockito 병렬 테스트 주의
 - `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용
