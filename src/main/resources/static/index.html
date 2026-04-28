@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KISTA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; }
+    h1 { margin-bottom: 24px; font-size: 1.4rem; }
+    h2 { font-size: 1rem; margin-bottom: 12px; color: #555; }
+    .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    th { background: #fafafa; font-weight: 600; }
+  </style>
+</head>
+<body>
+<h1>KISTA Dashboard</h1>
+<div class="card">
+  <h2>총자산 추이 (최근 30일)</h2>
+  <canvas id="portfolioChart" height="80"></canvas>
+</div>
+<div class="card">
+  <h2>거래 내역 (최근 30일)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>날짜</th><th>방향</th><th>유형</th><th>수량</th>
+        <th>가격</th><th>금액</th><th>상태</th>
+      </tr>
+    </thead>
+    <tbody id="tradeBody"></tbody>
+  </table>
+</div>
+<script>
+function cell(text) {
+  var td = document.createElement('td');
+  td.textContent = text;
+  return td;
+}
+
+(async function() {
+  try {
+    var r = await fetch('/api/portfolio/snapshots?days=30');
+    var data = await r.json();
+    new Chart(document.getElementById('portfolioChart'), {
+      type: 'line',
+      data: {
+        labels: data.map(function(s) { return s.snapshotDate; }),
+        datasets: [{
+          label: '총자산 (USD)',
+          data: data.map(function(s) { return parseFloat(s.totalAssetUsd); }),
+          tension: 0.3,
+          fill: true,
+          borderColor: '#1565c0',
+          backgroundColor: 'rgba(21,101,192,.1)'
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { callback: function(v) { return '$' + v.toLocaleString(); } } } }
+      }
+    });
+  } catch(e) { console.error('포트폴리오 로드 실패', e); }
+
+  try {
+    var r2 = await fetch('/api/trades');
+    var trades = await r2.json();
+    var tbody = document.getElementById('tradeBody');
+    if (!trades.length) {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 7;
+      td.textContent = '거래 내역 없음';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+    trades.forEach(function(h) {
+      var tr = document.createElement('tr');
+      tr.appendChild(cell(h.tradeDate));
+      tr.appendChild(cell(h.direction));
+      tr.appendChild(cell(h.orderType));
+      tr.appendChild(cell(String(h.qty)));
+      tr.appendChild(cell('$' + parseFloat(h.price).toFixed(4)));
+      tr.appendChild(cell('$' + parseFloat(h.amountUsd).toFixed(2)));
+      tr.appendChild(cell(h.status));
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    var tbody2 = document.getElementById('tradeBody');
+    var tr2 = document.createElement('tr');
+    var td2 = document.createElement('td');
+    td2.colSpan = 7;
+    td2.textContent = '데이터 로드 실패';
+    tr2.appendChild(td2);
+    tbody2.appendChild(tr2);
+  }
+})();
+</script>
+</body>
+</html>
