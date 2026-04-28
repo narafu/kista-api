@@ -1,0 +1,22 @@
+## 테스트
+
+### @WebMvcTest MockBean 주의
+- `@MockBean` (Spring Boot 3.4+)은 deprecated → 대안: `@MockitoBean` 사용 권장 (경고는 기능 무관, 당장은 무시 가능)
+
+### Mockito 병렬 테스트 주의
+- `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용
+- `AccountBalance(q>0, t>0)` 잔고는 `SoxlDivisionStrategy` 계산 시 BUY+SELL LOC 주문 2건 발생 — 테스트에서 `kisOrderPort.place()` 호출 횟수 주의
+
+### 테스트 DB
+
+통합 테스트는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).
+
+```bash
+docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
+```
+
+`application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
+
+### JPA 엔티티 저장 패턴
+- `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
+- `@Transactional` 테스트 내에서 `insertable=false, updatable=false` 필드(예: `createdAt`)는 DB DEFAULT 값이 JPA 1차 캐시에 반영되지 않음 → 해당 필드 `isNotNull()` 단언 금지
