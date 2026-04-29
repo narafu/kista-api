@@ -100,4 +100,16 @@ class TelegramAdapterTest {
 
         verify(restTemplate, never()).postForObject(any(), any(), any());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyError_bodyContainsExceptionMessage() {
+        Exception ex = new RuntimeException("KIS API 호출 실패");
+        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+
+        adapter.notifyError(ex);
+
+        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
+        assertThat(bodyCaptor.getValue().get("text")).contains("KIS API 호출 실패");
+    }
 }
