@@ -2,6 +2,9 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /workspace
 
+# Docker 빌드 중 Gradle JVM 메모리 상한 — 미설정 시 컨테이너 메모리 ~25%를 힙으로 잡아 BuildKit OOM 유발
+ENV JAVA_TOOL_OPTIONS="-Xmx768m"
+
 # Gradle Wrapper 및 의존성 레이어 캐싱 (소스 변경 없을 때 재사용)
 COPY gradle/ gradle/
 COPY gradlew settings.gradle.kts build.gradle.kts ./
