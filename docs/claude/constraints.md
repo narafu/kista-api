@@ -25,3 +25,10 @@ P = A × 1.2  (scale=2, HALF_UP)
 ### springdoc 버전 제약
 - Spring Boot 3.4.x(Spring Framework 6.2)는 springdoc **2.7.0 이상** 필요 — 2.6.x는 `NoSuchMethodError: ControllerAdviceBean` 발생
 - 현재: `springdoc = "2.8.4"` (`gradle/libs.versions.toml`)
+
+### 주석 규칙
+- 신규 코드 작성 시 주석을 함께 작성할 것
+- 필드: `// 역할 한 줄` 인라인 주석
+- 비즈니스 로직 블록 직전: 단계 설명 한 줄
+- API 상수/코드값: `"840" // 국가코드: 미국` 형식
+- Javadoc·블록 주석 금지 — `//` 인라인만 사용

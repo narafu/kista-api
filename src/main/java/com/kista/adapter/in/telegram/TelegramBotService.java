@@ -20,11 +20,12 @@ class TelegramBotService {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramBotService.class);
 
-    private final String adminChatId;
+    private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
     private final GetPortfolioUseCase getPortfolioUseCase;
     private final ExecuteTradingUseCase executeTradingUseCase;
+    // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
 
     TelegramBotService(

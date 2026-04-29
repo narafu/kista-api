@@ -14,8 +14,8 @@ import java.util.Map;
 public class KisOrderAdapter implements KisOrderPort {
 
     private static final String PATH      = "/uapi/overseas-stock/v1/trading/order";
-    private static final String BUY_TR_ID  = "TTTS0308U";
-    private static final String SELL_TR_ID = "TTTS0307U";
+    private static final String BUY_TR_ID  = "TTTS0308U"; // 해외주식 매수 주문
+    private static final String SELL_TR_ID = "TTTS0307U"; // 해외주식 매도 주문
 
     private final KisHttpClient kisHttpClient;
 
@@ -49,15 +49,15 @@ public class KisOrderAdapter implements KisOrderPort {
 
     private String resolveOrderDvsn(Order.OrderType type) {
         return switch (type) {
-            case LOC   -> "32";
-            case MOC   -> "34";
-            case LIMIT -> "00";
+            case LOC   -> "32"; // 장마감지정가(LOC)
+            case MOC   -> "34"; // 장마감시장가(MOC)
+            case LIMIT -> "00"; // 지정가
         };
     }
 
     private String resolvePrice(Order.OrderType type, BigDecimal price) {
         return switch (type) {
-            case LOC, MOC -> "0";
+            case LOC, MOC -> "0";           // LOC/MOC는 가격 무관하므로 0 입력
             case LIMIT    -> price.toPlainString();
         };
     }

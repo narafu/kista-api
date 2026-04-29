@@ -19,7 +19,7 @@ import java.util.List;
 public class KisExecutionAdapter implements KisExecutionPort {
 
     private static final String PATH  = "/uapi/overseas-stock/v1/trading/inquire-ccnl";
-    private static final String TR_ID = "TTTS3035R";
+    private static final String TR_ID = "TTTS3035R"; // 해외주식 체결 내역 조회
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final KisHttpClient kisHttpClient;
@@ -60,6 +60,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
     }
 
     private Order.OrderDirection resolveDirection(String selnByovCls) {
+        // SELN_BYOV_CLS: 01=매도, 그 외=매수
         return "01".equals(selnByovCls) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
     }
 
@@ -75,12 +76,12 @@ public class KisExecutionAdapter implements KisExecutionPort {
 
     record ExecutionListResponse(@JsonProperty("output") List<OutputItem> output) {
         record OutputItem(
-                @JsonProperty("PDNO") String pdno,
+                @JsonProperty("PDNO") String pdno,               // 종목코드
                 @JsonProperty("SELN_BYOV_CLS") String selnByovCls,
-                @JsonProperty("FT_CCLD_QTY") String ftCcldQty,
-                @JsonProperty("FT_CCLD_UNPR3") String ftCcldUnpr3,
-                @JsonProperty("CCLD_AMT") String ccldAmt,
-                @JsonProperty("ODNO") String odno
+                @JsonProperty("FT_CCLD_QTY") String ftCcldQty,   // 체결수량
+                @JsonProperty("FT_CCLD_UNPR3") String ftCcldUnpr3, // 체결단가
+                @JsonProperty("CCLD_AMT") String ccldAmt,         // 체결금액
+                @JsonProperty("ODNO") String odno                 // 주문번호
         ) {}
     }
 }

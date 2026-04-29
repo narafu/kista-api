@@ -14,13 +14,16 @@ import java.util.stream.Collectors;
 public class CorrectionStrategy {
 
     public List<Order> correct(List<Order> mainOrders, List<Execution> executions, LocalDate tradeDate) {
+        // 당일 실제 체결된 주문 번호 집합
         Set<String> filledOrderIds = executions.stream()
                 .map(Execution::kisOrderId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
         return mainOrders.stream()
+                // PLACED 상태인 주문만 보정 대상
                 .filter(o -> o.status() == Order.OrderStatus.PLACED)
+                // kisOrderId 없거나 체결 목록에 없으면 미체결로 간주
                 .filter(o -> o.kisOrderId() == null || !filledOrderIds.contains(o.kisOrderId()))
                 .map(o -> new Order(
                         tradeDate,

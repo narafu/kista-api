@@ -17,18 +17,18 @@ import java.util.List;
 @Service
 public class TradingService implements ExecuteTradingUseCase {
 
-    private final String symbol;
-    private final KisTokenPort kisTokenPort;
-    private final KisHolidayPort kisHolidayPort;
-    private final KisAccountPort kisAccountPort;
-    private final KisPricePort kisPricePort;
-    private final KisOrderPort kisOrderPort;
-    private final KisExecutionPort kisExecutionPort;
-    private final TradingStrategy tradingStrategy;
-    private final CorrectionStrategy correctionStrategy;
-    private final TradeHistoryPort tradeHistoryPort;
-    private final PortfolioSnapshotPort portfolioSnapshotPort;
-    private final NotifyPort notifyPort;
+    private final String symbol;                              // 거래 종목 코드 (기본: SOXL)
+    private final KisTokenPort kisTokenPort;                  // KIS OAuth 토큰 발급
+    private final KisHolidayPort kisHolidayPort;              // 미국 시장 개장일 확인
+    private final KisAccountPort kisAccountPort;              // 계좌 잔고 조회
+    private final KisPricePort kisPricePort;                  // 현재 주가 조회
+    private final KisOrderPort kisOrderPort;                  // 주문 접수
+    private final KisExecutionPort kisExecutionPort;          // 당일 체결 내역 조회
+    private final TradingStrategy tradingStrategy;            // 매수/매도 수량·가격 계산
+    private final CorrectionStrategy correctionStrategy;      // 미체결 주문 보정
+    private final TradeHistoryPort tradeHistoryPort;          // 거래 이력 저장
+    private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
+    private final NotifyPort notifyPort;                      // 텔레그램 알림 발송
 
     public TradingService(
             @Value("${kis.symbol:SOXL}") String symbol,
@@ -64,39 +64,48 @@ public class TradingService implements ExecuteTradingUseCase {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
     void execute(DstInfo dst) throws InterruptedException {
+        // LOC 마감 시각까지 대기 (장 마감 직전 LOC 주문 가능 시점 확보)
         long locWaitMs = dst.waitUntilLocDeadline().toMillis();
         if (locWaitMs > 0) Thread.sleep(locWaitMs);
 
         LocalDate today = LocalDate.now();
+        // KIS API 호출용 OAuth 토큰 발급
         String token = kisTokenPort.getToken();
 
+        // 미국 시장 휴장일 확인
         if (!kisHolidayPort.isMarketOpen(token, today)) {
             notifyPort.notifyMarketClosed();
             return;
         }
 
+        // 계좌 잔고 조회 및 최소 거래 금액 미달 시 종료
         AccountBalance balance = kisAccountPort.getBalance(token);
         if (balance.shouldSkip()) {
             notifyPort.notifyInsufficientBalance(balance);
             return;
         }
 
+        // 전략 계산 후 BUY/SELL LOC 주문 접수
         BigDecimal price = kisPricePort.getPrice(token, symbol);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
         List<Order> mainOrders = placeMainOrders(token, vars, today);
 
+        // PostClose 시각까지 대기 (체결 내역이 KIS에 반영될 때까지)
         long postWaitMs = dst.waitUntilPostClose().toMillis();
         if (postWaitMs > 0) Thread.sleep(postWaitMs);
 
+        // 당일 체결 내역 조회 후 미체결 주문 LIMIT으로 보정
         List<Execution> executions = kisExecutionPort.getExecutions(token, today);
         List<Order> corrections = correctionStrategy.correct(mainOrders, executions, today)
                 .stream()
                 .map(o -> kisOrderPort.place(token, o))
                 .toList();
 
+        // 거래 이력 저장
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o)));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o)));
 
+        // 포트폴리오 스냅샷 저장 후 텔레그램 리포트 발송
         portfolioSnapshotPort.save(toSnapshot(balance, price, today));
         notifyPort.notifyReport(buildReport(today, vars, mainOrders, corrections, executions));
     }

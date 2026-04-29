@@ -16,8 +16,8 @@ public class KisAccountAdapter implements KisAccountPort {
 
     private static final String BALANCE_PATH = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String PRESENT_PATH  = "/uapi/overseas-stock/v1/trading/inquire-present-balance";
-    private static final String BALANCE_TR_ID = "TTTS3012R";
-    private static final String PRESENT_TR_ID = "CTRP6504R";
+    private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
+    private static final String PRESENT_TR_ID = "CTRP6504R"; // 해외주식 현재 잔고(외화) 조회
 
     private final KisHttpClient kisHttpClient;
 
@@ -40,10 +40,10 @@ public class KisAccountAdapter implements KisAccountPort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
-        params.add("WCRC_FRCR_DVSN_CD", "02");
-        params.add("NATN_CD", "840");
+        params.add("WCRC_FRCR_DVSN_CD", "02"); // 외화 구분: 02=USD
+        params.add("NATN_CD", "840");           // 국가코드: 840=미국
         params.add("TR_MRCN_AMT", "0");
-        params.add("INQR_DVSN", "00");
+        params.add("INQR_DVSN", "00");          // 조회 구분: 00=전체
 
         BalanceResponse response = kisHttpClient.get(BALANCE_PATH, headers, params, BalanceResponse.class);
 
@@ -62,8 +62,8 @@ public class KisAccountAdapter implements KisAccountPort {
     private PresentResult fetchPresent(String token) {
         HttpHeaders headers = kisHttpClient.buildHeaders(token, PRESENT_TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("WCRC_FRCR_DVSN_CD", "02");
-        params.add("CRCY_CD", "USD");
+        params.add("WCRC_FRCR_DVSN_CD", "02"); // 외화 구분: 02=USD
+        params.add("CRCY_CD", "USD");           // 통화코드
 
         PresentBalanceResponse response = kisHttpClient.get(PRESENT_PATH, headers, params, PresentBalanceResponse.class);
 
@@ -99,8 +99,8 @@ public class KisAccountAdapter implements KisAccountPort {
 
     record PresentBalanceResponse(@JsonProperty("output3") Output3 output3) {
         record Output3(
-                @JsonProperty("FRCR_EVLU_AMT2") String frcrEvluAmt,
-                @JsonProperty("FRCR_DNCL_AMT_2") String frcrDnclAmt
+                @JsonProperty("FRCR_EVLU_AMT2") String frcrEvluAmt,   // 유가증권평가액
+                @JsonProperty("FRCR_DNCL_AMT_2") String frcrDnclAmt   // 외화예수금
         ) {}
     }
 }
