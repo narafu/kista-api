@@ -26,6 +26,10 @@ P = A × 1.2  (scale=2, HALF_UP)
 - Spring Boot 3.4.x(Spring Framework 6.2)는 springdoc **2.7.0 이상** 필요 — 2.6.x는 `NoSuchMethodError: ControllerAdviceBean` 발생
 - 현재: `springdoc = "2.8.4"` (`gradle/libs.versions.toml`)
 
+### 텔레그램 로컬 테스트
+- `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
+- 로컬에서 `curl .../sendMessage` 테스트 시 VPN 필요
+
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
 - 필드: `// 역할 한 줄` 인라인 주석

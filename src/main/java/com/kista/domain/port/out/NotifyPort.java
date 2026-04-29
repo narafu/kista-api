@@ -7,4 +7,5 @@ public interface NotifyPort {
     void notifyReport(TradingReport r);
     void notifyMarketClosed();
     void notifyInsufficientBalance(AccountBalance b);
+    void notifyError(Exception e);
 }

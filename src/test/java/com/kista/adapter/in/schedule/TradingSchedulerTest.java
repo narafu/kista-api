@@ -1,6 +1,7 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.port.in.ExecuteTradingUseCase;
+import com.kista.domain.port.out.NotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.*;
 class TradingSchedulerTest {
 
     @Mock ExecuteTradingUseCase useCase;
+    @Mock NotifyPort notifyPort;
     @InjectMocks TradingScheduler scheduler;
 
     @Test
@@ -42,5 +44,15 @@ class TradingSchedulerTest {
         scheduler.run();
 
         verify(useCase).execute();
+    }
+
+    @Test
+    void run_unexpectedException_notifiesErrorViaTelegram() throws InterruptedException {
+        RuntimeException ex = new RuntimeException("KIS API 호출 실패");
+        doThrow(ex).when(useCase).execute();
+
+        scheduler.run();
+
+        verify(notifyPort).notifyError(ex);
     }
 }

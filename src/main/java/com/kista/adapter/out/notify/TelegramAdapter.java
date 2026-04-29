@@ -49,6 +49,11 @@ public class TelegramAdapter implements NotifyPort {
                 b.soxlQty(), b.effectiveAmt()));
     }
 
+    @Override
+    public void notifyError(Exception e) {
+        send(String.format("<b>⚠️ 매매 오류 발생</b>%n%s", e.getMessage()));
+    }
+
     private void send(String text) {
         if (props.botToken() == null || props.botToken().isBlank()) {
             log.warn("Telegram botToken 미설정 — 메시지 전송 생략: {}", text);
