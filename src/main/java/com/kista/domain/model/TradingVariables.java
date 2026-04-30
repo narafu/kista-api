@@ -13,6 +13,8 @@ public record TradingVariables(
         BigDecimal unitAmount,        // 회차별 투자 단위 금액 (K) = B ÷ totalRounds
         BigDecimal targetProfitRate,  // 익절 목표 수익률 (예: 0.20)
         BigDecimal priceOffsetRate,   // 매매 결정 기준 편차율 = targetProfitRate × (1 - 2T/totalRounds)
+        BigDecimal usdDeposit,        // 예수금 (D) — 후반 K > D 비교용
+        BigDecimal referencePrice,    // 기준가 (G) = A × (1 + S)
         BigDecimal targetPrice,       // 익절 목표가 = A × (1 + targetProfitRate)
         BigDecimal currentPrice       // 현재 시장가
 ) {}

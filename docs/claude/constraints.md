@@ -12,10 +12,14 @@ M = A × Q (purchaseAmount)   D = currentPrice × Q (evaluationAmount, 정보성
 B = usdDeposit + M (totalAssets)   K = B ÷ 20 (unitAmount, scale=2, HALF_UP)
 T = Q==0 ? 0.0 : M ÷ K  (currentRound, double, 소수점 허용)
 S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=4, HALF_UP)
+G = A × (1 + S)  (referencePrice, scale=2, HALF_UP — LOC 주문 가격 기준)
 P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ```
 - `AccountBalance.effectiveAmt` = SOXL 시가 평가액 (KIS `FRCR_EVLU_AMT2`), `usdDeposit` = 예수금 (KIS `FRCR_DNCL_AMT_2`) — B 계산에는 반드시 `usdDeposit` 사용
-- `currentRound`(T)는 floor 없이 소수점 허용 — SELL 조건은 `currentRound > 0` (0.3회차에도 트리거)
+- `currentRound`(T)는 floor 없이 소수점 허용
+- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 T < 10 / T ≥ 10과 동치)
+- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②(K/2/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
+- **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
 
 ### Flyway
 - `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로

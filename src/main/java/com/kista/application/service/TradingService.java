@@ -16,6 +16,15 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.kista.domain.model.Order.OrderDirection.BUY;
+import static com.kista.domain.model.Order.OrderDirection.SELL;
+import static com.kista.domain.model.Order.OrderStatus.PLACED;
+import static com.kista.domain.model.Order.OrderType.LIMIT;
+import static com.kista.domain.model.Order.OrderType.LOC;
+import static com.kista.domain.model.Order.OrderType.MOC;
+import static java.math.RoundingMode.FLOOR;
+import static java.math.RoundingMode.HALF_UP;
+
 @Service
 public class TradingService implements ExecuteTradingUseCase {
 
@@ -135,23 +144,80 @@ public class TradingService implements ExecuteTradingUseCase {
     private List<Order> placeMainOrders(String token, TradingVariables vars, LocalDate today) {
         List<Order> orders = new ArrayList<>();
 
-        // BUY LOC: 총 포트폴리오의 priceOffsetRate 비중 매수
-        int buyQty = vars.totalAssets().multiply(vars.priceOffsetRate())
-                .divide(vars.currentPrice(), 0, RoundingMode.FLOOR)
-                .intValue();
-        if (buyQty >= 1) {
-            orders.add(kisOrderPort.place(token, new Order(
-                    today, symbol, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                    buyQty, vars.currentPrice(), Order.OrderStatus.PLACED, null)));
-        }
+        BigDecimal G = vars.referencePrice(); // 기준가 = A × (1+S)
+        BigDecimal A = vars.averagePrice();   // 평단가
+        BigDecimal K = vars.unitAmount();     // 회차별 투자금
+        BigDecimal P = vars.targetPrice();    // 목표가
+        BigDecimal D = vars.usdDeposit();     // 예수금
+        int Q = vars.quantity();
 
-        // SELL LOC: currentRound > 0이고 보유 수량 있는 경우 1회차분 매도
-        if (vars.quantity() > 0 && vars.currentRound() > 0) {
-            int sellQty = vars.unitAmount().divide(vars.targetPrice(), 0, RoundingMode.FLOOR).intValue();
-            if (sellQty >= 1) {
+        if (vars.priceOffsetRate().compareTo(BigDecimal.ZERO) > 0) {
+            // 전반 (priceOffsetRate > 0): LOC 매수 ①② + LOC 매도 + 지정가 매도
+
+            // LOC 매수 ① — 평단가 기준: floor(K / 2 / A)
+            int buyQty1 = K.divide(A.multiply(BigDecimal.valueOf(2)), 0, FLOOR).intValue();
+            if (buyQty1 >= 1) {
                 orders.add(kisOrderPort.place(token, new Order(
-                        today, symbol, Order.OrderType.LOC, Order.OrderDirection.SELL,
-                        sellQty, vars.targetPrice(), Order.OrderStatus.PLACED, null)));
+                        today, symbol, LOC, BUY, buyQty1, A, PLACED, null)));
+            }
+
+            // LOC 매수 ② — 기준가 기준: floor(K / 2 / G)
+            int buyQty2 = K.divide(G.multiply(BigDecimal.valueOf(2)), 0, FLOOR).intValue();
+            if (buyQty2 >= 1) {
+                orders.add(kisOrderPort.place(token, new Order(
+                        today, symbol, LOC, BUY, buyQty2, G, PLACED, null)));
+            }
+
+            // LOC 매도 — 기준가 + 0.01, 수량 Q/4
+            int locSellQty = Q / 4;
+            if (locSellQty >= 1) {
+                orders.add(kisOrderPort.place(token, new Order(
+                        today, symbol, LOC, SELL, locSellQty,
+                        G.add(new BigDecimal("0.01")), PLACED, null)));
+            }
+
+            // 지정가 매도 — 목표가, 수량 Q - Q/4
+            int limitSellQty = Q - Q / 4;
+            if (limitSellQty >= 1) {
+                orders.add(kisOrderPort.place(token, new Order(
+                        today, symbol, LIMIT, SELL, limitSellQty, P, PLACED, null)));
+            }
+
+        } else {
+            // 후반 (priceOffsetRate <= 0): 예수금 부족 여부로 분기
+
+            if (K.compareTo(D) > 0) {
+                // K > D: 예수금 부족 → MOC 매도만 (KIS: price=0으로 전송)
+                int mocSellQty = Q / 4;
+                if (mocSellQty >= 1) {
+                    orders.add(kisOrderPort.place(token, new Order(
+                            today, symbol, MOC, SELL, mocSellQty,
+                            BigDecimal.ZERO, PLACED, null)));
+                }
+            } else {
+                // K <= D: 예수금 충분 → LOC 매수 + LOC 매도 + 지정가 매도
+
+                // LOC 매수 — 기준가 기준: floor(K / G)
+                int buyQty = K.divide(G, 0, FLOOR).intValue();
+                if (buyQty >= 1) {
+                    orders.add(kisOrderPort.place(token, new Order(
+                            today, symbol, LOC, BUY, buyQty, G, PLACED, null)));
+                }
+
+                // LOC 매도 — 기준가 + 0.01, 수량 Q/4
+                int locSellQty = Q / 4;
+                if (locSellQty >= 1) {
+                    orders.add(kisOrderPort.place(token, new Order(
+                            today, symbol, LOC, SELL, locSellQty,
+                            G.add(new BigDecimal("0.01")), PLACED, null)));
+                }
+
+                // 지정가 매도 — 목표가, 수량 Q - Q/4
+                int limitSellQty = Q - Q / 4;
+                if (limitSellQty >= 1) {
+                    orders.add(kisOrderPort.place(token, new Order(
+                            today, symbol, LIMIT, SELL, limitSellQty, P, PLACED, null)));
+                }
             }
         }
 
@@ -160,7 +226,7 @@ public class TradingService implements ExecuteTradingUseCase {
 
     private TradeHistory toHistory(Order o) {
         BigDecimal amountUsd = o.price().multiply(BigDecimal.valueOf(o.qty()))
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(2, HALF_UP);
         return new TradeHistory(
                 null, o.tradeDate(), o.symbol(), "SOXL_DIVISION",
                 o.orderType(), o.direction(), o.qty(), o.price(),
@@ -169,9 +235,9 @@ public class TradingService implements ExecuteTradingUseCase {
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price, LocalDate today) {
         BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.quantity()))
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(2, HALF_UP);
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
                 null, today, symbol, balance.quantity(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, null);
@@ -181,11 +247,11 @@ public class TradingService implements ExecuteTradingUseCase {
                                       List<Order> mainOrders, List<Order> corrections,
                                       List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.BUY)
+                .filter(e -> e.direction() == BUY)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalSold = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.SELL)
+                .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, vars, mainOrders, corrections, totalBought, totalSold);

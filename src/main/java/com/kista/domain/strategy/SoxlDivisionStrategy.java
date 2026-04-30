@@ -40,6 +40,10 @@ public class SoxlDivisionStrategy implements TradingStrategy {
                 )
         ).setScale(4, RoundingMode.HALF_UP);
 
+        // 기준가 = 평단가 × (1 + 기준률)
+        BigDecimal referencePrice = averagePrice.multiply(BigDecimal.ONE.add(priceOffsetRate))
+                .setScale(2, RoundingMode.HALF_UP);
+
         // 익절 목표가 = 기준가 × (1 + 목표 수익률)
         BigDecimal targetPrice = averagePrice.multiply(BigDecimal.ONE.add(TARGET_PROFIT_RATE))
                 .setScale(2, RoundingMode.HALF_UP);
@@ -47,6 +51,8 @@ public class SoxlDivisionStrategy implements TradingStrategy {
         return new TradingVariables(
                 averagePrice, quantity, purchaseAmount, evaluationAmount,
                 totalAssets, TOTAL_ROUNDS, currentRound, unitAmount,
-                TARGET_PROFIT_RATE, priceOffsetRate, targetPrice, currentPrice);
+                TARGET_PROFIT_RATE, priceOffsetRate,
+                balance.usdDeposit(), referencePrice,
+                targetPrice, currentPrice);
     }
 }

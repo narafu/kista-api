@@ -83,6 +83,8 @@ class TelegramAdapterTest {
                 new BigDecimal("35.00"),  // unitAmount
                 new BigDecimal("0.20"),   // targetProfitRate
                 new BigDecimal("0.1733"), // priceOffsetRate
+                new BigDecimal("500.00"), // usdDeposit
+                new BigDecimal("23.47"),  // referencePrice (20 × 1.1733)
                 new BigDecimal("24.00"),  // targetPrice
                 new BigDecimal("22.00")); // currentPrice
         TradingReport report = new TradingReport(

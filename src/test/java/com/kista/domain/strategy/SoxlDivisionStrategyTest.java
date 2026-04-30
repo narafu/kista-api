@@ -35,6 +35,8 @@ class SoxlDivisionStrategyTest {
         assertThat(vars.unitAmount()).isEqualByComparingTo("100.00");
         assertThat(vars.targetProfitRate()).isEqualByComparingTo("0.20");
         assertThat(vars.priceOffsetRate()).isEqualByComparingTo("0.2000");
+        assertThat(vars.usdDeposit()).isEqualByComparingTo("2000");
+        assertThat(vars.referencePrice()).isEqualByComparingTo("24.00"); // 20 × (1+0.2000)
         assertThat(vars.targetPrice()).isEqualByComparingTo("24.00");
     }
 
@@ -59,6 +61,8 @@ class SoxlDivisionStrategyTest {
         assertThat(vars.unitAmount()).isEqualByComparingTo("150.00");
         assertThat(vars.targetProfitRate()).isEqualByComparingTo("0.20");
         assertThat(vars.priceOffsetRate()).isEqualByComparingTo("0.1734");
+        assertThat(vars.usdDeposit()).isEqualByComparingTo("2800");
+        assertThat(vars.referencePrice()).isEqualByComparingTo("23.47"); // 20 × (1+0.1734) = 23.468 → 23.47
         assertThat(vars.targetPrice()).isEqualByComparingTo("24.00");
     }
 
@@ -83,6 +87,8 @@ class SoxlDivisionStrategyTest {
         assertThat(vars.unitAmount()).isEqualByComparingTo("100.00");
         assertThat(vars.targetProfitRate()).isEqualByComparingTo("0.20");
         assertThat(vars.priceOffsetRate()).isEqualByComparingTo("0.1000");
+        assertThat(vars.usdDeposit()).isEqualByComparingTo("1500");
+        assertThat(vars.referencePrice()).isEqualByComparingTo("5.50"); // 5 × (1+0.1000)
         assertThat(vars.targetPrice()).isEqualByComparingTo("6.00");
     }
 }
