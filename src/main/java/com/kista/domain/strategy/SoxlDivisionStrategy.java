@@ -17,8 +17,8 @@ public class SoxlDivisionStrategy implements TradingStrategy {
         int q = balance.soxlQty();
         // 보유 자산액 = 기준가 × 수량
         BigDecimal m = a.multiply(BigDecimal.valueOf(q));
-        BigDecimal d = balance.effectiveAmt();
-        // 총 자산액 = 유효자산(예수금+평가) + 보유자산
+        BigDecimal d = balance.usdDeposit();  // 예수금 (현금 잔고)
+        // 총 자산액 = 예수금 + 보유자산(매입원가 기준)
         BigDecimal b = d.add(m);
         // 슬롯 크기 = 총자산을 20등분한 단위 금액
         BigDecimal k = b.divide(BigDecimal.valueOf(20), 2, RoundingMode.HALF_UP);
