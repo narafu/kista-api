@@ -161,7 +161,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### 실행 흐름 순서 (TradingService)
 
 1. `DstInfo` 계산 (서머타임 여부)
-2. `Thread.sleep(dst.waitUntilLocDeadline())` — LOC 마감까지 대기
+2. `Thread.sleep(dst.waitUntilOrderTime().toMillis())` — 주문 시각까지 대기
 3. KIS 토큰 발급
 4. 휴장일 확인 → 휴장이면 알림 후 종료
 5. 잔고 조회 → `shouldSkip()` true면 알림 후 종료

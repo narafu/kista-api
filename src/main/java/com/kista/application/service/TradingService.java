@@ -68,11 +68,11 @@ public class TradingService implements ExecuteTradingUseCase {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
     void execute(DstInfo dst) throws InterruptedException {
-        // LOC 마감 시각까지 대기 (장 마감 직전 LOC 주문 가능 시점 확보)
-        long locWaitMs = dst.waitUntilLocDeadline().toMillis();
-        log.info("DST={}, LOC 마감까지 대기: {}ms", dst.isDst(), locWaitMs);
-        if (locWaitMs > 0) Thread.sleep(locWaitMs);
-        log.info("LOC 마감 대기 완료");
+        // 주문 시각까지 대기
+        long orderWaitMs = dst.waitUntilOrderTime().toMillis();
+        log.info("DST={}, 주문 시각까지 대기: {}ms", dst.isDst(), orderWaitMs);
+        if (orderWaitMs > 0) Thread.sleep(orderWaitMs);
+        log.info("주문 시각 도달");
 
         LocalDate today = LocalDate.now();
         // KIS API 호출용 OAuth 토큰 발급
