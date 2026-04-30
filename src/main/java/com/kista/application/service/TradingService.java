@@ -11,18 +11,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.kista.domain.model.Order.OrderDirection.BUY;
 import static com.kista.domain.model.Order.OrderDirection.SELL;
-import static com.kista.domain.model.Order.OrderStatus.PLACED;
-import static com.kista.domain.model.Order.OrderType.LIMIT;
-import static com.kista.domain.model.Order.OrderType.LOC;
-import static com.kista.domain.model.Order.OrderType.MOC;
-import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
 
 @Service
@@ -111,8 +104,9 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("현재가: ${}", price);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
         log.info("전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}", vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
-        List<Order> mainOrders = placeMainOrders(token, vars, today);
-        log.info("LOC 주문 {}건 접수", mainOrders.size());
+        List<Order> pending = tradingStrategy.buildOrders(vars, today, symbol);
+        List<Order> mainOrders = pending.stream().map(o -> kisOrderPort.place(token, o)).toList();
+        log.info("주문 {}건 접수", mainOrders.size());
 
         // PostClose 시각까지 대기 (체결 내역이 KIS에 반영될 때까지)
         long postWaitMs = dst.waitUntilPostClose().toMillis();
@@ -139,89 +133,6 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("포트폴리오 스냅샷 저장 완료");
         notifyPort.notifyReport(buildReport(today, vars, mainOrders, corrections, executions));
         log.info("텔레그램 리포트 발송 완료");
-    }
-
-    private List<Order> placeMainOrders(String token, TradingVariables vars, LocalDate today) {
-        List<Order> orders = new ArrayList<>();
-
-        BigDecimal G = vars.referencePrice(); // 기준가 = A × (1+S)
-        BigDecimal A = vars.averagePrice();   // 평단가
-        BigDecimal K = vars.unitAmount();     // 회차별 투자금
-        BigDecimal P = vars.targetPrice();    // 목표가
-        BigDecimal D = vars.usdDeposit();     // 예수금
-        int Q = vars.quantity();
-
-        if (vars.priceOffsetRate().compareTo(BigDecimal.ZERO) > 0) {
-            // 전반 (priceOffsetRate > 0): LOC 매수 ①② + LOC 매도 + 지정가 매도
-
-            // LOC 매수 ① — 평단가 기준: floor(K / 2 / A)
-            int buyQty1 = K.divide(A.multiply(BigDecimal.valueOf(2)), 0, FLOOR).intValue();
-            if (buyQty1 >= 1) {
-                orders.add(kisOrderPort.place(token, new Order(
-                        today, symbol, LOC, BUY, buyQty1, A, PLACED, null)));
-            }
-
-            // LOC 매수 ② — 기준가 기준: floor(K / 2 / G)
-            int buyQty2 = K.divide(G.multiply(BigDecimal.valueOf(2)), 0, FLOOR).intValue();
-            if (buyQty2 >= 1) {
-                orders.add(kisOrderPort.place(token, new Order(
-                        today, symbol, LOC, BUY, buyQty2, G, PLACED, null)));
-            }
-
-            // LOC 매도 — 기준가 + 0.01, 수량 Q/4
-            int locSellQty = Q / 4;
-            if (locSellQty >= 1) {
-                orders.add(kisOrderPort.place(token, new Order(
-                        today, symbol, LOC, SELL, locSellQty,
-                        G.add(new BigDecimal("0.01")), PLACED, null)));
-            }
-
-            // 지정가 매도 — 목표가, 수량 Q - Q/4
-            int limitSellQty = Q - Q / 4;
-            if (limitSellQty >= 1) {
-                orders.add(kisOrderPort.place(token, new Order(
-                        today, symbol, LIMIT, SELL, limitSellQty, P, PLACED, null)));
-            }
-
-        } else {
-            // 후반 (priceOffsetRate <= 0): 예수금 부족 여부로 분기
-
-            if (K.compareTo(D) > 0) {
-                // K > D: 예수금 부족 → MOC 매도만 (KIS: price=0으로 전송)
-                int mocSellQty = Q / 4;
-                if (mocSellQty >= 1) {
-                    orders.add(kisOrderPort.place(token, new Order(
-                            today, symbol, MOC, SELL, mocSellQty,
-                            BigDecimal.ZERO, PLACED, null)));
-                }
-            } else {
-                // K <= D: 예수금 충분 → LOC 매수 + LOC 매도 + 지정가 매도
-
-                // LOC 매수 — 기준가 기준: floor(K / G)
-                int buyQty = K.divide(G, 0, FLOOR).intValue();
-                if (buyQty >= 1) {
-                    orders.add(kisOrderPort.place(token, new Order(
-                            today, symbol, LOC, BUY, buyQty, G, PLACED, null)));
-                }
-
-                // LOC 매도 — 기준가 + 0.01, 수량 Q/4
-                int locSellQty = Q / 4;
-                if (locSellQty >= 1) {
-                    orders.add(kisOrderPort.place(token, new Order(
-                            today, symbol, LOC, SELL, locSellQty,
-                            G.add(new BigDecimal("0.01")), PLACED, null)));
-                }
-
-                // 지정가 매도 — 목표가, 수량 Q - Q/4
-                int limitSellQty = Q - Q / 4;
-                if (limitSellQty >= 1) {
-                    orders.add(kisOrderPort.place(token, new Order(
-                            today, symbol, LIMIT, SELL, limitSellQty, P, PLACED, null)));
-                }
-            }
-        }
-
-        return orders;
     }
 
     private TradeHistory toHistory(Order o) {

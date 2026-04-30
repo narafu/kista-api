@@ -5,6 +5,7 @@ querydsl                 = "5.1.0"
 archunit                 = "1.3.0"
 springdoc                = "2.8.4"
 flyway                   = "10.21.0"
+lombok                   = "1.18.36"
 
 [libraries]
 # Spring Boot Starters
@@ -28,6 +29,9 @@ springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-sta
 
 # Observability
 micrometer-prometheus           = { module = "io.micrometer:micrometer-registry-prometheus" }
+
+# Lombok
+lombok                         = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 # Testing
 archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }

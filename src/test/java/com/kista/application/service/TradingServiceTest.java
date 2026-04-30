@@ -68,14 +68,17 @@ class TradingServiceTest {
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
         TradingVariables vars = new SoxlDivisionStrategy().calculate(NORMAL_BALANCE, PRICE);
+        Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 3, PRICE, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisTokenPort.getToken()).thenReturn(TOKEN);
         when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
         when(kisAccountPort.getBalance(TOKEN)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice(TOKEN, "SOXL")).thenReturn(PRICE);
         when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE)).thenReturn(vars);
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
         when(kisOrderPort.place(eq(TOKEN), any())).thenReturn(placedOrder);
         when(kisExecutionPort.getExecutions(eq(TOKEN), any())).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
@@ -94,18 +97,21 @@ class TradingServiceTest {
 
     @Test
     void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
-        // FRESH_BALANCE: q=0, t=0 → BUY LOC 1건만 발생 (SELL 없음)
+        // FRESH_BALANCE: q=0, t=0 → buildOrders가 BUY 1건 반환, save = main 1 + corr 1 = 2
         TradingVariables vars = new SoxlDivisionStrategy().calculate(FRESH_BALANCE, PRICE);
+        Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order mainOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
         Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
-                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, null);
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
         when(kisTokenPort.getToken()).thenReturn(TOKEN);
         when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
         when(kisAccountPort.getBalance(TOKEN)).thenReturn(FRESH_BALANCE);
         when(kisPricePort.getPrice(TOKEN, "SOXL")).thenReturn(PRICE);
         when(tradingStrategy.calculate(FRESH_BALANCE, PRICE)).thenReturn(vars);
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
         when(kisOrderPort.place(eq(TOKEN), any())).thenReturn(mainOrder, corrOrder);
         when(kisExecutionPort.getExecutions(eq(TOKEN), any())).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));

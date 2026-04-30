@@ -1,7 +1,10 @@
 package com.kista.domain.model;
 
+import lombok.Builder;
+
 import java.math.BigDecimal;
 
+@Builder
 public record TradingVariables(
         BigDecimal averagePrice,      // 평단가 (A): 수량>0이면 avgPrice, 수량==0이면 currentPrice
         int quantity,                 // 수량 (Q)

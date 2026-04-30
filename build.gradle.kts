@@ -47,6 +47,12 @@ dependencies {
     // Observability
     implementation(libs.micrometer.prometheus)
 
+    // Lombok (컴파일 타임 코드 생성)
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
+
     // Testing
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.archunit.junit5)

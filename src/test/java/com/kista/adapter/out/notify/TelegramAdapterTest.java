@@ -72,21 +72,22 @@ class TelegramAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyReport_bodyContainsDateAndAmounts() {
-        TradingVariables vars = new TradingVariables(
-                new BigDecimal("20.00"),  // averagePrice
-                10,                       // quantity
-                new BigDecimal("200.00"), // purchaseAmount
-                new BigDecimal("210.00"), // evaluationAmount (21 × 10)
-                new BigDecimal("700.00"), // totalAssets
-                20,                       // totalRounds
-                1.33,                     // currentRound
-                new BigDecimal("35.00"),  // unitAmount
-                new BigDecimal("0.20"),   // targetProfitRate
-                new BigDecimal("0.1733"), // priceOffsetRate
-                new BigDecimal("500.00"), // usdDeposit
-                new BigDecimal("23.47"),  // referencePrice (20 × 1.1733)
-                new BigDecimal("24.00"),  // targetPrice
-                new BigDecimal("22.00")); // currentPrice
+        TradingVariables vars = TradingVariables.builder()
+                .averagePrice(new BigDecimal("20.00"))
+                .quantity(10)
+                .purchaseAmount(new BigDecimal("200.00"))
+                .evaluationAmount(new BigDecimal("210.00"))
+                .totalAssets(new BigDecimal("700.00"))
+                .totalRounds(20)
+                .currentRound(1.33)
+                .unitAmount(new BigDecimal("35.00"))
+                .targetProfitRate(new BigDecimal("0.20"))
+                .priceOffsetRate(new BigDecimal("0.1733"))
+                .usdDeposit(new BigDecimal("500.00"))
+                .referencePrice(new BigDecimal("23.47"))
+                .targetPrice(new BigDecimal("24.00"))
+                .currentPrice(new BigDecimal("22.00"))
+                .build();
         TradingReport report = new TradingReport(
                 LocalDate.of(2024, 6, 15), vars, List.of(), List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
