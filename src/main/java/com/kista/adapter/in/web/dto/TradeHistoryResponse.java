@@ -11,12 +11,12 @@ public record TradeHistoryResponse(
         UUID id, LocalDate tradeDate, String symbol, String strategy,
         Order.OrderType orderType, Order.OrderDirection direction,
         int qty, BigDecimal price, BigDecimal amountUsd,
-        Order.OrderStatus status, String kisOrderId, String phase, Instant createdAt
+        Order.OrderStatus status, String kisOrderId, Instant createdAt
 ) {
     public static TradeHistoryResponse from(TradeHistory h) {
         return new TradeHistoryResponse(
                 h.id(), h.tradeDate(), h.symbol(), h.strategy(),
                 h.orderType(), h.direction(), h.qty(), h.price(),
-                h.amountUsd(), h.status(), h.kisOrderId(), h.phase(), h.createdAt());
+                h.amountUsd(), h.status(), h.kisOrderId(), h.createdAt());
     }
 }

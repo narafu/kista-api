@@ -44,6 +44,5 @@ class FidaOrderServiceTest {
         assertThat(placed.symbol()).isEqualTo("SOXL");
         assertThat(placed.qty()).isEqualTo(5);
         assertThat(placed.price()).isEqualByComparingTo("25.50");
-        assertThat(placed.phase()).isEqualTo("FIDA");
     }
 }

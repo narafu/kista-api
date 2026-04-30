@@ -11,13 +11,12 @@ public record Order(
         int qty,                  // 주문 수량
         BigDecimal price,         // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,       // 주문 상태
-        String kisOrderId,        // KIS 시스템 부여 주문 번호 (ODNO)
-        String phase              // 주문 단계 구분 (MAIN=자동매매, FIDA=수동주문)
+        String kisOrderId         // KIS 시스템 부여 주문 번호 (ODNO)
 ) {
     public enum OrderType {
         LOC,   // Limit On Close: 종가 지정가 주문
         MOC,   // Market On Close: 종가 시장가 주문
-        LIMIT  // 일반 지정가 주문
+        LIMIT  // 일반 지정가 주문/
     }
     public enum OrderDirection { BUY, SELL }
     public enum OrderStatus {

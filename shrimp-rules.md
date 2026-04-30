@@ -64,7 +64,7 @@ domain → 외부 레이어 의존 금지
 | Adapter 클래스 | `Kis{기능}Adapter`, `{기능}Adapter` | `KisOrderAdapter`, `TelegramAdapter` |
 | Entity 클래스 | `{도메인}Entity` | `TradeHistoryEntity` |
 | JPA Repository | `{도메인}JpaRepository` | `TradeHistoryJpaRepository` |
-| Controller | `{기능}Controller` | `FidaOrderController` |
+| Controller | `{기능}Controller` | `DashboardController` |
 
 ### 도메인 모델 규칙
 
@@ -76,16 +76,18 @@ domain → 외부 레이어 의존 금지
 ### 매매 변수 공식 (변경 금지 — 단위 테스트로 검증)
 
 ```
-A = avgPrice (qty==0이면 currentPrice 사용)
-Q = soxlQty
-M = A × Q
-D = effectiveAmt (해외주문가능금액)
-B = D + M
-K = B ÷ 20  (scale=2, HALF_UP)
-T = Q==0 ? 0 : floor(M ÷ K)
-S = (20 - T×2) ÷ 100  (scale=4, HALF_UP)
-P = A × 1.2  (scale=2, HALF_UP)
+A = averagePrice  (quantity==0이면 currentPrice)   Q = quantity
+M = A × Q  (purchaseAmount)
+D = currentPrice × Q  (evaluationAmount, 정보성 — B 계산에 미사용)
+B = usdDeposit + M  (totalAssets)
+K = B ÷ 20  (unitAmount, scale=2, HALF_UP)
+T = Q==0 ? 0.0 : M ÷ K  (currentRound, double, 소수점 허용)
+S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=4, HALF_UP)
+P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ```
+
+- `AccountBalance.effectiveAmt` = SOXL 시가 평가액, `usdDeposit` = USD 예수금 — B 계산에 반드시 `usdDeposit` 사용
+- `currentRound`(T)는 floor 없이 소수점 허용 — SELL 조건은 `currentRound > 0`
 
 ---
 
@@ -106,10 +108,10 @@ P = A × 1.2  (scale=2, HALF_UP)
 2. `application/service/TradingService`에서 Strategy 주입 (Strategy 패턴 유지)
 3. `strategy_configs` 테이블에 설정 항목 추가
 
-### FIDA 연동 엔드포인트 수정
+### FIDA 수동 주문 엔드포인트
 
-- 진입점: `adapter/in/web/FidaOrderController` → `POST /api/fida/orders`
-- 흐름: `FidaOrderController` → `FidaOrderService` → `KisOrderPort`
+- 진입점: `adapter/in/web/DashboardController` → `POST /api/orders/fida`
+- 흐름: `DashboardController` → `FidaOrderService` → `KisOrderPort`
 - `trade_histories` 저장 시 `phase = 'FIDA'` 필수
 
 ---
@@ -136,7 +138,8 @@ P = A × 1.2  (scale=2, HALF_UP)
 | KisHolidayAdapter | 휴장일 조회 | `CTOS5011R` |
 | KisAccountAdapter | 잔고 조회 | `TTTS3012R` |
 | KisAccountAdapter | 주문가능금액 | `CTRP6504R` |
-| KisOrderAdapter | 해외주식 주문 | `TTTS0308U` |
+| KisOrderAdapter | 해외주식 매수 주문 | `TTTS0308U` |
+| KisOrderAdapter | 해외주식 매도 주문 | `TTTS0307U` |
 | KisExecutionAdapter | 체결 조회 | 체결 내역 API |
 
 ### 오류 처리
@@ -201,9 +204,9 @@ P = A × 1.2  (scale=2, HALF_UP)
 
 ### 웹훅 및 명령어
 
-- 웹훅 엔드포인트: `POST /webhook/telegram`
-- 인증: `TELEGRAM_WEBHOOK_SECRET` 헤더 검증
-- 지원 명령어: `/status`, `/history`, `/portfolio`, `/help`
+- 웹훅 엔드포인트: `POST /telegram/webhook`
+- 인증: `telegram.chat-id` 설정값과 수신 `chat.id` 비교 — 불일치 시 무시
+- 지원 명령어: `/status`, `/history [days]`, `/run`, `/cancel`, `/help`
 
 ### Adapter 역할 분리
 
@@ -227,7 +230,7 @@ P = A × 1.2  (scale=2, HALF_UP)
 
 ```
 KIS_APP_KEY, KIS_APP_SECRET, KIS_ACCT_STOCK, KIS_HTS_ID
-TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET
+TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
 SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
 ```
@@ -253,14 +256,14 @@ SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
 
 ### 단위 테스트 필수 항목
 
-- `SoxlDivisionStrategy`: A, Q, M, D, B, K, T, S, P 계산 정확도 검증
+- `SoxlDivisionStrategy`: averagePrice, quantity, purchaseAmount, totalAssets, currentRound, priceOffsetRate, targetPrice 계산 정확도 검증
 - `CorrectionStrategy`: 미체결 보정 계산 검증
 - `AccountBalance.shouldSkip()`: 잔고 부족 판단 로직
 
 ### 통합 테스트
 
-- KIS API: 실제 토큰 발급 + 잔고 조회 확인 (모의투자 계정)
-- Persistence: Testcontainers PostgreSQL 사용
+- KIS API: 실제 토큰 발급 + 잔고 조회 확인 (실전 계좌 — 모의투자는 LOC/MOC 미지원)
+- Persistence: **docker-compose 로컬 PostgreSQL** 사용 (`docker-compose up -d postgres` 선행 필수)
 
 ### ArchUnit 규칙 유지
 

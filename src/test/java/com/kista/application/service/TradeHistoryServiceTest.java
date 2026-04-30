@@ -34,7 +34,7 @@ class TradeHistoryServiceTest {
         TradeHistory h = new TradeHistory(UUID.randomUUID(), from, "SOXL", "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", "MAIN", Instant.now());
+                Order.OrderStatus.PLACED, "KIS001", Instant.now());
         when(tradeHistoryPort.findBy(from, to, "SOXL")).thenReturn(List.of(h));
 
         List<TradeHistory> result = sut.getHistory(from, to, "SOXL");

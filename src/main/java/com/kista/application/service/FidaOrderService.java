@@ -31,8 +31,7 @@ public class FidaOrderService implements ExecuteFidaOrderUseCase {
                 request.qty(),
                 request.price(),
                 Order.OrderStatus.PLACED,
-                null,
-                "FIDA");
+                null);
         kisOrderPort.place(token, order);
     }
 }

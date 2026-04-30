@@ -43,7 +43,7 @@ public class KisOrderAdapter implements KisOrderPort {
 
         return new Order(
                 order.tradeDate(), order.symbol(), order.orderType(), order.direction(),
-                order.qty(), order.price(), Order.OrderStatus.PLACED, odno, order.phase()
+                order.qty(), order.price(), Order.OrderStatus.PLACED, odno
         );
     }
 

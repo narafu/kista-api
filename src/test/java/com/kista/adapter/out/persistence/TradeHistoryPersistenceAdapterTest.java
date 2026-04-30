@@ -27,7 +27,7 @@ class TradeHistoryPersistenceAdapterTest {
                 null, date, symbol, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY,
                 5, new BigDecimal("20.0000"), new BigDecimal("100.00"),
-                Order.OrderStatus.PLACED, kisOrderId, "MAIN",
+                Order.OrderStatus.PLACED, kisOrderId,
                 null
         );
     }
@@ -53,7 +53,6 @@ class TradeHistoryPersistenceAdapterTest {
         assertThat(saved.amountUsd()).isEqualByComparingTo("100.00");
         assertThat(saved.status()).isEqualTo(Order.OrderStatus.PLACED);
         assertThat(saved.kisOrderId()).isEqualTo("ORD-001");
-        assertThat(saved.phase()).isEqualTo("MAIN");
     }
 
     @Test

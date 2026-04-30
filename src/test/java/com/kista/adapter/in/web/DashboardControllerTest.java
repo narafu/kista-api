@@ -47,7 +47,7 @@ class DashboardControllerTest {
         TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), "SOXL", "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", "MAIN", Instant.now());
+                Order.OrderStatus.PLACED, "KIS001", Instant.now());
         when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(h));
 
         mockMvc.perform(get("/api/trades"))

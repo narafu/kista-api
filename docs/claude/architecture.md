@@ -14,7 +14,7 @@ application/
 
 adapter/in/
   schedule/      ← TradingScheduler (월~금 04:00 KST)
-  web/           ← REST Controller + DTO (FidaOrderController)
+  web/           ← REST Controller + DTO (DashboardController)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/

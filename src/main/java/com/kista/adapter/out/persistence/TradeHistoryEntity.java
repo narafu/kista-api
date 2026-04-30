@@ -50,9 +50,6 @@ class TradeHistoryEntity {
     @Column(name = "kis_order_id", length = 30)
     private String kisOrderId;
 
-    @Column(nullable = false, length = 20)
-    private String phase;
-
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -61,7 +58,7 @@ class TradeHistoryEntity {
     TradeHistoryEntity(UUID id, LocalDate tradeDate, String symbol, String strategy,
                        Order.OrderType orderType, Order.OrderDirection direction,
                        int qty, BigDecimal price, BigDecimal amountUsd,
-                       Order.OrderStatus status, String kisOrderId, String phase) {
+                       Order.OrderStatus status, String kisOrderId) {
         this.id = id;
         this.tradeDate = tradeDate;
         this.symbol = symbol;
@@ -73,7 +70,6 @@ class TradeHistoryEntity {
         this.amountUsd = amountUsd;
         this.status = status;
         this.kisOrderId = kisOrderId;
-        this.phase = phase;
     }
 
     UUID getId() { return id; }
@@ -87,6 +83,5 @@ class TradeHistoryEntity {
     BigDecimal getAmountUsd() { return amountUsd; }
     Order.OrderStatus getStatus() { return status; }
     String getKisOrderId() { return kisOrderId; }
-    String getPhase() { return phase; }
     Instant getCreatedAt() { return createdAt; }
 }

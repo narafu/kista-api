@@ -69,7 +69,7 @@ class TradingServiceTest {
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
         TradingVariables vars = new SoxlDivisionStrategy().calculate(NORMAL_BALANCE, PRICE);
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 3, PRICE, Order.OrderStatus.PLACED, "ORD-001", "MAIN");
+                Order.OrderDirection.BUY, 3, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisTokenPort.getToken()).thenReturn(TOKEN);
         when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
@@ -97,9 +97,9 @@ class TradingServiceTest {
         // FRESH_BALANCE: q=0, t=0 → BUY LOC 1건만 발생 (SELL 없음)
         TradingVariables vars = new SoxlDivisionStrategy().calculate(FRESH_BALANCE, PRICE);
         Order mainOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, "ORD-001", "MAIN");
+                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, "ORD-001");
         Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
-                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, null, "MAIN");
+                Order.OrderDirection.BUY, 4, PRICE, Order.OrderStatus.PLACED, null);
 
         when(kisTokenPort.getToken()).thenReturn(TOKEN);
         when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);

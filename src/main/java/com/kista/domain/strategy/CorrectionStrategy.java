@@ -33,8 +33,7 @@ public class CorrectionStrategy {
                         o.qty(),
                         o.price(),
                         Order.OrderStatus.PLACED,
-                        null,
-                        o.phase()
+                        null
                 ))
                 .toList();
     }

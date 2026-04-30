@@ -17,6 +17,5 @@ public record TradeHistory(
         BigDecimal amountUsd,
         Order.OrderStatus status,
         String kisOrderId,
-        String phase,
         Instant createdAt
 ) {}

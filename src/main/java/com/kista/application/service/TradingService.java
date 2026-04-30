@@ -142,7 +142,7 @@ public class TradingService implements ExecuteTradingUseCase {
         if (buyQty >= 1) {
             orders.add(kisOrderPort.place(token, new Order(
                     today, symbol, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                    buyQty, vars.currentPrice(), Order.OrderStatus.PLACED, null, "MAIN")));
+                    buyQty, vars.currentPrice(), Order.OrderStatus.PLACED, null)));
         }
 
         // SELL LOC: currentRound > 0이고 보유 수량 있는 경우 1회차분 매도
@@ -151,7 +151,7 @@ public class TradingService implements ExecuteTradingUseCase {
             if (sellQty >= 1) {
                 orders.add(kisOrderPort.place(token, new Order(
                         today, symbol, Order.OrderType.LOC, Order.OrderDirection.SELL,
-                        sellQty, vars.targetPrice(), Order.OrderStatus.PLACED, null, "MAIN")));
+                        sellQty, vars.targetPrice(), Order.OrderStatus.PLACED, null)));
             }
         }
 
@@ -164,7 +164,7 @@ public class TradingService implements ExecuteTradingUseCase {
         return new TradeHistory(
                 null, o.tradeDate(), o.symbol(), "SOXL_DIVISION",
                 o.orderType(), o.direction(), o.qty(), o.price(),
-                amountUsd, o.status(), o.kisOrderId(), o.phase(), null);
+                amountUsd, o.status(), o.kisOrderId(), null);
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price, LocalDate today) {
