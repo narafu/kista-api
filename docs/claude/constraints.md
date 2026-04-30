@@ -8,12 +8,13 @@
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
 A = avgPrice (qty==0이면 currentPrice)  Q = soxlQty
-M = A × Q   D = effectiveAmt
+M = A × Q   D = usdDeposit
 B = D + M   K = B ÷ 20  (scale=2, HALF_UP)
 T = Q==0 ? 0 : floor(M ÷ K)
 S = (20 - T×2) ÷ 100  (scale=4, HALF_UP)
 P = A × 1.2  (scale=2, HALF_UP)
 ```
+- `AccountBalance.effectiveAmt` = SOXL 시가 평가액 (KIS `FRCR_EVLU_AMT2`), `usdDeposit` = 예수금 (KIS `FRCR_DNCL_AMT_2`) — D는 반드시 `usdDeposit` 사용
 
 ### Flyway
 - `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로
