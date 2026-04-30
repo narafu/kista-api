@@ -17,6 +17,12 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 `application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
 
+### SoxlDivisionStrategy 테스트 패턴
+- `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`
+- `priceOffsetRate` 기대값: scale=2 반올림된 currentRound 기준으로 계산 (T=200/150=1.33 → 0.1734, not 0.1733)
+- `TradingServiceTest`는 `new SoxlDivisionStrategy().calculate()`로 vars 생성 — 전략 변경 시 자동 반영, 별도 수정 불필요
+- `AccountBalance` 테스트 데이터: `effectiveAmt = currentPrice × quantity`, `usdDeposit = 현금`; quantity=0이면 effectiveAmt=0
+
 ### JPA 엔티티 저장 패턴
 - `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
 - `@Transactional` 테스트 내에서 `insertable=false, updatable=false` 필드(예: `createdAt`)는 DB DEFAULT 값이 JPA 1차 캐시에 반영되지 않음 → 해당 필드 `isNotNull()` 단언 금지

@@ -7,14 +7,15 @@
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
-A = avgPrice (qty==0이면 currentPrice)  Q = soxlQty
-M = A × Q   D = usdDeposit
-B = D + M   K = B ÷ 20  (scale=2, HALF_UP)
-T = Q==0 ? 0 : floor(M ÷ K)
-S = (20 - T×2) ÷ 100  (scale=4, HALF_UP)
-P = A × 1.2  (scale=2, HALF_UP)
+A = averagePrice (qty==0이면 currentPrice)   Q = quantity
+M = A × Q (purchaseAmount)   D = currentPrice × Q (evaluationAmount, 정보성)
+B = usdDeposit + M (totalAssets)   K = B ÷ 20 (unitAmount, scale=2, HALF_UP)
+T = Q==0 ? 0.0 : M ÷ K  (currentRound, double, 소수점 허용)
+S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=4, HALF_UP)
+P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ```
-- `AccountBalance.effectiveAmt` = SOXL 시가 평가액 (KIS `FRCR_EVLU_AMT2`), `usdDeposit` = 예수금 (KIS `FRCR_DNCL_AMT_2`) — D는 반드시 `usdDeposit` 사용
+- `AccountBalance.effectiveAmt` = SOXL 시가 평가액 (KIS `FRCR_EVLU_AMT2`), `usdDeposit` = 예수금 (KIS `FRCR_DNCL_AMT_2`) — B 계산에는 반드시 `usdDeposit` 사용
+- `currentRound`(T)는 floor 없이 소수점 허용 — SELL 조건은 `currentRound > 0` (0.3회차에도 트리거)
 
 ### Flyway
 - `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로

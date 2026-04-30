@@ -90,7 +90,7 @@ public class TradingService implements ExecuteTradingUseCase {
 
         // 계좌 잔고 조회 및 최소 거래 금액 미달 시 종료
         AccountBalance balance = kisAccountPort.getBalance(token);
-        log.info("잔고 조회: SOXL {}주, 예수금 ${}, 유효잔고 ${}", balance.soxlQty(), balance.usdDeposit(), balance.effectiveAmt());
+        log.info("잔고 조회: SOXL {}주, 예수금 ${}, 유효잔고 ${}", balance.quantity(), balance.usdDeposit(), balance.effectiveAmt());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀");
             notifyPort.notifyInsufficientBalance(balance);
@@ -101,7 +101,7 @@ public class TradingService implements ExecuteTradingUseCase {
         BigDecimal price = kisPricePort.getPrice(token, symbol);
         log.info("현재가: ${}", price);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
-        log.info("전략 계산: S={}, T={}, K={}", vars.s(), vars.t(), vars.k());
+        log.info("전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}", vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
         List<Order> mainOrders = placeMainOrders(token, vars, today);
         log.info("LOC 주문 {}건 접수", mainOrders.size());
 
@@ -135,8 +135,8 @@ public class TradingService implements ExecuteTradingUseCase {
     private List<Order> placeMainOrders(String token, TradingVariables vars, LocalDate today) {
         List<Order> orders = new ArrayList<>();
 
-        // BUY LOC: 총 포트폴리오의 S% 비중 매수
-        int buyQty = vars.b().multiply(vars.s())
+        // BUY LOC: 총 포트폴리오의 priceOffsetRate 비중 매수
+        int buyQty = vars.totalAssets().multiply(vars.priceOffsetRate())
                 .divide(vars.currentPrice(), 0, RoundingMode.FLOOR)
                 .intValue();
         if (buyQty >= 1) {
@@ -145,13 +145,13 @@ public class TradingService implements ExecuteTradingUseCase {
                     buyQty, vars.currentPrice(), Order.OrderStatus.PLACED, null, "MAIN")));
         }
 
-        // SELL LOC: 익절 tier(T>0)가 있고 보유 수량 있는 경우 1슬롯 매도
-        if (vars.q() > 0 && vars.t() > 0) {
-            int sellQty = vars.k().divide(vars.p(), 0, RoundingMode.FLOOR).intValue();
+        // SELL LOC: currentRound > 0이고 보유 수량 있는 경우 1회차분 매도
+        if (vars.quantity() > 0 && vars.currentRound() > 0) {
+            int sellQty = vars.unitAmount().divide(vars.targetPrice(), 0, RoundingMode.FLOOR).intValue();
             if (sellQty >= 1) {
                 orders.add(kisOrderPort.place(token, new Order(
                         today, symbol, Order.OrderType.LOC, Order.OrderDirection.SELL,
-                        sellQty, vars.p(), Order.OrderStatus.PLACED, null, "MAIN")));
+                        sellQty, vars.targetPrice(), Order.OrderStatus.PLACED, null, "MAIN")));
             }
         }
 
@@ -168,12 +168,12 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price, LocalDate today) {
-        BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.soxlQty()))
+        BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.quantity()))
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, RoundingMode.HALF_UP);
         return new PortfolioSnapshot(
-                null, today, symbol, balance.soxlQty(), balance.avgPrice(),
+                null, today, symbol, balance.quantity(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, null);
     }
 

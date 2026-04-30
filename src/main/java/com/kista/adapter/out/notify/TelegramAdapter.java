@@ -30,11 +30,11 @@ public class TelegramAdapter implements NotifyPort {
                 "<b>매매 결산 [%s]</b>%n"
                 + "매수: $%.2f | 매도: $%.2f%n"
                 + "보유: %d주 @ $%.4f%n"
-                + "비율: %.4f | 목표가: $%.2f",
+                + "편차율: %.4f | 목표가: $%.2f",
                 r.date(),
                 r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.vars().q(), r.vars().a(),
-                r.vars().s(), r.vars().p());
+                r.vars().quantity(), r.vars().averagePrice(),
+                r.vars().priceOffsetRate(), r.vars().targetPrice());
         send(text);
     }
 
@@ -46,7 +46,7 @@ public class TelegramAdapter implements NotifyPort {
     @Override
     public void notifyInsufficientBalance(AccountBalance b) {
         send(String.format("잔고 부족: SOXL %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
-                b.soxlQty(), b.usdDeposit()));
+                b.quantity(), b.usdDeposit()));
     }
 
     @Override

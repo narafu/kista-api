@@ -59,7 +59,7 @@ class TelegramAdapterTest {
     @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_bodyContainsQtyAndAmount() {
         AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO,
-                new BigDecimal("5.00"), BigDecimal.ZERO);
+                BigDecimal.ZERO, new BigDecimal("5.00")); // effectiveAmt=0, usdDeposit=5.00
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.notifyInsufficientBalance(balance);
@@ -73,11 +73,18 @@ class TelegramAdapterTest {
     @SuppressWarnings("unchecked")
     void notifyReport_bodyContainsDateAndAmounts() {
         TradingVariables vars = new TradingVariables(
-                new BigDecimal("20.00"), 10,
-                new BigDecimal("200.00"), new BigDecimal("500.00"),
-                new BigDecimal("700.00"), new BigDecimal("35.00"),
-                5, new BigDecimal("0.1000"),
-                new BigDecimal("24.00"), new BigDecimal("22.00"));
+                new BigDecimal("20.00"),  // averagePrice
+                10,                       // quantity
+                new BigDecimal("200.00"), // purchaseAmount
+                new BigDecimal("210.00"), // evaluationAmount (21 × 10)
+                new BigDecimal("700.00"), // totalAssets
+                20,                       // totalRounds
+                1.33,                     // currentRound
+                new BigDecimal("35.00"),  // unitAmount
+                new BigDecimal("0.20"),   // targetProfitRate
+                new BigDecimal("0.1733"), // priceOffsetRate
+                new BigDecimal("24.00"),  // targetPrice
+                new BigDecimal("22.00")); // currentPrice
         TradingReport report = new TradingReport(
                 LocalDate.of(2024, 6, 15), vars, List.of(), List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
