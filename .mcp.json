@@ -3,11 +3,19 @@
     "shrimp-task-manager": {
       "type": "stdio",
       "command": "node",
-      "args": ["/home/user/workspace/mcp-shrimp-task-manager/dist/index.js"],
+      "args": ["/Users/phs/workspace/mcp-shrimp-task-manager/dist/index.js"],
       "env": {
-        "DATA_DIR": "/home/user/workspace/kista/.shrimp-data",
+        "DATA_DIR": "/Users/phs/workspace/kista/.shrimp-data",
         "TEMPLATES_USE": "en"
       }
+    },
+    "kis-coding-mcp": {
+      "type": "http",
+      "url": "http://localhost:8081/mcp"
+    },
+    "kis-trade-mcp": {
+      "type": "sse",
+      "url": "http://localhost:3001/sse"
     }
   }
 }
