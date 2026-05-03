@@ -70,27 +70,14 @@ public class TradingService implements ExecuteTradingUseCase {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
     void execute(DstInfo dst) throws InterruptedException {
-        // 주문 시각까지 대기
-        long orderWaitMs = dst.waitUntilOrderTime().toMillis();
-        log.info("DST={}, 주문 시각까지 대기: {}ms", dst.isDst(), orderWaitMs);
-        if (orderWaitMs > 0) Thread.sleep(orderWaitMs);
-        log.info("주문 시각 도달");
+        waitForOrderTime(dst);
 
-        LocalDate today = LocalDate.now();
-        // KIS API 호출용 OAuth 토큰 발급
         String token = kisTokenPort.getToken();
+        LocalDate today = LocalDate.now();
         log.info("KIS 토큰 발급 완료");
 
-        // 미국 시장 휴장일 확인
-        boolean marketOpen = kisHolidayPort.isMarketOpen(token, today);
-        log.info("시장 개장 여부: {}", marketOpen);
-        if (!marketOpen) {
-            log.info("휴장일 — 매매 건너뜀");
-            notifyPort.notifyMarketClosed();
-            return;
-        }
+        if (!isMarketOpen(token, today)) return;
 
-        // 계좌 잔고 조회 및 최소 거래 금액 미달 시 종료
         AccountBalance balance = kisAccountPort.getBalance(token);
         log.info("잔고 조회: SOXL {}주, 예수금 ${}, 유효잔고 ${}", balance.quantity(), balance.usdDeposit(), balance.effectiveAmt());
         if (balance.shouldSkip()) {
@@ -99,36 +86,69 @@ public class TradingService implements ExecuteTradingUseCase {
             return;
         }
 
-        // 전략 계산 후 BUY/SELL LOC 주문 접수
         BigDecimal price = kisPricePort.getPrice(token, symbol);
         log.info("현재가: ${}", price);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
         log.info("전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}", vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
-        List<Order> pending = tradingStrategy.buildOrders(vars, today, symbol);
-        List<Order> mainOrders = pending.stream().map(o -> kisOrderPort.place(token, o)).toList();
-        log.info("주문 {}건 접수", mainOrders.size());
+        List<Order> mainOrders = placeMainOrders(token, vars, today);
 
-        // PostClose 시각까지 대기 (체결 내역이 KIS에 반영될 때까지)
-        long postWaitMs = dst.waitUntilPostClose().toMillis();
-        log.info("PostClose까지 대기: {}ms", postWaitMs);
-        if (postWaitMs > 0) Thread.sleep(postWaitMs);
-        log.info("PostClose 대기 완료");
+        waitForPostClose(dst);
 
-        // 당일 체결 내역 조회 후 미체결 주문 LIMIT으로 보정
         List<Execution> executions = kisExecutionPort.getExecutions(token, today);
         log.info("체결 내역 {}건 조회", executions.size());
+        List<Order> corrections = applyCorrections(token, mainOrders, executions, today);
+
+        saveAndNotify(balance, price, today, vars, mainOrders, corrections, executions);
+    }
+
+    private void waitForOrderTime(DstInfo dst) throws InterruptedException {
+        long ms = dst.waitUntilOrderTime().toMillis();
+        log.info("DST={}, 주문 시각까지 대기: {}ms", dst.isDst(), ms);
+        if (ms > 0) Thread.sleep(ms);
+        log.info("주문 시각 도달");
+    }
+
+    // false 반환 시 알림 발송 후 execute()에서 즉시 return
+    private boolean isMarketOpen(String token, LocalDate today) {
+        boolean open = kisHolidayPort.isMarketOpen(token, today);
+        log.info("시장 개장 여부: {}", open);
+        if (!open) {
+            log.info("휴장일 — 매매 건너뜀");
+            notifyPort.notifyMarketClosed();
+        }
+        return open;
+    }
+
+    private List<Order> placeMainOrders(String token, TradingVariables vars, LocalDate today) {
+        List<Order> pending = tradingStrategy.buildOrders(vars, today, symbol);
+        List<Order> placed = pending.stream().map(o -> kisOrderPort.place(token, o)).toList();
+        log.info("주문 {}건 접수", placed.size());
+        return placed;
+    }
+
+    private void waitForPostClose(DstInfo dst) throws InterruptedException {
+        long ms = dst.waitUntilPostClose().toMillis();
+        log.info("PostClose까지 대기: {}ms", ms);
+        if (ms > 0) Thread.sleep(ms);
+        log.info("PostClose 대기 완료");
+    }
+
+    private List<Order> applyCorrections(String token, List<Order> mainOrders,
+                                         List<Execution> executions, LocalDate today) {
         List<Order> corrections = correctionStrategy.correct(mainOrders, executions, today)
                 .stream()
                 .map(o -> kisOrderPort.place(token, o))
                 .toList();
         log.info("보정 주문 {}건", corrections.size());
+        return corrections;
+    }
 
-        // 거래 이력 저장
+    private void saveAndNotify(AccountBalance balance, BigDecimal price, LocalDate today,
+                               TradingVariables vars, List<Order> mainOrders,
+                               List<Order> corrections, List<Execution> executions) {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o)));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o)));
         log.info("거래 이력 {}건 저장", mainOrders.size() + corrections.size());
-
-        // 포트폴리오 스냅샷 저장 후 텔레그램 리포트 발송
         portfolioSnapshotPort.save(toSnapshot(balance, price, today));
         log.info("포트폴리오 스냅샷 저장 완료");
         notifyPort.notifyReport(buildReport(today, vars, mainOrders, corrections, executions));

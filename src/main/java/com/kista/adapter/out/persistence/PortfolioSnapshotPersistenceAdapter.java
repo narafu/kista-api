@@ -12,7 +12,7 @@ public class PortfolioSnapshotPersistenceAdapter implements PortfolioSnapshotPor
 
     private final PortfolioSnapshotJpaRepository repository;
 
-    public PortfolioSnapshotPersistenceAdapter(PortfolioSnapshotJpaRepository repository) {
+    PortfolioSnapshotPersistenceAdapter(PortfolioSnapshotJpaRepository repository) {
         this.repository = repository;
     }
 

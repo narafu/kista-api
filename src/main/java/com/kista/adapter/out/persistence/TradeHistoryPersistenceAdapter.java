@@ -12,7 +12,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
 
     private final TradeHistoryJpaRepository repository;
 
-    public TradeHistoryPersistenceAdapter(TradeHistoryJpaRepository repository) {
+    TradeHistoryPersistenceAdapter(TradeHistoryJpaRepository repository) {
         this.repository = repository;
     }
 
