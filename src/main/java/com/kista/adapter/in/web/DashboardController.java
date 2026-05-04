@@ -8,6 +8,7 @@ import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -17,19 +18,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
 public class DashboardController {
 
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
     private final GetPortfolioUseCase getPortfolioUseCase;
     private final ExecuteFidaOrderUseCase executeFidaOrderUseCase;
-
-    public DashboardController(GetTradeHistoryUseCase getTradeHistoryUseCase,
-                               GetPortfolioUseCase getPortfolioUseCase,
-                               ExecuteFidaOrderUseCase executeFidaOrderUseCase) {
-        this.getTradeHistoryUseCase = getTradeHistoryUseCase;
-        this.getPortfolioUseCase = getPortfolioUseCase;
-        this.executeFidaOrderUseCase = executeFidaOrderUseCase;
-    }
 
     @GetMapping("/trades")
     public List<TradeHistoryResponse> getTrades(

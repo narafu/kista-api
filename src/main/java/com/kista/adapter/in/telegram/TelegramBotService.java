@@ -5,8 +5,8 @@ import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,11 +15,12 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 class TelegramBotService {
 
-    private static final Logger log = LoggerFactory.getLogger(TelegramBotService.class);
-
+    @Value("${telegram.chat-id:}")
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
@@ -27,19 +28,6 @@ class TelegramBotService {
     private final ExecuteTradingUseCase executeTradingUseCase;
     // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
-
-    TelegramBotService(
-            @Value("${telegram.chat-id:}") String adminChatId,
-            TelegramApiClient apiClient,
-            GetTradeHistoryUseCase getTradeHistoryUseCase,
-            GetPortfolioUseCase getPortfolioUseCase,
-            ExecuteTradingUseCase executeTradingUseCase) {
-        this.adminChatId = adminChatId;
-        this.apiClient = apiClient;
-        this.getTradeHistoryUseCase = getTradeHistoryUseCase;
-        this.getPortfolioUseCase = getPortfolioUseCase;
-        this.executeTradingUseCase = executeTradingUseCase;
-    }
 
     void handle(TelegramUpdate update) {
         if (update.message() == null || update.message().text() == null) return;
