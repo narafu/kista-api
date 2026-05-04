@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.port.out.KisTokenPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -9,13 +10,10 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class KisTokenAdapter implements KisTokenPort {
 
     private final KisHttpClient kisHttpClient;
-
-    public KisTokenAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public String getToken() {

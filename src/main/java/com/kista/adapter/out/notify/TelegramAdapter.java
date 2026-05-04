@@ -3,26 +3,22 @@ package com.kista.adapter.out.notify;
 import com.kista.domain.model.AccountBalance;
 import com.kista.domain.model.TradingReport;
 import com.kista.domain.port.out.NotifyPort;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class TelegramAdapter implements NotifyPort {
 
-    private static final Logger log = LoggerFactory.getLogger(TelegramAdapter.class);
     private static final String API_BASE = "https://api.telegram.org";
 
-    private final RestTemplate restTemplate;
+    private final RestTemplate telegramRestTemplate; // 빈 이름: telegramRestTemplate
     private final TelegramProperties props;
-
-    public TelegramAdapter(RestTemplate telegramRestTemplate, TelegramProperties props) {
-        this.restTemplate = telegramRestTemplate;
-        this.props = props;
-    }
 
     @Override
     public void notifyReport(TradingReport r) {
@@ -65,7 +61,7 @@ public class TelegramAdapter implements NotifyPort {
                     "chat_id", props.chatId(),
                     "text", text,
                     "parse_mode", "HTML");
-            restTemplate.postForObject(url, body, String.class);
+            telegramRestTemplate.postForObject(url, body, String.class);
         } catch (Exception e) {
             log.error("Telegram 메시지 전송 실패: {}", e.getMessage());
         }

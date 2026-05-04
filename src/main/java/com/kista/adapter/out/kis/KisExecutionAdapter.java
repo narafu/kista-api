@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Execution;
 import com.kista.domain.model.Order;
 import com.kista.domain.port.out.KisExecutionPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -16,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class KisExecutionAdapter implements KisExecutionPort {
 
     private static final String PATH  = "/uapi/overseas-stock/v1/trading/inquire-ccnl";
@@ -23,10 +25,6 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final KisHttpClient kisHttpClient;
-
-    public KisExecutionAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public List<Execution> getExecutions(String token, LocalDate date) {

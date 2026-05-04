@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.port.out.KisHolidayPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -12,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class KisHolidayAdapter implements KisHolidayPort {
 
     private static final String PATH = "/uapi/overseas-stock/v1/trading/countries-holiday";
@@ -19,10 +21,6 @@ public class KisHolidayAdapter implements KisHolidayPort {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final KisHttpClient kisHttpClient;
-
-    public KisHolidayAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public boolean isMarketOpen(String token, LocalDate date) {
