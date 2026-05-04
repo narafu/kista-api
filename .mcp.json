@@ -3,19 +3,29 @@
     "shrimp-task-manager": {
       "type": "stdio",
       "command": "sh",
-      "args": ["-c", "DATA_DIR=${HOME}/workspace/kista/.shrimp-data node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"],
+      "args": [
+        "-c",
+        "DATA_DIR=${HOME}/workspace/kista/.shrimp-data node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"
+      ],
       "env": {
         "TEMPLATES_USE": "en"
       }
+    },
+    "render": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "npx mcp-remote https://mcp.render.com/mcp --header \"Authorization: Bearer ${RENDER_API_KEY}\""
+      ]
     },
     "kis-coding-mcp": {
       "type": "http",
       "url": "http://localhost:8081/mcp"
     },
-    "render": {
-      "type": "stdio",
-      "command": "sh",
-      "args": ["-c", "npx mcp-remote https://mcp.render.com/mcp --header \"Authorization: Bearer ${RENDER_API_KEY}\""]
+    "kis-trade-mcp": {
+      "type": "sse",
+      "url": "http://localhost:3001/sse"
     }
   }
 }
