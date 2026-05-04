@@ -7,7 +7,7 @@ ENV JAVA_TOOL_OPTIONS="-Xmx768m"
 
 # Gradle Wrapper 및 의존성 레이어 캐싱 (소스 변경 없을 때 재사용)
 COPY gradle/ gradle/
-COPY gradlew settings.gradle.kts build.gradle.kts ./
+COPY gradlew settings.gradle.kts build.gradle.kts lombok.config ./
 RUN ./gradlew dependencies --no-daemon -q || true
 
 # 소스 복사 및 JAR 빌드

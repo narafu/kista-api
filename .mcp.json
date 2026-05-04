@@ -3,9 +3,8 @@
     "shrimp-task-manager": {
       "type": "stdio",
       "command": "sh",
-      "args": ["-c", "node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"],
+      "args": ["-c", "DATA_DIR=${HOME}/workspace/kista/.shrimp-data node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"],
       "env": {
-        "DATA_DIR": "/home/user/workspace/kista/.shrimp-data",
         "TEMPLATES_USE": "en"
       }
     },
