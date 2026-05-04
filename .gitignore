@@ -35,3 +35,6 @@ docker-compose.override.yml
 
 # Fly.io
 .fly/
+
+# memory
+/.shrimp-data/memory/
