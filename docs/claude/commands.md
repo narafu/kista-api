@@ -15,6 +15,7 @@
 curl https://kista.onrender.com/actuator/health
 # 로그: Render MCP mcp__render__list_logs 또는 대시보드
 # 서비스 ID: srv-d7sbvhrbc2fs738uf6c0 (kista 워크스페이스 tea-d7sbrv3rjlhs7389pr60)
+# Render MCP 로그 조회 전 반드시 먼저: mcp__render__select_workspace ownerID=tea-d7sbrv3rjlhs7389pr60
 ```
 
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
