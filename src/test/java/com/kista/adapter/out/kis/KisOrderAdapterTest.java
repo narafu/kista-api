@@ -45,8 +45,8 @@ class KisOrderAdapterTest {
     }
 
     @Test
-    @DisplayName("BUY+LOC: TTTS0308U 사용, ORD_DVSN=32, 가격=0, 상태=PLACED")
-    void place_buyLoc_usesBuyTrIdAndOrdDvsn32() {
+    @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 가격=0, 상태=PLACED")
+    void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
         Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY,
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
@@ -54,16 +54,16 @@ class KisOrderAdapterTest {
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.place(TOKEN, order);
 
-        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTS0308U"));
+        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTT1002U"));
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("ORD_DVSN")).isEqualTo("32");
+        assertThat(body.get("ORD_DVSN")).isEqualTo("34");
         assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
     }
 
     @Test
-    @DisplayName("BUY+MOC: ORD_DVSN=34, 가격=0")
-    void place_buyMoc_usesOrdDvsn34() {
+    @DisplayName("BUY+MOC: ORD_DVSN=33, 가격=0")
+    void place_buyMoc_usesOrdDvsn33() {
         Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.MOC, Order.OrderDirection.BUY,
                 5, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
@@ -73,7 +73,7 @@ class KisOrderAdapterTest {
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("ORD_DVSN")).isEqualTo("34");
+        assertThat(body.get("ORD_DVSN")).isEqualTo("33");
         assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
     }
 
@@ -95,7 +95,7 @@ class KisOrderAdapterTest {
     }
 
     @Test
-    @DisplayName("SELL: TTTS0307U 사용")
+    @DisplayName("SELL: TTTT1006U 사용")
     void place_sell_usesSellTrId() {
         Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.SELL,
                 8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
@@ -103,7 +103,7 @@ class KisOrderAdapterTest {
 
         adapter.place(TOKEN, order);
 
-        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTS0307U"));
+        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTT1006U"));
     }
 
     @Test

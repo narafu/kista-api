@@ -34,10 +34,18 @@ public class KisExecutionAdapter implements KisExecutionPort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
-        params.add("INQR_STRT_DT", dateStr);
-        params.add("INQR_END_DT", dateStr);
-        params.add("CTX_AREA_FK200", "");
+        params.add("PDNO", "%");              // 전종목
+        params.add("ORD_STRT_DT", dateStr);
+        params.add("ORD_END_DT", dateStr);
+        params.add("SLL_BUY_DVSN", "00");    // 전체
+        params.add("CCLD_NCCS_DVSN", "00");  // 전체
+        params.add("OVRS_EXCG_CD", "NASD");  // 미국 전체
+        params.add("SORT_SQN", "DS");        // 정순
+        params.add("ORD_DT", "");
+        params.add("ORD_GNO_BRNO", "");
+        params.add("ODNO", "");
         params.add("CTX_AREA_NK200", "");
+        params.add("CTX_AREA_FK200", "");
 
         ExecutionListResponse response = kisHttpClient.get(PATH, headers, params, ExecutionListResponse.class);
 
@@ -48,7 +56,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
                 .map(item -> new Execution(
                         date,
                         item.pdno(),
-                        resolveDirection(item.selnByovCls()),
+                        resolveDirection(item.sllBuyDvsnCd()),
                         parseIntSafe(item.ftCcldQty()),
                         parseBigDecimalSafe(item.ftCcldUnpr3()),
                         parseBigDecimalSafe(item.ccldAmt()),
@@ -57,9 +65,9 @@ public class KisExecutionAdapter implements KisExecutionPort {
                 .toList();
     }
 
-    private Order.OrderDirection resolveDirection(String selnByovCls) {
-        // SELN_BYOV_CLS: 01=매도, 그 외=매수
-        return "01".equals(selnByovCls) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
+    private Order.OrderDirection resolveDirection(String sllBuyDvsnCd) {
+        // sll_buy_dvsn_cd: 01=매도, 02=매수
+        return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
     }
 
     private static int parseIntSafe(String s) {
@@ -74,12 +82,12 @@ public class KisExecutionAdapter implements KisExecutionPort {
 
     record ExecutionListResponse(@JsonProperty("output") List<OutputItem> output) {
         record OutputItem(
-                @JsonProperty("PDNO") String pdno,               // 종목코드
-                @JsonProperty("SELN_BYOV_CLS") String selnByovCls,
-                @JsonProperty("FT_CCLD_QTY") String ftCcldQty,   // 체결수량
-                @JsonProperty("FT_CCLD_UNPR3") String ftCcldUnpr3, // 체결단가
-                @JsonProperty("CCLD_AMT") String ccldAmt,         // 체결금액
-                @JsonProperty("ODNO") String odno                 // 주문번호
+                @JsonProperty("pdno") String pdno,                     // 종목코드
+                @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd, // 매도매수구분: 01=매도, 02=매수
+                @JsonProperty("ft_ccld_qty") String ftCcldQty,         // FT체결수량
+                @JsonProperty("ft_ccld_unpr3") String ftCcldUnpr3,     // FT체결단가
+                @JsonProperty("ft_ccld_amt3") String ccldAmt,          // FT체결금액
+                @JsonProperty("odno") String odno                       // 주문번호
         ) {}
     }
 }
