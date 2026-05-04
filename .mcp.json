@@ -12,10 +12,6 @@
     "kis-coding-mcp": {
       "type": "http",
       "url": "http://localhost:8081/mcp"
-    },
-    "kis-trade-mcp": {
-      "type": "sse",
-      "url": "http://localhost:3001/sse"
     }
   }
 }
