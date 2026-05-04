@@ -24,9 +24,11 @@
 - 응답 lowercase 필드: `pdno`, `sll_buy_dvsn_cd`(01=매도,02=매수), `ft_ccld_qty`, `ft_ccld_unpr3`, `ft_ccld_amt3`, `odno`
 
 ### kis-trade-mcp (localhost:3001)
-- trade-kis-n8n Docker 컨테이너 (SSE 모드), KIS API 실제 호출 도구
-- **현재 인증 불가**: fastmcp `Context.set_state/get_state` async 미적용 버그 → `ka._TRENV.my_acct` AttributeError
-- 우회: API 스펙 검증은 `kis-coding-mcp`의 `search_overseas_stock_api` + `read_source_code` 사용
+- `open-trading-api/MCP/Kis Trading MCP` 소스, SSE 모드 Docker 컨테이너
+- docker run 시 반드시 KIS 자격증명 환경변수 전달 필요 (미전달 시 `ka._TRENV.my_acct` AttributeError)
+  - `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값)
+  - `KIS_ACCOUNT_NO` ≠ `KIS_ACCT_STOCK` — 변수명 다름 주의
+- fastmcp 3.2.4 호환: `server.py` `stateless_http` 제거, `middleware.py`·`tools/base.py` `set_state`/`get_state` 모두 `await` 필요
 
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용

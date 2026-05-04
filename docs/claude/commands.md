@@ -54,6 +54,21 @@ docker-compose up -d postgres                 # DB만 기동 (로컬 개발 시)
 docker compose build <service> && docker compose up -d --force-recreate <service>  # 설정 변경 후 이미지 재빌드 + 컨테이너 강제 재생성
 ```
 
+### kis-trade-mcp 재시작
+```bash
+# 소스: ~/workspace/open-trading-api/MCP/Kis Trading MCP
+docker stop kis-trade-mcp && docker rm kis-trade-mcp
+docker build -t kis-trade-mcp:latest ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP
+docker run -d -p 3001:3000 --name kis-trade-mcp \
+  --env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/.env.live \
+  -e KIS_APP_KEY=<kista .env의 KIS_APP_KEY> \
+  -e "KIS_APP_SECRET=<kista .env의 KIS_APP_SECRET>" \
+  -e KIS_HTS_ID=<kista .env의 KIS_HTS_ID> \
+  -e KIS_ACCT_STOCK=<kista .env의 KIS_ACCOUNT_NO> \
+  kis-trade-mcp:latest
+# KIS_ACCOUNT_NO → KIS_ACCT_STOCK (변수명 다름 주의)
+```
+
 ### .mcp.json 경로 이식성
 - args에 절대경로 하드코딩 금지 — `"command": "sh", "args": ["-c", "node ${HOME}/workspace/..."]` 패턴으로 Mac/WSL 공용화
 - `env` 섹션 값은 쉘 확장 없이 리터럴 문자열로 전달됨 — `${HOME}` 써도 확장 안 됨
