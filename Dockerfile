@@ -24,11 +24,20 @@ USER appuser
 
 COPY --from=builder /workspace/build/libs/app.jar app.jar
 
-# JVM 옵션: 컨테이너 메모리 인식 + ZGC (Virtual Threads와 궁합 좋음)
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 \
-               -XX:+UseZGC \
+# JVM 옵션: Render 무료 512MB 기준 메모리 분배
+# Heap 220m + Metaspace 128m + CodeCache 64m + OS/스택 ~50m ≈ 462m (512m 이내)
+# SerialGC: G1GC보다 메모리 오버헤드 낮음 — 저트래픽 스케줄러 앱에 적합
+ENV JAVA_OPTS="-Xmx220m \
+               -Xms32m \
+               -XX:MaxMetaspaceSize=128m \
+               -XX:ReservedCodeCacheSize=64m \
+               -XX:+UseSerialGC \
+               -XX:+UseContainerSupport \
                -Djava.security.egd=file:/dev/./urandom"
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
