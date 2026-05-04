@@ -1,6 +1,23 @@
 ## 자주 쓰는 명령어
 
-### Claude Code Bash 툴에서 Gradle 실행
+### macOS에서 Gradle 직접 실행
+# WSL 래퍼 불필요 — macOS에서는 아래처럼 직접 실행
+```bash
+./gradlew bootJar
+./gradlew test
+./gradlew compileJava
+```
+# WSL 래퍼(`wsl -d Ubuntu bash -c ...`)는 Windows Claude Code 환경 전용
+
+### Render 배포 모니터링
+```bash
+# 헬스 체크
+curl https://kista.onrender.com/actuator/health
+# 로그: Render MCP mcp__render__list_logs 또는 대시보드
+# 서비스 ID: srv-d7sbvhrbc2fs738uf6c0 (kista 워크스페이스 tea-d7sbrv3rjlhs7389pr60)
+```
+
+### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
 # 직접 `bash gradlew ...` 실행 시 Gradle이 UNC 경로(\\wsl.localhost\...)에 .gradle 캐시를 못 만들어 실패
 # 반드시 아래 WSL 래퍼 패턴 사용:
 # wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"
