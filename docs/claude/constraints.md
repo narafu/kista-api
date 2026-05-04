@@ -21,6 +21,10 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②(K/2/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
 - **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
 
+### KIS 계좌번호 환경변수 분리
+- `KIS_ACCOUNT_NO=74420614` (8자리만) + `KIS_ACCOUNT_TYPE=01` 별도 설정
+- `74420614-01` 형태로 하나의 변수에 넣으면 KIS API CANO 파라미터 오류
+
 ### Flyway
 - `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
