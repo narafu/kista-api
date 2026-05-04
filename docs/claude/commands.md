@@ -1,5 +1,11 @@
 ## 자주 쓰는 명령어
 
+### Claude Code Bash 툴에서 Gradle 실행
+# 직접 `bash gradlew ...` 실행 시 Gradle이 UNC 경로(\\wsl.localhost\...)에 .gradle 캐시를 못 만들어 실패
+# 반드시 아래 WSL 래퍼 패턴 사용:
+# wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"
+# wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.SomeTest'"
+
 ```bash
 # 빌드
 bash gradlew bootJar                          # build/libs/app.jar 생성
