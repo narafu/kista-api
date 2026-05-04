@@ -29,3 +29,6 @@ docker-compose up -d                          # 앱 + PostgreSQL + Prometheus + 
 docker-compose up -d postgres                 # DB만 기동 (로컬 개발 시)
 docker compose build <service> && docker compose up -d --force-recreate <service>  # 설정 변경 후 이미지 재빌드 + 컨테이너 강제 재생성
 ```
+
+### .mcp.json 경로 이식성
+- args에 절대경로 하드코딩 금지 — `"command": "sh", "args": ["-c", "node ${HOME}/workspace/..."]` 패턴으로 Mac/WSL 공용화
