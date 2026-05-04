@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.port.out.KisPricePort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -10,6 +11,7 @@ import org.springframework.util.MultiValueMap;
 import java.math.BigDecimal;
 
 @Component
+@RequiredArgsConstructor
 public class KisPriceAdapter implements KisPricePort {
 
     private static final String PATH  = "/uapi/overseas-price/v1/quotations/price";
@@ -17,10 +19,6 @@ public class KisPriceAdapter implements KisPricePort {
     private static final String EXCD  = "NAS";
 
     private final KisHttpClient kisHttpClient;
-
-    public KisPriceAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public BigDecimal getPrice(String token, String symbol) {

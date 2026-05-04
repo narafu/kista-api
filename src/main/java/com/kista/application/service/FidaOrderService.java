@@ -5,20 +5,17 @@ import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.KisTokenPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 
 @Service
+@RequiredArgsConstructor
 public class FidaOrderService implements ExecuteFidaOrderUseCase {
 
     private final KisTokenPort kisTokenPort;
     private final KisOrderPort kisOrderPort;
-
-    public FidaOrderService(KisTokenPort kisTokenPort, KisOrderPort kisOrderPort) {
-        this.kisTokenPort = kisTokenPort;
-        this.kisOrderPort = kisOrderPort;
-    }
 
     @Override
     public void execute(FidaOrderRequest request) {

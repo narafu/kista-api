@@ -1,5 +1,6 @@
 package com.kista.adapter.out.kis;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -9,17 +10,12 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-
 @Component
+@RequiredArgsConstructor
 public class KisHttpClient {
 
-    private final RestTemplate restTemplate;
+    private final RestTemplate kisRestTemplate; // 빈 이름: kisRestTemplate
     private final KisProperties props;
-
-    public KisHttpClient(RestTemplate kisRestTemplate, KisProperties kisProperties) {
-        this.restTemplate = kisRestTemplate;
-        this.props = kisProperties;
-    }
 
     public KisProperties props() {
         return props;
@@ -41,11 +37,11 @@ public class KisHttpClient {
                 .fromUriString(props.baseUrl() + path)
                 .queryParams(params)
                 .toUriString();
-        return restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
+        return kisRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
     }
 
     public <T> T post(String path, HttpHeaders headers, Object body, Class<T> responseType) {
-        return restTemplate.exchange(
+        return kisRestTemplate.exchange(
                 props.baseUrl() + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
         ).getBody();
     }

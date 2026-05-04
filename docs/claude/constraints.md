@@ -36,6 +36,12 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
 - 로컬에서 `curl .../sendMessage` 테스트 시 VPN 필요
 
+### Lombok 패턴
+- `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지
+- package-private 타입을 생성자에서 참조 시: `@RequiredArgsConstructor(access = AccessLevel.PACKAGE)` (ClassEscapesItsScope 회피)
+- `@Value` 필드를 Lombok 생성자에 포함하려면 `lombok.config`에 `lombok.copyableAnnotations += org.springframework.beans.factory.annotation.Value` 필요 (이미 설정됨)
+- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치시킬 것 — 불일치 시 NoUniqueBeanDefinitionException
+
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
 - 필드: `// 역할 한 줄` 인라인 주석
