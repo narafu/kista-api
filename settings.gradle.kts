@@ -1,4 +1,4 @@
-rootProject.name = "kista"
+rootProject.name = "kista-api"
 
 // 향후 멀티모듈 확장 시 아래 주석을 해제하고 모듈을 추가하세요
 // include("starter-domain")

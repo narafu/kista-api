@@ -5,7 +5,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "DATA_DIR=${HOME}/workspace/kista/.shrimp-data node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"
+        "DATA_DIR=${HOME}/workspace/kista/kista-api/.shrimp-data node ${HOME}/workspace/mcp-shrimp-task-manager/dist/index.js"
       ],
       "env": {
         "TEMPLATES_USE": "en"
