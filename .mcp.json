@@ -11,6 +11,11 @@
     "kis-coding-mcp": {
       "type": "http",
       "url": "http://localhost:8081/mcp"
+    },
+    "render": {
+      "type": "stdio",
+      "command": "sh",
+      "args": ["-c", "npx mcp-remote https://mcp.render.com/mcp --header \"Authorization: Bearer ${RENDER_API_KEY}\""]
     }
   }
 }
