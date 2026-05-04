@@ -38,3 +38,8 @@ docker-compose.override.yml
 
 # memory
 /.shrimp-data/memory/
+
+# Claude Code 런타임 파일
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/settings.local.json
