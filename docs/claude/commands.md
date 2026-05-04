@@ -54,6 +54,22 @@ docker-compose up -d postgres                 # DB만 기동 (로컬 개발 시)
 docker compose build <service> && docker compose up -d --force-recreate <service>  # 설정 변경 후 이미지 재빌드 + 컨테이너 강제 재생성
 ```
 
+### GitHub 레포 rename 후 remote URL 업데이트
+```bash
+gh repo rename kista-api --repo narafu/kista --yes
+git remote set-url origin git@github.com:narafu/kista-api.git
+```
+# gh rename 후 로컬 remote는 자동 업데이트 안 됨 — 반드시 set-url 필요
+
+### Render 서비스 재생성 시 환경변수 설정
+```bash
+# mcp__render__update_environment_variables 로 한번에 주입 (serviceId 필요)
+# 필수 12개: SPRING_PROFILES_ACTIVE=prod, KIS_APP_KEY/SECRET, KIS_ACCOUNT_NO/TYPE/SYMBOL/EXCHANGE_CODE,
+#            TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD
+# 주의: mcp__render__update_web_service 는 서비스명/URL 변경 미지원 → 대시보드 직접 변경
+#       URL이 안 바뀌면 서비스를 새로 생성하는 것이 가장 빠른 해결책
+```
+
 ### kis-trade-mcp 재시작
 ```bash
 # 소스: ~/workspace/open-trading-api/MCP/Kis Trading MCP
