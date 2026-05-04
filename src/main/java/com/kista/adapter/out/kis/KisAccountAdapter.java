@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.AccountBalance;
 import com.kista.domain.port.out.KisAccountPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class KisAccountAdapter implements KisAccountPort {
 
     private static final String BALANCE_PATH = "/uapi/overseas-stock/v1/trading/inquire-balance";
@@ -20,10 +22,6 @@ public class KisAccountAdapter implements KisAccountPort {
     private static final String PRESENT_TR_ID = "CTRP6504R"; // 해외주식 현재 잔고(외화) 조회
 
     private final KisHttpClient kisHttpClient;
-
-    public KisAccountAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public AccountBalance getBalance(String token) {
@@ -40,10 +38,10 @@ public class KisAccountAdapter implements KisAccountPort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
-        params.add("OVRS_EXCG_CD", "NASD");     // 실전: 미국 전체 조회
-        params.add("TR_CRCY_CD", "USD");         // 거래통화코드
-        params.add("CTX_AREA_FK200", "");        // 연속조회: 최초 조회
-        params.add("CTX_AREA_NK200", "");        // 연속조회: 최초 조회
+        params.add("WCRC_FRCR_DVSN_CD", "02"); // 외화 구분: 02=USD
+        params.add("NATN_CD", "840");           // 국가코드: 840=미국
+        params.add("TR_MRCN_AMT", "0");
+        params.add("INQR_DVSN", "00");          // 조회 구분: 00=전체
 
         BalanceResponse response = kisHttpClient.get(BALANCE_PATH, headers, params, BalanceResponse.class);
 
@@ -62,12 +60,8 @@ public class KisAccountAdapter implements KisAccountPort {
     private PresentResult fetchPresent(String token) {
         HttpHeaders headers = kisHttpClient.buildHeaders(token, PRESENT_TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("CANO", kisHttpClient.props().accountNo());
-        params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
         params.add("WCRC_FRCR_DVSN_CD", "02"); // 외화 구분: 02=USD
-        params.add("NATN_CD", "000");           // 국가코드: 000=전체
-        params.add("TR_MKET_CD", "00");         // 거래시장코드: 00=전체
-        params.add("INQR_DVSN_CD", "00");       // 조회구분코드: 00=전체
+        params.add("CRCY_CD", "USD");           // 통화코드
 
         PresentBalanceResponse response = kisHttpClient.get(PRESENT_PATH, headers, params, PresentBalanceResponse.class);
 
@@ -95,16 +89,16 @@ public class KisAccountAdapter implements KisAccountPort {
 
     record BalanceResponse(@JsonProperty("output1") List<Output1> output1) {
         record Output1(
-                @JsonProperty("ovrs_pdno") String pdno,          // 해외상품번호
-                @JsonProperty("ovrs_cblc_qty") String cblcQty,   // 해외잔고수량
-                @JsonProperty("pchs_avg_pric") String pchsAvgPric // 매입평균가격
+                @JsonProperty("PDNO") String pdno,
+                @JsonProperty("CBLC_QTY") String cblcQty,
+                @JsonProperty("PCHS_AVG_PRIC") String pchsAvgPric
         ) {}
     }
 
     record PresentBalanceResponse(@JsonProperty("output3") Output3 output3) {
         record Output3(
-                @JsonProperty("frcr_evlu_amt2") String frcrEvluAmt,   // 유가증권평가액
-                @JsonProperty("frcr_dncl_amt_2") String frcrDnclAmt   // 외화예수금
+                @JsonProperty("FRCR_EVLU_AMT2") String frcrEvluAmt,   // 유가증권평가액
+                @JsonProperty("FRCR_DNCL_AMT_2") String frcrDnclAmt   // 외화예수금
         ) {}
     }
 }
