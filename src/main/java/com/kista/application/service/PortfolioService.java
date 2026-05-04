@@ -3,19 +3,17 @@ package com.kista.application.service;
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.NoSuchElementException;
 
 @Service
+@RequiredArgsConstructor
 public class PortfolioService implements GetPortfolioUseCase {
 
     private final PortfolioSnapshotPort portfolioSnapshotPort;
-
-    public PortfolioService(PortfolioSnapshotPort portfolioSnapshotPort) {
-        this.portfolioSnapshotPort = portfolioSnapshotPort;
-    }
 
     @Override
     public PortfolioSnapshot getCurrent() {

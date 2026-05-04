@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Order;
 import com.kista.domain.port.out.KisOrderPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class KisOrderAdapter implements KisOrderPort {
 
     private static final String PATH      = "/uapi/overseas-stock/v1/trading/order";
@@ -18,10 +20,6 @@ public class KisOrderAdapter implements KisOrderPort {
     private static final String SELL_TR_ID = "TTTS0307U"; // 해외주식 매도 주문
 
     private final KisHttpClient kisHttpClient;
-
-    public KisOrderAdapter(KisHttpClient kisHttpClient) {
-        this.kisHttpClient = kisHttpClient;
-    }
 
     @Override
     public Order place(String token, Order order) {

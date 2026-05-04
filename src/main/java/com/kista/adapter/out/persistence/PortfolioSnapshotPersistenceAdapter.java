@@ -2,19 +2,18 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // PortfolioSnapshotJpaRepository가 package-private
 public class PortfolioSnapshotPersistenceAdapter implements PortfolioSnapshotPort {
 
     private final PortfolioSnapshotJpaRepository repository;
-
-    PortfolioSnapshotPersistenceAdapter(PortfolioSnapshotJpaRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public void save(PortfolioSnapshot s) {

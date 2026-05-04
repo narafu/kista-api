@@ -5,8 +5,8 @@ import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,11 +18,12 @@ import static com.kista.domain.model.Order.OrderDirection.BUY;
 import static com.kista.domain.model.Order.OrderDirection.SELL;
 import static java.math.RoundingMode.HALF_UP;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class TradingService implements ExecuteTradingUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(TradingService.class);
-
+    @Value("${kis.symbol:SOXL}")
     private final String symbol;                              // 거래 종목 코드 (기본: SOXL)
     private final KisTokenPort kisTokenPort;                  // KIS OAuth 토큰 발급
     private final KisHolidayPort kisHolidayPort;              // 미국 시장 개장일 확인
@@ -35,33 +36,6 @@ public class TradingService implements ExecuteTradingUseCase {
     private final TradeHistoryPort tradeHistoryPort;          // 거래 이력 저장
     private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
     private final NotifyPort notifyPort;                      // 텔레그램 알림 발송
-
-    public TradingService(
-            @Value("${kis.symbol:SOXL}") String symbol,
-            KisTokenPort kisTokenPort,
-            KisHolidayPort kisHolidayPort,
-            KisAccountPort kisAccountPort,
-            KisPricePort kisPricePort,
-            KisOrderPort kisOrderPort,
-            KisExecutionPort kisExecutionPort,
-            TradingStrategy tradingStrategy,
-            CorrectionStrategy correctionStrategy,
-            TradeHistoryPort tradeHistoryPort,
-            PortfolioSnapshotPort portfolioSnapshotPort,
-            NotifyPort notifyPort) {
-        this.symbol = symbol;
-        this.kisTokenPort = kisTokenPort;
-        this.kisHolidayPort = kisHolidayPort;
-        this.kisAccountPort = kisAccountPort;
-        this.kisPricePort = kisPricePort;
-        this.kisOrderPort = kisOrderPort;
-        this.kisExecutionPort = kisExecutionPort;
-        this.tradingStrategy = tradingStrategy;
-        this.correctionStrategy = correctionStrategy;
-        this.tradeHistoryPort = tradeHistoryPort;
-        this.portfolioSnapshotPort = portfolioSnapshotPort;
-        this.notifyPort = notifyPort;
-    }
 
     @Override
     public void execute() throws InterruptedException {

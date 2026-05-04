@@ -2,19 +2,18 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // TradeHistoryJpaRepository가 package-private
 public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
 
     private final TradeHistoryJpaRepository repository;
-
-    TradeHistoryPersistenceAdapter(TradeHistoryJpaRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public void save(TradeHistory h) {
