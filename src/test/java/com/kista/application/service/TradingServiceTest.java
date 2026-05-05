@@ -46,15 +46,15 @@ class TradingServiceTest {
 
     // 보유 수량 있는 잔고 (shouldSkip=false, t=5 → BUY+SELL LOC 2건)
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(
-            10, new BigDecimal("20.00"), new BigDecimal("500.00"), new BigDecimal("1000.00"));
+            10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
     // 보유 없는 잔고 (shouldSkip=false, t=0 → BUY LOC 1건만)
     static final AccountBalance FRESH_BALANCE = new AccountBalance(
-            0, BigDecimal.ZERO, new BigDecimal("500.00"), new BigDecimal("1000.00"));
+            0, BigDecimal.ZERO, new BigDecimal("1000.00"));
 
     // 수량 0 & 예수금 0 (shouldSkip=true)
     static final AccountBalance LOW_BALANCE = new AccountBalance(
-            0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            0, BigDecimal.ZERO, BigDecimal.ZERO);
 
     @BeforeEach
     void setUp() {

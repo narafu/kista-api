@@ -29,7 +29,6 @@ class SoxlDivisionStrategyTest {
     void case_q0() {
         // A=20, M=0, D=0, B=2000, K=100.00, T=0.0, priceOffsetRate=0.2000, targetPrice=24.00
         AccountBalance balance = new AccountBalance(0, null,
-                new BigDecimal("0"),     // effectiveAmt: SOXL 없으므로 0
                 new BigDecimal("2000")); // usdDeposit: 현금
 
         TradingVariables vars = strategy.calculate(balance, new BigDecimal("20"));
@@ -55,7 +54,6 @@ class SoxlDivisionStrategyTest {
         // A=20, M=200, D=210, B=3000, K=150.00, T=200/150=1.33
         // priceOffsetRate = 0.20*(1 - 2*1.33/20) = 0.1733
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"),
-                new BigDecimal("210"),   // effectiveAmt: 21×10 (SOXL 시가)
                 new BigDecimal("2800")); // usdDeposit: 현금
 
         TradingVariables vars = strategy.calculate(balance, new BigDecimal("21"));
@@ -81,7 +79,6 @@ class SoxlDivisionStrategyTest {
         // A=5, M=500, D=600, B=2000, K=100.00, T=500/100=5.0
         // priceOffsetRate = 0.20*(1 - 10/20) = 0.1000
         AccountBalance balance = new AccountBalance(100, new BigDecimal("5"),
-                new BigDecimal("600"),   // effectiveAmt: 6×100 (SOXL 시가)
                 new BigDecimal("1500")); // usdDeposit: 현금
 
         TradingVariables vars = strategy.calculate(balance, new BigDecimal("6"));
@@ -111,7 +108,7 @@ class SoxlDivisionStrategyTest {
         // BUY①: floor(60/2/20)=1, BUY②: floor(60/2/22.67)=1
         // LOC SELL: 10/4=2, LIMIT SELL: 10-2=8
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"),
-                new BigDecimal("220"), new BigDecimal("1000"));
+                new BigDecimal("1000"));
         TradingVariables vars = strategy.calculate(balance, new BigDecimal("22"));
 
         List<Order> orders = strategy.buildOrders(vars, TODAY, "SOXL");
@@ -130,7 +127,7 @@ class SoxlDivisionStrategyTest {
         // A=currentPrice=22, Q=0, D=1000 → B=1000, K=50
         // G=22×1.20=26.40, BUY①: floor(50/2/22)=1, BUY②: floor(50/2/26.40)=0
         AccountBalance balance = new AccountBalance(0, null,
-                new BigDecimal("0"), new BigDecimal("1000"));
+                new BigDecimal("1000"));
 
         List<Order> orders = strategy.buildOrders(strategy.calculate(balance, new BigDecimal("22")), TODAY, "SOXL");
 
@@ -143,7 +140,7 @@ class SoxlDivisionStrategyTest {
     void buildOrders_backHalf_insufficientDeposit() {
         // A=5, Q=200, D=50 → B=1050, K=52.50, T≈19.05 (후반), K(52.50)>D(50)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
-                new BigDecimal("1000"), new BigDecimal("50"));
+                new BigDecimal("50"));
 
         List<Order> orders = strategy.buildOrders(strategy.calculate(balance, new BigDecimal("5")), TODAY, "SOXL");
 
@@ -156,7 +153,7 @@ class SoxlDivisionStrategyTest {
     void buildOrders_backHalf_sufficientDeposit() {
         // A=5, Q=200, D=100 → B=1100, K=55, T≈18.18 (후반), K(55)<=D(100)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
-                new BigDecimal("1000"), new BigDecimal("100"));
+                new BigDecimal("100"));
 
         List<Order> orders = strategy.buildOrders(strategy.calculate(balance, new BigDecimal("5")), TODAY, "SOXL");
 

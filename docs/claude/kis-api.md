@@ -10,7 +10,8 @@
 
 ### 잔고 조회 API 파라미터
 - `TTTS3012R` (해외주식 잔고): `CANO`, `ACNT_PRDT_CD`, `OVRS_EXCG_CD=NASD`(실전 미국전체), `TR_CRCY_CD=USD`, `CTX_AREA_FK200=""`, `CTX_AREA_NK200=""`
-- `CTRP6504R` (체결기준현재잔고): `CANO`, `ACNT_PRDT_CD`, `WCRC_FRCR_DVSN_CD=02`, `NATN_CD=000`, `TR_MKET_CD=00`, `INQR_DVSN_CD=00`
+- `TTTC2101R` (해외증거금 통화별조회): `CANO`, `ACNT_PRDT_CD` — 응답 `output` 목록에서 `natn_name=="미국"` 행의 `itgr_ord_psbl_amt`를 `usdDeposit`으로 사용
+  - `frcr_dncl_amt_2`(환전된 외화만) 대신 `itgr_ord_psbl_amt`(통합주문가능금액) 사용 — 원화 자동 환전 포함
 - API 파라미터 불확실 시 `kis-coding-mcp`의 `search_overseas_stock_api` + `read_source_code`로 공식 확인
 
 ### 주문 API (KisOrderAdapter)
@@ -28,6 +29,10 @@
 - docker run 시 반드시 KIS 자격증명 환경변수 전달 필요 (미전달 시 `ka._TRENV.my_acct` AttributeError)
   - `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값)
   - `KIS_ACCOUNT_NO` ≠ `KIS_ACCT_STOCK` — 변수명 다름 주의
+- `KeyError: 'my_acct'` 오류 시: `docker exec kis-trade-mcp grep -E "my_acct|my_prod" /root/KIS/config/kis_devlp.yaml` 확인
+  - `my_acct` 키 없으면: `sed -i '/my_acct_stock:/a my_acct: ...'`로 추가
+  - `my_prod: ''`(빈값)이면 `'01'`로 수정 — `changeTREnv()`가 `product=="01"` 분기에서만 계좌번호 설정함
+  - 영구 수정: `module/plugin/kis.py` 패치 후 컨테이너 재빌드 (이미 패치됨)
 - fastmcp 3.2.4 호환: `server.py` `stateless_http` 제거, `middleware.py`·`tools/base.py` `set_state`/`get_state` 모두 `await` 필요
 
 ### KIS Adapter 단위 테스트

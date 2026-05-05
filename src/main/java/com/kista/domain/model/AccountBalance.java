@@ -3,10 +3,9 @@ package com.kista.domain.model;
 import java.math.BigDecimal;
 
 public record AccountBalance(
-        int quantity,             // 보유 수량
-        BigDecimal avgPrice,      // 평균 매입가 (quantity==0이면 null)
-        BigDecimal effectiveAmt,  // 시가 평가액 (USD, currentPrice × quantity)
-        BigDecimal usdDeposit     // USD 예수금 (현금)
+        int quantity,         // 보유 수량
+        BigDecimal avgPrice,  // 평균 매입가 (quantity==0이면 null)
+        BigDecimal usdDeposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
     /** avgPrice may be null when quantity == 0 */
     public boolean shouldSkip() {

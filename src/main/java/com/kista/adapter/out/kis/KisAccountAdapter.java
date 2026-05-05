@@ -17,9 +17,9 @@ import java.util.List;
 public class KisAccountAdapter implements KisAccountPort {
 
     private static final String BALANCE_PATH = "/uapi/overseas-stock/v1/trading/inquire-balance";
-    private static final String PRESENT_PATH  = "/uapi/overseas-stock/v1/trading/inquire-present-balance";
+    private static final String MARGIN_PATH   = "/uapi/overseas-stock/v1/trading/foreign-margin";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
-    private static final String PRESENT_TR_ID = "CTRP6504R"; // 해외주식 현재 잔고(외화) 조회
+    private static final String MARGIN_TR_ID  = "TTTC2101R"; // 해외증거금 통화별조회
 
     private final KisHttpClient kisHttpClient;
 
@@ -27,10 +27,10 @@ public class KisAccountAdapter implements KisAccountPort {
     public AccountBalance getBalance(String token) {
         String symbol = kisHttpClient.props().symbol();
         HoldingResult holding = fetchHolding(token, symbol);
-        PresentResult present  = fetchPresent(token);
+        BigDecimal usdDeposit = fetchMargin(token);
 
         BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
-        return new AccountBalance(holding.qty(), avgPrice, present.effectiveAmt(), present.usdDeposit());
+        return new AccountBalance(holding.qty(), avgPrice, usdDeposit);
     }
 
     private HoldingResult fetchHolding(String token, String symbol) {
@@ -57,25 +57,24 @@ public class KisAccountAdapter implements KisAccountPort {
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
 
-    private PresentResult fetchPresent(String token) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, PRESENT_TR_ID);
+    // 해외증거금 통화별조회(TTTC2101R)에서 미국(USD) 행의 itgr_ord_psbl_amt 반환
+    // frcr_dncl_amt_2(환전된 외화만)가 아닌 통합주문가능금액 사용 — 원화 자동 환전 케이스 포함
+    private BigDecimal fetchMargin(String token) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(token, MARGIN_TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
-        params.add("WCRC_FRCR_DVSN_CD", "02"); // 외화
-        params.add("NATN_CD", "000");            // 전체
-        params.add("TR_MKET_CD", "00");          // 전체
-        params.add("INQR_DVSN_CD", "00");       // 전체
 
-        PresentBalanceResponse response = kisHttpClient.get(PRESENT_PATH, headers, params, PresentBalanceResponse.class);
+        MarginResponse response = kisHttpClient.get(MARGIN_PATH, headers, params, MarginResponse.class);
 
-        if (response == null || response.output3() == null) {
-            return new PresentResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        if (response == null || response.output() == null) {
+            return BigDecimal.ZERO;
         }
-        PresentBalanceResponse.Output3 out = response.output3();
-        return new PresentResult(
-                parseBigDecimalSafe(out.frcrEvluAmt()),
-                parseBigDecimalSafe(out.frcrDnclAmt()));
+        return response.output().stream()
+                .filter(o -> "미국".equals(o.natnName()))
+                .findFirst()
+                .map(o -> parseBigDecimalSafe(o.itgrOrdPsblAmt()))
+                .orElse(BigDecimal.ZERO);
     }
 
     private static int parseIntSafe(String s) {
@@ -89,7 +88,6 @@ public class KisAccountAdapter implements KisAccountPort {
     }
 
     record HoldingResult(int qty, BigDecimal avgPrice) {}
-    record PresentResult(BigDecimal effectiveAmt, BigDecimal usdDeposit) {}
 
     record BalanceResponse(@JsonProperty("output1") List<Output1> output1) {
         record Output1(
@@ -99,10 +97,10 @@ public class KisAccountAdapter implements KisAccountPort {
         ) {}
     }
 
-    record PresentBalanceResponse(@JsonProperty("output3") Output3 output3) {
-        record Output3(
-                @JsonProperty("frcr_evlu_amt2") String frcrEvluAmt,   // 유가증권평가액
-                @JsonProperty("frcr_dncl_amt_2") String frcrDnclAmt   // 외화예수금
+    record MarginResponse(@JsonProperty("output") List<Output> output) {
+        record Output(
+                @JsonProperty("natn_name") String natnName,              // 국가명 ("미국" 등)
+                @JsonProperty("itgr_ord_psbl_amt") String itgrOrdPsblAmt // 통합주문가능금액 (USD)
         ) {}
     }
 }

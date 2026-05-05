@@ -59,7 +59,7 @@ class TelegramAdapterTest {
     @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_bodyContainsQtyAndAmount() {
         AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO,
-                BigDecimal.ZERO, new BigDecimal("5.00")); // effectiveAmt=0, usdDeposit=5.00
+                new BigDecimal("5.00")); // usdDeposit=5.00
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.notifyInsufficientBalance(balance);

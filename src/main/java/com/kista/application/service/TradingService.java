@@ -53,7 +53,7 @@ public class TradingService implements ExecuteTradingUseCase {
         if (!isMarketOpen(token, today)) return;
 
         AccountBalance balance = kisAccountPort.getBalance(token);
-        log.info("잔고 조회: SOXL {}주, 예수금 ${}, 유효잔고 ${}", balance.quantity(), balance.usdDeposit(), balance.effectiveAmt());
+        log.info("잔고 조회: SOXL {}주, 통합주문가능금액 ${}", balance.quantity(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀");
             notifyPort.notifyInsufficientBalance(balance);
