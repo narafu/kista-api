@@ -5,6 +5,9 @@
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
 
+### JPA 설정
+- `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, Supabase PgBouncer Transaction Mode에서 트랜잭션 외부 커넥션 점유 방지
+
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
 A = averagePrice (qty==0이면 currentPrice)   Q = quantity

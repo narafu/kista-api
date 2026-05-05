@@ -13,9 +13,11 @@
 ```bash
 # 헬스 체크
 curl https://kista-api.onrender.com/actuator/health
-# 로그: Render MCP mcp__render__list_logs 또는 대시보드
+# 배포 실패 진단: mcp__render__list_deploys → status 확인 후 아래 에러 로그 조회
+# mcp__render__list_logs resource=["srv-..."] type=["app"] level=["error"] — 에러만 필터링
 # 서비스 ID: srv-d7sir2jbc2fs73cptpm0 (kista 워크스페이스 tea-d7sbrv3rjlhs7389pr60)
 # Render MCP 로그 조회 전 반드시 먼저: mcp__render__select_workspace ownerID=tea-d7sbrv3rjlhs7389pr60
+# 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
 ```
 
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
@@ -64,8 +66,9 @@ git remote set-url origin git@github.com:narafu/kista-api.git
 ### Render 서비스 재생성 시 환경변수 설정
 ```bash
 # mcp__render__update_environment_variables 로 한번에 주입 (serviceId 필요)
-# 필수 12개: SPRING_PROFILES_ACTIVE=prod, KIS_APP_KEY/SECRET, KIS_ACCOUNT_NO/TYPE/SYMBOL/EXCHANGE_CODE,
-#            TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD
+# 필수 15개: SPRING_PROFILES_ACTIVE=prod, KIS_APP_KEY/SECRET/HTS_ID/VTS,
+#            KIS_ACCOUNT_NO/TYPE/SYMBOL/EXCHANGE_CODE,
+#            TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD, GEMINI_API_KEY
 # 주의: mcp__render__update_web_service 는 서비스명/URL 변경 미지원 → 대시보드 직접 변경
 #       URL이 안 바뀌면 서비스를 새로 생성하는 것이 가장 빠른 해결책
 ```
