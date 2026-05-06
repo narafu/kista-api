@@ -2,6 +2,7 @@ package com.kista.adapter.in.telegram;
 
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.model.TradeHistory;
+import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -26,10 +28,16 @@ class TelegramBotService {
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
     private final GetPortfolioUseCase getPortfolioUseCase;
     private final ExecuteTradingUseCase executeTradingUseCase;
+    private final ApproveUserUseCase approveUserUseCase; // 관리자 승인/거절 처리
     // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
 
     void handle(TelegramUpdate update) {
+        // 인라인 버튼 클릭(callback_query) 우선 처리
+        if (update.callbackQuery() != null) {
+            handleCallbackQuery(update.callbackQuery());
+            return;
+        }
         if (update.message() == null || update.message().text() == null) return;
         long chatId = update.message().chat().id();
         String text = update.message().text().trim();
@@ -46,6 +54,29 @@ class TelegramBotService {
         };
         if (reply != null) {
             apiClient.sendMessage(String.valueOf(chatId), reply);
+        }
+    }
+
+    private void handleCallbackQuery(TelegramUpdate.CallbackQuery callbackQuery) {
+        String data = callbackQuery.data();
+        String replyTo = callbackQuery.message() != null
+                ? String.valueOf(callbackQuery.message().chat().id())
+                : adminChatId;
+        try {
+            if (data != null && data.startsWith("approve:")) {
+                UUID userId = UUID.fromString(data.substring(8));
+                approveUserUseCase.approve(userId);
+                apiClient.sendMessage(replyTo, "✅ 승인이 완료되었습니다.");
+            } else if (data != null && data.startsWith("reject:")) {
+                UUID userId = UUID.fromString(data.substring(7));
+                approveUserUseCase.reject(userId);
+                apiClient.sendMessage(replyTo, "❌ 거절 처리되었습니다.");
+            }
+        } catch (Exception e) {
+            log.error("callback_query 처리 실패: data={}", data, e);
+        } finally {
+            // 버튼의 로딩 스피너 제거 (Telegram 필수 응답)
+            apiClient.answerCallbackQuery(callbackQuery.id());
         }
     }
 

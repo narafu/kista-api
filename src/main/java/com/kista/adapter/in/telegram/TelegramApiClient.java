@@ -33,4 +33,16 @@ class TelegramApiClient {
             log.error("Telegram 메시지 전송 실패: {}", e.getMessage());
         }
     }
+
+    // 인라인 버튼 클릭 후 버튼의 로딩 스피너 제거
+    void answerCallbackQuery(String callbackQueryId) {
+        if (props.botToken() == null || props.botToken().isBlank()) return;
+        try {
+            String url = API_BASE + "/bot" + props.botToken() + "/answerCallbackQuery";
+            telegramRestTemplate.postForObject(url,
+                    Map.of("callback_query_id", callbackQueryId), String.class);
+        } catch (Exception e) {
+            log.error("answerCallbackQuery 실패: {}", e.getMessage());
+        }
+    }
 }

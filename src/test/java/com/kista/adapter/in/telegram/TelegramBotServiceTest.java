@@ -3,6 +3,7 @@ package com.kista.adapter.in.telegram;
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.model.TradeHistory;
+import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
@@ -31,6 +32,7 @@ class TelegramBotServiceTest {
     @Mock GetTradeHistoryUseCase getTradeHistoryUseCase;
     @Mock GetPortfolioUseCase getPortfolioUseCase;
     @Mock ExecuteTradingUseCase executeTradingUseCase;
+    @Mock ApproveUserUseCase approveUserUseCase;
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
@@ -38,12 +40,21 @@ class TelegramBotServiceTest {
     @BeforeEach
     void setUp() {
         sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient,
-                getTradeHistoryUseCase, getPortfolioUseCase, executeTradingUseCase);
+                getTradeHistoryUseCase, getPortfolioUseCase, executeTradingUseCase, approveUserUseCase);
     }
 
+    // 일반 메시지 업데이트 생성 헬퍼
     private TelegramUpdate update(String text) {
         return new TelegramUpdate(1L,
-                new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), text));
+                new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), text),
+                null);
+    }
+
+    // callback_query 업데이트 생성 헬퍼
+    private TelegramUpdate callbackUpdate(String callbackData) {
+        TelegramUpdate.Message msg = new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), null);
+        TelegramUpdate.CallbackQuery cq = new TelegramUpdate.CallbackQuery("cq-id-123", callbackData, msg);
+        return new TelegramUpdate(1L, null, cq);
     }
 
     @Test
@@ -125,7 +136,8 @@ class TelegramBotServiceTest {
     @Test
     void unauthorized_chatId_is_ignored() {
         TelegramUpdate badUpdate = new TelegramUpdate(1L,
-                new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(99999L), "/help"));
+                new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(99999L), "/help"),
+                null);
 
         sut.handle(badUpdate);
 
@@ -139,5 +151,37 @@ class TelegramBotServiceTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(apiClient).sendMessage(any(), captor.capture());
         assertThat(captor.getValue()).contains("/help");
+    }
+
+    @Test
+    void callback_approve_calls_approve_usecase_and_answers() {
+        UUID userId = UUID.randomUUID();
+
+        sut.handle(callbackUpdate("approve:" + userId));
+
+        verify(approveUserUseCase).approve(userId);
+        verify(apiClient).answerCallbackQuery("cq-id-123");
+        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), contains("승인"));
+    }
+
+    @Test
+    void callback_reject_calls_reject_usecase_and_answers() {
+        UUID userId = UUID.randomUUID();
+
+        sut.handle(callbackUpdate("reject:" + userId));
+
+        verify(approveUserUseCase).reject(userId);
+        verify(apiClient).answerCallbackQuery("cq-id-123");
+        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), contains("거절"));
+    }
+
+    @Test
+    void callback_always_answers_even_on_error() {
+        doThrow(new RuntimeException("DB 오류")).when(approveUserUseCase).approve(any());
+
+        sut.handle(callbackUpdate("approve:" + UUID.randomUUID()));
+
+        // 오류가 나도 answerCallbackQuery는 반드시 호출
+        verify(apiClient).answerCallbackQuery("cq-id-123");
     }
 }
