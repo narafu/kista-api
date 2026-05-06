@@ -22,9 +22,9 @@ public class KisOrderAdapter implements KisOrderPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public Order place(String token, Order order) {
+    public Order place(Order order) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, trId);
+        HttpHeaders headers = kisHttpClient.buildHeaders(trId);
 
         Map<String, String> body = new LinkedHashMap<>();
         body.put("CANO", kisHttpClient.props().accountNo());

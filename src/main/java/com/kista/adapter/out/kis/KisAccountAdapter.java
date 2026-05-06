@@ -24,17 +24,17 @@ public class KisAccountAdapter implements KisAccountPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public AccountBalance getBalance(String token) {
+    public AccountBalance getBalance() {
         String symbol = kisHttpClient.props().symbol();
-        HoldingResult holding = fetchHolding(token, symbol);
-        BigDecimal usdDeposit = fetchMargin(token);
+        HoldingResult holding = fetchHolding(symbol);
+        BigDecimal usdDeposit = fetchMargin();
 
         BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
         return new AccountBalance(holding.qty(), avgPrice, usdDeposit);
     }
 
-    private HoldingResult fetchHolding(String token, String symbol) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, BALANCE_TR_ID);
+    private HoldingResult fetchHolding(String symbol) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(BALANCE_TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
@@ -59,8 +59,8 @@ public class KisAccountAdapter implements KisAccountPort {
 
     // 해외증거금 통화별조회(TTTC2101R)에서 미국(USD) 행의 itgr_ord_psbl_amt 반환
     // frcr_dncl_amt_2(환전된 외화만)가 아닌 통합주문가능금액 사용 — 원화 자동 환전 케이스 포함
-    private BigDecimal fetchMargin(String token) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, MARGIN_TR_ID);
+    private BigDecimal fetchMargin() {
+        HttpHeaders headers = kisHttpClient.buildHeaders(MARGIN_TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", kisHttpClient.props().accountNo());
         params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());

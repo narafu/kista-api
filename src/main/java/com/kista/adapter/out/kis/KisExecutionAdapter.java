@@ -27,8 +27,8 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public List<Execution> getExecutions(String token, LocalDate date) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, TR_ID);
+    public List<Execution> getExecutions(LocalDate date) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID);
         String dateStr = date.format(FMT);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();

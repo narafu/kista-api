@@ -36,12 +36,11 @@ class KisOrderAdapterTest {
             "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "NAS"
     );
     private static final LocalDate TRADE_DATE = LocalDate.of(2024, 6, 15);
-    private static final String TOKEN = "test-token";
 
     @BeforeEach
     void setUp() {
         when(kisHttpClient.props()).thenReturn(TEST_PROPS);
-        when(kisHttpClient.buildHeaders(anyString(), anyString())).thenReturn(new HttpHeaders());
+        when(kisHttpClient.buildHeaders(anyString())).thenReturn(new HttpHeaders());
     }
 
     @Test
@@ -52,9 +51,9 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(TOKEN, order);
+        adapter.place(order);
 
-        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTT1002U"));
+        verify(kisHttpClient).buildHeaders(eq("TTTT1002U"));
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
         assertThat(body.get("ORD_DVSN")).isEqualTo("34");
@@ -69,7 +68,7 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(TOKEN, order);
+        adapter.place(order);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
@@ -86,7 +85,7 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(TOKEN, order);
+        adapter.place(order);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
@@ -101,9 +100,9 @@ class KisOrderAdapterTest {
                 8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
-        adapter.place(TOKEN, order);
+        adapter.place(order);
 
-        verify(kisHttpClient).buildHeaders(eq(TOKEN), eq("TTTT1006U"));
+        verify(kisHttpClient).buildHeaders(eq("TTTT1006U"));
     }
 
     @Test
@@ -115,7 +114,7 @@ class KisOrderAdapterTest {
                 new KisOrderAdapter.OrderResponse(new KisOrderAdapter.OrderResponse.Output("ORD123"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(response);
 
-        Order result = adapter.place(TOKEN, order);
+        Order result = adapter.place(order);
 
         assertThat(result.kisOrderId()).isEqualTo("ORD123");
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);
@@ -128,7 +127,7 @@ class KisOrderAdapterTest {
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
-        Order result = adapter.place(TOKEN, order);
+        Order result = adapter.place(order);
 
         assertThat(result.kisOrderId()).isNull();
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);

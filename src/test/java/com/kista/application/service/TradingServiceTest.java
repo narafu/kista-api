@@ -22,7 +22,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TradingServiceTest {
 
-    @Mock KisTokenPort kisTokenPort;
     @Mock KisHolidayPort kisHolidayPort;
     @Mock KisAccountPort kisAccountPort;
     @Mock KisPricePort kisPricePort;
@@ -41,7 +40,6 @@ class TradingServiceTest {
             Instant.now().minusSeconds(3600),
             Instant.now().minusSeconds(1800));
 
-    static final String TOKEN = "test-token";
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
     // 보유 수량 있는 잔고 (shouldSkip=false, t=5 → BUY+SELL LOC 2건)
@@ -59,7 +57,7 @@ class TradingServiceTest {
     @BeforeEach
     void setUp() {
         service = new TradingService("SOXL",
-                kisTokenPort, kisHolidayPort, kisAccountPort,
+                kisHolidayPort, kisAccountPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort);
@@ -73,23 +71,22 @@ class TradingServiceTest {
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
-        when(kisTokenPort.getToken()).thenReturn(TOKEN);
-        when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
-        when(kisAccountPort.getBalance(TOKEN)).thenReturn(NORMAL_BALANCE);
-        when(kisPricePort.getPrice(TOKEN, "SOXL")).thenReturn(PRICE);
+        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
+        when(kisAccountPort.getBalance()).thenReturn(NORMAL_BALANCE);
+        when(kisPricePort.getPrice("SOXL")).thenReturn(PRICE);
         when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE)).thenReturn(vars);
         when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
-        when(kisOrderPort.place(eq(TOKEN), any())).thenReturn(placedOrder);
-        when(kisExecutionPort.getExecutions(eq(TOKEN), any())).thenReturn(List.of());
+        when(kisOrderPort.place(any())).thenReturn(placedOrder);
+        when(kisExecutionPort.getExecutions(any())).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
 
         service.execute(PAST_DST);
 
-        verify(kisHolidayPort).isMarketOpen(eq(TOKEN), any());
-        verify(kisAccountPort).getBalance(TOKEN);
-        verify(kisPricePort).getPrice(TOKEN, "SOXL");
+        verify(kisHolidayPort).isMarketOpen(any());
+        verify(kisAccountPort).getBalance();
+        verify(kisPricePort).getPrice("SOXL");
         verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE);
-        verify(kisExecutionPort).getExecutions(eq(TOKEN), any());
+        verify(kisExecutionPort).getExecutions(any());
         verify(correctionStrategy).correct(any(), any(), any());
         verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
         verify(notifyPort).notifyReport(any(TradingReport.class));
@@ -106,14 +103,13 @@ class TradingServiceTest {
         Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
-        when(kisTokenPort.getToken()).thenReturn(TOKEN);
-        when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
-        when(kisAccountPort.getBalance(TOKEN)).thenReturn(FRESH_BALANCE);
-        when(kisPricePort.getPrice(TOKEN, "SOXL")).thenReturn(PRICE);
+        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
+        when(kisAccountPort.getBalance()).thenReturn(FRESH_BALANCE);
+        when(kisPricePort.getPrice("SOXL")).thenReturn(PRICE);
         when(tradingStrategy.calculate(FRESH_BALANCE, PRICE)).thenReturn(vars);
         when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
-        when(kisOrderPort.place(eq(TOKEN), any())).thenReturn(mainOrder, corrOrder);
-        when(kisExecutionPort.getExecutions(eq(TOKEN), any())).thenReturn(List.of());
+        when(kisOrderPort.place(any())).thenReturn(mainOrder, corrOrder);
+        when(kisExecutionPort.getExecutions(any())).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
 
         service.execute(PAST_DST);
@@ -124,27 +120,25 @@ class TradingServiceTest {
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
-        when(kisTokenPort.getToken()).thenReturn(TOKEN);
-        when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(false);
+        when(kisHolidayPort.isMarketOpen(any())).thenReturn(false);
 
         service.execute(PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
-        verify(kisAccountPort, never()).getBalance(any());
-        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisAccountPort, never()).getBalance();
+        verify(kisPricePort, never()).getPrice(any());
         verify(notifyPort, never()).notifyReport(any());
     }
 
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
-        when(kisTokenPort.getToken()).thenReturn(TOKEN);
-        when(kisHolidayPort.isMarketOpen(eq(TOKEN), any())).thenReturn(true);
-        when(kisAccountPort.getBalance(TOKEN)).thenReturn(LOW_BALANCE);
+        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
+        when(kisAccountPort.getBalance()).thenReturn(LOW_BALANCE);
 
         service.execute(PAST_DST);
 
         verify(notifyPort).notifyInsufficientBalance(LOW_BALANCE);
-        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisPricePort, never()).getPrice(any());
         verify(tradeHistoryPort, never()).save(any());
         verify(notifyPort, never()).notifyReport(any());
     }

@@ -25,7 +25,6 @@ public class TradingService implements ExecuteTradingUseCase {
 
     @Value("${kis.symbol:SOXL}")
     private final String symbol;                              // 거래 종목 코드 (기본: SOXL)
-    private final KisTokenPort kisTokenPort;                  // KIS OAuth 토큰 발급
     private final KisHolidayPort kisHolidayPort;              // 미국 시장 개장일 확인
     private final KisAccountPort kisAccountPort;              // 계좌 잔고 조회
     private final KisPricePort kisPricePort;                  // 현재 주가 조회
@@ -46,13 +45,11 @@ public class TradingService implements ExecuteTradingUseCase {
     void execute(DstInfo dst) throws InterruptedException {
         waitForOrderTime(dst);
 
-        String token = kisTokenPort.getToken();
         LocalDate today = LocalDate.now();
-        log.info("KIS 토큰 발급 완료");
 
-        if (!isMarketOpen(token, today)) return;
+        if (!isMarketOpen(today)) return;
 
-        AccountBalance balance = kisAccountPort.getBalance(token);
+        AccountBalance balance = kisAccountPort.getBalance();
         log.info("잔고 조회: SOXL {}주, 통합주문가능금액 ${}", balance.quantity(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀");
@@ -60,17 +57,17 @@ public class TradingService implements ExecuteTradingUseCase {
             return;
         }
 
-        BigDecimal price = kisPricePort.getPrice(token, symbol);
+        BigDecimal price = kisPricePort.getPrice(symbol);
         log.info("현재가: ${}", price);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
         log.info("전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}", vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
-        List<Order> mainOrders = placeMainOrders(token, vars, today);
+        List<Order> mainOrders = placeMainOrders(vars, today);
 
         waitForPostClose(dst);
 
-        List<Execution> executions = kisExecutionPort.getExecutions(token, today);
+        List<Execution> executions = kisExecutionPort.getExecutions(today);
         log.info("체결 내역 {}건 조회", executions.size());
-        List<Order> corrections = applyCorrections(token, mainOrders, executions, today);
+        List<Order> corrections = applyCorrections(mainOrders, executions, today);
 
         saveAndNotify(balance, price, today, vars, mainOrders, corrections, executions);
     }
@@ -83,8 +80,8 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     // false 반환 시 알림 발송 후 execute()에서 즉시 return
-    private boolean isMarketOpen(String token, LocalDate today) {
-        boolean open = kisHolidayPort.isMarketOpen(token, today);
+    private boolean isMarketOpen(LocalDate today) {
+        boolean open = kisHolidayPort.isMarketOpen(today);
         log.info("시장 개장 여부: {}", open);
         if (!open) {
             log.info("휴장일 — 매매 건너뜀");
@@ -93,9 +90,9 @@ public class TradingService implements ExecuteTradingUseCase {
         return open;
     }
 
-    private List<Order> placeMainOrders(String token, TradingVariables vars, LocalDate today) {
+    private List<Order> placeMainOrders(TradingVariables vars, LocalDate today) {
         List<Order> pending = tradingStrategy.buildOrders(vars, today, symbol);
-        List<Order> placed = pending.stream().map(o -> kisOrderPort.place(token, o)).toList();
+        List<Order> placed = pending.stream().map(o -> kisOrderPort.place(o)).toList();
         log.info("주문 {}건 접수", placed.size());
         return placed;
     }
@@ -107,11 +104,11 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("PostClose 대기 완료");
     }
 
-    private List<Order> applyCorrections(String token, List<Order> mainOrders,
+    private List<Order> applyCorrections(List<Order> mainOrders,
                                          List<Execution> executions, LocalDate today) {
         List<Order> corrections = correctionStrategy.correct(mainOrders, executions, today)
                 .stream()
-                .map(o -> kisOrderPort.place(token, o))
+                .map(o -> kisOrderPort.place(o))
                 .toList();
         log.info("보정 주문 {}건", corrections.size());
         return corrections;

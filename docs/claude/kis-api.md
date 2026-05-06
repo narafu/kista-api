@@ -1,7 +1,10 @@
 ## KIS API
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
-- 토큰 관리는 `KisTokenAdapter`만 담당
+- `KisHttpClient.buildHeaders(String trId)` — token 파라미터 없음, 내부에서 `kisTokenPort.getToken()` 자동 호출
+- 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
+- **`KisTokenAdapter`는 `KisHttpClient` 미사용** — `RestTemplate`+`KisProperties` 직접 주입 (`KisHttpClient`→`KisTokenPort`→`KisTokenAdapter` 순환 방지)
+- KIS 포트 인터페이스(`KisAccountPort`, `KisHolidayPort` 등)에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
 
 ### 응답 필드명 대소문자 주의
@@ -37,5 +40,6 @@
 
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
-- `KisHttpClient` mock 시 `props()`와 `buildHeaders()` 모두 스텁 필요 (`KisProperties` record는 직접 생성)
+- `KisHttpClient` mock 시 `props()`와 `buildHeaders(anyString())` 스텁 필요 (단일 파라미터, token 없음)
+- `KisTokenAdapterTest`: `@Mock RestTemplate kisRestTemplate` + 생성자 직접 생성 (`@InjectMocks` 사용 금지 — `KisHttpClient` mock이 없으므로)
 - Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능

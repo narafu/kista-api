@@ -4,7 +4,6 @@ import com.kista.domain.model.Order;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.KisOrderPort;
-import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,12 +13,10 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class FidaOrderService implements ExecuteFidaOrderUseCase {
 
-    private final KisTokenPort kisTokenPort;
     private final KisOrderPort kisOrderPort;
 
     @Override
     public void execute(FidaOrderRequest request) {
-        String token = kisTokenPort.getToken();
         Order order = new Order(
                 LocalDate.now(),
                 request.symbol(),
@@ -29,6 +26,6 @@ public class FidaOrderService implements ExecuteFidaOrderUseCase {
                 request.price(),
                 Order.OrderStatus.PLACED,
                 null);
-        kisOrderPort.place(token, order);
+        kisOrderPort.place(order);
     }
 }

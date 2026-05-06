@@ -21,8 +21,8 @@ public class KisPriceAdapter implements KisPricePort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public BigDecimal getPrice(String token, String symbol) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(token, TR_ID);
+    public BigDecimal getPrice(String symbol) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         params.add("EXCD", EXCD);

@@ -41,6 +41,7 @@ domain      →  외부 의존 없음
 | 새 환경변수 추가 | `application.yml` + `.env.example` + `docker-compose.yml` |
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
+| `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
 | 매매 공식 변경 | `SoxlDivisionStrategyTest` |
 | `TradingVariables` 필드 추가 | `TelegramAdapterTest.java` (하드코딩 생성자) + `SoxlDivisionStrategyTest` |
 | 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |

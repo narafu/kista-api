@@ -34,12 +34,11 @@ class KisExecutionAdapterTest {
             "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "NAS"
     );
     private static final LocalDate DATE = LocalDate.of(2024, 6, 15);
-    private static final String TOKEN = "test-token";
 
     @BeforeEach
     void setUp() {
         when(kisHttpClient.props()).thenReturn(TEST_PROPS);
-        when(kisHttpClient.buildHeaders(anyString(), anyString())).thenReturn(new HttpHeaders());
+        when(kisHttpClient.buildHeaders(anyString())).thenReturn(new HttpHeaders());
     }
 
     @Test
@@ -47,7 +46,7 @@ class KisExecutionAdapterTest {
     void getExecutions_nullResponse_returnsEmptyList() {
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(null);
 
-        List<Execution> result = adapter.getExecutions(TOKEN, DATE);
+        List<Execution> result = adapter.getExecutions(DATE);
 
         assertThat(result).isEmpty();
     }
@@ -58,7 +57,7 @@ class KisExecutionAdapterTest {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(null);
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(TOKEN, DATE);
+        List<Execution> result = adapter.getExecutions(DATE);
 
         assertThat(result).isEmpty();
     }
@@ -73,7 +72,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(TOKEN, DATE);
+        List<Execution> result = adapter.getExecutions(DATE);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).direction()).isEqualTo(Order.OrderDirection.SELL);
@@ -89,7 +88,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(TOKEN, DATE);
+        List<Execution> result = adapter.getExecutions(DATE);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);
@@ -112,7 +111,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(TOKEN, DATE);
+        List<Execution> result = adapter.getExecutions(DATE);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);

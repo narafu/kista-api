@@ -6,5 +6,5 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface KisExecutionPort {
-    List<Execution> getExecutions(String token, LocalDate date);
+    List<Execution> getExecutions(LocalDate date);
 }
