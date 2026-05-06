@@ -1,0 +1,31 @@
+package com.kista.adapter.in.web.dto;
+
+import com.kista.domain.model.Strategy;
+import com.kista.domain.port.in.RegisterAccountUseCase;
+import com.kista.domain.port.in.UpdateAccountUseCase;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record AccountRequest(
+        @NotBlank String nickname,
+        String accountNo,        // 등록 시 필수, 수정 시 무시
+        String kisAppKey,        // 등록 시 필수
+        String kisSecretKey,     // 등록 시 필수
+        String kisAccountType,   // 기본값 "01"
+        Strategy strategy,       // 등록 시 필수
+        String telegramBotToken, // optional
+        String telegramChatId    // optional
+) {
+    public RegisterAccountUseCase.Command toRegisterCommand() {
+        return new RegisterAccountUseCase.Command(
+                nickname, accountNo, kisAppKey, kisSecretKey,
+                kisAccountType, strategy, telegramBotToken, telegramChatId
+        );
+    }
+
+    public UpdateAccountUseCase.Command toUpdateCommand() {
+        return new UpdateAccountUseCase.Command(
+                nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId
+        );
+    }
+}

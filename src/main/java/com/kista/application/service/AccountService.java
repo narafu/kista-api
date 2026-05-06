@@ -1,0 +1,99 @@
+package com.kista.application.service;
+
+import com.kista.domain.model.Account;
+import com.kista.domain.model.StrategyStatus;
+import com.kista.domain.port.in.DeleteAccountUseCase;
+import com.kista.domain.port.in.GetAccountUseCase;
+import com.kista.domain.port.in.RegisterAccountUseCase;
+import com.kista.domain.port.in.UpdateAccountUseCase;
+import com.kista.domain.port.out.AccountRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
+        DeleteAccountUseCase, GetAccountUseCase {
+
+    private static final int MAX_ACCOUNTS_PER_USER = 10;
+
+    private final AccountRepository accountRepository;
+
+    @Override
+    public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
+        if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
+            throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
+        }
+        Instant now = Instant.now();
+        Account account = new Account(
+                null, userId, cmd.nickname(),
+                cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
+                cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
+                cmd.strategy(), StrategyStatus.ACTIVE,
+                cmd.telegramBotToken(), cmd.telegramChatId(),
+                now, now
+        );
+        Account saved = accountRepository.save(account);
+        log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
+        return saved;
+    }
+
+    @Override
+    public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
+        Account account = findOrThrow(accountId);
+        verifyOwner(account, requesterId);
+
+        Account updated = new Account(
+                account.id(), account.userId(),
+                cmd.nickname() != null ? cmd.nickname() : account.nickname(),
+                account.accountNo(), // 계좌번호 변경 불가 (보안상)
+                cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
+                cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
+                account.kisAccountType(), account.strategy(), account.strategyStatus(),
+                cmd.telegramBotToken(), cmd.telegramChatId(),
+                account.createdAt(), Instant.now()
+        );
+        return accountRepository.save(updated);
+    }
+
+    @Override
+    public void delete(UUID accountId, UUID requesterId) {
+        Account account = findOrThrow(accountId);
+        verifyOwner(account, requesterId);
+        accountRepository.delete(accountId);
+        log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Account> listByUser(UUID userId) {
+        return accountRepository.findByUserId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Account getById(UUID id) {
+        return findOrThrow(id);
+    }
+
+    private Account findOrThrow(UUID accountId) {
+        return accountRepository.findById(accountId)
+                .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+    }
+
+    // 소유권 검증 실패 시 SecurityException(unchecked) → 컨트롤러에서 403 매핑
+    private void verifyOwner(Account account, UUID requesterId) {
+        if (!account.userId().equals(requesterId)) {
+            throw new SecurityException("계좌에 대한 접근 권한이 없습니다");
+        }
+    }
+}
