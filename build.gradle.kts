@@ -41,6 +41,12 @@ dependencies {
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
 
+    // Security & JWT
+    implementation(libs.spring.boot.starter.security)
+    implementation(libs.jjwt.api)
+    runtimeOnly(libs.jjwt.impl)
+    runtimeOnly(libs.jjwt.jackson)
+
     // API Documentation
     implementation(libs.springdoc.openapi.webmvc.ui)
 
@@ -55,6 +61,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.security.test)
     testImplementation(libs.archunit.junit5)
 }
 

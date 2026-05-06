@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(DashboardController.class)
 @Execution(ExecutionMode.SAME_THREAD)
+@WithMockUser // Spring Security 적용 후 인증된 사용자로 테스트
 class DashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -84,6 +87,7 @@ class DashboardControllerTest {
                 "SOXL", Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
 
         mockMvc.perform(post("/api/orders/fida")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isCreated());
@@ -92,6 +96,7 @@ class DashboardControllerTest {
     @Test
     void placeFidaOrder_invalid_body_returns_400() throws Exception {
         mockMvc.perform(post("/api/orders/fida")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
