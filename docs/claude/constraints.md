@@ -29,7 +29,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `74420614-01` 형태로 하나의 변수에 넣으면 KIS API CANO 파라미터 오류
 
 ### Flyway
-- `V1__`~`V3__.sql` **절대 수정 금지** — 새 마이그레이션은 `V4__...` 이후로
+- `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성
@@ -48,6 +48,21 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - package-private 타입을 생성자에서 참조 시: `@RequiredArgsConstructor(access = AccessLevel.PACKAGE)` (ClassEscapesItsScope 회피)
 - `@Value` 필드를 Lombok 생성자에 포함하려면 `lombok.config`에 `lombok.copyableAnnotations += org.springframework.beans.factory.annotation.Value` 필요 (이미 설정됨)
 - `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치시킬 것 — 불일치 시 NoUniqueBeanDefinitionException
+
+### AES-256 암호화 위치 (V2)
+- KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화
+- `AccountPersistenceAdapter`가 `AesCryptoService` 주입받아 처리 — `AccountService`(application layer)는 평문만 다룸
+- ArchUnit 규칙(application → adapter 금지)으로 서비스가 암호화 서비스 직접 호출 불가
+- 신규 환경변수: `AES_ENCRYPTION_KEY` (Base64 32바이트), `SUPABASE_JWT_SECRET`
+
+### Spring Security Filter 이중 등록 방지
+- `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
+- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `SupabaseJwtFilter`에 적용됨)
+
+### 소유권 검증 예외 패턴 (V2)
+- Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw
+- Controller에서 catch → `ResponseStatusException(HttpStatus.FORBIDDEN)` 변환
+- application 레이어가 Spring HTTP에 의존하지 않아 ArchUnit 규칙 준수
 
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것

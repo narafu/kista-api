@@ -21,8 +21,9 @@ curl https://kista-api.onrender.com/actuator/health
 ```
 
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
-# 직접 `bash gradlew ...` 실행 시 Gradle이 UNC 경로(\\wsl.localhost\...)에 .gradle 캐시를 못 만들어 실패
-# 반드시 아래 WSL 래퍼 패턴 사용:
+# WSL Ubuntu에 Java가 없어도 Git Bash에서 `bash gradlew ...` 직접 실행 가능
+# — Gradle toolchain이 JDK 21을 ~/.gradle/jdks/에 자동 다운로드 (첫 실행 ~30초)
+# WSL 래퍼는 WSL 내 Java가 설치된 경우에만 필요
 # wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"
 # wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.SomeTest'"
 
