@@ -85,7 +85,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
 
     @Override
     public void notifyStrategyChanged(User user, Account account, String action) {
-        String text = String.format("📋 <b>전략 변경</b>%n사용자: %s%n계좌: %s%n작업: %s",
+        String text = String.format("사용자 %s이 계좌 %s의 전략을 %s했습니다",
                 user.nickname(), account.nickname(), action);
         send(text); // 관리자 봇으로 전송
     }

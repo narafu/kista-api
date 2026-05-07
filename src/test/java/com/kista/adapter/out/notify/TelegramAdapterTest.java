@@ -10,9 +10,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -121,5 +123,23 @@ class TelegramAdapterTest {
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         assertThat(bodyCaptor.getValue().get("text")).contains("KIS API 호출 실패");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyStrategyChanged_bodyContainsNicknameAccountAndAction() {
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+        Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
+                "74420614", "key", "secret", "01",
+                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+
+        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        adapter.notifyStrategyChanged(user, account, "중지");
+
+        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
+        String text = bodyCaptor.getValue().get("text");
+        assertThat(text).contains("홍길동").contains("내SOXL계좌").contains("중지");
     }
 }
