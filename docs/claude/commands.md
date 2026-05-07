@@ -20,6 +20,26 @@ curl https://kista-api.onrender.com/actuator/health
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
 ```
 
+### Claude Code 웹 앱 (claude.ai/code) WSL2 내부 환경 전용
+# 이 Claude Code 세션은 이미 WSL2 내부 → `wsl -d Ubuntu bash -c ...` 명령어 사용 불가
+# Java 기본 미설치 — /tmp/jdk-21.0.5+11/ 에 JDK 캐시됨 (재부팅 시 소멸)
+# JDK 없으면 재다운로드:
+# curl -L "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz" | tar -xz -C /tmp/
+#
+# 파일 편집: /mnt/d/src/study/kista/kista-api/ (Windows D: 드라이브)
+# Gradle 실행: /home/user/workspace/kista/ (Linux 네이티브 경로 — 성능·경로 호환)
+# 편집 후 Gradle 실행 전 반드시 rsync 동기화:
+# rsync -av --include='*.java' --include='*/' --exclude='*' \
+#   /mnt/d/src/study/kista/kista-api/src/ /home/user/workspace/kista/src/
+# build 설정 변경 시 추가 동기화 (spring-security 등 의존성 누락 방지):
+# cp /mnt/d/src/study/kista/kista-api/build.gradle.kts /home/user/workspace/kista/
+# cp /mnt/d/src/study/kista/kista-api/gradle/libs.versions.toml /home/user/workspace/kista/gradle/
+# Gradle 실행 (JAVA_HOME 명시 필수):
+# JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
+#   bash /home/user/workspace/kista/gradlew compileJava --no-daemon -p /home/user/workspace/kista
+# JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
+#   bash /home/user/workspace/kista/gradlew test --tests 'com.kista.architecture.*' --no-daemon -p /home/user/workspace/kista
+
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
 # WSL Ubuntu에 Java가 없어도 Git Bash에서 `bash gradlew ...` 직접 실행 가능
 # — Gradle toolchain이 JDK 21을 ~/.gradle/jdks/에 자동 다운로드 (첫 실행 ~30초)
