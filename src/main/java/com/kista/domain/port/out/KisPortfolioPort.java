@@ -1,0 +1,8 @@
+package com.kista.domain.port.out;
+
+import com.kista.domain.model.Account;
+import com.kista.domain.model.PresentBalanceResult;
+
+public interface KisPortfolioPort {
+    PresentBalanceResult getPresentBalance(Account account);
+}
