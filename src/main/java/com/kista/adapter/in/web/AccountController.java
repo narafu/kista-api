@@ -4,7 +4,9 @@ import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
+import com.kista.domain.port.in.PauseStrategyUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
+import com.kista.domain.port.in.ResumeStrategyUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,8 @@ public class AccountController {
     private final UpdateAccountUseCase updateAccount;
     private final DeleteAccountUseCase deleteAccount;
     private final GetAccountUseCase getAccount;
+    private final PauseStrategyUseCase pauseStrategy;
+    private final ResumeStrategyUseCase resumeStrategy;
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @GetMapping
@@ -68,6 +72,32 @@ public class AccountController {
     public void delete(@PathVariable UUID id) {
         try {
             deleteAccount.delete(id, currentUserId());
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 전략 중지 (ACTIVE → PAUSED)
+    @PatchMapping("/{id}/strategy/pause")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void pauseStrategy(@PathVariable UUID id) {
+        try {
+            pauseStrategy.pause(id, currentUserId());
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 전략 재개 (PAUSED → ACTIVE)
+    @PatchMapping("/{id}/strategy/resume")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resumeStrategy(@PathVariable UUID id) {
+        try {
+            resumeStrategy.resume(id, currentUserId());
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
