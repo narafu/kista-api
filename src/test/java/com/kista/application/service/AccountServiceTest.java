@@ -3,9 +3,13 @@ package com.kista.application.service;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.Strategy;
 import com.kista.domain.model.StrategyStatus;
+import com.kista.domain.model.User;
+import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +24,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +32,8 @@ import static org.mockito.Mockito.*;
 class AccountServiceTest {
 
     @Mock AccountRepository accountRepository;
+    @Mock UserRepository userRepository;
+    @Mock UserNotificationPort notificationPort;
     @InjectMocks AccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -36,6 +43,18 @@ class AccountServiceTest {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 Strategy.INFINITE, StrategyStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+    }
+
+    private Account pausedAccount(UUID ownerId) {
+        return new Account(accountId, ownerId, "테스트계좌",
+                "74420614", "appKey", "appSecret", "01",
+                Strategy.INFINITE, StrategyStatus.PAUSED,
+                null, null, Instant.now(), Instant.now());
+    }
+
+    private User activeUser(UUID id) {
+        return new User(id, "kakao-123", "홍길동", UserStatus.ACTIVE,
                 null, null, Instant.now(), Instant.now());
     }
 
@@ -129,5 +148,44 @@ class AccountServiceTest {
         assertThatThrownBy(() -> accountService.update(accountId, userId,
                 new UpdateAccountUseCase.Command("닉", null, null, null, null)))
                 .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    @DisplayName("pause: ACTIVE → PAUSED 저장 + 관리자 알림")
+    void pause_changes_status_and_notifies() {
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser(userId)));
+        when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        accountService.pause(accountId, userId);
+
+        verify(accountRepository).save(argThat(a -> a.strategyStatus() == StrategyStatus.PAUSED));
+        verify(notificationPort).notifyStrategyChanged(any(), any(), eq("중지"));
+    }
+
+    @Test
+    @DisplayName("resume: PAUSED → ACTIVE 저장 + 관리자 알림")
+    void resume_changes_status_and_notifies() {
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(pausedAccount(userId)));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser(userId)));
+        when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        accountService.resume(accountId, userId);
+
+        verify(accountRepository).save(argThat(a -> a.strategyStatus() == StrategyStatus.ACTIVE));
+        verify(notificationPort).notifyStrategyChanged(any(), any(), eq("재개"));
+    }
+
+    @Test
+    @DisplayName("pause: 타 사용자 계좌 시 SecurityException(→403)")
+    void pause_by_non_owner_throws_forbidden() {
+        UUID otherId = UUID.randomUUID();
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
+
+        assertThatThrownBy(() -> accountService.pause(accountId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(accountRepository, never()).save(any());
+        verify(notificationPort, never()).notifyStrategyChanged(any(), any(), any());
     }
 }
