@@ -8,8 +8,10 @@
 - POST 요청 테스트: `.with(csrf())` 추가 필수 (없으면 403) — `import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf`
 - 인증 필요 엔드포인트 테스트: 클래스 또는 메서드에 `@WithMockUser` 추가 (없으면 401)
 - `/telegram/webhook` 같은 permitAll 경로도 `@WebMvcTest`에서는 `@WithMockUser` + `csrf()` 필요
+- 컨트롤러가 `(String) auth.getPrincipal()` 캐스팅 사용 시 `@WithMockUser` 금지 (principal이 UserDetails → ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(uuidString, null, List.of())))` 패턴 사용
 
 ### Mockito 병렬 테스트 주의
+- `@WebMvcTest` 클래스 전체에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 doThrow/doNothing mock이 다른 테스트에 오염됨 (DashboardControllerTest 패턴 참고)
 - `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용
 - `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건(LOC매수×2 + LOC매도 + 지정가매도) — `kisOrderPort.place()` 호출 횟수 주의
 - `TelegramAdapterTest`는 `new TradingVariables(...)` 생성자를 하드코딩 — `TradingVariables` 필드 추가 시 해당 테스트도 반드시 수정
