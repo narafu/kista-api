@@ -31,7 +31,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `74420614-01` 형태로 하나의 변수에 넣으면 KIS API CANO 파라미터 오류
 
 ### Flyway
-- `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블)
+- `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성

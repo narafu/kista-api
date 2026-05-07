@@ -185,6 +185,597 @@
       "analysisResult": "코드베이스 14개 파일에 걸쳐 필드 설명 주석(// 인라인)과 비즈니스 로직 주석(블록 전 한 줄)을 추가한다. 신규 코드 작성 없이 주석만 추가하므로 아키텍처 변경 없음. 기존 주석 스타일(// 인라인, Javadoc 유지) 준수. 각 그룹은 독립적으로 작업 가능하며, 전체 완료 후 compileJava + 테스트로 검증.",
       "summary": "TelegramBotService의 adminChatId 필드에 인라인 주석, stateMap 필드 위에 ConcurrentHashMap 사용 이유 주석 추가. compileJava, domain 테스트, architecture 테스트 모두 통과. 4개 태스크 전체 완료.",
       "completedAt": "2026-04-29T04:48:44.320Z"
+    },
+    {
+      "id": "9a60b116-4fdb-43b5-8cd2-9d1073c72900",
+      "name": "[V2-P1] Flyway V6~V8 마이그레이션 SQL 작성",
+      "description": "users, accounts 테이블 생성 및 기존 테이블에 account_id 컬럼 추가. V1~V5 수정 금지.\n\n수락 기준:\n- V6: users 테이블 (id UUID PK, kakao_id, nickname, status ENUM(PENDING/ACTIVE/REJECTED), telegram_bot_token, telegram_chat_id, created_at, updated_at)\n- V7: accounts 테이블 (id, user_id FK→users, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, strategy ENUM(INFINITE/PRIVACY), strategy_status ENUM(ACTIVE/PAUSED), telegram_bot_token, telegram_chat_id, created_at, updated_at)\n- V8: trade_histories, portfolio_snapshots, kis_tokens에 account_id UUID NULLABLE 컬럼 추가\n- bash gradlew compileJava 통과",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T12:40:02.253Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/resources/db/migration/V6__create_users.sql",
+          "type": "CREATE",
+          "description": "users 테이블 생성 SQL"
+        },
+        {
+          "path": "src/main/resources/db/migration/V7__create_accounts.sql",
+          "type": "CREATE",
+          "description": "accounts 테이블 생성 SQL"
+        },
+        {
+          "path": "src/main/resources/db/migration/V8__add_account_id_to_existing_tables.sql",
+          "type": "CREATE",
+          "description": "기존 테이블에 account_id 컬럼 추가 SQL"
+        },
+        {
+          "path": "src/main/resources/db/migration/V5__create_kis_tokens.sql",
+          "type": "REFERENCE",
+          "description": "기존 마이그레이션 패턴 참고"
+        }
+      ],
+      "implementationGuide": "1. src/main/resources/db/migration/V6__create_users.sql 생성: CREATE TYPE user_status AS ENUM, CREATE TABLE users\n2. V7__create_accounts.sql 생성: CREATE TYPE strategy_type/strategy_status AS ENUM, CREATE TABLE accounts (user_id FK ON DELETE CASCADE), CREATE INDEX\n3. V8__add_account_id_to_existing_tables.sql 생성: ALTER TABLE 3개 테이블 ADD COLUMN account_id UUID REFERENCES accounts(id) (NULL 허용, 기존 데이터 하위호환)\n4. compileJava로 검증",
+      "verificationCriteria": "wsl -d Ubuntu bash -c 'cd /home/user/workspace/kista && bash gradlew compileJava' 통과. SQL 파일 3개 생성 확인. V1~V5 파일 미변경 확인.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "V6(users), V7(accounts), V8(account_id 컬럼 추가) SQL 3개 파일 생성 완료. user_status/strategy_type/strategy_status ENUM 정의, CASCADE 삭제, accounts 인덱스, NULL 허용으로 기존 V1 데이터 하위호환 처리. bash gradlew compileJava BUILD SUCCESSFUL 확인 후 커밋.",
+      "completedAt": "2026-05-06T12:40:02.247Z"
+    },
+    {
+      "id": "fc233865-8d90-4d8e-862d-e2c9fc23e01a",
+      "name": "[V2-P1] 도메인 모델 확장 (User, Account, 신규 포트)",
+      "description": "User, Account 도메인 모델과 새 UseCase/Port 인터페이스 추가. ArchUnit 규칙 준수 필수(도메인에 Spring/JPA 어노테이션 금지).\n\n수락 기준:\n- domain/model/: User(record), UserStatus(enum), Account(record), Strategy(enum), StrategyStatus(enum)\n- domain/port/in/: RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, RegisterAccountUseCase, UpdateAccountUseCase, DeleteAccountUseCase, PauseStrategyUseCase, ResumeStrategyUseCase\n- domain/port/out/: UserRepository, AccountRepository, UserNotificationPort\n- ArchUnit 테스트 통과",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T12:42:43.327Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/domain/model/User.java",
+          "type": "CREATE",
+          "description": "User 도메인 record"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/model/UserStatus.java",
+          "type": "CREATE",
+          "description": "UserStatus enum"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/model/Account.java",
+          "type": "CREATE",
+          "description": "Account 도메인 record"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/model/Strategy.java",
+          "type": "CREATE",
+          "description": "Strategy enum (INFINITE/PRIVACY)"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/model/StrategyStatus.java",
+          "type": "CREATE",
+          "description": "StrategyStatus enum (ACTIVE/PAUSED)"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/RegisterUserUseCase.java",
+          "type": "CREATE",
+          "description": "신규 사용자 등록 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/ApproveUserUseCase.java",
+          "type": "CREATE",
+          "description": "승인/거절/재신청 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/GetUserUseCase.java",
+          "type": "CREATE",
+          "description": "사용자 조회 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/RegisterAccountUseCase.java",
+          "type": "CREATE",
+          "description": "계좌 등록 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/UpdateAccountUseCase.java",
+          "type": "CREATE",
+          "description": "계좌 수정 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/DeleteAccountUseCase.java",
+          "type": "CREATE",
+          "description": "계좌 삭제 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/PauseStrategyUseCase.java",
+          "type": "CREATE",
+          "description": "전략 중지 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/in/ResumeStrategyUseCase.java",
+          "type": "CREATE",
+          "description": "전략 재개 UseCase"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/out/UserRepository.java",
+          "type": "CREATE",
+          "description": "User 저장소 포트"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/out/AccountRepository.java",
+          "type": "CREATE",
+          "description": "Account 저장소 포트"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/out/UserNotificationPort.java",
+          "type": "CREATE",
+          "description": "사용자 알림 포트"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/model/Order.java",
+          "type": "REFERENCE",
+          "description": "기존 record 모델 패턴 참고"
+        },
+        {
+          "path": "src/test/java/com/kista/architecture/HexagonalArchitectureTest.java",
+          "type": "REFERENCE",
+          "description": "ArchUnit 규칙 확인"
+        }
+      ],
+      "implementationGuide": "1. User record: id(UUID), kakaoId, nickname, UserStatus, telegramBotToken(nullable), telegramChatId(nullable), createdAt, updatedAt\n2. Account record: id(UUID), userId, nickname, accountNo(복호화값), kisAppKey, kisSecretKey, kisAccountType, Strategy, StrategyStatus, telegramBotToken, telegramChatId, createdAt, updatedAt\n3. UseCase 인터페이스: 단일 책임 원칙 준수\n4. UserNotificationPort: notifyNewUser(User), notifyApproved(User), notifyRejected(User), notifyStrategyChanged(User, Account, String action)\n5. AccountRepository: findByUserId, findById, countByUserId, save, delete, findAllActive (ACTIVE 사용자의 ACTIVE 계좌)\n6. 도메인 패키지에 @Component/@Service/@Entity 절대 금지",
+      "verificationCriteria": "wsl -d Ubuntu bash -c 'cd /home/user/workspace/kista && bash gradlew test --tests com.kista.architecture.*' 통과",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "User/Account/UserStatus/Strategy/StrategyStatus 도메인 모델(record/enum) 생성. 8개 인바운드 UseCase(RegisterUser, ApproveUser, GetUser, RegisterAccount, UpdateAccount, DeleteAccount, PauseStrategy, ResumeStrategy) 및 3개 아웃바운드 포트(UserRepository, AccountRepository, UserNotificationPort) 생성. 도메인에 Spring/JPA 어노테이션 없음, ArchUnit BUILD SUCCESSFUL 확인 후 커밋.",
+      "completedAt": "2026-05-06T12:42:43.324Z"
+    },
+    {
+      "id": "016b3adf-1b81-4356-8744-fd8dc56c6cff",
+      "name": "[V2-P1] AES-256-GCM 암호화 유틸리티",
+      "description": "KIS 자격증명, 계좌번호, 텔레그램 봇 토큰을 AES-256-GCM으로 암호화/복호화하는 서비스 구현.\n\n수락 기준:\n- AesCryptoService: encrypt(String) → Base64, decrypt(String) → 원본\n- AES-256-GCM (IV 12바이트 랜덤, 인증 태그 128bit) — 같은 입력이어도 매번 다른 암호문\n- 환경변수 AES_ENCRYPTION_KEY (Base64 인코딩 32바이트)\n- 단위 테스트 통과: 암복호화 일치, 동일입력→다른암호문",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T12:44:36.767Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/out/crypto/AesCryptoService.java",
+          "type": "CREATE",
+          "description": "AES-256-GCM 암호화 서비스"
+        },
+        {
+          "path": "src/test/java/com/kista/adapter/out/crypto/AesCryptoServiceTest.java",
+          "type": "CREATE",
+          "description": "암호화 단위 테스트"
+        },
+        {
+          "path": "src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "crypto.aes-key 설정 추가"
+        },
+        {
+          "path": ".env.example",
+          "type": "TO_MODIFY",
+          "description": "AES_ENCRYPTION_KEY 추가"
+        }
+      ],
+      "implementationGuide": "1. com.kista.adapter.out.crypto.AesCryptoService @Component\n2. @Value('${crypto.aes-key}') String base64Key → Base64 디코딩 → SecretKeySpec(bytes, 'AES')\n3. encrypt(): SecureRandom IV 12바이트, Cipher AES/GCM/NoPadding, GCMParameterSpec(128, iv), IV+암호문 concat → Base64\n4. decrypt(): Base64 디코딩, bytes[0..11]=IV, bytes[12..]=암호문\n5. application.yml: crypto.aes-key: ${AES_ENCRYPTION_KEY}\n6. .env.example: AES_ENCRYPTION_KEY=<openssl rand -base64 32>",
+      "verificationCriteria": "wsl -d Ubuntu bash -c 'cd /home/user/workspace/kista && bash gradlew test --tests com.kista.adapter.out.crypto.*' 통과",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "AesCryptoService 구현(AES-256-GCM, IV 12바이트 랜덤, 태그 128bit). encrypt/decrypt 메서드, application.yml crypto.aes-key 추가(로컬 기본값 포함), .env.example AES_ENCRYPTION_KEY 추가. 단위 테스트 4개(암복호화 일치, 긴문자열, 동일입력→다른암호문, 잘못된입력 예외) BUILD SUCCESSFUL 확인 후 커밋.",
+      "completedAt": "2026-05-06T12:44:36.763Z"
+    },
+    {
+      "id": "692b38e6-19d5-4c8c-923f-6e1948f71588",
+      "name": "[V2-P2] Supabase JWT 인증 필터 + Spring Security 설정",
+      "description": "Supabase 발급 JWT를 검증하는 OncePerRequestFilter와 Spring Security 설정 추가.\n\n수락 기준:\n- Authorization: Bearer {token} 헤더 JWT 추출 및 HMAC-SHA256 검증\n- 검증 성공 시 SecurityContext에 userId(Supabase UID=sub 클레임) 주입\n- 검증 실패 시 401 반환\n- 공개 경로: /actuator/health, /swagger-ui/**, /api-docs/**, /telegram/webhook, /api/auth/**\n- jjwt 0.12.6 의존성 추가",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "fc233865-8d90-4d8e-862d-e2c9fc23e01a"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T12:57:30.969Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/security/SupabaseJwtFilter.java",
+          "type": "CREATE",
+          "description": "Supabase JWT 검증 필터"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/security/SecurityConfig.java",
+          "type": "CREATE",
+          "description": "Spring Security 설정"
+        },
+        {
+          "path": "build.gradle.kts",
+          "type": "TO_MODIFY",
+          "description": "jjwt 0.12.6 의존성 추가"
+        },
+        {
+          "path": "src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "supabase.jwt-secret 설정 추가"
+        },
+        {
+          "path": ".env.example",
+          "type": "TO_MODIFY",
+          "description": "SUPABASE_JWT_SECRET 추가"
+        }
+      ],
+      "implementationGuide": "1. build.gradle.kts에 jjwt-api/impl/jackson 0.12.6 추가\n2. SupabaseJwtFilter extends OncePerRequestFilter:\n   - extractBearerToken()으로 헤더 파싱\n   - Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secret.getBytes())).build().parseSignedClaims(token)\n   - claims.getSubject()를 principal로 UsernamePasswordAuthenticationToken 생성\n3. SecurityConfig @Configuration @EnableWebSecurity:\n   - csrf disable, STATELESS, 경로별 permit/authenticated\n   - addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)\n4. application.yml: supabase.jwt-secret: ${SUPABASE_JWT_SECRET}\n5. @Value('${supabase.jwt-secret}') in filter",
+      "verificationCriteria": "bash gradlew compileJava 통과. 인증 없이 /api/accounts 호출 시 401, /actuator/health 호출 시 200 반환 확인.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "jjwt 0.12.6 + spring-boot-starter-security 추가. SupabaseJwtFilter(Bearer 추출·HMAC검증·sub→userId SecurityContext 주입, 실패시 401). SecurityConfig(CSRF비활성화, STATELESS, 공개경로 설정, FilterRegistrationBean 이중등록방지). DashboardControllerTest @WithMockUser+csrf() 추가. 컴파일 및 테스트 BUILD SUCCESSFUL 후 커밋.",
+      "completedAt": "2026-05-06T12:57:30.966Z"
+    },
+    {
+      "id": "d94e8801-273d-4924-b7ab-13b05c27dd1b",
+      "name": "[V2-P2] 인증 API — 카카오 콜백, /me, 재신청",
+      "description": "Supabase Auth 카카오 OAuth 연동 후 사용자 상태 관리 API. UserPersistenceAdapter, UserService, AuthController 포함.\n\n수락 기준:\n- POST /api/auth/kakao/callback: 신규 가입 시 PENDING 저장 + 관리자 텔레그램 알림, 기존이면 조회\n- GET /api/auth/me: 현재 사용자 정보(id, nickname, status) 반환\n- POST /api/auth/reapply: REJECTED→PENDING 재전환, 다른 상태 시 400\n- UserService: @Service @Transactional, 3개 UseCase 구현\n- UserPersistenceAdapter: UserRepository 구현, UserEntity(JPA Entity), UserJpaRepository",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9a60b116-4fdb-43b5-8cd2-9d1073c72900"
+        },
+        {
+          "taskId": "fc233865-8d90-4d8e-862d-e2c9fc23e01a"
+        },
+        {
+          "taskId": "692b38e6-19d5-4c8c-923f-6e1948f71588"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T13:03:11.370Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/entity/UserEntity.java",
+          "type": "CREATE",
+          "description": "User JPA 엔티티"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/repository/UserJpaRepository.java",
+          "type": "CREATE",
+          "description": "User JPA 레포지토리"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/UserPersistenceAdapter.java",
+          "type": "CREATE",
+          "description": "UserRepository 구현체"
+        },
+        {
+          "path": "src/main/java/com/kista/application/service/UserService.java",
+          "type": "CREATE",
+          "description": "사용자 상태 관리 서비스"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/AuthController.java",
+          "type": "CREATE",
+          "description": "인증 REST 컨트롤러"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/dto/UserResponse.java",
+          "type": "CREATE",
+          "description": "사용자 응답 DTO"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/notify/TelegramAdapter.java",
+          "type": "TO_MODIFY",
+          "description": "UserNotificationPort 구현 추가"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/entity/TradeHistoryEntity.java",
+          "type": "REFERENCE",
+          "description": "기존 JPA Entity 패턴 참고"
+        }
+      ],
+      "implementationGuide": "1. UserEntity @Entity @Table(name='users'): @Enumerated(STRING) status, @Id UUID id (직접 할당), toModel()/fromModel() 정적 메서드\n2. UserJpaRepository extends JpaRepository<UserEntity, UUID>: findByKakaoId(String) 추가\n3. UserPersistenceAdapter @Component: findById/findByKakaoId/save 구현\n4. UserService @Service @Transactional:\n   - register(): findByKakaoId → 없으면 PENDING 저장 + notifyNewUser()\n   - approve()/reject(): status 전환 + notifyApproved()/notifyRejected()\n   - reapply(): status != REJECTED면 throw IllegalStateException + notifyNewUser()\n5. AuthController @RestController @RequestMapping('/api/auth'): SecurityContext에서 UUID userId 추출\n6. TelegramAdapter에 UserNotificationPort 구현 (notifyNewUser, notifyApproved, notifyRejected)",
+      "verificationCriteria": "bash gradlew compileJava 통과. UserService 단위 테스트(MockitoExtension): 재신청 PENDING 상태 아닐 때 예외, 신규 등록 시 notifyNewUser 호출 확인. ArchUnit 통과.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "UserEntity(JPA), UserJpaRepository, UserPersistenceAdapter 구현. UserService(RegisterUser/ApproveUser/GetUser UseCase, @Transactional). AuthController(POST /kakao/callback, GET /me, POST /reapply). UserResponse DTO. TelegramAdapter에 UserNotificationPort 구현(신규가입 인라인버튼, 승인/거절 알림, 전략변경). 단위 테스트 6개+ArchUnit BUILD SUCCESSFUL 후 커밋.",
+      "completedAt": "2026-05-06T13:03:11.366Z"
+    },
+    {
+      "id": "811499c8-52bd-45e0-8d3d-941d0e59dce7",
+      "name": "[V2-P2] 관리자 텔레그램 Webhook — 승인/거절 인라인 버튼",
+      "description": "신규 가입 알림에 [승인]/[거절] 인라인 키보드 추가. callback_query로 사용자 상태 전환.\n\n수락 기준:\n- 신규 가입 시 관리자에게 인라인 버튼(✅ 승인, ❌ 거절) 포함 메시지 발송\n- callback_data: 'approve:{userId}' / 'reject:{userId}'\n- 버튼 클릭 → ApproveUserUseCase.approve/reject 호출 → ACTIVE/REJECTED 전환 + 사용자 알림\n- TelegramWebhookController에 callback_query update 타입 처리 추가\n- 사용자 telegramChatId 없으면 사용자 알림 생략",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d94e8801-273d-4924-b7ab-13b05c27dd1b"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T13:18:01.599Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/out/notify/TelegramAdapter.java",
+          "type": "TO_MODIFY",
+          "description": "인라인 키보드 발송 메서드, notifyApproved/notifyRejected 구현"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/telegram/TelegramBotService.java",
+          "type": "TO_MODIFY",
+          "description": "callback_query 핸들러 추가"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/telegram/TelegramWebhookController.java",
+          "type": "TO_MODIFY",
+          "description": "callback_query update 타입 라우팅"
+        }
+      ],
+      "implementationGuide": "1. TelegramAdapter에 sendWithInlineKeyboard(chatId, text, buttons) 메서드 추가\n   - POST /sendMessage with reply_markup: {inline_keyboard: [[{text, callback_data},...]]}\n2. TelegramWebhookController 또는 TelegramBotService에 callback_query 분기 추가\n   - update.callback_query.data 파싱: startsWith('approve:') → approve(UUID), startsWith('reject:') → reject(UUID)\n   - answerCallbackQuery() 로 버튼 응답 처리\n3. notifyApproved/notifyRejected: user.telegramChatId() != null 조건 체크 후 발송",
+      "verificationCriteria": "bash gradlew compileJava 통과. TelegramAdapterTest 기존 테스트 regression 없음. callback_query 핸들러 단위 테스트 추가.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "TelegramUpdate에 CallbackQuery record 추가. TelegramApiClient에 answerCallbackQuery() 추가. TelegramBotService에 ApproveUserUseCase 주입 및 handleCallbackQuery() 구현(approve:/reject: 파싱, finally로 answerCallbackQuery 보장). 테스트 3개 추가(승인, 거절, 오류시 answerCallbackQuery 보장). 전체 Telegram+ArchUnit BUILD SUCCESSFUL 후 커밋.",
+      "completedAt": "2026-05-06T13:18:01.597Z"
+    },
+    {
+      "id": "d1bf522c-1715-44b0-b252-aa0affc07d69",
+      "name": "[V2-P3] 계좌 CRUD API + AES-256 암호화",
+      "description": "계좌 등록/조회/수정/삭제 API 구현. KIS 자격증명은 AES-256 암호화 저장, 조회 시 마스킹.\n\n수락 기준:\n- GET /api/accounts: account_no 마스킹(****1234) 반환\n- POST /api/accounts: AES-256 암호화 저장, 1계정 10개 초과 400\n- PUT /api/accounts/{id}: 소유권 검증(403)\n- DELETE /api/accounts/{id}: 소유권 검증(403)\n- AccountEntity(JPA), AccountJpaRepository, AccountPersistenceAdapter\n- Privacy(P) 전략 선택 가능 (스텁)",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "016b3adf-1b81-4356-8744-fd8dc56c6cff"
+        },
+        {
+          "taskId": "d94e8801-273d-4924-b7ab-13b05c27dd1b"
+        },
+        {
+          "taskId": "9a60b116-4fdb-43b5-8cd2-9d1073c72900"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T22:00:40.913Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/entity/AccountEntity.java",
+          "type": "CREATE",
+          "description": "Account JPA 엔티티"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/repository/AccountJpaRepository.java",
+          "type": "CREATE",
+          "description": "Account JPA 레포지토리"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/AccountPersistenceAdapter.java",
+          "type": "CREATE",
+          "description": "AccountRepository 구현체"
+        },
+        {
+          "path": "src/main/java/com/kista/application/service/AccountService.java",
+          "type": "CREATE",
+          "description": "계좌 관리 서비스"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/AccountController.java",
+          "type": "CREATE",
+          "description": "계좌 REST 컨트롤러"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/dto/AccountRequest.java",
+          "type": "CREATE",
+          "description": "계좌 등록/수정 요청 DTO"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/dto/AccountResponse.java",
+          "type": "CREATE",
+          "description": "계좌 응답 DTO (마스킹)"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/crypto/AesCryptoService.java",
+          "type": "DEPENDENCY",
+          "description": "암호화 서비스 주입"
+        }
+      ],
+      "implementationGuide": "1. AccountEntity @Entity @Table(name='accounts'): strategy/strategy_status @Enumerated(STRING), toModel()/fromModel()\n2. AccountJpaRepository: findByUserId(UUID), countByUserId(UUID)\n3. AccountPersistenceAdapter @Component: AccountRepository 구현\n4. AccountService @Transactional implements 3 UseCases:\n   - register(): countByUserId >= 10 → throw. accountNo/kisAppKey/kisSecretKey → crypto.encrypt(). telegramBotToken 있으면 암호화.\n   - update/delete: account.userId() != requesterId → throw ForbiddenException\n5. AccountController @RestController /api/accounts: SecurityContext에서 userId\n6. AccountResponse.masked(): accountNo 마지막 4자리만 노출\n7. RegisterAccountCommand record: nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, strategy, telegramBotToken(nullable), telegramChatId(nullable)",
+      "verificationCriteria": "bash gradlew compileJava 통과. AccountService 단위 테스트: 10개 초과 400, 타 소유자 403, 암호화 저장 확인. ArchUnit 통과.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "AccountEntity(@GeneratedValue UUID, @Enumerated), AccountJpaRepository(findByUserId/countByUserId/findAllActive native query), AccountPersistenceAdapter(암호화·복호화 담당, AesCryptoService 주입). AccountService(Register/Update/Delete/GetAccount, 10개 제한 IllegalStateException, 소유권위반 SecurityException). AccountController(GET/POST/PUT/DELETE, 403/400/404 매핑). AccountResponse 마스킹(****1234). 단위 테스트 6개+ArchUnit BUILD SUCCESSFUL 후 커밋.",
+      "completedAt": "2026-05-06T22:00:40.905Z"
+    },
+    {
+      "id": "7d7005b4-0196-4d0c-9201-e9554e5c75d2",
+      "name": "[V2-P3] 전략 중지/재개 API + 관리자 알림",
+      "description": "계좌별 매매전략 중지(PAUSED)/재개(ACTIVE) API와 관리자 텔레그램 알림.\n\n수락 기준:\n- PATCH /api/accounts/{id}/strategy/pause: strategy_status → PAUSED + 관리자 알림\n- PATCH /api/accounts/{id}/strategy/resume: strategy_status → ACTIVE + 관리자 알림\n- 알림: '사용자 {nickname}이 계좌 {accountNickname}의 전략을 {action}했습니다'\n- 소유권 검증 (403)",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d1bf522c-1715-44b0-b252-aa0affc07d69"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-07T00:50:36.489Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/application/service/AccountService.java",
+          "type": "TO_MODIFY",
+          "description": "PauseStrategyUseCase/ResumeStrategyUseCase 구현 추가"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/AccountController.java",
+          "type": "TO_MODIFY",
+          "description": "/pause, /resume 엔드포인트 추가"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/notify/TelegramAdapter.java",
+          "type": "TO_MODIFY",
+          "description": "notifyStrategyChanged 구현"
+        }
+      ],
+      "implementationGuide": "1. AccountService에 PauseStrategyUseCase/ResumeStrategyUseCase 구현\n   - pause(): verifyOwnership → strategyStatus=PAUSED인 새 Account record → save → notifyStrategyChanged(user, account, '중지')\n   - resume(): verifyOwnership → strategyStatus=ACTIVE → save → notifyStrategyChanged(user, account, '재개')\n2. GetUserUseCase 주입하여 requesterId로 User 조회\n3. TelegramAdapter.notifyStrategyChanged() 구현: 관리자 adminChatId로 메시지 발송\n4. AccountController에 /pause, /resume 엔드포인트 추가",
+      "verificationCriteria": "bash gradlew compileJava 통과. pause() 후 strategy_status=PAUSED DB 반영. notifyStrategyChanged 단위 테스트 (TelegramAdapterTest).",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "PATCH /strategy/pause·resume 엔드포인트 구현 완료. AccountService.pause()/resume()에서 소유권 검증+StrategyStatus 변경+UserNotificationPort.notifyStrategyChanged() 호출. TelegramAdapter에서 '사용자 {nickname}이 계좌 {accountNickname}의 전략을 {action}했습니다' 형식으로 관리자 봇 발송. AccountControllerTest 204/403/404, TelegramAdapterTest.notifyStrategyChanged_bodyContainsNicknameAccountAndAction 모두 통과. 모든 수락 기준 충족.",
+      "completedAt": "2026-05-07T00:50:36.485Z"
+    },
+    {
+      "id": "55892e64-9564-4241-9e56-0ffc9e0705d6",
+      "name": "[V2-P4] 스케줄러 멀티 계좌 리팩토링",
+      "description": "단일 계좌 스케줄러를 ACTIVE 계좌 전체 순차 실행으로 리팩토링. 스케줄 변경: 월~금 04:00 → 화~토 07:00 KST.\n\n수락 기준:\n- cron = '0 0 7 * * TUE-SAT' (Asia/Seoul)\n- AccountRepository.findAllActive() 로 ACTIVE 사용자의 ACTIVE 계좌 조회\n- 계좌별 순차 실행, 한 계좌 실패 시 다음 계좌 계속 (격리)\n- KIS 토큰: account_id 기반 독립 관리\n- 실행 결과 해당 사용자 텔레그램으로 전송\n- Privacy(P) → INFINITE와 동일 전략 실행 (스텁)",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d1bf522c-1715-44b0-b252-aa0affc07d69"
+        },
+        {
+          "taskId": "7d7005b4-0196-4d0c-9201-e9554e5c75d2"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-07T01:26:53.869Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/in/schedule/TradingScheduler.java",
+          "type": "TO_MODIFY",
+          "description": "cron 변경 및 멀티 계좌 루프"
+        },
+        {
+          "path": "src/main/java/com/kista/application/service/TradingService.java",
+          "type": "TO_MODIFY",
+          "description": "Account/User 파라미터 추가"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/kis/KisHttpClient.java",
+          "type": "TO_MODIFY",
+          "description": "per-call 자격증명 지원"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/persistence/KisTokenPersistenceAdapter.java",
+          "type": "TO_MODIFY",
+          "description": "account_id 기반 토큰 관리"
+        },
+        {
+          "path": "src/main/java/com/kista/domain/port/out/AccountRepository.java",
+          "type": "TO_MODIFY",
+          "description": "findAllActive() 메서드 추가"
+        },
+        {
+          "path": "src/test/java/com/kista/domain/TradingServiceTest.java",
+          "type": "TO_MODIFY",
+          "description": "Account 파라미터 변경 반영"
+        }
+      ],
+      "implementationGuide": "1. TradingScheduler: cron 변경, for-each account: try { execute(account, user) } catch(e) { notifyError(user, account, e) }\n2. AccountRepository에 findAllActive() 추가: JOIN users WHERE users.status=ACTIVE AND accounts.strategy_status=ACTIVE\n3. TradingService.execute(Account, User): 계좌별 자격증명(crypto.decrypt)으로 KIS 호출\n   - KisHttpClient에 per-call appKey/appSecret 전달 방식 (파라미터 or ThreadLocal)\n4. KisTokenPersistenceAdapter: findValidToken(UUID accountId), saveToken(UUID accountId, ...) 시그니처 변경\n5. KisTokenPort 인터페이스 수정: accountId 파라미터 추가\n6. Privacy(P): account.strategy() switch에서 PRIVACY → SoxlDivisionStrategy 동일하게 사용",
+      "verificationCriteria": "bash gradlew test --tests 'com.kista.domain.*' 통과. TradingServiceTest Account 파라미터 반영 확인. ArchUnit 통과.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "스케줄러 멀티계좌 리팩토링 완료. cron=TUE-SAT 07:00 KST. AccountRepository.findAllActive()로 ACTIVE 계좌 조회, 계좌별 순차 실행(격리). KisTokenPort/CachePort를 account_id 기반으로 전환(V9 migration). 모든 KIS 포트 인터페이스에 Account 파라미터 추가. TradingService.execute(Account, User): 계좌별 KIS 호출 + UserNotificationPort.notifyTradingReport()로 결과 발송. TelegramAdapter에 계좌별 봇 우선 발송 구현. Privacy→INFINITE 동일 전략(스텁). 전체 테스트 통과.",
+      "completedAt": "2026-05-07T01:26:53.856Z"
+    },
+    {
+      "id": "cfc1a8da-fa8e-45a4-b38f-32c539df6032",
+      "name": "[V2-P4] 계좌별 텔레그램 봇 알림 우선순위 처리",
+      "description": "매매 결과 알림 발송 시 계좌별 봇 > 전체 봇 > 생략 우선순위 적용. 전체 봇 설정 API 추가.\n\n수락 기준:\n- 계좌별 telegramBotToken 있으면 해당 봇으로 발송\n- 없고 users.telegramBotToken 있으면 전체 봇으로 발송\n- 둘 다 없으면 알림 생략 (중복 없음)\n- PUT /api/settings/telegram: users.telegramBotToken, telegramChatId 저장 (AES-256 암호화)\n- DELETE /api/settings/telegram: 해제",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "55892e64-9564-4241-9e56-0ffc9e0705d6"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-07T01:38:29.347Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/adapter/out/notify/TelegramAdapter.java",
+          "type": "TO_MODIFY",
+          "description": "sendToUser 메서드 추가 및 우선순위 로직"
+        },
+        {
+          "path": "src/main/java/com/kista/application/service/TradingService.java",
+          "type": "TO_MODIFY",
+          "description": "알림 발송 방식 변경"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/SettingsController.java",
+          "type": "CREATE",
+          "description": "텔레그램 봇 설정 API"
+        }
+      ],
+      "implementationGuide": "1. TelegramAdapter에 sendToUser(User, Account, String message) 메서드 추가\n   - account.telegramChatId() != null && account.telegramBotToken() != null → 계좌별 봇(복호화 토큰)으로 발송\n   - else if user.telegramChatId() != null && user.telegramBotToken() != null → 전체 봇으로 발송\n   - else → log.debug('텔레그램 미설정, 알림 생략')\n2. TradingService의 매매 결과 알림을 sendToUser 방식으로 변경\n3. SettingsController @RestController /api/settings:\n   - PUT /telegram: @RequestBody {botToken, chatId} → UserService.updateTelegram() → users 테이블 갱신\n   - DELETE /telegram: UserService.removeTelegram()",
+      "verificationCriteria": "TelegramAdapterTest: 계좌별 봇 설정 시 해당 봇 발송, 미설정 시 전체 봇 발송, 둘 다 미설정 시 미발송 확인.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "텔레그램 알림 우선순위 구현 완료. TelegramAdapter.notifyTradingReport()에 계좌봇>사용자봇>생략 우선순위 적용. UpdateUserTelegramUseCase + UserService 구현. SettingsController PUT/DELETE /api/settings/telegram 추가. UserPersistenceAdapter telegramBotToken AES-256 암호화/복호화 추가. TelegramAdapterTest(3케이스), SettingsControllerTest(3케이스) 통과. 전체 테스트 통과.",
+      "completedAt": "2026-05-07T01:38:29.340Z"
+    },
+    {
+      "id": "99592bb1-48b1-4943-b278-5a9966567ad3",
+      "name": "[V2-P5] KIS 기간손익·체결·포트폴리오 통계 API",
+      "description": "KIS API 3종 연동으로 계좌별 수익/손실 통계 조회 API 구현.\n\n수락 기준:\n- GET /api/accounts/{id}/profit?from=&to=: KIS 기간손익 (TTTS3027R)\n- GET /api/accounts/{id}/trades?from=&to=: 체결 내역 (TTTS3035R, 기존 KisExecutionAdapter 재활용)\n- GET /api/accounts/{id}/portfolio: 체결기준현재잔고 (CTRP6504R)\n- 계좌 소유권 검증 필수\n- KIS API 오류 시 503 반환",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "55892e64-9564-4241-9e56-0ffc9e0705d6"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-07T01:51:22.714Z",
+      "relatedFiles": [
+        {
+          "path": "src/main/java/com/kista/domain/port/out/KisProfitPort.java",
+          "type": "CREATE",
+          "description": "기간손익 KIS 포트"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/kis/KisProfitAdapter.java",
+          "type": "CREATE",
+          "description": "기간손익 KIS 어댑터"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/in/web/StatisticsController.java",
+          "type": "CREATE",
+          "description": "통계 REST 컨트롤러"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/kis/KisExecutionAdapter.java",
+          "type": "REFERENCE",
+          "description": "기존 KIS 어댑터 패턴 참고 (TTTS3035R)"
+        },
+        {
+          "path": "src/main/java/com/kista/adapter/out/kis/KisHttpClient.java",
+          "type": "REFERENCE",
+          "description": "KIS HTTP 클라이언트 재활용"
+        }
+      ],
+      "implementationGuide": "1. KisProfitPort 인터페이스: getPeriodProfit(KisCredential, LocalDate from, LocalDate to)\n2. KisProfitAdapter @Component KisHttpClient 활용: TTTS3027R 요청 빌드, 응답 파싱\n3. StatisticsController @RestController /api/accounts/{accountId}:\n   - 공통: accountId로 Account 조회 → 소유권 검증 → 복호화 자격증명 → KIS 토큰\n   - /profit, /trades, /portfolio 각 엔드포인트\n4. 기존 KisExecutionAdapter(TTTS3035R)는 /trades에 재활용\n5. KisCredential record: appKey, appSecret, accountNo, accountType (임시 전달용)",
+      "verificationCriteria": "bash gradlew compileJava 통과. ArchUnit 통과. KisProfitAdapter 단위 테스트 (MockitoExtension, KisHttpClient mock).",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정.",
+      "summary": "KIS 통계 API 3종 구현 완료. KisProfitAdapter(TTTS3039R: 기간손익), KisPortfolioAdapter(CTRP6504R: 체결기준현재잔고), KisExecutionAdapter 재활용(TTTS3035R: 체결내역). AccountStatisticsService에서 소유권 검증 + KIS 예외 전파. StatisticsController에서 403/404/503 처리. KisProfitAdapterTest·KisPortfolioAdapterTest·StatisticsControllerTest 통과. ArchUnit 통과.",
+      "completedAt": "2026-05-07T01:51:22.704Z"
+    },
+    {
+      "id": "3f65ae63-7d5c-4437-8022-9cbb7bc0d3c3",
+      "name": "[V2-P6] 배포 최적화 — springdoc 업그레이드 + 환경변수 추가",
+      "description": "springdoc 2.8.4 업그레이드, 신규 환경변수 docker-compose/Render 반영.\n\n수락 기준:\n- gradle/libs.versions.toml: springdoc = '2.8.4'\n- docker-compose.yml: AES_ENCRYPTION_KEY, SUPABASE_JWT_SECRET 환경변수 추가\n- .env.example 최신화\n- bash gradlew build 통과\n- Render 배포 후 /actuator/health 200 확인",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "99592bb1-48b1-4943-b278-5a9966567ad3"
+        }
+      ],
+      "createdAt": "2026-05-06T08:25:46.617Z",
+      "updatedAt": "2026-05-06T08:25:46.617Z",
+      "relatedFiles": [
+        {
+          "path": "gradle/libs.versions.toml",
+          "type": "TO_MODIFY",
+          "description": "springdoc 버전 2.8.4로 업그레이드"
+        },
+        {
+          "path": "docker-compose.yml",
+          "type": "TO_MODIFY",
+          "description": "신규 환경변수 추가"
+        },
+        {
+          "path": ".env.example",
+          "type": "TO_MODIFY",
+          "description": "신규 환경변수 설명 추가"
+        }
+      ],
+      "implementationGuide": "1. gradle/libs.versions.toml: springdoc 버전 2.8.4로 수정\n2. docker-compose.yml environment에 AES_ENCRYPTION_KEY: ${AES_ENCRYPTION_KEY}, SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET} 추가\n3. .env.example: 신규 변수 추가 + 생성 방법 주석\n4. bash gradlew build 전체 빌드 검증\n5. Render 대시보드에서 환경변수 AES_ENCRYPTION_KEY, SUPABASE_JWT_SECRET 직접 설정",
+      "verificationCriteria": "bash gradlew build 통과 (NoSuchMethodError 없음). Render 자동 배포 후 /actuator/health 200 반환.",
+      "analysisResult": "KISTA V2 kista-api 구현: V1 단일 사용자 자동매매 API를 최대 10명 초대제 멀티 사용자 SaaS로 확장. Hexagonal Architecture 유지, Supabase Auth(JWT) 인증, AES-256 암호화, 멀티 계좌 스케줄러(화~토 07:00 KST). Privacy(P) 전략 스텁, 슬리피지 추후 결정."
     }
   ]
 }
