@@ -24,7 +24,7 @@ public class TradingScheduler {
     private final UserRepository userRepository;       // 계좌 소유자 조회
     private final NotifyPort notifyPort;               // 관리자 오류 알림
 
-    @Scheduled(cron = "0 0 7 * * TUE-SAT", zone = "Asia/Seoul") // 화~토 07:00 KST
+    @Scheduled(cron = "0 0 4 * * MON-FRI", zone = "Asia/Seoul") // 월~금 04:00 KST
     public void run() {
         List<Account> accounts = accountRepository.findAllActive();
         log.info("매매 스케줄 시작 — ACTIVE 계좌 {}개", accounts.size());

@@ -13,7 +13,7 @@ application/
   service/       ← UseCase 구현체 (@Service), Port를 통해서만 외부 호출
 
 adapter/in/
-  schedule/      ← TradingScheduler (화~토 07:00 KST, 멀티계좌)
+  schedule/      ← TradingScheduler (월~금 04:00 KST, 멀티계좌)
   web/           ← REST Controller + DTO (DashboardController)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
