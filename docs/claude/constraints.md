@@ -4,7 +4,7 @@
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
-- TradingScheduler cron: `0 0 4 * * MON-FRI` (월~금 04:00 KST) — V2 멀티계좌 스케줄
+- TradingScheduler cron: `0 0 4 * * MON-FRI` (월~금 04:00 KST) — V2 멀티계좌 스케줄 (태스크 명세에 오기 있었음 — 변경 시 사용자 확인 필수)
 - 멀티계좌 순차 실행: `AccountRepository.findAllActive()` → 계좌별 `execute(Account, User)` — 한 계좌 실패 시 다음 계좌 계속 (격리)
 
 ### JPA 설정
