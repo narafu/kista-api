@@ -1,8 +1,11 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.DailyTransactionResult;
 import com.kista.domain.model.Execution;
+import com.kista.domain.model.MarginItem;
 import com.kista.domain.model.PeriodProfitResult;
 import com.kista.domain.model.PresentBalanceResult;
+import com.kista.domain.model.ReservationOrder;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -65,6 +68,57 @@ public class StatisticsController {
                                                   @AuthenticationPrincipal UUID userId) {
         try {
             return statisticsUseCase.getPresentBalance(accountId, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
+        }
+    }
+
+    // 해외증거금 통화별조회 (TTTC2101R) — USD·KRW만 반환
+    @GetMapping("/margin")
+    public List<MarginItem> getMargin(@PathVariable UUID accountId,
+                                      @AuthenticationPrincipal UUID userId) {
+        try {
+            return statisticsUseCase.getMargin(accountId, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
+        }
+    }
+
+    // 일별거래내역 조회 (CTOS4001R)
+    @GetMapping("/daily-trades")
+    public DailyTransactionResult getDailyTransactions(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        try {
+            return statisticsUseCase.getDailyTransactions(accountId, userId, from, to);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
+        }
+    }
+
+    // 예약주문 목록 조회 (TTTT3039R)
+    @GetMapping("/reservation-orders")
+    public List<ReservationOrder> getReservationOrders(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        try {
+            return statisticsUseCase.getReservationOrders(accountId, userId, from, to);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {

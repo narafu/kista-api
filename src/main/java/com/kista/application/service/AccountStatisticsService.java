@@ -1,14 +1,20 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.Account;
+import com.kista.domain.model.DailyTransactionResult;
 import com.kista.domain.model.Execution;
+import com.kista.domain.model.MarginItem;
 import com.kista.domain.model.PeriodProfitResult;
 import com.kista.domain.model.PresentBalanceResult;
+import com.kista.domain.model.ReservationOrder;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
+import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisProfitPort;
+import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +33,9 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     private final KisProfitPort kisProfitPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;
+    private final KisMarginPort kisMarginPort;
+    private final KisDailyTransactionPort kisDailyTransactionPort;
+    private final KisReservationOrderPort kisReservationOrderPort;
 
     @Override
     public PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId,
@@ -47,6 +56,26 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = findAndVerify(accountId, requesterId);
         return kisPortfolioPort.getPresentBalance(account);
+    }
+
+    @Override
+    public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
+        Account account = findAndVerify(accountId, requesterId);
+        return kisMarginPort.getMargin(account);
+    }
+
+    @Override
+    public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
+                                                        LocalDate from, LocalDate to) {
+        Account account = findAndVerify(accountId, requesterId);
+        return kisDailyTransactionPort.getDailyTransactions(from, to, account);
+    }
+
+    @Override
+    public List<ReservationOrder> getReservationOrders(UUID accountId, UUID requesterId,
+                                                        LocalDate from, LocalDate to) {
+        Account account = findAndVerify(accountId, requesterId);
+        return kisReservationOrderPort.getReservationOrders(from, to, account);
     }
 
     // 계좌 조회 + 소유권 검증
