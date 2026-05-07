@@ -176,6 +176,37 @@ class TelegramAdapterTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void notifyTradingReport_withoutAccountBot_fallsBackToUserBot() {
+        // 계좌 봇 미설정, 사용자 봇 설정 → 사용자 봇으로 발송
+        User userWithBot = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+                "user-bot-token", "user-chat-789", Instant.now(), Instant.now());
+        Account accountNoBot = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
+                "74420614", "key", "secret", "01",
+                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+        TradingVariables vars = TradingVariables.builder()
+                .averagePrice(new BigDecimal("20.00")).quantity(10)
+                .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
+                .totalAssets(new BigDecimal("700.00")).totalRounds(20).currentRound(1.33)
+                .unitAmount(new BigDecimal("35.00")).targetProfitRate(new BigDecimal("0.20"))
+                .priceOffsetRate(new BigDecimal("0.1733")).usdDeposit(new BigDecimal("500.00"))
+                .referencePrice(new BigDecimal("23.47")).targetPrice(new BigDecimal("24.00"))
+                .currentPrice(new BigDecimal("22.00")).build();
+        TradingReport report = new TradingReport(
+                java.time.LocalDate.of(2024, 6, 15), vars, java.util.List.of(), java.util.List.of(),
+                new BigDecimal("66.00"), new BigDecimal("35.00"));
+
+        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        adapter.notifyTradingReport(userWithBot, accountNoBot, report);
+
+        verify(restTemplate).postForObject(
+                contains("/botuser-bot-token/sendMessage"),
+                bodyCaptor.capture(), eq(String.class));
+        assertThat(bodyCaptor.getValue().get("chat_id")).isEqualTo("user-chat-789");
+    }
+
+    @Test
     void notifyTradingReport_withoutAccountBot_skipsWithoutException() {
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
                 null, null, Instant.now(), Instant.now());

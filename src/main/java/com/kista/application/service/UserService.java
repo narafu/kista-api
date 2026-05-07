@@ -5,6 +5,7 @@ import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
+import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase {
+public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase {
 
     private final UserRepository userRepository;
     private final UserNotificationPort notificationPort;
@@ -86,6 +87,24 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     private User findOrThrow(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
+    }
+
+    @Override
+    public void updateTelegram(UUID userId, String botToken, String chatId) {
+        User user = findOrThrow(userId);
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
+                botToken, chatId, user.createdAt(), Instant.now());
+        userRepository.save(updated);
+        log.info("텔레그램 설정 업데이트: userId={}", userId);
+    }
+
+    @Override
+    public void removeTelegram(UUID userId) {
+        User user = findOrThrow(userId);
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
+                null, null, user.createdAt(), Instant.now());
+        userRepository.save(updated);
+        log.info("텔레그램 설정 해제: userId={}", userId);
     }
 
     private User withStatus(User user, UserStatus newStatus) {
