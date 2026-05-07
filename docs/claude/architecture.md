@@ -13,7 +13,7 @@ application/
   service/       ← UseCase 구현체 (@Service), Port를 통해서만 외부 호출
 
 adapter/in/
-  schedule/      ← TradingScheduler (월~금 04:00 KST)
+  schedule/      ← TradingScheduler (화~토 07:00 KST, 멀티계좌)
   web/           ← REST Controller + DTO (DashboardController)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
@@ -46,3 +46,8 @@ domain      →  외부 의존 없음
 | 매매 공식 변경 | `SoxlDivisionStrategyTest` |
 | `TradingVariables` 필드 추가 | `TelegramAdapterTest.java` (하드코딩 생성자) + `SoxlDivisionStrategyTest` |
 | 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |
+| `UserPersistenceAdapter` telegramBotToken 변경 | `UserEntity` + `AesCryptoService` 암호화/복호화 패턴 확인 |
+
+### 텔레그램 알림 우선순위 (notifyTradingReport)
+- 계좌별 `telegramBotToken/chatId` 있으면 계좌봇 발송 → 없으면 `User.telegramBotToken/chatId` 사용자봇 → 없으면 생략 (`log.warn`)
+- `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용 (`AccountPersistenceAdapter`와 동일 패턴)

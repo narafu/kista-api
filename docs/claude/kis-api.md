@@ -1,10 +1,12 @@
 ## KIS API
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
-- `KisHttpClient.buildHeaders(String trId)` — token 파라미터 없음, 내부에서 `kisTokenPort.getToken()` 자동 호출
-- 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
+- `KisHttpClient.buildHeaders(String trId, Account account)` — V2: Account 계좌별 자격증명으로 헤더 구성
+- `KisTokenPort.getToken(UUID accountId, String appKey, String appSecret)` — V2: account_id 기반 독립 토큰 캐시 (`kis_tokens` PK = account_id UUID, V9 migration)
+- 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(accountId, now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
 - **`KisTokenAdapter`는 `KisHttpClient` 미사용** — `RestTemplate`+`KisProperties` 직접 주입 (`KisHttpClient`→`KisTokenPort`→`KisTokenAdapter` 순환 방지)
-- KIS 포트 인터페이스(`KisAccountPort`, `KisHolidayPort` 등)에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
+- 모든 KIS 포트 인터페이스에 `Account account` 파라미터 추가 (V2) — `getBalance(Account)`, `place(Order, Account)`, `isMarketOpen(LocalDate, Account)` 등
+- KIS 포트 인터페이스에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
 
 ### 응답 필드명 대소문자 주의
@@ -38,8 +40,21 @@
   - 영구 수정: `module/plugin/kis.py` 패치 후 컨테이너 재빌드 (이미 패치됨)
 - fastmcp 3.2.4 호환: `server.py` `stateless_http` 제거, `middleware.py`·`tools/base.py` `set_state`/`get_state` 모두 `await` 필요
 
+### 기간손익 API (TTTS3039R, KisProfitAdapter)
+- TR ID: `TTTS3039R` (주의: `TTTS3027R` 아님 — 오기 주의)
+- PATH: `/uapi/overseas-stock/v1/trading/inquire-period-profit`
+- 파라미터: `CANO`, `ACNT_PRDT_CD`, `OVRS_EXCG_CD=NASD`, `NATN_CD=""`, `CRCY_CD=USD`, `PDNO=""`, `INQR_STRT_DT`, `INQR_END_DT` (YYYYMMDD), `WCRC_FRCR_DVSN_CD=01`(외화), `CTX_AREA_FK200=""`, `CTX_AREA_NK200=""`
+- 응답: `output1[]`(종목별 손익 — `trad_day`, `ovrs_pdno`, `slcl_qty`, `pchs_avg_pric`, `avg_sll_unpr`, `ovrs_rlzt_pfls_amt`, `pftrt`), `output2`(요약 — `ovrs_rlzt_pfls_tot_amt`, `tot_pftrt`)
+
+### 체결기준현재잔고 API (CTRP6504R, KisPortfolioAdapter)
+- TR ID: `CTRP6504R` (실전) / `VTRP6504R` (모의)
+- PATH: `/uapi/overseas-stock/v1/trading/inquire-present-balance`
+- 파라미터: `CANO`, `ACNT_PRDT_CD`, `WCRC_FRCR_DVSN_CD=02`(외화), `NATN_CD=000`(전체), `TR_MKET_CD=00`(전체), `INQR_DVSN_CD=00`(전체)
+- 응답: `output1[]`(종목별 잔고 — `pdno`, `cblc_qty13`, `avg_unpr3`, `ovrs_now_pric1`, `frcr_evlu_amt2`, `evlu_pfls_amt2`, `evlu_pfls_rt1`), `output3`(요약 — `tot_asst_amt`, `tot_evlu_pfls_amt`, `evlu_erng_rt1`)
+
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
-- `KisHttpClient` mock 시 `props()`와 `buildHeaders(anyString())` 스텁 필요 (단일 파라미터, token 없음)
+- `KisHttpClient` mock 시 `buildHeaders(anyString(), any(Account.class))` 스텁 필요 (V2: Account 파라미터)
+- `props()` stub은 CANO 파라미터에 `props().accountNo()` 쓰는 어댑터에서만 — KisProfitAdapter 등 props() 미사용 어댑터 @BeforeEach에 넣으면 `UnnecessaryStubbingException`
 - `KisTokenAdapterTest`: `@Mock RestTemplate kisRestTemplate` + 생성자 직접 생성 (`@InjectMocks` 사용 금지 — `KisHttpClient` mock이 없으므로)
 - Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능

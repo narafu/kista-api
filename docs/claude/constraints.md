@@ -4,6 +4,8 @@
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
+- TradingScheduler cron: `0 0 7 * * TUE-SAT` (화~토 07:00 KST) — V2 멀티계좌 스케줄
+- 멀티계좌 순차 실행: `AccountRepository.findAllActive()` → 계좌별 `execute(Account, User)` — 한 계좌 실패 시 다음 계좌 계속 (격리)
 
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, Supabase PgBouncer Transaction Mode에서 트랜잭션 외부 커넥션 점유 방지
@@ -63,6 +65,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw
 - Controller에서 catch → `ResponseStatusException(HttpStatus.FORBIDDEN)` 변환
 - application 레이어가 Spring HTTP에 의존하지 않아 ArchUnit 규칙 준수
+- KIS API 오류: Service에서 예외 그대로 전파 → Controller에서 `catch (Exception e) → ResponseStatusException(503)` 변환
+- `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 금지 (ArchUnit `application → adapter` 규칙)
 
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
