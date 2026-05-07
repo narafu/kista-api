@@ -10,8 +10,7 @@ import com.kista.domain.port.in.ResumeStrategyUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,8 +32,8 @@ public class AccountController {
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @GetMapping
-    public List<AccountResponse> list() {
-        return getAccount.listByUser(currentUserId()).stream()
+    public List<AccountResponse> list(@AuthenticationPrincipal UUID userId) {
+        return getAccount.listByUser(userId).stream()
                 .map(AccountResponse::from)
                 .toList();
     }
@@ -42,10 +41,11 @@ public class AccountController {
     // 계좌 등록 (AES-256 암호화 저장)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AccountResponse register(@RequestBody AccountRequest request) {
+    public AccountResponse register(@AuthenticationPrincipal UUID userId,
+                                    @RequestBody AccountRequest request) {
         try {
             return AccountResponse.from(
-                    registerAccount.register(currentUserId(), request.toRegisterCommand())
+                    registerAccount.register(userId, request.toRegisterCommand())
             );
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
@@ -54,10 +54,12 @@ public class AccountController {
 
     // 계좌 수정 (소유권 검증)
     @PutMapping("/{id}")
-    public AccountResponse update(@PathVariable UUID id, @RequestBody AccountRequest request) {
+    public AccountResponse update(@PathVariable UUID id,
+                                  @AuthenticationPrincipal UUID userId,
+                                  @RequestBody AccountRequest request) {
         try {
             return AccountResponse.from(
-                    updateAccount.update(id, currentUserId(), request.toUpdateCommand())
+                    updateAccount.update(id, userId, request.toUpdateCommand())
             );
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
@@ -69,9 +71,9 @@ public class AccountController {
     // 계좌 삭제 (소유권 검증)
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID id) {
+    public void delete(@PathVariable UUID id, @AuthenticationPrincipal UUID userId) {
         try {
-            deleteAccount.delete(id, currentUserId());
+            deleteAccount.delete(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -82,9 +84,9 @@ public class AccountController {
     // 전략 중지 (ACTIVE → PAUSED)
     @PatchMapping("/{id}/strategy/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void pauseStrategy(@PathVariable UUID id) {
+    public void pauseStrategy(@PathVariable UUID id, @AuthenticationPrincipal UUID userId) {
         try {
-            pauseStrategy.pause(id, currentUserId());
+            pauseStrategy.pause(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -95,21 +97,13 @@ public class AccountController {
     // 전략 재개 (PAUSED → ACTIVE)
     @PatchMapping("/{id}/strategy/resume")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void resumeStrategy(@PathVariable UUID id) {
+    public void resumeStrategy(@PathVariable UUID id, @AuthenticationPrincipal UUID userId) {
         try {
-            resumeStrategy.resume(id, currentUserId());
+            resumeStrategy.resume(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
-    }
-
-    private UUID currentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-        return UUID.fromString((String) auth.getPrincipal());
     }
 }

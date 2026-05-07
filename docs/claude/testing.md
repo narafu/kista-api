@@ -8,7 +8,8 @@
 - POST 요청 테스트: `.with(csrf())` 추가 필수 (없으면 403) — `import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf`
 - 인증 필요 엔드포인트 테스트: 클래스 또는 메서드에 `@WithMockUser` 추가 (없으면 401)
 - `/telegram/webhook` 같은 permitAll 경로도 `@WebMvcTest`에서는 `@WithMockUser` + `csrf()` 필요
-- 컨트롤러가 `(String) auth.getPrincipal()` 캐스팅 사용 시 `@WithMockUser` 금지 (principal이 UserDetails → ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(uuidString, null, List.of())))` 패턴 사용
+- `@WithMockUser` 사용 금지 (principal이 UserDetails → `@AuthenticationPrincipal UUID`로 바인딩 시 ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuidString), null, List.of())))` 패턴 사용
+- `SupabaseJwtFilter`는 principal을 `UUID` 타입으로 저장 — 테스트 mock도 반드시 `UUID` 사용 (`String` 사용 시 컨트롤러에서 ClassCastException)
 
 ### Mockito 병렬 테스트 주의
 - `@WebMvcTest` 클래스 전체에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 doThrow/doNothing mock이 다른 테스트에 오염됨 (DashboardControllerTest 패턴 참고)

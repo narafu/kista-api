@@ -6,8 +6,7 @@ import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -27,37 +26,27 @@ public class AuthController {
 
     // 카카오 OAuth 콜백 처리 — 신규 가입 시 PENDING 저장, 기존이면 조회
     @PostMapping("/kakao/callback")
-    public UserResponse kakaoCallback(@RequestBody KakaoCallbackRequest request) {
-        UUID supabaseUid = extractUserId();
+    public UserResponse kakaoCallback(@AuthenticationPrincipal UUID userId,
+                                      @RequestBody KakaoCallbackRequest request) {
         return UserResponse.from(
-                registerUser.register(request.kakaoId(), request.nickname(), supabaseUid)
+                registerUser.register(request.kakaoId(), request.nickname(), userId)
         );
     }
 
     // 현재 사용자 정보 및 상태 조회
     @GetMapping("/me")
-    public UserResponse me() {
-        UUID userId = extractUserId();
+    public UserResponse me(@AuthenticationPrincipal UUID userId) {
         return UserResponse.from(getUser.getById(userId));
     }
 
     // 거절된 사용자 재신청 (REJECTED → PENDING)
     @PostMapping("/reapply")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void reapply() {
-        UUID userId = extractUserId();
+    public void reapply(@AuthenticationPrincipal UUID userId) {
         try {
             approveUser.reapply(userId);
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
-    }
-
-    private UUID extractUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다");
-        }
-        return UUID.fromString((String) auth.getPrincipal());
     }
 }

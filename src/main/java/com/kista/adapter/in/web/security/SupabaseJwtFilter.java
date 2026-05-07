@@ -18,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -40,7 +41,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
                         .getPayload();
 
                 // Supabase JWT의 sub 클레임 = 사용자 UUID (Supabase Auth UID)
-                String userId = claims.getSubject();
+                UUID userId = UUID.fromString(claims.getSubject());
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(userId, null, List.of())
                 );

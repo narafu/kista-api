@@ -68,6 +68,15 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - KIS API 오류: Service에서 예외 그대로 전파 → Controller에서 `catch (Exception e) → ResponseStatusException(503)` 변환
 - `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 금지 (ArchUnit `application → adapter` 규칙)
 
+### @EnableJpaAuditing 위치
+- `@EnableJpaAuditing`을 `@SpringBootApplication`에 두면 `@WebMvcTest` 슬라이스 테스트가 `BeanCreationException` 실패 — JPA 인프라 없음
+- 반드시 별도 `@Configuration` 클래스로 분리: `adapter/out/persistence/JpaAuditingConfig.java`
+- `@WebMvcTest`는 persistence 패키지의 `@Configuration`을 로드하지 않아 충돌 없음
+
+### Lombok @MappedSuperclass 상속 주의
+- `@MappedSuperclass` 부모 클래스 필드의 getter/setter는 서브클래스의 `@Getter`/`@Setter`로 생성되지 않음
+- `BaseAuditEntity` 같은 공통 엔티티 부모에 직접 `@Getter @Setter(AccessLevel.PACKAGE)` 추가 필요
+
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
 - 필드: `// 역할 한 줄` 인라인 주석

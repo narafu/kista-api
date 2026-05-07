@@ -7,7 +7,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,8 +67,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setStrategyStatus(a.strategyStatus());
         e.setTelegramBotToken(a.telegramBotToken() != null ? crypto.encrypt(a.telegramBotToken()) : null);
         e.setTelegramChatId(a.telegramChatId());
-        e.setCreatedAt(a.createdAt() != null ? a.createdAt() : Instant.now());
-        e.setUpdatedAt(a.updatedAt() != null ? a.updatedAt() : Instant.now());
+        e.setCreatedAt(a.createdAt()); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
 

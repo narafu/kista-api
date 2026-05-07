@@ -4,12 +4,11 @@ import com.kista.domain.model.User;
 import com.kista.domain.model.UserStatus;
 import jakarta.persistence.*;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-class UserEntity {
+class UserEntity extends BaseAuditEntity {
 
     @Id
     @Column(columnDefinition = "UUID")
@@ -31,12 +30,6 @@ class UserEntity {
     @Column(name = "telegram_chat_id", length = 50)
     private String telegramChatId;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
     protected UserEntity() {}
 
     static UserEntity fromModel(User user) {
@@ -47,8 +40,7 @@ class UserEntity {
         e.status = user.status();
         e.telegramBotToken = user.telegramBotToken();
         e.telegramChatId = user.telegramChatId();
-        e.createdAt = user.createdAt() != null ? user.createdAt() : Instant.now();
-        e.updatedAt = user.updatedAt() != null ? user.updatedAt() : Instant.now();
+        e.createdAt = user.createdAt(); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
 

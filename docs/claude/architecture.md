@@ -48,6 +48,14 @@ domain      →  외부 의존 없음
 | 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |
 | `UserPersistenceAdapter` telegramBotToken 변경 | `UserEntity` + `AesCryptoService` 암호화/복호화 패턴 확인 |
 
+### 인증 userId 추출 패턴
+- 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지
+- `SupabaseJwtFilter`: principal을 `UUID` 타입으로 저장 (`String` 아님)
+
+### JPA Auditing
+- `BaseAuditEntity` (`@MappedSuperclass`): `UserEntity`, `AccountEntity`가 상속 — `@CreatedDate`/`@LastModifiedDate`로 `createdAt`/`updatedAt` 자동 관리
+- 새 엔티티에 타임스탬프 필요 시 `BaseAuditEntity` 상속; `KisTokenEntity` 등 DB DEFAULT(`insertable=false, updatable=false`) 방식 엔티티는 그대로 유지
+
 ### 텔레그램 알림 우선순위 (notifyTradingReport)
 - 계좌별 `telegramBotToken/chatId` 있으면 계좌봇 발송 → 없으면 `User.telegramBotToken/chatId` 사용자봇 → 없으면 생략 (`log.warn`)
 - `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용 (`AccountPersistenceAdapter`와 동일 패턴)

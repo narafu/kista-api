@@ -35,7 +35,7 @@ class SettingsControllerTest {
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
     private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
+        return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
     }
 
     @Test

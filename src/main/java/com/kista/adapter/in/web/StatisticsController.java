@@ -7,8 +7,7 @@ import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,10 +27,11 @@ public class StatisticsController {
     @GetMapping("/profit")
     public PeriodProfitResult getPeriodProfit(
             @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         try {
-            return statisticsUseCase.getPeriodProfit(accountId, currentUserId(), from, to);
+            return statisticsUseCase.getPeriodProfit(accountId, userId, from, to);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -45,10 +45,11 @@ public class StatisticsController {
     @GetMapping("/trades")
     public List<Execution> getTrades(
             @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         try {
-            return statisticsUseCase.getTrades(accountId, currentUserId(), from, to);
+            return statisticsUseCase.getTrades(accountId, userId, from, to);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -60,9 +61,10 @@ public class StatisticsController {
 
     // 체결기준현재잔고 조회 (CTRP6504R)
     @GetMapping("/portfolio")
-    public PresentBalanceResult getPresentBalance(@PathVariable UUID accountId) {
+    public PresentBalanceResult getPresentBalance(@PathVariable UUID accountId,
+                                                  @AuthenticationPrincipal UUID userId) {
         try {
-            return statisticsUseCase.getPresentBalance(accountId, currentUserId());
+            return statisticsUseCase.getPresentBalance(accountId, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -70,13 +72,5 @@ public class StatisticsController {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
         }
-    }
-
-    private UUID currentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-        return UUID.fromString((String) auth.getPrincipal());
     }
 }

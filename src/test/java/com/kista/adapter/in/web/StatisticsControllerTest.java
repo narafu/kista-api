@@ -35,7 +35,7 @@ class StatisticsControllerTest {
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
 
     private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
+        return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
     }
 
     @Test

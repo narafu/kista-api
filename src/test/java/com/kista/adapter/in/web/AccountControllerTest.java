@@ -38,9 +38,9 @@ class AccountControllerTest {
     private final UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
-    // SupabaseJwtFilter와 동일하게 principal을 String UUID로 설정
+    // SupabaseJwtFilter와 동일하게 principal을 UUID로 설정
     private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
+        return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
     }
 
     @Test
