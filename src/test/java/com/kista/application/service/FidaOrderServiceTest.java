@@ -5,17 +5,13 @@ import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.KisOrderPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class FidaOrderServiceTest {
@@ -26,19 +22,13 @@ class FidaOrderServiceTest {
     FidaOrderService sut;
 
     @Test
-    void execute_places_limit_order() {
-        when(kisOrderPort.place(any())).thenAnswer(inv -> inv.getArgument(0));
+    void execute_throws_unsupported_in_v2() {
+        // V2에서는 계좌 컨텍스트 필요 — 직접 주문 API 사용 불가
         FidaOrderRequest req = new FidaOrderRequest(
                 "SOXL", Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
 
-        sut.execute(req);
-
-        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
-        verify(kisOrderPort).place(captor.capture());
-        Order placed = captor.getValue();
-        assertThat(placed.orderType()).isEqualTo(Order.OrderType.LIMIT);
-        assertThat(placed.symbol()).isEqualTo("SOXL");
-        assertThat(placed.qty()).isEqualTo(5);
-        assertThat(placed.price()).isEqualByComparingTo("25.50");
+        assertThatThrownBy(() -> sut.execute(req))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("V2");
     }
 }

@@ -90,6 +90,27 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
         send(text); // 관리자 봇으로 전송
     }
 
+    @Override
+    public void notifyTradingReport(User user, Account account, TradingReport r) {
+        // 계좌별 봇 토큰이 설정된 경우에만 발송 — 미설정 시 생략 (cfc1a8da에서 우선순위 확장 예정)
+        String botToken = account.telegramBotToken();
+        String chatId = account.telegramChatId();
+        if (botToken == null || botToken.isBlank() || chatId == null) {
+            log.warn("[{}] 계좌 텔레그램 미설정 — 매매 리포트 생략", account.nickname());
+            return;
+        }
+        String text = String.format(
+                "<b>매매 결산 [%s] — %s</b>%n"
+                + "매수: $%.2f | 매도: $%.2f%n"
+                + "보유: %d주 @ $%.4f%n"
+                + "편차율: %.4f | 목표가: $%.2f",
+                r.date(), account.nickname(),
+                r.totalBoughtUsd(), r.totalSoldUsd(),
+                r.vars().quantity(), r.vars().averagePrice(),
+                r.vars().priceOffsetRate(), r.vars().targetPrice());
+        sendMessage(chatId, text, botToken);
+    }
+
     // ── 내부 전송 헬퍼 ────────────────────────────────────────────────────────
 
     private void sendWithInlineKeyboard(String chatId, String text, String botToken,

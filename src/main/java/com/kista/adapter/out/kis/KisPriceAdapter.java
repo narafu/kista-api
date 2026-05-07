@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.Account;
 import com.kista.domain.port.out.KisPricePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -21,8 +22,8 @@ public class KisPriceAdapter implements KisPricePort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public BigDecimal getPrice(String symbol) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID);
+    public BigDecimal getPrice(String symbol, Account account) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         params.add("EXCD", EXCD);

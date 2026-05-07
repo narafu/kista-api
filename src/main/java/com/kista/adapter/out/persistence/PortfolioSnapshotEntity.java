@@ -40,6 +40,9 @@ class PortfolioSnapshotEntity {
     @Column(name = "total_asset_usd", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAssetUsd;
 
+    @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
+    private UUID accountId;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -48,7 +51,7 @@ class PortfolioSnapshotEntity {
     PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, String symbol, int qty,
                             BigDecimal avgPrice, BigDecimal currentPrice,
                             BigDecimal marketValueUsd, BigDecimal usdDeposit,
-                            BigDecimal totalAssetUsd) {
+                            BigDecimal totalAssetUsd, UUID accountId) {
         this.id = id;
         this.snapshotDate = snapshotDate;
         this.symbol = symbol;
@@ -58,6 +61,7 @@ class PortfolioSnapshotEntity {
         this.marketValueUsd = marketValueUsd;
         this.usdDeposit = usdDeposit;
         this.totalAssetUsd = totalAssetUsd;
+        this.accountId = accountId;
     }
 
     UUID getId() { return id; }
@@ -69,5 +73,6 @@ class PortfolioSnapshotEntity {
     BigDecimal getMarketValueUsd() { return marketValueUsd; }
     BigDecimal getUsdDeposit() { return usdDeposit; }
     BigDecimal getTotalAssetUsd() { return totalAssetUsd; }
+    UUID getAccountId() { return accountId; }
     Instant getCreatedAt() { return createdAt; }
 }

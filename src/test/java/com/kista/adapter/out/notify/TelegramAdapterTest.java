@@ -142,4 +142,62 @@ class TelegramAdapterTest {
         String text = bodyCaptor.getValue().get("text");
         assertThat(text).contains("홍길동").contains("내SOXL계좌").contains("중지");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyTradingReport_withAccountBot_sendsToAccountChatId() {
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+        Account account = new Account(UUID.randomUUID(), user.id(), "SOXL계좌",
+                "74420614", "key", "secret", "01",
+                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                "account-bot-token", "account-chat-456", Instant.now(), Instant.now());
+        TradingVariables vars = TradingVariables.builder()
+                .averagePrice(new BigDecimal("20.00")).quantity(10)
+                .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
+                .totalAssets(new BigDecimal("700.00")).totalRounds(20).currentRound(1.33)
+                .unitAmount(new BigDecimal("35.00")).targetProfitRate(new BigDecimal("0.20"))
+                .priceOffsetRate(new BigDecimal("0.1733")).usdDeposit(new BigDecimal("500.00"))
+                .referencePrice(new BigDecimal("23.47")).targetPrice(new BigDecimal("24.00"))
+                .currentPrice(new BigDecimal("22.00")).build();
+        TradingReport report = new TradingReport(
+                java.time.LocalDate.of(2024, 6, 15), vars, java.util.List.of(), java.util.List.of(),
+                new BigDecimal("66.00"), new BigDecimal("35.00"));
+
+        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        adapter.notifyTradingReport(user, account, report);
+
+        verify(restTemplate).postForObject(
+                contains("/botaccount-bot-token/sendMessage"),
+                bodyCaptor.capture(), eq(String.class));
+        Map<String, String> body = bodyCaptor.getValue();
+        assertThat(body.get("chat_id")).isEqualTo("account-chat-456");
+        assertThat(body.get("text")).contains("2024-06-15").contains("SOXL계좌");
+    }
+
+    @Test
+    void notifyTradingReport_withoutAccountBot_skipsWithoutException() {
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+        Account accountNoBot = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
+                "74420614", "key", "secret", "01",
+                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                null, null, Instant.now(), Instant.now());
+        TradingVariables vars = TradingVariables.builder()
+                .averagePrice(new BigDecimal("20.00")).quantity(10)
+                .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
+                .totalAssets(new BigDecimal("700.00")).totalRounds(20).currentRound(1.33)
+                .unitAmount(new BigDecimal("35.00")).targetProfitRate(new BigDecimal("0.20"))
+                .priceOffsetRate(new BigDecimal("0.1733")).usdDeposit(new BigDecimal("500.00"))
+                .referencePrice(new BigDecimal("23.47")).targetPrice(new BigDecimal("24.00"))
+                .currentPrice(new BigDecimal("22.00")).build();
+        TradingReport report = new TradingReport(
+                java.time.LocalDate.of(2024, 6, 15), vars, java.util.List.of(), java.util.List.of(),
+                new BigDecimal("66.00"), new BigDecimal("35.00"));
+
+        adapter.notifyTradingReport(user, accountNoBot, report);
+
+        // 계좌 봇 미설정 시 발송 없음
+        verify(restTemplate, never()).postForObject(any(), any(), any());
+    }
 }

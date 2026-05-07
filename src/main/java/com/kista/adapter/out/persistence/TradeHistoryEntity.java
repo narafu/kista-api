@@ -50,6 +50,9 @@ class TradeHistoryEntity {
     @Column(name = "kis_order_id", length = 30)
     private String kisOrderId;
 
+    @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
+    private UUID accountId;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -58,7 +61,7 @@ class TradeHistoryEntity {
     TradeHistoryEntity(UUID id, LocalDate tradeDate, String symbol, String strategy,
                        Order.OrderType orderType, Order.OrderDirection direction,
                        int qty, BigDecimal price, BigDecimal amountUsd,
-                       Order.OrderStatus status, String kisOrderId) {
+                       Order.OrderStatus status, String kisOrderId, UUID accountId) {
         this.id = id;
         this.tradeDate = tradeDate;
         this.symbol = symbol;
@@ -70,6 +73,7 @@ class TradeHistoryEntity {
         this.amountUsd = amountUsd;
         this.status = status;
         this.kisOrderId = kisOrderId;
+        this.accountId = accountId;
     }
 
     UUID getId() { return id; }
@@ -83,5 +87,6 @@ class TradeHistoryEntity {
     BigDecimal getAmountUsd() { return amountUsd; }
     Order.OrderStatus getStatus() { return status; }
     String getKisOrderId() { return kisOrderId; }
+    UUID getAccountId() { return accountId; }
     Instant getCreatedAt() { return createdAt; }
 }

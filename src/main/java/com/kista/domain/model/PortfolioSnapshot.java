@@ -15,5 +15,6 @@ public record PortfolioSnapshot(
         BigDecimal marketValueUsd, // 평가액 (USD) = currentPrice × qty
         BigDecimal usdDeposit,     // USD 예수금
         BigDecimal totalAssetUsd,  // 총 자산 (USD) = marketValueUsd + usdDeposit
+        UUID accountId,            // FK → accounts(id), V8에서 추가 (nullable)
         Instant createdAt          // DB 저장 시각 (DB DEFAULT, 저장 전 null)
 ) {}

@@ -32,7 +32,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
         return new TradeHistoryEntity(
                 h.id(), h.tradeDate(), h.symbol(), h.strategy(),
                 h.orderType(), h.direction(), h.qty(), h.price(),
-                h.amountUsd(), h.status(), h.kisOrderId()
+                h.amountUsd(), h.status(), h.kisOrderId(), h.accountId()
         );
     }
 
@@ -41,7 +41,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
                 e.getId(), e.getTradeDate(), e.getSymbol(), e.getStrategy(),
                 e.getOrderType(), e.getDirection(), e.getQty(), e.getPrice(),
                 e.getAmountUsd(), e.getStatus(), e.getKisOrderId(),
-                e.getCreatedAt()
+                e.getAccountId(), e.getCreatedAt()
         );
     }
 }

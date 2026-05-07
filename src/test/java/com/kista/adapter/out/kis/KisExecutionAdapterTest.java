@@ -1,7 +1,6 @@
 package com.kista.adapter.out.kis;
 
-import com.kista.domain.model.Execution;
-import com.kista.domain.model.Order;
+import com.kista.domain.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,8 +11,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,21 +25,23 @@ import static org.mockito.Mockito.when;
 @DisplayName("KisExecutionAdapter 체결 조회 검증")
 class KisExecutionAdapterTest {
 
-    @Mock
-    KisHttpClient kisHttpClient;
-
-    @InjectMocks
-    KisExecutionAdapter adapter;
+    @Mock KisHttpClient kisHttpClient;
+    @InjectMocks KisExecutionAdapter adapter;
 
     private static final KisProperties TEST_PROPS = new KisProperties(
             "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "NAS"
     );
     private static final LocalDate DATE = LocalDate.of(2024, 6, 15);
+    private static final Account ACCOUNT = new Account(
+            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
+            "74420614", "appKey", "appSecret", "01",
+            Strategy.INFINITE, StrategyStatus.ACTIVE,
+            null, null, Instant.now(), Instant.now()
+    );
 
     @BeforeEach
     void setUp() {
-        when(kisHttpClient.props()).thenReturn(TEST_PROPS);
-        when(kisHttpClient.buildHeaders(anyString())).thenReturn(new HttpHeaders());
+        when(kisHttpClient.buildHeaders(anyString(), any(Account.class))).thenReturn(new HttpHeaders());
     }
 
     @Test
@@ -46,7 +49,7 @@ class KisExecutionAdapterTest {
     void getExecutions_nullResponse_returnsEmptyList() {
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(null);
 
-        List<Execution> result = adapter.getExecutions(DATE);
+        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
 
         assertThat(result).isEmpty();
     }
@@ -57,7 +60,7 @@ class KisExecutionAdapterTest {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(null);
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE);
+        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
 
         assertThat(result).isEmpty();
     }
@@ -72,7 +75,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE);
+        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).direction()).isEqualTo(Order.OrderDirection.SELL);
@@ -88,7 +91,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE);
+        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);
@@ -111,7 +114,7 @@ class KisExecutionAdapterTest {
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE);
+        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);

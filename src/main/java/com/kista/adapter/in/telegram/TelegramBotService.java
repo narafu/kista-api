@@ -3,7 +3,6 @@ package com.kista.adapter.in.telegram;
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ class TelegramBotService {
     private final TelegramApiClient apiClient;
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
     private final GetPortfolioUseCase getPortfolioUseCase;
-    private final ExecuteTradingUseCase executeTradingUseCase;
     private final ApproveUserUseCase approveUserUseCase; // 관리자 승인/거절 처리
     // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
@@ -103,17 +101,8 @@ class TelegramBotService {
         return switch (text.toLowerCase()) {
             case "yes" -> {
                 stateMap.put(chatId, BotState.IDLE);
-                Thread.ofVirtual().start(() -> {
-                    try {
-                        executeTradingUseCase.execute();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        log.warn("수동 매매 스레드 인터럽트");
-                    } catch (Exception e) {
-                        log.error("수동 매매 실패", e);
-                    }
-                });
-                yield "매매 실행을 시작합니다. 결과는 완료 후 알림으로 전송됩니다.";
+                // V2: 수동 실행은 스케줄러가 자동 처리 — 계좌별 전략 API 사용 권장
+                yield "V2에서는 스케줄러(화~토 07:00)가 자동 실행합니다. 계좌 전략은 앱에서 설정하세요.";
             }
             case "no", "/cancel" -> {
                 stateMap.put(chatId, BotState.IDLE);

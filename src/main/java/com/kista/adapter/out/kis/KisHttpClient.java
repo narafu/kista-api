@@ -1,5 +1,6 @@
 package com.kista.adapter.out.kis;
 
+import com.kista.domain.model.Account;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
@@ -15,21 +16,21 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class KisHttpClient {
 
-    private final RestTemplate kisRestTemplate; // 빈 이름: kisRestTemplate
+    private final RestTemplate kisRestTemplate;
     private final KisProperties props;
-    private final KisTokenPort kisTokenPort; // 매 KIS 호출 시 토큰 자동 검증+갱신
+    private final KisTokenPort kisTokenPort;
 
     public KisProperties props() {
         return props;
     }
 
-    public HttpHeaders buildHeaders(String trId) {
-        // 매 호출마다 토큰 유효성 검증 — 만료 시 자동 재발급
-        String token = kisTokenPort.getToken();
+    // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
+    public HttpHeaders buildHeaders(String trId, Account account) {
+        String token = kisTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + token);
-        headers.set("appkey", props.appKey());
-        headers.set("appsecret", props.appSecret());
+        headers.set("appkey", account.kisAppKey());
+        headers.set("appsecret", account.kisSecretKey());
         headers.set("tr_id", trId);
         headers.set("custtype", "P");
         headers.setContentType(MediaType.APPLICATION_JSON);

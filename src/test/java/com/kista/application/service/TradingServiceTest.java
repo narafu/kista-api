@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -32,27 +33,36 @@ class TradingServiceTest {
     @Mock TradeHistoryPort tradeHistoryPort;
     @Mock PortfolioSnapshotPort portfolioSnapshotPort;
     @Mock NotifyPort notifyPort;
+    @Mock UserNotificationPort userNotificationPort;
 
     TradingService service;
 
-    // 과거 시점 DstInfo: sleep 없이 즉시 통과
     static final DstInfo PAST_DST = new DstInfo(true,
             Instant.now().minusSeconds(3600),
             Instant.now().minusSeconds(1800));
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    // 보유 수량 있는 잔고 (shouldSkip=false, t=5 → BUY+SELL LOC 2건)
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(
             10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
-    // 보유 없는 잔고 (shouldSkip=false, t=0 → BUY LOC 1건만)
     static final AccountBalance FRESH_BALANCE = new AccountBalance(
             0, BigDecimal.ZERO, new BigDecimal("1000.00"));
 
-    // 수량 0 & 예수금 0 (shouldSkip=true)
     static final AccountBalance LOW_BALANCE = new AccountBalance(
             0, BigDecimal.ZERO, BigDecimal.ZERO);
+
+    static final Account ACCOUNT = new Account(
+            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
+            "74420614", "key", "secret", "01",
+            Strategy.INFINITE, StrategyStatus.ACTIVE,
+            null, null, Instant.now(), Instant.now()
+    );
+
+    static final User USER = new User(
+            ACCOUNT.userId(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+            null, null, Instant.now(), Instant.now()
+    );
 
     @BeforeEach
     void setUp() {
@@ -60,7 +70,7 @@ class TradingServiceTest {
                 kisHolidayPort, kisAccountPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
-                tradeHistoryPort, portfolioSnapshotPort, notifyPort);
+                tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort);
     }
 
     @Test
@@ -71,30 +81,29 @@ class TradingServiceTest {
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
-        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
-        when(kisAccountPort.getBalance()).thenReturn(NORMAL_BALANCE);
-        when(kisPricePort.getPrice("SOXL")).thenReturn(PRICE);
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
+        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE)).thenReturn(vars);
         when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
-        when(kisOrderPort.place(any())).thenReturn(placedOrder);
-        when(kisExecutionPort.getExecutions(any())).thenReturn(List.of());
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
+        when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
 
-        service.execute(PAST_DST);
+        service.execute(ACCOUNT, USER, PAST_DST);
 
-        verify(kisHolidayPort).isMarketOpen(any());
-        verify(kisAccountPort).getBalance();
-        verify(kisPricePort).getPrice("SOXL");
+        verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
+        verify(kisAccountPort).getBalance(ACCOUNT);
+        verify(kisPricePort).getPrice("SOXL", ACCOUNT);
         verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE);
-        verify(kisExecutionPort).getExecutions(any());
+        verify(kisExecutionPort).getExecutions(any(), eq(ACCOUNT));
         verify(correctionStrategy).correct(any(), any(), any());
         verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
-        verify(notifyPort).notifyReport(any(TradingReport.class));
+        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
     }
 
     @Test
     void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
-        // FRESH_BALANCE: q=0, t=0 → buildOrders가 BUY 1건 반환, save = main 1 + corr 1 = 2
         TradingVariables vars = new SoxlDivisionStrategy().calculate(FRESH_BALANCE, PRICE);
         Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
@@ -103,43 +112,42 @@ class TradingServiceTest {
         Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
-        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
-        when(kisAccountPort.getBalance()).thenReturn(FRESH_BALANCE);
-        when(kisPricePort.getPrice("SOXL")).thenReturn(PRICE);
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
+        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.calculate(FRESH_BALANCE, PRICE)).thenReturn(vars);
         when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
-        when(kisOrderPort.place(any())).thenReturn(mainOrder, corrOrder);
-        when(kisExecutionPort.getExecutions(any())).thenReturn(List.of());
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(mainOrder, corrOrder);
+        when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
 
-        service.execute(PAST_DST);
+        service.execute(ACCOUNT, USER, PAST_DST);
 
-        // mainOrder 1개 + corrOrder 1개 = 총 2번 save
         verify(tradeHistoryPort, times(2)).save(any(TradeHistory.class));
     }
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
-        when(kisHolidayPort.isMarketOpen(any())).thenReturn(false);
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
 
-        service.execute(PAST_DST);
+        service.execute(ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
-        verify(kisAccountPort, never()).getBalance();
-        verify(kisPricePort, never()).getPrice(any());
-        verify(notifyPort, never()).notifyReport(any());
+        verify(kisAccountPort, never()).getBalance(any());
+        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
-        when(kisHolidayPort.isMarketOpen(any())).thenReturn(true);
-        when(kisAccountPort.getBalance()).thenReturn(LOW_BALANCE);
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(LOW_BALANCE);
 
-        service.execute(PAST_DST);
+        service.execute(ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyInsufficientBalance(LOW_BALANCE);
-        verify(kisPricePort, never()).getPrice(any());
+        verify(kisPricePort, never()).getPrice(any(), any());
         verify(tradeHistoryPort, never()).save(any());
-        verify(notifyPort, never()).notifyReport(any());
+        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 }

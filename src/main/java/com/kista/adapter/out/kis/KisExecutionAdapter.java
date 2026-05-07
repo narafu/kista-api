@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.Account;
 import com.kista.domain.model.Execution;
 import com.kista.domain.model.Order;
 import com.kista.domain.port.out.KisExecutionPort;
@@ -27,13 +28,13 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public List<Execution> getExecutions(LocalDate date) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID);
+    public List<Execution> getExecutions(LocalDate date, Account account) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
         String dateStr = date.format(FMT);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("CANO", kisHttpClient.props().accountNo());
-        params.add("ACNT_PRDT_CD", kisHttpClient.props().accountType());
+        params.add("CANO", account.accountNo());
+        params.add("ACNT_PRDT_CD", account.kisAccountType());
         params.add("PDNO", "%");              // 전종목
         params.add("ORD_STRT_DT", dateStr);
         params.add("ORD_END_DT", dateStr);

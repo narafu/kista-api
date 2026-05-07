@@ -17,39 +17,38 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class KisTokenAdapter implements KisTokenPort {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul"); // KIS API 응답 시각대
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"); // KIS 만료 시각 포맷
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // KisHttpClient를 주입받지 않음 — KisHttpClient가 KisTokenPort에 의존하므로 순환 방지
     private final RestTemplate kisRestTemplate;
     private final KisProperties kisProperties;
-    private final KisTokenCachePort kisTokenCachePort; // 토큰 캐시 포트
+    private final KisTokenCachePort kisTokenCachePort;
 
     @Override
-    public String getToken() {
+    public String getToken(UUID accountId, String appKey, String appSecret) {
         // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
-        Optional<String> cached = kisTokenCachePort.findValidToken(OffsetDateTime.now(KST).plusMinutes(1));
+        Optional<String> cached = kisTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
         if (cached.isPresent()) {
             return cached.get();
         }
-
-        // 캐시 미스 — KIS API 신규 발급 후 저장
-        return fetchAndCacheToken();
+        return fetchAndCacheToken(accountId, appKey, appSecret);
     }
 
-    private String fetchAndCacheToken() {
+    private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         Map<String, String> body = Map.of(
                 "grant_type", "client_credentials",
-                "appkey", kisProperties.appKey(),
-                "appsecret", kisProperties.appSecret()
+                "appkey", appKey,
+                "appsecret", appSecret
         );
 
         // KIS OAuth 토큰 발급 요청 (RestTemplate 직접 호출 — KisHttpClient 경유 불가)
@@ -62,8 +61,8 @@ public class KisTokenAdapter implements KisTokenPort {
 
         OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
 
-        // 발급된 토큰을 DB에 upsert
-        kisTokenCachePort.saveToken(response.accessToken(), expiresAt);
+        // 발급된 토큰을 account_id 기준으로 DB에 upsert
+        kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
         return response.accessToken();
     }
 

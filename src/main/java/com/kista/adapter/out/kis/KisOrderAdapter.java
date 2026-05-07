@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.Account;
 import com.kista.domain.model.Order;
 import com.kista.domain.port.out.KisOrderPort;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +23,13 @@ public class KisOrderAdapter implements KisOrderPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public Order place(Order order) {
+    public Order place(Order order, Account account) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
-        HttpHeaders headers = kisHttpClient.buildHeaders(trId);
+        HttpHeaders headers = kisHttpClient.buildHeaders(trId, account);
 
         Map<String, String> body = new LinkedHashMap<>();
-        body.put("CANO", kisHttpClient.props().accountNo());
-        body.put("ACNT_PRDT_CD", kisHttpClient.props().accountType());
+        body.put("CANO", account.accountNo());
+        body.put("ACNT_PRDT_CD", account.kisAccountType());
         body.put("OVRS_EXCG_CD", kisHttpClient.props().exchangeCode());
         body.put("PDNO", order.symbol());
         body.put("ORD_DVSN", resolveOrderDvsn(order.orderType()));

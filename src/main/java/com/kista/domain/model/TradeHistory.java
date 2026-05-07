@@ -17,5 +17,6 @@ public record TradeHistory(
         BigDecimal amountUsd,
         Order.OrderStatus status,
         String kisOrderId,
+        UUID accountId,  // FK → accounts(id), V8에서 추가 (nullable)
         Instant createdAt
 ) {}

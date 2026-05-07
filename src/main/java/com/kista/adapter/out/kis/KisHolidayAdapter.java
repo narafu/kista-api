@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.Account;
 import com.kista.domain.port.out.KisHolidayPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,9 +26,9 @@ public class KisHolidayAdapter implements KisHolidayPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public boolean isMarketOpen(LocalDate date) {
+    public boolean isMarketOpen(LocalDate date, Account account) {
         try {
-            HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID);
+            HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
             MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
             params.add("BASS_DT", date.format(FMT));
             params.add("CTX_AREA_KEY", "");

@@ -2,8 +2,9 @@ package com.kista.domain.port.out;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface KisTokenCachePort {
-    Optional<String> findValidToken(OffsetDateTime now); // now 이후에 만료되는 토큰 조회
-    void saveToken(String accessToken, OffsetDateTime expiresAt); // 토큰과 만료시각 저장
+    Optional<String> findValidToken(UUID accountId, OffsetDateTime now);
+    void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt);
 }

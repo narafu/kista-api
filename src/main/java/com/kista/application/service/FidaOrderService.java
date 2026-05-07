@@ -17,15 +17,7 @@ public class FidaOrderService implements ExecuteFidaOrderUseCase {
 
     @Override
     public void execute(FidaOrderRequest request) {
-        Order order = new Order(
-                LocalDate.now(),
-                request.symbol(),
-                Order.OrderType.LIMIT,
-                request.direction(),
-                request.qty(),
-                request.price(),
-                Order.OrderStatus.PLACED,
-                null);
-        kisOrderPort.place(order);
+        // V2: 계좌 컨텍스트 필요 — AccountController 통해 계좌별 전략 제어 사용 권장
+        throw new UnsupportedOperationException("V2에서는 계좌별 전략 API(/api/accounts/{id}/strategy)를 사용하세요");
     }
 }

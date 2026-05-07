@@ -26,7 +26,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
                 null, date, "SOXL", 10,
                 new BigDecimal("20.0000"), new BigDecimal("22.0000"),
                 new BigDecimal("220.00"), new BigDecimal("500.00"),
-                new BigDecimal("720.00"), null
+                new BigDecimal("720.00"), null, null
         );
     }
 

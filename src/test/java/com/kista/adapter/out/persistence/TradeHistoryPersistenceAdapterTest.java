@@ -27,8 +27,7 @@ class TradeHistoryPersistenceAdapterTest {
                 null, date, symbol, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY,
                 5, new BigDecimal("20.0000"), new BigDecimal("100.00"),
-                Order.OrderStatus.PLACED, kisOrderId,
-                null
+                Order.OrderStatus.PLACED, kisOrderId, null, null
         );
     }
 

@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kis;
 
-import com.kista.domain.model.Order;
+import com.kista.domain.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,8 +12,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,21 +28,25 @@ import static org.mockito.Mockito.when;
 @DisplayName("KisOrderAdapter 주문 처리 검증")
 class KisOrderAdapterTest {
 
-    @Mock
-    KisHttpClient kisHttpClient;
-
-    @InjectMocks
-    KisOrderAdapter adapter;
+    @Mock KisHttpClient kisHttpClient;
+    @InjectMocks KisOrderAdapter adapter;
 
     private static final KisProperties TEST_PROPS = new KisProperties(
             "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "NAS"
     );
     private static final LocalDate TRADE_DATE = LocalDate.of(2024, 6, 15);
 
+    private static final Account ACCOUNT = new Account(
+            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
+            "74420614", "appKey", "appSecret", "01",
+            Strategy.INFINITE, StrategyStatus.ACTIVE,
+            null, null, Instant.now(), Instant.now()
+    );
+
     @BeforeEach
     void setUp() {
         when(kisHttpClient.props()).thenReturn(TEST_PROPS);
-        when(kisHttpClient.buildHeaders(anyString())).thenReturn(new HttpHeaders());
+        when(kisHttpClient.buildHeaders(anyString(), any(Account.class))).thenReturn(new HttpHeaders());
     }
 
     @Test
@@ -51,9 +57,9 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(order);
+        adapter.place(order, ACCOUNT);
 
-        verify(kisHttpClient).buildHeaders(eq("TTTT1002U"));
+        verify(kisHttpClient).buildHeaders(eq("TTTT1002U"), eq(ACCOUNT));
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
         assertThat(body.get("ORD_DVSN")).isEqualTo("34");
@@ -68,12 +74,11 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(order);
+        adapter.place(order, ACCOUNT);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
-        Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("ORD_DVSN")).isEqualTo("33");
-        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
+        assertThat(bodyCaptor.getValue().get("ORD_DVSN")).isEqualTo("33");
+        assertThat(bodyCaptor.getValue().get("OVRS_ORD_UNPR")).isEqualTo("0");
     }
 
     @Test
@@ -85,12 +90,11 @@ class KisOrderAdapterTest {
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.place(order);
+        adapter.place(order, ACCOUNT);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
-        Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("ORD_DVSN")).isEqualTo("00");
-        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("25.50");
+        assertThat(bodyCaptor.getValue().get("ORD_DVSN")).isEqualTo("00");
+        assertThat(bodyCaptor.getValue().get("OVRS_ORD_UNPR")).isEqualTo("25.50");
     }
 
     @Test
@@ -100,9 +104,9 @@ class KisOrderAdapterTest {
                 8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
-        adapter.place(order);
+        adapter.place(order, ACCOUNT);
 
-        verify(kisHttpClient).buildHeaders(eq("TTTT1006U"));
+        verify(kisHttpClient).buildHeaders(eq("TTTT1006U"), eq(ACCOUNT));
     }
 
     @Test
@@ -114,7 +118,7 @@ class KisOrderAdapterTest {
                 new KisOrderAdapter.OrderResponse(new KisOrderAdapter.OrderResponse.Output("ORD123"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(response);
 
-        Order result = adapter.place(order);
+        Order result = adapter.place(order, ACCOUNT);
 
         assertThat(result.kisOrderId()).isEqualTo("ORD123");
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);
@@ -127,7 +131,7 @@ class KisOrderAdapterTest {
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
-        Order result = adapter.place(order);
+        Order result = adapter.place(order, ACCOUNT);
 
         assertThat(result.kisOrderId()).isNull();
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);

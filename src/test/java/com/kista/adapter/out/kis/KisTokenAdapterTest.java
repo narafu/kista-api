@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,14 +26,12 @@ import static org.mockito.Mockito.*;
 @DisplayName("KisTokenAdapter 토큰 캐시 검증")
 class KisTokenAdapterTest {
 
-    @Mock
-    RestTemplate kisRestTemplate;
-
-    @Mock
-    KisTokenCachePort kisTokenCachePort;
+    @Mock RestTemplate kisRestTemplate;
+    @Mock KisTokenCachePort kisTokenCachePort;
 
     KisTokenAdapter adapter;
 
+    private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final KisProperties TEST_PROPS = new KisProperties(
             "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "AMS"
     );
@@ -45,9 +44,9 @@ class KisTokenAdapterTest {
     @Test
     @DisplayName("캐시에 유효 토큰 있으면 KIS API 호출 없이 반환")
     void getToken_whenCacheHit_returnsCachedToken() {
-        when(kisTokenCachePort.findValidToken(any())).thenReturn(Optional.of("cached-token"));
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
 
-        String result = adapter.getToken();
+        String result = adapter.getToken(ACCOUNT_ID, "key", "secret");
 
         assertThat(result).isEqualTo("cached-token");
         verifyNoInteractions(kisRestTemplate);
@@ -56,26 +55,26 @@ class KisTokenAdapterTest {
     @Test
     @DisplayName("캐시 미스 시 KIS API 호출하여 신규 토큰 반환")
     void getToken_whenCacheMiss_returnsNewToken() {
-        when(kisTokenCachePort.findValidToken(any())).thenReturn(Optional.empty());
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisTokenAdapter.TokenResponse.class)))
                 .thenReturn(ResponseEntity.ok(new KisTokenAdapter.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
-        String result = adapter.getToken();
+        String result = adapter.getToken(ACCOUNT_ID, "key", "secret");
 
         assertThat(result).isEqualTo("new-token");
     }
 
     @Test
-    @DisplayName("캐시 미스 시 발급 토큰을 saveToken으로 캐시에 저장")
+    @DisplayName("캐시 미스 시 발급 토큰을 account_id와 함께 saveToken으로 캐시에 저장")
     void getToken_whenCacheMiss_savesTokenToCache() {
-        when(kisTokenCachePort.findValidToken(any())).thenReturn(Optional.empty());
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisTokenAdapter.TokenResponse.class)))
                 .thenReturn(ResponseEntity.ok(new KisTokenAdapter.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
-        adapter.getToken();
+        adapter.getToken(ACCOUNT_ID, "key", "secret");
 
         ArgumentCaptor<OffsetDateTime> expiresCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(kisTokenCachePort).saveToken(eq("new-token"), expiresCaptor.capture());
+        verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
         // KIS 응답은 KST(+09:00)이므로 offset이 +09:00이어야 함
         assertThat(expiresCaptor.getValue().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
     }
@@ -83,14 +82,14 @@ class KisTokenAdapterTest {
     @Test
     @DisplayName("캐시 만료 1분 전 임박 토큰은 재발급 — findValidToken에 now+1분 전달")
     void getToken_uses1MinBuffer_forCacheCheck() {
-        when(kisTokenCachePort.findValidToken(any())).thenReturn(Optional.empty());
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisTokenAdapter.TokenResponse.class)))
                 .thenReturn(ResponseEntity.ok(new KisTokenAdapter.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
-        adapter.getToken();
+        adapter.getToken(ACCOUNT_ID, "key", "secret");
 
         ArgumentCaptor<OffsetDateTime> thresholdCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(kisTokenCachePort).findValidToken(thresholdCaptor.capture());
+        verify(kisTokenCachePort).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
         // 전달된 threshold가 현재 시각보다 최소 59초 이상 미래여야 함 (1분 버퍼)
         assertThat(thresholdCaptor.getValue()).isAfter(OffsetDateTime.now().plusSeconds(59));
     }

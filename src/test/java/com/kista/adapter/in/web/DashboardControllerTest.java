@@ -50,7 +50,7 @@ class DashboardControllerTest {
         TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), "SOXL", "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", Instant.now());
+                Order.OrderStatus.PLACED, "KIS001", null, Instant.now());
         when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(h));
 
         mockMvc.perform(get("/api/trades"))
@@ -64,7 +64,7 @@ class DashboardControllerTest {
         PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), "SOXL",
                 100, new BigDecimal("25.0000"), new BigDecimal("26.0000"),
                 new BigDecimal("2600.00"), new BigDecimal("1000.00"),
-                new BigDecimal("3600.00"), Instant.now());
+                new BigDecimal("3600.00"), null, Instant.now());
         when(getPortfolioUseCase.getCurrent()).thenReturn(snap);
 
         mockMvc.perform(get("/api/portfolio/current"))

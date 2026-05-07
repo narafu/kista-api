@@ -4,32 +4,34 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "kis_tokens")
 class KisTokenEntity {
 
     @Id
-    private int id; // 고정값 1 — 단일 행 upsert용
+    @Column(name = "account_id")
+    private UUID accountId; // 계좌별 PK (멀티계좌 독립 토큰 관리)
 
     @Column(name = "access_token", nullable = false, columnDefinition = "TEXT")
-    private String accessToken; // KIS OAuth 액세스 토큰
+    private String accessToken;
 
     @Column(name = "expires_at", nullable = false)
-    private OffsetDateTime expiresAt; // KST → OffsetDateTime(+09:00) 변환 후 저장
+    private OffsetDateTime expiresAt;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt; // DB DEFAULT now() 자동 설정
+    private Instant createdAt;
 
     protected KisTokenEntity() {}
 
-    KisTokenEntity(int id, String accessToken, OffsetDateTime expiresAt) {
-        this.id = id;
+    KisTokenEntity(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
+        this.accountId = accountId;
         this.accessToken = accessToken;
         this.expiresAt = expiresAt;
     }
 
-    int getId() { return id; }
+    UUID getAccountId() { return accountId; }
     String getAccessToken() { return accessToken; }
     OffsetDateTime getExpiresAt() { return expiresAt; }
     Instant getCreatedAt() { return createdAt; }
