@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -40,14 +39,13 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
-        Instant now = Instant.now();
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
                 cmd.strategy(), StrategyStatus.ACTIVE,
                 cmd.telegramBotToken(), cmd.telegramChatId(),
-                now, now
+                null, null
         );
         Account saved = accountRepository.save(account);
         log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
@@ -67,7 +65,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), account.strategy(), account.strategyStatus(),
                 cmd.telegramBotToken(), cmd.telegramChatId(),
-                account.createdAt(), Instant.now()
+                account.createdAt(), null
         );
         return accountRepository.save(updated);
     }
@@ -136,6 +134,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategy(), status,
                 account.telegramBotToken(), account.telegramChatId(),
-                account.createdAt(), Instant.now());
+                account.createdAt(), null);
     }
 }

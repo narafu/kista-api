@@ -71,7 +71,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     @Override
     public void notifyApproved(User user) {
         if (user.telegramChatId() != null && user.telegramBotToken() != null) {
-            sendMessage(user.telegramChatId(), "✅ 가입이 승인되었습니다. KISTA에 오신 걸 환영합니다!",
+            sendMessage(user.telegramChatId(), "✅ 가입이 승인되었습니다.",
                     user.telegramBotToken());
         }
     }
