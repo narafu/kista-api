@@ -21,6 +21,11 @@
 - 증상: `docker compose up` 빌드 중 `failed to receive status: ... error reading from server: EOF`
 - 해결: `Dockerfile` builder 스테이지에 `ENV JAVA_TOOL_OPTIONS="-Xmx768m"` (이미 적용됨)
 
+### 로컬 Docker Compose 환경변수 주입 방식
+- `.env`는 `${VAR}` 치환용 — 컨테이너에 직접 주입되지 않음, `environment:` 섹션에 명시된 것만 주입됨
+- `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 Supabase URL 무시됨
+- 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `SUPABASE_JWT_SECRET`(JWT 검증) — 누락 시 기본값 사용 → 인증 실패
+
 ### Dockerfile `lombok.config` 누락
 - 증상: `Parameter 0 of constructor in <Service> required a bean of type 'java.lang.String' that could not be found`
 - 원인: `lombok.config`가 `src/`·`gradle/` 외부에 있어 Docker 빌드 시 Lombok이 `@Value` 전파 불가
