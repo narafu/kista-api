@@ -5,6 +5,7 @@ import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -28,9 +29,14 @@ public class AuthController {
     @PostMapping("/kakao/callback")
     public UserResponse kakaoCallback(@AuthenticationPrincipal UUID userId,
                                       @RequestBody KakaoCallbackRequest request) {
-        return UserResponse.from(
-                registerUser.register(request.kakaoId(), request.nickname(), userId)
-        );
+        try {
+            return UserResponse.from(
+                    registerUser.register(request.kakaoId(), request.nickname(), userId)
+            );
+        } catch (DataIntegrityViolationException e) {
+            // 로그인 중복 클릭 race condition: 이미 저장된 사용자 반환
+            return UserResponse.from(getUser.getByKakaoId(request.kakaoId()));
+        }
     }
 
     // 현재 사용자 정보 및 상태 조회

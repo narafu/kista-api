@@ -1,5 +1,6 @@
 package com.kista.adapter.out.notify;
 
+import com.kista.application.service.NewUserRegisteredEvent;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.AccountBalance;
 import com.kista.domain.model.TradingReport;
@@ -9,6 +10,8 @@ import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -52,6 +55,14 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     @Override
     public void notifyError(Exception e) {
         send(String.format("<b>⚠️ 매매 오류 발생</b>%n%s", e.getMessage()));
+    }
+
+    // ── 트랜잭션 이벤트 리스너 ─────────────────────────────────────────────────
+
+    // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onNewUserRegistered(NewUserRegisteredEvent event) {
+        notifyNewUser(event.user());
     }
 
     // ── UserNotificationPort 구현 ──────────────────────────────────────────────

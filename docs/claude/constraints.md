@@ -111,3 +111,21 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 비즈니스 로직 블록 직전: 단계 설명 한 줄
 - API 상수/코드값: `"840" // 국가코드: 미국` 형식
 - Javadoc·블록 주석 금지 — `//` 인라인만 사용
+
+### CORS (SecurityConfig)
+- SecurityConfig에 `.cors(cors -> cors.configurationSource(...))` 필수 — 미설정 시 Vercel 브라우저 fetch 전체 차단
+- 허용 origin: `CORS_ALLOWED_ORIGINS` 환경변수 (Render), 기본값 `http://localhost:3000`
+- `corsConfigurationSource()`: allowedMethods=GET/POST/PUT/DELETE/OPTIONS, allowedHeaders=Authorization/Content-Type, allowCredentials=true
+
+### Telegram Webhook 등록
+- `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
+- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://kista-api.onrender.com/telegram/webhook"}'`
+- Render URL 변경 시 재등록 필요
+
+### @Transactional 내부 외부 시스템 호출 금지
+- RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용
+- 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
+
+### ArchUnit 규칙 예외 (adapter.out)
+- `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용
+- TelegramAdapter(adapter.out)에서 NewUserRegisteredEvent(application.service) 참조 가능

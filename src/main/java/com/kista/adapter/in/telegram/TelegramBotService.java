@@ -72,6 +72,7 @@ class TelegramBotService {
             }
         } catch (Exception e) {
             log.error("callback_query 처리 실패: data={}", data, e);
+            apiClient.sendMessage(replyTo, "⚠️ 처리 중 오류가 발생했습니다: " + e.getMessage());
         } finally {
             // 버튼의 로딩 스피너 제거 (Telegram 필수 응답)
             apiClient.answerCallbackQuery(callbackQuery.id());

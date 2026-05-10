@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +27,7 @@ class UserServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock UserNotificationPort notificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks UserService userService;
 
@@ -40,8 +42,8 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("신규 사용자 등록 시 PENDING 저장 + 관리자 알림")
-    void register_new_user_saves_pending_and_notifies() {
+    @DisplayName("신규 사용자 등록 시 PENDING 저장 + 커밋 후 알림 이벤트 발행")
+    void register_new_user_saves_pending_and_publishes_event() {
         UUID uid = UUID.randomUUID();
         when(userRepository.findByKakaoId("kakao-123")).thenReturn(Optional.empty());
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -50,7 +52,8 @@ class UserServiceTest {
 
         assertThat(result.status()).isEqualTo(UserStatus.PENDING);
         assertThat(result.id()).isEqualTo(uid);
-        verify(notificationPort).notifyNewUser(any());
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any()); // 직접 호출하지 않음
     }
 
     @Test
@@ -64,7 +67,7 @@ class UserServiceTest {
 
         assertThat(result).isEqualTo(existing);
         verify(userRepository, never()).save(any());
-        verify(notificationPort, never()).notifyNewUser(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
