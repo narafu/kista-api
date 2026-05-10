@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
+import com.kista.domain.model.CooldownException;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
@@ -55,12 +56,15 @@ public class AuthController {
         return sseEmitterRegistry.connect(userId);
     }
 
-    // 거절된 사용자 재신청 (REJECTED → PENDING)
+    // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청
     @PostMapping("/reapply")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reapply(@AuthenticationPrincipal UUID userId) {
         try {
             approveUser.reapply(userId);
+        } catch (CooldownException e) {
+            // 쿨다운 중 — 재신청 가능 시각을 body에 포함
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, e.getRetryAfter().toString());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
