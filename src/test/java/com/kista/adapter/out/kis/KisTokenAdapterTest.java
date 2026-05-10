@@ -33,7 +33,7 @@ class KisTokenAdapterTest {
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final KisProperties TEST_PROPS = new KisProperties(
-            "https://api.test.com", "key", "secret", "12345678", "01"
+            "https://api.test.com", "key", "secret"
     );
 
     @BeforeEach

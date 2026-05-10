@@ -29,7 +29,7 @@ class KisExecutionAdapterTest {
     @InjectMocks KisExecutionAdapter adapter;
 
     private static final KisProperties TEST_PROPS = new KisProperties(
-            "https://api.test.com", "key", "secret", "12345678", "01"
+            "https://api.test.com", "key", "secret"
     );
     private static final LocalDate DATE = LocalDate.of(2024, 6, 15);
     private static final Account ACCOUNT = new Account(

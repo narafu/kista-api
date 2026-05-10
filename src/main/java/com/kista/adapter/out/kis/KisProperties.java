@@ -6,7 +6,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record KisProperties(
         String baseUrl,
         String appKey,
-        String appSecret,
-        String accountNo,
-        String accountType
+        String appSecret
 ) {}
