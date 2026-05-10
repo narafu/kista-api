@@ -16,6 +16,7 @@ import java.util.UUID;
 public class AccountPersistenceAdapter implements AccountRepository {
 
     private final AccountJpaRepository jpaRepository;
+    private final StrategyJpaRepository strategyJpaRepository;
     private final AesCryptoService crypto;
 
     @Override
@@ -45,15 +46,33 @@ public class AccountPersistenceAdapter implements AccountRepository {
     @Override
     public Account save(Account account) {
         AccountEntity entity = toEntity(account);
-        return toDomain(jpaRepository.save(entity));
+        AccountEntity saved = jpaRepository.save(entity);
+
+        if (account.id() == null) {
+            // 신규 계좌 - strategy 생성
+            StrategyEntity strategyEntity = new StrategyEntity();
+            strategyEntity.setAccountId(saved.getId());
+            strategyEntity.setType(account.strategy());
+            strategyEntity.setStatus(account.strategyStatus());
+            strategyJpaRepository.save(strategyEntity);
+        } else {
+            // 기존 계좌 - strategy status/type 업데이트
+            StrategyEntity strategyEntity = strategyJpaRepository
+                    .findByAccountId(account.id()).orElseThrow();
+            strategyEntity.setType(account.strategy());
+            strategyEntity.setStatus(account.strategyStatus());
+            strategyJpaRepository.save(strategyEntity);
+        }
+
+        return toDomain(saved);
     }
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.deleteById(id);
+        jpaRepository.deleteById(id); // strategies는 ON DELETE CASCADE로 자동 삭제
     }
 
-    // Account 도메인 모델 → 암호화 후 Entity 변환
+    // Account 도메인 모델 → 암호화 후 Entity 변환 (strategy 필드 제외 — strategies 테이블 별도 관리)
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();
         e.setId(a.id()); // null이면 @GeneratedValue가 UUID 생성
@@ -63,8 +82,6 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setKisAppKey(crypto.encrypt(a.kisAppKey()));
         e.setKisSecretKey(crypto.encrypt(a.kisSecretKey()));
         e.setKisAccountType(a.kisAccountType());
-        e.setStrategy(a.strategy());
-        e.setStrategyStatus(a.strategyStatus());
         e.setTelegramBotToken(a.telegramBotToken() != null ? crypto.encrypt(a.telegramBotToken()) : null);
         e.setTelegramChatId(a.telegramChatId());
         e.setSymbol(a.symbol());
@@ -73,14 +90,15 @@ public class AccountPersistenceAdapter implements AccountRepository {
         return e;
     }
 
-    // Entity → 복호화 후 Account 도메인 모델 변환
+    // Entity → 복호화 후 Account 도메인 모델 변환 (strategy는 strategies 테이블에서 로드)
     private Account toDomain(AccountEntity e) {
+        StrategyEntity s = strategyJpaRepository.findByAccountId(e.getId()).orElseThrow();
         return new Account(
                 e.getId(), e.getUserId(), e.getNickname(),
                 crypto.decrypt(e.getAccountNo()),
                 crypto.decrypt(e.getKisAppKey()),
                 crypto.decrypt(e.getKisSecretKey()),
-                e.getKisAccountType(), e.getStrategy(), e.getStrategyStatus(),
+                e.getKisAccountType(), s.getType(), s.getStatus(),
                 e.getTelegramBotToken() != null ? crypto.decrypt(e.getTelegramBotToken()) : null,
                 e.getTelegramChatId(), e.getSymbol(), e.getExchangeCode(),
                 e.getCreatedAt(), e.getUpdatedAt()
