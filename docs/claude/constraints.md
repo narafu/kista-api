@@ -90,6 +90,15 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `@MappedSuperclass` 부모 클래스 필드의 getter/setter는 서브클래스의 `@Getter`/`@Setter`로 생성되지 않음
 - `BaseAuditEntity` 같은 공통 엔티티 부모에 직접 `@Getter @Setter(AccessLevel.PACKAGE)` 추가 필요
 
+### Supabase JWT 인증 (ECC P-256 방식)
+- Supabase가 HS256(공유 시크릿) → ECC P-256(비대칭키)으로 전환됨 — `SUPABASE_JWT_SECRET` 더 이상 사용 안 함
+- 인증 방식: `NimbusJwtDecoder.withJwkSetUri(jwksUri)` — JWKS 자동 패치·캐시·키 갱신 처리
+- JWKS URI: `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (kista: `nnpchirdkaxvdybhqzct`)
+- `NimbusJwtDecoder.withJwkSetUri("")` (빈 문자열)는 bean 생성 시점에 `MalformedURLException` 즉시 발생 — 빈 기본값 금지
+- profile별 `JwtDecoder` 빈: `@Profile("local | test")` → HS256, `@Profile("!(local | test)")` → JWKS (SpEL OR/NOT 지원)
+- 로컬 HS256 유지 이유: `DevAuthController`가 HS256으로 dev-token 생성 — JWKS로 변경 시 dev-token이 401 → **로컬만 HS256이 맞음, JWKS로 통일 금지**
+- 의존성: `spring-boot-starter-oauth2-resource-server` 추가 필요 (`NimbusJwtDecoder` 포함)
+
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
 - 필드: `// 역할 한 줄` 인라인 주석

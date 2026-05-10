@@ -10,6 +10,8 @@
 - `/telegram/webhook` 같은 permitAll 경로도 `@WebMvcTest`에서는 `@WithMockUser` + `csrf()` 필요
 - `@WithMockUser` 사용 금지 (principal이 UserDetails → `@AuthenticationPrincipal UUID`로 바인딩 시 ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuidString), null, List.of())))` 패턴 사용
 - `SupabaseJwtFilter`는 principal을 `UUID` 타입으로 저장 — 테스트 mock도 반드시 `UUID` 사용 (`String` 사용 시 컨트롤러에서 ClassCastException)
+- `JwtDecoder`가 profile-conditional `@Bean`인 경우: `@WebMvcTest`에 `@MockBean JwtDecoder jwtDecoder;` 필수 — 없으면 prod 프로파일 decoder가 빈 URI로 생성 시도 → `MalformedURLException` 컨텍스트 실패
+- `@SpringBootTest @ActiveProfiles("test")`: `application-test.yml`에 `supabase.jwt-secret` 추가 필요 (`local | test` profile 조건으로 HS256 디코더 사용)
 
 ### Mockito 병렬 테스트 주의
 - `@WebMvcTest` 클래스 전체에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 doThrow/doNothing mock이 다른 테스트에 오염됨 (DashboardControllerTest 패턴 참고)

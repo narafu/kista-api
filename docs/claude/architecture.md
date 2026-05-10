@@ -38,7 +38,7 @@ domain      →  외부 의존 없음
 
 | 파일 A | 파일 B |
 |--------|--------|
-| 새 환경변수 추가 | `application.yml` + `.env.example` + `docker-compose.yml` |
+| 환경변수 추가/제거 | `application.yml` + `.env.example` + `docker-compose.yml` 동시 반영 |
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
