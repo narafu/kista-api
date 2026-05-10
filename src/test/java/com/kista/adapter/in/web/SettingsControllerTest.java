@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -30,6 +31,7 @@ class SettingsControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
+    @MockBean JwtDecoder jwtDecoder; // SupabaseJwtFilter 의존성 — 실제 JWKS 호출 방지
     @MockBean UpdateUserTelegramUseCase updateUserTelegram;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";

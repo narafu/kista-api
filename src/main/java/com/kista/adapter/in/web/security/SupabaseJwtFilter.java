@@ -1,31 +1,30 @@
 package com.kista.adapter.in.web.security;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class SupabaseJwtFilter extends OncePerRequestFilter {
 
-    @Value("${supabase.jwt-secret}")
-    private String jwtSecret;
+    // SecurityConfig에서 profile에 따라 주입 (local: HS256, prod: ECC P-256 JWKS)
+    private final JwtDecoder jwtDecoder;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -34,14 +33,9 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
         String token = extractBearerToken(request);
         if (token != null) {
             try {
-                Claims claims = Jwts.parser()
-                        .verifyWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
-                        .build()
-                        .parseSignedClaims(token)
-                        .getPayload();
-
-                // Supabase JWT의 sub 클레임 = 사용자 UUID (Supabase Auth UID)
-                UUID userId = UUID.fromString(claims.getSubject());
+                Jwt jwt = jwtDecoder.decode(token);
+                // sub 클레임 = Supabase Auth UID (UUID)
+                UUID userId = UUID.fromString(jwt.getSubject());
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(userId, null, List.of())
                 );
