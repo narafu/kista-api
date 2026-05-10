@@ -32,7 +32,7 @@ class KisPortfolioAdapterTest {
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
             Strategy.INFINITE, StrategyStatus.ACTIVE,
-            null, null, Instant.now(), Instant.now()
+            null, null, "SOXL", "AMS", Instant.now(), Instant.now()
     );
 
     @BeforeEach

@@ -30,7 +30,7 @@ public class KisOrderAdapter implements KisOrderPort {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("CANO", account.accountNo());
         body.put("ACNT_PRDT_CD", account.kisAccountType());
-        body.put("OVRS_EXCG_CD", kisHttpClient.props().exchangeCode());
+        body.put("OVRS_EXCG_CD", account.exchangeCode());
         body.put("PDNO", order.symbol());
         body.put("ORD_DVSN", resolveOrderDvsn(order.orderType()));
         body.put("ORD_QTY", String.valueOf(order.qty()));

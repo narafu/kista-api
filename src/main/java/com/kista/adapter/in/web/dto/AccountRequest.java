@@ -14,18 +14,22 @@ public record AccountRequest(
         String kisAccountType,   // 기본값 "01"
         Strategy strategy,       // 등록 시 필수
         String telegramBotToken, // optional
-        String telegramChatId    // optional
+        String telegramChatId,   // optional
+        String symbol,           // 거래 종목 (기본값 "SOXL")
+        String exchangeCode      // 해외거래소 코드 (기본값 "AMS")
 ) {
     public RegisterAccountUseCase.Command toRegisterCommand() {
         return new RegisterAccountUseCase.Command(
                 nickname, accountNo, kisAppKey, kisSecretKey,
-                kisAccountType, strategy, telegramBotToken, telegramChatId
+                kisAccountType, strategy, telegramBotToken, telegramChatId,
+                symbol, exchangeCode
         );
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
-                nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId
+                nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId,
+                symbol, exchangeCode
         );
     }
 }

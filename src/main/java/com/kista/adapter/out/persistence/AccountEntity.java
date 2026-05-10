@@ -57,4 +57,10 @@ class AccountEntity extends BaseAuditEntity {
 
     @Column(name = "telegram_chat_id", length = 50)
     private String telegramChatId;
+
+    @Column(nullable = false, length = 20)
+    private String symbol;               // 거래 종목 코드 (예: SOXL)
+
+    @Column(name = "exchange_code", nullable = false, length = 20)
+    private String exchangeCode;         // 해외거래소 코드 (예: AMS)
 }

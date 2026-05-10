@@ -67,6 +67,8 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setStrategyStatus(a.strategyStatus());
         e.setTelegramBotToken(a.telegramBotToken() != null ? crypto.encrypt(a.telegramBotToken()) : null);
         e.setTelegramChatId(a.telegramChatId());
+        e.setSymbol(a.symbol());
+        e.setExchangeCode(a.exchangeCode());
         e.setCreatedAt(a.createdAt()); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
@@ -80,7 +82,8 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(), e.getStrategy(), e.getStrategyStatus(),
                 e.getTelegramBotToken() != null ? crypto.decrypt(e.getTelegramBotToken()) : null,
-                e.getTelegramChatId(), e.getCreatedAt(), e.getUpdatedAt()
+                e.getTelegramChatId(), e.getSymbol(), e.getExchangeCode(),
+                e.getCreatedAt(), e.getUpdatedAt()
         );
     }
 }

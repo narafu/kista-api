@@ -30,13 +30,13 @@ class KisProfitAdapterTest {
     @InjectMocks KisProfitAdapter adapter;
 
     private static final KisProperties PROPS = new KisProperties(
-            "https://api.test.com", "key", "secret", "12345678", "01", "SOXL", "NASD"
+            "https://api.test.com", "key", "secret", "12345678", "01"
     );
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
             Strategy.INFINITE, StrategyStatus.ACTIVE,
-            null, null, Instant.now(), Instant.now()
+            null, null, "SOXL", "AMS", Instant.now(), Instant.now()
     );
 
     @BeforeEach

@@ -7,7 +7,6 @@ import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,8 +22,6 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class TradingService implements ExecuteTradingUseCase {
 
-    @Value("${kis.symbol:SOXL}")
-    private final String symbol;                              // 거래 종목 코드 (기본: SOXL)
     private final KisHolidayPort kisHolidayPort;              // 미국 시장 개장일 확인
     private final KisAccountPort kisAccountPort;              // 계좌 잔고 조회
     private final KisPricePort kisPricePort;                  // 현재 주가 조회
@@ -51,14 +48,14 @@ public class TradingService implements ExecuteTradingUseCase {
         if (!isMarketOpen(today, account)) return;
 
         AccountBalance balance = kisAccountPort.getBalance(account);
-        log.info("잔고 조회: [{}] SOXL {}주, 통합주문가능금액 ${}", account.nickname(), balance.quantity(), balance.usdDeposit());
+        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.symbol(), balance.quantity(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(balance);
             return;
         }
 
-        BigDecimal price = kisPricePort.getPrice(symbol, account);
+        BigDecimal price = kisPricePort.getPrice(account.symbol(), account);
         log.info("현재가: ${}", price);
         TradingVariables vars = tradingStrategy.calculate(balance, price);
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
@@ -93,7 +90,7 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     private List<Order> placeMainOrders(TradingVariables vars, LocalDate today, Account account) {
-        List<Order> pending = tradingStrategy.buildOrders(vars, today, symbol);
+        List<Order> pending = tradingStrategy.buildOrders(vars, today, account.symbol());
         List<Order> placed = pending.stream().map(o -> kisOrderPort.place(o, account)).toList();
         log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());
         return placed;
@@ -123,7 +120,7 @@ public class TradingService implements ExecuteTradingUseCase {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
-        portfolioSnapshotPort.save(toSnapshot(balance, price, today, account.id()));
+        portfolioSnapshotPort.save(toSnapshot(balance, price, today, account));
         log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
         TradingReport report = buildReport(today, vars, mainOrders, corrections, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
@@ -140,14 +137,14 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price,
-                                          LocalDate today, java.util.UUID accountId) {
+                                          LocalDate today, Account account) {
         BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.quantity()))
                 .setScale(2, HALF_UP);
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
-                null, today, symbol, balance.quantity(), balance.avgPrice(),
-                price, marketValue, balance.usdDeposit(), totalAsset, accountId, null);
+                null, today, account.symbol(), balance.quantity(), balance.avgPrice(),
+                price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 
     private TradingReport buildReport(LocalDate today, TradingVariables vars,

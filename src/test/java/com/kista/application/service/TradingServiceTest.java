@@ -56,7 +56,7 @@ class TradingServiceTest {
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
             Strategy.INFINITE, StrategyStatus.ACTIVE,
-            null, null, Instant.now(), Instant.now()
+            null, null, "SOXL", "AMS", Instant.now(), Instant.now()
     );
 
     static final User USER = new User(
@@ -66,7 +66,7 @@ class TradingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TradingService("SOXL",
+        service = new TradingService(
                 kisHolidayPort, kisAccountPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,

@@ -45,6 +45,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
                 cmd.strategy(), StrategyStatus.ACTIVE,
                 cmd.telegramBotToken(), cmd.telegramChatId(),
+                cmd.symbol() != null ? cmd.symbol() : "SOXL",
+                cmd.exchangeCode() != null ? cmd.exchangeCode() : "AMS",
                 null, null
         );
         Account saved = accountRepository.save(account);
@@ -65,6 +67,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), account.strategy(), account.strategyStatus(),
                 cmd.telegramBotToken(), cmd.telegramChatId(),
+                cmd.symbol() != null ? cmd.symbol() : account.symbol(),
+                cmd.exchangeCode() != null ? cmd.exchangeCode() : account.exchangeCode(),
                 account.createdAt(), null
         );
         return accountRepository.save(updated);
@@ -134,6 +138,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategy(), status,
                 account.telegramBotToken(), account.telegramChatId(),
+                account.symbol(), account.exchangeCode(),
                 account.createdAt(), null);
     }
 }

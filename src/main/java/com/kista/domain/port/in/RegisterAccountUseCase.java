@@ -16,6 +16,8 @@ public interface RegisterAccountUseCase {
             String kisAccountType,  // 기본값 "01"
             Strategy strategy,
             String telegramBotToken, // null 가능
-            String telegramChatId    // null 가능
+            String telegramChatId,   // null 가능
+            String symbol,           // 거래 종목 (기본값 "SOXL")
+            String exchangeCode      // 해외거래소 코드 (기본값 "AMS")
     ) {}
 }
