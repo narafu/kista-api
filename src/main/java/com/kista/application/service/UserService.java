@@ -34,7 +34,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         // 기존 사용자면 반환, 신규이면 PENDING 저장 + 관리자 알림
         return userRepository.findByKakaoId(kakaoId).orElseGet(() -> {
             User newUser = new User(supabaseUid, kakaoId, nickname, UserStatus.PENDING,
-                    null, null, null, null);
+                    null, null, null, null, null);
             User saved = userRepository.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, uid={}", kakaoId, supabaseUid);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
@@ -98,7 +98,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void updateTelegram(UUID userId, String botToken, String chatId) {
         User user = findOrThrow(userId);
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
-                botToken, chatId, user.createdAt(), null);
+                botToken, chatId, user.createdAt(), null, user.lastReappliedAt());
         userRepository.save(updated);
         log.info("텔레그램 설정 업데이트: userId={}", userId);
     }
@@ -107,13 +107,14 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void removeTelegram(UUID userId) {
         User user = findOrThrow(userId);
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
-                null, null, user.createdAt(), null);
+                null, null, user.createdAt(), null, user.lastReappliedAt());
         userRepository.save(updated);
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
 
     private User withStatus(User user, UserStatus newStatus) {
         return new User(user.id(), user.kakaoId(), user.nickname(), newStatus,
-                user.telegramBotToken(), user.telegramChatId(), user.createdAt(), null);
+                user.telegramBotToken(), user.telegramChatId(), user.createdAt(), null,
+                user.lastReappliedAt());
     }
 }

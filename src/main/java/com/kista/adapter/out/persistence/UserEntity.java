@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -33,6 +34,9 @@ class UserEntity extends BaseAuditEntity {
     @Column(name = "telegram_chat_id", length = 50)
     private String telegramChatId;
 
+    @Column(name = "last_reapplied_at")
+    private Instant lastReappliedAt; // nullable — 쿨다운 기준 시각
+
     protected UserEntity() {}
 
     static UserEntity fromModel(User user) {
@@ -44,11 +48,12 @@ class UserEntity extends BaseAuditEntity {
         e.telegramBotToken = user.telegramBotToken();
         e.telegramChatId = user.telegramChatId();
         e.createdAt = user.createdAt(); // null이면 @CreatedDate가 INSERT 시 자동 설정
+        e.lastReappliedAt = user.lastReappliedAt();
         return e;
     }
 
     User toModel() {
         return new User(id, kakaoId, nickname, status,
-                telegramBotToken, telegramChatId, createdAt, updatedAt);
+                telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt);
     }
 }

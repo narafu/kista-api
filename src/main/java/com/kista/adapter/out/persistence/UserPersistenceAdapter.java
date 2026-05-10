@@ -37,7 +37,7 @@ public class UserPersistenceAdapter implements UserRepository {
         if (user.telegramBotToken() == null) return user;
         return new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
                 crypto.encrypt(user.telegramBotToken()), user.telegramChatId(),
-                user.createdAt(), user.updatedAt());
+                user.createdAt(), user.updatedAt(), user.lastReappliedAt());
     }
 
     // persistence 경계에서 telegramBotToken 복호화
@@ -46,6 +46,6 @@ public class UserPersistenceAdapter implements UserRepository {
         if (raw.telegramBotToken() == null) return raw;
         return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(),
                 crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(),
-                raw.createdAt(), raw.updatedAt());
+                raw.createdAt(), raw.updatedAt(), raw.lastReappliedAt());
     }
 }

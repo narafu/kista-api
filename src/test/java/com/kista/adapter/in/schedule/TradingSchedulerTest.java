@@ -40,7 +40,7 @@ class TradingSchedulerTest {
 
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", UserStatus.ACTIVE,
-                null, null, Instant.now(), Instant.now());
+                null, null, Instant.now(), Instant.now(), null);
     }
 
     @Test

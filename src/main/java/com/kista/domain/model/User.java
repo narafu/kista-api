@@ -11,5 +11,6 @@ public record User(
         String telegramBotToken,    // 전체 계좌 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
         String telegramChatId,      // 전체 계좌 텔레그램 Chat ID (null 가능)
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Instant lastReappliedAt     // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
 ) {}

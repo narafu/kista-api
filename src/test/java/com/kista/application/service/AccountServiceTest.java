@@ -55,7 +55,7 @@ class AccountServiceTest {
 
     private User activeUser(UUID id) {
         return new User(id, "kakao-123", "홍길동", UserStatus.ACTIVE,
-                null, null, Instant.now(), Instant.now());
+                null, null, Instant.now(), Instant.now(), null);
     }
 
     private RegisterAccountUseCase.Command registerCmd() {

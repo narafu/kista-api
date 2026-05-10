@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,13 +35,26 @@ class UserServiceTest {
     @InjectMocks UserService userService;
 
     private User pendingUser(UUID id) {
+        // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
-                null, null, Instant.now(), Instant.now());
+                null, null, Instant.now(), Instant.now(), null);
     }
 
     private User rejectedUser(UUID id) {
+        // 25h 전 거절 → 24h 쿨다운 경과
         return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
-                null, null, Instant.now(), Instant.now());
+                null, null, Instant.now(), Instant.now(),
+                Instant.now().minus(25, ChronoUnit.HOURS));
+    }
+
+    private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
+        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
+                null, null, Instant.now(), Instant.now(), lastReappliedAt);
+    }
+
+    private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
+        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
+                null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     @Test
