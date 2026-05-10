@@ -96,6 +96,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### Supabase JWT 인증 (ECC P-256 방식)
 - Supabase가 HS256(공유 시크릿) → ECC P-256(비대칭키)으로 전환됨 — `SUPABASE_JWT_SECRET` 더 이상 사용 안 함
 - 인증 방식: `NimbusJwtDecoder.withJwkSetUri(jwksUri)` — JWKS 자동 패치·캐시·키 갱신 처리
+- **`withJwkSetUri()` 기본 알고리즘은 RS256** — Supabase가 ES256 사용하므로 반드시 `.jwsAlgorithm(SignatureAlgorithm.ES256)` 명시 (`JwtDecoderConfig.java` 참고)
+- JWT 검증 실패 시 `SupabaseJwtFilter`가 `log.warn`으로 기록 — Render 로그에서 원인 확인 가능
 - JWKS URI: `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (kista: `nnpchirdkaxvdybhqzct`)
 - `NimbusJwtDecoder.withJwkSetUri("")` (빈 문자열)는 bean 생성 시점에 `MalformedURLException` 즉시 발생 — 빈 기본값 금지
 - profile별 `JwtDecoder` 빈: `@Profile("local | test")` → HS256, `@Profile("!(local | test)")` → JWKS (SpEL OR/NOT 지원)

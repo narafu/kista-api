@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
@@ -25,9 +26,12 @@ public class JwtDecoderConfig {
     }
 
     // prod 프로파일: Supabase ECC P-256 JWKS 자동 패치·캐시·갱신
+    // withJwkSetUri() 기본값은 RS256 — Supabase가 ES256 사용하므로 명시 필수
     @Bean
     @Profile("!(local | test)")
     public JwtDecoder prodJwtDecoder(@Value("${supabase.jwks-uri}") String jwksUri) {
-        return NimbusJwtDecoder.withJwkSetUri(jwksUri).build();
+        return NimbusJwtDecoder.withJwkSetUri(jwksUri)
+                .jwsAlgorithm(SignatureAlgorithm.ES256)
+                .build();
     }
 }
