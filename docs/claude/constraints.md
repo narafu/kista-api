@@ -1,5 +1,12 @@
 ## 핵심 제약 사항
 
+### Swagger 개발 도구
+- `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
+- `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
+- `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
+  - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
+  - Supabase는 카카오 OAuth 전용 — email/password 로그인 불가
+
 ### Virtual Thread
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
@@ -9,6 +16,12 @@
 
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, Supabase PgBouncer Transaction Mode에서 트랜잭션 외부 커넥션 점유 방지
+
+### PostgreSQL 네이티브 ENUM 타입 매핑
+- Flyway가 `user_status`, `strategy_type`, `strategy_status`를 PostgreSQL 네이티브 ENUM으로 생성 (`CREATE TYPE ... AS ENUM`)
+- Hibernate 6+의 `@Enumerated(EnumType.STRING)` 단독 사용 시 varchar로 바인딩 → `column "status" is of type user_status but expression is of type character varying` 오류
+- 반드시 `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 병기 필요 (`UserEntity.status`, `AccountEntity.strategy/strategyStatus`에 이미 적용됨)
+- VARCHAR 컬럼 ENUM(예: `TradeHistoryEntity`)은 해당 없음 — 네이티브 ENUM 컬럼에만 필요
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```

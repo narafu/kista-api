@@ -24,7 +24,7 @@
 ### 로컬 Docker Compose 환경변수 주입 방식
 - `.env`는 `${VAR}` 치환용 — 컨테이너에 직접 주입되지 않음, `environment:` 섹션에 명시된 것만 주입됨
 - `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 Supabase URL 무시됨
-- 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `SUPABASE_JWT_SECRET`(JWT 검증) — 누락 시 기본값 사용 → 인증 실패
+- 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `SUPABASE_JWT_SECRET`(JWT 검증) — **빈 문자열로 주입 시 기동 불가** (`AesCryptoService: Empty key`), `.env`에 반드시 실제 값 설정
 
 ### Dockerfile `lombok.config` 누락
 - 증상: `Parameter 0 of constructor in <Service> required a bean of type 'java.lang.String' that could not be found`

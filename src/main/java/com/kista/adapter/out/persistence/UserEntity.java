@@ -3,6 +3,8 @@ package com.kista.adapter.out.persistence;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -21,6 +23,7 @@ class UserEntity extends BaseAuditEntity {
     private String nickname;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, length = 10)
     private UserStatus status;
 
