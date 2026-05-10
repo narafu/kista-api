@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
@@ -95,19 +96,86 @@ class UserServiceTest {
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == UserStatus.PENDING));
+        verify(userRepository).save(argThat(u ->
+                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(notificationPort).notifyNewUser(any());
     }
 
     @Test
-    @DisplayName("PENDING 상태에서 재신청 시 예외 발생")
-    void reapply_pending_user_throws_exception() {
+    @DisplayName("PENDING 1시간 이내 재신청 시 CooldownException")
+    void reapply_pending_within_1h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        // 30분 전에 마지막 재신청
+        when(userRepository.findById(userId)).thenReturn(Optional.of(
+                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES))));
 
         assertThatThrownBy(() -> userService.reapply(userId))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("REJECTED");
+                .isInstanceOf(CooldownException.class);
+    }
+
+    @Test
+    @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 알림")
+    void reapply_pending_after_1h_succeeds() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(
+                pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS))));
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userRepository).save(argThat(u ->
+                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
+        verify(notificationPort).notifyNewUser(any());
+    }
+
+    @Test
+    @DisplayName("PENDING lastReappliedAt=null 이면 즉시 재신청 허용")
+    void reapply_pending_null_lastReappliedAt_succeeds() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userRepository).save(argThat(u -> u.status() == UserStatus.PENDING));
+    }
+
+    @Test
+    @DisplayName("REJECTED 24시간 이내 재신청 시 CooldownException")
+    void reapply_rejected_within_24h_throws_cooldown() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(
+                rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS))));
+
+        assertThatThrownBy(() -> userService.reapply(userId))
+                .isInstanceOf(CooldownException.class);
+    }
+
+    @Test
+    @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
+    void reapply_rejected_null_lastReappliedAt_succeeds() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED,
+                null, null, Instant.now(), Instant.now(), null);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userRepository).save(argThat(u -> u.status() == UserStatus.PENDING));
+    }
+
+    @Test
+    @DisplayName("거절 시 lastReappliedAt 갱신 (24h 카운트다운 시작)")
+    void reject_sets_lastReappliedAt() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId);
+
+        verify(userRepository).save(argThat(u ->
+                u.status() == UserStatus.REJECTED && u.lastReappliedAt() != null));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
@@ -15,6 +16,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -56,7 +59,9 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public void reject(UUID userId) {
         User user = findOrThrow(userId);
-        User updated = withStatus(user, UserStatus.REJECTED);
+        // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), UserStatus.REJECTED,
+                user.telegramBotToken(), user.telegramChatId(), user.createdAt(), null, Instant.now());
         userRepository.save(updated);
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
@@ -66,10 +71,26 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public void reapply(UUID userId) {
         User user = findOrThrow(userId);
-        if (user.status() != UserStatus.REJECTED) {
-            throw new IllegalStateException("REJECTED 상태인 사용자만 재신청할 수 있습니다");
+        Instant now = Instant.now();
+
+        // 상태별 쿨다운 검증
+        switch (user.status()) {
+            case PENDING -> {
+                if (user.lastReappliedAt() != null &&
+                        now.isBefore(user.lastReappliedAt().plus(1, ChronoUnit.HOURS)))
+                    throw new CooldownException(user.lastReappliedAt().plus(1, ChronoUnit.HOURS));
+            }
+            case REJECTED -> {
+                if (user.lastReappliedAt() != null &&
+                        now.isBefore(user.lastReappliedAt().plus(24, ChronoUnit.HOURS)))
+                    throw new CooldownException(user.lastReappliedAt().plus(24, ChronoUnit.HOURS));
+            }
+            default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }
-        User updated = withStatus(user, UserStatus.PENDING);
+
+        // PENDING 전환 + 재신청 시각 갱신
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), UserStatus.PENDING,
+                user.telegramBotToken(), user.telegramChatId(), user.createdAt(), null, now);
         userRepository.save(updated);
         log.info("사용자 재신청: userId={}", userId);
         notificationPort.notifyNewUser(updated);
