@@ -46,7 +46,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V11__extract_strategies_table.sql` (strategy 컬럼 → strategies 테이블 분리)
+- 현재 최신: `V12__add_last_reapplied_at_to_users.sql` (users.last_reapplied_at 추가)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성
@@ -133,6 +133,12 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `AccountPersistenceAdapter.save()`: `account.id()==null` → `StrategyEntity` 신규 생성, `!=null` → 기존 로드 후 type/status 업데이트
 - `save()` 내 `buildDomain(AccountEntity, StrategyEntity)` 헬퍼로 이중 `findByAccountId` 쿼리 방지 — `toDomain()`은 조회 경로(`findById` 등) 전용
 - `findAllActive()`: native SQL, `JOIN strategies s ON s.account_id = a.id WHERE ... AND s.status = 'ACTIVE'`, `SELECT DISTINCT` (향후 1:N 중복 방지)
+
+### reapply 쿨다운 정책
+- PENDING 사용자: 1시간마다 재신청 가능 (누락 대비 알림 재발송, 무한 요청 방지)
+- REJECTED 사용자: 거절 후 24시간 후 재신청 가능
+- `lastReappliedAt` 단일 필드로 추적 — `reject()` 시 설정, `reapply()` 성공 시 갱신
+- 쿨다운 위반: `CooldownException(retryAfter: Instant)` → controller에서 429 변환
 
 ### ArchUnit 규칙 예외 (adapter.out)
 - `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용

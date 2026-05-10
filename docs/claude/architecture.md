@@ -49,6 +49,7 @@ domain      →  외부 의존 없음
 | 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |
 | `UserPersistenceAdapter` telegramBotToken 변경 | `UserEntity` + `AesCryptoService` 암호화/복호화 패턴 확인 |
 | `KisProperties` 필드 추가/제거 | `KisTokenAdapterTest` + `KisExecutionAdapterTest` + `KisProfitAdapterTest` (생성자 하드코딩) |
+| `User` record 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + `UserServiceTest` + `TelegramAdapterTest` + `TradingSchedulerTest` + `AccountServiceTest` + `TradingServiceTest` (`new User(...)` 호출 전파) |
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지
