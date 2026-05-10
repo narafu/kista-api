@@ -48,23 +48,23 @@ public class AccountPersistenceAdapter implements AccountRepository {
         AccountEntity entity = toEntity(account);
         AccountEntity saved = jpaRepository.save(entity);
 
+        StrategyEntity strategyEntity;
         if (account.id() == null) {
             // 신규 계좌 - strategy 생성
-            StrategyEntity strategyEntity = new StrategyEntity();
+            strategyEntity = new StrategyEntity();
             strategyEntity.setAccountId(saved.getId());
             strategyEntity.setType(account.strategy());
             strategyEntity.setStatus(account.strategyStatus());
-            strategyJpaRepository.save(strategyEntity);
         } else {
-            // 기존 계좌 - strategy status/type 업데이트
-            StrategyEntity strategyEntity = strategyJpaRepository
+            // 기존 계좌 - strategy type/status 업데이트
+            strategyEntity = strategyJpaRepository
                     .findByAccountId(account.id()).orElseThrow();
             strategyEntity.setType(account.strategy());
             strategyEntity.setStatus(account.strategyStatus());
-            strategyJpaRepository.save(strategyEntity);
         }
+        strategyJpaRepository.save(strategyEntity);
 
-        return toDomain(saved);
+        return buildDomain(saved, strategyEntity); // 이중 findByAccountId 방지
     }
 
     @Override
@@ -93,6 +93,11 @@ public class AccountPersistenceAdapter implements AccountRepository {
     // Entity → 복호화 후 Account 도메인 모델 변환 (strategy는 strategies 테이블에서 로드)
     private Account toDomain(AccountEntity e) {
         StrategyEntity s = strategyJpaRepository.findByAccountId(e.getId()).orElseThrow();
+        return buildDomain(e, s);
+    }
+
+    // 이미 로드된 StrategyEntity를 받아 Account 조합 — save()에서 이중 쿼리 방지
+    private Account buildDomain(AccountEntity e, StrategyEntity s) {
         return new Account(
                 e.getId(), e.getUserId(), e.getNickname(),
                 crypto.decrypt(e.getAccountNo()),

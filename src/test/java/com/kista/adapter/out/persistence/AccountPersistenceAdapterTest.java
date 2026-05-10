@@ -77,8 +77,7 @@ class AccountPersistenceAdapterTest {
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
-        when(strategyJpaRepository.findByAccountId(accountId))
-                .thenReturn(Optional.of(strategyEntity(accountId, Strategy.INFINITE, StrategyStatus.ACTIVE)));
+        // strategyJpaRepository.findByAccountId stub 제거 (buildDomain으로 이중 쿼리 제거됨)
 
         // when
         adapter.save(newAccount);
