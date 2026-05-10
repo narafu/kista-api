@@ -39,12 +39,14 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②(K/2/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
 - **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
 
-### KIS 계좌번호 환경변수 분리
-- `KIS_ACCOUNT_NO=74420614` (8자리만) + `KIS_ACCOUNT_TYPE=01` 별도 설정
-- `74420614-01` 형태로 하나의 변수에 넣으면 KIS API CANO 파라미터 오류
+### KIS 계좌번호 DB 저장 방식
+- 계좌번호는 `accounts.account_no` (8자리, AES-256 암호화) + `accounts.kis_account_type` (평문 `"01"`) 으로 분리 저장
+- KIS API 호출: `CANO = account.accountNo()`, `ACNT_PRDT_CD = account.kisAccountType()`
+- `74420614-01` 형태로 하나의 필드에 합치면 KIS API CANO 파라미터 오류 — 반드시 분리
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
+- 현재 최신: `V11__extract_strategies_table.sql` (strategy 컬럼 → strategies 테이블 분리)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성
@@ -125,6 +127,12 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### @Transactional 내부 외부 시스템 호출 금지
 - RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
+
+### strategies 테이블 분리 (V11)
+- `accounts.strategy`/`strategy_status` → `strategies` 테이블로 분리 (account:strategy = 1:N 대비 설계)
+- `AccountPersistenceAdapter.save()`: `account.id()==null` → `StrategyEntity` 신규 생성, `!=null` → 기존 로드 후 type/status 업데이트
+- `save()` 내 `buildDomain(AccountEntity, StrategyEntity)` 헬퍼로 이중 `findByAccountId` 쿼리 방지 — `toDomain()`은 조회 경로(`findById` 등) 전용
+- `findAllActive()`: native SQL, `JOIN strategies s ON s.account_id = a.id WHERE ... AND s.status = 'ACTIVE'`, `SELECT DISTINCT` (향후 1:N 중복 방지)
 
 ### ArchUnit 규칙 예외 (adapter.out)
 - `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용

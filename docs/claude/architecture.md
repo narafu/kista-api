@@ -40,6 +40,7 @@ domain      →  외부 의존 없음
 |--------|--------|
 | 환경변수 추가/제거 | `application.yml` + `.env.example` + `docker-compose.yml` 동시 반영 |
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
+| strategies 테이블 변경 | `StrategyEntity` + `StrategyJpaRepository` + `AccountPersistenceAdapter` 동시 수정 |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
 | `AccountService` UseCase 추가 | `AccountController` 필드 + 엔드포인트 동시 추가 |
