@@ -6,6 +6,7 @@ import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
+import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
 
     private final UserRepository userRepository;
     private final UserNotificationPort notificationPort;
+    private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
 
     @Override
@@ -48,6 +50,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         userRepository.save(updated);
         log.info("사용자 승인: userId={}", userId);
         notificationPort.notifyApproved(updated);
+        realtimeNotificationPort.notifyStatusChange(userId, UserStatus.ACTIVE);
     }
 
     @Override
@@ -57,6 +60,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         userRepository.save(updated);
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
+        realtimeNotificationPort.notifyStatusChange(userId, UserStatus.REJECTED);
     }
 
     @Override

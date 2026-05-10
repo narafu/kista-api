@@ -13,6 +13,10 @@
 - `JwtDecoder`가 profile-conditional `@Bean`인 경우: `@WebMvcTest`에 `@MockBean JwtDecoder jwtDecoder;` 필수 — 없으면 prod 프로파일 decoder가 빈 URI로 생성 시도 → `MalformedURLException` 컨텍스트 실패
 - `@SpringBootTest @ActiveProfiles("test")`: `application-test.yml`에 `supabase.jwt-secret` 추가 필요 (`local | test` profile 조건으로 HS256 디코더 사용)
 
+### @InjectMocks + @RequiredArgsConstructor 서비스 필드 추가 시 주의
+- 서비스에 `private final` 필드 추가 시 해당 테스트에 `@Mock` 추가 필수 — 누락 시 Mockito 생성자 주입 실패 (NPE 또는 객체 생성 오류)
+- 예: `UserService`에 `RealtimeNotificationPort` 추가 → `UserServiceTest`에 `@Mock RealtimeNotificationPort realtimeNotificationPort` 추가
+
 ### Mockito 병렬 테스트 주의
 - `@WebMvcTest` 클래스 전체에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 doThrow/doNothing mock이 다른 테스트에 오염됨 (DashboardControllerTest 패턴 참고)
 - `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용

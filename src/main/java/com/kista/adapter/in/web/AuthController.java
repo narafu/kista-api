@@ -1,15 +1,18 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.UserResponse;
+import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
@@ -21,6 +24,7 @@ public class AuthController {
     private final RegisterUserUseCase registerUser;
     private final GetUserUseCase getUser;
     private final ApproveUserUseCase approveUser;
+    private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
 
     // 카카오 콜백 요청 바디
     record KakaoCallbackRequest(String kakaoId, String nickname) {}
@@ -43,6 +47,12 @@ public class AuthController {
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
         return UserResponse.from(getUser.getById(userId));
+    }
+
+    // PENDING 상태 사용자의 SSE 연결 — 승인/거절 시 브라우저 자동 리다이렉트
+    @GetMapping(value = "/status-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter statusStream(@AuthenticationPrincipal UUID userId) {
+        return sseEmitterRegistry.connect(userId);
     }
 
     // 거절된 사용자 재신청 (REJECTED → PENDING)

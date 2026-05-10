@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserStatus;
+import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ class UserServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock UserNotificationPort notificationPort;
+    @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks UserService userService;
