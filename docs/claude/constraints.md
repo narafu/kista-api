@@ -57,6 +57,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### 텔레그램 로컬 테스트
 - `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
 - 로컬에서 `curl .../sendMessage` 테스트 시 VPN 필요
+- 로컬 Docker에서 Telegram 인바운드(버튼 클릭 callback_query) 동작 불가 — Telegram 서버가 localhost 미접근
+- callback_query 시뮬레이션: `curl -s -X POST http://localhost:8080/telegram/webhook -H "Content-Type: application/json" -d '{"callback_query":{"id":"test123","data":"approve:<UUID>","message":{"chat":{"id":<CHAT_ID>}}}}'`
+- `answerCallbackQuery 실패` 에러는 가짜 callback ID 사용 시 정상 발생 — 승인 로직 자체는 실행됨
 
 ### Lombok 패턴
 - `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지
@@ -96,6 +99,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - JWKS URI: `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (kista: `nnpchirdkaxvdybhqzct`)
 - `NimbusJwtDecoder.withJwkSetUri("")` (빈 문자열)는 bean 생성 시점에 `MalformedURLException` 즉시 발생 — 빈 기본값 금지
 - profile별 `JwtDecoder` 빈: `@Profile("local | test")` → HS256, `@Profile("!(local | test)")` → JWKS (SpEL OR/NOT 지원)
+- **`JwtDecoder` @Bean은 반드시 `JwtDecoderConfig.java`에 분리** — `SecurityConfig`에 두면 `SupabaseJwtFilter` 순환 참조로 `APPLICATION FAILED TO START`
 - 로컬 HS256 유지 이유: `DevAuthController`가 HS256으로 dev-token 생성 — JWKS로 변경 시 dev-token이 401 → **로컬만 HS256이 맞음, JWKS로 통일 금지**
 - 의존성: `spring-boot-starter-oauth2-resource-server` 추가 필요 (`NimbusJwtDecoder` 포함)
 

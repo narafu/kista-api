@@ -40,7 +40,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(userId, null, List.of())
                 );
             } catch (JwtException e) {
-                log.debug("JWT 검증 실패: {}", e.getMessage());
+                log.warn("JWT 검증 실패: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return;
             }
