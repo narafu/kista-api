@@ -26,6 +26,9 @@
 - `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 Supabase URL 무시됨
 - 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `SUPABASE_JWT_SECRET`(JWT 검증) — **빈 문자열로 주입 시 기동 불가** (`AesCryptoService: Empty key`), `.env`에 반드시 실제 값 설정
 
+### 로컬 포트 할당
+- Grafana: `3030:3000` (호스트 3030 → 컨테이너 내부 3000) — `3030:3030`은 동작 안 함, kista-ui와 3000 충돌 방지
+
 ### Dockerfile `lombok.config` 누락
 - 증상: `Parameter 0 of constructor in <Service> required a bean of type 'java.lang.String' that could not be found`
 - 원인: `lombok.config`가 `src/`·`gradle/` 외부에 있어 Docker 빌드 시 Lombok이 `@Value` 전파 불가
