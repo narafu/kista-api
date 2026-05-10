@@ -12,11 +12,12 @@ interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
     int countByUserId(UUID userId);
 
-    // ACTIVE 사용자의 ACTIVE 계좌 전체 조회 (스케줄러용)
+    // ACTIVE 사용자의 ACTIVE 전략을 가진 계좌 전체 조회 (스케줄러용)
     @Query(value = """
             SELECT a.* FROM accounts a
             JOIN users u ON a.user_id = u.id
-            WHERE u.status = 'ACTIVE' AND a.strategy_status = 'ACTIVE'
+            JOIN strategies s ON s.account_id = a.id
+            WHERE u.status = 'ACTIVE' AND s.status = 'ACTIVE'
             """, nativeQuery = true)
     List<AccountEntity> findAllActive();
 }

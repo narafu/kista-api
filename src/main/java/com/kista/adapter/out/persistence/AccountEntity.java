@@ -1,10 +1,6 @@
 package com.kista.adapter.out.persistence;
 
-import com.kista.domain.model.Strategy;
-import com.kista.domain.model.StrategyStatus;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -41,16 +37,6 @@ class AccountEntity extends BaseAuditEntity {
 
     @Column(name = "kis_account_type", nullable = false, length = 10)
     private String kisAccountType;       // 계좌 상품 코드 (기본: 01)
-
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, length = 20)
-    private Strategy strategy;
-
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "strategy_status", nullable = false, length = 10)
-    private StrategyStatus strategyStatus;
 
     @Column(name = "telegram_bot_token", length = 255)
     private String telegramBotToken;     // 계좌별 봇 (optional, AES-256)
