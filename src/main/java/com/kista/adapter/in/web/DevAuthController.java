@@ -48,7 +48,7 @@ public class DevAuthController {
         String token = Jwts.builder()
                 .subject(user.id().toString())
                 .expiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MS))
-                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
                 .compact();
 
         return new TokenResponse(token, "bearer", TOKEN_TTL_MS / 1000);
