@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    # Supabase PgBouncer Transaction Mode (포트 6543) 사용 시 prepareThreshold=0 필수
+    # url 예시: jdbc:postgresql://<host>:6543/postgres?pgbouncer=true&prepareThreshold=0
+    hikari:
+      maximum-pool-size: 5   # Supabase 무료 연결 한도 25개 이내
+      minimum-idle: 1
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: WARN
+    com.kista: INFO

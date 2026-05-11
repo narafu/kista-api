@@ -16,11 +16,11 @@ build/
 .DS_Store
 Thumbs.db
 
-# 환경별 시크릿 파일 — 실제 프로젝트에서는 아래처럼 추가
-# application-prod.yml
+# 환경별 시크릿 파일
+**/application-local.yml
+**/application-test.yml
 *.env
 .env*
-.env.local
 !.env.example
 
 # Querydsl 생성 파일
