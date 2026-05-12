@@ -34,6 +34,7 @@ class TradingServiceTest {
     @Mock PortfolioSnapshotPort portfolioSnapshotPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
+    @Mock PlannedOrderPort plannedOrderPort; // 신규
 
     TradingService service;
 
@@ -52,13 +53,18 @@ class TradingServiceTest {
     static final AccountBalance LOW_BALANCE = new AccountBalance(
             0, BigDecimal.ZERO, BigDecimal.ZERO);
 
+    // Account 생성자: id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType,
+    //                 strategyType, strategyStatus, telegramBotToken, telegramChatId,
+    //                 symbol, exchangeCode, createdAt, updatedAt
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
-            Strategy.INFINITE, StrategyStatus.ACTIVE,
+            StrategyType.INFINITE, StrategyStatus.ACTIVE,
             null, null, "SOXL", "AMS", Instant.now(), Instant.now()
     );
 
+    // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,
+    //              createdAt, updatedAt, lastReappliedAt
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", UserStatus.ACTIVE,
             null, null, Instant.now(), Instant.now(), null
@@ -70,7 +76,8 @@ class TradingServiceTest {
                 kisHolidayPort, kisAccountPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
-                tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort);
+                tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
+                plannedOrderPort); // 신규 인자
     }
 
     @Test
@@ -81,11 +88,20 @@ class TradingServiceTest {
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
+        // DB에서 조회될 PENDING 주문 (id 필수: markExecuted에서 UUID로 사용)
+        UUID plannedId = UUID.randomUUID();
+        PlannedOrder planned = new PlannedOrder(plannedId, ACCOUNT.id(), LocalDate.now(),
+                "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                PlannedOrder.PlannedOrderStatus.PENDING, null);
+
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL")))
+                .thenReturn(List.of(pendingOrder));
+        when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
+                .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
@@ -96,6 +112,10 @@ class TradingServiceTest {
         verify(kisAccountPort).getBalance(ACCOUNT);
         verify(kisPricePort).getPrice("SOXL", ACCOUNT);
         verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE);
+        verify(plannedOrderPort).saveAll(anyList());                                      // 계획 저장
+        verify(plannedOrderPort).findPendingByAccountAndDate(eq(ACCOUNT.id()), any());   // 실행 조회
+        verify(kisOrderPort).place(any(), eq(ACCOUNT));
+        verify(plannedOrderPort).markExecuted(eq(plannedId), eq("ORD-001"));             // 상태 갱신
         verify(kisExecutionPort).getExecutions(any(), eq(ACCOUNT));
         verify(correctionStrategy).correct(any(), any(), any());
         verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
@@ -112,11 +132,19 @@ class TradingServiceTest {
         Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
+        UUID plannedId = UUID.randomUUID();
+        PlannedOrder planned = new PlannedOrder(plannedId, ACCOUNT.id(), LocalDate.now(),
+                "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                PlannedOrder.PlannedOrderStatus.PENDING, null);
+
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.calculate(FRESH_BALANCE, PRICE)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL"))).thenReturn(List.of(pendingOrder));
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL")))
+                .thenReturn(List.of(pendingOrder));
+        when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
+                .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(mainOrder, corrOrder);
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
@@ -128,6 +156,7 @@ class TradingServiceTest {
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
+        // isMarketOpen이 waitForOrderTime보다 먼저 → 휴장 시 plan도 저장 안 됨
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
 
         service.execute(ACCOUNT, USER, PAST_DST);
@@ -135,6 +164,7 @@ class TradingServiceTest {
         verify(notifyPort).notifyMarketClosed();
         verify(kisAccountPort, never()).getBalance(any());
         verify(kisPricePort, never()).getPrice(any(), any());
+        verify(plannedOrderPort, never()).saveAll(any()); // 계획 주문도 저장 안 됨
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
@@ -147,6 +177,7 @@ class TradingServiceTest {
 
         verify(notifyPort).notifyInsufficientBalance(LOW_BALANCE);
         verify(kisPricePort, never()).getPrice(any(), any());
+        verify(plannedOrderPort, never()).saveAll(any()); // 잔고 부족 시 계획 주문도 없음
         verify(tradeHistoryPort, never()).save(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
