@@ -72,7 +72,7 @@ crypto:
   aes-key: ${AES_ENCRYPTION_KEY}
 
 supabase:
-  jwks-uri: ${SUPABASE_JWKS_URI}
+  jwks-uri: ${SUPABASE_JWKS_URI:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
