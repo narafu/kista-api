@@ -5,6 +5,7 @@
 - `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
 - `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
   - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
+  - dev-token 서명: `supabase.signing-jwk` EC 개인키로 ES256 서명 — 로컬 Supabase와 동일 키페어, 인-메모리 디코더로 검증됨
   - Supabase는 카카오 OAuth 전용 — email/password 로그인 불가
 
 ### Virtual Thread
@@ -73,7 +74,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화
 - `AccountPersistenceAdapter`가 `AesCryptoService` 주입받아 처리 — `AccountService`(application layer)는 평문만 다룸
 - ArchUnit 규칙(application → adapter 금지)으로 서비스가 암호화 서비스 직접 호출 불가
-- 신규 환경변수: `AES_ENCRYPTION_KEY` (Base64 32바이트), `SUPABASE_JWT_SECRET`
+- 신규 환경변수: `AES_ENCRYPTION_KEY` (Base64 32바이트)
 
 ### Spring Security Filter 이중 등록 방지
 - `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
@@ -96,16 +97,16 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `BaseAuditEntity` 같은 공통 엔티티 부모에 직접 `@Getter @Setter(AccessLevel.PACKAGE)` 추가 필요
 
 ### Supabase JWT 인증 (ECC P-256 방식)
-- Supabase가 HS256(공유 시크릿) → ECC P-256(비대칭키)으로 전환됨 — `SUPABASE_JWT_SECRET` 더 이상 사용 안 함
-- 인증 방식: `NimbusJwtDecoder.withJwkSetUri(jwksUri)` — JWKS 자동 패치·캐시·키 갱신 처리
-- **`withJwkSetUri()` 기본 알고리즘은 RS256** — Supabase가 ES256 사용하므로 반드시 `.jwsAlgorithm(SignatureAlgorithm.ES256)` 명시 (`JwtDecoderConfig.java` 참고)
+- Supabase(로컬 포함)는 ES256(ECC P-256)으로 JWT 서명 — `SUPABASE_JWT_SECRET`(HS256) 더 이상 사용 안 함
 - JWT 검증 실패 시 `SupabaseJwtFilter`가 `log.warn`으로 기록 — Render 로그에서 원인 확인 가능
-- JWKS URI: `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (kista: `nnpchirdkaxvdybhqzct`)
-- `NimbusJwtDecoder.withJwkSetUri("")` (빈 문자열)는 bean 생성 시점에 `MalformedURLException` 즉시 발생 — 빈 기본값 금지
-- profile별 `JwtDecoder` 빈: `@Profile("local | test")` → HS256, `@Profile("!(local | test)")` → JWKS (SpEL OR/NOT 지원)
+- JWKS URI(prod): `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (kista: `nnpchirdkaxvdybhqzct`)
+- `NimbusJwtDecoder.withJwkSetUri("")` (빈 문자열)는 bean 생성 시점에 `MalformedURLException` 즉시 발생 — `${SUPABASE_JWKS_URI:}` 빈 기본값 필수
+- profile별 `JwtDecoder` 빈: `@Profile("local | test")` → 인-메모리 ECKey JWKSet, `@Profile("!(local | test)")` → JWKS URI (SpEL OR/NOT 지원)
+- **로컬·test 인-메모리 방식**: `supabase.signing-jwk`(EC 전체 JWK JSON) → `ECKey.parse()` → `NimbusJwtDecoder(DefaultJWTProcessor)` — JWKS 엔드포인트 호출 없음
+- 로컬 Supabase gotrue v2.188.1+는 `GOTRUE_JWT_KEYS`에 EC 키로 ES256 서명 — `signing-jwk` 값이 이 키페어와 일치해야 dev-token·실제 토큰 모두 검증됨
 - **`JwtDecoder` @Bean은 반드시 `JwtDecoderConfig.java`에 분리** — `SecurityConfig`에 두면 `SupabaseJwtFilter` 순환 참조로 `APPLICATION FAILED TO START`
-- 로컬 HS256 유지 이유: `DevAuthController`가 HS256으로 dev-token 생성 — JWKS로 변경 시 dev-token이 401 → **로컬만 HS256이 맞음, JWKS로 통일 금지**
-- 의존성: `spring-boot-starter-oauth2-resource-server` 추가 필요 (`NimbusJwtDecoder` 포함)
+- **`withJwkSetUri()` 기본 알고리즘은 RS256** — prod 빈에 반드시 `.jwsAlgorithm(SignatureAlgorithm.ES256)` 명시
+- 의존성: `spring-boot-starter-oauth2-resource-server` 추가 필요 (`NimbusJwtDecoder`, `nimbus-jose-jwt` 포함)
 
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것
