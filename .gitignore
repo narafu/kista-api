@@ -46,3 +46,9 @@ docker-compose.override.yml
 
 # mcp
 .mcp.json
+
+# Node.js 의존성 폴더
+node_modules/
+
+#supabase 로컬 상태 및 데이터
+.supabase/
