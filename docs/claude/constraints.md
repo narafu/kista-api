@@ -62,10 +62,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
 - 로컬에서 `curl .../sendMessage` 테스트 시 VPN 필요
 - 로컬 Docker에서 Telegram 인바운드(버튼 클릭 callback_query) 동작 불가 — Telegram 서버가 localhost 미접근
-- 로컬 승인 방법: ① DB에서 UUID 확인 `docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "SELECT id, nickname, status FROM users ORDER BY created_at DESC LIMIT 5;"` ② 아래 curl 실행
-- callback_query 시뮬레이션: `curl -s -X POST http://localhost:8080/telegram/webhook -H "Content-Type: application/json" -d '{"callback_query":{"id":"test123","data":"approve:<UUID>","message":{"chat":{"id":<CHAT_ID>}}}}'`
-- `<CHAT_ID>`는 `.env`의 `TELEGRAM_CHAT_ID` 값 사용
-- `answerCallbackQuery 실패` 에러는 가짜 callback ID 사용 시 정상 발생 — 승인 로직 자체는 실행됨
+- 로컬 승인 방법: `POST /api/auth/dev-approve/{userId}` (`DevAuthController`, `@Profile("local")` 전용)
+  - `curl -s -X POST http://localhost:8080/api/auth/dev-approve/<UUID>`
+  - UUID 확인: `docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "SELECT id, nickname, status FROM users ORDER BY created_at DESC LIMIT 5;"`
 
 ### Lombok 패턴
 - `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지

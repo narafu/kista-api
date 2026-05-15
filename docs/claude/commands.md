@@ -65,7 +65,7 @@ bash gradlew test --tests 'com.kista.domain.*' --no-daemon
 wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew bootJar"   # build/libs/app.jar 생성
 
 # 초기 환경 설정
-cp .env.example .env                          # 환경변수 파일 복사 후 값 입력 필요
+cp ..env.example ..env                          # 환경변수 파일 복사 후 값 입력 필요
 
 # 테스트
 wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test"                              # 전체 테스트 (병렬 실행)
@@ -113,7 +113,7 @@ git remote set-url origin git@github.com:narafu/kista-api.git
 docker stop kis-trade-mcp && docker rm kis-trade-mcp
 docker build -t kis-trade-mcp:latest ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP
 docker run -d -p 3001:3000 --name kis-trade-mcp \
-  --env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/.env.live \
+  --.env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/..env.live \
   -e KIS_APP_KEY=<kista .env의 KIS_APP_KEY> \
   -e "KIS_APP_SECRET=<kista .env의 KIS_APP_SECRET>" \
   -e KIS_HTS_ID=<kista .env의 KIS_HTS_ID> \
