@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TelegramWebhookControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockBean JwtDecoder jwtDecoder; // SupabaseJwtFilter 의존성 — 실제 JWKS 호출 방지
+    @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean TelegramBotService botService;
 
     @Test

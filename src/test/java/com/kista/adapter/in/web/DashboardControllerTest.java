@@ -42,7 +42,7 @@ class DashboardControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
-    @MockBean JwtDecoder jwtDecoder; // SupabaseJwtFilter 의존성 — 실제 JWKS 호출 방지
+    @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean GetTradeHistoryUseCase getTradeHistoryUseCase;
     @MockBean GetPortfolioUseCase getPortfolioUseCase;
     @MockBean ExecuteFidaOrderUseCase executeFidaOrderUseCase;

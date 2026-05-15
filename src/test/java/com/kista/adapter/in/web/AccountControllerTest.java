@@ -29,7 +29,7 @@ class AccountControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockBean JwtDecoder jwtDecoder; // SupabaseJwtFilter 의존성 — 실제 JWKS 호출 방지
+    @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean RegisterAccountUseCase registerAccount;
     @MockBean UpdateAccountUseCase updateAccount;
     @MockBean DeleteAccountUseCase deleteAccount;
@@ -40,7 +40,7 @@ class AccountControllerTest {
     private final UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
-    // SupabaseJwtFilter와 동일하게 principal을 UUID로 설정
+    // JwtAuthFilter와 동일하게 principal을 UUID로 설정
     private UsernamePasswordAuthenticationToken mockAuth() {
         return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
     }
