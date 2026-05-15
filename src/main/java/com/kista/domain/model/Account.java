@@ -11,7 +11,7 @@ public record Account(
         String kisAppKey,           // KIS App Key (복호화된 값)
         String kisSecretKey,        // KIS Secret Key (복호화된 값)
         String kisAccountType,      // 계좌 상품 코드 (기본: 01)
-        Strategy strategy,          // 매매 전략
+        StrategyType strategyType,          // 매매 전략
         StrategyStatus strategyStatus, // 전략 실행 상태
         String telegramBotToken,    // 계좌별 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
         String telegramChatId,      // 계좌별 텔레그램 Chat ID (null 가능)

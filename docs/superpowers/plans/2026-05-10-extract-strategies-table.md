@@ -86,7 +86,7 @@ git commit -m "chore: V11 마이그레이션 - strategies 테이블 분리"
 ```java
 package com.kista.adapter.out.persistence;
 
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -172,7 +172,7 @@ git commit -m "feat: StrategyEntity + StrategyJpaRepository 추가"
 
 ```java
 // 삭제할 import
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -231,7 +231,7 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.Account;
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

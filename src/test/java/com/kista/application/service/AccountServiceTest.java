@@ -1,10 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.Strategy;
-import com.kista.domain.model.StrategyStatus;
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.*;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
@@ -42,14 +38,14 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 null, null, "SOXL", "AMS", Instant.now(), Instant.now());
     }
 
     private Account pausedAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                Strategy.INFINITE, StrategyStatus.PAUSED,
+                StrategyType.INFINITE, StrategyStatus.PAUSED,
                 null, null, "SOXL", "AMS", Instant.now(), Instant.now());
     }
 
@@ -61,7 +57,7 @@ class AccountServiceTest {
     private RegisterAccountUseCase.Command registerCmd() {
         return new RegisterAccountUseCase.Command(
                 "테스트계좌", "74420614", "appKey", "appSecret",
-                "01", Strategy.INFINITE, null, null, "SOXL", "AMS"
+                "01", StrategyType.INFINITE, null, null, "SOXL", "AMS"
         );
     }
 
@@ -73,13 +69,13 @@ class AccountServiceTest {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
-                    a.kisAccountType(), a.strategy(), a.strategyStatus(),
+                    a.kisAccountType(), a.strategyType(), a.strategyStatus(),
                     null, null, a.symbol(), a.exchangeCode(), a.createdAt(), a.updatedAt());
         });
 
         Account result = accountService.register(userId, registerCmd());
 
-        assertThat(result.strategy()).isEqualTo(Strategy.INFINITE);
+        assertThat(result.strategyType()).isEqualTo(StrategyType.INFINITE);
         assertThat(result.strategyStatus()).isEqualTo(StrategyStatus.ACTIVE);
         verify(accountRepository).save(any());
     }

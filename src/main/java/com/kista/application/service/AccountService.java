@@ -43,7 +43,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
-                cmd.strategy(), StrategyStatus.ACTIVE,
+                cmd.strategyType(), StrategyStatus.ACTIVE,
                 cmd.telegramBotToken(), cmd.telegramChatId(),
                 cmd.symbol() != null ? cmd.symbol() : "SOXL",
                 cmd.exchangeCode() != null ? cmd.exchangeCode() : "AMS",
@@ -65,7 +65,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.accountNo(), // 계좌번호 변경 불가 (보안상)
                 cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
-                account.kisAccountType(), account.strategy(), account.strategyStatus(),
+                account.kisAccountType(), account.strategyType(), account.strategyStatus(),
                 cmd.telegramBotToken(), cmd.telegramChatId(),
                 cmd.symbol() != null ? cmd.symbol() : account.symbol(),
                 cmd.exchangeCode() != null ? cmd.exchangeCode() : account.exchangeCode(),
@@ -136,7 +136,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     private Account withStrategyStatus(Account account, StrategyStatus status) {
         return new Account(account.id(), account.userId(), account.nickname(),
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
-                account.kisAccountType(), account.strategy(), status,
+                account.kisAccountType(), account.strategyType(), status,
                 account.telegramBotToken(), account.telegramChatId(),
                 account.symbol(), account.exchangeCode(),
                 account.createdAt(), null);
