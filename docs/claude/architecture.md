@@ -54,7 +54,7 @@ domain      →  외부 의존 없음
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지
-- `SupabaseJwtFilter`: principal을 `UUID` 타입으로 저장 (`String` 아님)
+- `JwtAuthFilter`: principal을 `UUID` 타입으로 저장 (`String` 아님)
 
 ### JPA Auditing
 - `BaseAuditEntity` (`@MappedSuperclass`): `UserEntity`, `AccountEntity`가 상속 — `@CreatedDate`/`@LastModifiedDate`로 `createdAt`/`updatedAt` 자동 관리
