@@ -53,13 +53,13 @@ public class AccountPersistenceAdapter implements AccountRepository {
             // 신규 계좌 - strategy 생성
             strategyEntity = new StrategyEntity();
             strategyEntity.setAccountId(saved.getId());
-            strategyEntity.setType(account.strategy());
+            strategyEntity.setType(account.strategyType());
             strategyEntity.setStatus(account.strategyStatus());
         } else {
             // 기존 계좌 - strategy type/status 업데이트
             strategyEntity = strategyJpaRepository
                     .findByAccountId(account.id()).orElseThrow();
-            strategyEntity.setType(account.strategy());
+            strategyEntity.setType(account.strategyType());
             strategyEntity.setStatus(account.strategyStatus());
         }
         strategyJpaRepository.save(strategyEntity);

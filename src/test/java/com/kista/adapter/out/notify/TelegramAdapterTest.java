@@ -132,7 +132,7 @@ class TelegramAdapterTest {
                 null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
                 "74420614", "key", "secret", "01",
-                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 null, null, "SOXL", "AMS", Instant.now(), Instant.now());
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -150,7 +150,7 @@ class TelegramAdapterTest {
                 null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
-                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 "account-bot-token", "account-chat-456", "SOXL", "AMS", Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)
@@ -183,7 +183,7 @@ class TelegramAdapterTest {
                 "user-bot-token", "user-chat-789", Instant.now(), Instant.now(), null);
         Account accountNoBot = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
-                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 null, null, "SOXL", "AMS", Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)
@@ -212,7 +212,7 @@ class TelegramAdapterTest {
                 null, null, Instant.now(), Instant.now(), null);
         Account accountNoBot = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
                 "74420614", "key", "secret", "01",
-                Strategy.INFINITE, StrategyStatus.ACTIVE,
+                StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 null, null, "SOXL", "AMS", Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)

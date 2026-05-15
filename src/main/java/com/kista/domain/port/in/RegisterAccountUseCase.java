@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.Account;
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 
 import java.util.UUID;
 
@@ -14,7 +14,7 @@ public interface RegisterAccountUseCase {
             String kisAppKey,       // 평문
             String kisSecretKey,    // 평문
             String kisAccountType,  // 기본값 "01"
-            Strategy strategy,
+            StrategyType strategyType,
             String telegramBotToken, // null 가능
             String telegramChatId,   // null 가능
             String symbol,           // 거래 종목 (기본값 "SOXL")

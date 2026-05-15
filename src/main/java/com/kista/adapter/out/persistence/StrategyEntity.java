@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence;
 
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -30,7 +30,7 @@ class StrategyEntity extends BaseAuditEntity {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "type", nullable = false, length = 20)
-    private Strategy type; // 매매 전략 종류 (INFINITE, PRIVACY)
+    private StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

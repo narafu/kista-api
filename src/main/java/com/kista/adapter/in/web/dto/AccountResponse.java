@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.Account;
-import com.kista.domain.model.Strategy;
+import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
 
 import java.util.UUID;
@@ -10,7 +10,7 @@ public record AccountResponse(
         UUID id,
         String nickname,
         String accountNoMasked,   // 마지막 4자리만 노출 (예: ****1234)
-        Strategy strategy,
+        StrategyType strategyType,
         StrategyStatus strategyStatus,
         boolean hasTelegram,
         String symbol,            // 거래 종목 코드
@@ -21,7 +21,7 @@ public record AccountResponse(
                 a.id(),
                 a.nickname(),
                 maskAccountNo(a.accountNo()),
-                a.strategy(),
+                a.strategyType(),
                 a.strategyStatus(),
                 a.telegramChatId() != null,
                 a.symbol(),
