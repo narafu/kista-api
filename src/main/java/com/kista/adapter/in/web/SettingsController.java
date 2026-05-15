@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
+import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,13 @@ import java.util.UUID;
 public class SettingsController {
 
     private final UpdateUserTelegramUseCase updateUserTelegram;
+    private final GetUserUseCase getUser;
+
+    // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
+    @GetMapping("/telegram")
+    public TelegramSettingsResponse getTelegram(@AuthenticationPrincipal UUID userId) {
+        return TelegramSettingsResponse.from(getUser.getById(userId));
+    }
 
     // 텔레그램 봇 설정 (botToken, chatId 저장)
     @PutMapping("/telegram")

@@ -4,6 +4,7 @@ import com.kista.domain.model.StrategyType;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record AccountRequest(
         @NotBlank String nickname,
@@ -11,7 +12,7 @@ public record AccountRequest(
         String kisAppKey,        // 등록 시 필수
         String kisSecretKey,     // 등록 시 필수
         String kisAccountType,   // 기본값 "01"
-        StrategyType strategyType,       // 등록 시 필수
+        @NotNull StrategyType strategyType, // 등록 시 필수 (INFINITE or PRIVACY)
         String telegramBotToken, // optional
         String telegramChatId,   // optional
         String symbol,           // 거래 종목 (기본값 "SOXL")

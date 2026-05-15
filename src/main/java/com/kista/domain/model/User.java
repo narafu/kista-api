@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record User(
-        UUID id,                    // Supabase Auth UID와 동기화
+        UUID id,                    // 카카오 OAuth UID (앱에서 할당)
         String kakaoId,             // 카카오 고유 ID
         String nickname,            // 카카오 닉네임
         UserStatus status,          // 계정 상태

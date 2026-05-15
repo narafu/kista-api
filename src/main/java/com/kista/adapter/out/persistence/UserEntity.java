@@ -15,7 +15,7 @@ class UserEntity extends BaseAuditEntity {
 
     @Id
     @Column(columnDefinition = "UUID")
-    private UUID id; // Supabase Auth UID — DB가 아닌 앱에서 할당
+    private UUID id; // 카카오 OAuth UID — DB가 아닌 앱에서 할당
 
     @Column(name = "kakao_id", nullable = false, unique = true, length = 50)
     private String kakaoId;
