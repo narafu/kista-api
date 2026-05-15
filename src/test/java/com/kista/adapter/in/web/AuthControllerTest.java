@@ -1,10 +1,11 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.RegisterUserUseCase;
+import com.kista.domain.port.in.KakaoLoginUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -35,10 +36,11 @@ class AuthControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockBean ApproveUserUseCase approveUser;
-    @MockBean RegisterUserUseCase registerUser;
     @MockBean GetUserUseCase getUser;
     @MockBean SseEmitterRegistry sseEmitterRegistry;
-    @MockBean JwtDecoder jwtDecoder; // profile-conditional bean — WebMvcTest에서 명시 필요
+    @MockBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
+    @MockBean KakaoLoginUseCase kakaoLoginUseCase; // 카카오 로그인 유스케이스
+    @MockBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
