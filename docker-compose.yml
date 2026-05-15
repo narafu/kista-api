@@ -1,4 +1,18 @@
 services:
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: kistadb
+      POSTGRES_USER: kista
+      POSTGRES_PASSWORD: kista
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kista-api-net
+
   # ── Application ──────────────────────────────────────────────────────────────
   app:
     build: .
@@ -19,7 +33,6 @@ services:
     restart: unless-stopped
     networks:
       - kista-api-net
-      - supabase_network
 
   # ── Prometheus ────────────────────────────────────────────────────────────────
   prometheus:
@@ -53,12 +66,10 @@ services:
       - kista-api-net
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:
 
 networks:
   kista-api-net:
     driver: bridge
-  supabase_network:
-    external: true
-    name: supabase_network_kista-api

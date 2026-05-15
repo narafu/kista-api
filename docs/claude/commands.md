@@ -22,7 +22,7 @@ curl https://kista-api.onrender.com/actuator/health
 
 ### Git 구조 (Claude Code 세션 필수 지식)
 # kista-api와 kista-ui는 각각 독립 git 저장소 — 루트 /kista에는 git 없음
-# 커밋 전 author 설정 필요: git config user.email "wheatal123@gmail.com" && git config user.name "Kista Developer"
+# 커밋 전 author 확인 필수: git config user.name (올바른 값: narafu), git config user.email (올바른 값: narafu@kakao.com) — 글로벌 config 자동 적용됨, 별도 설정 불필요
 # application-local.yml은 .gitignore에 포함 — git add 불가, Edit 도구로 직접 수정
 
 ### Claude Code 웹 앱 (claude.ai/code) WSL2 내부 환경 전용

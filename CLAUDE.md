@@ -5,6 +5,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 
 ## Git 규칙
 - `git push`는 사용자가 명시적으로 요청한 경우에만 실행 — 커밋 후 자동 푸시 금지
+- 커밋 전 `git config user.name` / `git config user.email` 확인 — 올바른 author: `narafu <narafu@kakao.com>`
 
 @docs/claude/commands.md
 @docs/claude/architecture.md
