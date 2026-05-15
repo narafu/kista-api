@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public interface RegisterUserUseCase {
     // 카카오 로그인 후 신규 가입(PENDING) 또는 기존 사용자 조회
-    User register(String kakaoId, String nickname, UUID supabaseUid);
+    User register(String kakaoId, String nickname, UUID userId);
 }
