@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +29,13 @@ public class DevAuthController {
     private final RegisterUserUseCase registerUser;
     private final ApproveUserUseCase  approveUser;
     private final JwtIssuerService    jwtIssuerService; // 자체 발급 ES256 JWT
+
+    @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용")
+    @SecurityRequirements
+    @PostMapping("/dev-approve/{userId}")
+    public void devApprove(@PathVariable UUID userId) {
+        approveUser.approve(userId);
+    }
 
     @Operation(summary = "[DEV] 개발용 JWT 토큰 발급 — 로컬 프로파일 전용")
     @SecurityRequirements // 자물쇠 아이콘 제거 (인증 없이 호출 가능)
