@@ -25,7 +25,7 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins; // 쉼표 구분 허용 origin 목록 (ex: https://kista-ui.vercel.app)
 
-    private final SupabaseJwtFilter jwtFilter;
+    private final JwtAuthFilter jwtFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -58,10 +58,10 @@ public class SecurityConfig {
         return source;
     }
 
-    // SupabaseJwtFilter가 서블릿 필터 체인에 중복 등록되지 않도록 비활성화
+    // JwtAuthFilter가 서블릿 필터 체인에 중복 등록되지 않도록 비활성화
     @Bean
-    public FilterRegistrationBean<SupabaseJwtFilter> jwtFilterRegistration(SupabaseJwtFilter filter) {
-        FilterRegistrationBean<SupabaseJwtFilter> registration = new FilterRegistrationBean<>(filter);
+    public FilterRegistrationBean<JwtAuthFilter> jwtFilterRegistration(JwtAuthFilter filter) {
+        FilterRegistrationBean<JwtAuthFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
