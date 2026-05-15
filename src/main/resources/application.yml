@@ -71,8 +71,12 @@ telegram:
 crypto:
   aes-key: ${AES_ENCRYPTION_KEY}
 
-supabase:
-  jwks-uri: ${SUPABASE_JWKS_URI:}
+jwt:
+  signing-key: ${JWT_SIGNING_KEY}
+
+kakao:
+  client-id: ${KAKAO_CLIENT_ID}
+  client-secret: ${KAKAO_CLIENT_SECRET:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
