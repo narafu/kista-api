@@ -21,7 +21,7 @@
 ### PostgreSQL 네이티브 ENUM 타입 매핑
 - Flyway가 `user_status`, `strategy_type`, `strategy_status`를 PostgreSQL 네이티브 ENUM으로 생성 (`CREATE TYPE ... AS ENUM`)
 - Hibernate 6+의 `@Enumerated(EnumType.STRING)` 단독 사용 시 varchar로 바인딩 → `column "status" is of type user_status but expression is of type character varying` 오류
-- 반드시 `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 병기 필요 (`UserEntity.status`, `AccountEntity.strategy/strategyStatus`에 이미 적용됨)
+- 반드시 `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 병기 필요 (`UserEntity.status`, `StrategyEntity.type/status`에 이미 적용됨)
 - VARCHAR 컬럼 ENUM(예: `TradeHistoryEntity`)은 해당 없음 — 네이티브 ENUM 컬럼에만 필요
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
@@ -47,7 +47,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V12__add_last_reapplied_at_to_users.sql` (users.last_reapplied_at 추가)
+- 현재 최신: `V13__create_planned_orders.sql` (planned_orders 테이블 추가)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성
