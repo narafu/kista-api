@@ -20,9 +20,14 @@ curl https://kista-api.onrender.com/actuator/health
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
 ```
 
+### Git 구조 (Claude Code 세션 필수 지식)
+# kista-api와 kista-ui는 각각 독립 git 저장소 — 루트 /kista에는 git 없음
+# 커밋 전 author 설정 필요: git config user.email "wheatal123@gmail.com" && git config user.name "Kista Developer"
+# application-local.yml은 .gitignore에 포함 — git add 불가, Edit 도구로 직접 수정
+
 ### Claude Code 웹 앱 (claude.ai/code) WSL2 내부 환경 전용
 # 이 Claude Code 세션은 이미 WSL2 내부 → `wsl -d Ubuntu bash -c ...` 명령어 사용 불가
-# Java 기본 미설치 — /tmp/jdk-21.0.5+11/ 에 JDK 캐시됨 (재부팅 시 소멸)
+# Java 기본 미설치 — /tmp/jdk-21.0.5+11/ 에 JDK 캐시됨 (재부팅 시 소멸, 세션마다 확인 필요)
 # JDK 없으면 재다운로드:
 # curl -L "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz" | tar -xz -C /tmp/
 #
@@ -36,9 +41,9 @@ curl https://kista-api.onrender.com/actuator/health
 # cp /mnt/d/src/study/kista/kista-api/gradle/libs.versions.toml /home/user/workspace/kista/gradle/
 # Gradle 실행 (JAVA_HOME 명시 필수):
 # JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
-#   bash /home/user/workspace/kista/gradlew compileJava --no-daemon -p /home/user/workspace/kista
+#   bash /home/user/workspace/kista/kista-api/gradlew compileJava --no-daemon -p /home/user/workspace/kista/kista-api
 # JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
-#   bash /home/user/workspace/kista/gradlew test --tests 'com.kista.architecture.*' --no-daemon -p /home/user/workspace/kista
+#   bash /home/user/workspace/kista/kista-api/gradlew test --tests 'com.kista.architecture.*' --no-daemon -p /home/user/workspace/kista/kista-api
 
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
 # WSL Ubuntu에 Java가 없어도 Git Bash에서 `bash gradlew ...` 직접 실행 가능
