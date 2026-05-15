@@ -34,3 +34,12 @@
 - 원인: `lombok.config`가 `src/`·`gradle/` 외부에 있어 Docker 빌드 시 Lombok이 `@Value` 전파 불가
 - 현재 Dockerfile: `COPY gradlew settings.gradle.kts build.gradle.kts lombok.config ./` 로 이미 수정됨
 - 새 루트 설정 파일 추가 시 동일하게 COPY 라인에 포함할 것
+
+### WSL Docker Desktop Integration 미활성화 시 우회 방법
+- 증상: `The command 'docker' could not be found in this WSL 2 distro.`
+- 원인: Docker Desktop → Settings → Resources → WSL Integration이 Ubuntu distro에 비활성화
+- 직접 해결 (Docker Desktop 설정 없이): `~/.local/bin/docker` 래퍼 스크립트로 PowerShell 경유 실행 (이미 설치됨)
+  - `~/.local/bin`은 `~/.zshrc`에서 이미 PATH 포함 — 스크립트 생성 즉시 사용 가능
+  - 핵심: `wslpath -w "$(pwd)"` 로 WSL 경로 → Windows UNC 경로 변환 후 PowerShell `Set-Location` 으로 이동
+  - Docker context: `desktop-windows`(기본) 대신 `--context desktop-linux` 지정 필수 (`docker context ls` 로 확인)
+- `docker-compose.yml` Supabase 잔재 제거 완료: `supabase_network_kista-api` 외부 네트워크 삭제, `postgres:16` 서비스 추가 (kistadb/kista/kista, 포트 5432)
