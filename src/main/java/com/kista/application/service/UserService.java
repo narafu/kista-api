@@ -33,13 +33,13 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
 
     @Override
-    public User register(String kakaoId, String nickname, UUID supabaseUid) {
+    public User register(String kakaoId, String nickname, UUID userId) {
         // 기존 사용자면 반환, 신규이면 PENDING 저장 + 관리자 알림
         return userRepository.findByKakaoId(kakaoId).orElseGet(() -> {
-            User newUser = new User(supabaseUid, kakaoId, nickname, UserStatus.PENDING,
+            User newUser = new User(userId, kakaoId, nickname, UserStatus.PENDING,
                     null, null, null, null, null);
             User saved = userRepository.save(newUser);
-            log.info("신규 사용자 등록: kakaoId={}, uid={}", kakaoId, supabaseUid);
+            log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
             eventPublisher.publishEvent(new NewUserRegisteredEvent(saved));
             return saved;
