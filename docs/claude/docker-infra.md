@@ -10,12 +10,6 @@
 - GHCR 불필요 — Render가 GitHub 레포에서 Dockerfile 직접 빌드·배포
 - `main` push 시 자동 배포, 환경변수 변경 시 자동 재배포 트리거됨
 
-### Supabase 연결 (Render → Supabase)
-- 반드시 포트 **6543** (PgBouncer Transaction Mode Pooler) 사용
-- JDBC URL에 `?pgbouncer=true&prepareThreshold=0` 필수 — 없으면 prepared statement 오류
-- `DB_USERNAME` 형식: `postgres.<project-ref>` (일반 `postgres` 아님)
-- Spring Boot 첫 기동 시 Flyway + 네트워크 레이턴시로 ~140초 소요 — `HEALTHCHECK --start-period=180s` 권장
-
 ### Docker 빌드 OOM
 - `gradle.properties`는 Dockerfile에 복사되지 않음 — JVM이 컨테이너 메모리 ~25%를 힙으로 자동 할당해 BuildKit OOM 유발
 - 증상: `docker compose up` 빌드 중 `failed to receive status: ... error reading from server: EOF`
@@ -23,8 +17,9 @@
 
 ### 로컬 Docker Compose 환경변수 주입 방식
 - `.env`는 `${VAR}` 치환용 — 컨테이너에 직접 주입되지 않음, `environment:` 섹션에 명시된 것만 주입됨
-- `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 Supabase URL 무시됨
+- `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 DB_URL 무시됨
 - 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `JWT_SIGNING_KEY`(JWT 검증) — **빈 문자열로 주입 시 기동 불가** (`AesCryptoService: Empty key`), `.env`에 반드시 실제 값 설정
+- `.env` DB 자격증명은 docker-compose postgres 계정과 반드시 일치: `DB_USERNAME=kista` / `DB_PASSWORD=kista` (`postgres`/`postgres` 아님) — 불일치 시 `FATAL: password authentication failed for user "postgres"`
 
 ### 로컬 포트 할당
 - Grafana: `3030:3000` (호스트 3030 → 컨테이너 내부 3000) — `3030:3030`은 동작 안 함, kista-ui와 3000 충돌 방지
@@ -42,4 +37,4 @@
   - `~/.local/bin`은 `~/.zshrc`에서 이미 PATH 포함 — 스크립트 생성 즉시 사용 가능
   - 핵심: `wslpath -w "$(pwd)"` 로 WSL 경로 → Windows UNC 경로 변환 후 PowerShell `Set-Location` 으로 이동
   - Docker context: `desktop-windows`(기본) 대신 `--context desktop-linux` 지정 필수 (`docker context ls` 로 확인)
-- `docker-compose.yml` Supabase 잔재 제거 완료: `supabase_network_kista-api` 외부 네트워크 삭제, `postgres:16` 서비스 추가 (kistadb/kista/kista, 포트 5432)
+- `docker-compose.yml`: `postgres:16` 서비스 (kistadb/kista/kista, 포트 5432)

@@ -8,6 +8,7 @@ import com.kista.domain.port.in.PauseStrategyUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.ResumeStrategyUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -42,7 +43,7 @@ public class AccountController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
-                                    @RequestBody AccountRequest request) {
+                                    @Valid @RequestBody AccountRequest request) {
         try {
             return AccountResponse.from(
                     registerAccount.register(userId, request.toRegisterCommand())

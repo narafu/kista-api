@@ -6,7 +6,7 @@
 - `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
   - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
   - dev-token 서명: `jwt.signing-key`(application-local.yml, gitignored) EC 개인키로 ES256 서명 — JwtIssuerService 사용
-  - 카카오 OAuth 직접 처리 — Supabase 미사용
+  - 카카오 OAuth 직접 처리
 
 ### Virtual Thread
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
@@ -16,7 +16,7 @@
 - 멀티계좌 순차 실행: `AccountRepository.findAllActive()` → 계좌별 `execute(Account, User)` — 한 계좌 실패 시 다음 계좌 계속 (격리)
 
 ### JPA 설정
-- `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, Supabase PgBouncer Transaction Mode에서 트랜잭션 외부 커넥션 점유 방지
+- `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
 
 ### PostgreSQL 네이티브 ENUM 타입 매핑
 - Flyway가 `user_status`, `strategy_type`, `strategy_status`를 PostgreSQL 네이티브 ENUM으로 생성 (`CREATE TYPE ... AS ENUM`)
@@ -61,7 +61,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
 - 로컬에서 `curl .../sendMessage` 테스트 시 VPN 필요
 - 로컬 Docker에서 Telegram 인바운드(버튼 클릭 callback_query) 동작 불가 — Telegram 서버가 localhost 미접근
+- 로컬 승인 방법: ① DB에서 UUID 확인 `docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "SELECT id, nickname, status FROM users ORDER BY created_at DESC LIMIT 5;"` ② 아래 curl 실행
 - callback_query 시뮬레이션: `curl -s -X POST http://localhost:8080/telegram/webhook -H "Content-Type: application/json" -d '{"callback_query":{"id":"test123","data":"approve:<UUID>","message":{"chat":{"id":<CHAT_ID>}}}}'`
+- `<CHAT_ID>`는 `.env`의 `TELEGRAM_CHAT_ID` 값 사용
 - `answerCallbackQuery 실패` 에러는 가짜 callback ID 사용 시 정상 발생 — 승인 로직 자체는 실행됨
 
 ### Lombok 패턴
@@ -96,7 +98,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `@MappedSuperclass` 부모 클래스 필드의 getter/setter는 서브클래스의 `@Getter`/`@Setter`로 생성되지 않음
 - `BaseAuditEntity` 같은 공통 엔티티 부모에 직접 `@Getter @Setter(AccessLevel.PACKAGE)` 추가 필요
 
-### 자체 JWT 인증 (ECC P-256, Supabase 완전 제거됨)
+### 자체 JWT 인증 (ECC P-256)
 - `JwtIssuerService`: `jwt.signing-key` EC P-256 JWK로 ES256 JWT 발급 (TTL: 7일 = 604_800_000ms)
 - `JwtAuthFilter`: Bearer 토큰 추출 → `JwtDecoder`(NimbusJwtDecoder) 검증 → principal UUID 설정 (log.warn 실패 시)
 - `JwtDecoderConfig`: 단일 빈, 프로파일 분기 없음 — `${jwt.signing-key}` 공개키만으로 검증
