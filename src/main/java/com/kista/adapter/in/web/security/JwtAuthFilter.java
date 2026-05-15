@@ -21,9 +21,8 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class SupabaseJwtFilter extends OncePerRequestFilter {
+public class JwtAuthFilter extends OncePerRequestFilter {
 
-    // SecurityConfig에서 profile에 따라 주입 (local: HS256, prod: ECC P-256 JWKS)
     private final JwtDecoder jwtDecoder;
 
     @Override
@@ -34,8 +33,7 @@ public class SupabaseJwtFilter extends OncePerRequestFilter {
         if (token != null) {
             try {
                 Jwt jwt = jwtDecoder.decode(token);
-                // sub 클레임 = Supabase Auth UID (UUID)
-                UUID userId = UUID.fromString(jwt.getSubject());
+                UUID userId = UUID.fromString(jwt.getSubject()); // sub 클레임 = 사용자 UUID
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(userId, null, List.of())
                 );
