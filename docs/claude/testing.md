@@ -22,7 +22,7 @@
 - `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용
 - `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건(LOC매수×2 + LOC매도 + 지정가매도) — `kisOrderPort.place(order, account)` 호출 횟수 주의 (V2: Account 파라미터)
 - `TelegramAdapterTest`는 `new TradingVariables(...)` 생성자를 하드코딩 — `TradingVariables` 필드 추가 시 해당 테스트도 반드시 수정
-- `AccountBalance` 생성자 직접 사용: `SoxlDivisionStrategyTest`, `TelegramAdapterTest`, `TradingServiceTest` — 필드 변경 시 3개 모두 수정
+- `AccountBalance` 생성자 직접 사용: `SoxlDivisionStrategyTypeTest`, `TelegramAdapterTest`, `TradingServiceTest` — 필드 변경 시 3개 모두 수정
 
 ### 테스트 DB
 
@@ -33,6 +33,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
 `application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
+- DB 연결 필요 통합 테스트: `PortfolioSnapshotPersistenceAdapterTest`, `TradeHistoryPersistenceAdapterTest` — Docker Desktop 미실행 시 `java.net.ConnectException` 실패
 
 ### SoxlDivisionStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`

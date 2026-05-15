@@ -43,6 +43,10 @@ curl https://kista-api.onrender.com/actuator/health
 ### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
 # WSL Ubuntu에 Java가 없어도 Git Bash에서 `bash gradlew ...` 직접 실행 가능
 # — Gradle toolchain이 JDK 21을 ~/.gradle/jdks/에 자동 다운로드 (첫 실행 ~30초)
+# WSL workspace(/home/user/workspace/kista)가 없어도 Git Bash에서 바로 실행됨:
+bash gradlew compileTestJava --no-daemon
+bash gradlew test --no-daemon
+bash gradlew test --tests 'com.kista.domain.*' --no-daemon
 # WSL 래퍼는 WSL 내 Java가 설치된 경우에만 필요
 # wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"
 # wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.SomeTest'"
