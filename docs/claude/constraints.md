@@ -5,6 +5,7 @@
 - `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
 - `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
   - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
+  - 응답 JSON: `{"accessToken":"...","tokenType":"bearer","expiresIn":604800}` — 필드명 `accessToken` (`token` 아님)
   - dev-token 서명: `jwt.signing-key`(application-local.yml, gitignored) EC 개인키로 ES256 서명 — JwtIssuerService 사용
   - 카카오 OAuth 직접 처리
 
@@ -143,3 +144,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### ArchUnit 규칙 예외 (adapter.out)
 - `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용
 - TelegramAdapter(adapter.out)에서 NewUserRegisteredEvent(application.service) 참조 가능
+
+### 공유 DTO @Valid 제약
+- `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)
+- register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
+- `AccountService.update()`는 strategyType을 요청이 아닌 기존 DB 값에서 읽음 — update 요청의 strategyType 무시됨

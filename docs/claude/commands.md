@@ -18,6 +18,8 @@ curl https://kista-api.onrender.com/actuator/health
 # 서비스 ID: srv-d7sir2jbc2fs73cptpm0 (kista 워크스페이스 tea-d7sbrv3rjlhs7389pr60)
 # Render MCP 로그 조회 전 반드시 먼저: mcp__render__select_workspace ownerID=tea-d7sbrv3rjlhs7389pr60
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
+# 로컬 Docker 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB) — kista-kista-api-1 아님
+# 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
 ```
 
 ### Git 구조 (Claude Code 세션 필수 지식)
