@@ -175,7 +175,7 @@ class TradingServiceTest {
 
         service.execute(ACCOUNT, USER, PAST_DST);
 
-        verify(notifyPort).notifyInsufficientBalance(LOW_BALANCE);
+        verify(notifyPort).notifyInsufficientBalance(ACCOUNT, LOW_BALANCE);
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(plannedOrderPort, never()).saveAll(any()); // 잔고 부족 시 계획 주문도 없음
         verify(tradeHistoryPort, never()).save(any());

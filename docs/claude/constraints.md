@@ -1,5 +1,10 @@
 ## 핵심 제약 사항
 
+### symbol → exchangeCode 매핑
+- `AccountService.resolveExchangeCode(symbol)`: TQQQ→`NASD`, SOXL→`AMS`, USD→`NASD`, default→`NASD`
+- PRIVACY 전략: 항상 서버에서 SOXL 강제 (클라이언트 입력 무시) — `register()` 참고
+- INFINITE 전략: 지정 없으면 기본 TQQQ, exchangeCode는 자동 결정 (UI에서 exchangeCode 전달 불필요)
+
 ### Swagger 개발 도구
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
 - `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
