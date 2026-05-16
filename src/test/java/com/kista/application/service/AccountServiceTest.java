@@ -66,7 +66,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
-        when(kisTokenPort.testToken(any(), any())).thenReturn("mock-token"); // KIS 키 검증 통과
+        doNothing().when(kisTokenPort).testToken(any(), any()); // KIS 키 검증 통과
         when(accountRepository.countByUserId(userId)).thenReturn(0);
         when(accountRepository.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
@@ -86,7 +86,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 10개 초과 시 IllegalStateException 발생")
     void register_exceeds_limit_throws() {
-        when(kisTokenPort.testToken(any(), any())).thenReturn("mock-token"); // KIS 키 검증 통과
+        doNothing().when(kisTokenPort).testToken(any(), any()); // KIS 키 검증 통과
         when(accountRepository.countByUserId(userId)).thenReturn(10);
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
@@ -187,5 +187,24 @@ class AccountServiceTest {
 
         verify(accountRepository, never()).save(any());
         verify(notificationPort, never()).notifyStrategyChanged(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("update: kisAppKey 변경 시 testToken 호출")
+    void update_키변경시_testToken호출() {
+        // given: 기존 계좌
+        Account existing = activeAccount(userId); // appKey="appKey", appSecret="appSecret"
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(existing));
+        doNothing().when(kisTokenPort).testToken(any(), any());
+        when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when: kisAppKey만 변경
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command(
+                "새닉네임", "newAppKey", null, null, null, null
+        );
+        accountService.update(accountId, userId, cmd);
+
+        // then: 새 appKey + 기존 secretKey 조합으로 testToken 호출
+        verify(kisTokenPort).testToken("newAppKey", existing.kisSecretKey());
     }
 }
