@@ -4,6 +4,9 @@
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
 - `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
 - `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
+- `@Schema` 추가 위치: DTO (`adapter/in/web/dto/`)에만 — `domain/model/`은 ArchUnit이 막지 않아도 "외부 의존성 0" 원칙으로 금지 (StatisticsController가 반환하는 PeriodProfitResult 등 도메인 객체는 springdoc 자동 introspection에 맡김)
+- Java record에서 `@Schema`는 생성자 파라미터(필드 선언)에 직접 붙임
+- 컨트롤러 클래스에 `@Tag(name="...", description="...")` — Swagger UI 그룹 레이블
   - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
   - 응답 JSON: `{"accessToken":"...","tokenType":"bearer","expiresIn":604800}` — 필드명 `accessToken` (`token` 아님)
   - dev-token 서명: `jwt.signing-key`(application-local.yml, gitignored) EC 개인키로 ES256 서명 — JwtIssuerService 사용
