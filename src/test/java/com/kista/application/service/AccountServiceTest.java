@@ -4,6 +4,7 @@ import com.kista.domain.model.*;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.KisTokenPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,7 @@ class AccountServiceTest {
     @Mock AccountRepository accountRepository;
     @Mock UserRepository userRepository;
     @Mock UserNotificationPort notificationPort;
+    @Mock KisTokenPort kisTokenPort;
     @InjectMocks AccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -64,6 +66,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
+        when(kisTokenPort.testToken(any(), any())).thenReturn("mock-token"); // KIS 키 검증 통과
         when(accountRepository.countByUserId(userId)).thenReturn(0);
         when(accountRepository.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
@@ -83,6 +86,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 10개 초과 시 IllegalStateException 발생")
     void register_exceeds_limit_throws() {
+        when(kisTokenPort.testToken(any(), any())).thenReturn("mock-token"); // KIS 키 검증 통과
         when(accountRepository.countByUserId(userId)).thenReturn(10);
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))

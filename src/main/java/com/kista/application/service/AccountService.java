@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.Account;
+import com.kista.domain.model.InvalidKisKeyException;
 import com.kista.domain.model.StrategyStatus;
 import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.Ticker;
@@ -12,6 +13,7 @@ import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.ResumeStrategyUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.KisTokenPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +37,17 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;       // pause/resume 시 사용자 조회용
     private final UserNotificationPort notificationPort; // 관리자 알림용
+    private final KisTokenPort kisTokenPort;           // 계좌 저장 전 KIS API 키 유효성 검증용
 
     @Override
     public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
+        // KIS 키 유효성 검증 — DB 저장 전에 실제 OAuth2 토큰 발급 시도
+        try {
+            kisTokenPort.testToken(cmd.kisAppKey(), cmd.kisSecretKey());
+        } catch (Exception e) {
+            throw new InvalidKisKeyException();
+        }
+
         if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
