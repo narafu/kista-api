@@ -52,7 +52,7 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.symbol(), balance.quantity(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
-            notifyPort.notifyInsufficientBalance(balance);
+            notifyPort.notifyInsufficientBalance(account, balance);
             return;
         }
 

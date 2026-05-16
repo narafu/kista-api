@@ -47,9 +47,9 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(AccountBalance b) {
-        send(String.format("잔고 부족: SOXL %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
-                b.quantity(), b.usdDeposit()));
+    public void notifyInsufficientBalance(Account account, AccountBalance b) {
+        send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
+                account.symbol(), b.quantity(), b.usdDeposit()));
     }
 
     @Override

@@ -63,8 +63,10 @@ class TelegramAdapterTest {
         AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO,
                 new BigDecimal("5.00")); // usdDeposit=5.00
 
+        Account account = mock(Account.class);
+        when(account.symbol()).thenReturn("SOXL");
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.notifyInsufficientBalance(balance);
+        adapter.notifyInsufficientBalance(account, balance);
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         String text = bodyCaptor.getValue().get("text");
