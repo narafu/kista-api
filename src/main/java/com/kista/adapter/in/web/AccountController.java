@@ -87,6 +87,8 @@ public class AccountController {
             return AccountResponse.from(
                     updateAccount.update(id, userId, request.toUpdateCommand())
             );
+        } catch (InvalidKisKeyException e) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
