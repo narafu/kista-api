@@ -1,5 +1,10 @@
 ## 핵심 제약 사항
 
+### AES-256 암호화 컬럼 크기
+- AES-256 CBC 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
+- 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
+- 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
+
 ### Ticker enum (단일 진실 공급원)
 - `Ticker` enum: `TQQQ("NASD", 0.15)`, `SOXL("AMS", 0.20)`, `USD("NASD", 0.20)` — `exchangeCode` + `targetProfitRate` 통합 관리
 - `Account.ticker: Ticker` — 기존 `symbol: String` + `exchangeCode: String` 두 필드 대체
@@ -60,7 +65,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V13__create_planned_orders.sql` (planned_orders 테이블 추가)
+- 현재 최신: `V15__expand_encrypted_columns.sql` (accounts 암호화 컬럼 VARCHAR(512) 확장)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 
 ### application-local.yml Docker 호환성
@@ -100,6 +105,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - application 레이어가 Spring HTTP에 의존하지 않아 ArchUnit 규칙 준수
 - KIS API 오류: Service에서 예외 그대로 전파 → Controller에서 `catch (Exception e) → ResponseStatusException(503)` 변환
 - `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 금지 (ArchUnit `application → adapter` 규칙)
+- `InvalidKisKeyException`(domain/model/) → Controller에서 422(UNPROCESSABLE_ENTITY) 변환 — register/update 공통 적용
 
 ### @EnableJpaAuditing 위치
 - `@EnableJpaAuditing`을 `@SpringBootApplication`에 두면 `@WebMvcTest` 슬라이스 테스트가 `BeanCreationException` 실패 — JPA 인프라 없음

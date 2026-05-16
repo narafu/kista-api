@@ -26,19 +26,19 @@ class AccountEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 100)
     private String nickname;              // 계좌 별칭
 
-    @Column(name = "account_no", nullable = false, length = 255)
+    @Column(name = "account_no", nullable = false, length = 512)
     private String accountNo;            // AES-256 암호화 저장
 
-    @Column(name = "kis_app_key", nullable = false, length = 255)
+    @Column(name = "kis_app_key", nullable = false, length = 512)
     private String kisAppKey;            // AES-256 암호화 저장
 
-    @Column(name = "kis_secret_key", nullable = false, length = 255)
+    @Column(name = "kis_secret_key", nullable = false, length = 512)
     private String kisSecretKey;         // AES-256 암호화 저장
 
     @Column(name = "kis_account_type", nullable = false, length = 10)
     private String kisAccountType;       // 계좌 상품 코드 (기본: 01)
 
-    @Column(name = "telegram_bot_token", length = 255)
+    @Column(name = "telegram_bot_token", length = 512)
     private String telegramBotToken;     // 계좌별 봇 (optional, AES-256)
 
     @Column(name = "telegram_chat_id", length = 50)
