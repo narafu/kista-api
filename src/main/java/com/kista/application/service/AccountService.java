@@ -77,7 +77,17 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
             kisTokenPort.testToken(newAppKey, newSecretKey);
         }
 
-        Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
+        // 전략 결정: cmd 값 우선, null이면 기존값 유지
+        StrategyType newStrategyType = cmd.strategyType() != null
+                ? cmd.strategyType() : account.strategyType();
+
+        // PRIVACY는 항상 SOXL 고정 (register와 동일 규칙)
+        Ticker updatedTicker;
+        if (newStrategyType == StrategyType.PRIVACY) {
+            updatedTicker = Ticker.SOXL;
+        } else {
+            updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
+        }
 
         Account updated = new Account(
                 account.id(), account.userId(),
@@ -85,7 +95,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.accountNo(), // 계좌번호 변경 불가 (보안상)
                 cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
-                account.kisAccountType(), account.strategyType(), account.strategyStatus(),
+                account.kisAccountType(), newStrategyType, account.strategyStatus(),
                 cmd.telegramBotToken(), cmd.telegramChatId(),
                 updatedTicker,
                 account.createdAt(), null

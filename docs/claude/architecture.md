@@ -58,6 +58,7 @@ domain      →  외부 의존 없음
 | `KisProperties` 필드 추가/제거 | `KisTokenAdapterTest` + `KisExecutionAdapterTest` + `KisProfitAdapterTest` (생성자 하드코딩) |
 | `User` record 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + `UserServiceTest` + `TelegramAdapterTest` + `TradingSchedulerTest` + `AccountServiceTest` + `TradingServiceTest` (`new User(...)` 호출 전파) |
 | `PlannedOrder` 변경 | `PlannedOrderPort` + `PlannedOrderPersistenceAdapter` + `PlannedOrderEntity` + `PlannedOrderJpaRepository` + `TradingService` (savePlannedOrders/executePlannedOrders 메서드) |
+| `UpdateAccountUseCase.Command` 필드 추가 | `AccountService.update()`에 적용 로직 + `AccountRequest.toUpdateCommand()` 동시 수정 |
 | `NotifyPort` 시그니처 변경 | `TelegramAdapter` + `TradingService` + `TelegramAdapterTest` + `TradingServiceTest` |
 
 ### 인증 userId 추출 패턴
