@@ -68,7 +68,7 @@ public class KisTokenAdapter implements KisTokenPort {
     }
 
     @Override
-    public String testToken(String appKey, String appSecret) {
+    public void testToken(String appKey, String appSecret) {
         // KIS OAuth2 직접 호출 — accountId 없이 키 유효성만 검증, DB 캐시 저장 안 함
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -78,13 +78,12 @@ public class KisTokenAdapter implements KisTokenPort {
                     "appkey", appKey,
                     "appsecret", appSecret
             );
-            TokenResponse response = kisRestTemplate.exchange(
+            kisRestTemplate.exchange(
                     kisProperties.baseUrl() + "/oauth2/tokenP",
                     HttpMethod.POST,
                     new HttpEntity<>(body, headers),
                     TokenResponse.class
-            ).getBody();
-            return response.accessToken();
+            );
         } catch (Exception e) {
             throw new InvalidKisKeyException();
         }

@@ -70,6 +70,13 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         Account account = findOrThrow(accountId);
         verifyOwner(account, requesterId);
 
+        // 키 변경 시 유효성 검증 — 변경되는 키와 기존 키를 조합해 실제 사용 값으로 검증
+        String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
+        String newSecretKey = cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey();
+        if (cmd.kisAppKey() != null || cmd.kisSecretKey() != null) {
+            kisTokenPort.testToken(newAppKey, newSecretKey);
+        }
+
         Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
 
         Account updated = new Account(
