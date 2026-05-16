@@ -17,6 +17,12 @@ adapter/in/
   web/           ← REST Controller + DTO (DashboardController)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
+### DashboardController vs StatisticsController 응답 형식 차이
+- `DashboardController`: DB 기반 → `PortfolioSnapshotResponse`, `TradeHistoryResponse` 등 전용 DTO 반환 → kista-ui 타입과 일치
+- `StatisticsController`: KIS live API 직접 호출 → `PresentBalanceResult`, `PeriodProfitResult` 등 도메인 모델 그대로 반환
+  - kista-ui에서 소비 시 normalizer 함수 필요 (예: `normalizePortfolio()`, `ProfitSummary` optional 필드 fallback)
+  - 신규 KIS live 엔드포인트 추가 시 kista-ui 타입과 응답 필드명 반드시 대조 확인
+
 adapter/out/
   kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리)
   persistence/   ← JPA Entity + JpaRepository + PersistenceAdapter

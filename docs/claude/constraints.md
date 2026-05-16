@@ -135,6 +135,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### CORS (SecurityConfig)
 - SecurityConfig에 `.cors(cors -> cors.configurationSource(...))` 필수 — 미설정 시 Vercel 브라우저 fetch 전체 차단
 - 허용 origin: `CORS_ALLOWED_ORIGINS` 환경변수 (Render), 기본값 `http://localhost:3000`
+- `CORS_ALLOWED_ORIGINS` 쉼표 구분, 각 origin 앞뒤 공백 자동 trim — `http://localhost:3000, http://127.0.0.1:3000`처럼 공백 포함 작성 가능
 - `corsConfigurationSource()`: allowedMethods=GET/POST/PUT/DELETE/OPTIONS, allowedHeaders=Authorization/Content-Type, allowCredentials=true
 
 ### Telegram Webhook 등록
