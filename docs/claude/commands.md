@@ -1,13 +1,25 @@
 ## 자주 쓰는 명령어
 
-### macOS에서 Gradle 직접 실행
-# WSL 래퍼 불필요 — macOS에서는 아래처럼 직접 실행
+### Gradle (macOS)
 ```bash
-./gradlew bootJar
-./gradlew test
-./gradlew compileJava
+./gradlew bootJar                                               # app.jar 빌드
+./gradlew bootRun --args='--spring.profiles.active=local'      # 로컬 실행
+./gradlew test                                                  # 전체 테스트
+./gradlew compileJava                                           # 컴파일만
+./gradlew test --tests 'com.kista.architecture.*'               # ArchUnit 규칙만
+./gradlew test --tests 'com.kista.domain.*'                     # 도메인 단위 테스트
+./gradlew test --tests 'com.kista.adapter.out.kis.*'            # KIS Adapter 테스트
+./gradlew test --rerun-tasks                                    # 캐시 무시 강제 재실행
+# 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
+grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```
-# WSL 래퍼(`wsl -d Ubuntu bash -c ...`)는 Windows Claude Code 환경 전용
+
+### Docker (로컬)
+```bash
+docker compose up -d                                            # 앱 + PostgreSQL + Prometheus + Grafana
+docker compose up -d postgres                                   # DB만 기동
+docker compose build <service> && docker compose up -d --force-recreate <service>
+```
 
 ### Render 배포 모니터링
 ```bash
@@ -29,66 +41,6 @@ curl https://kista-api.onrender.com/actuator/health
 # 잘못 커밋됐으면: git commit --amend --author="narafu <narafu@kakao.com>" --no-edit → git push --force-with-lease
 # application-local.yml은 .gitignore에 포함 — git add 불가, Edit 도구로 직접 수정
 
-### Claude Code 웹 앱 (claude.ai/code) WSL2 내부 환경 전용
-# 이 Claude Code 세션은 이미 WSL2 내부 → `wsl -d Ubuntu bash -c ...` 명령어 사용 불가
-# Java 기본 미설치 — /tmp/jdk-21.0.5+11/ 에 JDK 캐시됨 (재부팅 시 소멸, 세션마다 확인 필요)
-# JDK 없으면 재다운로드:
-# curl -L "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz" | tar -xz -C /tmp/
-#
-# 파일 편집: /mnt/d/src/study/kista/kista-api/ (Windows D: 드라이브)
-# Gradle 실행: /home/user/workspace/kista/ (Linux 네이티브 경로 — 성능·경로 호환)
-# 편집 후 Gradle 실행 전 반드시 rsync 동기화:
-# rsync -av --include='*.java' --include='*/' --exclude='*' \
-#   /mnt/d/src/study/kista/kista-api/src/ /home/user/workspace/kista/src/
-# build 설정 변경 시 추가 동기화 (spring-security 등 의존성 누락 방지):
-# cp /mnt/d/src/study/kista/kista-api/build.gradle.kts /home/user/workspace/kista/
-# cp /mnt/d/src/study/kista/kista-api/gradle/libs.versions.toml /home/user/workspace/kista/gradle/
-# Gradle 실행 (JAVA_HOME 명시 필수):
-# JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
-#   bash /home/user/workspace/kista/kista-api/gradlew compileJava --no-daemon -p /home/user/workspace/kista/kista-api
-# JAVA_HOME=/tmp/jdk-21.0.5+11 PATH="/tmp/jdk-21.0.5+11/bin:$PATH" \
-#   bash /home/user/workspace/kista/kista-api/gradlew test --tests 'com.kista.architecture.*' --no-daemon -p /home/user/workspace/kista/kista-api
-
-### Claude Code Bash 툴에서 Gradle 실행 (Windows/WSL 전용)
-# WSL Ubuntu에 Java가 없어도 Git Bash에서 `bash gradlew ...` 직접 실행 가능
-# — Gradle toolchain이 JDK 21을 ~/.gradle/jdks/에 자동 다운로드 (첫 실행 ~30초)
-# WSL workspace(/home/user/workspace/kista)가 없어도 Git Bash에서 바로 실행됨:
-bash gradlew compileTestJava --no-daemon
-bash gradlew test --no-daemon
-bash gradlew test --tests 'com.kista.domain.*' --no-daemon
-# WSL 래퍼는 WSL 내 Java가 설치된 경우에만 필요
-# wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"
-# wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.SomeTest'"
-
-```bash
-# 빌드
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew bootJar"   # build/libs/app.jar 생성
-
-# 초기 환경 설정
-cp ..env.example ..env                          # 환경변수 파일 복사 후 값 입력 필요
-
-# 테스트
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test"                              # 전체 테스트 (병렬 실행)
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew compileJava"                       # 컴파일만 빠르게 확인 (테스트 없이)
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.architecture.*'"    # ArchUnit 규칙 테스트만
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.domain.*'"          # 도메인 단위 테스트만
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --tests 'com.kista.adapter.out.kis.*'" # KIS Adapter 단위 테스트만
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew test --rerun-tasks"                # 캐시 무시하고 강제 재실행 (UP-TO-DATE 우회)
-# 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && grep -oP 'failures=\"\K[^\"]+' build/test-results/test/TEST-*.xml | grep -v ':0'"
-
-# WSL 환경에서 gradlew CRLF 오류 시 (bad interpreter: /bin/sh^M)
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && sed -i 's/\r//' gradlew"
-
-# Qodana 결과 JSON (브라우저 없이 이슈 목록 직접 확인)
-cat /mnt/c/Users/USER/AppData/Local/Temp/qodana-converter/result-allProblems.json | python3 -m json.tool
-
-# 실행
-wsl -d Ubuntu bash -c "cd /home/user/workspace/kista && bash gradlew bootRun --args='--spring.profiles.active=local'"
-docker-compose up -d                          # 앱 + PostgreSQL + Prometheus + Grafana
-docker-compose up -d postgres                 # DB만 기동 (로컬 개발 시)
-docker compose build <service> && docker compose up -d --force-recreate <service>  # 설정 변경 후 이미지 재빌드 + 컨테이너 강제 재생성
-```
 
 ### GitHub 레포 rename 후 remote URL 업데이트
 ```bash
