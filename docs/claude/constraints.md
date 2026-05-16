@@ -166,4 +166,4 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### 공유 DTO @Valid 제약
 - `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)
 - register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
-- `AccountService.update()`는 strategyType을 요청이 아닌 기존 DB 값에서 읽음 — update 요청의 strategyType 무시됨
+- `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)

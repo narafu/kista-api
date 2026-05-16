@@ -39,7 +39,7 @@ public record AccountRequest(
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
                 nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId,
-                ticker
+                ticker, strategyType
         );
     }
 }
