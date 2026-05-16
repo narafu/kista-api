@@ -3,6 +3,7 @@ package com.kista.application.service;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.StrategyStatus;
 import com.kista.domain.model.StrategyType;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.User;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
@@ -41,10 +42,9 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
         // PRIVACY는 항상 SOXL 고정, INFINITE는 지정 없으면 TQQQ
-        String resolvedSymbol = cmd.strategyType() == StrategyType.PRIVACY
-                ? "SOXL"
-                : (cmd.symbol() != null ? cmd.symbol() : "TQQQ");
-        String resolvedExchangeCode = resolveExchangeCode(resolvedSymbol);
+        Ticker ticker = cmd.strategyType() == StrategyType.PRIVACY
+                ? Ticker.SOXL
+                : (cmd.ticker() != null ? cmd.ticker() : Ticker.TQQQ);
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
@@ -52,8 +52,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
                 cmd.strategyType(), StrategyStatus.ACTIVE,
                 cmd.telegramBotToken(), cmd.telegramChatId(),
-                resolvedSymbol,
-                resolvedExchangeCode,
+                ticker,
                 null, null
         );
         Account saved = accountRepository.save(account);
@@ -66,8 +65,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         Account account = findOrThrow(accountId);
         verifyOwner(account, requesterId);
 
-        String updatedSymbol = cmd.symbol() != null ? cmd.symbol() : account.symbol();
-        String updatedExchangeCode = resolveExchangeCode(updatedSymbol);
+        Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
 
         Account updated = new Account(
                 account.id(), account.userId(),
@@ -77,8 +75,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), account.strategyType(), account.strategyStatus(),
                 cmd.telegramBotToken(), cmd.telegramChatId(),
-                updatedSymbol,
-                updatedExchangeCode,
+                updatedTicker,
                 account.createdAt(), null
         );
         return accountRepository.save(updated);
@@ -148,17 +145,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategyType(), status,
                 account.telegramBotToken(), account.telegramChatId(),
-                account.symbol(), account.exchangeCode(),
+                account.ticker(),
                 account.createdAt(), null);
-    }
-
-    // 종목 코드로 해외거래소 코드 자동 결정
-    private String resolveExchangeCode(String symbol) {
-        return switch (symbol) {
-            case "TQQQ" -> "NASD"; // NASDAQ
-            case "SOXL" -> "AMS";  // NYSE ARCA (기존 설정 유지)
-            case "USD"  -> "NASD"; // NASDAQ
-            default     -> "NASD";
-        };
     }
 }

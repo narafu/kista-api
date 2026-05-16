@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -33,6 +34,7 @@ class SettingsControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean UpdateUserTelegramUseCase updateUserTelegram;
+    @MockBean GetUserUseCase getUser;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

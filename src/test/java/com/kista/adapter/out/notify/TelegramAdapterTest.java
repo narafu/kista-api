@@ -64,7 +64,7 @@ class TelegramAdapterTest {
                 new BigDecimal("5.00")); // usdDeposit=5.00
 
         Account account = mock(Account.class);
-        when(account.symbol()).thenReturn("SOXL");
+        when(account.ticker()).thenReturn(Ticker.SOXL);
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.notifyInsufficientBalance(account, balance);
 
@@ -135,7 +135,7 @@ class TelegramAdapterTest {
         Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.notifyStrategyChanged(user, account, "중지");
@@ -153,7 +153,7 @@ class TelegramAdapterTest {
         Account account = new Account(UUID.randomUUID(), user.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                "account-bot-token", "account-chat-456", "SOXL", "AMS", Instant.now(), Instant.now());
+                "account-bot-token", "account-chat-456", Ticker.SOXL, Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)
                 .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
@@ -186,7 +186,7 @@ class TelegramAdapterTest {
         Account accountNoBot = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)
                 .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
@@ -215,7 +215,7 @@ class TelegramAdapterTest {
         Account accountNoBot = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
         TradingVariables vars = TradingVariables.builder()
                 .averagePrice(new BigDecimal("20.00")).quantity(10)
                 .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))

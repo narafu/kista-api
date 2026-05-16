@@ -49,7 +49,7 @@ public class TradingService implements ExecuteTradingUseCase {
 
         // 2. 잔고 조회
         AccountBalance balance = kisAccountPort.getBalance(account);
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.symbol(), balance.quantity(), balance.usdDeposit());
+        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.ticker().name(), balance.quantity(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(account, balance);
@@ -57,11 +57,11 @@ public class TradingService implements ExecuteTradingUseCase {
         }
 
         // 3. 현재가 조회
-        BigDecimal price = kisPricePort.getPrice(account.symbol(), account);
+        BigDecimal price = kisPricePort.getPrice(account.ticker().name(), account);
         log.info("현재가: ${}", price);
 
         // 4. 전략 계산 → planned_orders에 저장 (plan 단계)
-        TradingVariables vars = tradingStrategy.calculate(balance, price);
+        TradingVariables vars = tradingStrategy.calculate(balance, price, account.ticker());
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
                 account.nickname(), vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
         savePlannedOrders(vars, today, account);
@@ -88,7 +88,7 @@ public class TradingService implements ExecuteTradingUseCase {
 
     // 전략 계산 결과를 planned_orders에 PENDING 상태로 저장
     private void savePlannedOrders(TradingVariables vars, LocalDate today, Account account) {
-        List<Order> pending = tradingStrategy.buildOrders(vars, today, account.symbol());
+        List<Order> pending = tradingStrategy.buildOrders(vars, today, account.ticker());
         List<PlannedOrder> planned = pending.stream()
                 .map(o -> PlannedOrder.from(o, account.id()))
                 .toList();
@@ -173,7 +173,7 @@ public class TradingService implements ExecuteTradingUseCase {
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
-                null, today, account.symbol(), balance.quantity(), balance.avgPrice(),
+                null, today, account.ticker().name(), balance.quantity(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 

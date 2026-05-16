@@ -36,7 +36,7 @@ class KisExecutionAdapterTest {
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
             StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            null, null, "SOXL", "AMS", Instant.now(), Instant.now()
+            null, null, Ticker.SOXL, Instant.now(), Instant.now()
     );
 
     @BeforeEach

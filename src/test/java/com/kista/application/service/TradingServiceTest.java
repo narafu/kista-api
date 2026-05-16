@@ -3,7 +3,7 @@ package com.kista.application.service;
 import com.kista.domain.model.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
-import com.kista.domain.strategy.SoxlDivisionStrategy;
+import com.kista.domain.strategy.InfiniteStrategy;
 import com.kista.domain.strategy.TradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,12 +55,12 @@ class TradingServiceTest {
 
     // Account 생성자: id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType,
     //                 strategyType, strategyStatus, telegramBotToken, telegramChatId,
-    //                 symbol, exchangeCode, createdAt, updatedAt
+    //                 ticker, createdAt, updatedAt
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
             StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            null, null, "SOXL", "AMS", Instant.now(), Instant.now()
+            null, null, Ticker.SOXL, Instant.now(), Instant.now()
     );
 
     // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,
@@ -82,7 +82,7 @@ class TradingServiceTest {
 
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
-        TradingVariables vars = new SoxlDivisionStrategy().calculate(NORMAL_BALANCE, PRICE);
+        TradingVariables vars = new InfiniteStrategy().calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL);
         Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
@@ -97,8 +97,8 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
-        when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL")))
+        when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL)).thenReturn(vars);
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq(Ticker.SOXL)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
@@ -111,7 +111,7 @@ class TradingServiceTest {
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
         verify(kisAccountPort).getBalance(ACCOUNT);
         verify(kisPricePort).getPrice("SOXL", ACCOUNT);
-        verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE);
+        verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL);
         verify(plannedOrderPort).saveAll(anyList());                                      // 계획 저장
         verify(plannedOrderPort).findPendingByAccountAndDate(eq(ACCOUNT.id()), any());   // 실행 조회
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
@@ -124,7 +124,7 @@ class TradingServiceTest {
 
     @Test
     void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
-        TradingVariables vars = new SoxlDivisionStrategy().calculate(FRESH_BALANCE, PRICE);
+        TradingVariables vars = new InfiniteStrategy().calculate(FRESH_BALANCE, PRICE, Ticker.SOXL);
         Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order mainOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
@@ -140,8 +140,8 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
-        when(tradingStrategy.calculate(FRESH_BALANCE, PRICE)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq("SOXL")))
+        when(tradingStrategy.calculate(FRESH_BALANCE, PRICE, Ticker.SOXL)).thenReturn(vars);
+        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq(Ticker.SOXL)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));

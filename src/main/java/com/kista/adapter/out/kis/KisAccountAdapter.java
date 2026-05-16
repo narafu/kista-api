@@ -26,7 +26,7 @@ public class KisAccountAdapter implements KisAccountPort {
 
     @Override
     public AccountBalance getBalance(Account account) {
-        HoldingResult holding = fetchHolding(account.symbol(), account);
+        HoldingResult holding = fetchHolding(account.ticker().name(), account);
         BigDecimal usdDeposit = fetchMargin(account);
 
         BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
