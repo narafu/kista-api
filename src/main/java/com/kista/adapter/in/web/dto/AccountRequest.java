@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.StrategyType;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,23 +25,21 @@ public record AccountRequest(
         String telegramBotToken,
         @Schema(description = "텔레그램 채팅 ID (선택)", example = "-1001234567890")
         String telegramChatId,
-        @Schema(description = "거래 종목 코드 (기본값 \"SOXL\")", example = "SOXL")
-        String symbol,
-        @Schema(description = "해외거래소 코드 (기본값 \"AMS\")", example = "AMS")
-        String exchangeCode
+        @Schema(description = "거래 종목 (선택, PRIVACY=SOXL 고정, INFINITE 기본=TQQQ)", example = "TQQQ")
+        Ticker ticker
 ) {
     public RegisterAccountUseCase.Command toRegisterCommand() {
         return new RegisterAccountUseCase.Command(
                 nickname, accountNo, kisAppKey, kisSecretKey,
                 kisAccountType, strategyType, telegramBotToken, telegramChatId,
-                symbol, exchangeCode
+                ticker
         );
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
                 nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId,
-                symbol, exchangeCode
+                ticker
         );
     }
 }

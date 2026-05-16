@@ -1,9 +1,13 @@
 ## 핵심 제약 사항
 
-### symbol → exchangeCode 매핑
-- `AccountService.resolveExchangeCode(symbol)`: TQQQ→`NASD`, SOXL→`AMS`, USD→`NASD`, default→`NASD`
-- PRIVACY 전략: 항상 서버에서 SOXL 강제 (클라이언트 입력 무시) — `register()` 참고
-- INFINITE 전략: 지정 없으면 기본 TQQQ, exchangeCode는 자동 결정 (UI에서 exchangeCode 전달 불필요)
+### Ticker enum (단일 진실 공급원)
+- `Ticker` enum: `TQQQ("NASD", 0.15)`, `SOXL("AMS", 0.20)`, `USD("NASD", 0.20)` — `exchangeCode` + `targetProfitRate` 통합 관리
+- `Account.ticker: Ticker` — 기존 `symbol: String` + `exchangeCode: String` 두 필드 대체
+- `resolveExchangeCode()` 메서드 삭제됨 — `ticker.getExchangeCode()`로 대체
+- PRIVACY 전략: 항상 서버에서 `Ticker.SOXL` 강제 (클라이언트 입력 무시) — `register()` 참고
+- INFINITE 전략: 지정 없으면 기본 `Ticker.TQQQ`, exchangeCode는 Ticker가 자동 결정
+- DB: `accounts.symbol` 컬럼 유지 (Ticker.name() 저장), `exchange_code` 컬럼 V14 마이그레이션으로 제거됨
+- `AccountPersistenceAdapter`: `Ticker.valueOf(entity.getSymbol())`으로 변환
 
 ### Swagger 개발 도구
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)

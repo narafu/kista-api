@@ -39,14 +39,14 @@ class AccountServiceTest {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
     }
 
     private Account pausedAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.PAUSED,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
     }
 
     private User activeUser(UUID id) {
@@ -57,7 +57,7 @@ class AccountServiceTest {
     private RegisterAccountUseCase.Command registerCmd() {
         return new RegisterAccountUseCase.Command(
                 "테스트계좌", "74420614", "appKey", "appSecret",
-                "01", StrategyType.INFINITE, null, null, "SOXL", "AMS"
+                "01", StrategyType.INFINITE, null, null, Ticker.SOXL
         );
     }
 
@@ -70,7 +70,7 @@ class AccountServiceTest {
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
                     a.kisAccountType(), a.strategyType(), a.strategyStatus(),
-                    null, null, a.symbol(), a.exchangeCode(), a.createdAt(), a.updatedAt());
+                    null, null, a.ticker(), a.createdAt(), a.updatedAt());
         });
 
         Account result = accountService.register(userId, registerCmd());
@@ -96,7 +96,7 @@ class AccountServiceTest {
         UUID otherId = UUID.randomUUID();
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null);
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, cmd))
                 .isInstanceOf(SecurityException.class);
@@ -108,7 +108,7 @@ class AccountServiceTest {
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null);
         Account result = accountService.update(accountId, userId, cmd);
 
         assertThat(result.nickname()).isEqualTo("변경닉네임");
@@ -142,7 +142,7 @@ class AccountServiceTest {
         when(accountRepository.findById(accountId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
-                new UpdateAccountUseCase.Command("닉", null, null, null, null, null, null)))
+                new UpdateAccountUseCase.Command("닉", null, null, null, null, null)))
                 .isInstanceOf(java.util.NoSuchElementException.class);
     }
 

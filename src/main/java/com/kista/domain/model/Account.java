@@ -15,8 +15,7 @@ public record Account(
         StrategyStatus strategyStatus, // 전략 실행 상태
         String telegramBotToken,    // 계좌별 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
         String telegramChatId,      // 계좌별 텔레그램 Chat ID (null 가능)
-        String symbol,              // 거래 종목 코드 (예: SOXL)
-        String exchangeCode,        // 해외거래소 코드 (예: AMS)
+        Ticker ticker,              // 거래 종목 (exchangeCode 포함)
         Instant createdAt,
         Instant updatedAt
 ) {}

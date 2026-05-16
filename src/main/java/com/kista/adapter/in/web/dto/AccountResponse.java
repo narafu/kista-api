@@ -1,8 +1,9 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.Account;
-import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
+import com.kista.domain.model.StrategyType;
+import com.kista.domain.model.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -20,10 +21,8 @@ public record AccountResponse(
         StrategyStatus strategyStatus,
         @Schema(description = "텔레그램 알림 설정 여부", example = "true")
         boolean hasTelegram,
-        @Schema(description = "거래 종목 코드", example = "SOXL")
-        String symbol,
-        @Schema(description = "해외거래소 코드", example = "AMS")
-        String exchangeCode
+        @Schema(description = "거래 종목", example = "TQQQ")
+        Ticker ticker
 ) {
     public static AccountResponse from(Account a) {
         return new AccountResponse(
@@ -33,8 +32,7 @@ public record AccountResponse(
                 a.strategyType(),
                 a.strategyStatus(),
                 a.telegramChatId() != null,
-                a.symbol(),
-                a.exchangeCode()
+                a.ticker()
         );
     }
 

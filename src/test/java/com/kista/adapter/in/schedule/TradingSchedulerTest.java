@@ -35,7 +35,7 @@ class TradingSchedulerTest {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
     }
 
     private User mockUser() {
@@ -84,7 +84,7 @@ class TradingSchedulerTest {
         Account account2 = new Account(UUID.randomUUID(), USER_ID, "계좌2",
                 "74420615", "key2", "secret2", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
         User user = mockUser();
         when(accountRepository.findAllActive()).thenReturn(List.of(account1, account2));
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));

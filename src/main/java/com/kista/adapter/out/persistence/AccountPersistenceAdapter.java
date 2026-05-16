@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.Account;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.AccountRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -84,8 +85,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setKisAccountType(a.kisAccountType());
         e.setTelegramBotToken(a.telegramBotToken() != null ? crypto.encrypt(a.telegramBotToken()) : null);
         e.setTelegramChatId(a.telegramChatId());
-        e.setSymbol(a.symbol());
-        e.setExchangeCode(a.exchangeCode());
+        e.setSymbol(a.ticker().name());
         e.setCreatedAt(a.createdAt()); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
@@ -105,7 +105,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(), s.getType(), s.getStatus(),
                 e.getTelegramBotToken() != null ? crypto.decrypt(e.getTelegramBotToken()) : null,
-                e.getTelegramChatId(), e.getSymbol(), e.getExchangeCode(),
+                e.getTelegramChatId(), Ticker.valueOf(e.getSymbol()),
                 e.getCreatedAt(), e.getUpdatedAt()
         );
     }

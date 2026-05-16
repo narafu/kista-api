@@ -4,6 +4,7 @@ import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.StrategyType;
 import com.kista.domain.model.StrategyStatus;
+import com.kista.domain.model.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,6 @@ class AccountPersistenceAdapterTest {
         e.setKisSecretKey("enc:appSecret");
         e.setKisAccountType("01");
         e.setSymbol("SOXL");
-        e.setExchangeCode("AMS");
         e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
         return e;
@@ -73,7 +73,7 @@ class AccountPersistenceAdapterTest {
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, "SOXL", "AMS", null, null);
+                null, null, Ticker.SOXL, null, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
@@ -97,7 +97,7 @@ class AccountPersistenceAdapterTest {
         Account existingAccount = new Account(accountId, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.PAUSED,
-                null, null, "SOXL", "AMS", Instant.now(), Instant.now());
+                null, null, Ticker.SOXL, Instant.now(), Instant.now());
 
         AccountEntity entity = accountEntityWithId(accountId);
         StrategyEntity strategy = strategyEntity(accountId, StrategyType.INFINITE, StrategyStatus.ACTIVE);

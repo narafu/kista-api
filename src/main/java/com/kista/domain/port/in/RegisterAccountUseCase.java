@@ -2,6 +2,7 @@ package com.kista.domain.port.in;
 
 import com.kista.domain.model.Account;
 import com.kista.domain.model.StrategyType;
+import com.kista.domain.model.Ticker;
 
 import java.util.UUID;
 
@@ -17,7 +18,6 @@ public interface RegisterAccountUseCase {
             StrategyType strategyType,
             String telegramBotToken, // null 가능
             String telegramChatId,   // null 가능
-            String symbol,           // 거래 종목 (기본값 "SOXL")
-            String exchangeCode      // 해외거래소 코드 (기본값 "AMS")
+            Ticker ticker            // null이면 전략에 따라 결정 (PRIVACY=SOXL, INFINITE=TQQQ)
     ) {}
 }
