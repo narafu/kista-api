@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
+import com.kista.domain.model.InvalidKisKeyException;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.PauseStrategyUseCase;
@@ -61,6 +62,9 @@ public class AccountController {
             return AccountResponse.from(
                     registerAccount.register(userId, request.toRegisterCommand())
             );
+        } catch (InvalidKisKeyException e) {
+            // KIS 앱키/시크릿 유효성 검증 실패 → 422 Unprocessable Entity
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }

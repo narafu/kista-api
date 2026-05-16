@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.InvalidKisKeyException;
 import com.kista.domain.port.out.KisTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,29 @@ public class KisTokenAdapter implements KisTokenPort {
         // 발급된 토큰을 account_id 기준으로 DB에 upsert
         kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
         return response.accessToken();
+    }
+
+    @Override
+    public String testToken(String appKey, String appSecret) {
+        // KIS OAuth2 직접 호출 — accountId 없이 키 유효성만 검증, DB 캐시 저장 안 함
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            Map<String, String> body = Map.of(
+                    "grant_type", "client_credentials",
+                    "appkey", appKey,
+                    "appsecret", appSecret
+            );
+            TokenResponse response = kisRestTemplate.exchange(
+                    kisProperties.baseUrl() + "/oauth2/tokenP",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    TokenResponse.class
+            ).getBody();
+            return response.accessToken();
+        } catch (Exception e) {
+            throw new InvalidKisKeyException();
+        }
     }
 
     OffsetDateTime parseExpiry(String raw) {
