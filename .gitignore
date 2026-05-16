@@ -44,6 +44,12 @@ docker-compose.override.yml
 .claude/scheduled_tasks.json
 .claude/settings.local.json
 
+# Serena MCP 런타임 디렉토리
+.serena/
+
+# Gradle 컴파일 바이너리 출력
+bin/
+
 # mcp
 .mcp.json
 
