@@ -5,6 +5,7 @@ import com.kista.adapter.in.web.dto.AccountResponse;
 import com.kista.domain.model.InvalidKisKeyException;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
+import com.kista.domain.port.in.KisConnectionTestUseCase;
 import com.kista.domain.port.in.PauseStrategyUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.ResumeStrategyUseCase;
@@ -37,6 +38,11 @@ public class AccountController {
     private final GetAccountUseCase getAccount;
     private final PauseStrategyUseCase pauseStrategy;
     private final ResumeStrategyUseCase resumeStrategy;
+    private final KisConnectionTestUseCase connectionTest; // KIS 자격증명 연결 테스트
+
+    // 연결 테스트 요청/응답 DTO (컨트롤러 내부 전용)
+    record TestConnectionRequest(String appKey, String appSecret) {}
+    record TestConnectionResponse(boolean success, String message) {}
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")
@@ -160,5 +166,20 @@ public class AccountController {
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
+    }
+
+    // KIS API 자격증명 연결 테스트 — 토큰 발급 시도로 appKey/appSecret 유효성 확인
+    @Operation(summary = "KIS API 연결 테스트", description = "appKey/appSecret으로 KIS OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "검증 완료 (success 필드로 결과 확인)"),
+    })
+    @PostMapping("/test-connection")
+    public TestConnectionResponse testConnection(
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody TestConnectionRequest request) {
+        boolean success = connectionTest.test(request.appKey(), request.appSecret());
+        // 성공 시 message null, 실패 시 안내 메시지 반환
+        String message = success ? null : "KIS API 인증에 실패했습니다. appKey 또는 appSecret을 확인하세요.";
+        return new TestConnectionResponse(success, message);
     }
 }

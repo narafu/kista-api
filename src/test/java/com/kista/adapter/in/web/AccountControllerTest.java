@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.port.in.*;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,11 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AccountController.class)
@@ -36,6 +41,7 @@ class AccountControllerTest {
     @MockBean GetAccountUseCase getAccount;
     @MockBean PauseStrategyUseCase pauseStrategy;
     @MockBean ResumeStrategyUseCase resumeStrategy;
+    @MockBean KisConnectionTestUseCase connectionTest; // T3: 연결 테스트 UseCase
 
     private final UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -79,6 +85,27 @@ class AccountControllerTest {
         mockMvc.perform(patch("/api/accounts/" + accountId + "/strategy/resume")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testConnection_success_returns200() throws Exception {
+        when(connectionTest.test(anyString(), anyString())).thenReturn(true);
+
+        mockMvc.perform(post("/api/accounts/test-connection")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testConnection_anonymous_returns401() throws Exception {
+        mockMvc.perform(post("/api/accounts/test-connection")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
