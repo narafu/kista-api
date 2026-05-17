@@ -63,6 +63,7 @@ domain      →  외부 의존 없음
 | `StatisticsController` 응답 타입 변경 | `StatisticsControllerTest`의 JSONPath 업데이트 필수 (예: `$.totalAssetUsd` → `$.summary.totalAssetUsd`) |
 | `User.role` 변경 또는 `UserRole` 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + `JwtIssuerService` claim |
 | `AdminBootstrapProperties.kakaoIds` 변경 | `application.yml` + `.env.example` + `docker-compose.yml` + Render env |
+| 새 admin 엔드포인트 추가 (`AdminXxxController`) | `AdminXxxService` + `AdminXxxUseCase`(domain/port/in) + `AdminXxxControllerTest`(`@MockBean` 필수: JwtDecoder + 사용하는 모든 UseCase) |
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지

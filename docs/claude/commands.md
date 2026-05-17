@@ -14,6 +14,17 @@
 grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```
 
+### 로컬 admin 토큰 발급 (DevAuthController, local 프로파일 전용)
+```bash
+# 일반 사용자 토큰
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-token | jq -r .accessToken)
+curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/admin/_ping  # 403 기대
+
+# ADMIN 토큰 (고정 UUID 00000000-0000-0000-0000-000000000002)
+ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .accessToken)
+curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
+```
+
 ### Docker (로컬)
 ```bash
 docker compose up -d                                            # 앱 + PostgreSQL + Prometheus + Grafana
