@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
@@ -33,6 +34,7 @@ class UserServiceTest {
     @Mock UserNotificationPort notificationPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock AdminBootstrapProperties bootstrapProps;
 
     @InjectMocks UserService userService;
 
@@ -203,5 +205,39 @@ class UserServiceTest {
 
         verify(userRepository).save(argThat(u -> u.status() == UserStatus.REJECTED));
         verify(notificationPort).notifyRejected(any());
+    }
+
+    @Test
+    @DisplayName("ADMIN seed kakaoId 신규 등록 시 ACTIVE + ADMIN 역할로 생성")
+    void register_adminSeed_returnsActiveAdmin() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("12345")).thenReturn(true);
+        when(userRepository.findByKakaoId("12345")).thenReturn(Optional.empty());
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("12345", "adminName", uid);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("일반 사용자 신규 등록 시 PENDING + USER 역할로 생성")
+    void register_normalUser_returnsPendingUser() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("99999")).thenReturn(false);
+        when(userRepository.findByKakaoId("99999")).thenReturn(Optional.empty());
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("99999", "userName", uid);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.USER);
+        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
     }
 }

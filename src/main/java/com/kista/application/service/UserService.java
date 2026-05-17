@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
@@ -32,12 +33,17 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     private final UserNotificationPort notificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
+    private final AdminBootstrapProperties bootstrapProps; // ADMIN seed 목록
 
     @Override
     public User register(String kakaoId, String nickname, UUID userId) {
-        // 기존 사용자면 반환, 신규이면 PENDING 저장 + 관리자 알림
+        // 기존 사용자면 반환, 신규이면 역할/상태 결정 후 저장 + 관리자 알림
         return userRepository.findByKakaoId(kakaoId).orElseGet(() -> {
-            User newUser = new User(userId, kakaoId, nickname, UserStatus.PENDING, UserRole.USER,
+            // ADMIN seed 여부에 따라 역할/상태 결정
+            boolean isAdminSeed = bootstrapProps.isAdmin(kakaoId);
+            UserRole role = isAdminSeed ? UserRole.ADMIN : UserRole.USER;
+            UserStatus status = isAdminSeed ? UserStatus.ACTIVE : UserStatus.PENDING;
+            User newUser = new User(userId, kakaoId, nickname, status, role,
                     null, null, null, null, null);
             User saved = userRepository.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
