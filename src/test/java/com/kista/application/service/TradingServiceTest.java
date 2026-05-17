@@ -35,6 +35,7 @@ class TradingServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock PlannedOrderPort plannedOrderPort; // 신규
+    @Mock RealtimeNotificationPort realtimeNotificationPort; // SSE 알림
 
     TradingService service;
 
@@ -77,7 +78,7 @@ class TradingServiceTest {
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
-                plannedOrderPort); // 신규 인자
+                plannedOrderPort, realtimeNotificationPort); // 신규 인자
     }
 
     @Test

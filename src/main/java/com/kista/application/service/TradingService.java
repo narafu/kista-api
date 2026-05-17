@@ -34,6 +34,7 @@ public class TradingService implements ExecuteTradingUseCase {
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
     private final PlannedOrderPort plannedOrderPort;           // 계획 주문 저장·조회
+    private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
 
     @Override
     public void execute(Account account, User user) throws InterruptedException {
@@ -155,6 +156,14 @@ public class TradingService implements ExecuteTradingUseCase {
         TradingReport report = buildReport(today, vars, mainOrders, corrections, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
         log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
+        // 체결 건별 SSE 실시간 알림 (@Transactional 외부에서 호출 — 이미 DB 저장 완료 후)
+        for (Execution e : executions) {
+            TradeEvent event = e.direction() == SELL
+                    ? TradeEvent.sell(e.symbol(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
+                    : TradeEvent.buy(e.symbol(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
+            realtimeNotificationPort.notifyTrade(user.id(), event);
+        }
+        log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
     }
 
     private TradeHistory toHistory(Order o, java.util.UUID accountId) {
