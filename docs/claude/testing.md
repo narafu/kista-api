@@ -12,6 +12,7 @@
 - `JwtAuthFilter`는 principal을 `UUID` 타입으로 저장 — 테스트 mock도 반드시 `UUID` 사용 (`String` 사용 시 컨트롤러에서 ClassCastException)
 - `JwtDecoder`가 profile-conditional `@Bean`인 경우: `@WebMvcTest`에 `@MockBean JwtDecoder jwtDecoder;` 필수 — 없으면 prod 프로파일 decoder가 빈 URI로 생성 시도 → `MalformedURLException` 컨텍스트 실패
 - `@SpringBootTest @ActiveProfiles("test")`: `application-test.yml`에 `jwt.signing-key` EC JWK 추가 필요 (`JwtDecoderConfig` 단일 빈이 이 값으로 검증)
+- role 기반 인가 규칙(`hasRole`) 검증이 필요한 `@WebMvcTest`는 `@Import({SecurityConfig.class, JwtAuthFilter.class})` 추가 필수 — 미추가 시 `AuthorizationFilter`가 로드되지 않아 ROLE 검사 없이 200 반환 (`AdminPingControllerTest` 패턴 참고)
 
 ### @InjectMocks + @RequiredArgsConstructor 서비스 필드 추가 시 주의
 - 서비스에 `private final` 필드 추가 시 해당 테스트에 `@Mock` 추가 필수 — 누락 시 Mockito 생성자 주입 실패 (NPE 또는 객체 생성 오류)

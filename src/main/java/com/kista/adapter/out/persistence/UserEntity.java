@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.User;
+import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -28,7 +29,12 @@ class UserEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 10)
     private UserStatus status;
 
-    @Column(name = "telegram_bot_token", length = 255)
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, length = 10)
+    private UserRole role; // 사용자 권한 (USER / ADMIN)
+
+    @Column(name = "telegram_bot_token", length = 512)
     private String telegramBotToken; // AES-256 암호화 저장
 
     @Column(name = "telegram_chat_id", length = 50)
@@ -45,6 +51,7 @@ class UserEntity extends BaseAuditEntity {
         e.kakaoId = user.kakaoId();
         e.nickname = user.nickname();
         e.status = user.status();
+        e.role = user.role();
         e.telegramBotToken = user.telegramBotToken();
         e.telegramChatId = user.telegramChatId();
         e.createdAt = user.createdAt(); // null이면 @CreatedDate가 INSERT 시 자동 설정
@@ -53,7 +60,7 @@ class UserEntity extends BaseAuditEntity {
     }
 
     User toModel() {
-        return new User(id, kakaoId, nickname, status,
+        return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt);
     }
 }

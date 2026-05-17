@@ -170,3 +170,12 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)
 - register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
 - `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)
+
+### ADMIN 권한 관리
+- `users.role` PostgreSQL 네이티브 ENUM (`user_role`: USER/ADMIN) — V17
+- ADMIN seed: 환경변수 `ADMIN_KAKAO_IDS` (쉼표 구분 String) — `UserService.register()` / `KakaoLoginService.login()`에서 idempotent promote
+- JWT claim: `"role": "ADMIN"` — `JwtIssuerService.issue(uuid, role)`
+- `JwtAuthFilter`: `ROLE_USER` / `ROLE_ADMIN` authorities 자동 부여
+- `/api/admin/**` → `hasRole("ADMIN")` (SecurityConfig)
+- `audit_logs`: 관리자 액션 영구 기록 (admin_id, action, target_type, target_id, payload JSONB)
+- 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 자동 발급

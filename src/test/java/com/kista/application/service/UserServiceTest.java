@@ -1,7 +1,9 @@
 package com.kista.application.service;
 
+import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
+import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -32,29 +34,30 @@ class UserServiceTest {
     @Mock UserNotificationPort notificationPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock AdminBootstrapProperties bootstrapProps;
 
     @InjectMocks UserService userService;
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
+        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
+        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(),
                 Instant.now().minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
+        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
+        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
@@ -155,7 +158,7 @@ class UserServiceTest {
     @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED,
+        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -202,5 +205,39 @@ class UserServiceTest {
 
         verify(userRepository).save(argThat(u -> u.status() == UserStatus.REJECTED));
         verify(notificationPort).notifyRejected(any());
+    }
+
+    @Test
+    @DisplayName("ADMIN seed kakaoId 신규 등록 시 ACTIVE + ADMIN 역할로 생성")
+    void register_adminSeed_returnsActiveAdmin() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("12345")).thenReturn(true);
+        when(userRepository.findByKakaoId("12345")).thenReturn(Optional.empty());
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("12345", "adminName", uid);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("일반 사용자 신규 등록 시 PENDING + USER 역할로 생성")
+    void register_normalUser_returnsPendingUser() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("99999")).thenReturn(false);
+        when(userRepository.findByKakaoId("99999")).thenReturn(Optional.empty());
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("99999", "userName", uid);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.USER);
+        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
     }
 }

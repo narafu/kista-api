@@ -73,6 +73,11 @@ public class AccountPersistenceAdapter implements AccountRepository {
         jpaRepository.deleteById(id); // strategies는 ON DELETE CASCADE로 자동 삭제
     }
 
+    @Override
+    public long countAll() {
+        return jpaRepository.count(); // JpaRepository 기본 제공 메서드
+    }
+
     // Account 도메인 모델 → 암호화 후 Entity 변환 (strategy 필드 제외 — strategies 테이블 별도 관리)
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();

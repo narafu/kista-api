@@ -14,4 +14,5 @@ public interface AccountRepository {
     List<Account> findAllActive();
     Account save(Account account);
     void delete(UUID id);
+    long countAll(); // 전체 계좌 수 (대시보드 통계용)
 }

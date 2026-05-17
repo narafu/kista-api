@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/status-stream").authenticated() // 상태 SSE 연결은 인증 필수
                         .requestMatchers("/api/trades/stream").authenticated() // 매매 SSE 연결은 인증 필수
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 // JWT 필터를 Spring Security 체인 내부에만 등록

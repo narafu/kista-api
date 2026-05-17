@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -33,8 +34,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Jwt jwt = jwtDecoder.decode(token);
                 UUID userId = UUID.fromString(jwt.getSubject()); // sub 클레임 = 사용자 UUID
+                // role claim → ROLE_* authority 변환 (claim 없으면 빈 authorities)
+                String roleClaim = jwt.getClaimAsString("role");
+                List<SimpleGrantedAuthority> authorities = roleClaim == null
+                        ? List.of()
+                        : List.of(new SimpleGrantedAuthority("ROLE_" + roleClaim));
                 SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(userId, null, List.of())
+                        new UsernamePasswordAuthenticationToken(userId, null, authorities)
                 );
             } catch (Exception e) { // JwtException + NPE + IAE 등 모두 처리
                 log.warn("JWT 인증 실패: {}", e.getMessage());

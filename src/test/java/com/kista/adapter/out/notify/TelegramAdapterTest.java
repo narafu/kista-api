@@ -130,7 +130,7 @@ class TelegramAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyStrategyChanged_bodyContainsNicknameAccountAndAction() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
                 "74420614", "key", "secret", "01",
@@ -148,7 +148,7 @@ class TelegramAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyTradingReport_withAccountBot_sendsToAccountChatId() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
@@ -181,7 +181,7 @@ class TelegramAdapterTest {
     @SuppressWarnings("unchecked")
     void notifyTradingReport_withoutAccountBot_fallsBackToUserBot() {
         // 계좌 봇 미설정, 사용자 봇 설정 → 사용자 봇으로 발송
-        User userWithBot = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+        User userWithBot = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
                 "user-bot-token", "user-chat-789", Instant.now(), Instant.now(), null);
         Account accountNoBot = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
@@ -210,7 +210,7 @@ class TelegramAdapterTest {
 
     @Test
     void notifyTradingReport_withoutAccountBot_skipsWithoutException() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
         Account accountNoBot = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
                 "74420614", "key", "secret", "01",

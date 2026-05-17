@@ -67,7 +67,7 @@ class TradingServiceTest {
     // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,
     //              createdAt, updatedAt, lastReappliedAt
     static final User USER = new User(
-            ACCOUNT.userId(), "kakao-1", "홍길동", UserStatus.ACTIVE,
+            ACCOUNT.userId(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
             null, null, Instant.now(), Instant.now(), null
     );
 
