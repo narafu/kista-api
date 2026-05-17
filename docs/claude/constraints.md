@@ -65,8 +65,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V15__expand_encrypted_columns.sql` (accounts 암호화 컬럼 VARCHAR(512) 확장)
+- 현재 최신: `V16__fix_account_fk_cascades.sql` (kis_tokens/trade_histories/portfolio_snapshots FK ON DELETE CASCADE 추가)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
+- **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
 
 ### application-local.yml Docker 호환성
 - datasource url/username/password는 반드시 `${DB_URL:...}` 형식 유지 — 하드코딩 시 Docker에서 주입한 `DB_URL=postgres:5432`가 무시되고 `localhost:5432`로 접속 시도
@@ -136,7 +137,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - SecurityConfig에 `.cors(cors -> cors.configurationSource(...))` 필수 — 미설정 시 Vercel 브라우저 fetch 전체 차단
 - 허용 origin: `CORS_ALLOWED_ORIGINS` 환경변수 (Render), 기본값 `http://localhost:3000`
 - `CORS_ALLOWED_ORIGINS` 쉼표 구분, 각 origin 앞뒤 공백 자동 trim — `http://localhost:3000, http://127.0.0.1:3000`처럼 공백 포함 작성 가능
-- `corsConfigurationSource()`: allowedMethods=GET/POST/PUT/DELETE/OPTIONS, allowedHeaders=Authorization/Content-Type, allowCredentials=true
+- `corsConfigurationSource()`: allowedMethods=GET/POST/PUT/**PATCH**/DELETE/OPTIONS (PATCH 미포함 시 전략중지/재개 등 PATCH 엔드포인트 403), allowedHeaders=Authorization/Content-Type, allowCredentials=true
+- **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 `Http403ForbiddenEntryPoint` 기본 적용 → 인증 실패가 401 대신 403 반환
+- **`JwtAuthFilter` catch 절은 `Exception`으로** — `JwtException`만 잡으면 `UUID.fromString(jwt.getSubject())`의 NPE·IAE 미처리 → 인증 미설정 → 익명 사용자 → 403
 
 ### Telegram Webhook 등록
 - `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
