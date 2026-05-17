@@ -5,17 +5,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.AuditLog;
 import com.kista.domain.port.out.AuditLogPort;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor(access = lombok.AccessLevel.PACKAGE) // AuditLogJpaRepository가 package-private
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // AuditLogJpaRepository가 package-private
 class AuditLogPersistenceAdapter implements AuditLogPort {
 
-    private final AuditLogJpaRepository repo;
+    private final AuditLogJpaRepository repo; // audit_logs 테이블 JPA 저장소
     private final ObjectMapper objectMapper; // Spring Boot 자동 구성 빈
 
     @Override
@@ -34,19 +36,19 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
 
     @Override
     public AuditLog findById(UUID id) {
-        return repo.findById(id).map(this::toDomain).orElseThrow();
+        return repo.findById(id).map(this::toDomain).orElseThrow(() -> new NoSuchElementException("AuditLog not found: " + id));
     }
 
     // 엔티티 → 도메인 record 변환 (payload JSON String → Map 역직렬화)
-    private AuditLog toDomain(AuditLogEntity e) {
+    private AuditLog toDomain(AuditLogEntity entity) {
         Map<String, Object> p = null;
-        if (e.getPayload() != null) {
+        if (entity.getPayload() != null) {
             try {
-                p = objectMapper.readValue(e.getPayload(), new TypeReference<>() {});
+                p = objectMapper.readValue(entity.getPayload(), new TypeReference<>() {});
             } catch (JsonProcessingException ex) {
                 throw new IllegalStateException("payload 역직렬화 실패", ex);
             }
         }
-        return new AuditLog(e.getId(), e.getAdminId(), e.getAction(), e.getTargetType(), e.getTargetId(), p, e.getCreatedAt());
+        return new AuditLog(entity.getId(), entity.getAdminId(), entity.getAction(), entity.getTargetType(), entity.getTargetId(), p, entity.getCreatedAt());
     }
 }
