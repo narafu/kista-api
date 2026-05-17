@@ -34,23 +34,24 @@ public class KakaoLoginService implements KakaoLoginUseCase {
         // 카카오 액세스 토큰으로 사용자 정보 조회
         KakaoOAuthPort.KakaoUserInfo kakaoUser = kakaoOAuthPort.getUserInfo(kakaoAccessToken);
 
+        User user;
         try {
-            // 신규 사용자 등록 시도
-            return registerUser.register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
+            // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
+            user = registerUser.register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
         } catch (DataIntegrityViolationException e) {
-            // 중복 kakaoId → 기존 사용자 조회 후 ADMIN promote 확인
+            // 동시 가입 경쟁 조건 → 기존 사용자 조회
             log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());
-            User existing = getUser.getByKakaoId(kakaoUser.kakaoId());
-            // 기존 사용자가 ADMIN seed인데 아직 USER이면 idempotent promote
-            if (bootstrapProps.isAdmin(existing.kakaoId()) && existing.role() != UserRole.ADMIN) {
-                log.info("기존 사용자 ADMIN promote: kakaoId={}", existing.kakaoId());
-                existing = userRepository.save(new User(
-                        existing.id(), existing.kakaoId(), existing.nickname(), UserStatus.ACTIVE, UserRole.ADMIN,
-                        existing.telegramBotToken(), existing.telegramChatId(),
-                        existing.createdAt(), existing.updatedAt(), existing.lastReappliedAt()
-                ));
-            }
-            return existing;
+            user = getUser.getByKakaoId(kakaoUser.kakaoId());
         }
+        // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
+        if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != UserRole.ADMIN) {
+            log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
+            user = userRepository.save(new User(
+                    user.id(), user.kakaoId(), user.nickname(), UserStatus.ACTIVE, UserRole.ADMIN,
+                    user.telegramBotToken(), user.telegramChatId(),
+                    user.createdAt(), user.updatedAt(), user.lastReappliedAt()
+            ));
+        }
+        return user;
     }
 }
