@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.security;
 
+import com.kista.domain.model.UserRole;
 import com.nimbusds.jose.jwk.ECKey;
 import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
@@ -19,11 +20,12 @@ public class JwtIssuerService {
     @Value("${jwt.signing-key}")
     private String signingJwk; // EC JWK JSON 문자열
 
-    // userId를 subject로 담은 ES256 서명 JWT 발급
-    public String issue(UUID userId) {
+    // userId를 subject, role을 클레임으로 담은 ES256 서명 JWT 발급
+    public String issue(UUID userId, UserRole role) {
         ECPrivateKey privateKey = parsePrivateKey();
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("role", role.name()) // 역할(USER/ADMIN) 클레임 — JwtAuthFilter에서 권한 추출
                 .expiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MS))
                 .signWith(privateKey, Jwts.SIG.ES256)
                 .compact();

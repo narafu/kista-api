@@ -53,7 +53,7 @@ public class DevAuthController {
         User user = registerUser.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID);
         // ACTIVE 상태로 설정 (이미 ACTIVE여도 무해)
         approveUser.approve(user.id());
-        String token = jwtIssuerService.issue(user.id()); // JwtIssuerService로 ES256 서명
+        String token = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함 ES256 서명
         return new TokenResponse(token, "bearer", jwtIssuerService.expiresInSeconds());
     }
 }

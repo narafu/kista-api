@@ -51,7 +51,7 @@ public class AuthController {
     @SecurityRequirements
     public KakaoLoginResponse kakaoCallback(@RequestBody KakaoCallbackRequest request) {
         User user = kakaoLoginUseCase.login(request.code(), request.redirectUri());
-        String token = jwtIssuerService.issue(user.id());
+        String token = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함
         return new KakaoLoginResponse(token, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user));
     }
 
