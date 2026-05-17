@@ -45,6 +45,14 @@ public class AccountPersistenceAdapter implements AccountRepository {
     }
 
     @Override
+    public List<Account> findAll() {
+        // 전체 계좌 조회 — toDomain()이 각 계좌별 strategy N+1 쿼리 실행 (관리자용 소량 허용)
+        return jpaRepository.findAll().stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public Account save(Account account) {
         AccountEntity entity = toEntity(account);
         AccountEntity saved = jpaRepository.save(entity);

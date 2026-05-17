@@ -28,6 +28,14 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
                 .toList();
     }
 
+    @Override
+    public List<TradeHistory> findAll(LocalDate from, LocalDate to) {
+        return repository.findByTradeDateBetween(from, to)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     private TradeHistoryEntity toEntity(TradeHistory h) {
         return new TradeHistoryEntity(
                 h.id(), h.tradeDate(), h.symbol(), h.strategy(),

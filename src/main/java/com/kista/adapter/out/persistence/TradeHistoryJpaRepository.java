@@ -8,4 +8,7 @@ import java.util.UUID;
 
 interface TradeHistoryJpaRepository extends JpaRepository<TradeHistoryEntity, UUID> {
     List<TradeHistoryEntity> findByTradeDateBetweenAndSymbol(LocalDate from, LocalDate to, String symbol);
+
+    // symbol 필터 없이 기간 내 전체 거래 조회 (관리자용)
+    List<TradeHistoryEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
 }

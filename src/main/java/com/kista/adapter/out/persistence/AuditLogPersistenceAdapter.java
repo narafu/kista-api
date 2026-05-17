@@ -9,6 +9,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -37,6 +38,14 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
     @Override
     public AuditLog findById(UUID id) {
         return repo.findById(id).map(this::toDomain).orElseThrow(() -> new NoSuchElementException("AuditLog not found: " + id));
+    }
+
+    @Override
+    public List<AuditLog> findAll() {
+        // 최신순 상위 100건 조회 후 도메인 변환
+        return repo.findTop100ByOrderByCreatedAtDesc().stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     // 엔티티 → 도메인 record 변환 (payload JSON String → Map 역직렬화)
