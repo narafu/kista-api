@@ -3,8 +3,11 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.TokenResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.domain.model.User;
+import com.kista.domain.model.UserRole;
+import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
+import com.kista.domain.port.out.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,12 +30,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DevAuthController {
 
-    private static final UUID   DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private static final String DEV_KAKAO_ID = "dev-test-user";
+    private static final UUID   DEV_USER_ID   = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID   DEV_ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final String DEV_KAKAO_ID  = "dev-test-user";
 
     private final RegisterUserUseCase registerUser;
     private final ApproveUserUseCase  approveUser;
     private final JwtIssuerService    jwtIssuerService; // 자체 발급 ES256 JWT
+    private final UserRepository      userRepository;   // ADMIN 테스트 유저 직접 저장용
 
     @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용", description = "지정한 userId를 APPROVED 상태로 변경. Telegram 없이 로컬 승인 처리 시 사용.")
     @ApiResponse(responseCode = "200", description = "승인 성공")
@@ -55,5 +60,23 @@ public class DevAuthController {
         approveUser.approve(user.id());
         String token = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함 ES256 서명
         return new TokenResponse(token, "bearer", jwtIssuerService.expiresInSeconds());
+    }
+
+    @Operation(summary = "로컬 전용 ADMIN 테스트 토큰 발급")
+    @SecurityRequirements // 자물쇠 아이콘 제거 (인증 없이 호출 가능)
+    @PostMapping("/dev-admin-token")
+    public TokenResponse devAdminToken() {
+        // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
+        User admin = userRepository.findById(DEV_ADMIN_UUID).orElseGet(() ->
+                userRepository.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", UserStatus.ACTIVE, UserRole.ADMIN,
+                        null, null, null, null, null)));
+        // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
+        if (admin.role() != UserRole.ADMIN) {
+            admin = userRepository.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
+                    UserStatus.ACTIVE, UserRole.ADMIN, admin.telegramBotToken(), admin.telegramChatId(),
+                    admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt()));
+        }
+        String token = jwtIssuerService.issue(admin.id(), UserRole.ADMIN); // ADMIN role ES256 서명
+        return new TokenResponse(token, "bearer", 604800);
     }
 }
