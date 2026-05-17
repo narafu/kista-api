@@ -82,7 +82,7 @@ class StatisticsControllerTest {
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/portfolio")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalAssetUsd").value(1000.00));
+                .andExpect(jsonPath("$.summary.totalAssetUsd").value(1000.00));
     }
 
     @Test

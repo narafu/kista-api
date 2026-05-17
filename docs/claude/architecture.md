@@ -60,6 +60,7 @@ domain      →  외부 의존 없음
 | `PlannedOrder` 변경 | `PlannedOrderPort` + `PlannedOrderPersistenceAdapter` + `PlannedOrderEntity` + `PlannedOrderJpaRepository` + `TradingService` (savePlannedOrders/executePlannedOrders 메서드) |
 | `UpdateAccountUseCase.Command` 필드 추가 | `AccountService.update()`에 적용 로직 + `AccountRequest.toUpdateCommand()` 동시 수정 |
 | `NotifyPort` 시그니처 변경 | `TelegramAdapter` + `TradingService` + `TelegramAdapterTest` + `TradingServiceTest` |
+| `StatisticsController` 응답 타입 변경 | `StatisticsControllerTest`의 JSONPath 업데이트 필수 (예: `$.totalAssetUsd` → `$.summary.totalAssetUsd`) |
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지
