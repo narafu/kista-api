@@ -52,9 +52,10 @@ git remote set-url origin git@github.com:narafu/kista-api.git
 ### Render 서비스 재생성 시 환경변수 설정
 ```bash
 # mcp__render__update_environment_variables 로 한번에 주입 (serviceId 필요)
-# 필수 15개: SPRING_PROFILES_ACTIVE=prod, KIS_APP_KEY/SECRET/HTS_ID/VTS,
+# 필수 16개: SPRING_PROFILES_ACTIVE=prod, KIS_APP_KEY/SECRET/HTS_ID/VTS,
 #            KIS_ACCOUNT_NO/TYPE/SYMBOL/EXCHANGE_CODE,
-#            TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD, GEMINI_API_KEY
+#            TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD, GEMINI_API_KEY,
+#            ADMIN_KAKAO_IDS (쉼표 구분 카카오 ID 목록, 자동 ADMIN 승격)
 # 주의: mcp__render__update_web_service 는 서비스명/URL 변경 미지원 → 대시보드 직접 변경
 #       URL이 안 바뀌면 서비스를 새로 생성하는 것이 가장 빠른 해결책
 ```

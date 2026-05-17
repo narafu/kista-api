@@ -78,6 +78,9 @@ kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET:}
 
+admin:
+  kakao-ids: ${ADMIN_KAKAO_IDS:}
+
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
