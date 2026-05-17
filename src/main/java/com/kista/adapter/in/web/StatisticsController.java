@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
 import com.kista.domain.model.DailyTransactionResult;
 import com.kista.domain.model.Execution;
 import com.kista.domain.model.MarginItem;
@@ -97,12 +98,13 @@ public class StatisticsController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/portfolio")
-    public PresentBalanceResult getPresentBalance(
+    public PortfolioSummaryResponse getPresentBalance(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
         try {
-            return statisticsUseCase.getPresentBalance(accountId, userId);
+            PresentBalanceResult result = statisticsUseCase.getPresentBalance(accountId, userId);
+            return normalizePortfolio(result);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -110,6 +112,32 @@ public class StatisticsController {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
         }
+    }
+
+    // PresentBalanceResult(KIS raw) → PortfolioSummaryResponse(kista-ui 호환 포맷) 변환
+    private PortfolioSummaryResponse normalizePortfolio(PresentBalanceResult result) {
+        // output1: 종목별 잔고 → PositionDto 목록으로 변환
+        List<PortfolioSummaryResponse.PositionDto> positions = result.items().stream()
+                .map(item -> new PortfolioSummaryResponse.PositionDto(
+                        item.symbol(),
+                        item.qty(),
+                        item.avgPrice(),
+                        item.currentPrice(),
+                        item.evalAmountUsd(),
+                        item.profitLossUsd(),
+                        item.profitRate(),
+                        item.exchangeCode()
+                ))
+                .toList();
+
+        // output3: 계좌 전체 요약 → SummaryDto 변환
+        PortfolioSummaryResponse.SummaryDto summary = new PortfolioSummaryResponse.SummaryDto(
+                result.totalAssetUsd(),
+                result.totalEvalProfit(),
+                result.totalReturnRate()
+        );
+
+        return new PortfolioSummaryResponse(positions, summary);
     }
 
     // 해외증거금 통화별조회 (TTTC2101R) — USD·KRW만 반환
