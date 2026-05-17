@@ -1,0 +1,65 @@
+package com.kista.adapter.in.web;
+
+import com.kista.adapter.in.web.security.JwtAuthFilter;
+import com.kista.adapter.in.web.security.SecurityConfig;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(AdminPingController.class)
+@Import({SecurityConfig.class, JwtAuthFilter.class}) // 실제 SecurityConfig + JwtAuthFilter 로드 — /api/admin/** hasRole 가드 적용
+@Execution(ExecutionMode.SAME_THREAD)
+class AdminPingControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
+
+    private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    @Test
+    void ping_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void ping_userToken_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping")
+                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ping_adminToken_returns200() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.adminId").value(ADMIN_UUID.toString()));
+    }
+
+    private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
+        return new UsernamePasswordAuthenticationToken(uuid, null,
+                List.of(new SimpleGrantedAuthority(role)));
+    }
+}
