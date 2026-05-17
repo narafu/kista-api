@@ -5,6 +5,7 @@ import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
+import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
@@ -18,6 +19,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -239,5 +241,26 @@ class UserServiceTest {
         // then
         assertThat(result.role()).isEqualTo(UserRole.USER);
         assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 시 userRepository.delete 호출")
+    void deleteMe_removesUser() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+
+        userService.deleteMe(id);
+
+        verify(userRepository).delete(id);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자 탈퇴 시 NoSuchElementException")
+    void deleteMe_userNotFound_throws() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.deleteMe(id))
+                .isInstanceOf(NoSuchElementException.class);
     }
 }

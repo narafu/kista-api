@@ -4,6 +4,7 @@ import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.port.in.ApproveUserUseCase;
+import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,6 +43,7 @@ class AuthControllerTest {
     @MockBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
     @MockBean KakaoLoginUseCase kakaoLoginUseCase; // 카카오 로그인 유스케이스
     @MockBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
+    @MockBean DeleteMeUseCase deleteMe;             // 회원 탈퇴 유스케이스
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -59,5 +62,21 @@ class AuthControllerTest {
                         .with(csrf())
                         .with(authentication(auth())))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 — 인증 후 204 반환")
+    void deleteMe_authenticated_returns204() throws Exception {
+        mockMvc.perform(delete("/api/auth/me")
+                        .with(csrf())
+                        .with(authentication(auth())))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 — 비인증 시 401 반환")
+    void deleteMe_anonymous_returns401() throws Exception {
+        mockMvc.perform(delete("/api/auth/me").with(csrf()))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -7,6 +7,7 @@ import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
+import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +37,7 @@ public class AuthController {
     private final GetUserUseCase getUser;
     private final ApproveUserUseCase approveUser;
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
+    private final DeleteMeUseCase deleteMe;              // 회원 탈퇴
 
     record KakaoCallbackRequest(
             @Schema(description = "카카오 OAuth 인가 코드", example = "xxxxxxxxxxxxxxxxxxxxxxxx")
@@ -89,5 +91,14 @@ public class AuthController {
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
+    }
+
+    // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (V16 FK CASCADE)
+    @Operation(summary = "회원 탈퇴", description = "본인 계정 및 모든 연관 데이터(계좌, 거래내역 등)를 즉시 삭제합니다.")
+    @ApiResponse(responseCode = "204", description = "탈퇴 성공")
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMe(@AuthenticationPrincipal UUID userId) {
+        deleteMe.deleteMe(userId);
     }
 }
