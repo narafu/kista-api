@@ -22,9 +22,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -71,6 +74,19 @@ class AuthControllerTest {
                         .with(csrf())
                         .with(authentication(auth())))
                 .andExpect(status().isNoContent());
+
+        verify(deleteMe).deleteMe(USER_ID); // UseCase 실제 호출 검증
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자 탈퇴 시 404 반환")
+    void deleteMe_userNotFound_returns404() throws Exception {
+        doThrow(new NoSuchElementException()).when(deleteMe).deleteMe(any());
+
+        mockMvc.perform(delete("/api/auth/me")
+                        .with(csrf())
+                        .with(authentication(auth())))
+                .andExpect(status().isNotFound());
     }
 
     @Test
