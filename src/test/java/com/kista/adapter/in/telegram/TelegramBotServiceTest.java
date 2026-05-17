@@ -3,7 +3,6 @@ package com.kista.adapter.in.telegram;
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PortfolioSnapshot;
 import com.kista.domain.model.TradeHistory;
-import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,28 +29,20 @@ class TelegramBotServiceTest {
     @Mock TelegramApiClient apiClient;
     @Mock GetTradeHistoryUseCase getTradeHistoryUseCase;
     @Mock GetPortfolioUseCase getPortfolioUseCase;
-    @Mock ApproveUserUseCase approveUserUseCase;
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
 
     @BeforeEach
     void setUp() {
-        // executeTradingUseCase 제거 — V2에서는 스케줄러가 자동 처리
         sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient,
-                getTradeHistoryUseCase, getPortfolioUseCase, approveUserUseCase);
+                getTradeHistoryUseCase, getPortfolioUseCase);
     }
 
     private TelegramUpdate update(String text) {
         return new TelegramUpdate(1L,
                 new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), text),
                 null);
-    }
-
-    private TelegramUpdate callbackUpdate(String callbackData) {
-        TelegramUpdate.Message msg = new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), null);
-        TelegramUpdate.CallbackQuery cq = new TelegramUpdate.CallbackQuery("cq-id-123", callbackData, msg);
-        return new TelegramUpdate(1L, null, cq);
     }
 
     @Test
@@ -152,34 +143,4 @@ class TelegramBotServiceTest {
         assertThat(captor.getValue()).contains("/help");
     }
 
-    @Test
-    void callback_approve_calls_approve_usecase_and_answers() {
-        UUID userId = UUID.randomUUID();
-
-        sut.handle(callbackUpdate("approve:" + userId));
-
-        verify(approveUserUseCase).approve(userId);
-        verify(apiClient).answerCallbackQuery("cq-id-123");
-        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), contains("승인"));
-    }
-
-    @Test
-    void callback_reject_calls_reject_usecase_and_answers() {
-        UUID userId = UUID.randomUUID();
-
-        sut.handle(callbackUpdate("reject:" + userId));
-
-        verify(approveUserUseCase).reject(userId);
-        verify(apiClient).answerCallbackQuery("cq-id-123");
-        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), contains("거절"));
-    }
-
-    @Test
-    void callback_always_answers_even_on_error() {
-        doThrow(new RuntimeException("DB 오류")).when(approveUserUseCase).approve(any());
-
-        sut.handle(callbackUpdate("approve:" + UUID.randomUUID()));
-
-        verify(apiClient).answerCallbackQuery("cq-id-123");
-    }
 }
