@@ -34,7 +34,7 @@ class UserEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 10)
     private UserRole role; // 사용자 권한 (USER / ADMIN)
 
-    @Column(name = "telegram_bot_token", length = 255)
+    @Column(name = "telegram_bot_token", length = 512)
     private String telegramBotToken; // AES-256 암호화 저장
 
     @Column(name = "telegram_chat_id", length = 50)
