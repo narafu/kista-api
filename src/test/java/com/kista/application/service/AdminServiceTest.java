@@ -10,6 +10,7 @@ import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -72,6 +73,16 @@ class AdminServiceTest {
     }
 
     @Test
+    void rejectUser_delegatesAndLogsAudit() {
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+
+        adminService.rejectUser(adminId, targetId);
+
+        verify(approveUserUseCase).reject(targetId);
+        verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), any());
+    }
+
+    @Test
     void changeRole_updatesRoleAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
         User existing = user(targetId, UserStatus.ACTIVE);
@@ -80,7 +91,9 @@ class AdminServiceTest {
 
         adminService.changeRole(adminId, targetId, UserRole.ADMIN);
 
-        verify(userRepository).save(any(User.class));
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().role()).isEqualTo(UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
     }
 
