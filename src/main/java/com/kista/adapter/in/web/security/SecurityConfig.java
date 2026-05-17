@@ -39,7 +39,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/telegram/webhook").permitAll()
-                        .requestMatchers("/api/auth/status-stream").authenticated() // SSE 연결은 인증 필수
+                        .requestMatchers("/api/auth/status-stream").authenticated() // 상태 SSE 연결은 인증 필수
+                        .requestMatchers("/api/trades/stream").authenticated() // 매매 SSE 연결은 인증 필수
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

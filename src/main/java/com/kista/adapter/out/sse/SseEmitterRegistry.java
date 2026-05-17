@@ -1,7 +1,9 @@
 package com.kista.adapter.out.sse;
 
+import com.kista.domain.model.TradeEvent;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -10,9 +12,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@RequiredArgsConstructor
 public class SseEmitterRegistry implements RealtimeNotificationPort {
 
     private final ConcurrentHashMap<UUID, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final TradeSseEmitterRegistry tradeSseEmitterRegistry; // 매매 알림 SSE 레지스트리
 
     // 사용자 SSE 연결 등록 — AuthController에서 호출
     public SseEmitter connect(UUID userId) {
@@ -34,5 +38,10 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
         } catch (IOException e) {
             emitters.remove(userId, emitter);
         }
+    }
+
+    @Override
+    public void notifyTrade(UUID userId, TradeEvent event) {
+        tradeSseEmitterRegistry.send(userId, event);
     }
 }

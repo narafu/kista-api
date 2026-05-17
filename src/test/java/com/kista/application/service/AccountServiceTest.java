@@ -100,7 +100,7 @@ class AccountServiceTest {
         UUID otherId = UUID.randomUUID();
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null, null);
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, cmd))
                 .isInstanceOf(SecurityException.class);
@@ -112,7 +112,7 @@ class AccountServiceTest {
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null, null, null);
         Account result = accountService.update(accountId, userId, cmd);
 
         assertThat(result.nickname()).isEqualTo("변경닉네임");
@@ -146,7 +146,7 @@ class AccountServiceTest {
         when(accountRepository.findById(accountId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
-                new UpdateAccountUseCase.Command("닉", null, null, null, null, null)))
+                new UpdateAccountUseCase.Command("닉", null, null, null, null, null, null)))
                 .isInstanceOf(java.util.NoSuchElementException.class);
     }
 
@@ -200,7 +200,7 @@ class AccountServiceTest {
 
         // when: kisAppKey만 변경
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command(
-                "새닉네임", "newAppKey", null, null, null, null
+                "새닉네임", "newAppKey", null, null, null, null, null
         );
         accountService.update(accountId, userId, cmd);
 
