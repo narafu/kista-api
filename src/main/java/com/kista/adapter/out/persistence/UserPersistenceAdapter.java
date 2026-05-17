@@ -35,7 +35,7 @@ public class UserPersistenceAdapter implements UserRepository {
     // persistence 경계에서 telegramBotToken 암호화
     private User encrypt(User user) {
         if (user.telegramBotToken() == null) return user;
-        return new User(user.id(), user.kakaoId(), user.nickname(), user.status(),
+        return new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 crypto.encrypt(user.telegramBotToken()), user.telegramChatId(),
                 user.createdAt(), user.updatedAt(), user.lastReappliedAt());
     }
@@ -44,7 +44,7 @@ public class UserPersistenceAdapter implements UserRepository {
     private User toDomain(UserEntity e) {
         User raw = e.toModel();
         if (raw.telegramBotToken() == null) return raw;
-        return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(),
+        return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(), raw.role(),
                 crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(),
                 raw.createdAt(), raw.updatedAt(), raw.lastReappliedAt());
     }

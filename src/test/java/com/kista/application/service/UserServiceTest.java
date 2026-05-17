@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.model.CooldownException;
 import com.kista.domain.model.User;
+import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -37,24 +38,24 @@ class UserServiceTest {
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
+        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
+        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(),
                 Instant.now().minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING,
+        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED,
+        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
@@ -155,7 +156,7 @@ class UserServiceTest {
     @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED,
+        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
                 null, null, Instant.now(), Instant.now(), null);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
