@@ -3,6 +3,6 @@
 - 계좌별 순차 실행: `TradingService.execute(Account, User)` — 한 계좌 실패 시 다음 계좌 계속 (격리)
 - 각 계좌: 잔고·현재가 조회 → 전략 계산 → `planned_orders` PENDING 저장 → `DstInfo.waitUntilOrderTime()` 대기 (DST=30분, 비DST=90분) → `planned_orders` 조회 → KIS 접수 (EXECUTED 기록)
 - 계좌별 KIS 토큰: `kis_tokens` 테이블에 account_id 기준 독립 관리
-- 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 계좌봇 > 사용자봇 > 생략
+- 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 > 생략 (계좌별 봇 제거됨)
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 계좌 계속 실행
 - `TradingService`에 INFO 로그 있음 — 계좌별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘

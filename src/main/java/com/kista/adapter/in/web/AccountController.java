@@ -77,7 +77,7 @@ public class AccountController {
     }
 
     // 계좌 수정 (소유권 검증)
-    @Operation(summary = "계좌 수정", description = "별명, KIS 자격증명, 텔레그램 설정, 종목 등을 수정. 계좌번호·전략종류는 수정 불가.")
+    @Operation(summary = "계좌 수정", description = "별명, KIS 자격증명, 종목 등을 수정. 계좌번호·전략종류는 수정 불가.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),

@@ -65,7 +65,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V18__expand_user_telegram_bot_token_length.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장)
+- 현재 최신: `V19__remove_account_telegram.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 테이블 telegram 컬럼 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
 

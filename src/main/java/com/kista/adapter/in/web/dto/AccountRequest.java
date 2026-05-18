@@ -21,25 +21,19 @@ public record AccountRequest(
         String kisAccountType,
         @Schema(description = "매매 전략 (등록 시 필수)", example = "INFINITE")
         @NotNull StrategyType strategyType,
-        @Schema(description = "텔레그램 봇 토큰 (선택)", example = "7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-        String telegramBotToken,
-        @Schema(description = "텔레그램 채팅 ID (선택)", example = "-1001234567890")
-        String telegramChatId,
         @Schema(description = "거래 종목 (선택, PRIVACY=SOXL 고정, INFINITE 기본=TQQQ)", example = "TQQQ")
         Ticker ticker
 ) {
     public RegisterAccountUseCase.Command toRegisterCommand() {
         return new RegisterAccountUseCase.Command(
                 nickname, accountNo, kisAppKey, kisSecretKey,
-                kisAccountType, strategyType, telegramBotToken, telegramChatId,
-                ticker
+                kisAccountType, strategyType, ticker
         );
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
-                nickname, kisAppKey, kisSecretKey, telegramBotToken, telegramChatId,
-                ticker, strategyType
+                nickname, kisAppKey, kisSecretKey, ticker, strategyType
         );
     }
 }

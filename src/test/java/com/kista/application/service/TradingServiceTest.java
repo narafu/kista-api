@@ -55,13 +55,12 @@ class TradingServiceTest {
             0, BigDecimal.ZERO, BigDecimal.ZERO);
 
     // Account 생성자: id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType,
-    //                 strategyType, strategyStatus, telegramBotToken, telegramChatId,
-    //                 ticker, createdAt, updatedAt
+    //                 strategyType, strategyStatus, ticker, createdAt, updatedAt
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
             StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            null, null, Ticker.SOXL, Instant.now(), Instant.now()
+            Ticker.SOXL, Instant.now(), Instant.now()
     );
 
     // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,

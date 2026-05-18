@@ -16,8 +16,6 @@ public interface RegisterAccountUseCase {
             String kisSecretKey,    // 평문
             String kisAccountType,  // 기본값 "01"
             StrategyType strategyType,
-            String telegramBotToken, // null 가능
-            String telegramChatId,   // null 가능
             Ticker ticker            // null이면 전략에 따라 결정 (PRIVACY=SOXL, INFINITE=TQQQ)
     ) {}
 }

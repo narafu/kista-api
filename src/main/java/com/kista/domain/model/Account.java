@@ -13,8 +13,6 @@ public record Account(
         String kisAccountType,      // 계좌 상품 코드 (기본: 01)
         StrategyType strategyType,          // 매매 전략
         StrategyStatus strategyStatus, // 전략 실행 상태
-        String telegramBotToken,    // 계좌별 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
-        String telegramChatId,      // 계좌별 텔레그램 Chat ID (null 가능)
         Ticker ticker,              // 거래 종목 (exchangeCode 포함)
         Instant createdAt,
         Instant updatedAt

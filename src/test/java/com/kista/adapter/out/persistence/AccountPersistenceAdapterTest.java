@@ -73,7 +73,7 @@ class AccountPersistenceAdapterTest {
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                null, null, Ticker.SOXL, null, null);
+                Ticker.SOXL, null, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
@@ -97,7 +97,7 @@ class AccountPersistenceAdapterTest {
         Account existingAccount = new Account(accountId, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 StrategyType.INFINITE, StrategyStatus.PAUSED,
-                null, null, Ticker.SOXL, Instant.now(), Instant.now());
+                Ticker.SOXL, Instant.now(), Instant.now());
 
         AccountEntity entity = accountEntityWithId(accountId);
         StrategyEntity strategy = strategyEntity(accountId, StrategyType.INFINITE, StrategyStatus.ACTIVE);

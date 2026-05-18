@@ -19,8 +19,6 @@ public record AccountResponse(
         StrategyType strategyType,
         @Schema(description = "전략 상태", example = "ACTIVE")
         StrategyStatus strategyStatus,
-        @Schema(description = "텔레그램 알림 설정 여부", example = "true")
-        boolean hasTelegram,
         @Schema(description = "거래 종목", example = "TQQQ")
         Ticker ticker
 ) {
@@ -31,7 +29,6 @@ public record AccountResponse(
                 maskAccountNo(a.accountNo()),
                 a.strategyType(),
                 a.strategyStatus(),
-                a.telegramChatId() != null,
                 a.ticker()
         );
     }

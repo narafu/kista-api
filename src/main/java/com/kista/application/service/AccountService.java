@@ -56,7 +56,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
                 cmd.strategyType(), StrategyStatus.ACTIVE,
-                cmd.telegramBotToken(), cmd.telegramChatId(),
                 ticker,
                 null, null
         );
@@ -96,7 +95,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), newStrategyType, account.strategyStatus(),
-                cmd.telegramBotToken(), cmd.telegramChatId(),
                 updatedTicker,
                 account.createdAt(), null
         );
@@ -166,7 +164,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         return new Account(account.id(), account.userId(), account.nickname(),
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategyType(), status,
-                account.telegramBotToken(), account.telegramChatId(),
                 account.ticker(),
                 account.createdAt(), null);
     }

@@ -59,6 +59,7 @@ domain      →  외부 의존 없음
 | `User` record 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + `UserServiceTest` + `TelegramAdapterTest` + `TradingSchedulerTest` + `AccountServiceTest` + `TradingServiceTest` (`new User(...)` 호출 전파) |
 | `PlannedOrder` 변경 | `PlannedOrderPort` + `PlannedOrderPersistenceAdapter` + `PlannedOrderEntity` + `PlannedOrderJpaRepository` + `TradingService` (savePlannedOrders/executePlannedOrders 메서드) |
 | `UpdateAccountUseCase.Command` 필드 추가 | `AccountService.update()`에 적용 로직 + `AccountRequest.toUpdateCommand()` 동시 수정 |
+| `Account` record 필드 추가/제거 | `AccountEntity` + `AccountPersistenceAdapter`(toEntity/buildDomain) + `AccountService`(register/update/withStrategyStatus 3곳) + `AccountRequest`(toRegisterCommand/toUpdateCommand) + `AccountResponse.from()` + `RegisterAccountUseCase.Command` + `UpdateAccountUseCase.Command` + 테스트 9개(`AccountServiceTest` — `new Account` 및 `new UpdateAccountUseCase.Command` 직접 호출 포함, `AccountPersistenceAdapterTest`, `TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`, `KisPortfolioAdapterTest`, `KisProfitAdapterTest`, `KisOrderAdapterTest`, `KisExecutionAdapterTest`) |
 | `NotifyPort` 시그니처 변경 | `TelegramAdapter` + `TradingService` + `TelegramAdapterTest` + `TradingServiceTest` |
 | `StatisticsController` 응답 타입 변경 | `StatisticsControllerTest`의 JSONPath 업데이트 필수 (예: `$.totalAssetUsd` → `$.summary.totalAssetUsd`) |
 | `User.role` 변경 또는 `UserRole` 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + `JwtIssuerService` claim |
@@ -74,6 +75,6 @@ domain      →  외부 의존 없음
 - 새 엔티티에 타임스탬프 필요 시 `BaseAuditEntity` 상속; `KisTokenEntity` 등 DB DEFAULT(`insertable=false, updatable=false`) 방식 엔티티는 그대로 유지
 - 서비스에서 domain record 생성 시: `updatedAt=null` (adapter가 무시, `@LastModifiedDate`가 처리), `createdAt`은 update 시 기존 값 보존 / register 시 `null` (`@CreatedDate`가 처리)
 
-### 텔레그램 알림 우선순위 (notifyTradingReport)
-- 계좌별 `telegramBotToken/chatId` 있으면 계좌봇 발송 → 없으면 `User.telegramBotToken/chatId` 사용자봇 → 없으면 생략 (`log.warn`)
-- `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용 (`AccountPersistenceAdapter`와 동일 패턴)
+### 텔레그램 알림 (notifyTradingReport)
+- 계좌별 텔레그램 설정 제거됨 — `User.telegramBotToken/chatId` 사용자봇만 사용 → 미설정 시 생략 (`log.warn`)
+- `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용

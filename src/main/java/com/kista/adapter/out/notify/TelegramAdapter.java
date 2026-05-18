@@ -103,10 +103,9 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport r) {
-        // 우선순위: 계좌별 봇 > 사용자 전체 봇 > 생략
-        String botToken = resolveNotifyBot(user, account);
-        String chatId = resolveNotifyChatId(user, account);
-        if (botToken == null || chatId == null) {
+        // 사용자 텔레그램 봇 미설정 시 생략
+        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
+                || user.telegramChatId() == null) {
             log.warn("[{}] 텔레그램 미설정 — 매매 리포트 생략", account.nickname());
             return;
         }
@@ -119,28 +118,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
                 r.totalBoughtUsd(), r.totalSoldUsd(),
                 r.vars().quantity(), r.vars().averagePrice(),
                 r.vars().priceOffsetRate(), r.vars().targetPrice());
-        sendMessage(chatId, text, botToken);
-    }
-
-    // 계좌별 봇 > 사용자 전체 봇 순서로 유효한 봇 토큰 반환
-    private String resolveNotifyBot(User user, Account account) {
-        if (account.telegramBotToken() != null && !account.telegramBotToken().isBlank()
-                && account.telegramChatId() != null) {
-            return account.telegramBotToken();
-        }
-        if (user.telegramBotToken() != null && !user.telegramBotToken().isBlank()
-                && user.telegramChatId() != null) {
-            return user.telegramBotToken();
-        }
-        return null;
-    }
-
-    private String resolveNotifyChatId(User user, Account account) {
-        if (account.telegramBotToken() != null && !account.telegramBotToken().isBlank()
-                && account.telegramChatId() != null) {
-            return account.telegramChatId();
-        }
-        return user.telegramChatId();
+        sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
 
     // ── 내부 전송 헬퍼 ────────────────────────────────────────────────────────

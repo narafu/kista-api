@@ -38,12 +38,6 @@ class AccountEntity extends BaseAuditEntity {
     @Column(name = "kis_account_type", nullable = false, length = 10)
     private String kisAccountType;       // 계좌 상품 코드 (기본: 01)
 
-    @Column(name = "telegram_bot_token", length = 512)
-    private String telegramBotToken;     // 계좌별 봇 (optional, AES-256)
-
-    @Column(name = "telegram_chat_id", length = 50)
-    private String telegramChatId;
-
     @Column(nullable = false, length = 20)
     private String symbol;               // 거래 종목 코드 (Ticker name, 예: SOXL)
 }
