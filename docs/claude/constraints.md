@@ -65,7 +65,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V19__remove_account_telegram.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 테이블 telegram 컬럼 제거)
+- 현재 최신: `V20__add_telegram_bot_username.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 텔레그램 컬럼 제거, V20: users.telegram_bot_username 추가)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
 
@@ -95,6 +95,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `AccountPersistenceAdapter`가 `AesCryptoService` 주입받아 처리 — `AccountService`(application layer)는 평문만 다룸
 - ArchUnit 규칙(application → adapter 금지)으로 서비스가 암호화 서비스 직접 호출 불가
 - 신규 환경변수: `AES_ENCRYPTION_KEY` (Base64 32바이트)
+
+### TelegramApiClient package-private 제약
+- `TelegramApiClient` (`adapter/in/telegram/`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가
+- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `domain/port/out/` 포트 + `adapter/out/notify/` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
+- 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
 
 ### Spring Security Filter 이중 등록 방지
 - `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
