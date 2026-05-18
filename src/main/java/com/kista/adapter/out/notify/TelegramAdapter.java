@@ -36,8 +36,8 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
                 + "편차율: %.4f | 목표가: $%.2f",
                 r.date(),
                 r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.vars().quantity(), r.vars().averagePrice(),
-                r.vars().priceOffsetRate(), r.vars().targetPrice());
+                r.snapshot().quantity(), r.snapshot().averagePrice(),
+                r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
         send(text);
     }
 
@@ -116,8 +116,8 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
                 + "편차율: %.4f | 목표가: $%.2f",
                 r.date(), account.nickname(),
                 r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.vars().quantity(), r.vars().averagePrice(),
-                r.vars().priceOffsetRate(), r.vars().targetPrice());
+                r.snapshot().quantity(), r.snapshot().averagePrice(),
+                r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
         sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
 

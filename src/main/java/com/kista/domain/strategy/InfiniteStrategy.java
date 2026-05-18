@@ -1,9 +1,7 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.AccountBalance;
 import com.kista.domain.model.InfinitePosition;
 import com.kista.domain.model.Order;
-import com.kista.domain.model.Ticker;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -20,18 +18,13 @@ import static com.kista.domain.model.Order.OrderType.*;
 public class InfiniteStrategy implements TradingStrategy {
 
     @Override
-    public List<Order> buildOrders(AccountBalance balance, BigDecimal currentPrice, Ticker ticker, LocalDate tradeDate) {
-        // 1. 컨텍스트를 담은 도메인 객체 생성
-        InfinitePosition position = new InfinitePosition(balance, ticker, currentPrice);
+    public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
         List<Order> orders = new ArrayList<>();
-
-        // 2. TDA 원칙에 따른 선언적 흐름 제어
         if (position.isEarlyStage()) {
             buildEarlyStageOrders(orders, position, tradeDate);
         } else {
             buildLateStageOrders(orders, position, tradeDate);
         }
-
         return orders;
     }
 

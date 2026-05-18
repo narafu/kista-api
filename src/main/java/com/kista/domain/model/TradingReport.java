@@ -6,7 +6,7 @@ import java.util.List;
 
 public record TradingReport(
         LocalDate date,                  // 거래일
-        TradingVariables vars,           // 당일 전략 계산 변수
+        TradingSnapshot snapshot,        // 당일 전략 계산 스냅샷
         List<Order> mainOrders,          // LOC 자동 주문 목록
         List<Order> correctionOrders,    // 미체결 보정 LIMIT 주문 목록
         BigDecimal totalBoughtUsd,       // 당일 총 매수 체결액 (USD)

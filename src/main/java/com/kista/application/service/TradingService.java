@@ -62,10 +62,10 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("현재가: ${}", price);
 
         // 4. 전략 계산 → planned_orders에 저장 (plan 단계)
-        TradingVariables vars = tradingStrategy.calculate(balance, price, account.ticker());
+        InfinitePosition position = new InfinitePosition(balance, account.ticker(), price);
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
-                account.nickname(), vars.priceOffsetRate(), vars.currentRound(), vars.unitAmount());
-        savePlannedOrders(vars, today, account);
+                account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
+        savePlannedOrders(position, today, account);
 
         // 5. 주문 시각까지 대기 (계획 저장 후 대기로 이동)
         waitForOrderTime(dst);
@@ -84,12 +84,12 @@ public class TradingService implements ExecuteTradingUseCase {
         List<Order> corrections = applyCorrections(mainOrders, executions, today, account);
 
         // 10. 이력 저장 + 알림
-        saveAndNotify(balance, price, today, vars, mainOrders, corrections, executions, user, account);
+        saveAndNotify(balance, price, today, position, mainOrders, corrections, executions, user, account);
     }
 
     // 전략 계산 결과를 planned_orders에 PENDING 상태로 저장
-    private void savePlannedOrders(TradingVariables vars, LocalDate today, Account account) {
-        List<Order> pending = tradingStrategy.buildOrders(vars, today, account.ticker());
+    private void savePlannedOrders(InfinitePosition position, LocalDate today, Account account) {
+        List<Order> pending = tradingStrategy.buildOrders(position, today);
         List<PlannedOrder> planned = pending.stream()
                 .map(o -> PlannedOrder.from(o, account.id()))
                 .toList();
@@ -145,7 +145,7 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     private void saveAndNotify(AccountBalance balance, BigDecimal price, LocalDate today,
-                               TradingVariables vars, List<Order> mainOrders,
+                               InfinitePosition position, List<Order> mainOrders,
                                List<Order> corrections, List<Execution> executions,
                                User user, Account account) {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
@@ -153,7 +153,7 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
         portfolioSnapshotPort.save(toSnapshot(balance, price, today, account));
         log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
-        TradingReport report = buildReport(today, vars, mainOrders, corrections, executions);
+        TradingReport report = buildReport(today, position, mainOrders, corrections, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
         log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
         // 체결 건별 SSE 실시간 알림 (@Transactional 외부에서 호출 — 이미 DB 저장 완료 후)
@@ -186,7 +186,7 @@ public class TradingService implements ExecuteTradingUseCase {
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 
-    private TradingReport buildReport(LocalDate today, TradingVariables vars,
+    private TradingReport buildReport(LocalDate today, InfinitePosition position,
                                       List<Order> mainOrders, List<Order> corrections,
                                       List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
@@ -197,6 +197,6 @@ public class TradingService implements ExecuteTradingUseCase {
                 .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TradingReport(today, vars, mainOrders, corrections, totalBought, totalSold);
+        return new TradingReport(today, position.toSnapshot(), mainOrders, corrections, totalBought, totalSold);
     }
 }
