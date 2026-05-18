@@ -69,12 +69,12 @@ public class DevAuthController {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userRepository.findById(DEV_ADMIN_UUID).orElseGet(() ->
                 userRepository.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", UserStatus.ACTIVE, UserRole.ADMIN,
-                        null, null, null, null, null)));
+                        null, null, null, null, null, null)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != UserRole.ADMIN) {
             admin = userRepository.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
                     UserStatus.ACTIVE, UserRole.ADMIN, admin.telegramBotToken(), admin.telegramChatId(),
-                    admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt()));
+                    admin.telegramBotUsername(), admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt()));
         }
         String token = jwtIssuerService.issue(admin.id(), UserRole.ADMIN); // ADMIN role ES256 서명
         return new TokenResponse(token, "bearer", 604800);

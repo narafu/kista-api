@@ -17,7 +17,9 @@ public record UserResponse(
         @Schema(description = "텔레그램 알림 설정 여부", example = "true")
         boolean hasTelegram,
         @Schema(description = "역할 (USER/ADMIN)", example = "USER")
-        UserRole role
+        UserRole role,
+        @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
+        String telegramBotUsername
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
@@ -25,7 +27,8 @@ public record UserResponse(
                 user.nickname(),
                 user.status(),
                 user.telegramChatId() != null,
-                user.role()
+                user.role(),
+                user.telegramBotUsername()
         );
     }
 }

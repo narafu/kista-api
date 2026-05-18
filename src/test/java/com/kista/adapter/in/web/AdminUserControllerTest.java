@@ -54,7 +54,7 @@ class AdminUserControllerTest {
     // 테스트용 샘플 User 생성 (10개 필드: id, kakaoId, nickname, status, role, botToken, chatId, createdAt, updatedAt, lastReappliedAt)
     private User sampleUser(UUID id) {
         return new User(id, "kakao-1", "테스트유저", UserStatus.PENDING, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
     }
 
     @Test

@@ -74,6 +74,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
                 role,
                 user.telegramBotToken(),
                 user.telegramChatId(),
+                user.telegramBotUsername(),
                 user.createdAt(),
                 null,
                 user.lastReappliedAt()

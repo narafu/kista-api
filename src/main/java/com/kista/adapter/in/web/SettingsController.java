@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -31,16 +32,21 @@ public class SettingsController {
         return TelegramSettingsResponse.from(getUser.getById(userId));
     }
 
-    // 텔레그램 봇 설정 (botToken, chatId 저장)
+    // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증)
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
     @ApiResponse(responseCode = "204", description = "저장 성공")
+    @ApiResponse(responseCode = "400", description = "유효하지 않은 Bot Token")
     @PutMapping("/telegram")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
                                @RequestBody Map<String, String> body) {
         String botToken = body.get("botToken");
         String chatId = body.get("chatId");
-        updateUserTelegram.updateTelegram(userId, botToken, chatId);
+        try {
+            updateUserTelegram.updateTelegram(userId, botToken, chatId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     // 텔레그램 봇 설정 해제

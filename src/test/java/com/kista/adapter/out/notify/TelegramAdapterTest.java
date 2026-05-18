@@ -117,7 +117,7 @@ class TelegramAdapterTest {
     @SuppressWarnings("unchecked")
     void notifyStrategyChanged_bodyContainsNicknameAccountAndAction() {
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
@@ -136,7 +136,7 @@ class TelegramAdapterTest {
     void notifyTradingReport_withUserBot_sendsToUserChatId() {
         // 사용자 텔레그램 봇 설정 → 사용자 봇으로 발송
         User userWithBot = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
-                "user-bot-token", "user-chat-789", Instant.now(), Instant.now(), null);
+                "user-bot-token", "user-chat-789", null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
@@ -162,7 +162,7 @@ class TelegramAdapterTest {
     void notifyTradingReport_noUserBot_skips() {
         // 사용자 텔레그램 봇 미설정 시 예외 없이 발송 스킵
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
         Account account = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,

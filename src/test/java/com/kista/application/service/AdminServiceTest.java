@@ -40,7 +40,7 @@ class AdminServiceTest {
     // (id, kakaoId, nickname, status, role, telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt)
     private User user(UUID id, UserStatus status) {
         return new User(id, "kakao-" + id, "테스트", status, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
     }
 
     @Test

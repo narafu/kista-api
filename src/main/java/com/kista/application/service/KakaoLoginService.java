@@ -48,7 +48,7 @@ public class KakaoLoginService implements KakaoLoginUseCase {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
             user = userRepository.save(new User(
                     user.id(), user.kakaoId(), user.nickname(), UserStatus.ACTIVE, UserRole.ADMIN,
-                    user.telegramBotToken(), user.telegramChatId(),
+                    user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                     user.createdAt(), user.updatedAt(), user.lastReappliedAt()
             ));
         }

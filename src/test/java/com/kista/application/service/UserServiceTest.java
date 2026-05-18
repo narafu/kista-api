@@ -7,6 +7,7 @@ import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
 import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.out.RealtimeNotificationPort;
+import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -37,30 +38,31 @@ class UserServiceTest {
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock AdminBootstrapProperties bootstrapProps;
+    @Mock TelegramBotInfoPort telegramBotInfoPort;
 
     @InjectMocks UserService userService;
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
         return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
-                null, null, Instant.now(), Instant.now(),
+                null, null, null, Instant.now(), Instant.now(),
                 Instant.now().minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), lastReappliedAt);
+                null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), lastReappliedAt);
+                null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     @Test
@@ -161,7 +163,7 @@ class UserServiceTest {
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
-                null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

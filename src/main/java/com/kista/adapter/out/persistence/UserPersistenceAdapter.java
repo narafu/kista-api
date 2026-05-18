@@ -53,7 +53,7 @@ public class UserPersistenceAdapter implements UserRepository {
     private User encrypt(User user) {
         if (user.telegramBotToken() == null) return user;
         return new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                crypto.encrypt(user.telegramBotToken()), user.telegramChatId(),
+                crypto.encrypt(user.telegramBotToken()), user.telegramChatId(), user.telegramBotUsername(),
                 user.createdAt(), user.updatedAt(), user.lastReappliedAt());
     }
 
@@ -62,7 +62,7 @@ public class UserPersistenceAdapter implements UserRepository {
         User raw = e.toModel();
         if (raw.telegramBotToken() == null) return raw;
         return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(), raw.role(),
-                crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(),
+                crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername(),
                 raw.createdAt(), raw.updatedAt(), raw.lastReappliedAt());
     }
 }
