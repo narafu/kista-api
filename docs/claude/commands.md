@@ -14,6 +14,18 @@
 grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```
 
+### 미참조 타입 전수조사 (dead code 스캔)
+```bash
+for f in $(find src/main/java -name "*.java"); do
+  name=$(basename "$f" .java)
+  cnt=$(grep -rlw --include="*.java" "$name" src 2>/dev/null | grep -vF "$f" | wc -l)
+  [ "$cnt" -eq 0 ] && echo "ZERO-REF: $f"
+done
+# 오탐 분류: @RestController/@Configuration → 컴포넌트 스캔으로 동작, @Service/@Component → 인터페이스 DI(UseCase/Port)로 주입
+# 진짜 dead: annotation 없는 순수 record/class 이고 src 전체에 참조 없는 것 (예: 과거 StrategyConfig)
+# 삭제 후 검증: ./gradlew compileJava && ./gradlew test --tests 'com.kista.architecture.*'
+```
+
 ### 로컬 admin 토큰 발급 (DevAuthController, local 프로파일 전용)
 ```bash
 # 일반 사용자 토큰
