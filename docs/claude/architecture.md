@@ -52,7 +52,8 @@ domain      →  외부 의존 없음
 | `AccountService` UseCase 추가 | `AccountController` 필드 + 엔드포인트 동시 추가 |
 | 컨트롤러에 새 UseCase 필드 추가 | 해당 `@WebMvcTest` 테스트에 `@MockBean` 추가 필수 (누락 시 `ApplicationContext` 실패) |
 | 매매 공식 변경 | `InfiniteStrategyTypeTest` |
-| `TradingVariables` 필드 추가 | `TelegramAdapterTest.java` (하드코딩 생성자) + `InfiniteStrategyTypeTest` |
+| `InfinitePosition` 공개 메서드 변경 | `InfinitePositionTest` + `InfiniteStrategyTypeTest` |
+| `TradingSnapshot` 필드 변경 | `TelegramAdapterTest` (`new TradingSnapshot(...)` 3곳) + `TradingReport` |
 | 새 KIS Adapter 추가 | 같은 패키지에 `*AdapterTest` 단위 테스트 |
 | `UserPersistenceAdapter` telegramBotToken 변경 | `UserEntity` + `AesCryptoService` 암호화/복호화 패턴 확인 |
 | `KisProperties` 필드 추가/제거 | `KisTokenAdapterTest` + `KisExecutionAdapterTest` + `KisProfitAdapterTest` (생성자 하드코딩) |
@@ -78,3 +79,9 @@ domain      →  외부 의존 없음
 ### 텔레그램 알림 (notifyTradingReport)
 - 계좌별 텔레그램 설정 제거됨 — `User.telegramBotToken/chatId` 사용자봇만 사용 → 미설정 시 생략 (`log.warn`)
 - `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용
+
+### TDA 전략 패턴 (InfiniteStrategy)
+- `InfinitePosition` (`domain/model`): 잔고·종목·현재가로부터 모든 매매 변수 계산 + TDA 행위 메서드 (`isEarlyStage()`, `isDepositDeficient()`, `calcXxx()`) + `toSnapshot()`
+- `TradingStrategy`: 단일 메서드 `buildOrders(InfinitePosition, LocalDate)` — `TradingService`가 `InfinitePosition` 1회 생성 후 전달 (SSOT)
+- `TradingReport.snapshot: TradingSnapshot` — 알림용 4개 필드 (quantity, averagePrice, priceOffsetRate, targetPrice)
+- `TelegramAdapter` 접근 경로: `r.snapshot().X()` (포맷 문자열 변경 금지)
