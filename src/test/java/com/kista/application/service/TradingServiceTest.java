@@ -3,7 +3,6 @@ package com.kista.application.service;
 import com.kista.domain.model.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
-import com.kista.domain.strategy.InfiniteStrategy;
 import com.kista.domain.strategy.TradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,7 +81,6 @@ class TradingServiceTest {
 
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
-        TradingVariables vars = new InfiniteStrategy().calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL);
         Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
@@ -97,8 +95,7 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
-        when(tradingStrategy.calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq(Ticker.SOXL)))
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
@@ -111,7 +108,6 @@ class TradingServiceTest {
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
         verify(kisAccountPort).getBalance(ACCOUNT);
         verify(kisPricePort).getPrice("SOXL", ACCOUNT);
-        verify(tradingStrategy).calculate(NORMAL_BALANCE, PRICE, Ticker.SOXL);
         verify(plannedOrderPort).saveAll(anyList());                                      // 계획 저장
         verify(plannedOrderPort).findPendingByAccountAndDate(eq(ACCOUNT.id()), any());   // 실행 조회
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
@@ -124,7 +120,6 @@ class TradingServiceTest {
 
     @Test
     void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
-        TradingVariables vars = new InfiniteStrategy().calculate(FRESH_BALANCE, PRICE, Ticker.SOXL);
         Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
         Order mainOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
@@ -140,8 +135,7 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
         when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
-        when(tradingStrategy.calculate(FRESH_BALANCE, PRICE, Ticker.SOXL)).thenReturn(vars);
-        when(tradingStrategy.buildOrders(eq(vars), any(LocalDate.class), eq(Ticker.SOXL)))
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));

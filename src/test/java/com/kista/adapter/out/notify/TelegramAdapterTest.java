@@ -76,24 +76,10 @@ class TelegramAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyReport_bodyContainsDateAndAmounts() {
-        TradingVariables vars = TradingVariables.builder()
-                .averagePrice(new BigDecimal("20.00"))
-                .quantity(10)
-                .purchaseAmount(new BigDecimal("200.00"))
-                .evaluationAmount(new BigDecimal("210.00"))
-                .totalAssets(new BigDecimal("700.00"))
-                .totalRounds(20)
-                .currentRound(1.33)
-                .unitAmount(new BigDecimal("35.00"))
-                .targetProfitRate(new BigDecimal("0.20"))
-                .priceOffsetRate(new BigDecimal("0.1733"))
-                .usdDeposit(new BigDecimal("500.00"))
-                .referencePrice(new BigDecimal("23.47"))
-                .targetPrice(new BigDecimal("24.00"))
-                .currentPrice(new BigDecimal("22.00"))
-                .build();
+        TradingSnapshot snapshot = new TradingSnapshot(10,
+                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         TradingReport report = new TradingReport(
-                LocalDate.of(2024, 6, 15), vars, List.of(), List.of(),
+                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -155,16 +141,10 @@ class TelegramAdapterTest {
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 Ticker.SOXL, Instant.now(), Instant.now());
-        TradingVariables vars = TradingVariables.builder()
-                .averagePrice(new BigDecimal("20.00")).quantity(10)
-                .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
-                .totalAssets(new BigDecimal("700.00")).totalRounds(20).currentRound(1.33)
-                .unitAmount(new BigDecimal("35.00")).targetProfitRate(new BigDecimal("0.20"))
-                .priceOffsetRate(new BigDecimal("0.1733")).usdDeposit(new BigDecimal("500.00"))
-                .referencePrice(new BigDecimal("23.47")).targetPrice(new BigDecimal("24.00"))
-                .currentPrice(new BigDecimal("22.00")).build();
+        TradingSnapshot snapshot = new TradingSnapshot(10,
+                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         TradingReport report = new TradingReport(
-                java.time.LocalDate.of(2024, 6, 15), vars, java.util.List.of(), java.util.List.of(),
+                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -187,16 +167,10 @@ class TelegramAdapterTest {
                 "74420614", "key", "secret", "01",
                 StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 Ticker.SOXL, Instant.now(), Instant.now());
-        TradingVariables vars = TradingVariables.builder()
-                .averagePrice(new BigDecimal("20.00")).quantity(10)
-                .purchaseAmount(new BigDecimal("200.00")).evaluationAmount(new BigDecimal("210.00"))
-                .totalAssets(new BigDecimal("700.00")).totalRounds(20).currentRound(1.33)
-                .unitAmount(new BigDecimal("35.00")).targetProfitRate(new BigDecimal("0.20"))
-                .priceOffsetRate(new BigDecimal("0.1733")).usdDeposit(new BigDecimal("500.00"))
-                .referencePrice(new BigDecimal("23.47")).targetPrice(new BigDecimal("24.00"))
-                .currentPrice(new BigDecimal("22.00")).build();
+        TradingSnapshot snapshot = new TradingSnapshot(10,
+                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         TradingReport report = new TradingReport(
-                java.time.LocalDate.of(2024, 6, 15), vars, java.util.List.of(), java.util.List.of(),
+                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
 
         adapter.notifyTradingReport(user, account, report);
