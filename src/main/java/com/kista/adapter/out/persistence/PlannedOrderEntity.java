@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PlannedOrder;
+import com.kista.domain.model.Ticker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "planned_orders")
 @Getter
-@Setter(AccessLevel.PACKAGE) // markExecuted 전용 (status, kisOrderId)
+@Setter(AccessLevel.PACKAGE) // markExecuted 전용 (status, orderId)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
 class PlannedOrderEntity {
 
@@ -31,8 +32,9 @@ class PlannedOrderEntity {
     @Column(name = "trade_date", nullable = false)
     private LocalDate tradeDate;
 
-    @Column(nullable = false, length = 20)
-    private String symbol;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticker", nullable = false, length = 20)
+    private Ticker ticker;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 10)
@@ -52,8 +54,8 @@ class PlannedOrderEntity {
     @Column(nullable = false, length = 10)
     private PlannedOrder.PlannedOrderStatus status; // PENDING / EXECUTED
 
-    @Column(name = "kis_order_id", length = 30)
-    private String kisOrderId; // EXECUTED 이후 설정
+    @Column(name = "order_id", length = 30)
+    private String orderId; // EXECUTED 이후 설정
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt; // DB DEFAULT now() 자동 설정

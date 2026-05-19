@@ -2,6 +2,7 @@ package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.InfinitePosition;
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,7 +14,7 @@ public record NextOrdersResponse(
         List<OrderItem> orders
 ) {
     public record PositionSnapshot(
-            String symbol,           // 종목 코드
+            Ticker symbol,           // 거래 종목
             int quantity,            // 보유 수량
             BigDecimal averagePrice, // 평균 매입가
             BigDecimal usdDeposit,   // 통합주문가능금액
@@ -27,7 +28,7 @@ public record NextOrdersResponse(
     ) {
         public static PositionSnapshot from(InfinitePosition p) {
             return new PositionSnapshot(
-                    p.symbol(),
+                    p.ticker(),
                     p.quantity(),
                     p.averagePrice(),
                     p.usdDeposit(),
@@ -42,16 +43,16 @@ public record NextOrdersResponse(
         }
     }
 
-    // tradeDate·status·kisOrderId는 preview에서 의미 없으므로 제외
+    // tradeDate·status·orderId는 preview에서 의미 없으므로 제외
     public record OrderItem(
-            String symbol,              // 종목 코드
+            Ticker symbol,              // 거래 종목
             Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             Order.OrderDirection direction, // 매수/매도 방향
             int qty,                    // 주문 수량
             BigDecimal price            // 주문 가격 (LOC/MOC는 참고용)
     ) {
         public static OrderItem from(Order o) {
-            return new OrderItem(o.symbol(), o.orderType(), o.direction(), o.qty(), o.price());
+            return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.qty(), o.price());
         }
     }
 

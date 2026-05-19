@@ -34,11 +34,11 @@ public class PlannedOrderPersistenceAdapter implements PlannedOrderPort {
     }
 
     @Override
-    public void markExecuted(UUID plannedOrderId, String kisOrderId) {
-        // 명시적 save로 dirty checking 의존 없이 EXECUTED + kisOrderId 기록
+    public void markExecuted(UUID plannedOrderId, String orderId) {
+        // 명시적 save로 dirty checking 의존 없이 EXECUTED + orderId 기록
         repository.findById(plannedOrderId).ifPresent(e -> {
             e.setStatus(PlannedOrder.PlannedOrderStatus.EXECUTED);
-            e.setKisOrderId(kisOrderId);
+            e.setOrderId(orderId);
             repository.save(e);
         });
     }
@@ -47,21 +47,21 @@ public class PlannedOrderPersistenceAdapter implements PlannedOrderPort {
         PlannedOrderEntity e = new PlannedOrderEntity();
         e.setAccountId(p.accountId());
         e.setTradeDate(p.tradeDate());
-        e.setSymbol(p.symbol());
+        e.setTicker(p.ticker());
         e.setOrderType(p.orderType());
         e.setDirection(p.direction());
         e.setQty(p.qty());
         e.setPrice(p.price());
         e.setStatus(p.status());
-        e.setKisOrderId(p.kisOrderId());
+        e.setOrderId(p.orderId());
         return e;
     }
 
     private PlannedOrder toDomain(PlannedOrderEntity e) {
         return new PlannedOrder(
-                e.getId(), e.getAccountId(), e.getTradeDate(), e.getSymbol(),
+                e.getId(), e.getAccountId(), e.getTradeDate(), e.getTicker(),
                 e.getOrderType(), e.getDirection(), e.getQty(), e.getPrice(),
-                e.getStatus(), e.getKisOrderId()
+                e.getStatus(), e.getOrderId()
         );
     }
 }

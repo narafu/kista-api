@@ -84,7 +84,7 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         Map<String, String> body = new HashMap<>();
         body.put("CANO", account.accountNo());
         body.put("ACNT_PRDT_CD", account.kisAccountType());
-        body.put("PDNO", command.symbol());
+        body.put("PDNO", command.ticker().name());
         body.put("OVRS_EXCG_CD", EXCHANGE_CODE);
         body.put("FT_ORD_QTY", String.valueOf(command.qty()));
         body.put("FT_ORD_UNPR3", command.price().toPlainString());

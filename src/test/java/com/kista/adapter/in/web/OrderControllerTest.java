@@ -51,7 +51,7 @@ class OrderControllerTest {
     private GetNextOrdersUseCase.Result buildNextResult() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"));
-        Order order = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order order = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order));
     }
@@ -107,7 +107,7 @@ class OrderControllerTest {
         when(placeReservationOrderUseCase.place(eq(ACCOUNT_ID), any(), any())).thenReturn(receipt);
 
         ReservationOrderRequest request = new ReservationOrderRequest(
-                "SOXL", Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
+                Ticker.SOXL, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
 
         mockMvc.perform(post("/api/accounts/" + ACCOUNT_ID + "/reservation-orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -123,7 +123,7 @@ class OrderControllerTest {
                 .thenThrow(new SecurityException("접근 불가"));
 
         ReservationOrderRequest request = new ReservationOrderRequest(
-                "SOXL", Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
+                Ticker.SOXL, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
 
         mockMvc.perform(post("/api/accounts/" + ACCOUNT_ID + "/reservation-orders")
                         .contentType(MediaType.APPLICATION_JSON)

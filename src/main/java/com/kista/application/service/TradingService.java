@@ -58,7 +58,7 @@ public class TradingService implements ExecuteTradingUseCase {
         }
 
         // 3. 현재가 조회
-        BigDecimal price = kisPricePort.getPrice(account.ticker().name(), account);
+        BigDecimal price = kisPricePort.getPrice(account.ticker(), account);
         log.info("현재가: ${}", price);
 
         // 4. 전략 계산 → planned_orders에 저장 (plan 단계)
@@ -170,7 +170,7 @@ public class TradingService implements ExecuteTradingUseCase {
         BigDecimal amountUsd = o.price().multiply(BigDecimal.valueOf(o.qty()))
                 .setScale(2, HALF_UP);
         return new TradeHistory(
-                null, o.tradeDate(), o.symbol(), "SOXL_DIVISION",
+                null, o.tradeDate(), o.ticker(), "SOXL_DIVISION",
                 o.orderType(), o.direction(), o.qty(), o.price(),
                 amountUsd, o.status(), o.kisOrderId(), accountId, null);
     }
@@ -182,7 +182,7 @@ public class TradingService implements ExecuteTradingUseCase {
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
-                null, today, account.ticker().name(), balance.quantity(), balance.avgPrice(),
+                null, today, account.ticker(), balance.quantity(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 

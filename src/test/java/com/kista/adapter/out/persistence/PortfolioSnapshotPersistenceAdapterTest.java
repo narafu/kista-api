@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +24,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
 
     private PortfolioSnapshot snapshot(LocalDate date) {
         return new PortfolioSnapshot(
-                null, date, "SOXL", 10,
+                null, date, Ticker.SOXL, 10,
                 new BigDecimal("20.0000"), new BigDecimal("22.0000"),
                 new BigDecimal("220.00"), new BigDecimal("500.00"),
                 new BigDecimal("720.00"), null, null
@@ -40,7 +41,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
         assertThat(result).hasSize(1);
         PortfolioSnapshot saved = result.get(0);
         assertThat(saved.snapshotDate()).isEqualTo(today);
-        assertThat(saved.symbol()).isEqualTo("SOXL");
+        assertThat(saved.ticker()).isEqualTo(Ticker.SOXL);
         assertThat(saved.qty()).isEqualTo(10);
         assertThat(saved.avgPrice()).isEqualByComparingTo("20.0000");
         assertThat(saved.currentPrice()).isEqualByComparingTo("22.0000");

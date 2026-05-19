@@ -79,7 +79,7 @@ public class AdminAnomaliesController {
             User user = userId != null ? userMap.get(userId) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             return new FailedTradeItem(
-                    t.id(), t.accountId(), nickname, t.tradeDate(), t.symbol(),
+                    t.id(), t.accountId(), nickname, t.tradeDate(), t.ticker().name(),
                     t.direction().name(), t.orderType().name(), t.qty(), t.price());
         }
     }

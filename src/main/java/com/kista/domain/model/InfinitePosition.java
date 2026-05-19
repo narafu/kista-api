@@ -15,10 +15,6 @@ public record InfinitePosition(
 
     // --- 기본 도메인 속성 조회 ---
 
-    public String symbol() {
-        return ticker.name();
-    }
-
     public int quantity() {
         return balance.quantity();
     }

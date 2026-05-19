@@ -44,7 +44,7 @@ class InfiniteStrategyTypeTest {
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.referencePrice()) == 0);
         assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.qty() == 2);
         assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.qty() == 8 && o.price().compareTo(position.targetPrice()) == 0);
-        assertThat(orders).allMatch(o -> o.symbol().equals("SOXL") && o.tradeDate().equals(TODAY));
+        assertThat(orders).allMatch(o -> o.ticker() == Ticker.SOXL && o.tradeDate().equals(TODAY));
     }
 
     @Test
@@ -103,6 +103,6 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).isNotEmpty();
-        assertThat(orders).allMatch(o -> o.symbol().equals("TQQQ"));
+        assertThat(orders).allMatch(o -> o.ticker() == Ticker.TQQQ);
     }
 }

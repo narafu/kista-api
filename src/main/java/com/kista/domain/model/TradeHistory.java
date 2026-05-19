@@ -8,7 +8,7 @@ import java.util.UUID;
 public record TradeHistory(
         UUID id,
         LocalDate tradeDate,
-        String symbol,
+        Ticker ticker,            // 거래 종목
         String strategy,
         Order.OrderType orderType,
         Order.OrderDirection direction,

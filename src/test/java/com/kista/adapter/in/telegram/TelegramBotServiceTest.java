@@ -2,6 +2,7 @@ package com.kista.adapter.in.telegram;
 
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
@@ -55,7 +56,7 @@ class TelegramBotServiceTest {
 
     @Test
     void status_command_returns_portfolio_info() {
-        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), "SOXL",
+        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 100, new BigDecimal("25.0000"), new BigDecimal("26.0000"),
                 new BigDecimal("2600.00"), new BigDecimal("1000.00"),
                 new BigDecimal("3600.00"), null, Instant.now());
@@ -81,12 +82,12 @@ class TelegramBotServiceTest {
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(getTradeHistoryUseCase.getHistory(any(), any(), eq("SOXL"))).thenReturn(List.of());
+        when(getTradeHistoryUseCase.getHistory(any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
         verify(getTradeHistoryUseCase).getHistory(
-                LocalDate.now().minusDays(14), LocalDate.now(), "SOXL");
+                LocalDate.now().minusDays(14), LocalDate.now(), Ticker.SOXL);
     }
 
     @Test

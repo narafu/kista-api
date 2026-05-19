@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +23,9 @@ class TradeHistoryPersistenceAdapterTest {
     @Autowired
     private TradeHistoryPersistenceAdapter adapter;
 
-    private TradeHistory history(LocalDate date, String symbol, String kisOrderId) {
+    private TradeHistory history(LocalDate date, Ticker ticker, String kisOrderId) {
         return new TradeHistory(
-                null, date, symbol, "SOXL_DIVISION",
+                null, date, ticker, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY,
                 5, new BigDecimal("20.0000"), new BigDecimal("100.00"),
                 Order.OrderStatus.PLACED, kisOrderId, null, null
@@ -34,16 +35,16 @@ class TradeHistoryPersistenceAdapterTest {
     @Test
     void save_and_findBy_returns_matching_record() {
         LocalDate today = LocalDate.of(2024, 6, 15);
-        TradeHistory h = history(today, "SOXL", "ORD-001");
+        TradeHistory h = history(today, Ticker.SOXL, "ORD-001");
 
         adapter.save(h);
 
-        List<TradeHistory> result = adapter.findBy(today, today, "SOXL");
+        List<TradeHistory> result = adapter.findBy(today, today, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
         TradeHistory saved = result.get(0);
         assertThat(saved.tradeDate()).isEqualTo(today);
-        assertThat(saved.symbol()).isEqualTo("SOXL");
+        assertThat(saved.ticker()).isEqualTo(Ticker.SOXL);
         assertThat(saved.strategy()).isEqualTo("SOXL_DIVISION");
         assertThat(saved.orderType()).isEqualTo(Order.OrderType.LOC);
         assertThat(saved.direction()).isEqualTo(Order.OrderDirection.BUY);
@@ -59,10 +60,10 @@ class TradeHistoryPersistenceAdapterTest {
         LocalDate inRange = LocalDate.of(2024, 6, 15);
         LocalDate outOfRange = LocalDate.of(2024, 6, 10);
 
-        adapter.save(history(inRange, "SOXL", null));
-        adapter.save(history(outOfRange, "SOXL", null));
+        adapter.save(history(inRange, Ticker.SOXL, null));
+        adapter.save(history(outOfRange, Ticker.SOXL, null));
 
-        List<TradeHistory> result = adapter.findBy(inRange, inRange, "SOXL");
+        List<TradeHistory> result = adapter.findBy(inRange, inRange, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).tradeDate()).isEqualTo(inRange);
@@ -71,9 +72,9 @@ class TradeHistoryPersistenceAdapterTest {
     @Test
     void save_allows_null_kisOrderId() {
         LocalDate today = LocalDate.of(2024, 6, 15);
-        adapter.save(history(today, "SOXL", null));
+        adapter.save(history(today, Ticker.SOXL, null));
 
-        List<TradeHistory> result = adapter.findBy(today, today, "SOXL");
+        List<TradeHistory> result = adapter.findBy(today, today, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).kisOrderId()).isNull();

@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -13,8 +14,8 @@ public record TradeHistoryResponse(
         UUID id,
         @Schema(description = "거래 날짜", example = "2025-01-15")
         LocalDate tradeDate,
-        @Schema(description = "종목 코드", example = "SOXL")
-        String symbol,
+        @Schema(description = "거래 종목", example = "SOXL")
+        Ticker symbol,
         @Schema(description = "적용 전략", example = "INFINITE")
         String strategy,
         @Schema(description = "주문 유형 (LOC/MOC/LIMIT)", example = "LOC")
@@ -36,7 +37,7 @@ public record TradeHistoryResponse(
 ) {
     public static TradeHistoryResponse from(TradeHistory h) {
         return new TradeHistoryResponse(
-                h.id(), h.tradeDate(), h.symbol(), h.strategy(),
+                h.id(), h.tradeDate(), h.ticker(), h.strategy(),
                 h.orderType(), h.direction(), h.qty(), h.price(),
                 h.amountUsd(), h.status(), h.kisOrderId(), h.createdAt());
     }

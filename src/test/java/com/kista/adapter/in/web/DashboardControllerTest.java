@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.dto.FidaOrderRequestDto;
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.GetPortfolioUseCase;
@@ -49,7 +50,7 @@ class DashboardControllerTest {
 
     @Test
     void getTrades_returns_200_with_list() throws Exception {
-        TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), "SOXL", "SOXL_DIVISION",
+        TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
                 Order.OrderStatus.PLACED, "KIS001", null, Instant.now());
@@ -63,7 +64,7 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioCurrent_returns_200() throws Exception {
-        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), "SOXL",
+        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 100, new BigDecimal("25.0000"), new BigDecimal("26.0000"),
                 new BigDecimal("2600.00"), new BigDecimal("1000.00"),
                 new BigDecimal("3600.00"), null, Instant.now());
@@ -86,7 +87,7 @@ class DashboardControllerTest {
     @Test
     void placeFidaOrder_returns_201() throws Exception {
         FidaOrderRequestDto dto = new FidaOrderRequestDto(
-                "SOXL", Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
+                Ticker.SOXL, Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
 
         mockMvc.perform(post("/api/orders/fida")
                         .with(csrf())

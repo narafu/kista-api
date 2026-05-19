@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -12,8 +13,8 @@ public record PortfolioSnapshotResponse(
         UUID id,
         @Schema(description = "스냅샷 날짜", example = "2025-01-15")
         LocalDate snapshotDate,
-        @Schema(description = "종목 코드", example = "SOXL")
-        String symbol,
+        @Schema(description = "거래 종목", example = "SOXL")
+        Ticker symbol,
         @Schema(description = "보유 수량", example = "30")
         int qty,
         @Schema(description = "평균매입단가 (USD)", example = "72.50")
@@ -31,7 +32,7 @@ public record PortfolioSnapshotResponse(
 ) {
     public static PortfolioSnapshotResponse from(PortfolioSnapshot s) {
         return new PortfolioSnapshotResponse(
-                s.id(), s.snapshotDate(), s.symbol(), s.qty(),
+                s.id(), s.snapshotDate(), s.ticker(), s.qty(),
                 s.avgPrice(), s.currentPrice(), s.marketValueUsd(),
                 s.usdDeposit(), s.totalAssetUsd(), s.createdAt());
     }

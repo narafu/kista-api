@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.KisOrderPort;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class FidaOrderServiceTest {
     void execute_throws_unsupported_in_v2() {
         // V2에서는 계좌 컨텍스트 필요 — 직접 주문 API 사용 불가
         FidaOrderRequest req = new FidaOrderRequest(
-                "SOXL", Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
+                Ticker.SOXL, Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
 
         assertThatThrownBy(() -> sut.execute(req))
                 .isInstanceOf(UnsupportedOperationException.class)

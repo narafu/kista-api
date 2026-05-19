@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +55,7 @@ class PortfolioServiceTest {
     }
 
     private PortfolioSnapshot snapshot(LocalDate date) {
-        return new PortfolioSnapshot(UUID.randomUUID(), date, "SOXL", 100,
+        return new PortfolioSnapshot(UUID.randomUUID(), date, Ticker.SOXL, 100,
                 new BigDecimal("25.0000"), new BigDecimal("26.0000"),
                 new BigDecimal("2600.00"), new BigDecimal("1000.00"),
                 new BigDecimal("3600.00"), null, Instant.now());

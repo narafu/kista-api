@@ -38,7 +38,7 @@ public class NextOrdersService implements GetNextOrdersUseCase {
 
         // 휴장 여부·잔고 shouldSkip() 무시 — 항상 강제 계산
         AccountBalance balance = kisAccountPort.getBalance(account);
-        BigDecimal price = kisPricePort.getPrice(account.ticker().name(), account);
+        BigDecimal price = kisPricePort.getPrice(account.ticker(), account);
         InfinitePosition position = new InfinitePosition(balance, account.ticker(), price);
 
         LocalDate today = LocalDate.now();

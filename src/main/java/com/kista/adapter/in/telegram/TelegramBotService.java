@@ -1,6 +1,7 @@
 package com.kista.adapter.in.telegram;
 
 import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
@@ -96,7 +97,7 @@ class TelegramBotService {
     private String buildHistoryMessage(int days) {
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(days);
-        List<TradeHistory> list = getTradeHistoryUseCase.getHistory(from, to, "SOXL");
+        List<TradeHistory> list = getTradeHistoryUseCase.getHistory(from, to, Ticker.SOXL);
         if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
         StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
         list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",

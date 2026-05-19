@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
 import org.junit.jupiter.api.Test;
@@ -31,15 +32,15 @@ class TradeHistoryServiceTest {
     void getHistory_delegates_to_port() {
         LocalDate from = LocalDate.of(2026, 4, 1);
         LocalDate to = LocalDate.of(2026, 4, 28);
-        TradeHistory h = new TradeHistory(UUID.randomUUID(), from, "SOXL", "SOXL_DIVISION",
+        TradeHistory h = new TradeHistory(UUID.randomUUID(), from, Ticker.SOXL, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
                 Order.OrderStatus.PLACED, "KIS001", null, Instant.now());
-        when(tradeHistoryPort.findBy(from, to, "SOXL")).thenReturn(List.of(h));
+        when(tradeHistoryPort.findBy(from, to, Ticker.SOXL)).thenReturn(List.of(h));
 
-        List<TradeHistory> result = sut.getHistory(from, to, "SOXL");
+        List<TradeHistory> result = sut.getHistory(from, to, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).symbol()).isEqualTo("SOXL");
+        assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
     }
 }

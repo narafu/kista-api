@@ -48,7 +48,7 @@ class KisOrderAdapterTest {
     @Test
     @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 가격=0, 상태=PLACED")
     void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
@@ -65,7 +65,7 @@ class KisOrderAdapterTest {
     @Test
     @DisplayName("BUY+MOC: ORD_DVSN=33, 가격=0")
     void place_buyMoc_usesOrdDvsn33() {
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.MOC, Order.OrderDirection.BUY,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.MOC, Order.OrderDirection.BUY,
                 5, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
@@ -81,7 +81,7 @@ class KisOrderAdapterTest {
     @DisplayName("BUY+LIMIT: ORD_DVSN=00, 실제 가격 전달")
     void place_buyLimit_usesActualPrice() {
         BigDecimal limitPrice = new BigDecimal("25.50");
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LIMIT, Order.OrderDirection.BUY,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.LIMIT, Order.OrderDirection.BUY,
                 3, limitPrice, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
@@ -96,7 +96,7 @@ class KisOrderAdapterTest {
     @Test
     @DisplayName("SELL: TTTT1006U 사용")
     void place_sell_usesSellTrId() {
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.SELL,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.SELL,
                 8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
@@ -106,9 +106,9 @@ class KisOrderAdapterTest {
     }
 
     @Test
-    @DisplayName("응답 ODNO → kisOrderId 반환, 상태=PLACED")
+    @DisplayName("응답 ODNO → orderId 반환, 상태=PLACED")
     void place_responseWithOdno_returnsKisOrderId() {
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         KisOrderAdapter.OrderResponse response =
                 new KisOrderAdapter.OrderResponse(new KisOrderAdapter.OrderResponse.Output("ORD123"));
@@ -121,9 +121,9 @@ class KisOrderAdapterTest {
     }
 
     @Test
-    @DisplayName("null 응답: kisOrderId=null, 상태=PLACED")
+    @DisplayName("null 응답: orderId=null, 상태=PLACED")
     void place_nullResponse_returnsNullKisOrderId() {
-        Order order = new Order(TRADE_DATE, "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY,
+        Order order = new Order(TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 

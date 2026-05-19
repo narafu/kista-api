@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.Order;
 import com.kista.domain.model.PlannedOrder;
+import com.kista.domain.model.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +37,7 @@ class PlannedOrderPersistenceAdapterTest {
 
     @Test
     void saveAll_delegatesToRepository() {
-        PlannedOrder order = new PlannedOrder(null, ACCOUNT_ID, TODAY, "SOXL",
+        PlannedOrder order = new PlannedOrder(null, ACCOUNT_ID, TODAY, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, PRICE,
                 PlannedOrder.PlannedOrderStatus.PENDING, null);
 
@@ -50,7 +51,7 @@ class PlannedOrderPersistenceAdapterTest {
         PlannedOrderEntity entity = new PlannedOrderEntity();
         entity.setAccountId(ACCOUNT_ID);
         entity.setTradeDate(TODAY);
-        entity.setSymbol("SOXL");
+        entity.setTicker(Ticker.SOXL);
         entity.setOrderType(Order.OrderType.LOC);
         entity.setDirection(Order.OrderDirection.BUY);
         entity.setQty(5);
@@ -64,7 +65,7 @@ class PlannedOrderPersistenceAdapterTest {
         List<PlannedOrder> result = adapter.findPendingByAccountAndDate(ACCOUNT_ID, TODAY);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).symbol()).isEqualTo("SOXL");
+        assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.get(0).qty()).isEqualTo(5);
         assertThat(result.get(0).status()).isEqualTo(PlannedOrder.PlannedOrderStatus.PENDING);
     }
@@ -89,7 +90,7 @@ class PlannedOrderPersistenceAdapterTest {
         adapter.markExecuted(plannedId, "ORD-001");
 
         assertThat(entity.getStatus()).isEqualTo(PlannedOrder.PlannedOrderStatus.EXECUTED);
-        assertThat(entity.getKisOrderId()).isEqualTo("ORD-001");
+        assertThat(entity.getOrderId()).isEqualTo("ORD-001");
         verify(repository).save(entity); // 명시적 save로 dirty checking 없이 처리
     }
 

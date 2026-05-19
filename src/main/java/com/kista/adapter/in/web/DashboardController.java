@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.FidaOrderRequestDto;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;
@@ -41,8 +42,8 @@ public class DashboardController {
             @Parameter(description = "조회 종료일 (기본: 오늘)", example = "2025-01-31")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @Parameter(description = "종목 코드", example = "SOXL")
-            @RequestParam(defaultValue = "SOXL") String symbol) {
+            @Parameter(description = "거래 종목", example = "SOXL")
+            @RequestParam(defaultValue = "SOXL") Ticker symbol) {
         LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
         LocalDate resolvedTo = to != null ? to : LocalDate.now();
         return getTradeHistoryUseCase.getHistory(resolvedFrom, resolvedTo, symbol)

@@ -81,20 +81,20 @@ class TradingServiceTest {
 
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
-        Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order pendingOrder = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
-        Order placedOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order placedOrder = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         // DB에서 조회될 PENDING 주문 (id 필수: markExecuted에서 UUID로 사용)
         UUID plannedId = UUID.randomUUID();
         PlannedOrder planned = new PlannedOrder(plannedId, ACCOUNT.id(), LocalDate.now(),
-                "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
                 PlannedOrder.PlannedOrderStatus.PENDING, null);
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
-        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
@@ -107,7 +107,7 @@ class TradingServiceTest {
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
         verify(kisAccountPort).getBalance(ACCOUNT);
-        verify(kisPricePort).getPrice("SOXL", ACCOUNT);
+        verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT);
         verify(plannedOrderPort).saveAll(anyList());                                      // 계획 저장
         verify(plannedOrderPort).findPendingByAccountAndDate(eq(ACCOUNT.id()), any());   // 실행 조회
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
@@ -120,21 +120,21 @@ class TradingServiceTest {
 
     @Test
     void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
-        Order pendingOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order pendingOrder = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
-        Order mainOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order mainOrder = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
-        Order corrOrder = new Order(LocalDate.now(), "SOXL", Order.OrderType.LIMIT,
+        Order corrOrder = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
         UUID plannedId = UUID.randomUUID();
         PlannedOrder planned = new PlannedOrder(plannedId, ACCOUNT.id(), LocalDate.now(),
-                "SOXL", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
                 PlannedOrder.PlannedOrderStatus.PENDING, null);
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
-        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(pendingOrder));
         when(plannedOrderPort.findPendingByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))

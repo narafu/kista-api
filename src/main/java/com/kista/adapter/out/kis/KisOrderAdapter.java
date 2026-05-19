@@ -31,7 +31,7 @@ public class KisOrderAdapter implements KisOrderPort {
         body.put("CANO", account.accountNo());
         body.put("ACNT_PRDT_CD", account.kisAccountType());
         body.put("OVRS_EXCG_CD", account.ticker().getExchangeCode());
-        body.put("PDNO", order.symbol());
+        body.put("PDNO", order.ticker().name());
         body.put("ORD_DVSN", resolveOrderDvsn(order.orderType()));
         body.put("ORD_QTY", String.valueOf(order.qty()));
         body.put("OVRS_ORD_UNPR", resolvePrice(order.orderType(), order.price()));
@@ -41,7 +41,7 @@ public class KisOrderAdapter implements KisOrderPort {
         String odno = (response != null && response.output() != null) ? response.output().odno() : null;
 
         return new Order(
-                order.tradeDate(), order.symbol(), order.orderType(), order.direction(),
+                order.tradeDate(), order.ticker(), order.orderType(), order.direction(),
                 order.qty(), order.price(), Order.OrderStatus.PLACED, odno
         );
     }

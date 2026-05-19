@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public record Order(
         LocalDate tradeDate,      // 거래일
-        String symbol,            // 종목 코드 (예: SOXL)
+        Ticker ticker,            // 거래 종목
         OrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
         OrderDirection direction, // 매수/매도 방향
         int qty,                  // 주문 수량

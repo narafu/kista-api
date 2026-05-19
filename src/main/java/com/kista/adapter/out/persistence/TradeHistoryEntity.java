@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -20,8 +21,9 @@ class TradeHistoryEntity {
     @Column(name = "trade_date", nullable = false)
     private LocalDate tradeDate;
 
-    @Column(nullable = false, length = 20)
-    private String symbol;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticker", nullable = false, length = 20)
+    private Ticker ticker;
 
     @Column(nullable = false, length = 50)
     private String strategy;
@@ -58,13 +60,13 @@ class TradeHistoryEntity {
 
     protected TradeHistoryEntity() {}
 
-    TradeHistoryEntity(UUID id, LocalDate tradeDate, String symbol, String strategy,
+    TradeHistoryEntity(UUID id, LocalDate tradeDate, Ticker ticker, String strategy,
                        Order.OrderType orderType, Order.OrderDirection direction,
                        int qty, BigDecimal price, BigDecimal amountUsd,
                        Order.OrderStatus status, String kisOrderId, UUID accountId) {
         this.id = id;
         this.tradeDate = tradeDate;
-        this.symbol = symbol;
+        this.ticker = ticker;
         this.strategy = strategy;
         this.orderType = orderType;
         this.direction = direction;
@@ -78,7 +80,7 @@ class TradeHistoryEntity {
 
     UUID getId() { return id; }
     LocalDate getTradeDate() { return tradeDate; }
-    String getSymbol() { return symbol; }
+    Ticker getTicker() { return ticker; }
     String getStrategy() { return strategy; }
     Order.OrderType getOrderType() { return orderType; }
     Order.OrderDirection getDirection() { return direction; }

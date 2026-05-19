@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import com.kista.domain.port.out.TradeHistoryPort;
@@ -16,7 +17,7 @@ public class TradeHistoryService implements GetTradeHistoryUseCase {
     private final TradeHistoryPort tradeHistoryPort;
 
     @Override
-    public List<TradeHistory> getHistory(LocalDate from, LocalDate to, String symbol) {
-        return tradeHistoryPort.findBy(from, to, symbol);
+    public List<TradeHistory> getHistory(LocalDate from, LocalDate to, Ticker ticker) {
+        return tradeHistoryPort.findBy(from, to, ticker);
     }
 }

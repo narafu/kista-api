@@ -61,7 +61,7 @@ public class AdminTradeController {
             User user = userId != null ? userMap.get(userId) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             return new AdminTradeResponse(
-                    t.id(), userId, nickname, t.tradeDate(), t.symbol(),
+                    t.id(), userId, nickname, t.tradeDate(), t.ticker().name(),
                     t.direction().name(), t.orderType().name(),
                     t.qty(), t.price(), t.status().name());
         }

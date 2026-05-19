@@ -60,21 +60,21 @@ class NextOrdersServiceTest {
 
     @Test
     void preview_returns_result_with_orders_from_strategy() {
-        Order order = new Order(LocalDate.now(), "SOXL", Order.OrderType.LOC,
+        Order order = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
         // findByIdOrThrow는 interface default 메서드 — Mockito가 override하므로 직접 stub
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
-        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT_ID, USER_ID);
 
         assertThat(result.orders()).hasSize(1);
-        assertThat(result.orders().get(0).symbol()).isEqualTo("SOXL");
-        assertThat(result.position().symbol()).isEqualTo("SOXL");
+        assertThat(result.orders().get(0).ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.position().ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.position().currentPrice()).isEqualByComparingTo(PRICE);
         assertThat(result.tradeDate()).isEqualTo(LocalDate.now());
     }
@@ -103,7 +103,7 @@ class NextOrdersServiceTest {
         // 잔고 부족(shouldSkip=true)이어도 강제 계산 — kisHolidayPort 의존 없음으로도 보장
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
         when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(LOW_BALANCE);
-        when(kisPricePort.getPrice("SOXL", ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of());
 

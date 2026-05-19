@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence;
 
+import com.kista.domain.model.Ticker;
 import com.kista.domain.model.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.AccessLevel;
@@ -21,8 +22,8 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
     }
 
     @Override
-    public List<TradeHistory> findBy(LocalDate from, LocalDate to, String symbol) {
-        return repository.findByTradeDateBetweenAndSymbol(from, to, symbol)
+    public List<TradeHistory> findBy(LocalDate from, LocalDate to, Ticker ticker) {
+        return repository.findByTradeDateBetweenAndTicker(from, to, ticker)
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -38,7 +39,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
 
     private TradeHistoryEntity toEntity(TradeHistory h) {
         return new TradeHistoryEntity(
-                h.id(), h.tradeDate(), h.symbol(), h.strategy(),
+                h.id(), h.tradeDate(), h.ticker(), h.strategy(),
                 h.orderType(), h.direction(), h.qty(), h.price(),
                 h.amountUsd(), h.status(), h.kisOrderId(), h.accountId()
         );
@@ -46,7 +47,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
 
     private TradeHistory toDomain(TradeHistoryEntity e) {
         return new TradeHistory(
-                e.getId(), e.getTradeDate(), e.getSymbol(), e.getStrategy(),
+                e.getId(), e.getTradeDate(), e.getTicker(), e.getStrategy(),
                 e.getOrderType(), e.getDirection(), e.getQty(), e.getPrice(),
                 e.getAmountUsd(), e.getStatus(), e.getKisOrderId(),
                 e.getAccountId(), e.getCreatedAt()

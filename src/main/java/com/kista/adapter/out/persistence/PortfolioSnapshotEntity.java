@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence;
 
+import com.kista.domain.model.Ticker;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -19,8 +20,9 @@ class PortfolioSnapshotEntity {
     @Column(name = "snapshot_date", nullable = false)
     private LocalDate snapshotDate;
 
-    @Column(nullable = false, length = 20)
-    private String symbol;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticker", nullable = false, length = 20)
+    private Ticker ticker;
 
     @Column(nullable = false)
     private int qty;
@@ -48,13 +50,13 @@ class PortfolioSnapshotEntity {
 
     protected PortfolioSnapshotEntity() {}
 
-    PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, String symbol, int qty,
+    PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int qty,
                             BigDecimal avgPrice, BigDecimal currentPrice,
                             BigDecimal marketValueUsd, BigDecimal usdDeposit,
                             BigDecimal totalAssetUsd, UUID accountId) {
         this.id = id;
         this.snapshotDate = snapshotDate;
-        this.symbol = symbol;
+        this.ticker = ticker;
         this.qty = qty;
         this.avgPrice = avgPrice;
         this.currentPrice = currentPrice;
@@ -66,7 +68,7 @@ class PortfolioSnapshotEntity {
 
     UUID getId() { return id; }
     LocalDate getSnapshotDate() { return snapshotDate; }
-    String getSymbol() { return symbol; }
+    Ticker getTicker() { return ticker; }
     int getQty() { return qty; }
     BigDecimal getAvgPrice() { return avgPrice; }
     BigDecimal getCurrentPrice() { return currentPrice; }

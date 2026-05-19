@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisPricePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -22,17 +23,17 @@ public class KisPriceAdapter implements KisPricePort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public BigDecimal getPrice(String symbol, Account account) {
+    public BigDecimal getPrice(Ticker ticker, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         params.add("EXCD", EXCD);
-        params.add("SYMB", symbol);
+        params.add("SYMB", ticker.name());
 
         PriceResponse response = kisHttpClient.get(PATH, headers, params, PriceResponse.class);
 
         if (response == null || response.output() == null || response.output().last() == null) {
-            throw new IllegalStateException("가격 조회 실패: " + symbol);
+            throw new IllegalStateException("가격 조회 실패: " + ticker);
         }
         return new BigDecimal(response.output().last());
     }
