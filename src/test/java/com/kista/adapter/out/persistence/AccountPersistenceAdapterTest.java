@@ -52,7 +52,6 @@ class AccountPersistenceAdapterTest {
         e.setKisAppKey("enc:appKey");
         e.setKisSecretKey("enc:appSecret");
         e.setKisAccountType("01");
-        e.setSymbol("SOXL");
         e.setCreatedAt(Instant.now());
         e.setUpdatedAt(Instant.now());
         return e;
@@ -62,6 +61,7 @@ class AccountPersistenceAdapterTest {
         StrategyEntity s = new StrategyEntity();
         s.setAccountId(accId);
         s.setType(type);
+        s.setTicker("SOXL");
         s.setStatus(status);
         return s;
     }
@@ -87,6 +87,7 @@ class AccountPersistenceAdapterTest {
         verify(strategyJpaRepository).save(captor.capture());
         assertThat(captor.getValue().getAccountId()).isEqualTo(accountId);
         assertThat(captor.getValue().getType()).isEqualTo(StrategyType.INFINITE);
+        assertThat(captor.getValue().getTicker()).isEqualTo("SOXL");
         assertThat(captor.getValue().getStatus()).isEqualTo(StrategyStatus.ACTIVE);
     }
 

@@ -3,12 +3,19 @@ package com.kista.domain.port.out;
 import com.kista.domain.model.Account;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface AccountRepository {
     List<Account> findByUserId(UUID userId);
     Optional<Account> findById(UUID id);
+
+    // 없으면 NoSuchElementException — findById + orElseThrow 반복 제거용
+    default Account findByIdOrThrow(UUID accountId) {
+        return findById(accountId).orElseThrow(
+                () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+    }
     int countByUserId(UUID userId);
     // ACTIVE 사용자의 ACTIVE 계좌 전체 조회 (스케줄러용)
     List<Account> findAllActive();

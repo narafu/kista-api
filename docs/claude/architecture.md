@@ -14,7 +14,8 @@ application/
 
 adapter/in/
   schedule/      ← TradingScheduler (월~금 04:00 KST, 멀티계좌)
-  web/           ← REST Controller + DTO (DashboardController)
+  web/           ← REST Controller + DTO
+                    - OrderController: 예약주문(POST /reservation-orders) + 다음 주문 미리보기(GET /orders/next)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 ### DashboardController vs StatisticsController 응답 형식 차이
@@ -46,7 +47,7 @@ domain      →  외부 의존 없음
 |--------|--------|
 | 환경변수 추가/제거 | `application.yml` + `.env.example` + `docker-compose.yml` 동시 반영 |
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
-| strategies 테이블 변경 | `StrategyEntity` + `StrategyJpaRepository` + `AccountPersistenceAdapter` 동시 수정 |
+| strategies 테이블 변경 | `StrategyEntity` + `StrategyJpaRepository` + `AccountPersistenceAdapter` + `AccountPersistenceAdapterTest`(`strategyEntity()` 헬퍼에 새 필드 세팅 필수 — 누락 시 `buildDomain()` NPE) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
 | `AccountService` UseCase 추가 | `AccountController` 필드 + 엔드포인트 동시 추가 |
@@ -66,10 +67,16 @@ domain      →  외부 의존 없음
 | `User.role` 변경 또는 `UserRole` 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + `JwtIssuerService` claim |
 | `AdminBootstrapProperties.kakaoIds` 변경 | `application.yml` + `.env.example` + `docker-compose.yml` + Render env |
 | 새 admin 엔드포인트 추가 (`AdminXxxController`) | `AdminXxxService` + `AdminXxxUseCase`(domain/port/in) + `AdminXxxControllerTest`(`@MockBean` 필수: JwtDecoder + 사용하는 모든 UseCase) |
+| `OrderController`에 엔드포인트 추가 | `GetNextOrdersUseCase` + `PlaceReservationOrderUseCase` **둘 다** `@MockBean` 필수 (`OrderControllerTest`) |
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지
 - `JwtAuthFilter`: principal을 `UUID` 타입으로 저장 (`String` 아님)
+
+### 소유권 검증 패턴 (Account 도메인)
+- `account.verifyOwnedBy(requesterId)` — 불일치 시 `SecurityException` (컨트롤러에서 403 매핑)
+- `accountRepository.findByIdOrThrow(id)` — 없으면 `NoSuchElementException` (컨트롤러에서 404 매핑)
+- Mockito 테스트 주의: `findByIdOrThrow`는 interface default 메서드 → Mockito가 override하므로 `when(repo.findById(...))` stub 무시됨, `when(repo.findByIdOrThrow(...))` 직접 stub 필요
 
 ### JPA Auditing
 - `BaseAuditEntity` (`@MappedSuperclass`): `UserEntity`, `AccountEntity`가 상속 — `@CreatedDate`/`@LastModifiedDate`로 `createdAt`/`updatedAt` 자동 관리

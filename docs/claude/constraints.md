@@ -11,8 +11,8 @@
 - `resolveExchangeCode()` 메서드 삭제됨 — `ticker.getExchangeCode()`로 대체
 - PRIVACY 전략: 항상 서버에서 `Ticker.SOXL` 강제 (클라이언트 입력 무시) — `register()` 참고
 - INFINITE 전략: 지정 없으면 기본 `Ticker.TQQQ`, exchangeCode는 Ticker가 자동 결정
-- DB: `accounts.symbol` 컬럼 유지 (Ticker.name() 저장), `exchange_code` 컬럼 V14 마이그레이션으로 제거됨
-- `AccountPersistenceAdapter`: `Ticker.valueOf(entity.getSymbol())`으로 변환
+- DB: `strategies.ticker` 컬럼에 Ticker.name() 저장 (V22에서 accounts.symbol → strategies.ticker 이관), `exchange_code` 컬럼 V14 마이그레이션으로 제거됨
+- `AccountPersistenceAdapter`: `Ticker.valueOf(strategyEntity.getTicker())`으로 변환
 
 ### Swagger 개발 도구
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
@@ -65,8 +65,10 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V20__add_telegram_bot_username.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 텔레그램 컬럼 제거, V20: users.telegram_bot_username 추가)
+- 현재 최신: `V22__move_symbol_to_strategies_ticker.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 텔레그램 컬럼 제거, V20: users.telegram_bot_username 추가, V21: strategy_configs 테이블 제거, V22: accounts.symbol → strategies.ticker 이관)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
+- PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
+- Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
 
 ### application-local.yml Docker 호환성

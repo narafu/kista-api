@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -98,7 +99,7 @@ class AccountServiceTest {
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null);
 
@@ -109,7 +110,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("본인 계좌 수정 성공")
     void update_by_owner_success() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null, null, null);
@@ -122,7 +123,7 @@ class AccountServiceTest {
     @DisplayName("타 사용자 계좌 삭제 시 SecurityException 발생 (→ 403)")
     void delete_by_non_owner_throws_forbidden() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
         assertThatThrownBy(() -> accountService.delete(accountId, userId))
                 .isInstanceOf(SecurityException.class);
@@ -133,7 +134,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("본인 계좌 삭제 성공")
     void delete_by_owner_success() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
 
         accountService.delete(accountId, userId);
 
@@ -143,17 +144,18 @@ class AccountServiceTest {
     @Test
     @DisplayName("존재하지 않는 계좌 수정 시 NoSuchElementException 발생 (→ 404)")
     void update_not_found_throws() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.empty());
+        when(accountRepository.findByIdOrThrow(accountId))
+                .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
                 new UpdateAccountUseCase.Command("닉", null, null, null, null)))
-                .isInstanceOf(java.util.NoSuchElementException.class);
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     @DisplayName("pause: ACTIVE → PAUSED 저장 + 관리자 알림")
     void pause_changes_status_and_notifies() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(userId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
         when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser(userId)));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -166,7 +168,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("resume: PAUSED → ACTIVE 저장 + 관리자 알림")
     void resume_changes_status_and_notifies() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(pausedAccount(userId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(pausedAccount(userId));
         when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser(userId)));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -180,7 +182,7 @@ class AccountServiceTest {
     @DisplayName("pause: 타 사용자 계좌 시 SecurityException(→403)")
     void pause_by_non_owner_throws_forbidden() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(activeAccount(otherId)));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
         assertThatThrownBy(() -> accountService.pause(accountId, userId))
                 .isInstanceOf(SecurityException.class);
@@ -194,7 +196,7 @@ class AccountServiceTest {
     void update_키변경시_testToken호출() {
         // given: 기존 계좌
         Account existing = activeAccount(userId); // appKey="appKey", appSecret="appSecret"
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(existing));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(existing);
         doNothing().when(kisTokenPort).testToken(any(), any());
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

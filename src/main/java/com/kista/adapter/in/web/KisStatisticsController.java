@@ -29,7 +29,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
-public class StatisticsController {
+public class KisStatisticsController {
 
     private final GetAccountStatisticsUseCase statisticsUseCase;
 

@@ -6,3 +6,7 @@
 - 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 > 생략 (계좌별 봇 제거됨)
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 계좌 계속 실행
 - `TradingService`에 INFO 로그 있음 — 계좌별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
+
+### TradingService 기록 테이블 구분
+- `trade_histories`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 각 1행, order_type/direction/qty/price/status 포함)
+- `portfolio_snapshots`: 실행 단위 상태 스냅샷 — 실행당 1건 (qty/avg_price/current_price/total_asset_usd 등 계좌 잔고 현황)

@@ -66,8 +66,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
-        Account account = findOrThrow(accountId);
-        verifyOwner(account, requesterId);
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
 
         // 키 변경 시 유효성 검증 — 변경되는 키와 기존 키를 조합해 실제 사용 값으로 검증
         String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
@@ -103,8 +103,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     @Override
     public void delete(UUID accountId, UUID requesterId) {
-        Account account = findOrThrow(accountId);
-        verifyOwner(account, requesterId);
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
         accountRepository.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
     }
@@ -118,18 +118,13 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     @Override
     @Transactional(readOnly = true)
     public Account getById(UUID id) {
-        return findOrThrow(id);
-    }
-
-    private Account findOrThrow(UUID accountId) {
-        return accountRepository.findById(accountId)
-                .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+        return accountRepository.findByIdOrThrow(id);
     }
 
     @Override
     public void pause(UUID accountId, UUID requesterId) {
-        Account account = findOrThrow(accountId);
-        verifyOwner(account, requesterId);
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
         User user = findUserOrThrow(requesterId);
         Account paused = withStrategyStatus(account, StrategyStatus.PAUSED);
         accountRepository.save(paused);
@@ -139,20 +134,13 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     @Override
     public void resume(UUID accountId, UUID requesterId) {
-        Account account = findOrThrow(accountId);
-        verifyOwner(account, requesterId);
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
         User user = findUserOrThrow(requesterId);
         Account active = withStrategyStatus(account, StrategyStatus.ACTIVE);
         accountRepository.save(active);
         log.info("전략 재개: accountId={}, userId={}", accountId, requesterId);
         notificationPort.notifyStrategyChanged(user, active, "재개");
-    }
-
-    // 소유권 검증 실패 시 SecurityException(unchecked) → 컨트롤러에서 403 매핑
-    private void verifyOwner(Account account, UUID requesterId) {
-        if (!account.userId().equals(requesterId)) {
-            throw new SecurityException("계좌에 대한 접근 권한이 없습니다");
-        }
     }
 
     private User findUserOrThrow(UUID userId) {

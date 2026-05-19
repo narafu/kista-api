@@ -19,6 +19,11 @@
 - 예: `UserService`에 `RealtimeNotificationPort` 추가 → `UserServiceTest`에 `@Mock RealtimeNotificationPort realtimeNotificationPort` 추가
 - **`@WebMvcTest` 동일 적용**: 컨트롤러에 새 `private final UseCase` 필드 추가 시 해당 `*ControllerTest`에 `@MockBean` 추가 필수 — 누락 시 `No qualifying bean of type 'X'` 오류로 `ApplicationContext` 로드 실패
 
+### Mockito + interface default 메서드 주의
+- interface의 default 메서드는 Mockito mock이 override — 내부에서 호출하는 기존 메서드를 stub해도 연결 안 됨
+- 예: `findByIdOrThrow`(default)는 내부적으로 `findById`를 호출하지만, `when(repo.findById(...))` stub 무시됨
+- 반드시 `when(repo.findByIdOrThrow(...)).thenReturn(...)` 직접 stub — 실패 시 NPE(null 반환)로 나타남
+
 ### Mockito 병렬 테스트 주의
 - `@WebMvcTest` 클래스 전체에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 doThrow/doNothing mock이 다른 테스트에 오염됨 (DashboardControllerTest 패턴 참고)
 - `ArgumentCaptor<Map>` (raw) + `any()` 조합은 JUnit 5 concurrent 모드에서 오작동 → `ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class)` + `any(String.class)` + `@SuppressWarnings("unchecked")` 사용

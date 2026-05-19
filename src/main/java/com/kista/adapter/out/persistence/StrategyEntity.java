@@ -32,6 +32,9 @@ class StrategyEntity extends BaseAuditEntity {
     @Column(name = "type", nullable = false, length = 20)
     private StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
+    @Column(name = "ticker", nullable = false, length = 20)
+    private String ticker; // 거래 종목 코드 (Ticker name, 예: SOXL)
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false, length = 10)
