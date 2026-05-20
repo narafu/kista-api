@@ -1,11 +1,10 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
-import com.kista.domain.model.CooldownException;
+import com.kista.domain.model.Account;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
-import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -117,7 +116,7 @@ class UserServiceTest {
                 pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES))));
 
         assertThatThrownBy(() -> userService.reapply(userId))
-                .isInstanceOf(CooldownException.class);
+                .isInstanceOf(Account.CooldownException.class);
     }
 
     @Test
@@ -155,7 +154,7 @@ class UserServiceTest {
                 rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS))));
 
         assertThatThrownBy(() -> userService.reapply(userId))
-                .isInstanceOf(CooldownException.class);
+                .isInstanceOf(Account.CooldownException.class);
     }
 
     @Test

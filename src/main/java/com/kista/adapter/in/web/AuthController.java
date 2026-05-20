@@ -4,7 +4,7 @@ import com.kista.adapter.in.web.dto.KakaoLoginResponse;
 import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
-import com.kista.domain.model.CooldownException;
+import com.kista.domain.model.Account;
 import com.kista.domain.model.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
@@ -85,7 +85,7 @@ public class AuthController {
     public void reapply(@AuthenticationPrincipal UUID userId) {
         try {
             approveUser.reapply(userId);
-        } catch (CooldownException e) {
+        } catch (Account.CooldownException e) {
             // 쿨다운 중 — 재신청 가능 시각을 body에 포함
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, e.getRetryAfter().toString());
         } catch (IllegalStateException e) {

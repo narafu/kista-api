@@ -1,7 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
-import com.kista.domain.model.CooldownException;
+import com.kista.domain.model.Account;
 import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
@@ -88,12 +88,12 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
             case PENDING -> {
                 if (user.lastReappliedAt() != null &&
                         now.isBefore(user.lastReappliedAt().plus(1, ChronoUnit.HOURS)))
-                    throw new CooldownException(user.lastReappliedAt().plus(1, ChronoUnit.HOURS));
+                    throw new Account.CooldownException(user.lastReappliedAt().plus(1, ChronoUnit.HOURS));
             }
             case REJECTED -> {
                 if (user.lastReappliedAt() != null &&
                         now.isBefore(user.lastReappliedAt().plus(24, ChronoUnit.HOURS)))
-                    throw new CooldownException(user.lastReappliedAt().plus(24, ChronoUnit.HOURS));
+                    throw new Account.CooldownException(user.lastReappliedAt().plus(24, ChronoUnit.HOURS));
             }
             default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }

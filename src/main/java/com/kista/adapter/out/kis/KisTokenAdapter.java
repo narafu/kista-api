@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.InvalidKisKeyException;
+import com.kista.domain.model.Account;
 import com.kista.domain.port.out.KisTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
@@ -85,7 +85,7 @@ public class KisTokenAdapter implements KisTokenPort {
                     TokenResponse.class
             );
         } catch (Exception e) {
-            throw new InvalidKisKeyException();
+            throw new Account.InvalidKisKeyException();
         }
     }
 

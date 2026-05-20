@@ -23,4 +23,24 @@ public record Account(
             throw new SecurityException("계좌에 대한 접근 권한이 없습니다");
         }
     }
+
+    public static class CooldownException extends RuntimeException {
+
+        private final Instant retryAfter; // 재신청 가능 시각
+
+        public CooldownException(Instant retryAfter) {
+            super("재신청 대기 중입니다. 가능 시각: " + retryAfter);
+            this.retryAfter = retryAfter;
+        }
+
+        public Instant getRetryAfter() {
+            return retryAfter;
+        }
+    }
+
+    public static class InvalidKisKeyException extends RuntimeException {
+        public InvalidKisKeyException() {
+            super("KIS API 키가 유효하지 않습니다");
+        }
+    }
 }
