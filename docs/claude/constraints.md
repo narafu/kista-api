@@ -77,6 +77,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
+- PostgreSQL ENUM → VARCHAR 전환 시 `DROP TYPE` 실패 원인: `ALTER COLUMN TYPE` 후에도 DEFAULT 표현식(`'PENDING'::user_status`)에 ENUM 캐스팅이 남아 의존성 유지 → `DROP TYPE ... CASCADE`로 의존 DEFAULT 함께 제거 후 `SET DEFAULT '값'`으로 재설정 (V25 패턴)
+- Flyway checksum mismatch (로컬 마이그레이션 파일 수정 시): `DELETE FROM flyway_schema_history WHERE version = 'N'` + 해당 테이블 DROP → 앱 재시작 (로컬 전용 — 운영 DB에 절대 적용 금지)
 
 ### application-local.yml Docker 호환성
 - datasource url/username/password는 반드시 `${DB_URL:...}` 형식 유지 — 하드코딩 시 Docker에서 주입한 `DB_URL=postgres:5432`가 무시되고 `localhost:5432`로 접속 시도
