@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence;
 
 import com.kista.domain.model.Order;
-import com.kista.domain.model.Ticker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -9,11 +8,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "privacy_trade_order")
+@Table(name = "privacy_trades_detail")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
@@ -25,16 +23,16 @@ class PrivacyTradeOrderEntity extends BaseAuditEntity {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn
+    @JoinColumn(name = "privacy_trade_id", nullable = false)
     private PrivacyTradeEntity privacyTrade;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 5)
-    private Order.OrderDirection direction;
+    private Order.OrderDirection direction;    // BUY / SELL
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private Order.OrderType orderType;
+    private Order.OrderType orderType;         // LOC / MOC / LIMIT
 
     @Column(nullable = false)
     private int qty;
