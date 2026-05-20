@@ -57,6 +57,13 @@
 - `Ticker.tryParse`가 empty인 항목은 자동 제외 (silent drop) — 필요 시 `log.warn("KIS 응답 Ticker 외 종목 무시: {}", pdno)` 추가
 - 어댑터 단위 테스트: fixture에 `pdno="AAPL"` 행 추가 → 결과 List 크기·내용으로 필터 동작 검증
 
+### KIS 어댑터 공통 파싱 헬퍼 (KisResponseParser)
+- `adapter/out/kis/KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
+- 어댑터 내부에 파싱 헬퍼 직접 정의 금지 — KisResponseParser 사용
+- `parseIntSafe`: `(int) Double.parseDouble()` 경유 — KIS 응답이 `"5.0"` 같은 소수 형식일 수 있음
+- `KisAccountAdapter.fetchMargin()`: KisMarginPort 주입 경유 (직접 TTTC2101R 호출 아님) — USD 행 필터는 `currency()` 필드 기준
+- `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` / `foreignBalance()` — KIS API 필드명(`crcy_cd` 등) 아님
+
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
 - `KisHttpClient` mock 시 `buildHeaders(anyString(), any(Account.class))` 스텁 필요 (V2: Account 파라미터)

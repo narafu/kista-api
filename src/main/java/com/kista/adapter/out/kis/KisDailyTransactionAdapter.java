@@ -5,7 +5,6 @@ import com.kista.domain.model.Account;
 import com.kista.domain.model.DailyTransaction;
 import com.kista.domain.model.DailyTransactionResult;
 import com.kista.domain.model.DailyTransactionSummary;
-import com.kista.domain.model.Order;
 import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
@@ -61,14 +60,14 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
                                 .map(ticker -> new DailyTransaction(
                                         o.tradDt(),
                                         o.sttlDt(),
-                                        parseDirection(o.sllBuyDvsnCd()),
+                                        KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
                                         ticker,
                                         o.ovrsItemName(),
-                                        parseIntSafe(o.ccldQty()),
-                                        parseBd(o.ovrsStckCcldUnpr()),
-                                        parseBd(o.trFrcrAmt2()),
-                                        parseBd(o.wcrcExccAmt()),
-                                        parseBd(o.erlmExrt()),
+                                        KisResponseParser.parseIntSafe(o.ccldQty()),
+                                        KisResponseParser.parseBd(o.ovrsStckCcldUnpr()),
+                                        KisResponseParser.parseBd(o.trFrcrAmt2()),
+                                        KisResponseParser.parseBd(o.wcrcExccAmt()),
+                                        KisResponseParser.parseBd(o.erlmExrt()),
                                         o.crcyCd()
                                 ))
                                 .stream()
@@ -78,28 +77,13 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
         DailyTransactionSummary summary = emptySummary();
         if (response.output2() != null) {
             summary = new DailyTransactionSummary(
-                    parseBd(response.output2().frcrBuyAmtSmtl()),
-                    parseBd(response.output2().frcrSllAmtSmtl()),
-                    parseBd(response.output2().dmstFeeSmtl()),
-                    parseBd(response.output2().ovrsFeeSmtl())
+                    KisResponseParser.parseBd(response.output2().frcrBuyAmtSmtl()),
+                    KisResponseParser.parseBd(response.output2().frcrSllAmtSmtl()),
+                    KisResponseParser.parseBd(response.output2().dmstFeeSmtl()),
+                    KisResponseParser.parseBd(response.output2().ovrsFeeSmtl())
             );
         }
         return new DailyTransactionResult(items, summary);
-    }
-
-    // sll_buy_dvsn_cd: 01=매도, 02=매수
-    private static Order.OrderDirection parseDirection(String code) {
-        return "01".equals(code) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : (int) Double.parseDouble(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBd(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     private static DailyTransactionSummary emptySummary() {

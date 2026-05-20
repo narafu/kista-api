@@ -51,12 +51,12 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
                         .flatMap(o -> Ticker.tryParse(o.pdno())
                                 .map(ticker -> new PresentBalanceResult.Item(
                                         ticker,
-                                        parseIntSafe(o.cblcQty13()),
-                                        parseBd(o.avgUnpr3()),
-                                        parseBd(o.ovrsNowPric1()),
-                                        parseBd(o.frcrEvluAmt2()),
-                                        parseBd(o.evluPflsAmt2()),
-                                        parseBd(o.evluPflsRt1()),
+                                        KisResponseParser.parseIntSafe(o.cblcQty13()),
+                                        KisResponseParser.parseBd(o.avgUnpr3()),
+                                        KisResponseParser.parseBd(o.ovrsNowPric1()),
+                                        KisResponseParser.parseBd(o.frcrEvluAmt2()),
+                                        KisResponseParser.parseBd(o.evluPflsAmt2()),
+                                        KisResponseParser.parseBd(o.evluPflsRt1()),
                                         o.ovrsExcgCd()
                                 ))
                                 .stream()
@@ -67,21 +67,11 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
         BigDecimal totalProfit = BigDecimal.ZERO;
         BigDecimal totalRate = BigDecimal.ZERO;
         if (response.output3() != null) {
-            totalAsset = parseBd(response.output3().totAsstAmt());
-            totalProfit = parseBd(response.output3().totEvluPflsAmt());
-            totalRate = parseBd(response.output3().evluErngRt1());
+            totalAsset = KisResponseParser.parseBd(response.output3().totAsstAmt());
+            totalProfit = KisResponseParser.parseBd(response.output3().totEvluPflsAmt());
+            totalRate = KisResponseParser.parseBd(response.output3().evluErngRt1());
         }
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate);
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : (int) Double.parseDouble(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBd(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record BalanceResponse(

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.AccountBalance;
 import com.kista.domain.port.out.KisAccountPort;
+import com.kista.domain.port.out.KisMarginPort;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -19,12 +20,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KisAccountAdapter implements KisAccountPort {
 
-    private static final String BALANCE_PATH = "/uapi/overseas-stock/v1/trading/inquire-balance";
-    private static final String MARGIN_PATH   = "/uapi/overseas-stock/v1/trading/foreign-margin";
+    private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
-    private static final String MARGIN_TR_ID  = "TTTC2101R"; // 해외증거금 통화별조회
 
     private final KisHttpClient kisHttpClient;
+    private final KisMarginPort kisMarginPort;
 
     @Override
     public AccountBalance getBalance(Account account) {
@@ -54,55 +54,28 @@ public class KisAccountAdapter implements KisAccountPort {
                 .filter(o -> account.ticker().name().equals(o.pdno()))
                 .findFirst()
                 .map(o -> new HoldingResult(
-                        parseIntSafe(o.cblcQty()),
-                        parseBigDecimalSafe(o.pchsAvgPric())))
+                        KisResponseParser.parseIntSafe(o.cblcQty()),
+                        KisResponseParser.parseBd(o.pchsAvgPric())))
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
 
-    // 해외증거금 통화별조회(TTTC2101R)에서 미국(USD) 행의 itgr_ord_psbl_amt 반환
+    // 해외증거금 통화별조회(TTTC2101R)에서 USD 행의 integratedOrderableAmount 반환
     // frcr_dncl_amt_2(환전된 외화만)가 아닌 통합주문가능금액 사용 — 원화 자동 환전 케이스 포함
     private BigDecimal fetchMargin(Account account) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(MARGIN_TR_ID, account);
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("CANO", account.accountNo());
-        params.add("ACNT_PRDT_CD", account.kisAccountType());
-
-        MarginResponse response = kisHttpClient.get(MARGIN_PATH, headers, params, MarginResponse.class);
-
-        if (response == null || response.output() == null) {
-            return BigDecimal.ZERO;
-        }
-        return response.output().stream()
-                .filter(o -> "미국".equals(o.natnName()))
+        return kisMarginPort.getMargin(account).stream()
+                .filter(item -> "USD".equals(item.currency()))
                 .findFirst()
-                .map(o -> parseBigDecimalSafe(o.itgrOrdPsblAmt()))
+                .map(item -> item.integratedOrderableAmount())
                 .orElse(BigDecimal.ZERO);
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : Integer.parseInt(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBigDecimalSafe(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record HoldingResult(int qty, BigDecimal avgPrice) {}
 
     record BalanceResponse(@JsonProperty("output1") List<Output1> output1) {
         record Output1(
-                @JsonProperty("ovrs_pdno") String pdno,         // 해외상품번호
-                @JsonProperty("ovrs_cblc_qty") String cblcQty,  // 해외잔고수량
+                @JsonProperty("ovrs_pdno") String pdno,           // 해외상품번호
+                @JsonProperty("ovrs_cblc_qty") String cblcQty,    // 해외잔고수량
                 @JsonProperty("pchs_avg_pric") String pchsAvgPric // 매입평균가격
-        ) {}
-    }
-
-    record MarginResponse(@JsonProperty("output") List<Output> output) {
-        record Output(
-                @JsonProperty("natn_name") String natnName,              // 국가명 ("미국" 등)
-                @JsonProperty("itgr_ord_psbl_amt") String itgrOrdPsblAmt // 통합주문가능금액 (USD)
         ) {}
     }
 }

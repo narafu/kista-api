@@ -3,7 +3,6 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.Execution;
-import com.kista.domain.model.Order;
 import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisExecutionPort;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -61,30 +59,15 @@ public class KisExecutionAdapter implements KisExecutionPort {
                         .map(ticker -> new Execution(
                                 date,
                                 ticker,
-                                resolveDirection(item.sllBuyDvsnCd()),
-                                parseIntSafe(item.ftCcldQty()),
-                                parseBigDecimalSafe(item.ftCcldUnpr3()),
-                                parseBigDecimalSafe(item.ccldAmt()),
+                                KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
+                                KisResponseParser.parseIntSafe(item.ftCcldQty()),
+                                KisResponseParser.parseBd(item.ftCcldUnpr3()),
+                                KisResponseParser.parseBd(item.ccldAmt()),
                                 item.odno()
                         ))
                         .stream()
                 )
                 .toList();
-    }
-
-    private Order.OrderDirection resolveDirection(String sllBuyDvsnCd) {
-        // sll_buy_dvsn_cd: 01=매도, 02=매수
-        return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : Integer.parseInt(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBigDecimalSafe(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record ExecutionListResponse(@JsonProperty("output") List<OutputItem> output) {

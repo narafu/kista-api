@@ -59,11 +59,11 @@ public class KisProfitAdapter implements KisProfitPort {
                                 .map(ticker -> new PeriodProfitResult.Item(
                                         o.tradDay(),
                                         ticker,
-                                        parseIntSafe(o.slclQty()),
-                                        parseBd(o.pchsAvgPric()),
-                                        parseBd(o.avgSllUnpr()),
-                                        parseBd(o.ovrsRlztPflsAmt()),
-                                        parseBd(o.pftrt()),
+                                        KisResponseParser.parseIntSafe(o.slclQty()),
+                                        KisResponseParser.parseBd(o.pchsAvgPric()),
+                                        KisResponseParser.parseBd(o.avgSllUnpr()),
+                                        KisResponseParser.parseBd(o.ovrsRlztPflsAmt()),
+                                        KisResponseParser.parseBd(o.pftrt()),
                                         o.ovrsExcgCd()
                                 ))
                                 .stream()
@@ -73,20 +73,10 @@ public class KisProfitAdapter implements KisProfitPort {
         BigDecimal totalProfit = BigDecimal.ZERO;
         BigDecimal totalRate = BigDecimal.ZERO;
         if (response.output2() != null) {
-            totalProfit = parseBd(response.output2().ovrsRlztPflsTotAmt());
-            totalRate = parseBd(response.output2().totPftrt());
+            totalProfit = KisResponseParser.parseBd(response.output2().ovrsRlztPflsTotAmt());
+            totalRate = KisResponseParser.parseBd(response.output2().totPftrt());
         }
         return new PeriodProfitResult(items, totalProfit, totalRate);
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : (int) Double.parseDouble(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBd(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record ProfitResponse(

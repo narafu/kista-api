@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -45,15 +44,10 @@ public class KisMarginAdapter implements KisMarginPort {
                 .filter(o -> TARGET_CURRENCIES.contains(o.crcyCd()))
                 .map(o -> new MarginItem(
                         o.crcyCd(),
-                        parseBd(o.itgrOrdPsblAmt()),
-                        parseBd(o.frcrDnclAmt2())
+                        KisResponseParser.parseBd(o.itgrOrdPsblAmt()),
+                        KisResponseParser.parseBd(o.frcrDnclAmt2())
                 ))
                 .toList();
-    }
-
-    private static BigDecimal parseBd(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record MarginResponse(@JsonProperty("output") List<Output> output) {

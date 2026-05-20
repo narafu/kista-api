@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -64,15 +63,15 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
                         o.rsvnOrdRcitDt(),
                         o.ordRcitTmd(),
                         o.ovrsRsvnOdno(),
-                        parseDirection(o.sllBuyDvsnCd()),
+                        KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
                         o.ovrsRsvnOrdStatCd(),
                         o.ovrsRsvnOrdStatCdName(),
                         ticker,
                         o.prdtName(),
                         o.ovrsExcgCd(),
-                        parseIntSafe(o.ftOrdQty()),
-                        parseBd(o.ftOrdUnpr3()),
-                        parseIntSafe(o.ftCcldQty()),
+                        KisResponseParser.parseIntSafe(o.ftOrdQty()),
+                        KisResponseParser.parseBd(o.ftOrdUnpr3()),
+                        KisResponseParser.parseIntSafe(o.ftCcldQty()),
                         "Y".equals(o.cnclYn())
                 )).stream())
                 .toList();
@@ -103,21 +102,6 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
             receiptDate = response.output().rsvnOrdRcitDt() != null ? response.output().rsvnOrdRcitDt() : "";
         }
         return new ReservationOrderReceipt(kisOrderId, reservationOrderId, receiptDate);
-    }
-
-    // sll_buy_dvsn_cd: 01=매도, 02=매수
-    private static Order.OrderDirection parseDirection(String code) {
-        return "01".equals(code) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
-    }
-
-    private static int parseIntSafe(String s) {
-        try { return s == null || s.isBlank() ? 0 : (int) Double.parseDouble(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
-    }
-
-    private static BigDecimal parseBd(String s) {
-        try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
     }
 
     record ReservationListResponse(@JsonProperty("output") List<Output> output) {

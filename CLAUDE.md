@@ -8,6 +8,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - 반복 코드보다 재사용성·가독성·최신 문법을 우선
 - 디자인 패턴, 객체지향, SOLID 원칙 준수
 - Hexagonal Architecture, EDD, DDD, CQRS, TDA 설계 지향
+- 코드 철학에 맞지 않는 코드베이스를 발견하면 개선을 제안할 것 — 다른 작업 중 우연히 발견한 경우도 포함
 
 ## 작업 방식
 
