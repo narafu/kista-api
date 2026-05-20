@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.adapter.out.persistence.BaseAuditEntity;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Ticker;
 import jakarta.persistence.*;
@@ -9,7 +10,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -18,7 +18,7 @@ import java.util.UUID;
 @Getter
 @Setter(AccessLevel.PACKAGE) // markPlaced 전용 (status, kisOrderId)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class OrderEntity {
+class OrderEntity extends BaseAuditEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -55,7 +55,4 @@ class OrderEntity {
 
     @Column(name = "kis_order_id", length = 30)
     private String kisOrderId; // PLACED 이후 설정
-
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt; // DB DEFAULT now() 자동 설정
 }

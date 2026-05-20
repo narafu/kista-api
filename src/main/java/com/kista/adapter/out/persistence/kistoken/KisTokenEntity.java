@@ -1,14 +1,14 @@
 package com.kista.adapter.out.persistence.kistoken;
 
+import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "kis_tokens")
-class KisTokenEntity {
+class KisTokenEntity extends BaseAuditEntity {
 
     @Id
     @Column(name = "account_id")
@@ -19,9 +19,6 @@ class KisTokenEntity {
 
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
-
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt;
 
     protected KisTokenEntity() {}
 
@@ -34,5 +31,4 @@ class KisTokenEntity {
     UUID getAccountId() { return accountId; }
     String getAccessToken() { return accessToken; }
     OffsetDateTime getExpiresAt() { return expiresAt; }
-    Instant getCreatedAt() { return createdAt; }
 }
