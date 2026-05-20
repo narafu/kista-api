@@ -36,11 +36,11 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     public void markPlaced(UUID orderId, String kisOrderId) {
         // 명시적 save로 dirty checking 의존 없이 PLACED + kisOrderId 기록
-        repository.findById(orderId).ifPresent(e -> {
-            e.setStatus(Order.OrderStatus.PLACED);
-            e.setKisOrderId(kisOrderId);
-            repository.save(e);
-        });
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        e.setStatus(Order.OrderStatus.PLACED);
+        e.setKisOrderId(kisOrderId);
+        repository.save(e);
     }
 
     private OrderEntity toEntity(Order o) {
