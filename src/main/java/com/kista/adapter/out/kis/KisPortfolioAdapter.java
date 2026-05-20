@@ -51,7 +51,7 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
                         .flatMap(o -> Ticker.tryParse(o.pdno())
                                 .map(ticker -> new PresentBalanceResult.Item(
                                         ticker,
-                                        KisResponseParser.parseIntSafe(o.cblcQty13()),
+                                        KisResponseParser.parseIntSafe(o.balanceQuantity13()),
                                         KisResponseParser.parseBd(o.avgUnpr3()),
                                         KisResponseParser.parseBd(o.ovrsNowPric1()),
                                         KisResponseParser.parseBd(o.frcrEvluAmt2()),
@@ -80,7 +80,7 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
     ) {
         record Output1(
                 @JsonProperty("pdno") String pdno,                 // 종목코드
-                @JsonProperty("cblc_qty13") String cblcQty13,      // 잔고수량
+                @JsonProperty("cblc_qty13") String balanceQuantity13, // 잔고수량
                 @JsonProperty("avg_unpr3") String avgUnpr3,        // 평균단가
                 @JsonProperty("ovrs_now_pric1") String ovrsNowPric1, // 현재가
                 @JsonProperty("frcr_evlu_amt2") String frcrEvluAmt2, // 외화평가금액

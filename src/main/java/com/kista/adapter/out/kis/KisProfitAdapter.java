@@ -59,7 +59,7 @@ public class KisProfitAdapter implements KisProfitPort {
                                 .map(ticker -> new PeriodProfitResult.Item(
                                         o.tradDay(),
                                         ticker,
-                                        KisResponseParser.parseIntSafe(o.slclQty()),
+                                        KisResponseParser.parseIntSafe(o.sellLiquidationQuantity()),
                                         KisResponseParser.parseBd(o.pchsAvgPric()),
                                         KisResponseParser.parseBd(o.avgSllUnpr()),
                                         KisResponseParser.parseBd(o.ovrsRlztPflsAmt()),
@@ -86,7 +86,7 @@ public class KisProfitAdapter implements KisProfitPort {
         record Output1(
                 @JsonProperty("trad_day") String tradDay,           // 매매일
                 @JsonProperty("ovrs_pdno") String ovrsPdno,         // 해외상품번호
-                @JsonProperty("slcl_qty") String slclQty,           // 매도청산수량
+                @JsonProperty("slcl_qty") String sellLiquidationQuantity, // 매도청산수량
                 @JsonProperty("pchs_avg_pric") String pchsAvgPric,  // 매입평균가격
                 @JsonProperty("avg_sll_unpr") String avgSllUnpr,    // 평균매도단가
                 @JsonProperty("ovrs_rlzt_pfls_amt") String ovrsRlztPflsAmt, // 실현손익

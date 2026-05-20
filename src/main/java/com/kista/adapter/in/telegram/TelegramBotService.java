@@ -87,7 +87,7 @@ class TelegramBotService {
             PortfolioSnapshot s = getPortfolioUseCase.getCurrent();
             return String.format(
                     "<b>포트폴리오 현황 [%s]</b>%n보유: %d주 @ $%.4f%n현재가: $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
-                    s.snapshotDate(), s.qty(), s.avgPrice(), s.currentPrice(),
+                    s.snapshotDate(), s.holdings(), s.avgPrice(), s.currentPrice(),
                     s.marketValueUsd(), s.usdDeposit(), s.totalAssetUsd());
         } catch (NoSuchElementException e) {
             return "포트폴리오 데이터가 없습니다.";
@@ -101,7 +101,7 @@ class TelegramBotService {
         if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
         StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
         list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",
-                h.tradeDate(), h.direction(), h.orderType(), h.qty(), h.price())));
+                h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
         return sb.toString().trim();
     }
 

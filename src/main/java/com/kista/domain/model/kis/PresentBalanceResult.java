@@ -12,7 +12,7 @@ public record PresentBalanceResult(
 ) {
     public record Item(
             Ticker ticker,             // pdno: 종목코드
-            int qty,                   // cblc_qty13: 잔고수량
+            int holdings,              // cblc_qty13: 잔고수량
             BigDecimal avgPrice,       // avg_unpr3: 평균단가
             BigDecimal currentPrice,   // ovrs_now_pric1: 현재가
             BigDecimal evalAmountUsd,  // frcr_evlu_amt2: 외화평가금액

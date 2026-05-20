@@ -66,7 +66,7 @@ class KisProfitAdapterTest {
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.items().get(0).qty()).isEqualTo(5);
+        assertThat(result.items().get(0).quantity()).isEqualTo(5);
         assertThat(result.totalRealizedProfit()).isEqualByComparingTo("125.00");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("25.0");
     }

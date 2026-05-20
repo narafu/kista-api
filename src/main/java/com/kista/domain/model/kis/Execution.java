@@ -9,8 +9,8 @@ public record Execution(
         LocalDate tradeDate,            // 체결일
         Ticker ticker,                  // 종목 코드
         Order.OrderDirection direction, // 매수/매도 방향
-        int qty,                        // 체결 수량
+        int quantity,                   // 체결 수량
         BigDecimal price,               // 체결 단가 (USD)
-        BigDecimal amountUsd,           // 체결 금액 (USD) = price × qty
+        BigDecimal amountUsd,           // 체결 금액 (USD) = price × quantity
         String kisOrderId               // KIS 주문 번호 (ODNO)
 ) {}

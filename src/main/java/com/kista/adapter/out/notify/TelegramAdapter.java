@@ -36,7 +36,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
                 + "편차율: %.4f | 목표가: $%.2f",
                 r.date(),
                 r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.snapshot().quantity(), r.snapshot().averagePrice(),
+                r.snapshot().holdings(), r.snapshot().averagePrice(),
                 r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
         send(text);
     }
@@ -49,7 +49,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     @Override
     public void notifyInsufficientBalance(Account account, AccountBalance b) {
         send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
-                account.ticker().name(), b.quantity(), b.usdDeposit()));
+                account.ticker().name(), b.holdings(), b.usdDeposit()));
     }
 
     @Override
@@ -116,7 +116,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
                 + "편차율: %.4f | 목표가: $%.2f",
                 r.date(), account.nickname(),
                 r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.snapshot().quantity(), r.snapshot().averagePrice(),
+                r.snapshot().holdings(), r.snapshot().averagePrice(),
                 r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
         sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }

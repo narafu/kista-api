@@ -24,8 +24,8 @@ public class ReservationOrderService implements PlaceReservationOrderUseCase {
     public ReservationOrderReceipt place(UUID accountId, UUID requesterId, ReservationOrderCommand command) {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-        log.info("예약주문 접수: accountId={}, ticker={}, direction={}, qty={}, price={}",
-                accountId, command.ticker(), command.direction(), command.qty(), command.price());
+        log.info("예약주문 접수: accountId={}, ticker={}, direction={}, quantity={}, price={}",
+                accountId, command.ticker(), command.direction(), command.quantity(), command.price());
         // KIS 예외는 그대로 전파 → 컨트롤러에서 503 처리
         return kisReservationOrderPort.placeReservationOrder(command, account);
     }

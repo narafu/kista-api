@@ -10,7 +10,7 @@ public record DailyTransaction(
         Order.OrderDirection direction,      // 매도/매수 방향 (sll_buy_dvsn_cd: 01=매도, 02=매수)
         Ticker ticker,                       // 종목코드 (pdno)
         String symbolName,                   // 종목명 (ovrs_item_name)
-        int qty,                             // 체결수량 (ccld_qty)
+        int quantity,                        // 체결수량 (ccld_qty)
         BigDecimal price,                    // 해외주식체결단가 (ovrs_stck_ccld_unpr)
         BigDecimal tradeAmountUsd,           // 거래외화금액 (tr_frcr_amt2)
         BigDecimal settlementAmountKrw,      // 원화정산금액 (wcrc_excc_amt)

@@ -101,7 +101,7 @@ class KisExecutionAdapterTest {
         assertThat(result).hasSize(1);
         Execution e = result.get(0);
         assertThat(e.direction()).isEqualTo(Order.OrderDirection.BUY);
-        assertThat(e.qty()).isEqualTo(10);
+        assertThat(e.quantity()).isEqualTo(10);
         assertThat(e.price()).isEqualByComparingTo("30.50");
         assertThat(e.amountUsd()).isEqualByComparingTo("305.00");
         assertThat(e.kisOrderId()).isEqualTo("ORD002");
@@ -110,7 +110,7 @@ class KisExecutionAdapterTest {
     }
 
     @Test
-    @DisplayName("빈 문자열 필드: qty=0, price=0, amountUsd=0 안전 파싱")
+    @DisplayName("빈 문자열 필드: quantity=0, price=0, amountUsd=0 안전 파싱")
     void getExecutions_blankFields_parsedSafely() {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(
                 List.of(new KisExecutionAdapter.ExecutionListResponse.OutputItem(
@@ -123,7 +123,7 @@ class KisExecutionAdapterTest {
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);
-        assertThat(e.qty()).isEqualTo(0);
+        assertThat(e.quantity()).isEqualTo(0);
         assertThat(e.price()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(e.amountUsd()).isEqualByComparingTo(BigDecimal.ZERO);
     }

@@ -84,7 +84,7 @@ function cell(text) {
       tr.appendChild(cell(h.tradeDate));
       tr.appendChild(cell(h.direction));
       tr.appendChild(cell(h.orderType));
-      tr.appendChild(cell(String(h.qty)));
+      tr.appendChild(cell(String(h.quantity)));
       tr.appendChild(cell('$' + parseFloat(h.price).toFixed(4)));
       tr.appendChild(cell('$' + parseFloat(h.amountUsd).toFixed(2)));
       tr.appendChild(cell(h.status));

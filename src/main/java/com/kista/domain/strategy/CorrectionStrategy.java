@@ -30,7 +30,7 @@ public class CorrectionStrategy {
                         o.ticker(),
                         Order.OrderType.LIMIT,
                         o.direction(),
-                        o.qty(),
+                        o.quantity(),
                         o.price(),
                         Order.OrderStatus.PLACED,
                         null

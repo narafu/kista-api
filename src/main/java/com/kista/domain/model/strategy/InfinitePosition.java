@@ -15,8 +15,8 @@ public record InfinitePosition(
 
     // --- 기본 도메인 속성 조회 ---
 
-    public int quantity() {
-        return balance.quantity();
+    public int holdings() {
+        return balance.holdings();
     }
 
     public BigDecimal usdDeposit() {
@@ -26,11 +26,11 @@ public record InfinitePosition(
     // --- 무한매수법 핵심 수식 연산 (행위) ---
 
     public BigDecimal averagePrice() {
-        return quantity() == 0 ? currentPrice : balance.avgPrice();
+        return holdings() == 0 ? currentPrice : balance.avgPrice();
     }
 
     public BigDecimal purchaseAmount() {
-        return averagePrice().multiply(BigDecimal.valueOf(quantity()));
+        return averagePrice().multiply(BigDecimal.valueOf(holdings()));
     }
 
     public BigDecimal totalAssets() {
@@ -42,7 +42,7 @@ public record InfinitePosition(
     }
 
     public double currentRound() {
-        return quantity() == 0 ? 0.0
+        return holdings() == 0 ? 0.0
                 : purchaseAmount().divide(unitAmount(), 2, HALF_UP).doubleValue();
     }
 
@@ -64,11 +64,11 @@ public record InfinitePosition(
     }
 
     public BigDecimal evaluationAmount() {
-        return currentPrice.multiply(BigDecimal.valueOf(quantity()));
+        return currentPrice.multiply(BigDecimal.valueOf(holdings()));
     }
 
     public TradingSnapshot toSnapshot() {
-        return new TradingSnapshot(quantity(), averagePrice(), priceOffsetRate(), targetPrice());
+        return new TradingSnapshot(holdings(), averagePrice(), priceOffsetRate(), targetPrice());
     }
 
     // --- TDA 지향: 비즈니스 조건 판단 메서드 (Tell, Don't Ask) ---
@@ -102,7 +102,7 @@ public record InfinitePosition(
     }
 
     public int calcLimitSellQuantity() {
-        return quantity() - sellQuantityQuarter();
+        return holdings() - sellQuantityQuarter();
     }
 
     public int calcMocSellQuantity() {
@@ -110,6 +110,6 @@ public record InfinitePosition(
     }
 
     private int sellQuantityQuarter() {
-        return quantity() / 4;
+        return holdings() / 4;
     }
 }

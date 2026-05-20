@@ -14,8 +14,8 @@ public record ReservationOrder(
         Ticker ticker,                 // 종목코드 (pdno)
         String symbolName,             // 상품명 (prdt_name)
         String exchangeCode,           // 해외거래소코드 (ovrs_excg_cd)
-        int orderedQty,                // FT주문수량 (ft_ord_qty)
+        int orderedQuantity,           // FT주문수량 (ft_ord_qty)
         BigDecimal orderedPrice,       // FT주문단가 (ft_ord_unpr3)
-        int filledQty,                 // FT체결수량 (ft_ccld_qty)
+        int filledQuantity,            // FT체결수량 (ft_ccld_qty)
         boolean cancelled              // 취소여부 (cncl_yn: Y=취소)
 ) {}

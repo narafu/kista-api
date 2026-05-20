@@ -55,7 +55,7 @@ public class TradingService implements ExecuteTradingUseCase {
 
         // 2. 잔고 조회
         AccountBalance balance = kisAccountPort.getBalance(account);
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.ticker().name(), balance.quantity(), balance.usdDeposit());
+        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.ticker().name(), balance.holdings(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(account, balance);
@@ -164,30 +164,30 @@ public class TradingService implements ExecuteTradingUseCase {
         // 체결 건별 SSE 실시간 알림 (@Transactional 외부에서 호출 — 이미 DB 저장 완료 후)
         for (Execution e : executions) {
             TradeEvent event = e.direction() == SELL
-                    ? TradeEvent.sell(e.ticker().name(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
-                    : TradeEvent.buy(e.ticker().name(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
+                    ? TradeEvent.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
+                    : TradeEvent.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
             realtimeNotificationPort.notifyTrade(user.id(), event);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
     }
 
     private TradeHistory toHistory(Order o, java.util.UUID accountId) {
-        BigDecimal amountUsd = o.price().multiply(BigDecimal.valueOf(o.qty()))
+        BigDecimal amountUsd = o.price().multiply(BigDecimal.valueOf(o.quantity()))
                 .setScale(2, HALF_UP);
         return new TradeHistory(
                 null, o.tradeDate(), o.ticker(), "SOXL_DIVISION",
-                o.orderType(), o.direction(), o.qty(), o.price(),
+                o.orderType(), o.direction(), o.quantity(), o.price(),
                 amountUsd, o.status(), o.kisOrderId(), accountId, null);
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price,
                                           LocalDate today, Account account) {
-        BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.quantity()))
+        BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.holdings()))
                 .setScale(2, HALF_UP);
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
-                null, today, account.ticker(), balance.quantity(), balance.avgPrice(),
+                null, today, account.ticker(), balance.holdings(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 

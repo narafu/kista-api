@@ -15,11 +15,11 @@ public record ReservationOrderRequest(
         @Schema(description = "매매 방향 (BUY 또는 SELL)", example = "BUY")
         @NotNull Order.OrderDirection direction,
         @Schema(description = "주문 수량 (양수)", example = "5")
-        @Positive int qty,
+        @Positive int quantity,
         @Schema(description = "주문 단가 USD (양수)", example = "85.50")
         @NotNull @Positive BigDecimal price
 ) {
     public ReservationOrderCommand toCommand() {
-        return new ReservationOrderCommand(ticker, direction, qty, price);
+        return new ReservationOrderCommand(ticker, direction, quantity, price);
     }
 }

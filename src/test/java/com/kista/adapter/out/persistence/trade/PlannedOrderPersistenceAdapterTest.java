@@ -54,7 +54,7 @@ class PlannedOrderPersistenceAdapterTest {
         entity.setTicker(Ticker.SOXL);
         entity.setOrderType(Order.OrderType.LOC);
         entity.setDirection(Order.OrderDirection.BUY);
-        entity.setQty(5);
+        entity.setQuantity(5);
         entity.setPrice(PRICE);
         entity.setStatus(PlannedOrder.PlannedOrderStatus.PENDING);
 
@@ -66,7 +66,7 @@ class PlannedOrderPersistenceAdapterTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.get(0).qty()).isEqualTo(5);
+        assertThat(result.get(0).quantity()).isEqualTo(5);
         assertThat(result.get(0).status()).isEqualTo(PlannedOrder.PlannedOrderStatus.PENDING);
     }
 

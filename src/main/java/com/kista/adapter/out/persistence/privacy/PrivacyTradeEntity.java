@@ -40,7 +40,7 @@ class PrivacyTradeEntity extends BaseAuditEntity {
     private BigDecimal avgPrice;              // 보유 평단가
 
     @Column(nullable = false)
-    private int qty;                          // 보유 수량
+    private int holdings;                     // 보유 수량
 
     @OneToMany(mappedBy = "privacyTrade", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PrivacyTradeOrderEntity> orders = new ArrayList<>();

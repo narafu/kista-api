@@ -63,7 +63,7 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
                                         KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
                                         ticker,
                                         o.ovrsItemName(),
-                                        KisResponseParser.parseIntSafe(o.ccldQty()),
+                                        KisResponseParser.parseIntSafe(o.filledQuantity()),
                                         KisResponseParser.parseBd(o.ovrsStckCcldUnpr()),
                                         KisResponseParser.parseBd(o.trFrcrAmt2()),
                                         KisResponseParser.parseBd(o.wcrcExccAmt()),
@@ -100,7 +100,7 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
                 @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd,      // 매도매수구분코드 (01=매도, 02=매수)
                 @JsonProperty("pdno") String pdno,                          // 종목코드
                 @JsonProperty("ovrs_item_name") String ovrsItemName,        // 종목명
-                @JsonProperty("ccld_qty") String ccldQty,                   // 체결수량
+                @JsonProperty("ccld_qty") String filledQuantity,             // 체결수량
                 @JsonProperty("ovrs_stck_ccld_unpr") String ovrsStckCcldUnpr, // 해외주식체결단가
                 @JsonProperty("tr_frcr_amt2") String trFrcrAmt2,           // 거래외화금액
                 @JsonProperty("wcrc_excc_amt") String wcrcExccAmt,         // 원화정산금액

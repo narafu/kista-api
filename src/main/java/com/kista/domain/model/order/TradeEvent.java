@@ -7,7 +7,7 @@ import java.time.Instant;
 public record TradeEvent(
     String kind,            // BUY | SELL | INFO | FAIL
     String ticker,
-    Integer qty,
+    Integer quantity,
     Double price,
     Double amount,
     Instant time,
@@ -15,13 +15,13 @@ public record TradeEvent(
     String message
 ) {
     // BUY 이벤트 팩토리 메서드
-    public static TradeEvent buy(String ticker, int qty, double price, double amount, String nickname) {
-        return new TradeEvent("BUY", ticker, qty, price, amount, Instant.now(), nickname, null);
+    public static TradeEvent buy(String ticker, int quantity, double price, double amount, String nickname) {
+        return new TradeEvent("BUY", ticker, quantity, price, amount, Instant.now(), nickname, null);
     }
 
     // SELL 이벤트 팩토리 메서드
-    public static TradeEvent sell(String ticker, int qty, double price, double amount, String nickname) {
-        return new TradeEvent("SELL", ticker, qty, price, amount, Instant.now(), nickname, null);
+    public static TradeEvent sell(String ticker, int quantity, double price, double amount, String nickname) {
+        return new TradeEvent("SELL", ticker, quantity, price, amount, Instant.now(), nickname, null);
     }
 
     // 실패 이벤트 팩토리 메서드

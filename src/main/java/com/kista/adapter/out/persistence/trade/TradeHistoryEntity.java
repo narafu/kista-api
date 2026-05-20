@@ -37,7 +37,7 @@ class TradeHistoryEntity {
     private Order.OrderDirection direction;
 
     @Column(nullable = false)
-    private int qty;
+    private int quantity;
 
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal price;
@@ -62,7 +62,7 @@ class TradeHistoryEntity {
 
     TradeHistoryEntity(UUID id, LocalDate tradeDate, Ticker ticker, String strategy,
                        Order.OrderType orderType, Order.OrderDirection direction,
-                       int qty, BigDecimal price, BigDecimal amountUsd,
+                       int quantity, BigDecimal price, BigDecimal amountUsd,
                        Order.OrderStatus status, String kisOrderId, UUID accountId) {
         this.id = id;
         this.tradeDate = tradeDate;
@@ -70,7 +70,7 @@ class TradeHistoryEntity {
         this.strategy = strategy;
         this.orderType = orderType;
         this.direction = direction;
-        this.qty = qty;
+        this.quantity = quantity;
         this.price = price;
         this.amountUsd = amountUsd;
         this.status = status;
@@ -84,7 +84,7 @@ class TradeHistoryEntity {
     String getStrategy() { return strategy; }
     Order.OrderType getOrderType() { return orderType; }
     Order.OrderDirection getDirection() { return direction; }
-    int getQty() { return qty; }
+    int getQuantity() { return quantity; }
     BigDecimal getPrice() { return price; }
     BigDecimal getAmountUsd() { return amountUsd; }
     Order.OrderStatus getStatus() { return status; }

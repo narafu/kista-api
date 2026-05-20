@@ -70,7 +70,7 @@ public class AdminAnomaliesController {
             String ticker,
             String direction,
             String orderType,
-            int qty,
+            int quantity,
             BigDecimal price
     ) {
         static FailedTradeItem from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, User> userMap) {
@@ -80,7 +80,7 @@ public class AdminAnomaliesController {
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             return new FailedTradeItem(
                     t.id(), t.accountId(), nickname, t.tradeDate(), t.ticker().name(),
-                    t.direction().name(), t.orderType().name(), t.qty(), t.price());
+                    t.direction().name(), t.orderType().name(), t.quantity(), t.price());
         }
     }
 

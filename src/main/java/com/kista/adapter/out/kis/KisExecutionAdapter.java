@@ -60,7 +60,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
                                 date,
                                 ticker,
                                 KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
-                                KisResponseParser.parseIntSafe(item.ftCcldQty()),
+                                KisResponseParser.parseIntSafe(item.filledQuantity()),
                                 KisResponseParser.parseBd(item.ftCcldUnpr3()),
                                 KisResponseParser.parseBd(item.ccldAmt()),
                                 item.odno()
@@ -74,7 +74,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
         record OutputItem(
                 @JsonProperty("pdno") String pdno,                     // 종목코드
                 @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd, // 매도매수구분: 01=매도, 02=매수
-                @JsonProperty("ft_ccld_qty") String ftCcldQty,         // FT체결수량
+                @JsonProperty("ft_ccld_qty") String filledQuantity,     // FT체결수량
                 @JsonProperty("ft_ccld_unpr3") String ftCcldUnpr3,     // FT체결단가
                 @JsonProperty("ft_ccld_amt3") String ccldAmt,          // FT체결금액
                 @JsonProperty("odno") String odno                       // 주문번호

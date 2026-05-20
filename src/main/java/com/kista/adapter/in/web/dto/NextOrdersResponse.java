@@ -15,7 +15,7 @@ public record NextOrdersResponse(
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
-            int quantity,            // 보유 수량
+            int holdings,            // 보유 수량
             BigDecimal averagePrice, // 평균 매입가
             BigDecimal usdDeposit,   // 통합주문가능금액
             BigDecimal currentPrice, // 현재가 (장마감 시 마지막 체결가)
@@ -29,7 +29,7 @@ public record NextOrdersResponse(
         public static PositionSnapshot from(InfinitePosition p) {
             return new PositionSnapshot(
                     p.ticker(),
-                    p.quantity(),
+                    p.holdings(),
                     p.averagePrice(),
                     p.usdDeposit(),
                     p.currentPrice(),
@@ -48,11 +48,11 @@ public record NextOrdersResponse(
             Ticker ticker,              // 거래 종목
             Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             Order.OrderDirection direction, // 매수/매도 방향
-            int qty,                    // 주문 수량
+            int quantity,               // 주문 수량
             BigDecimal price            // 주문 가격 (LOC/MOC는 참고용)
     ) {
         public static OrderItem from(Order o) {
-            return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.qty(), o.price());
+            return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.quantity(), o.price());
         }
     }
 

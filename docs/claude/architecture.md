@@ -83,6 +83,7 @@ domain      →  외부 의존 없음
 | KIS 응답 도메인 모델(`Execution`/`PresentBalanceResult.Item`/`PeriodProfitResult.Item`/`DailyTransaction`/`ReservationOrder`) 필드 변경 | 해당 KIS 어댑터(`flatMap+tryParse` 매핑) + 어댑터 단위 테스트 fixture + `kista-ui/types/trade.ts` |
 | `privacy_trades_master` 스키마 변경 | `PrivacyTradeEntity` + `PrivacyTradeOrderEntity`(cascade 영향) + V번호 마이그레이션 |
 | `privacy_trades_detail` 스키마 변경 | `PrivacyTradeOrderEntity` + V번호 마이그레이션 |
+| 수량 관련 Domain record 필드 추가 | 해당 JPA Entity + Flyway 마이그레이션 + KIS 어댑터 매핑부 + DTO `from()` + kista-ui `types/` 동시 수정 |
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지

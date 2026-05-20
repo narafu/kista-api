@@ -120,7 +120,7 @@ public class KisStatisticsController {
         List<PortfolioSummaryResponse.PositionDto> positions = result.items().stream()
                 .map(item -> new PortfolioSummaryResponse.PositionDto(
                         item.ticker(),
-                        item.qty(),
+                        item.holdings(),
                         item.avgPrice(),
                         item.currentPrice(),
                         item.evalAmountUsd(),

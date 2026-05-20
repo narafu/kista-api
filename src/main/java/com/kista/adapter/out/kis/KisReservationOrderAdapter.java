@@ -69,9 +69,9 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
                         ticker,
                         o.prdtName(),
                         o.ovrsExcgCd(),
-                        KisResponseParser.parseIntSafe(o.ftOrdQty()),
+                        KisResponseParser.parseIntSafe(o.orderedQuantity()),
                         KisResponseParser.parseBd(o.ftOrdUnpr3()),
-                        KisResponseParser.parseIntSafe(o.ftCcldQty()),
+                        KisResponseParser.parseIntSafe(o.filledQuantity()),
                         "Y".equals(o.cnclYn())
                 )).stream())
                 .toList();
@@ -88,7 +88,7 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         body.put("ACNT_PRDT_CD", account.kisAccountType());
         body.put("PDNO", command.ticker().name());
         body.put("OVRS_EXCG_CD", EXCHANGE_CODE);
-        body.put("FT_ORD_QTY", String.valueOf(command.qty()));
+        body.put("FT_ORD_QTY", String.valueOf(command.quantity()));
         body.put("FT_ORD_UNPR3", command.price().toPlainString());
 
         ReservationOrderResponse response = kisHttpClient.post(ORDER_PATH, headers, body, ReservationOrderResponse.class);
@@ -115,9 +115,9 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
                 @JsonProperty("pdno") String pdno,                                     // 종목코드
                 @JsonProperty("prdt_name") String prdtName,                            // 상품명
                 @JsonProperty("ovrs_excg_cd") String ovrsExcgCd,                       // 거래소코드
-                @JsonProperty("ft_ord_qty") String ftOrdQty,                           // FT주문수량
+                @JsonProperty("ft_ord_qty") String orderedQuantity,                     // FT주문수량
                 @JsonProperty("ft_ord_unpr3") String ftOrdUnpr3,                       // FT주문단가
-                @JsonProperty("ft_ccld_qty") String ftCcldQty,                         // FT체결수량
+                @JsonProperty("ft_ccld_qty") String filledQuantity,                    // FT체결수량
                 @JsonProperty("cncl_yn") String cnclYn                                 // 취소여부 (Y=취소)
         ) {}
     }

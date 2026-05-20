@@ -28,7 +28,7 @@ class InfiniteStrategyTypeTest {
 
     @Test
     @DisplayName("buildOrders 전반 Q>0: LOC매수①② + LOC매도 + 지정가매도 = 4건")
-    void buildOrders_frontHalf_withQty() {
+    void buildOrders_frontHalf_withQuantity() {
         // A=20, Q=10, D=1000 → B=1200, K=60, T≈3.33, S>0 (전반)
         // G=20×(1+S)≈22.67, P=24.00
         // BUY①: floor(60/2/20)=1, BUY②: floor(60/2/22.67)=1
@@ -42,14 +42,14 @@ class InfiniteStrategyTypeTest {
         assertThat(orders).hasSize(4);
         assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.averagePrice()) == 0);
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.referencePrice()) == 0);
-        assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.qty() == 2);
-        assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.qty() == 8 && o.price().compareTo(position.targetPrice()) == 0);
+        assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
+        assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8 && o.price().compareTo(position.targetPrice()) == 0);
         assertThat(orders).allMatch(o -> o.ticker() == Ticker.SOXL && o.tradeDate().equals(TODAY));
     }
 
     @Test
     @DisplayName("buildOrders 전반 Q=0: BUY①만 (BUY②<1주, SELL Q/4=0)")
-    void buildOrders_frontHalf_noQty() {
+    void buildOrders_frontHalf_noQuantity() {
         // A=currentPrice=22, Q=0, D=1000 → B=1000, K=50
         // G=22×1.20=26.40, BUY①: floor(50/2/22)=1, BUY②: floor(50/2/26.40)=0
         AccountBalance balance = new AccountBalance(0, null,
@@ -73,7 +73,7 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.qty() == 50); // 200/4
+        assertThat(orders.get(0)).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 50); // 200/4
     }
 
     @Test
@@ -88,8 +88,8 @@ class InfiniteStrategyTypeTest {
 
         assertThat(orders).hasSize(3);
         assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY);
-        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.qty() == 50); // 200/4
-        assertThat(orders.get(2)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.qty() == 150); // 200-50
+        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 50); // 200/4
+        assertThat(orders.get(2)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 150); // 200-50
     }
 
     @Test

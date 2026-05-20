@@ -31,8 +31,8 @@ public class KisAccountAdapter implements KisAccountPort {
         HoldingResult holding = fetchHolding(account);
         BigDecimal usdDeposit = fetchMargin(account);
 
-        BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
-        return new AccountBalance(holding.qty(), avgPrice, usdDeposit);
+        BigDecimal avgPrice = holding.quantity() > 0 ? holding.avgPrice() : null;
+        return new AccountBalance(holding.quantity(), avgPrice, usdDeposit);
     }
 
     private HoldingResult fetchHolding(Account account) {
@@ -54,7 +54,7 @@ public class KisAccountAdapter implements KisAccountPort {
                 .filter(o -> account.ticker().name().equals(o.pdno()))
                 .findFirst()
                 .map(o -> new HoldingResult(
-                        KisResponseParser.parseIntSafe(o.cblcQty()),
+                        KisResponseParser.parseIntSafe(o.balanceQuantity()),
                         KisResponseParser.parseBd(o.pchsAvgPric())))
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
@@ -69,12 +69,12 @@ public class KisAccountAdapter implements KisAccountPort {
                 .orElse(BigDecimal.ZERO);
     }
 
-    record HoldingResult(int qty, BigDecimal avgPrice) {}
+    record HoldingResult(int quantity, BigDecimal avgPrice) {}
 
     record BalanceResponse(@JsonProperty("output1") List<Output1> output1) {
         record Output1(
                 @JsonProperty("ovrs_pdno") String pdno,           // 해외상품번호
-                @JsonProperty("ovrs_cblc_qty") String cblcQty,    // 해외잔고수량
+                @JsonProperty("ovrs_cblc_qty") String balanceQuantity, // 해외잔고수량
                 @JsonProperty("pchs_avg_pric") String pchsAvgPric // 매입평균가격
         ) {}
     }

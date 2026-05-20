@@ -48,7 +48,7 @@ class TradeHistoryPersistenceAdapterTest {
         assertThat(saved.strategy()).isEqualTo("SOXL_DIVISION");
         assertThat(saved.orderType()).isEqualTo(Order.OrderType.LOC);
         assertThat(saved.direction()).isEqualTo(Order.OrderDirection.BUY);
-        assertThat(saved.qty()).isEqualTo(5);
+        assertThat(saved.quantity()).isEqualTo(5);
         assertThat(saved.price()).isEqualByComparingTo("20.0000");
         assertThat(saved.amountUsd()).isEqualByComparingTo("100.00");
         assertThat(saved.status()).isEqualTo(Order.OrderStatus.PLACED);

@@ -64,7 +64,7 @@ class TelegramAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void notifyInsufficientBalance_bodyContainsQtyAndAmount() {
+    void notifyInsufficientBalance_bodyContainsQuantityAndAmount() {
         AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO,
                 new BigDecimal("5.00")); // usdDeposit=5.00
 

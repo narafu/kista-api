@@ -23,7 +23,7 @@ class InfinitePositionTest {
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("20"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("20");
-        assertThat(pos.quantity()).isEqualTo(0);
+        assertThat(pos.holdings()).isEqualTo(0);
         assertThat(pos.purchaseAmount()).isEqualByComparingTo("0");
         assertThat(pos.evaluationAmount()).isEqualByComparingTo("0");
         assertThat(pos.totalAssets()).isEqualByComparingTo("2000");
@@ -43,7 +43,7 @@ class InfinitePositionTest {
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("20");
-        assertThat(pos.quantity()).isEqualTo(10);
+        assertThat(pos.holdings()).isEqualTo(10);
         assertThat(pos.purchaseAmount()).isEqualByComparingTo("200");
         assertThat(pos.evaluationAmount()).isEqualByComparingTo("210");
         assertThat(pos.totalAssets()).isEqualByComparingTo("3000");
@@ -63,7 +63,7 @@ class InfinitePositionTest {
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("6"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("5");
-        assertThat(pos.quantity()).isEqualTo(100);
+        assertThat(pos.holdings()).isEqualTo(100);
         assertThat(pos.purchaseAmount()).isEqualByComparingTo("500");
         assertThat(pos.evaluationAmount()).isEqualByComparingTo("600");
         assertThat(pos.totalAssets()).isEqualByComparingTo("2000");

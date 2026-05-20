@@ -42,7 +42,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
         PortfolioSnapshot saved = result.get(0);
         assertThat(saved.snapshotDate()).isEqualTo(today);
         assertThat(saved.ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(saved.qty()).isEqualTo(10);
+        assertThat(saved.holdings()).isEqualTo(10);
         assertThat(saved.avgPrice()).isEqualByComparingTo("20.0000");
         assertThat(saved.currentPrice()).isEqualByComparingTo("22.0000");
         assertThat(saved.marketValueUsd()).isEqualByComparingTo("220.00");

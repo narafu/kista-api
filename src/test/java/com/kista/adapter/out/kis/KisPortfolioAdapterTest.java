@@ -61,7 +61,7 @@ class KisPortfolioAdapterTest {
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.items().get(0).qty()).isEqualTo(10);
+        assertThat(result.items().get(0).holdings()).isEqualTo(10);
         assertThat(result.totalAssetUsd()).isEqualByComparingTo("1000.00");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("2.0");
     }

@@ -1,5 +1,14 @@
 ## 핵심 제약 사항
 
+### 수량 변수명 규칙 (V26 전수 통일 완료)
+- **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `PortfolioSnapshot`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
+- **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `TradeHistory`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
+- `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
+- DB 컬럼: `portfolio_snapshots.holdings`, `privacy_trades_master.holdings`(보유) / `trade_histories.quantity`, `planned_orders.quantity`, `privacy_trades_detail.quantity`(주문)
+- KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
+- 복합 수량 필드: `orderedQty`/`filledQty` 패턴 금지 → `orderedQuantity`/`filledQuantity`
+- `InfinitePosition.calcXxxQuantity()` 메서드명은 "주문 수량 계산 결과"이므로 Quantity 유지 (보유수량 아님)
+
 ### AES-256 암호화 컬럼 크기
 - AES-256 CBC 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512

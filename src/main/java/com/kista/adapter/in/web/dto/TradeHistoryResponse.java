@@ -23,7 +23,7 @@ public record TradeHistoryResponse(
         @Schema(description = "매매 방향 (BUY/SELL)", example = "BUY")
         Order.OrderDirection direction,
         @Schema(description = "주문 수량", example = "5")
-        int qty,
+        int quantity,
         @Schema(description = "주문 단가 (USD)", example = "85.50")
         BigDecimal price,
         @Schema(description = "주문 금액 (USD)", example = "427.50")
@@ -38,7 +38,7 @@ public record TradeHistoryResponse(
     public static TradeHistoryResponse from(TradeHistory h) {
         return new TradeHistoryResponse(
                 h.id(), h.tradeDate(), h.ticker(), h.strategy(),
-                h.orderType(), h.direction(), h.qty(), h.price(),
+                h.orderType(), h.direction(), h.quantity(), h.price(),
                 h.amountUsd(), h.status(), h.kisOrderId(), h.createdAt());
     }
 }

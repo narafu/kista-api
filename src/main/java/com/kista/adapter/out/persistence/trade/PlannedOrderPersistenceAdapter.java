@@ -50,7 +50,7 @@ public class PlannedOrderPersistenceAdapter implements PlannedOrderPort {
         e.setTicker(p.ticker());
         e.setOrderType(p.orderType());
         e.setDirection(p.direction());
-        e.setQty(p.qty());
+        e.setQuantity(p.quantity());
         e.setPrice(p.price());
         e.setStatus(p.status());
         e.setOrderId(p.orderId());
@@ -60,7 +60,7 @@ public class PlannedOrderPersistenceAdapter implements PlannedOrderPort {
     private PlannedOrder toDomain(PlannedOrderEntity e) {
         return new PlannedOrder(
                 e.getId(), e.getAccountId(), e.getTradeDate(), e.getTicker(),
-                e.getOrderType(), e.getDirection(), e.getQty(), e.getPrice(),
+                e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getOrderId()
         );
     }

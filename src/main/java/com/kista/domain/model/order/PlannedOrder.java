@@ -12,7 +12,7 @@ public record PlannedOrder(
         Ticker ticker,                  // 거래 종목
         Order.OrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
         Order.OrderDirection direction, // 매수/매도 방향
-        int qty,                        // 주문 수량
+        int quantity,                   // 주문 수량
         BigDecimal price,               // 주문 가격 (LOC/MOC는 참고용)
         PlannedOrderStatus status,      // 실행 상태
         String orderId               // EXECUTED 이후 KIS 부여 주문번호
@@ -31,7 +31,7 @@ public record PlannedOrder(
                 order.ticker(),
                 order.orderType(),
                 order.direction(),
-                order.qty(),
+                order.quantity(),
                 order.price(),
                 PlannedOrderStatus.PENDING,
                 null // 아직 KIS 접수 전
@@ -40,7 +40,7 @@ public record PlannedOrder(
 
     // PlannedOrder → Order: kisOrderPort.place()에 넘길 Order 재구성
     public Order toOrder() {
-        return new Order(tradeDate, ticker, orderType, direction, qty, price,
+        return new Order(tradeDate, ticker, orderType, direction, quantity, price,
                 Order.OrderStatus.PLACED, null);
     }
 }

@@ -8,6 +8,6 @@ import java.math.BigDecimal;
 public record FidaOrderRequest(
         Ticker ticker,
         Order.OrderDirection direction,
-        int qty,
+        int quantity,
         BigDecimal price
 ) {}

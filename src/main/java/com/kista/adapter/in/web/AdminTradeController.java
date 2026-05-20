@@ -50,7 +50,7 @@ public class AdminTradeController {
             String ticker,
             String direction,        // BUY | SELL
             String orderType,        // LOC | MOC | LIMIT
-            int qty,
+            int quantity,
             BigDecimal price,
             String status            // PLACED | FILLED | FAILED
     ) {
@@ -63,7 +63,7 @@ public class AdminTradeController {
             return new AdminTradeResponse(
                     t.id(), userId, nickname, t.tradeDate(), t.ticker().name(),
                     t.direction().name(), t.orderType().name(),
-                    t.qty(), t.price(), t.status().name());
+                    t.quantity(), t.price(), t.status().name());
         }
     }
 }

@@ -13,7 +13,7 @@ public record TradeHistory(
         String strategy,
         Order.OrderType orderType,
         Order.OrderDirection direction,
-        int qty,
+        int quantity,
         BigDecimal price,
         BigDecimal amountUsd,
         Order.OrderStatus status,

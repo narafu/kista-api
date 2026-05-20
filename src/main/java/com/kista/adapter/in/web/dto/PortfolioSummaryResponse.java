@@ -15,7 +15,7 @@ public record PortfolioSummaryResponse(
     // 종목별 포지션 — kista-ui PortfolioSnapshot 호환
     public record PositionDto(
             Ticker ticker,             // pdno: 종목코드
-            int qty,                   // cblc_qty13: 잔고수량
+            int holdings,              // cblc_qty13: 잔고수량
             BigDecimal avgPrice,       // avg_unpr3: 평균단가 (USD)
             BigDecimal currentPrice,   // ovrs_now_pric1: 현재가 (USD)
             BigDecimal evalAmountUsd,  // frcr_evlu_amt2: 외화평가금액

@@ -25,7 +25,7 @@ class PortfolioSnapshotEntity {
     private Ticker ticker;
 
     @Column(nullable = false)
-    private int qty;
+    private int holdings;
 
     @Column(name = "avg_price", nullable = false, precision = 12, scale = 4)
     private BigDecimal avgPrice;
@@ -50,14 +50,14 @@ class PortfolioSnapshotEntity {
 
     protected PortfolioSnapshotEntity() {}
 
-    PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int qty,
+    PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int holdings,
                             BigDecimal avgPrice, BigDecimal currentPrice,
                             BigDecimal marketValueUsd, BigDecimal usdDeposit,
                             BigDecimal totalAssetUsd, UUID accountId) {
         this.id = id;
         this.snapshotDate = snapshotDate;
         this.ticker = ticker;
-        this.qty = qty;
+        this.holdings = holdings;
         this.avgPrice = avgPrice;
         this.currentPrice = currentPrice;
         this.marketValueUsd = marketValueUsd;
@@ -69,7 +69,7 @@ class PortfolioSnapshotEntity {
     UUID getId() { return id; }
     LocalDate getSnapshotDate() { return snapshotDate; }
     Ticker getTicker() { return ticker; }
-    int getQty() { return qty; }
+    int getHoldings() { return holdings; }
     BigDecimal getAvgPrice() { return avgPrice; }
     BigDecimal getCurrentPrice() { return currentPrice; }
     BigDecimal getMarketValueUsd() { return marketValueUsd; }

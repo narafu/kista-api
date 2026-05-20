@@ -16,7 +16,7 @@ public record PortfolioSnapshotResponse(
         @Schema(description = "거래 종목", example = "SOXL")
         Ticker ticker,
         @Schema(description = "보유 수량", example = "30")
-        int qty,
+        int holdings,
         @Schema(description = "평균매입단가 (USD)", example = "72.50")
         BigDecimal avgPrice,
         @Schema(description = "현재가 (USD)", example = "85.20")
@@ -32,7 +32,7 @@ public record PortfolioSnapshotResponse(
 ) {
     public static PortfolioSnapshotResponse from(PortfolioSnapshot s) {
         return new PortfolioSnapshotResponse(
-                s.id(), s.snapshotDate(), s.ticker(), s.qty(),
+                s.id(), s.snapshotDate(), s.ticker(), s.holdings(),
                 s.avgPrice(), s.currentPrice(), s.marketValueUsd(),
                 s.usdDeposit(), s.totalAssetUsd(), s.createdAt());
     }
