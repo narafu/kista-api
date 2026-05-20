@@ -15,7 +15,7 @@ public record TradeHistoryResponse(
         @Schema(description = "거래 날짜", example = "2025-01-15")
         LocalDate tradeDate,
         @Schema(description = "거래 종목", example = "SOXL")
-        Ticker symbol,
+        Ticker ticker,
         @Schema(description = "적용 전략", example = "INFINITE")
         String strategy,
         @Schema(description = "주문 유형 (LOC/MOC/LIMIT)", example = "LOC")

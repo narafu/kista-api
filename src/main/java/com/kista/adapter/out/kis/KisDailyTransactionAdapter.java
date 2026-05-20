@@ -6,8 +6,10 @@ import com.kista.domain.model.DailyTransaction;
 import com.kista.domain.model.DailyTransactionResult;
 import com.kista.domain.model.DailyTransactionSummary;
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -19,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
@@ -54,19 +57,22 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
         List<DailyTransaction> items = response.output1() == null
                 ? Collections.emptyList()
                 : response.output1().stream()
-                        .map(o -> new DailyTransaction(
-                                o.tradDt(),
-                                o.sttlDt(),
-                                parseDirection(o.sllBuyDvsnCd()),
-                                o.pdno(),
-                                o.ovrsItemName(),
-                                parseIntSafe(o.ccldQty()),
-                                parseBd(o.ovrsStckCcldUnpr()),
-                                parseBd(o.trFrcrAmt2()),
-                                parseBd(o.wcrcExccAmt()),
-                                parseBd(o.erlmExrt()),
-                                o.crcyCd()
-                        ))
+                        .flatMap(o -> Ticker.tryParse(o.pdno())
+                                .map(ticker -> new DailyTransaction(
+                                        o.tradDt(),
+                                        o.sttlDt(),
+                                        parseDirection(o.sllBuyDvsnCd()),
+                                        ticker,
+                                        o.ovrsItemName(),
+                                        parseIntSafe(o.ccldQty()),
+                                        parseBd(o.ovrsStckCcldUnpr()),
+                                        parseBd(o.trFrcrAmt2()),
+                                        parseBd(o.wcrcExccAmt()),
+                                        parseBd(o.erlmExrt()),
+                                        o.crcyCd()
+                                ))
+                                .stream()
+                        )
                         .toList();
 
         DailyTransactionSummary summary = emptySummary();

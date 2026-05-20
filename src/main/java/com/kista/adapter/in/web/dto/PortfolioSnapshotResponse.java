@@ -14,7 +14,7 @@ public record PortfolioSnapshotResponse(
         @Schema(description = "스냅샷 날짜", example = "2025-01-15")
         LocalDate snapshotDate,
         @Schema(description = "거래 종목", example = "SOXL")
-        Ticker symbol,
+        Ticker ticker,
         @Schema(description = "보유 수량", example = "30")
         int qty,
         @Schema(description = "평균매입단가 (USD)", example = "72.50")

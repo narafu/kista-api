@@ -60,7 +60,7 @@ class KisProfitAdapterTest {
                 ACCOUNT, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
 
         assertThat(result.items()).hasSize(1);
-        assertThat(result.items().get(0).symbol()).isEqualTo("SOXL");
+        assertThat(result.items().get(0).ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.items().get(0).qty()).isEqualTo(5);
         assertThat(result.totalRealizedProfit()).isEqualByComparingTo("125.00");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("25.0");

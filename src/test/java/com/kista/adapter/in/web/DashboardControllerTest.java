@@ -58,7 +58,7 @@ class DashboardControllerTest {
 
         mockMvc.perform(get("/api/trades"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].symbol").value("SOXL"))
+                .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].qty").value(10));
     }
 
@@ -72,7 +72,7 @@ class DashboardControllerTest {
 
         mockMvc.perform(get("/api/portfolio/current"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.symbol").value("SOXL"))
+                .andExpect(jsonPath("$.ticker").value("SOXL"))
                 .andExpect(jsonPath("$.qty").value(100));
     }
 

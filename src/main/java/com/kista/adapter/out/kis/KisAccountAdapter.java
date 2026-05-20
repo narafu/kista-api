@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.AccountBalance;
 import com.kista.domain.port.out.KisAccountPort;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import org.springframework.util.MultiValueMap;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisAccountAdapter implements KisAccountPort {
@@ -26,14 +28,14 @@ public class KisAccountAdapter implements KisAccountPort {
 
     @Override
     public AccountBalance getBalance(Account account) {
-        HoldingResult holding = fetchHolding(account.ticker().name(), account);
+        HoldingResult holding = fetchHolding(account);
         BigDecimal usdDeposit = fetchMargin(account);
 
         BigDecimal avgPrice = holding.qty() > 0 ? holding.avgPrice() : null;
         return new AccountBalance(holding.qty(), avgPrice, usdDeposit);
     }
 
-    private HoldingResult fetchHolding(String symbol, Account account) {
+    private HoldingResult fetchHolding(Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(BALANCE_TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());
@@ -49,7 +51,7 @@ public class KisAccountAdapter implements KisAccountPort {
             return new HoldingResult(0, BigDecimal.ZERO);
         }
         return response.output1().stream()
-                .filter(o -> symbol.equals(o.pdno()))
+                .filter(o -> account.ticker().name().equals(o.pdno()))
                 .findFirst()
                 .map(o -> new HoldingResult(
                         parseIntSafe(o.cblcQty()),

@@ -119,7 +119,7 @@ public class KisStatisticsController {
         // output1: 종목별 잔고 → PositionDto 목록으로 변환
         List<PortfolioSummaryResponse.PositionDto> positions = result.items().stream()
                 .map(item -> new PortfolioSummaryResponse.PositionDto(
-                        item.symbol(),
+                        item.ticker(),
                         item.qty(),
                         item.avgPrice(),
                         item.currentPrice(),

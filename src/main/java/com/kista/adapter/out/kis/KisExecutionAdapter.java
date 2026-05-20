@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.Execution;
 import com.kista.domain.model.Order;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisExecutionPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -17,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisExecutionAdapter implements KisExecutionPort {
@@ -54,15 +57,18 @@ public class KisExecutionAdapter implements KisExecutionPort {
             return Collections.emptyList();
         }
         return response.output().stream()
-                .map(item -> new Execution(
-                        date,
-                        item.pdno(),
-                        resolveDirection(item.sllBuyDvsnCd()),
-                        parseIntSafe(item.ftCcldQty()),
-                        parseBigDecimalSafe(item.ftCcldUnpr3()),
-                        parseBigDecimalSafe(item.ccldAmt()),
-                        item.odno()
-                ))
+                .flatMap(item -> Ticker.tryParse(item.pdno())
+                        .map(ticker -> new Execution(
+                                date,
+                                ticker,
+                                resolveDirection(item.sllBuyDvsnCd()),
+                                parseIntSafe(item.ftCcldQty()),
+                                parseBigDecimalSafe(item.ftCcldUnpr3()),
+                                parseBigDecimalSafe(item.ccldAmt()),
+                                item.odno()
+                        ))
+                        .stream()
+                )
                 .toList();
     }
 

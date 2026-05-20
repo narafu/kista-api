@@ -9,7 +9,7 @@ public record ReservationOrder(
         Order.OrderDirection direction, // 매도/매수 방향 (sll_buy_dvsn_cd: 01=매도, 02=매수)
         String statusCode,             // 해외예약주문상태코드 (ovrs_rsvn_ord_stat_cd)
         String statusName,             // 해외예약주문상태코드명 (ovrs_rsvn_ord_stat_cd_name)
-        String symbol,                 // 종목코드 (pdno)
+        Ticker ticker,                 // 종목코드 (pdno)
         String symbolName,             // 상품명 (prdt_name)
         String exchangeCode,           // 해외거래소코드 (ovrs_excg_cd)
         int orderedQty,                // FT주문수량 (ft_ord_qty)

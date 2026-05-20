@@ -14,7 +14,7 @@ public record NextOrdersResponse(
         List<OrderItem> orders
 ) {
     public record PositionSnapshot(
-            Ticker symbol,           // 거래 종목
+            Ticker ticker,           // 거래 종목
             int quantity,            // 보유 수량
             BigDecimal averagePrice, // 평균 매입가
             BigDecimal usdDeposit,   // 통합주문가능금액
@@ -45,7 +45,7 @@ public record NextOrdersResponse(
 
     // tradeDate·status·orderId는 preview에서 의미 없으므로 제외
     public record OrderItem(
-            Ticker symbol,              // 거래 종목
+            Ticker ticker,              // 거래 종목
             Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             Order.OrderDirection direction, // 매수/매도 방향
             int qty,                    // 주문 수량

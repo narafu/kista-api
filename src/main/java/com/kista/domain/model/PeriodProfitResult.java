@@ -10,7 +10,7 @@ public record PeriodProfitResult(
 ) {
     public record Item(
             String tradeDate,              // trad_day: 매매일
-            String symbol,                 // ovrs_pdno: 해외상품번호
+            Ticker ticker,                 // ovrs_pdno: 해외상품번호
             int qty,                       // slcl_qty: 매도청산수량
             BigDecimal avgBuyPrice,        // pchs_avg_pric: 매입평균가격
             BigDecimal avgSellPrice,       // avg_sll_unpr: 평균매도단가

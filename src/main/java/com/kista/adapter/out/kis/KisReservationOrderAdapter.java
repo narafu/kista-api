@@ -6,8 +6,10 @@ import com.kista.domain.model.Order;
 import com.kista.domain.model.ReservationOrder;
 import com.kista.domain.model.ReservationOrderCommand;
 import com.kista.domain.model.ReservationOrderReceipt;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -21,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisReservationOrderAdapter implements KisReservationOrderPort {
@@ -57,21 +60,21 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         }
 
         return response.output().stream()
-                .map(o -> new ReservationOrder(
+                .flatMap(o -> Ticker.tryParse(o.pdno()).map(ticker -> new ReservationOrder(
                         o.rsvnOrdRcitDt(),
                         o.ordRcitTmd(),
                         o.ovrsRsvnOdno(),
                         parseDirection(o.sllBuyDvsnCd()),
                         o.ovrsRsvnOrdStatCd(),
                         o.ovrsRsvnOrdStatCdName(),
-                        o.pdno(),
+                        ticker,
                         o.prdtName(),
                         o.ovrsExcgCd(),
                         parseIntSafe(o.ftOrdQty()),
                         parseBd(o.ftOrdUnpr3()),
                         parseIntSafe(o.ftCcldQty()),
                         "Y".equals(o.cnclYn())
-                ))
+                )).stream())
                 .toList();
     }
 

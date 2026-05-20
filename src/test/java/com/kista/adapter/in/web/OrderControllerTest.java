@@ -66,7 +66,7 @@ class OrderControllerTest {
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeDate").value(LocalDate.now().toString()))
-                .andExpect(jsonPath("$.position.symbol").value("SOXL"))
+                .andExpect(jsonPath("$.position.ticker").value("SOXL"))
                 .andExpect(jsonPath("$.position.currentPrice").value(22.00))
                 .andExpect(jsonPath("$.orders[0].direction").value("BUY"))
                 .andExpect(jsonPath("$.orders[0].orderType").value("LOC"));

@@ -159,8 +159,8 @@ public class TradingService implements ExecuteTradingUseCase {
         // 체결 건별 SSE 실시간 알림 (@Transactional 외부에서 호출 — 이미 DB 저장 완료 후)
         for (Execution e : executions) {
             TradeEvent event = e.direction() == SELL
-                    ? TradeEvent.sell(e.symbol(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
-                    : TradeEvent.buy(e.symbol(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
+                    ? TradeEvent.sell(e.ticker().name(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
+                    : TradeEvent.buy(e.ticker().name(), e.qty(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
             realtimeNotificationPort.notifyTrade(user.id(), event);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());

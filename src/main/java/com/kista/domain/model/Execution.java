@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public record Execution(
         LocalDate tradeDate,            // 체결일
-        String symbol,                  // 종목 코드
+        Ticker ticker,                  // 종목 코드
         Order.OrderDirection direction, // 매수/매도 방향
         int qty,                        // 체결 수량
         BigDecimal price,               // 체결 단가 (USD)

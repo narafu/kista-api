@@ -43,7 +43,7 @@ public class NextOrdersService implements GetNextOrdersUseCase {
 
         LocalDate today = LocalDate.now();
         List<Order> orders = tradingStrategy.buildOrders(position, today);
-        log.info("[next-orders] accountId={}, symbol={}, orders={}, currentRound={}",
+        log.info("[next-orders] accountId={}, ticker={}, orders={}, currentRound={}",
                 accountId, account.ticker().name(), orders.size(), position.currentRound());
 
         return new Result(today, position, orders);

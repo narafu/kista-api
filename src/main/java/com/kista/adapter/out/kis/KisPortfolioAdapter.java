@@ -3,8 +3,10 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.PresentBalanceResult;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisPortfolioPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -14,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisPortfolioAdapter implements KisPortfolioPort {
@@ -45,16 +48,19 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
         List<PresentBalanceResult.Item> items = response.output1() == null
                 ? Collections.emptyList()
                 : response.output1().stream()
-                        .map(o -> new PresentBalanceResult.Item(
-                                o.pdno(),
-                                parseIntSafe(o.cblcQty13()),
-                                parseBd(o.avgUnpr3()),
-                                parseBd(o.ovrsNowPric1()),
-                                parseBd(o.frcrEvluAmt2()),
-                                parseBd(o.evluPflsAmt2()),
-                                parseBd(o.evluPflsRt1()),
-                                o.ovrsExcgCd()
-                        ))
+                        .flatMap(o -> Ticker.tryParse(o.pdno())
+                                .map(ticker -> new PresentBalanceResult.Item(
+                                        ticker,
+                                        parseIntSafe(o.cblcQty13()),
+                                        parseBd(o.avgUnpr3()),
+                                        parseBd(o.ovrsNowPric1()),
+                                        parseBd(o.frcrEvluAmt2()),
+                                        parseBd(o.evluPflsAmt2()),
+                                        parseBd(o.evluPflsRt1()),
+                                        o.ovrsExcgCd()
+                                ))
+                                .stream()
+                        )
                         .toList();
 
         BigDecimal totalAsset = BigDecimal.ZERO;

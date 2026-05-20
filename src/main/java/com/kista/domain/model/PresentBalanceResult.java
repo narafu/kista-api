@@ -10,7 +10,7 @@ public record PresentBalanceResult(
         BigDecimal totalReturnRate     // output3: evlu_erng_rt1 (총수익률 %)
 ) {
     public record Item(
-            String symbol,             // pdno: 종목코드
+            Ticker ticker,             // pdno: 종목코드
             int qty,                   // cblc_qty13: 잔고수량
             BigDecimal avgPrice,       // avg_unpr3: 평균단가
             BigDecimal currentPrice,   // ovrs_now_pric1: 현재가

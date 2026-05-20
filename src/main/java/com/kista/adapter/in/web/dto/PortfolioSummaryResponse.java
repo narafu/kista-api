@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.domain.model.Ticker;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -10,9 +12,9 @@ public record PortfolioSummaryResponse(
         SummaryDto summary            // output3: 계좌 전체 요약
 ) {
 
-    // 종목별 포지션 — PresentBalanceResult.Item 필드명 그대로 유지 (kista-ui PortfolioSnapshot 호환)
+    // 종목별 포지션 — kista-ui PortfolioSnapshot 호환
     public record PositionDto(
-            String symbol,             // pdno: 종목코드
+            Ticker ticker,             // pdno: 종목코드
             int qty,                   // cblc_qty13: 잔고수량
             BigDecimal avgPrice,       // avg_unpr3: 평균단가 (USD)
             BigDecimal currentPrice,   // ovrs_now_pric1: 현재가 (USD)

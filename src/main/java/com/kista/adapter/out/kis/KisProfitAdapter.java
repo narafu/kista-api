@@ -3,8 +3,10 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.Account;
 import com.kista.domain.model.PeriodProfitResult;
+import com.kista.domain.model.Ticker;
 import com.kista.domain.port.out.KisProfitPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -16,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisProfitAdapter implements KisProfitPort {
@@ -52,16 +55,19 @@ public class KisProfitAdapter implements KisProfitPort {
         List<PeriodProfitResult.Item> items = response.output1() == null
                 ? Collections.emptyList()
                 : response.output1().stream()
-                        .map(o -> new PeriodProfitResult.Item(
-                                o.tradDay(),
-                                o.ovrsPdno(),
-                                parseIntSafe(o.slclQty()),
-                                parseBd(o.pchsAvgPric()),
-                                parseBd(o.avgSllUnpr()),
-                                parseBd(o.ovrsRlztPflsAmt()),
-                                parseBd(o.pftrt()),
-                                o.ovrsExcgCd()
-                        ))
+                        .flatMap(o -> Ticker.tryParse(o.ovrsPdno())
+                                .map(ticker -> new PeriodProfitResult.Item(
+                                        o.tradDay(),
+                                        ticker,
+                                        parseIntSafe(o.slclQty()),
+                                        parseBd(o.pchsAvgPric()),
+                                        parseBd(o.avgSllUnpr()),
+                                        parseBd(o.ovrsRlztPflsAmt()),
+                                        parseBd(o.pftrt()),
+                                        o.ovrsExcgCd()
+                                ))
+                                .stream()
+                        )
                         .toList();
 
         BigDecimal totalProfit = BigDecimal.ZERO;

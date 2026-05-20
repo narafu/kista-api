@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 
 public record FidaOrderRequestDto(
         @Schema(description = "거래 종목", example = "SOXL")
-        @NotNull Ticker symbol,
+        @NotNull Ticker ticker,
         @Schema(description = "매매 방향 (BUY 또는 SELL)", example = "BUY")
         @NotNull Order.OrderDirection direction,
         @Schema(description = "주문 수량", example = "5")

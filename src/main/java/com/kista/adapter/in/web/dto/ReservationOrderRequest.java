@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 
 public record ReservationOrderRequest(
         @Schema(description = "거래 종목", example = "SOXL")
-        @NotNull Ticker symbol,
+        @NotNull Ticker ticker,
         @Schema(description = "매매 방향 (BUY 또는 SELL)", example = "BUY")
         @NotNull Order.OrderDirection direction,
         @Schema(description = "주문 수량 (양수)", example = "5")
@@ -20,6 +20,6 @@ public record ReservationOrderRequest(
         @NotNull @Positive BigDecimal price
 ) {
     public ReservationOrderCommand toCommand() {
-        return new ReservationOrderCommand(symbol, direction, qty, price); // symbol: Ticker
+        return new ReservationOrderCommand(ticker, direction, qty, price);
     }
 }

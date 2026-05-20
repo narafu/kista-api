@@ -42,7 +42,7 @@ class StatisticsControllerTest {
     @Test
     void profit_returns_200_with_result() throws Exception {
         PeriodProfitResult result = new PeriodProfitResult(
-                List.of(new PeriodProfitResult.Item("20240615", "SOXL", 5,
+                List.of(new PeriodProfitResult.Item("20240615", Ticker.SOXL, 5,
                         new BigDecimal("20.00"), new BigDecimal("25.00"),
                         new BigDecimal("25.00"), new BigDecimal("25.0"), "NASD")),
                 new BigDecimal("125.00"), new BigDecimal("25.0")
@@ -55,7 +55,7 @@ class StatisticsControllerTest {
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalRealizedProfit").value(125.00))
-                .andExpect(jsonPath("$.items[0].symbol").value("SOXL"));
+                .andExpect(jsonPath("$.items[0].ticker").value("SOXL"));
     }
 
     @Test

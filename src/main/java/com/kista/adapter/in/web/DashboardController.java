@@ -43,10 +43,10 @@ public class DashboardController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "거래 종목", example = "SOXL")
-            @RequestParam(defaultValue = "SOXL") Ticker symbol) {
+            @RequestParam(defaultValue = "SOXL") Ticker ticker) {
         LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
         LocalDate resolvedTo = to != null ? to : LocalDate.now();
-        return getTradeHistoryUseCase.getHistory(resolvedFrom, resolvedTo, symbol)
+        return getTradeHistoryUseCase.getHistory(resolvedFrom, resolvedTo, ticker)
                 .stream().map(TradeHistoryResponse::from).toList();
     }
 
@@ -76,6 +76,6 @@ public class DashboardController {
     @ResponseStatus(HttpStatus.CREATED)
     public void placeFidaOrder(@RequestBody @Valid FidaOrderRequestDto dto) {
         executeFidaOrderUseCase.execute(new FidaOrderRequest(
-                dto.symbol(), dto.direction(), dto.qty(), dto.price()));
+                dto.ticker(), dto.direction(), dto.qty(), dto.price()));
     }
 }
