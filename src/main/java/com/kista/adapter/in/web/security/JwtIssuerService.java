@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.security;
 
-import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.User;
 import com.nimbusds.jose.jwk.ECKey;
 import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,7 @@ public class JwtIssuerService {
     private String signingJwk; // EC JWK JSON 문자열
 
     // userId를 subject, role을 클레임으로 담은 ES256 서명 JWT 발급
-    public String issue(UUID userId, UserRole role) {
+    public String issue(UUID userId, User.UserRole role) {
         ECPrivateKey privateKey = parsePrivateKey();
         return Jwts.builder()
                 .subject(userId.toString())

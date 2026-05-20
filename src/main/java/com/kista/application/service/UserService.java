@@ -3,8 +3,6 @@ package com.kista.application.service;
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
@@ -44,8 +42,8 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         return userRepository.findByKakaoId(kakaoId).orElseGet(() -> {
             // ADMIN seed 여부에 따라 역할/상태 결정
             boolean isAdminSeed = bootstrapProps.isAdmin(kakaoId);
-            UserRole role = isAdminSeed ? UserRole.ADMIN : UserRole.USER;
-            UserStatus status = isAdminSeed ? UserStatus.ACTIVE : UserStatus.PENDING;
+            User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
+            User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
                     null, null, null, null, null, null);
             User saved = userRepository.save(newUser);
@@ -59,23 +57,23 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public void approve(UUID userId) {
         User user = findOrThrow(userId);
-        User updated = withStatus(user, UserStatus.ACTIVE);
+        User updated = withStatus(user, User.UserStatus.ACTIVE);
         userRepository.save(updated);
         log.info("사용자 승인: userId={}", userId);
         notificationPort.notifyApproved(updated);
-        realtimeNotificationPort.notifyStatusChange(userId, UserStatus.ACTIVE);
+        realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.ACTIVE);
     }
 
     @Override
     public void reject(UUID userId) {
         User user = findOrThrow(userId);
         // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), UserStatus.REJECTED, user.role(),
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.REJECTED, user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, Instant.now());
         userRepository.save(updated);
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
-        realtimeNotificationPort.notifyStatusChange(userId, UserStatus.REJECTED);
+        realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
     }
 
     @Override
@@ -99,7 +97,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         }
 
         // PENDING 전환 + 재신청 시각 갱신
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), UserStatus.PENDING, user.role(),
+        User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.PENDING, user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, now);
         userRepository.save(updated);
         log.info("사용자 재신청: userId={}", userId);
@@ -152,7 +150,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         log.info("사용자 탈퇴: userId={}", userId);
     }
 
-    private User withStatus(User user, UserStatus newStatus) {
+    private User withStatus(User user, User.UserStatus newStatus) {
         return new User(user.id(), user.kakaoId(), user.nickname(), newStatus, user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null,
                 user.lastReappliedAt());

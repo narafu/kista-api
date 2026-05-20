@@ -2,7 +2,6 @@ package com.kista.adapter.out.persistence.user;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.out.UserRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +39,7 @@ public class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
-    public List<User> findAllByStatus(UserStatus status) {
+    public List<User> findAllByStatus(User.UserStatus status) {
         return jpaRepository.findAllByStatus(status).stream().map(this::toDomain).toList();
     }
 

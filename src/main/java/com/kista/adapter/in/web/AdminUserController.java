@@ -2,8 +2,6 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminUserResponse;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +29,7 @@ public class AdminUserController {
     @Operation(summary = "사용자 목록 조회")
     @GetMapping
     public List<AdminUserResponse> listUsers(
-            @RequestParam(required = false) UserStatus status,
+            @RequestParam(required = false) User.UserStatus status,
             @AuthenticationPrincipal UUID adminId) {
         List<User> users = status == null
                 ? listUsers.listAll()
@@ -89,5 +87,5 @@ public class AdminUserController {
         }
     }
 
-    record RoleRequest(UserRole role) {} // 역할 변경 요청 body
+    record RoleRequest(User.UserRole role) {} // 역할 변경 요청 body
 }

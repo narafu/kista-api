@@ -1,12 +1,12 @@
 package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kista.adapter.in.web.dto.FidaOrderRequestDto;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
+import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import org.junit.jupiter.api.Test;
@@ -86,13 +86,14 @@ class DashboardControllerTest {
 
     @Test
     void placeFidaOrder_returns_201() throws Exception {
-        FidaOrderRequestDto dto = new FidaOrderRequestDto(
-                Ticker.SOXL, Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
+        FidaOrderRequest req = new FidaOrderRequest(
+                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         mockMvc.perform(post("/api/orders/fida")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated());
     }
 

@@ -1,6 +1,5 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.FidaOrderRequestDto;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
 import com.kista.domain.model.strategy.Ticker;
@@ -74,8 +73,7 @@ public class DashboardController {
     })
     @PostMapping("/orders/fida")
     @ResponseStatus(HttpStatus.CREATED)
-    public void placeFidaOrder(@RequestBody @Valid FidaOrderRequestDto dto) {
-        executeFidaOrderUseCase.execute(new FidaOrderRequest(
-                dto.ticker(), dto.direction(), dto.qty(), dto.price()));
+    public void placeFidaOrder(@RequestBody @Valid FidaOrderRequest request) {
+        executeFidaOrderUseCase.execute(request);
     }
 }

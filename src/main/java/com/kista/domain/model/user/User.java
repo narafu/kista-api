@@ -15,4 +15,12 @@ public record User(
         Instant createdAt,
         Instant updatedAt,
         Instant lastReappliedAt         // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
-) {}
+) {
+    public enum UserRole { USER, ADMIN }
+
+    public enum UserStatus {
+        PENDING,  // 관리자 승인 대기 중
+        ACTIVE,   // 승인 완료, 서비스 이용 가능
+        REJECTED  // 거절됨 (재신청 가능)
+    }
+}

@@ -3,7 +3,6 @@ package com.kista.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.account.StrategyStatus;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.out.AccountRepository;
@@ -40,7 +39,7 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
         // 전략 PAUSED 계좌
         List<Account> pausedAccounts = allAccounts.stream()
-                .filter(a -> a.strategyStatus() == StrategyStatus.PAUSED)
+                .filter(a -> a.strategyStatus() == Account.StrategyStatus.PAUSED)
                 .toList();
 
         // 최근 7일 거래 있는 accountId 집합
@@ -51,7 +50,7 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
         // ACTIVE 전략이지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
-                .filter(a -> a.strategyStatus() == StrategyStatus.ACTIVE)
+                .filter(a -> a.strategyStatus() == Account.StrategyStatus.ACTIVE)
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();
 

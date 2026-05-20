@@ -2,8 +2,6 @@ package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.AdminDashboardUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
@@ -40,7 +38,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
 
     @Override
     @Transactional(readOnly = true)
-    public List<User> listByStatus(UserStatus status) {
+    public List<User> listByStatus(User.UserStatus status) {
         return userRepository.findAllByStatus(status);
     }
 
@@ -61,7 +59,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
     }
 
     @Override
-    public void changeRole(UUID adminId, UUID targetUserId, UserRole role) {
+    public void changeRole(UUID adminId, UUID targetUserId, User.UserRole role) {
         // 사용자 존재 확인
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
@@ -100,9 +98,9 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
     public AdminStats getStats() {
         List<User> all = userRepository.findAll();
         long totalUsers = all.size();
-        long pendingCount = all.stream().filter(u -> u.status() == UserStatus.PENDING).count();
-        long activeCount = all.stream().filter(u -> u.status() == UserStatus.ACTIVE).count();
-        long rejectedCount = all.stream().filter(u -> u.status() == UserStatus.REJECTED).count();
+        long pendingCount = all.stream().filter(u -> u.status() == User.UserStatus.PENDING).count();
+        long activeCount = all.stream().filter(u -> u.status() == User.UserStatus.ACTIVE).count();
+        long rejectedCount = all.stream().filter(u -> u.status() == User.UserStatus.REJECTED).count();
         long totalAccounts = accountRepository.countAll();
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }

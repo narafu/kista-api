@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import org.junit.jupiter.api.Test;
@@ -53,7 +51,7 @@ class AdminUserControllerTest {
 
     // 테스트용 샘플 User 생성 (10개 필드: id, kakaoId, nickname, status, role, botToken, chatId, createdAt, updatedAt, lastReappliedAt)
     private User sampleUser(UUID id) {
-        return new User(id, "kakao-1", "테스트유저", UserStatus.PENDING, UserRole.USER,
+        return new User(id, "kakao-1", "테스트유저", User.UserStatus.PENDING, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
     }
 

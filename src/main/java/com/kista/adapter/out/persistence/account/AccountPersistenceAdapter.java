@@ -98,6 +98,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setKisAppKey(crypto.encrypt(a.kisAppKey()));
         e.setKisSecretKey(crypto.encrypt(a.kisSecretKey()));
         e.setKisAccountType(a.kisAccountType());
+        e.setBroker(a.broker());
         e.setCreatedAt(a.createdAt()); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
@@ -117,6 +118,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(), s.getType(), s.getStatus(),
                 Ticker.valueOf(s.getTicker()),
+                e.getBroker(),
                 e.getCreatedAt(), e.getUpdatedAt()
         );
     }

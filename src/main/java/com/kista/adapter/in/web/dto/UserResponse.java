@@ -1,8 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -13,11 +11,11 @@ public record UserResponse(
         @Schema(description = "닉네임", example = "홍길동")
         String nickname,
         @Schema(description = "계정 상태 (PENDING/APPROVED/REJECTED)", example = "APPROVED")
-        UserStatus status,
+        User.UserStatus status,
         @Schema(description = "텔레그램 알림 설정 여부", example = "true")
         boolean hasTelegram,
         @Schema(description = "역할 (USER/ADMIN)", example = "USER")
-        UserRole role,
+        User.UserRole role,
         @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
         String telegramBotUsername
 ) {

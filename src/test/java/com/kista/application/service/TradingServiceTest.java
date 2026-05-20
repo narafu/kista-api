@@ -63,14 +63,14 @@ class TradingServiceTest {
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
-            StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            Ticker.SOXL, Instant.now(), Instant.now()
+            Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
+            Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
     // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,
     //              createdAt, updatedAt, lastReappliedAt
     static final User USER = new User(
-            ACCOUNT.userId(), "kakao-1", "홍길동", UserStatus.ACTIVE, UserRole.USER,
+            ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
             null, null, null, Instant.now(), Instant.now(), null
     );
 

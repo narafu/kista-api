@@ -1,8 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.StrategyStatus;
-import com.kista.domain.model.account.StrategyType;
 import com.kista.domain.model.strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -16,9 +14,9 @@ public record AccountResponse(
         @Schema(description = "마스킹된 계좌번호 (마지막 4자리만 노출)", example = "****4614")
         String accountNoMasked,
         @Schema(description = "매매 전략", example = "INFINITE")
-        StrategyType strategyType,
+        Account.StrategyType strategyType,
         @Schema(description = "전략 상태", example = "ACTIVE")
-        StrategyStatus strategyStatus,
+        Account.StrategyStatus strategyStatus,
         @Schema(description = "거래 종목", example = "TQQQ")
         Ticker ticker
 ) {

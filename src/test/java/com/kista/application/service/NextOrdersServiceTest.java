@@ -48,8 +48,8 @@ class NextOrdersServiceTest {
     static final Account ACCOUNT = new Account(
             ACCOUNT_ID, USER_ID, "테스트계좌",
             "74420614", "key", "secret", "01",
-            StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            Ticker.SOXL, Instant.now(), Instant.now()
+            Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
+            Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(
