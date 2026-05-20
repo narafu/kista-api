@@ -13,6 +13,9 @@
 - INFINITE 전략: 지정 없으면 기본 `Ticker.TQQQ`, exchangeCode는 Ticker가 자동 결정
 - DB: `strategies.ticker` 컬럼에 Ticker.name() 저장 (V22에서 accounts.symbol → strategies.ticker 이관), `exchange_code` 컬럼 V14 마이그레이션으로 제거됨
 - `AccountPersistenceAdapter`: `Ticker.valueOf(strategyEntity.getTicker())`으로 변환
+- `Ticker.tryParse(String)` — `Optional<Ticker>` 반환, KIS 응답 종목코드를 안전하게 enum 변환 (valueOf 실패 시 empty)
+- KIS 응답 모델(`Execution`, `PresentBalanceResult.Item`, `PeriodProfitResult.Item`, `DailyTransaction`, `ReservationOrder`) — `Ticker ticker` 전환 완료, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
+- **`symbolName: String`은 유지** — KIS `ovrs_item_name`(종목 표시명) / `prdt_name`(상품명)은 enum 후보 아님
 
 ### Swagger 개발 도구
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)

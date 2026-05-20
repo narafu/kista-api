@@ -52,6 +52,11 @@
 - 파라미터: `CANO`, `ACNT_PRDT_CD`, `WCRC_FRCR_DVSN_CD=02`(외화), `NATN_CD=000`(전체), `TR_MKET_CD=00`(전체), `INQR_DVSN_CD=00`(전체)
 - 응답: `output1[]`(종목별 잔고 — `pdno`, `cblc_qty13`, `avg_unpr3`, `ovrs_now_pric1`, `frcr_evlu_amt2`, `evlu_pfls_amt2`, `evlu_pfls_rt1`), `output3`(요약 — `tot_asst_amt`, `tot_evlu_pfls_amt`, `evlu_erng_rt1`)
 
+### KIS 응답 Ticker 필터링 패턴
+- 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> Ticker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`
+- `Ticker.tryParse`가 empty인 항목은 자동 제외 (silent drop) — 필요 시 `log.warn("KIS 응답 Ticker 외 종목 무시: {}", pdno)` 추가
+- 어댑터 단위 테스트: fixture에 `pdno="AAPL"` 행 추가 → 결과 List 크기·내용으로 필터 동작 검증
+
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
 - `KisHttpClient` mock 시 `buildHeaders(anyString(), any(Account.class))` 스텁 필요 (V2: Account 파라미터)

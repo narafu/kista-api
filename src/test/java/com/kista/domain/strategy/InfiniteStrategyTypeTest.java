@@ -93,8 +93,8 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders TQQQ: symbol이 TQQQ로 설정됨")
-    void buildOrders_tqqq_symbolSet() {
+    @DisplayName("buildOrders TQQQ: ticker가 TQQQ로 설정됨")
+    void buildOrders_tqqq_tickerSet() {
         // B=2000, K=100, A=currentPrice=10, G=10×1.15=11.50
         // BUY①: floor(100/2/10)=5, BUY②: floor(100/2/11.50)=4 → 주문 있음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));

@@ -57,6 +57,13 @@ curl https://kista-api.onrender.com/actuator/health
 # 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
 ```
 
+### kista-ui TypeScript 타입 체크 (WSL 환경)
+```bash
+# npm run build는 lightningcss native module 오류로 WSL에서 실패
+# 타입 오류 확인은 tsc 직접 사용
+bash -c "cd /mnt/d/src/study/kista/kista-ui && npx tsc --noEmit"
+```
+
 ### Git 구조 (Claude Code 세션 필수 지식)
 # kista-api와 kista-ui는 각각 독립 git 저장소 — 루트 /kista에는 git 없음
 # 커밋 전 author 확인 필수: git config user.name / git config user.email — 올바른 값: narafu / narafu@kakao.com

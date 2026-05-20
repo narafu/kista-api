@@ -47,7 +47,7 @@ public class AdminTradeController {
             UUID userId,
             String ownerNickname,    // 계좌 소유자 닉네임
             LocalDate tradeDate,
-            String ticker,           // TradeHistory.symbol
+            String ticker,
             String direction,        // BUY | SELL
             String orderType,        // LOC | MOC | LIMIT
             int qty,
