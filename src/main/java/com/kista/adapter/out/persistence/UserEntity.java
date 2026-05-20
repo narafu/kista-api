@@ -4,8 +4,6 @@ import com.kista.domain.model.User;
 import com.kista.domain.model.UserRole;
 import com.kista.domain.model.UserStatus;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -25,13 +23,11 @@ class UserEntity extends BaseAuditEntity {
     private String nickname;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     private UserStatus status;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     private UserRole role; // 사용자 권한 (USER / ADMIN)
 
     @Column(name = "telegram_bot_token", length = 512)

@@ -39,11 +39,11 @@
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
 
-### PostgreSQL 네이티브 ENUM 타입 매핑
-- Flyway가 `user_status`, `strategy_type`, `strategy_status`를 PostgreSQL 네이티브 ENUM으로 생성 (`CREATE TYPE ... AS ENUM`)
-- Hibernate 6+의 `@Enumerated(EnumType.STRING)` 단독 사용 시 varchar로 바인딩 → `column "status" is of type user_status but expression is of type character varying` 오류
-- 반드시 `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 병기 필요 (`UserEntity.status`, `StrategyEntity.type/status`에 이미 적용됨)
-- VARCHAR 컬럼 ENUM(예: `TradeHistoryEntity`)은 해당 없음 — 네이티브 ENUM 컬럼에만 필요
+### Java Enum ↔ DB 컬럼 매핑 규칙 (전 프로젝트 통일)
+- **DB 컬럼**: PostgreSQL 네이티브 ENUM (`CREATE TYPE ... AS ENUM`) **사용 금지** — VARCHAR(20) 사용
+- **JPA 매핑**: `@Enumerated(EnumType.STRING)` 단독 사용 — `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 사용 금지
+- **Flyway**: `CREATE TYPE` 구문 작성 금지, 컬럼 정의는 `VARCHAR(20)` (값 길이 여유 있게)
+- 기존 네이티브 ENUM은 V25에서 VARCHAR로 전환 완료 (`user_status`, `user_role`, `strategy_type`, `strategy_status`)
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
@@ -68,9 +68,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V22__move_symbol_to_strategies_ticker.sql` (V17: user_role ENUM + audit_logs, V18: users.telegram_bot_token VARCHAR(512) 확장, V19: accounts 텔레그램 컬럼 제거, V20: users.telegram_bot_username 추가, V21: strategy_configs 테이블 제거, V22: accounts.symbol → strategies.ticker 이관)
+- 현재 최신: `V25__convert_native_enums_to_varchar.sql` (V23: symbol→ticker·kis_order_id 리네임, V24: privacy_trade 테이블 생성, V25: 네이티브 ENUM → VARCHAR 전환)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
+- 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
+- **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
 

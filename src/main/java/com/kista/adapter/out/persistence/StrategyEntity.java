@@ -7,8 +7,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -28,7 +26,6 @@ class StrategyEntity extends BaseAuditEntity {
     private UUID accountId; // FK → accounts.id (ON DELETE CASCADE)
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "type", nullable = false, length = 20)
     private StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
@@ -36,7 +33,6 @@ class StrategyEntity extends BaseAuditEntity {
     private String ticker; // 거래 종목 코드 (Ticker name, 예: SOXL)
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "status", nullable = false, length = 10)
+    @Column(name = "status", nullable = false, length = 20)
     private StrategyStatus status; // 실행 상태 (ACTIVE, PAUSED)
 }
