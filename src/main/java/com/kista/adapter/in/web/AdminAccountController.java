@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.User;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;

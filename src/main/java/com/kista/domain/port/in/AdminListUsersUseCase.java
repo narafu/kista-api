@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserStatus;
 
 import java.util.List;
 

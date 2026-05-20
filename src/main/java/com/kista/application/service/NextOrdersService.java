@@ -1,9 +1,9 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.AccountBalance;
-import com.kista.domain.model.InfinitePosition;
-import com.kista.domain.model.Order;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisAccountPort;

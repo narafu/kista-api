@@ -1,10 +1,10 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.application.service.NewUserRegisteredEvent;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.AccountBalance;
-import com.kista.domain.model.TradingReport;
-import com.kista.domain.model.User;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.TradingReport;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;

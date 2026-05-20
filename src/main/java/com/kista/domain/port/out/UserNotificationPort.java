@@ -1,8 +1,8 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.TradingReport;
-import com.kista.domain.model.User;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.TradingReport;
+import com.kista.domain.model.user.User;
 
 public interface UserNotificationPort {
     void notifyNewUser(User user);                                    // 관리자에게 신규 가입 승인 요청 알림

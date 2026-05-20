@@ -1,7 +1,7 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.InfinitePosition;
-import com.kista.domain.model.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.order.Order;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -9,10 +9,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.kista.domain.model.Order.OrderDirection.BUY;
-import static com.kista.domain.model.Order.OrderDirection.SELL;
-import static com.kista.domain.model.Order.OrderStatus.PLACED;
-import static com.kista.domain.model.Order.OrderType.*;
+import static com.kista.domain.model.order.Order.OrderDirection.BUY;
+import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderStatus.PLACED;
+import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
 public class InfiniteStrategy implements TradingStrategy {

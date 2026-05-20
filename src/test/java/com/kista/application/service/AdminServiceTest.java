@@ -1,9 +1,9 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.AdminStats;
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.AuditLogPort;

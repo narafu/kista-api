@@ -1,5 +1,9 @@
 package com.kista.domain.model;
 
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Ticker;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

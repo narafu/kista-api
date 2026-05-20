@@ -1,10 +1,10 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.AdminAnomalies;
-import com.kista.domain.model.Order;
-import com.kista.domain.model.StrategyStatus;
-import com.kista.domain.model.TradeHistory;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminAnomalies;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.account.StrategyStatus;
+import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.TradeHistoryPort;

@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.domain.model.PlannedOrder;
+import com.kista.domain.model.order.PlannedOrder;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;

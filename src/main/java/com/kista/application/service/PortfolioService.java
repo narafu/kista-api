@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
 import lombok.RequiredArgsConstructor;

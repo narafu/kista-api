@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.InfinitePosition;
-import com.kista.domain.model.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.order.Order;
 
 import java.time.LocalDate;
 import java.util.List;

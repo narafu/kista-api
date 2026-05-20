@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;

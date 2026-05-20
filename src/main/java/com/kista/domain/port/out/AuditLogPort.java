@@ -1,6 +1,6 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.AuditLog;
+import com.kista.domain.model.admin.AuditLog;
 
 import java.util.List;
 import java.util.Map;

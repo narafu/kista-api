@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.account;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.out.AccountRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

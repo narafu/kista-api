@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.AdminStats;
+import com.kista.domain.model.admin.AdminStats;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record AdminDashboardResponse(

@@ -1,12 +1,12 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.Order;
-import com.kista.domain.model.ReservationOrder;
-import com.kista.domain.model.ReservationOrderCommand;
-import com.kista.domain.model.ReservationOrderReceipt;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.kis.ReservationOrder;
+import com.kista.domain.model.order.ReservationOrderCommand;
+import com.kista.domain.model.kis.ReservationOrderReceipt;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

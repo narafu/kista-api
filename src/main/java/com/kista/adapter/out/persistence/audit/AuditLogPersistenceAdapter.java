@@ -3,7 +3,7 @@ package com.kista.adapter.out.persistence.audit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kista.domain.model.AuditLog;
+import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.out.AuditLogPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.user;
 
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.UserStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

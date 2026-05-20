@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kis;
 
-import com.kista.domain.model.Account;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;

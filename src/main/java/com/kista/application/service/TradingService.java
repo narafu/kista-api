@@ -1,6 +1,11 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.*;
+import com.kista.domain.model.user.*;
+import com.kista.domain.model.account.*;
+import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.order.*;
+import com.kista.domain.model.kis.*;
+import com.kista.domain.model.admin.*;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
@@ -13,8 +18,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.domain.model.Order.OrderDirection.BUY;
-import static com.kista.domain.model.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderDirection.BUY;
+import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 import static java.math.RoundingMode.HALF_UP;
 
 @Slf4j

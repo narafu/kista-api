@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.ReservationOrderCommand;
-import com.kista.domain.model.ReservationOrderReceipt;
+import com.kista.domain.model.order.ReservationOrderCommand;
+import com.kista.domain.model.kis.ReservationOrderReceipt;
 
 import java.util.UUID;
 

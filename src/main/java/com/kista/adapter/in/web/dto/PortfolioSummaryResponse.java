@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.Order;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Ticker;
 
 import java.math.BigDecimal;
 

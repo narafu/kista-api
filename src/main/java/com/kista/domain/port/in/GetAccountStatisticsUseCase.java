@@ -1,11 +1,11 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.DailyTransactionResult;
-import com.kista.domain.model.Execution;
-import com.kista.domain.model.MarginItem;
-import com.kista.domain.model.PeriodProfitResult;
-import com.kista.domain.model.PresentBalanceResult;
-import com.kista.domain.model.ReservationOrder;
+import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.kis.PeriodProfitResult;
+import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.kis.ReservationOrder;
 
 import java.time.LocalDate;
 import java.util.List;

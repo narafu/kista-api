@@ -1,8 +1,8 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.MarginItem;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.port.out.KisMarginPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;

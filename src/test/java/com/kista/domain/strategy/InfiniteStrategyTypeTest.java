@@ -1,9 +1,9 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.AccountBalance;
-import com.kista.domain.model.InfinitePosition;
-import com.kista.domain.model.Order;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,11 +11,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.domain.model.Order.OrderDirection.BUY;
-import static com.kista.domain.model.Order.OrderDirection.SELL;
-import static com.kista.domain.model.Order.OrderType.LIMIT;
-import static com.kista.domain.model.Order.OrderType.LOC;
-import static com.kista.domain.model.Order.OrderType.MOC;
+import static com.kista.domain.model.order.Order.OrderDirection.BUY;
+import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderType.LIMIT;
+import static com.kista.domain.model.order.Order.OrderType.LOC;
+import static com.kista.domain.model.order.Order.OrderType.MOC;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("InfiniteStrategy 매매 변수 계산 검증")

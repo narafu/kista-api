@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.security;
 
-import com.kista.domain.model.UserRole;
+import com.kista.domain.model.user.UserRole;
 import com.nimbusds.jose.jwk.ECKey;
 import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;

@@ -1,8 +1,9 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminUserResponse;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +33,7 @@ public class AdminUserController {
     public List<AdminUserResponse> listUsers(
             @RequestParam(required = false) UserStatus status,
             @AuthenticationPrincipal UUID adminId) {
-        List<com.kista.domain.model.User> users = status == null
+        List<User> users = status == null
                 ? listUsers.listAll()
                 : listUsers.listByStatus(status);
         return AdminUserResponse.fromList(users);

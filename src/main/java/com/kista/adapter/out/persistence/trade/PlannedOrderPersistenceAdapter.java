@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.domain.model.PlannedOrder;
+import com.kista.domain.model.order.PlannedOrder;
 import com.kista.domain.port.out.PlannedOrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

@@ -1,9 +1,9 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.ReservationOrder;
-import com.kista.domain.model.ReservationOrderCommand;
-import com.kista.domain.model.ReservationOrderReceipt;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.ReservationOrder;
+import com.kista.domain.model.order.ReservationOrderCommand;
+import com.kista.domain.model.kis.ReservationOrderReceipt;
 
 import java.time.LocalDate;
 import java.util.List;

@@ -1,12 +1,12 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
-import com.kista.domain.model.DailyTransactionResult;
-import com.kista.domain.model.Execution;
-import com.kista.domain.model.MarginItem;
-import com.kista.domain.model.PeriodProfitResult;
-import com.kista.domain.model.PresentBalanceResult;
-import com.kista.domain.model.ReservationOrder;
+import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.kis.PeriodProfitResult;
+import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.kis.ReservationOrder;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

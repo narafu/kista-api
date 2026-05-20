@@ -1,10 +1,10 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;

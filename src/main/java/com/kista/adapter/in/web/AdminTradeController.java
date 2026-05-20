@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.TradeHistory;
-import com.kista.domain.model.User;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.TradeHistory;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListTradesUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;

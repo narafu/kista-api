@@ -1,6 +1,6 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.order.PortfolioSnapshot;
 
 import java.util.List;
 

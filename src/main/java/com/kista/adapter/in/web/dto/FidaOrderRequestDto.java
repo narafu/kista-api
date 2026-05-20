@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.Order;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

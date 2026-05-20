@@ -1,10 +1,10 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.StrategyStatus;
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.Ticker;
-import com.kista.domain.model.User;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.StrategyStatus;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.PauseStrategyUseCase;

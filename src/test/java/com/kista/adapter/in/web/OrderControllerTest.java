@@ -2,7 +2,12 @@ package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.dto.ReservationOrderRequest;
-import com.kista.domain.model.*;
+import com.kista.domain.model.user.*;
+import com.kista.domain.model.account.*;
+import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.order.*;
+import com.kista.domain.model.kis.*;
+import com.kista.domain.model.admin.*;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import org.junit.jupiter.api.Test;

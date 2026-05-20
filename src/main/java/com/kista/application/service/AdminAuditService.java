@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.AuditLog;
+import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.in.AdminListAuditLogsUseCase;
 import com.kista.domain.port.out.AuditLogPort;
 import lombok.RequiredArgsConstructor;

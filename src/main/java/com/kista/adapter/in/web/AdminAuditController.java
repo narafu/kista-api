@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.AuditLog;
+import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.in.AdminListAuditLogsUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

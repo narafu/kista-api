@@ -1,10 +1,10 @@
 package com.kista.adapter.out.persistence.account;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.StrategyStatus;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.account.StrategyStatus;
+import com.kista.domain.model.strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

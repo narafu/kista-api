@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.FidaOrderRequestDto;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;

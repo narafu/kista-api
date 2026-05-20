@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.model.AdminAnomalies;
+import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;

@@ -1,6 +1,6 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.TradeHistory;
+import com.kista.domain.model.order.TradeHistory;
 import java.util.List;
 
 public interface AdminListTradesUseCase {

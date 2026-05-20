@@ -1,6 +1,6 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.UserRole;
+import com.kista.domain.model.user.UserRole;
 
 import java.util.UUID;
 

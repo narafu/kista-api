@@ -1,11 +1,11 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.DailyTransaction;
-import com.kista.domain.model.DailyTransactionResult;
-import com.kista.domain.model.DailyTransactionSummary;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.DailyTransaction;
+import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.DailyTransactionSummary;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

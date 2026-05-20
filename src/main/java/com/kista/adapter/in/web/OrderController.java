@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.NextOrdersResponse;
 import com.kista.adapter.in.web.dto.ReservationOrderRequest;
-import com.kista.domain.model.ReservationOrderReceipt;
+import com.kista.domain.model.kis.ReservationOrderReceipt;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import io.swagger.v3.oas.annotations.Operation;

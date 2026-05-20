@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.domain.model.PortfolioSnapshot;
+import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

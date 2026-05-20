@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;

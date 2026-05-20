@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.user;
 
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 

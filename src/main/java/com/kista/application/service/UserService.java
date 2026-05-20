@@ -1,10 +1,10 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;

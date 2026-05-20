@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import lombok.RequiredArgsConstructor;

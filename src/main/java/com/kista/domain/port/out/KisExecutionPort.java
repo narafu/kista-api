@@ -1,7 +1,7 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.Execution;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Execution;
 
 import java.time.LocalDate;
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.Execution;
-import com.kista.domain.model.Order;
+import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.order.Order;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;

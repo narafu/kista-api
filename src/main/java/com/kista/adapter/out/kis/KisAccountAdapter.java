@@ -1,8 +1,8 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.Account;
-import com.kista.domain.model.AccountBalance;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisMarginPort;
 import lombok.extern.slf4j.Slf4j;

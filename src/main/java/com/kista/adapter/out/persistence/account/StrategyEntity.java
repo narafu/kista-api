@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.account;
 
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.StrategyStatus;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.account.StrategyStatus;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

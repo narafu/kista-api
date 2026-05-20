@@ -1,8 +1,8 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.ReservationOrderCommand;
-import com.kista.domain.model.ReservationOrderReceipt;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.ReservationOrderCommand;
+import com.kista.domain.model.kis.ReservationOrderReceipt;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisReservationOrderPort;

@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.model.AdminStats;
+import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.port.in.AdminDashboardUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

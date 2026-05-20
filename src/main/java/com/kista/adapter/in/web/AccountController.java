@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
-import com.kista.domain.model.Account;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.KisConnectionTestUseCase;

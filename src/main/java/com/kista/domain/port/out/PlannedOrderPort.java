@@ -1,6 +1,6 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.PlannedOrder;
+import com.kista.domain.model.order.PlannedOrder;
 
 import java.time.LocalDate;
 import java.util.List;

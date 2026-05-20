@@ -1,8 +1,8 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.strategy.Ticker;
 
 import java.util.UUID;
 

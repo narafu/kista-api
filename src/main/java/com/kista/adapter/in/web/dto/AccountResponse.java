@@ -1,9 +1,9 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.Account;
-import com.kista.domain.model.StrategyStatus;
-import com.kista.domain.model.StrategyType;
-import com.kista.domain.model.Ticker;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.StrategyStatus;
+import com.kista.domain.model.account.StrategyType;
+import com.kista.domain.model.strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;

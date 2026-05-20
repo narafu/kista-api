@@ -2,9 +2,9 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TokenResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
-import com.kista.domain.model.User;
-import com.kista.domain.model.UserRole;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserRole;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import com.kista.domain.port.out.UserRepository;

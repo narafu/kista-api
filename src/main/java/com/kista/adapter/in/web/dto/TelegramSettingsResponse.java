@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.User;
+import com.kista.domain.model.user.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // chatId만 반환 — botToken은 보안상 미노출

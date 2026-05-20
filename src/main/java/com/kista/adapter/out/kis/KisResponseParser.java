@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kis;
 
-import com.kista.domain.model.Order;
+import com.kista.domain.model.order.Order;
 
 import java.math.BigDecimal;
 

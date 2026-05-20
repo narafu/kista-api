@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.TradeHistory;
+import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminListTradesUseCase;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.RequiredArgsConstructor;

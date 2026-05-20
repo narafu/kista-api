@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
-import com.kista.domain.model.Account;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;

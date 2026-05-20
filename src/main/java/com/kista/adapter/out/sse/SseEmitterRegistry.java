@@ -1,7 +1,7 @@
 package com.kista.adapter.out.sse;
 
-import com.kista.domain.model.TradeEvent;
-import com.kista.domain.model.UserStatus;
+import com.kista.domain.model.order.TradeEvent;
+import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
