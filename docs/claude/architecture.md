@@ -26,7 +26,13 @@ adapter/in/
 
 adapter/out/
   kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리)
-  persistence/   ← JPA Entity + JpaRepository + PersistenceAdapter
+  persistence/   ← JPA 인프라 (BaseAuditEntity, JpaAuditingConfig) + 어그리게이트별 서브패키지
+    user/        ← UserEntity + UserJpaRepository + UserPersistenceAdapter
+    account/     ← AccountEntity + StrategyEntity + 관련 Repo/Adapter
+    kistoken/    ← KisTokenEntity + KisTokenJpaRepository + KisTokenPersistenceAdapter
+    audit/       ← AuditLogEntity + AuditLogJpaRepository + AuditLogPersistenceAdapter
+    trade/       ← TradeHistory/PortfolioSnapshot/PlannedOrder (Entity + Repo + Adapter)
+    privacy/     ← PrivacyTradeEntity + PrivacyTradeOrderEntity (Repo/Adapter 미구현)
   notify/        ← TelegramAdapter (NotifyPort 구현)
 ```
 
