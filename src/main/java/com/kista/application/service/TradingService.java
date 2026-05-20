@@ -38,7 +38,7 @@ public class TradingService implements ExecuteTradingUseCase {
     private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
-    private final PlannedOrderPort plannedOrderPort;           // 계획 주문 저장·조회
+    private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
 
     @Override
@@ -66,7 +66,7 @@ public class TradingService implements ExecuteTradingUseCase {
         BigDecimal price = kisPricePort.getPrice(account.ticker(), account);
         log.info("현재가: ${}", price);
 
-        // 4. 전략 계산 → planned_orders에 저장 (plan 단계)
+        // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
         InfinitePosition position = new InfinitePosition(balance, account.ticker(), price);
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
                 account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
@@ -75,7 +75,7 @@ public class TradingService implements ExecuteTradingUseCase {
         // 5. 주문 시각까지 대기 (계획 저장 후 대기로 이동)
         waitForOrderTime(dst);
 
-        // 6. planned_orders 조회 → KIS 일괄 접수 (execute 단계)
+        // 6. orders(PLANNED) 조회 → KIS 일괄 접수 (execute 단계)
         List<Order> mainOrders = executePlannedOrders(today, account);
 
         // 7. 장 후 체결 확인 대기
@@ -92,22 +92,22 @@ public class TradingService implements ExecuteTradingUseCase {
         saveAndNotify(balance, price, today, position, mainOrders, corrections, executions, user, account);
     }
 
-    // 전략 계산 결과를 planned_orders에 PENDING 상태로 저장
+    // 전략 계산 결과를 orders에 PLANNED 상태로 저장
     private void savePlannedOrders(InfinitePosition position, LocalDate today, Account account) {
-        List<Order> pending = tradingStrategy.buildOrders(position, today);
-        List<PlannedOrder> planned = pending.stream()
-                .map(o -> PlannedOrder.from(o, account.id()))
+        List<Order> templates = tradingStrategy.buildOrders(position, today);
+        List<Order> planned = templates.stream()
+                .map(o -> Order.plan(o, account.id()))
                 .toList();
-        plannedOrderPort.saveAll(planned);
-        log.info("[{}] 계획 주문 {}건 저장 (PENDING)", account.nickname(), planned.size());
+        orderPort.saveAll(planned);
+        log.info("[{}] 계획 주문 {}건 저장 (PLANNED)", account.nickname(), planned.size());
     }
 
-    // planned_orders에서 PENDING 조회 후 KIS에 일괄 접수, 완료 즉시 EXECUTED 기록
+    // orders에서 PLANNED 조회 후 KIS에 일괄 접수, 완료 즉시 PLACED 기록
     private List<Order> executePlannedOrders(LocalDate today, Account account) {
-        List<PlannedOrder> pending = plannedOrderPort.findPendingByAccountAndDate(account.id(), today);
-        List<Order> placed = pending.stream().map(p -> {
-            Order placedOrder = kisOrderPort.place(p.toOrder(), account);
-            plannedOrderPort.markExecuted(p.id(), placedOrder.kisOrderId()); // 접수 완료 즉시 기록
+        List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
+        List<Order> placed = planned.stream().map(p -> {
+            Order placedOrder = kisOrderPort.place(p, account);
+            orderPort.markPlaced(p.id(), placedOrder.kisOrderId()); // 접수 완료 즉시 기록
             return placedOrder;
         }).toList();
         log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());

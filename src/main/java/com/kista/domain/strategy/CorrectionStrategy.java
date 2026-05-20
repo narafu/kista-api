@@ -25,7 +25,9 @@ public class CorrectionStrategy {
                 .filter(o -> o.status() == Order.OrderStatus.PLACED)
                 // orderId 없거나 체결 목록에 없으면 미체결로 간주
                 .filter(o -> o.kisOrderId() == null || !filledOrderIds.contains(o.kisOrderId()))
+                // 보정 주문: id=null, accountId=null — 호출 직후 kisOrderPort.place()로 바로 접수
                 .map(o -> new Order(
+                        null, null,
                         tradeDate,
                         o.ticker(),
                         Order.OrderType.LIMIT,

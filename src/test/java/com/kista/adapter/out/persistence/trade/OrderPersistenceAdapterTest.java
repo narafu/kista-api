@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.PlannedOrder;
 import com.kista.domain.model.strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,10 +20,10 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class PlannedOrderPersistenceAdapterTest {
+class OrderPersistenceAdapterTest {
 
-    @Mock PlannedOrderJpaRepository repository;
-    PlannedOrderPersistenceAdapter adapter;
+    @Mock OrderJpaRepository repository;
+    OrderPersistenceAdapter adapter;
 
     static final UUID ACCOUNT_ID = UUID.randomUUID();
     static final LocalDate TODAY = LocalDate.now();
@@ -32,14 +31,14 @@ class PlannedOrderPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new PlannedOrderPersistenceAdapter(repository);
+        adapter = new OrderPersistenceAdapter(repository);
     }
 
     @Test
     void saveAll_delegatesToRepository() {
-        PlannedOrder order = new PlannedOrder(null, ACCOUNT_ID, TODAY, Ticker.SOXL,
+        Order order = new Order(null, ACCOUNT_ID, TODAY, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, PRICE,
-                PlannedOrder.PlannedOrderStatus.PENDING, null);
+                Order.OrderStatus.PLANNED, null);
 
         adapter.saveAll(List.of(order));
 
@@ -47,8 +46,8 @@ class PlannedOrderPersistenceAdapterTest {
     }
 
     @Test
-    void findPendingByAccountAndDate_returnsMappedDomainObjects() {
-        PlannedOrderEntity entity = new PlannedOrderEntity();
+    void findPlannedByAccountAndDate_returnsMappedDomainObjects() {
+        OrderEntity entity = new OrderEntity();
         entity.setAccountId(ACCOUNT_ID);
         entity.setTradeDate(TODAY);
         entity.setTicker(Ticker.SOXL);
@@ -56,50 +55,50 @@ class PlannedOrderPersistenceAdapterTest {
         entity.setDirection(Order.OrderDirection.BUY);
         entity.setQuantity(5);
         entity.setPrice(PRICE);
-        entity.setStatus(PlannedOrder.PlannedOrderStatus.PENDING);
+        entity.setStatus(Order.OrderStatus.PLANNED);
 
         when(repository.findByAccountIdAndTradeDateAndStatus(
-                ACCOUNT_ID, TODAY, PlannedOrder.PlannedOrderStatus.PENDING))
+                ACCOUNT_ID, TODAY, Order.OrderStatus.PLANNED))
                 .thenReturn(List.of(entity));
 
-        List<PlannedOrder> result = adapter.findPendingByAccountAndDate(ACCOUNT_ID, TODAY);
+        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.get(0).quantity()).isEqualTo(5);
-        assertThat(result.get(0).status()).isEqualTo(PlannedOrder.PlannedOrderStatus.PENDING);
+        assertThat(result.get(0).status()).isEqualTo(Order.OrderStatus.PLANNED);
     }
 
     @Test
-    void findPendingByAccountAndDate_returnsEmptyIfNone() {
+    void findPlannedByAccountAndDate_returnsEmptyIfNone() {
         when(repository.findByAccountIdAndTradeDateAndStatus(any(), any(), any()))
                 .thenReturn(List.of());
 
-        List<PlannedOrder> result = adapter.findPendingByAccountAndDate(ACCOUNT_ID, TODAY);
+        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY);
 
         assertThat(result).isEmpty();
     }
 
     @Test
-    void markExecuted_updatesStatusAndKisOrderId() {
-        UUID plannedId = UUID.randomUUID();
-        PlannedOrderEntity entity = new PlannedOrderEntity();
-        entity.setStatus(PlannedOrder.PlannedOrderStatus.PENDING);
-        when(repository.findById(plannedId)).thenReturn(Optional.of(entity));
+    void markPlaced_updatesStatusAndKisOrderId() {
+        UUID orderId = UUID.randomUUID();
+        OrderEntity entity = new OrderEntity();
+        entity.setStatus(Order.OrderStatus.PLANNED);
+        when(repository.findById(orderId)).thenReturn(Optional.of(entity));
 
-        adapter.markExecuted(plannedId, "ORD-001");
+        adapter.markPlaced(orderId, "ORD-001");
 
-        assertThat(entity.getStatus()).isEqualTo(PlannedOrder.PlannedOrderStatus.EXECUTED);
-        assertThat(entity.getOrderId()).isEqualTo("ORD-001");
+        assertThat(entity.getStatus()).isEqualTo(Order.OrderStatus.PLACED);
+        assertThat(entity.getKisOrderId()).isEqualTo("ORD-001");
         verify(repository).save(entity); // 명시적 save로 dirty checking 없이 처리
     }
 
     @Test
-    void markExecuted_doesNothingIfNotFound() {
-        UUID plannedId = UUID.randomUUID();
-        when(repository.findById(plannedId)).thenReturn(Optional.empty());
+    void markPlaced_doesNothingIfNotFound() {
+        UUID orderId = UUID.randomUUID();
+        when(repository.findById(orderId)).thenReturn(Optional.empty());
 
-        adapter.markExecuted(plannedId, "ORD-001");
+        adapter.markPlaced(orderId, "ORD-001");
 
         verify(repository, never()).save(any());
     }

@@ -65,7 +65,7 @@ class NextOrdersServiceTest {
 
     @Test
     void preview_returns_result_with_orders_from_strategy() {
-        Order order = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
         // findByIdOrThrow는 interface default 메서드 — Mockito가 override하므로 직접 stub

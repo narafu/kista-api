@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.PlannedOrder;
 import com.kista.domain.model.strategy.Ticker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -15,11 +14,11 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "planned_orders")
+@Table(name = "orders")
 @Getter
-@Setter(AccessLevel.PACKAGE) // markExecuted 전용 (status, orderId)
+@Setter(AccessLevel.PACKAGE) // markPlaced 전용 (status, kisOrderId)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class PlannedOrderEntity {
+class OrderEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -52,10 +51,10 @@ class PlannedOrderEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private PlannedOrder.PlannedOrderStatus status; // PENDING / EXECUTED
+    private Order.OrderStatus status; // PLANNED / PLACED / FILLED / FAILED
 
-    @Column(name = "order_id", length = 30)
-    private String orderId; // EXECUTED 이후 설정
+    @Column(name = "kis_order_id", length = 30)
+    private String kisOrderId; // PLACED 이후 설정
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt; // DB DEFAULT now() 자동 설정
