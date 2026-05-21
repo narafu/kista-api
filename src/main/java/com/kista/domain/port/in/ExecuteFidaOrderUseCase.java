@@ -1,5 +1,7 @@
 package com.kista.domain.port.in;
 
+import com.kista.domain.port.out.PrivacyTradeSaveResult;
+
 public interface ExecuteFidaOrderUseCase {
-    void execute(FidaOrderRequest request);
+    PrivacyTradeSaveResult execute(FidaOrderRequest request);
 }

@@ -31,7 +31,7 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
             throw new IllegalArgumentException("payload 직렬화 실패", e);
         }
         // 엔티티 생성 후 저장 (id·createdAt은 DB 자동 부여)
-        AuditLogEntity entity = new AuditLogEntity(null, adminId, action, targetType, targetId, payloadJson, null);
+        AuditLogEntity entity = new AuditLogEntity(null, adminId, action, targetType, targetId, payloadJson);
         repo.save(entity);
     }
 

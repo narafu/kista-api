@@ -46,26 +46,26 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                Ticker.SOXL, Instant.now(), Instant.now());
+                Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
+                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
     }
 
     private Account pausedAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                StrategyType.INFINITE, StrategyStatus.PAUSED,
-                Ticker.SOXL, Instant.now(), Instant.now());
+                Account.StrategyType.INFINITE, Account.StrategyStatus.PAUSED,
+                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
     }
 
     private User activeUser(UUID id) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.ACTIVE, UserRole.USER,
+        return new User(id, "kakao-123", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
     }
 
     private RegisterAccountUseCase.Command registerCmd() {
         return new RegisterAccountUseCase.Command(
                 "테스트계좌", "74420614", "appKey", "appSecret",
-                "01", StrategyType.INFINITE, Ticker.SOXL
+                "01", Account.StrategyType.INFINITE, Ticker.SOXL
         );
     }
 
@@ -79,13 +79,13 @@ class AccountServiceTest {
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
                     a.kisAccountType(), a.strategyType(), a.strategyStatus(),
-                    a.ticker(), a.createdAt(), a.updatedAt());
+                    a.ticker(), a.broker(), a.createdAt(), a.updatedAt());
         });
 
         Account result = accountService.register(userId, registerCmd());
 
-        assertThat(result.strategyType()).isEqualTo(StrategyType.INFINITE);
-        assertThat(result.strategyStatus()).isEqualTo(StrategyStatus.ACTIVE);
+        assertThat(result.strategyType()).isEqualTo(Account.StrategyType.INFINITE);
+        assertThat(result.strategyStatus()).isEqualTo(Account.StrategyStatus.ACTIVE);
         verify(accountRepository).save(any());
     }
 
@@ -166,7 +166,7 @@ class AccountServiceTest {
 
         accountService.pause(accountId, userId);
 
-        verify(accountRepository).save(argThat(a -> a.strategyStatus() == StrategyStatus.PAUSED));
+        verify(accountRepository).save(argThat(a -> a.strategyStatus() == Account.StrategyStatus.PAUSED));
         verify(notificationPort).notifyStrategyChanged(any(), any(), eq("중지"));
     }
 
@@ -179,7 +179,7 @@ class AccountServiceTest {
 
         accountService.resume(accountId, userId);
 
-        verify(accountRepository).save(argThat(a -> a.strategyStatus() == StrategyStatus.ACTIVE));
+        verify(accountRepository).save(argThat(a -> a.strategyStatus() == Account.StrategyStatus.ACTIVE));
         verify(notificationPort).notifyStrategyChanged(any(), any(), eq("재개"));
     }
 

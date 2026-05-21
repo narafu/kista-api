@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
@@ -25,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminAccountController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class})
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AdminAccountControllerTest {
 

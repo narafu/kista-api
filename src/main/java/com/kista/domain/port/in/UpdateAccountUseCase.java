@@ -1,7 +1,6 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.StrategyType;
 import com.kista.domain.model.strategy.Ticker;
 
 import java.util.UUID;
@@ -14,6 +13,6 @@ public interface UpdateAccountUseCase {
             String kisAppKey,           // null이면 기존값 유지
             String kisSecretKey,        // null이면 기존값 유지
             Ticker ticker,              // null이면 기존값 유지
-            StrategyType strategyType   // null이면 기존값 유지
+            Account.StrategyType strategyType   // null이면 기존값 유지
     ) {}
 }

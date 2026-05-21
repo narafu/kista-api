@@ -2,8 +2,6 @@ package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
@@ -44,10 +42,10 @@ public class KakaoLoginService implements KakaoLoginUseCase {
             user = getUser.getByKakaoId(kakaoUser.kakaoId());
         }
         // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
-        if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != UserRole.ADMIN) {
+        if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != User.UserRole.ADMIN) {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
             user = userRepository.save(new User(
-                    user.id(), user.kakaoId(), user.nickname(), UserStatus.ACTIVE, UserRole.ADMIN,
+                    user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                     user.createdAt(), user.updatedAt(), user.lastReappliedAt()
             ));

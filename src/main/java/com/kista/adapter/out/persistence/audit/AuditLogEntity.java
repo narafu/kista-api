@@ -1,10 +1,10 @@
 package com.kista.adapter.out.persistence.audit;
 
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -13,7 +13,7 @@ import java.util.UUID;
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuditLogEntity {
+public class AuditLogEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -35,7 +35,4 @@ public class AuditLogEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String payload;
-
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private Instant createdAt;
 }

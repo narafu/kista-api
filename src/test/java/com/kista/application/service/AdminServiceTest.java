@@ -2,8 +2,6 @@ package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.AuditLogPort;
@@ -38,8 +36,8 @@ class AdminServiceTest {
 
     // User 헬퍼: User record 필드 순서에 맞게 작성
     // (id, kakaoId, nickname, status, role, telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt)
-    private User user(UUID id, UserStatus status) {
-        return new User(id, "kakao-" + id, "테스트", status, UserRole.USER,
+    private User user(UUID id, User.UserStatus status) {
+        return new User(id, "kakao-" + id, "테스트", status, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
     }
 
@@ -47,9 +45,9 @@ class AdminServiceTest {
     void getStats_returnsCorrectCounts() {
         UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID(), id3 = UUID.randomUUID();
         when(userRepository.findAll()).thenReturn(List.of(
-                user(id1, UserStatus.PENDING),
-                user(id2, UserStatus.ACTIVE),
-                user(id3, UserStatus.REJECTED)
+                user(id1, User.UserStatus.PENDING),
+                user(id2, User.UserStatus.ACTIVE),
+                user(id3, User.UserStatus.REJECTED)
         ));
         when(accountRepository.countAll()).thenReturn(5L);
 
@@ -85,22 +83,22 @@ class AdminServiceTest {
     @Test
     void changeRole_updatesRoleAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        User existing = user(targetId, UserStatus.ACTIVE);
+        User existing = user(targetId, User.UserStatus.ACTIVE);
         when(userRepository.findById(targetId)).thenReturn(Optional.of(existing));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        adminService.changeRole(adminId, targetId, UserRole.ADMIN);
+        adminService.changeRole(adminId, targetId, User.UserRole.ADMIN);
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().role()).isEqualTo(UserRole.ADMIN);
+        assertThat(captor.getValue().role()).isEqualTo(User.UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
     }
 
     @Test
     void deleteUser_deletesAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userRepository.findById(targetId)).thenReturn(Optional.of(user(targetId, UserStatus.ACTIVE)));
+        when(userRepository.findById(targetId)).thenReturn(Optional.of(user(targetId, User.UserStatus.ACTIVE)));
 
         adminService.deleteUser(adminId, targetId);
 

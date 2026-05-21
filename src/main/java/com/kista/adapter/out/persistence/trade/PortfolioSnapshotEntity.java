@@ -1,16 +1,16 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import com.kista.domain.model.strategy.Ticker;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
 @Table(name = "portfolio_snapshots")
-class PortfolioSnapshotEntity {
+class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -45,9 +45,6 @@ class PortfolioSnapshotEntity {
     @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
     private UUID accountId;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt;
-
     protected PortfolioSnapshotEntity() {}
 
     PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int holdings,
@@ -76,5 +73,4 @@ class PortfolioSnapshotEntity {
     BigDecimal getUsdDeposit() { return usdDeposit; }
     BigDecimal getTotalAssetUsd() { return totalAssetUsd; }
     UUID getAccountId() { return accountId; }
-    Instant getCreatedAt() { return createdAt; }
 }

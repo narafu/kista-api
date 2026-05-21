@@ -1,8 +1,6 @@
 package com.kista.adapter.out.persistence.user;
 
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 
@@ -25,11 +23,11 @@ class UserEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private UserStatus status;
+    private User.UserStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private UserRole role; // 사용자 권한 (USER / ADMIN)
+    private User.UserRole role; // 사용자 권한 (USER / ADMIN)
 
     @Column(name = "telegram_bot_token", length = 512)
     private String telegramBotToken; // AES-256 암호화 저장

@@ -11,7 +11,7 @@ import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
-import static com.kista.domain.model.order.Order.OrderStatus.PLACED;
+import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
@@ -32,13 +32,13 @@ public class InfiniteStrategy implements TradingStrategy {
         // LOC 매수 ① — 평단가 기준
         int buyQuantity1 = position.calcEarlyBuyQuantityByAvgPrice();
         if (buyQuantity1 >= 1) {
-            orders.add(new Order(tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice(), PLACED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice(), PLANNED, null));
         }
 
         // LOC 매수 ② — 기준가 기준
         int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice();
         if (buyQuantity2 >= 1) {
-            orders.add(new Order(tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLACED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLANNED, null));
         }
 
         addCommonSellOrders(orders, position, tradeDate);
@@ -48,13 +48,13 @@ public class InfiniteStrategy implements TradingStrategy {
         if (position.isDepositDeficient()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
-                orders.add(new Order(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO, PLACED, null));
+                orders.add(new Order(null, null, tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO, PLANNED, null));
             }
         } else {
             // LOC 매수 — 기준가 기준
             int buyQuantity = position.calcLateBuyQuantity();
             if (buyQuantity >= 1) {
-                orders.add(new Order(tradeDate, position.ticker(), LOC, BUY, buyQuantity, position.referencePrice(), PLACED, null));
+                orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity, position.referencePrice(), PLANNED, null));
             }
 
             addCommonSellOrders(orders, position, tradeDate);
@@ -66,13 +66,13 @@ public class InfiniteStrategy implements TradingStrategy {
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
             BigDecimal locSellPrice = position.referencePrice().add(new BigDecimal("0.01"));
-            orders.add(new Order(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, PLACED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, PLANNED, null));
         }
 
         // 지정가 매도 (목표가)
         int limitSellQuantity = position.calcLimitSellQuantity();
         if (limitSellQuantity >= 1) {
-            orders.add(new Order(tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice(), PLACED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice(), PLANNED, null));
         }
     }
 }

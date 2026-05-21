@@ -1,8 +1,6 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.StrategyStatus;
-import com.kista.domain.model.account.StrategyType;
 import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteAccountUseCase;
@@ -47,7 +45,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
         // PRIVACY는 항상 SOXL 고정, INFINITE는 지정 없으면 TQQQ
-        Ticker ticker = cmd.strategyType() == StrategyType.PRIVACY
+        Ticker ticker = cmd.strategyType() == Account.StrategyType.PRIVACY
                 ? Ticker.SOXL
                 : (cmd.ticker() != null ? cmd.ticker() : Ticker.TQQQ);
 
@@ -55,8 +53,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
-                cmd.strategyType(), StrategyStatus.ACTIVE,
-                ticker,
+                cmd.strategyType(), Account.StrategyStatus.ACTIVE,
+                ticker, Account.Broker.KIS,
                 null, null
         );
         Account saved = accountRepository.save(account);
@@ -77,12 +75,12 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         }
 
         // 전략 결정: cmd 값 우선, null이면 기존값 유지
-        StrategyType newStrategyType = cmd.strategyType() != null
+        Account.StrategyType newStrategyType = cmd.strategyType() != null
                 ? cmd.strategyType() : account.strategyType();
 
         // PRIVACY는 항상 SOXL 고정 (register와 동일 규칙)
         Ticker updatedTicker;
-        if (newStrategyType == StrategyType.PRIVACY) {
+        if (newStrategyType == Account.StrategyType.PRIVACY) {
             updatedTicker = Ticker.SOXL;
         } else {
             updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
@@ -95,7 +93,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), newStrategyType, account.strategyStatus(),
-                updatedTicker,
+                updatedTicker, account.broker(),
                 account.createdAt(), null
         );
         return accountRepository.save(updated);
@@ -126,7 +124,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         User user = findUserOrThrow(requesterId);
-        Account paused = withStrategyStatus(account, StrategyStatus.PAUSED);
+        Account paused = withStrategyStatus(account, Account.StrategyStatus.PAUSED);
         accountRepository.save(paused);
         log.info("전략 중지: accountId={}, userId={}", accountId, requesterId);
         notificationPort.notifyStrategyChanged(user, paused, "중지");
@@ -137,7 +135,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         User user = findUserOrThrow(requesterId);
-        Account active = withStrategyStatus(account, StrategyStatus.ACTIVE);
+        Account active = withStrategyStatus(account, Account.StrategyStatus.ACTIVE);
         accountRepository.save(active);
         log.info("전략 재개: accountId={}, userId={}", accountId, requesterId);
         notificationPort.notifyStrategyChanged(user, active, "재개");
@@ -148,11 +146,11 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 
-    private Account withStrategyStatus(Account account, StrategyStatus status) {
+    private Account withStrategyStatus(Account account, Account.StrategyStatus status) {
         return new Account(account.id(), account.userId(), account.nickname(),
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategyType(), status,
-                account.ticker(),
+                account.ticker(), account.broker(),
                 account.createdAt(), null);
     }
 }

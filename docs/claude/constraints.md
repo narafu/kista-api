@@ -4,7 +4,7 @@
 - **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `PortfolioSnapshot`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `TradeHistory`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
-- DB 컬럼: `portfolio_snapshots.holdings`, `privacy_trades_master.holdings`(보유) / `trade_histories.quantity`, `planned_orders.quantity`, `privacy_trades_detail.quantity`(주문)
+- DB 컬럼: `portfolio_snapshots.holdings`, `privacy_trades_master.holdings`(보유) / `trade_histories.quantity`, `planned_orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
 - KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
 - 복합 수량 필드: `orderedQty`/`filledQty` 패턴 금지 → `orderedQuantity`/`filledQuantity`
 - `InfinitePosition.calcXxxQuantity()` 메서드명은 "주문 수량 계산 결과"이므로 Quantity 유지 (보유수량 아님)
@@ -49,6 +49,7 @@
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈
 - IDE 경고 "열을 해결할 수 없습니다" — Flyway 미적용 상태의 false positive. `compileJava BUILD SUCCESSFUL`이 실제 검증 기준
+- **`BaseAuditEntity` vs `BaseCreatedAtEntity`**: `createdAt`+`updatedAt` 필요 시 `BaseAuditEntity` 상속, `createdAt`만 필요 시 `BaseCreatedAtEntity` 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패)
 
 ### Java Enum ↔ DB 컬럼 매핑 규칙 (전 프로젝트 통일)
 - **DB 컬럼**: PostgreSQL 네이티브 ENUM (`CREATE TYPE ... AS ENUM`) **사용 금지** — VARCHAR(20) 사용
@@ -79,7 +80,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V25__convert_native_enums_to_varchar.sql` (V23: symbol→ticker·kis_order_id 리네임, V24: privacy_trades_master/detail 테이블 생성, V25: 네이티브 ENUM → VARCHAR 전환)
+- 현재 최신: `V32__drop_updated_at_from_privacy_tables.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거, V32: privacy_trades_master/detail에서 updated_at 컬럼 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
@@ -123,7 +124,13 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Spring Security Filter 이중 등록 방지
 - `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
-- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `JwtAuthFilter`에 적용됨)
+- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `JwtAuthFilter`, `InternalTokenAuthFilter` 모두 적용됨)
+- `SecurityConfig`에 새 Filter 주입 필드 추가 시 `@Import(SecurityConfig.class)` 사용하는 **모든** `@WebMvcTest` 테스트에 해당 Filter 클래스도 `@Import` 목록에 추가 필수 — 누락 시 `NoSuchBeanDefinitionException`으로 컨텍스트 실패 (실패가 캐시돼 무관한 테스트까지 `IllegalStateException` 전파)
+
+### 서버 간 내부 인증 (InternalTokenAuthFilter)
+- `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (미설정 시 항상 401)
+- `SecurityConfig`: `/api/internal/**` → `hasRole("INTERNAL")`, `InternalTokenAuthFilter` JWT 필터보다 먼저 실행
+- `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
 
 ### 소유권 검증 예외 패턴 (V2)
 - Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw

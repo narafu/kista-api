@@ -40,8 +40,9 @@ public class KisOrderAdapter implements KisOrderPort {
         OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
         String odno = (response != null && response.output() != null) ? response.output().odno() : null;
 
+        // id=null, accountId=null — KIS 응답 객체이므로 DB PK 없음, 호출자가 markPlaced()로 별도 처리
         return new Order(
-                order.tradeDate(), order.ticker(), order.orderType(), order.direction(),
+                null, null, order.tradeDate(), order.ticker(), order.orderType(), order.direction(),
                 order.quantity(), order.price(), Order.OrderStatus.PLACED, odno
         );
     }

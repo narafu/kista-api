@@ -56,7 +56,7 @@ class OrderControllerTest {
     private GetNextOrdersUseCase.Result buildNextResult() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"));
-        Order order = new Order(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order));
     }

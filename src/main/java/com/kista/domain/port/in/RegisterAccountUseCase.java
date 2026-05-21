@@ -1,7 +1,6 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.StrategyType;
 import com.kista.domain.model.strategy.Ticker;
 
 import java.util.UUID;
@@ -15,7 +14,7 @@ public interface RegisterAccountUseCase {
             String kisAppKey,       // 평문
             String kisSecretKey,    // 평문
             String kisAccountType,  // 기본값 "01"
-            StrategyType strategyType,
+            Account.StrategyType strategyType,
             Ticker ticker            // null이면 전략에 따라 결정 (PRIVACY=SOXL, INFINITE=TQQQ)
     ) {}
 }

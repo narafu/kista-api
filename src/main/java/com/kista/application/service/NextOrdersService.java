@@ -24,7 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NextOrdersService implements GetNextOrdersUseCase {
 
-    // 조회 전용 — 쓰기 포트(PlannedOrderPort, KisOrderPort 등) 의도적으로 미주입
+    // 조회 전용 — 쓰기 포트(OrderPort, KisOrderPort 등) 의도적으로 미주입
     private final AccountRepository accountRepository;
     private final KisAccountPort kisAccountPort;
     private final KisPricePort kisPricePort;

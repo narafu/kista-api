@@ -1,7 +1,7 @@
 package com.kista.adapter.out.sse;
 
 import com.kista.domain.model.order.TradeEvent;
-import com.kista.domain.model.user.UserStatus;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -29,7 +29,7 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
     }
 
     @Override
-    public void notifyStatusChange(UUID userId, UserStatus status) {
+    public void notifyStatusChange(UUID userId, User.UserStatus status) {
         SseEmitter emitter = emitters.get(userId);
         if (emitter == null) return;
         try {

@@ -2,8 +2,6 @@ package com.kista.adapter.out.persistence.account;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.StrategyType;
-import com.kista.domain.model.account.StrategyStatus;
 import com.kista.domain.model.strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,7 +55,7 @@ class AccountPersistenceAdapterTest {
         return e;
     }
 
-    private StrategyEntity strategyEntity(UUID accId, StrategyType type, StrategyStatus status) {
+    private StrategyEntity strategyEntity(UUID accId, Account.StrategyType type, Account.StrategyStatus status) {
         StrategyEntity s = new StrategyEntity();
         s.setAccountId(accId);
         s.setType(type);
@@ -72,8 +70,8 @@ class AccountPersistenceAdapterTest {
         // given: id=null 신규 계좌
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                StrategyType.INFINITE, StrategyStatus.ACTIVE,
-                Ticker.SOXL, null, null);
+                Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
+                Ticker.SOXL, Account.Broker.KIS, null, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
@@ -86,9 +84,9 @@ class AccountPersistenceAdapterTest {
         ArgumentCaptor<StrategyEntity> captor = ArgumentCaptor.forClass(StrategyEntity.class);
         verify(strategyJpaRepository).save(captor.capture());
         assertThat(captor.getValue().getAccountId()).isEqualTo(accountId);
-        assertThat(captor.getValue().getType()).isEqualTo(StrategyType.INFINITE);
+        assertThat(captor.getValue().getType()).isEqualTo(Account.StrategyType.INFINITE);
         assertThat(captor.getValue().getTicker()).isEqualTo("SOXL");
-        assertThat(captor.getValue().getStatus()).isEqualTo(StrategyStatus.ACTIVE);
+        assertThat(captor.getValue().getStatus()).isEqualTo(Account.StrategyStatus.ACTIVE);
     }
 
     @Test
@@ -97,11 +95,11 @@ class AccountPersistenceAdapterTest {
         // given: id 존재 기존 계좌 (status: ACTIVE → PAUSED로 변경)
         Account existingAccount = new Account(accountId, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                StrategyType.INFINITE, StrategyStatus.PAUSED,
-                Ticker.SOXL, Instant.now(), Instant.now());
+                Account.StrategyType.INFINITE, Account.StrategyStatus.PAUSED,
+                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
 
         AccountEntity entity = accountEntityWithId(accountId);
-        StrategyEntity strategy = strategyEntity(accountId, StrategyType.INFINITE, StrategyStatus.ACTIVE);
+        StrategyEntity strategy = strategyEntity(accountId, Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE);
 
         when(accountJpaRepository.save(any())).thenReturn(entity);
         when(strategyJpaRepository.findByAccountId(accountId))
@@ -111,7 +109,7 @@ class AccountPersistenceAdapterTest {
         adapter.save(existingAccount);
 
         // then: 기존 StrategyEntity의 status가 PAUSED로 업데이트됨
-        assertThat(strategy.getStatus()).isEqualTo(StrategyStatus.PAUSED);
+        assertThat(strategy.getStatus()).isEqualTo(Account.StrategyStatus.PAUSED);
         verify(strategyJpaRepository).save(strategy);
     }
 
@@ -120,7 +118,7 @@ class AccountPersistenceAdapterTest {
     void findById_loads_strategy_from_strategies_table() {
         // given
         AccountEntity entity = accountEntityWithId(accountId);
-        StrategyEntity strategy = strategyEntity(accountId, StrategyType.INFINITE, StrategyStatus.ACTIVE);
+        StrategyEntity strategy = strategyEntity(accountId, Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE);
 
         when(accountJpaRepository.findById(accountId)).thenReturn(Optional.of(entity));
         when(strategyJpaRepository.findByAccountId(accountId)).thenReturn(Optional.of(strategy));
@@ -130,7 +128,7 @@ class AccountPersistenceAdapterTest {
 
         // then: strategy 정보가 strategies 테이블에서 정상 로드됨
         assertThat(result).isPresent();
-        assertThat(result.get().strategyType()).isEqualTo(StrategyType.INFINITE);
-        assertThat(result.get().strategyStatus()).isEqualTo(StrategyStatus.ACTIVE);
+        assertThat(result.get().strategyType()).isEqualTo(Account.StrategyType.INFINITE);
+        assertThat(result.get().strategyStatus()).isEqualTo(Account.StrategyStatus.ACTIVE);
     }
 }

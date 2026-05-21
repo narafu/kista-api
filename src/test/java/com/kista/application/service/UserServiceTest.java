@@ -3,8 +3,6 @@ package com.kista.application.service;
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -43,24 +41,24 @@ class UserServiceTest {
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
+        return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
+        return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(),
                 Instant.now().minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.PENDING, UserRole.USER,
+        return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
+        return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
     }
 
@@ -73,7 +71,7 @@ class UserServiceTest {
 
         User result = userService.register("kakao-123", "홍길동", uid);
 
-        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+        assertThat(result.status()).isEqualTo(User.UserStatus.PENDING);
         assertThat(result.id()).isEqualTo(uid);
         verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
         verify(notificationPort, never()).notifyNewUser(any()); // 직접 호출하지 않음
@@ -103,7 +101,7 @@ class UserServiceTest {
         userService.reapply(userId);
 
         verify(userRepository).save(argThat(u ->
-                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
+                u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(notificationPort).notifyNewUser(any());
     }
 
@@ -130,7 +128,7 @@ class UserServiceTest {
         userService.reapply(userId);
 
         verify(userRepository).save(argThat(u ->
-                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
+                u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(notificationPort).notifyNewUser(any());
     }
 
@@ -143,7 +141,7 @@ class UserServiceTest {
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == UserStatus.PENDING));
+        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.PENDING));
     }
 
     @Test
@@ -161,14 +159,14 @@ class UserServiceTest {
     @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-123", "홍길동", UserStatus.REJECTED, UserRole.USER,
+        User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == UserStatus.PENDING));
+        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.PENDING));
     }
 
     @Test
@@ -181,7 +179,7 @@ class UserServiceTest {
         userService.reject(userId);
 
         verify(userRepository).save(argThat(u ->
-                u.status() == UserStatus.REJECTED && u.lastReappliedAt() != null));
+                u.status() == User.UserStatus.REJECTED && u.lastReappliedAt() != null));
     }
 
     @Test
@@ -193,7 +191,7 @@ class UserServiceTest {
 
         userService.approve(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == UserStatus.ACTIVE));
+        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.ACTIVE));
         verify(notificationPort).notifyApproved(any());
     }
 
@@ -206,7 +204,7 @@ class UserServiceTest {
 
         userService.reject(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == UserStatus.REJECTED));
+        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
         verify(notificationPort).notifyRejected(any());
     }
 
@@ -223,8 +221,8 @@ class UserServiceTest {
         User result = userService.register("12345", "adminName", uid);
 
         // then
-        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
-        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(result.role()).isEqualTo(User.UserRole.ADMIN);
+        assertThat(result.status()).isEqualTo(User.UserStatus.ACTIVE);
     }
 
     @Test
@@ -240,8 +238,8 @@ class UserServiceTest {
         User result = userService.register("99999", "userName", uid);
 
         // then
-        assertThat(result.role()).isEqualTo(UserRole.USER);
-        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+        assertThat(result.role()).isEqualTo(User.UserRole.USER);
+        assertThat(result.status()).isEqualTo(User.UserStatus.PENDING);
     }
 
     @Test

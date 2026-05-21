@@ -1,17 +1,17 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Ticker;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
 @Table(name = "trade_histories")
-class TradeHistoryEntity {
+class TradeHistoryEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -36,11 +36,11 @@ class TradeHistoryEntity {
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 
-    @Column(nullable = false)
-    private int quantity;
-
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal price;
+
+    @Column(nullable = false)
+    private int quantity;
 
     @Column(name = "amount_usd", nullable = false, precision = 12, scale = 2)
     private BigDecimal amountUsd;
@@ -54,9 +54,6 @@ class TradeHistoryEntity {
 
     @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
     private UUID accountId;
-
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt;
 
     protected TradeHistoryEntity() {}
 
@@ -90,5 +87,4 @@ class TradeHistoryEntity {
     Order.OrderStatus getStatus() { return status; }
     String getKisOrderId() { return kisOrderId; }
     UUID getAccountId() { return accountId; }
-    Instant getCreatedAt() { return createdAt; }
 }

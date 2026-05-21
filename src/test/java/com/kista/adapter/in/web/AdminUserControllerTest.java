@@ -1,11 +1,10 @@
 package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserRole;
-import com.kista.domain.model.user.UserStatus;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminUserController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class}) // 실제 SecurityConfig 로드 — /api/admin/** hasRole 가드 적용
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD) // 병렬 실행 mock 오염 방지
 class AdminUserControllerTest {
 
@@ -53,7 +52,7 @@ class AdminUserControllerTest {
 
     // 테스트용 샘플 User 생성 (10개 필드: id, kakaoId, nickname, status, role, botToken, chatId, createdAt, updatedAt, lastReappliedAt)
     private User sampleUser(UUID id) {
-        return new User(id, "kakao-1", "테스트유저", UserStatus.PENDING, UserRole.USER,
+        return new User(id, "kakao-1", "테스트유저", User.UserStatus.PENDING, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
     }
 

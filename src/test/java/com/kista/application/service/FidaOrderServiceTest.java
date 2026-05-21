@@ -1,6 +1,5 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.KisOrderPort;
@@ -11,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,7 +27,8 @@ class FidaOrderServiceTest {
     void execute_throws_unsupported_in_v2() {
         // V2에서는 계좌 컨텍스트 필요 — 직접 주문 API 사용 불가
         FidaOrderRequest req = new FidaOrderRequest(
-                Ticker.SOXL, Order.OrderDirection.BUY, 5, new BigDecimal("25.50"));
+                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         assertThatThrownBy(() -> sut.execute(req))
                 .isInstanceOf(UnsupportedOperationException.class)
