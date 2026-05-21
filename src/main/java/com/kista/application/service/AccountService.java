@@ -2,6 +2,8 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Ticker;
+
+import java.math.BigDecimal;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
@@ -49,12 +51,14 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 ? Ticker.SOXL
                 : (cmd.ticker() != null ? cmd.ticker() : Ticker.TQQQ);
 
+        BigDecimal multiple = cmd.multiple() != null ? cmd.multiple() : BigDecimal.ONE;
+
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
                 cmd.strategyType(), Account.StrategyStatus.ACTIVE,
-                ticker, Account.Broker.KIS,
+                ticker, multiple, Account.Broker.KIS,
                 null, null
         );
         Account saved = accountRepository.save(account);
@@ -86,6 +90,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
             updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
         }
 
+        BigDecimal updatedMultiple = cmd.multiple() != null ? cmd.multiple() : account.multiple();
+
         Account updated = new Account(
                 account.id(), account.userId(),
                 cmd.nickname() != null ? cmd.nickname() : account.nickname(),
@@ -93,7 +99,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
                 cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
                 account.kisAccountType(), newStrategyType, account.strategyStatus(),
-                updatedTicker, account.broker(),
+                updatedTicker, updatedMultiple, account.broker(),
                 account.createdAt(), null
         );
         return accountRepository.save(updated);
@@ -150,7 +156,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         return new Account(account.id(), account.userId(), account.nickname(),
                 account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.strategyType(), status,
-                account.ticker(), account.broker(),
+                account.ticker(), account.multiple(), account.broker(),
                 account.createdAt(), null);
     }
 }

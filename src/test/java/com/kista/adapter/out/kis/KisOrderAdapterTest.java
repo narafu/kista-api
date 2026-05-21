@@ -42,7 +42,7 @@ class KisOrderAdapterTest {
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
             Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-            Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now()
+            Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
     @BeforeEach

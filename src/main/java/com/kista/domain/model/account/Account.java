@@ -2,6 +2,7 @@ package com.kista.domain.model.account;
 
 import com.kista.domain.model.strategy.Ticker;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,6 +17,7 @@ public record Account(
         StrategyType strategyType,  // 매매 전략
         StrategyStatus strategyStatus, // 전략 실행 상태
         Ticker ticker,              // 거래 종목 (exchangeCode 포함)
+        BigDecimal multiple,        // 배수 (기본값 1.0)
         Broker broker,              // 증권사 (기본: KIS)
         Instant createdAt,
         Instant updatedAt

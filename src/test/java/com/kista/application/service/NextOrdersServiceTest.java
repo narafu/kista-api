@@ -49,7 +49,7 @@ class NextOrdersServiceTest {
             ACCOUNT_ID, USER_ID, "테스트계좌",
             "74420614", "key", "secret", "01",
             Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-            Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now()
+            Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(

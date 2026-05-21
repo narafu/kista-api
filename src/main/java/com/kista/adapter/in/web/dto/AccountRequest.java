@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
+
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
@@ -22,18 +24,20 @@ public record AccountRequest(
         @Schema(description = "매매 전략 (등록 시 필수)", example = "INFINITE")
         @NotNull Account.StrategyType strategyType,
         @Schema(description = "거래 종목 (선택, PRIVACY=SOXL 고정, INFINITE 기본=TQQQ)", example = "TQQQ")
-        Ticker ticker
+        Ticker ticker,
+        @Schema(description = "배수 (선택, 기본값 1.0)", example = "1.0")
+        BigDecimal multiple
 ) {
     public RegisterAccountUseCase.Command toRegisterCommand() {
         return new RegisterAccountUseCase.Command(
                 nickname, accountNo, kisAppKey, kisSecretKey,
-                kisAccountType, strategyType, ticker
+                kisAccountType, strategyType, ticker, multiple
         );
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
-                nickname, kisAppKey, kisSecretKey, ticker, strategyType
+                nickname, kisAppKey, kisSecretKey, ticker, strategyType, multiple
         );
     }
 }

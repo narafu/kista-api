@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public record AccountResponse(
@@ -18,7 +19,9 @@ public record AccountResponse(
         @Schema(description = "전략 상태", example = "ACTIVE")
         Account.StrategyStatus strategyStatus,
         @Schema(description = "거래 종목", example = "TQQQ")
-        Ticker ticker
+        Ticker ticker,
+        @Schema(description = "배수", example = "1.0")
+        BigDecimal multiple
 ) {
     public static AccountResponse from(Account a) {
         return new AccountResponse(
@@ -27,7 +30,8 @@ public record AccountResponse(
                 maskAccountNo(a.accountNo()),
                 a.strategyType(),
                 a.strategyStatus(),
-                a.ticker()
+                a.ticker(),
+                a.multiple()
         );
     }
 

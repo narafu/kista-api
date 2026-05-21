@@ -63,13 +63,15 @@ public class AccountPersistenceAdapter implements AccountRepository {
             strategyEntity.setAccountId(saved.getId());
             strategyEntity.setType(account.strategyType());
             strategyEntity.setTicker(account.ticker());
+            strategyEntity.setMultiple(account.multiple());
             strategyEntity.setStatus(account.strategyStatus());
         } else {
-            // 기존 계좌 - strategy type/ticker/status 업데이트
+            // 기존 계좌 - strategy type/ticker/multiple/status 업데이트
             strategyEntity = strategyJpaRepository
                     .findByAccountId(account.id()).orElseThrow();
             strategyEntity.setType(account.strategyType());
             strategyEntity.setTicker(account.ticker());
+            strategyEntity.setMultiple(account.multiple());
             strategyEntity.setStatus(account.strategyStatus());
         }
         strategyJpaRepository.save(strategyEntity);
@@ -116,7 +118,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisAppKey()),
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(), s.getType(), s.getStatus(),
-                s.getTicker(),
+                s.getTicker(), s.getMultiple(),
                 e.getBroker(),
                 e.getCreatedAt(), e.getUpdatedAt()
         );

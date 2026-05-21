@@ -126,7 +126,7 @@ class TelegramAdapterTest {
         Account account = new Account(UUID.randomUUID(), user.id(), "내SOXL계좌",
                 "74420614", "key", "secret", "01",
                 Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
+                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         adapter.notifyStrategyChanged(user, account, "중지");
@@ -145,7 +145,7 @@ class TelegramAdapterTest {
         Account account = new Account(UUID.randomUUID(), userWithBot.id(), "SOXL계좌",
                 "74420614", "key", "secret", "01",
                 Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
+                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
         TradingSnapshot snapshot = new TradingSnapshot(10,
                 new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         TradingReport report = new TradingReport(
@@ -171,7 +171,7 @@ class TelegramAdapterTest {
         Account account = new Account(UUID.randomUUID(), user.id(), "노봇계좌",
                 "74420614", "key", "secret", "01",
                 Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
+                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
         TradingSnapshot snapshot = new TradingSnapshot(10,
                 new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         TradingReport report = new TradingReport(

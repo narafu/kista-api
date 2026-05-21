@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,7 +60,8 @@ class AccountPersistenceAdapterTest {
         StrategyEntity s = new StrategyEntity();
         s.setAccountId(accId);
         s.setType(type);
-        s.setTicker("SOXL");
+        s.setTicker(Ticker.SOXL);
+        s.setMultiple(BigDecimal.ONE);
         s.setStatus(status);
         return s;
     }
@@ -71,7 +73,7 @@ class AccountPersistenceAdapterTest {
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, Account.Broker.KIS, null, null);
+                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, null, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
@@ -85,7 +87,7 @@ class AccountPersistenceAdapterTest {
         verify(strategyJpaRepository).save(captor.capture());
         assertThat(captor.getValue().getAccountId()).isEqualTo(accountId);
         assertThat(captor.getValue().getType()).isEqualTo(Account.StrategyType.INFINITE);
-        assertThat(captor.getValue().getTicker()).isEqualTo("SOXL");
+        assertThat(captor.getValue().getTicker()).isEqualTo(Ticker.SOXL);
         assertThat(captor.getValue().getStatus()).isEqualTo(Account.StrategyStatus.ACTIVE);
     }
 
@@ -96,7 +98,7 @@ class AccountPersistenceAdapterTest {
         Account existingAccount = new Account(accountId, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
                 Account.StrategyType.INFINITE, Account.StrategyStatus.PAUSED,
-                Ticker.SOXL, Account.Broker.KIS, Instant.now(), Instant.now());
+                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
 
         AccountEntity entity = accountEntityWithId(accountId);
         StrategyEntity strategy = strategyEntity(accountId, Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE);
