@@ -1,8 +1,12 @@
 package com.kista.domain.model.account;
 
 import com.kista.domain.model.strategy.Ticker;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 public record Account(
@@ -22,9 +26,23 @@ public record Account(
 ) {
     public enum Broker { KIS, TOSS }
 
+    @Getter
+    @RequiredArgsConstructor
     public enum StrategyType {
-        INFINITE, // 20차수 분할매매 (V1 기존 로직)
-        PRIVACY   // FIDA 서비스 연계 예정 (현재 스텁)
+        // Ticker Enum을 직접 활용하여 관계 정의
+        INFINITE(EnumSet.of(Ticker.SOXL)),
+        PRIVACY(EnumSet.of(Ticker.TQQQ, Ticker.USD, Ticker.SOXL));
+
+        // 해당 전략에서 사용 가능한 티커 집합
+        private final Set<Ticker> availableTickers;
+
+        /**
+         * 이 전략에서 해당 Ticker가 사용 가능한지 검증
+         */
+        public boolean isSupported(Ticker ticker) {
+            if (ticker == null) return false;
+            return this.availableTickers.contains(ticker);
+        }
     }
 
     public enum StrategyStatus {
