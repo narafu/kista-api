@@ -2,6 +2,7 @@ package com.kista.domain.port.in;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Ticker;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -19,4 +20,12 @@ public record FidaOrderRequest(
         @Nullable BigDecimal avgPrice,
         @PositiveOrZero int holdings,
         List<Order> orders
-) {}
+) {
+    // quantity=null은 "남은 전부 매도"를 의미 — SELL 방향에서만 허용
+    @AssertTrue(message = "BUY 주문의 quantity는 null일 수 없습니다")
+    public boolean isBuyQuantityValid() {
+        return orders == null || orders.stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .allMatch(o -> o.quantity() != null);
+    }
+}
