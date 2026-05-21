@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
+import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -9,18 +10,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class FidaOrderService implements ExecuteFidaOrderUseCase {
 
+    private final PrivacyTradePort privacyTradePort;
+
     @Override
     public void execute(FidaOrderRequest request) {
-        /* todo
-        * PrivacyTradeMasterEntity save
-        *   -> request.tradeDate
-        *   -> request.ticker
-        *   -> request.currentCycleStart
-        *   -> request.currentCycleRealizedPnl
-        *   -> request.avgPrice
-        *   -> request.holdings
-        * PrivacyTradeDetailEntity save
-        *   -> request.orders
-        * */
+        privacyTradePort.saveMasterWithDetails(request);
     }
 }

@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record FidaOrderRequest(
-        LocalDate tradeDate,
+        @NotNull LocalDate tradeDate,
         @NotNull Ticker ticker,
         @NotNull @Positive BigDecimal currentCycleStart,
         @NotNull BigDecimal currentCycleRealizedPnl,

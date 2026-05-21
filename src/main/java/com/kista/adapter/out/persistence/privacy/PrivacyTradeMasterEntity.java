@@ -29,6 +29,7 @@ class PrivacyTradeMasterEntity extends BaseAuditEntity {
     @Column(name = "trade_date", nullable = false)
     private LocalDate tradeDate;              // 기준 매매표가 적용되는 거래일
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
     private Ticker ticker;                    // 대상 종목 (PRIVACY는 SOXL)
 
