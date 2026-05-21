@@ -79,7 +79,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V25__convert_native_enums_to_varchar.sql` (V23: symbol→ticker·kis_order_id 리네임, V24: privacy_trades_master/detail 테이블 생성, V25: 네이티브 ENUM → VARCHAR 전환)
+- 현재 최신: `V29__add_updated_at_to_orders_and_kis_tokens.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
@@ -123,7 +123,13 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Spring Security Filter 이중 등록 방지
 - `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
-- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `JwtAuthFilter`에 적용됨)
+- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `JwtAuthFilter`, `InternalTokenAuthFilter` 모두 적용됨)
+- `SecurityConfig`에 새 Filter 주입 필드 추가 시 `@Import(SecurityConfig.class)` 사용하는 **모든** `@WebMvcTest` 테스트에 해당 Filter 클래스도 `@Import` 목록에 추가 필수 — 누락 시 `NoSuchBeanDefinitionException`으로 컨텍스트 실패 (실패가 캐시돼 무관한 테스트까지 `IllegalStateException` 전파)
+
+### 서버 간 내부 인증 (InternalTokenAuthFilter)
+- `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (미설정 시 항상 401)
+- `SecurityConfig`: `/api/internal/**` → `hasRole("INTERNAL")`, `InternalTokenAuthFilter` JWT 필터보다 먼저 실행
+- `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
 
 ### 소유권 검증 예외 패턴 (V2)
 - Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw
