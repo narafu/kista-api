@@ -29,6 +29,7 @@ public class SecurityConfig {
     private String allowedOrigins; // 쉼표 구분 허용 origin 목록 (ex: https://kista-ui.vercel.app)
 
     private final JwtAuthFilter jwtFilter;
+    private final InternalTokenAuthFilter internalTokenFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -45,10 +46,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated() // 회원 탈퇴는 인증 필수
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()
                 )
+                // InternalTokenAuthFilter는 JWT 필터보다 먼저 실행 (내부 API는 JWT 불필요)
+                .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 // JWT 필터를 Spring Security 체인 내부에만 등록
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtFilter, InternalTokenAuthFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) ->
                                 res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
@@ -75,6 +79,14 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<JwtAuthFilter> jwtFilterRegistration(JwtAuthFilter filter) {
         FilterRegistrationBean<JwtAuthFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    // InternalTokenAuthFilter도 서블릿 필터 체인 중복 등록 비활성화
+    @Bean
+    public FilterRegistrationBean<InternalTokenAuthFilter> internalFilterRegistration(InternalTokenAuthFilter filter) {
+        FilterRegistrationBean<InternalTokenAuthFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

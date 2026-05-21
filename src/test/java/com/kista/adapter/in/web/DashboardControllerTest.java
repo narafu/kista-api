@@ -1,12 +1,9 @@
 package com.kista.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.model.order.TradeHistory;
-import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
-import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import org.junit.jupiter.api.Test;
@@ -15,7 +12,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,9 +25,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,12 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
 
     @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean GetTradeHistoryUseCase getTradeHistoryUseCase;
     @MockBean GetPortfolioUseCase getPortfolioUseCase;
-    @MockBean ExecuteFidaOrderUseCase executeFidaOrderUseCase;
 
     @Test
     void getTrades_returns_200_with_list() throws Exception {
@@ -84,25 +76,4 @@ class DashboardControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
-    void placeFidaOrder_returns_201() throws Exception {
-        FidaOrderRequest req = new FidaOrderRequest(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
-                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
-
-        mockMvc.perform(post("/api/orders/fida")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isCreated());
-    }
-
-    @Test
-    void placeFidaOrder_invalid_body_returns_400() throws Exception {
-        mockMvc.perform(post("/api/orders/fida")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-    }
 }

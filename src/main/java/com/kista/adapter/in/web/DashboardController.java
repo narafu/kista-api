@@ -3,8 +3,6 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
 import com.kista.domain.model.strategy.Ticker;
-import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
-import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,16 +10,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Tag(name = "대시보드", description = "거래 내역, 포트폴리오 스냅샷 조회 및 FIDA 주문")
+@Tag(name = "대시보드", description = "거래 내역, 포트폴리오 스냅샷 조회")
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -29,7 +25,6 @@ public class DashboardController {
 
     private final GetTradeHistoryUseCase getTradeHistoryUseCase;
     private final GetPortfolioUseCase getPortfolioUseCase;
-    private final ExecuteFidaOrderUseCase executeFidaOrderUseCase;
 
     @Operation(summary = "거래 내역 조회", description = "날짜 범위와 종목으로 필터링. 기본: 최근 30일, 종목 SOXL.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -66,14 +61,4 @@ public class DashboardController {
                 .stream().map(PortfolioSnapshotResponse::from).toList();
     }
 
-    @Operation(summary = "FIDA 주문 실행", description = "FIDA 계좌로 즉시 지정가 매매 주문 접수.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "주문 접수 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 (파라미터 누락 또는 유효성 오류)")
-    })
-    @PostMapping("/orders/fida")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void placeFidaOrder(@RequestBody @Valid FidaOrderRequest request) {
-        executeFidaOrderUseCase.execute(request);
-    }
 }
