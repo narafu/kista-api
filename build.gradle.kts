@@ -54,6 +54,9 @@ dependencies {
     // Observability
     implementation(libs.micrometer.prometheus)
 
+    // Firebase
+    implementation(libs.firebase.admin)
+
     // Lombok (컴파일 타임 코드 생성)
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)

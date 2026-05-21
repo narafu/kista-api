@@ -7,6 +7,7 @@ springdoc                = "2.8.4"
 flyway                   = "10.21.0"
 lombok                   = "1.18.36"
 jjwt                     = "0.12.6"
+firebase-admin           = "9.4.1"
 
 [libraries]
 # Spring Boot Starters
@@ -43,6 +44,9 @@ jjwt-jackson                   = { module = "io.jsonwebtoken:jjwt-jackson", vers
 
 # Testing
 archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+# Firebase
+firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 
 [plugins]
 spring-boot            = { id = "org.springframework.boot", version.ref = "spring-boot" }
