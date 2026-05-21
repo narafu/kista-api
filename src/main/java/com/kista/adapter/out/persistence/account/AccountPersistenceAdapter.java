@@ -2,7 +2,6 @@ package com.kista.adapter.out.persistence.account;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.out.AccountRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -63,14 +62,14 @@ public class AccountPersistenceAdapter implements AccountRepository {
             strategyEntity = new StrategyEntity();
             strategyEntity.setAccountId(saved.getId());
             strategyEntity.setType(account.strategyType());
-            strategyEntity.setTicker(account.ticker().name());
+            strategyEntity.setTicker(account.ticker());
             strategyEntity.setStatus(account.strategyStatus());
         } else {
             // 기존 계좌 - strategy type/ticker/status 업데이트
             strategyEntity = strategyJpaRepository
                     .findByAccountId(account.id()).orElseThrow();
             strategyEntity.setType(account.strategyType());
-            strategyEntity.setTicker(account.ticker().name());
+            strategyEntity.setTicker(account.ticker());
             strategyEntity.setStatus(account.strategyStatus());
         }
         strategyJpaRepository.save(strategyEntity);
@@ -117,7 +116,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisAppKey()),
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(), s.getType(), s.getStatus(),
-                Ticker.valueOf(s.getTicker()),
+                s.getTicker(),
                 e.getBroker(),
                 e.getCreatedAt(), e.getUpdatedAt()
         );

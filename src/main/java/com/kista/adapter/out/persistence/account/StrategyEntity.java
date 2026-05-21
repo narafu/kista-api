@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.account;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Ticker;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -29,8 +30,9 @@ class StrategyEntity extends BaseAuditEntity {
     @Column(name = "type", nullable = false, length = 20)
     private Account.StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
-    private String ticker; // 거래 종목 코드 (Ticker name, 예: SOXL)
+    private Ticker ticker; // 거래 종목 코드
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
