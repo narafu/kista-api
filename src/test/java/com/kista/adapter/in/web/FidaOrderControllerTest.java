@@ -22,8 +22,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FidaOrderController.class)
@@ -41,16 +45,22 @@ class FidaOrderControllerTest {
     private static final String VALID_TOKEN = "test-internal-token";
 
     @Test
-    void placeFidaOrder_returns_201() throws Exception {
+    void placeFidaOrder_returns_201_with_body() throws Exception {
+        UUID masterId = UUID.randomUUID();
         FidaOrderRequest req = new FidaOrderRequest(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
+
+        given(executeFidaOrderUseCase.execute(any())).willReturn(masterId);
 
         mockMvc.perform(post("/api/internal/fida-orders")
                         .header("X-Internal-Token", VALID_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(masterId.toString()))
+                .andExpect(jsonPath("$.ticker").value("SOXL"))
+                .andExpect(jsonPath("$.holdings").value(10));
     }
 
     @Test

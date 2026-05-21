@@ -1,5 +1,7 @@
 package com.kista.domain.port.in;
 
+import java.util.UUID;
+
 public interface ExecuteFidaOrderUseCase {
-    void execute(FidaOrderRequest request);
+    UUID execute(FidaOrderRequest request);
 }

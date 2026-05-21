@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
@@ -15,7 +17,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     @Transactional
-    public void saveMasterWithDetails(FidaOrderRequest request) {
+    public UUID saveMasterWithDetails(FidaOrderRequest request) {
         // master 엔티티 생성 및 필드 세팅
         PrivacyTradeMasterEntity master = new PrivacyTradeMasterEntity();
         master.setTradeDate(request.tradeDate());
@@ -36,6 +38,6 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
             master.getOrders().add(detail);
         }
 
-        masterRepository.save(master);
+        return masterRepository.save(master).getId();
     }
 }
