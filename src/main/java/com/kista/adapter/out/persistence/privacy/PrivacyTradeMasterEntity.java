@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.domain.model.strategy.Ticker;
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,11 +15,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "privacy_trades_master")
+@Table(
+    name = "privacy_trades_master",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"trade_date", "ticker"})
+)
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class PrivacyTradeMasterEntity extends BaseAuditEntity {
+class PrivacyTradeMasterEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

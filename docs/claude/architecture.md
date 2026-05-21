@@ -83,8 +83,8 @@ domain      →  외부 의존 없음
 | 새 admin 엔드포인트 추가 (`AdminXxxController`) | `AdminXxxService` + `AdminXxxUseCase`(domain/port/in) + `AdminXxxControllerTest`(`@MockBean` 필수: JwtDecoder + 사용하는 모든 UseCase) |
 | `OrderController`에 엔드포인트 추가 | `GetNextOrdersUseCase` + `PlaceReservationOrderUseCase` **둘 다** `@MockBean` 필수 (`OrderControllerTest`) |
 | KIS 응답 도메인 모델(`Execution`/`PresentBalanceResult.Item`/`PeriodProfitResult.Item`/`DailyTransaction`/`ReservationOrder`) 필드 변경 | 해당 KIS 어댑터(`flatMap+tryParse` 매핑) + 어댑터 단위 테스트 fixture + `kista-ui/types/trade.ts` |
-| `privacy_trades_master` 스키마 변경 | `PrivacyTradeEntity` + `PrivacyTradeOrderEntity`(cascade 영향) + V번호 마이그레이션 |
-| `privacy_trades_detail` 스키마 변경 | `PrivacyTradeOrderEntity` + V번호 마이그레이션 |
+| `privacy_trades_master` 스키마 변경 | `PrivacyTradeMasterEntity` + `PrivacyTradeDetailEntity`(cascade 영향) + V번호 마이그레이션 |
+| `privacy_trades_detail` 스키마 변경 | `PrivacyTradeDetailEntity` + V번호 마이그레이션 |
 | 수량 관련 Domain record 필드 추가 | 해당 JPA Entity + Flyway 마이그레이션 + KIS 어댑터 매핑부 + DTO `from()` + kista-ui `types/` 동시 수정 |
 
 ### 인증 userId 추출 패턴
@@ -112,8 +112,15 @@ domain      →  외부 의존 없음
 - `TelegramAdapter` 접근 경로: `r.snapshot().X()` (포맷 문자열 변경 금지)
 
 ### PRIVACY 전략 패턴 (기준 매매표)
-- `privacy_trades_master` (`adapter/out/persistence/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
-- `privacy_trades_detail`: 마스터 1행에 대한 계획 주문 세트 (direction/orderType/quantity/price) — 향후 필드 추가 예정
-- FIDA 수신 흐름: `POST /api/internal/fida-orders` → `FidaOrderService` → `PrivacyTradePort.saveMasterWithDetails()` → `PrivacyTradePersistenceAdapter` (구현 완료)
+- `privacy_trades_master` (`adapter/out/persistence/privacy/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
+  - `(trade_date, ticker)` UNIQUE 제약 (V24) — 하루에 종목당 마스터 1건
+  - `updated_at` 없음 — `BaseCreatedAtEntity` 상속 (`createdAt`만)
+- `privacy_trades_detail`: 마스터 1행에 대한 계획 주문 세트 (direction/orderType/quantity/price)
+  - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리
+- FIDA 수신 흐름 (`PrivacyTradeSaveResult(id, created)` 반환):
+  - `(tradeDate, ticker)` 없음 → INSERT → 201
+  - 있고 내용 동일 → 200 (멱등)
+  - 있고 내용 다름 → `PrivacyTradeConflictException` (`domain/model/privacy/`) → 409
+- `PrivacyTradeSaveResult` (`domain/port/out/`): `UUID id` + `boolean created` — 컨트롤러가 201/200 분기
 - 스케줄러 흐름: `StrategyType.PRIVACY` → `privacy_trades_master/detail` 조회 → `orders` 복사 (미구현, INFINITE와 동일 출구)
 - 테이블명 컨벤션: 마스터-디테일 분리 시 `xxx_master` / `xxx_detail` 접미사 패턴 사용

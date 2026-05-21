@@ -49,6 +49,7 @@
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈
 - IDE 경고 "열을 해결할 수 없습니다" — Flyway 미적용 상태의 false positive. `compileJava BUILD SUCCESSFUL`이 실제 검증 기준
+- **`BaseAuditEntity` vs `BaseCreatedAtEntity`**: `createdAt`+`updatedAt` 필요 시 `BaseAuditEntity` 상속, `createdAt`만 필요 시 `BaseCreatedAtEntity` 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패)
 
 ### Java Enum ↔ DB 컬럼 매핑 규칙 (전 프로젝트 통일)
 - **DB 컬럼**: PostgreSQL 네이티브 ENUM (`CREATE TYPE ... AS ENUM`) **사용 금지** — VARCHAR(20) 사용
@@ -79,7 +80,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V31__nullable_quantity_in_privacy_trades_detail.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거)
+- 현재 최신: `V32__drop_updated_at_from_privacy_tables.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거, V32: privacy_trades_master/detail에서 updated_at 컬럼 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)

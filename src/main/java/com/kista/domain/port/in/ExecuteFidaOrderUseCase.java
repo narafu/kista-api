@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
-import java.util.UUID;
+import com.kista.domain.port.out.PrivacyTradeSaveResult;
 
 public interface ExecuteFidaOrderUseCase {
-    UUID execute(FidaOrderRequest request);
+    PrivacyTradeSaveResult execute(FidaOrderRequest request);
 }

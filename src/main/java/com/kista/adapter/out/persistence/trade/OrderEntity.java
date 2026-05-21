@@ -43,11 +43,11 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 
-    @Column(nullable = false)
-    private int quantity;
-
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal price;
+
+    @Column(nullable = false)
+    private int quantity;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

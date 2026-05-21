@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.domain.model.order.Order;
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,7 +16,7 @@ import java.util.UUID;
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class PrivacyTradeDetailEntity extends BaseAuditEntity {
+class PrivacyTradeDetailEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -35,9 +35,9 @@ class PrivacyTradeDetailEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 10)
     private Order.OrderType orderType;         // LOC / MOC / LIMIT
 
-    @Column
-    private Integer quantity;
-
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal price;
+
+    @Column
+    private Integer quantity;
 }

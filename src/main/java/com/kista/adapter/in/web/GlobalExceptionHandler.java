@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -33,6 +34,13 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         detail.setTitle("Invalid Request");
+        return detail;
+    }
+
+    @ExceptionHandler(PrivacyTradeConflictException.class)
+    public ProblemDetail handlePrivacyTradeConflict(PrivacyTradeConflictException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        detail.setTitle("Privacy Trade Conflict");
         return detail;
     }
 }
