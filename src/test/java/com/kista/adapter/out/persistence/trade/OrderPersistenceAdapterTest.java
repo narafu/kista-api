@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
@@ -94,12 +95,12 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void markPlaced_doesNothingIfNotFound() {
+    void markPlaced_throwsIfNotFound() {
         UUID orderId = UUID.randomUUID();
         when(repository.findById(orderId)).thenReturn(Optional.empty());
 
-        adapter.markPlaced(orderId, "ORD-001");
-
-        verify(repository, never()).save(any());
+        assertThatThrownBy(() -> adapter.markPlaced(orderId, "ORD-001"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(orderId.toString());
     }
 }

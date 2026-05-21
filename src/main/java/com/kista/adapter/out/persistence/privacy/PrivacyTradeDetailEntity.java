@@ -35,8 +35,8 @@ class PrivacyTradeDetailEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 10)
     private Order.OrderType orderType;         // LOC / MOC / LIMIT
 
-    @Column(nullable = false)
-    private int quantity;
+    @Column
+    private Integer quantity;
 
     @Column(nullable = false, precision = 12, scale = 4)
     private BigDecimal price;

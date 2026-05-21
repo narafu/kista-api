@@ -12,7 +12,7 @@ public record Order(
         Ticker ticker,             // 거래 종목
         OrderType orderType,       // 주문 유형 (LOC/MOC/LIMIT)
         OrderDirection direction,  // 매수/매도 방향
-        int quantity,              // 주문 수량
+        Integer quantity,          // 주문 수량(nullable)
         BigDecimal price,          // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,        // 주문 상태
         String kisOrderId          // KIS 시스템 부여 주문 번호 (ODNO), PLANNED 상태에서는 null
