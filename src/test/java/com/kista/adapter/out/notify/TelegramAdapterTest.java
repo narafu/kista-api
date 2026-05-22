@@ -5,8 +5,6 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
-import com.kista.domain.model.user.NotificationChannel;
-import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,20 +38,15 @@ class TelegramAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new TelegramAdapter(restTemplate, PROPS);
+        TelegramHttpClient httpClient = new TelegramHttpClient(restTemplate);
+        adapter = new TelegramAdapter(httpClient, PROPS);
     }
 
-    // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 제거)
+    // Account 10개 필드 생성자
     private Account account(UUID userId, String nickname) {
         return new Account(UUID.randomUUID(), userId, nickname,
                 "74420614", "key", "secret", "01",
                 Account.Broker.KIS, Instant.now(), Instant.now());
-    }
-
-    private TradingCycle cycle(UUID accountId) {
-        return new TradingCycle(UUID.randomUUID(), accountId, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
     }
 
     @Test
@@ -112,7 +105,8 @@ class TelegramAdapterTest {
 
     @Test
     void send_withEmptyToken_skipsRestTemplateCall() {
-        TelegramAdapter noTokenAdapter = new TelegramAdapter(restTemplate, EMPTY_PROPS);
+        TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restTemplate);
+        TelegramAdapter noTokenAdapter = new TelegramAdapter(emptyHttpClient, EMPTY_PROPS);
 
         noTokenAdapter.notifyMarketClosed();
 
@@ -129,63 +123,5 @@ class TelegramAdapterTest {
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         assertThat(bodyCaptor.getValue().get("text")).contains("KIS API 호출 실패");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void notifyStrategyChanged_bodyContainsNicknameAccountAndAction() {
-        UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
-        Account acc = account(userId, "내SOXL계좌");
-        TradingCycle tc = cycle(acc.id());
-
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.notifyStrategyChanged(user, acc, tc, "중지");
-
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
-        assertThat(text).contains("홍길동").contains("내SOXL계좌").contains("중지");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void notifyTradingReport_withUserBot_sendsToUserChatId() {
-        UUID userId = UUID.randomUUID();
-        User userWithBot = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                "user-bot-token", "user-chat-789", null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
-        Account acc = account(userId, "SOXL계좌");
-        TradingSnapshot snapshot = new TradingSnapshot(10,
-                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
-        TradingReport report = new TradingReport(
-                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
-                new BigDecimal("66.00"), new BigDecimal("35.00"));
-
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.notifyTradingReport(userWithBot, acc, report);
-
-        verify(restTemplate).postForObject(
-                contains("/botuser-bot-token/sendMessage"),
-                bodyCaptor.capture(), eq(String.class));
-        Map<String, String> body = bodyCaptor.getValue();
-        assertThat(body.get("chat_id")).isEqualTo("user-chat-789");
-        assertThat(body.get("text")).contains("2024-06-15").contains("SOXL계좌");
-    }
-
-    @Test
-    void notifyTradingReport_noUserBot_skips() {
-        UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
-        Account acc = account(userId, "노봇계좌");
-        TradingSnapshot snapshot = new TradingSnapshot(10,
-                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
-        TradingReport report = new TradingReport(
-                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
-                new BigDecimal("66.00"), new BigDecimal("35.00"));
-
-        adapter.notifyTradingReport(user, acc, report);
-
-        verify(restTemplate, never()).postForObject(any(), any(), any());
     }
 }
