@@ -1,0 +1,54 @@
+package com.kista.adapter.in.web;
+
+import com.kista.domain.port.in.RegisterFcmTokenUseCase;
+import com.kista.domain.port.in.UnregisterFcmTokenUseCase;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(FcmController.class)
+class FcmControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @MockBean RegisterFcmTokenUseCase registerFcmToken;
+    @MockBean UnregisterFcmTokenUseCase unregisterFcmToken;
+    @MockBean JwtDecoder jwtDecoder;
+
+    static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Test
+    void registerToken_returns204() throws Exception {
+        mockMvc.perform(post("/api/fcm/tokens")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"fcm-token-abc\",\"platform\":\"WEB\"}"))
+                .andExpect(status().isNoContent());
+        verify(registerFcmToken).register(eq(USER_ID), eq("fcm-token-abc"), eq("WEB"));
+    }
+
+    @Test
+    void unregisterToken_returns204() throws Exception {
+        mockMvc.perform(delete("/api/fcm/tokens/fcm-token-abc")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()))))
+                .andExpect(status().isNoContent());
+        verify(unregisterFcmToken).unregister(eq(USER_ID), eq("fcm-token-abc"));
+    }
+}
