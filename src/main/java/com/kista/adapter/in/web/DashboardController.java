@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import io.swagger.v3.oas.annotations.Operation;

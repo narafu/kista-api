@@ -1,14 +1,12 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.account.*;
-import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.order.*;
-import com.kista.domain.model.kis.*;
-import com.kista.domain.model.admin.*;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.NotifyPort;
+import com.kista.domain.port.out.StrategyRepository;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,18 +29,27 @@ class TradingSchedulerTest {
 
     @Mock ExecuteTradingUseCase useCase;
     @Mock AccountRepository accountRepository;
+    @Mock StrategyRepository strategyRepository;
     @Mock UserRepository userRepository;
     @Mock NotifyPort notifyPort;
     @InjectMocks TradingScheduler scheduler;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
+    private static final UUID STRATEGY_ID = UUID.randomUUID();
 
+    // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 없음)
     private Account mockAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "key", "secret", "01",
-                Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS, Instant.now(), Instant.now());
+    }
+
+    // Strategy record
+    private Strategy mockStrategy() {
+        return new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.StrategyType.INFINITE,
+                Strategy.StrategyStatus.ACTIVE, Strategy.Ticker.SOXL, BigDecimal.ONE,
+                Instant.now(), Instant.now());
     }
 
     private User mockUser() {
@@ -50,33 +58,37 @@ class TradingSchedulerTest {
     }
 
     @Test
-    void run_callsExecuteForEachActiveAccount() throws InterruptedException {
+    void run_callsExecuteForEachActiveStrategy() throws InterruptedException {
         Account account = mockAccount();
+        Strategy strategy = mockStrategy();
         User user = mockUser();
-        when(accountRepository.findAllActive()).thenReturn(List.of(account));
+        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         scheduler.run();
 
-        verify(useCase).execute(account, user);
+        verify(useCase).execute(strategy, account, user);
     }
 
     @Test
-    void run_noActiveAccounts_doesNotCallExecute() throws InterruptedException {
-        when(accountRepository.findAllActive()).thenReturn(List.of());
+    void run_noActiveStrategies_doesNotCallExecute() throws InterruptedException {
+        when(strategyRepository.findAllActive()).thenReturn(List.of());
 
         scheduler.run();
 
-        verify(useCase, never()).execute(any(), any());
+        verify(useCase, never()).execute(any(), any(), any());
     }
 
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
         Account account = mockAccount();
+        Strategy strategy = mockStrategy();
         User user = mockUser();
-        when(accountRepository.findAllActive()).thenReturn(List.of(account));
+        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        doThrow(new InterruptedException("interrupted")).when(useCase).execute(any(), any());
+        doThrow(new InterruptedException("interrupted")).when(useCase).execute(any(), any(), any());
 
         scheduler.run();
 
@@ -85,31 +97,34 @@ class TradingSchedulerTest {
     }
 
     @Test
-    void run_unexpectedException_continuesNextAccount() throws InterruptedException {
-        Account account1 = mockAccount();
-        Account account2 = new Account(UUID.randomUUID(), USER_ID, "계좌2",
-                "74420615", "key2", "secret2", "01",
-                Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-                Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now());
+    void run_unexpectedException_continuesNextStrategy() throws InterruptedException {
+        Account account = mockAccount();
+        Strategy strategy1 = mockStrategy();
+        Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT_ID,
+                Strategy.StrategyType.INFINITE, Strategy.StrategyStatus.ACTIVE,
+                Strategy.Ticker.SOXL, BigDecimal.ONE, Instant.now(), Instant.now());
         User user = mockUser();
-        when(accountRepository.findAllActive()).thenReturn(List.of(account1, account2));
+        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy1, strategy2));
+        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        doThrow(new RuntimeException("api error")).when(useCase).execute(eq(account1), any());
+        doThrow(new RuntimeException("api error")).when(useCase).execute(eq(strategy1), any(), any());
 
         scheduler.run();
 
-        // account1 실패해도 account2 실행 확인
-        verify(useCase).execute(eq(account2), any());
+        // strategy1 실패해도 strategy2 실행 확인
+        verify(useCase).execute(eq(strategy2), any(), any());
     }
 
     @Test
     void run_unexpectedException_notifiesAdminViaNotifyPort() throws InterruptedException {
         Account account = mockAccount();
+        Strategy strategy = mockStrategy();
         User user = mockUser();
-        when(accountRepository.findAllActive()).thenReturn(List.of(account));
+        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
-        doThrow(ex).when(useCase).execute(any(), any());
+        doThrow(ex).when(useCase).execute(any(), any(), any());
 
         scheduler.run();
 

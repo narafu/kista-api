@@ -1,27 +1,18 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.Ticker;
-
-import java.math.BigDecimal;
-import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
-import com.kista.domain.port.in.PauseStrategyUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
-import com.kista.domain.port.in.ResumeStrategyUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisTokenPort;
-import com.kista.domain.port.out.UserNotificationPort;
-import com.kista.domain.port.out.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Slf4j
@@ -29,36 +20,25 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 public class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
-        DeleteAccountUseCase, GetAccountUseCase, PauseStrategyUseCase, ResumeStrategyUseCase {
+        DeleteAccountUseCase, GetAccountUseCase {
 
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
     private final AccountRepository accountRepository;
-    private final UserRepository userRepository;       // pause/resume 시 사용자 조회용
-    private final UserNotificationPort notificationPort; // 관리자 알림용
-    private final KisTokenPort kisTokenPort;           // 계좌 저장 전 KIS API 키 유효성 검증용
+    private final KisTokenPort kisTokenPort;
 
     @Override
     public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
-        // KIS 키 유효성 검증 (DB 저장 전) — 실패 시 InvalidKisKeyException이 자연 전파
+        // KIS 키 유효성 검증 — 실패 시 InvalidKisKeyException 전파
         kisTokenPort.testToken(cmd.kisAppKey(), cmd.kisSecretKey());
-
         if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
-        // PRIVACY는 항상 SOXL 고정, INFINITE는 지정 없으면 TQQQ
-        Ticker ticker = cmd.strategyType() == Account.StrategyType.PRIVACY
-                ? Ticker.SOXL
-                : (cmd.ticker() != null ? cmd.ticker() : Ticker.TQQQ);
-
-        BigDecimal multiple = cmd.multiple() != null ? cmd.multiple() : BigDecimal.ONE;
-
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
-                cmd.strategyType(), Account.StrategyStatus.ACTIVE,
-                ticker, multiple, Account.Broker.KIS,
+                Account.Broker.KIS,
                 null, null
         );
         Account saved = accountRepository.save(account);
@@ -70,36 +50,18 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-
-        // 키 변경 시 유효성 검증 — 변경되는 키와 기존 키를 조합해 실제 사용 값으로 검증
+        // 키 변경 시에만 유효성 검증
         String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
         String newSecretKey = cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey();
         if (cmd.kisAppKey() != null || cmd.kisSecretKey() != null) {
             kisTokenPort.testToken(newAppKey, newSecretKey);
         }
-
-        // 전략 결정: cmd 값 우선, null이면 기존값 유지
-        Account.StrategyType newStrategyType = cmd.strategyType() != null
-                ? cmd.strategyType() : account.strategyType();
-
-        // PRIVACY는 항상 SOXL 고정 (register와 동일 규칙)
-        Ticker updatedTicker;
-        if (newStrategyType == Account.StrategyType.PRIVACY) {
-            updatedTicker = Ticker.SOXL;
-        } else {
-            updatedTicker = cmd.ticker() != null ? cmd.ticker() : account.ticker();
-        }
-
-        BigDecimal updatedMultiple = cmd.multiple() != null ? cmd.multiple() : account.multiple();
-
         Account updated = new Account(
                 account.id(), account.userId(),
                 cmd.nickname() != null ? cmd.nickname() : account.nickname(),
-                account.accountNo(), // 계좌번호 변경 불가 (보안상)
-                cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey(),
-                cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey(),
-                account.kisAccountType(), newStrategyType, account.strategyStatus(),
-                updatedTicker, updatedMultiple, account.broker(),
+                account.accountNo(),
+                newAppKey, newSecretKey,
+                account.kisAccountType(), account.broker(),
                 account.createdAt(), null
         );
         return accountRepository.save(updated);
@@ -123,40 +85,5 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     @Transactional(readOnly = true)
     public Account getById(UUID id) {
         return accountRepository.findByIdOrThrow(id);
-    }
-
-    @Override
-    public void pause(UUID accountId, UUID requesterId) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
-        User user = findUserOrThrow(requesterId);
-        Account paused = withStrategyStatus(account, Account.StrategyStatus.PAUSED);
-        accountRepository.save(paused);
-        log.info("전략 중지: accountId={}, userId={}", accountId, requesterId);
-        notificationPort.notifyStrategyChanged(user, paused, "중지");
-    }
-
-    @Override
-    public void resume(UUID accountId, UUID requesterId) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
-        User user = findUserOrThrow(requesterId);
-        Account active = withStrategyStatus(account, Account.StrategyStatus.ACTIVE);
-        accountRepository.save(active);
-        log.info("전략 재개: accountId={}, userId={}", accountId, requesterId);
-        notificationPort.notifyStrategyChanged(user, active, "재개");
-    }
-
-    private User findUserOrThrow(UUID userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-    }
-
-    private Account withStrategyStatus(Account account, Account.StrategyStatus status) {
-        return new Account(account.id(), account.userId(), account.nickname(),
-                account.accountNo(), account.kisAppKey(), account.kisSecretKey(),
-                account.kisAccountType(), account.strategyType(), status,
-                account.ticker(), account.multiple(), account.broker(),
-                account.createdAt(), null);
     }
 }

@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.trade;
 
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

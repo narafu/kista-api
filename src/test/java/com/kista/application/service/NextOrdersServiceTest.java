@@ -1,15 +1,14 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.account.*;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.order.*;
-import com.kista.domain.model.kis.*;
-import com.kista.domain.model.admin.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisPricePort;
+import com.kista.domain.port.out.StrategyRepository;
 import com.kista.domain.strategy.TradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +33,7 @@ import static org.mockito.Mockito.when;
 class NextOrdersServiceTest {
 
     @Mock AccountRepository accountRepository;
+    @Mock StrategyRepository strategyRepository;
     @Mock KisAccountPort kisAccountPort;
     @Mock KisPricePort kisPricePort;
     @Mock TradingStrategy tradingStrategy;
@@ -43,13 +43,21 @@ class NextOrdersServiceTest {
     static final UUID ACCOUNT_ID = UUID.randomUUID();
     static final UUID USER_ID = UUID.randomUUID();
     static final UUID OTHER_USER_ID = UUID.randomUUID();
+    static final UUID STRATEGY_ID = UUID.randomUUID();
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
+    // Account 10개 필드 생성자
     static final Account ACCOUNT = new Account(
             ACCOUNT_ID, USER_ID, "테스트계좌",
             "74420614", "key", "secret", "01",
-            Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-            Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS, Instant.now(), Instant.now()
+    );
+
+    // Strategy record
+    static final Strategy STRATEGY = new Strategy(
+            STRATEGY_ID, ACCOUNT_ID, Strategy.StrategyType.INFINITE,
+            Strategy.StrategyStatus.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+            Instant.now(), Instant.now()
     );
 
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(
@@ -60,7 +68,8 @@ class NextOrdersServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new NextOrdersService(accountRepository, kisAccountPort, kisPricePort, tradingStrategy);
+        // NextOrdersService(accountRepository, strategyRepository, kisAccountPort, kisPricePort, tradingStrategy)
+        service = new NextOrdersService(accountRepository, strategyRepository, kisAccountPort, kisPricePort, tradingStrategy);
     }
 
     @Test
@@ -68,9 +77,10 @@ class NextOrdersServiceTest {
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
-        // findByIdOrThrow는 interface default 메서드 — Mockito가 override하므로 직접 stub
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
-        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
+        when(strategyRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        // getBalance(account, ticker) - 2개 파라미터
+        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
@@ -96,7 +106,6 @@ class NextOrdersServiceTest {
 
     @Test
     void preview_throws_SecurityException_when_not_owner() {
-        // ACCOUNT.userId() == USER_ID → OTHER_USER_ID로 호출하면 verifyOwnedBy가 SecurityException
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
 
         assertThatThrownBy(() -> service.preview(ACCOUNT_ID, OTHER_USER_ID))
@@ -105,9 +114,9 @@ class NextOrdersServiceTest {
 
     @Test
     void preview_calls_buildOrders_even_when_balance_should_skip() {
-        // 잔고 부족(shouldSkip=true)이어도 강제 계산 — kisHolidayPort 의존 없음으로도 보장
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
-        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(LOW_BALANCE);
+        when(strategyRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(LOW_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of());

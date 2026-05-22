@@ -37,11 +37,9 @@ public class AdminAccountController {
     record AdminAccountResponse(
             UUID id,
             UUID userId,
-            String ownerNickname,     // User.nickname
-            String accountNoMasked,   // "****1234"
-            String ticker,            // Ticker.name()
-            String strategyType,      // StrategyType.name()
-            String strategyStatus     // StrategyStatus.name()
+            String ownerNickname,   // User.nickname
+            String accountNoMasked, // "****1234"
+            String broker           // Broker.name()
     ) {
         static AdminAccountResponse from(Account a, User user) {
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
@@ -49,7 +47,7 @@ public class AdminAccountController {
                     Math.max(0, a.accountNo().length() - 4));
             return new AdminAccountResponse(
                     a.id(), a.userId(), nickname, masked,
-                    a.ticker().name(), a.strategyType().name(), a.strategyStatus().name());
+                    a.broker() != null ? a.broker().name() : null);
         }
     }
 }

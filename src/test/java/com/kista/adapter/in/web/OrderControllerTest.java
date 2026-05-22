@@ -5,6 +5,7 @@ import com.kista.adapter.in.web.dto.ReservationOrderRequest;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.account.*;
 import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.admin.*;
@@ -55,7 +56,7 @@ class OrderControllerTest {
 
     private GetNextOrdersUseCase.Result buildNextResult() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"), BigDecimal.ONE);
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order));

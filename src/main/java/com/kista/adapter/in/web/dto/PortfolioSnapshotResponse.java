@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.order.PortfolioSnapshot;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;

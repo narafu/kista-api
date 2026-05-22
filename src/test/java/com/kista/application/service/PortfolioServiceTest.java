@@ -1,7 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.order.PortfolioSnapshot;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.PortfolioSnapshotPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

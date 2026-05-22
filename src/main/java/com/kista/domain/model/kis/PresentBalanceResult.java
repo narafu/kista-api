@@ -1,5 +1,5 @@
 package com.kista.domain.model.kis;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.util.List;

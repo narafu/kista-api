@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.AccessLevel;

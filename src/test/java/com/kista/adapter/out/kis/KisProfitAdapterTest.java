@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.account.*;
 import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.admin.*;
@@ -41,8 +42,7 @@ class KisProfitAdapterTest {
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
-            Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-            Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
     @BeforeEach

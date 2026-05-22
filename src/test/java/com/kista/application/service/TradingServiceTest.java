@@ -1,11 +1,11 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.account.*;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
-import com.kista.domain.model.admin.*;
+import com.kista.domain.model.user.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
@@ -39,7 +39,7 @@ class TradingServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
-    @Mock RealtimeNotificationPort realtimeNotificationPort; // SSE 알림
+    @Mock RealtimeNotificationPort realtimeNotificationPort;
 
     TradingService service;
 
@@ -58,17 +58,20 @@ class TradingServiceTest {
     static final AccountBalance LOW_BALANCE = new AccountBalance(
             0, BigDecimal.ZERO, BigDecimal.ZERO);
 
-    // Account 생성자: id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType,
-    //                 strategyType, strategyStatus, ticker, multiple, broker, createdAt, updatedAt
+    // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 제거됨)
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
-            Account.StrategyType.INFINITE, Account.StrategyStatus.ACTIVE,
-            Ticker.SOXL, BigDecimal.ONE, Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
-    // User 생성자: id, kakaoId, nickname, status, telegramBotToken, telegramChatId,
-    //              createdAt, updatedAt, lastReappliedAt
+    // Strategy record - Account↔Strategy 분리 후 별도 엔티티
+    static final Strategy STRATEGY = new Strategy(
+            UUID.randomUUID(), ACCOUNT.id(), Strategy.StrategyType.INFINITE,
+            Strategy.StrategyStatus.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+            Instant.now(), Instant.now()
+    );
+
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
             null, null, null, Instant.now(), Instant.now(), null
@@ -86,20 +89,17 @@ class TradingServiceTest {
 
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
-        // tradingStrategy.buildOrders()가 반환하는 template (id=null, accountId=null)
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null);
-        // DB에서 조회될 PLANNED 주문 (id 필수: markPlaced에서 UUID로 사용)
         UUID plannedId = UUID.randomUUID();
         Order planned = new Order(plannedId, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
                 Order.OrderStatus.PLANNED, null);
-        // kisOrderPort.place() 반환값 (PLACED + kisOrderId 설정)
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(NORMAL_BALANCE);
+        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
@@ -109,15 +109,15 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
 
-        service.execute(ACCOUNT, USER, PAST_DST);
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
-        verify(kisAccountPort).getBalance(ACCOUNT);
+        verify(kisAccountPort).getBalance(ACCOUNT, Ticker.SOXL);
         verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT);
-        verify(orderPort).saveAll(anyList());                                       // 계획 저장
-        verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());    // 실행 조회
+        verify(orderPort).saveAll(anyList());
+        verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
-        verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));                // 상태 갱신
+        verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), eq(ACCOUNT));
         verify(correctionStrategy).correct(any(), any(), any());
         verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
@@ -139,7 +139,7 @@ class TradingServiceTest {
                 Order.OrderStatus.PLANNED, null);
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(FRESH_BALANCE);
+        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(FRESH_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
@@ -149,35 +149,34 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
 
-        service.execute(ACCOUNT, USER, PAST_DST);
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
         verify(tradeHistoryPort, times(2)).save(any(TradeHistory.class));
     }
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
-        // isMarketOpen이 waitForOrderTime보다 먼저 → 휴장 시 plan도 저장 안 됨
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
 
-        service.execute(ACCOUNT, USER, PAST_DST);
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
-        verify(kisAccountPort, never()).getBalance(any());
+        verify(kisAccountPort, never()).getBalance(any(), any());
         verify(kisPricePort, never()).getPrice(any(), any());
-        verify(orderPort, never()).saveAll(any()); // 계획 주문도 저장 안 됨
+        verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT)).thenReturn(LOW_BALANCE);
+        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(LOW_BALANCE);
 
-        service.execute(ACCOUNT, USER, PAST_DST);
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
-        verify(notifyPort).notifyInsufficientBalance(ACCOUNT, LOW_BALANCE);
+        verify(notifyPort).notifyInsufficientBalance(ACCOUNT, LOW_BALANCE, Ticker.SOXL);
         verify(kisPricePort, never()).getPrice(any(), any());
-        verify(orderPort, never()).saveAll(any()); // 잔고 부족 시 계획 주문도 없음
+        verify(orderPort, never()).saveAll(any());
         verify(tradeHistoryPort, never()).save(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }

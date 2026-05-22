@@ -16,7 +16,6 @@ import java.util.UUID;
 public class AccountPersistenceAdapter implements AccountRepository {
 
     private final AccountJpaRepository jpaRepository;
-    private final StrategyJpaRepository strategyJpaRepository;
     private final AesCryptoService crypto;
 
     @Override
@@ -37,15 +36,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
     }
 
     @Override
-    public List<Account> findAllActive() {
-        return jpaRepository.findAllActive().stream()
-                .map(this::toDomain)
-                .toList();
-    }
-
-    @Override
     public List<Account> findAll() {
-        // 전체 계좌 조회 — toDomain()이 각 계좌별 strategy N+1 쿼리 실행 (관리자용 소량 허용)
         return jpaRepository.findAll().stream()
                 .map(this::toDomain)
                 .toList();
@@ -55,28 +46,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
     public Account save(Account account) {
         AccountEntity entity = toEntity(account);
         AccountEntity saved = jpaRepository.save(entity);
-
-        StrategyEntity strategyEntity;
-        if (account.id() == null) {
-            // 신규 계좌 - strategy 생성
-            strategyEntity = new StrategyEntity();
-            strategyEntity.setAccountId(saved.getId());
-            strategyEntity.setType(account.strategyType());
-            strategyEntity.setTicker(account.ticker());
-            strategyEntity.setMultiple(account.multiple());
-            strategyEntity.setStatus(account.strategyStatus());
-        } else {
-            // 기존 계좌 - strategy type/ticker/multiple/status 업데이트
-            strategyEntity = strategyJpaRepository
-                    .findByAccountId(account.id()).orElseThrow();
-            strategyEntity.setType(account.strategyType());
-            strategyEntity.setTicker(account.ticker());
-            strategyEntity.setMultiple(account.multiple());
-            strategyEntity.setStatus(account.strategyStatus());
-        }
-        strategyJpaRepository.save(strategyEntity);
-
-        return buildDomain(saved, strategyEntity); // 이중 findByAccountId 방지
+        return toDomain(saved);
     }
 
     @Override
@@ -86,10 +56,10 @@ public class AccountPersistenceAdapter implements AccountRepository {
 
     @Override
     public long countAll() {
-        return jpaRepository.count(); // JpaRepository 기본 제공 메서드
+        return jpaRepository.count();
     }
 
-    // Account 도메인 모델 → 암호화 후 Entity 변환 (strategy 필드 제외 — strategies 테이블 별도 관리)
+    // Account 도메인 모델 → 암호화 후 Entity 변환
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();
         e.setId(a.id()); // null이면 @GeneratedValue가 UUID 생성
@@ -99,26 +69,19 @@ public class AccountPersistenceAdapter implements AccountRepository {
         e.setKisAppKey(crypto.encrypt(a.kisAppKey()));
         e.setKisSecretKey(crypto.encrypt(a.kisSecretKey()));
         e.setKisAccountType(a.kisAccountType());
-        e.setBroker(a.broker() != null ? a.broker() : Account.Broker.KIS); // null 방어 — service는 항상 KIS 전달하지만 persistence 경계에서 보장
+        e.setBroker(a.broker() != null ? a.broker() : Account.Broker.KIS); // null 방어 — persistence 경계에서 보장
         e.setCreatedAt(a.createdAt()); // null이면 @CreatedDate가 INSERT 시 자동 설정
         return e;
     }
 
-    // Entity → 복호화 후 Account 도메인 모델 변환 (strategy는 strategies 테이블에서 로드)
+    // Entity → 복호화 후 Account 도메인 모델 변환
     private Account toDomain(AccountEntity e) {
-        StrategyEntity s = strategyJpaRepository.findByAccountId(e.getId()).orElseThrow();
-        return buildDomain(e, s);
-    }
-
-    // 이미 로드된 StrategyEntity를 받아 Account 조합 — save()에서 이중 쿼리 방지
-    private Account buildDomain(AccountEntity e, StrategyEntity s) {
         return new Account(
                 e.getId(), e.getUserId(), e.getNickname(),
                 crypto.decrypt(e.getAccountNo()),
                 crypto.decrypt(e.getKisAppKey()),
                 crypto.decrypt(e.getKisSecretKey()),
-                e.getKisAccountType(), s.getType(), s.getStatus(),
-                s.getTicker(), s.getMultiple(),
+                e.getKisAccountType(),
                 e.getBroker(),
                 e.getCreatedAt(), e.getUpdatedAt()
         );

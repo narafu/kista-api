@@ -42,32 +42,32 @@ public class TradingService implements ExecuteTradingUseCase {
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
 
     @Override
-    public void execute(Account account, User user) throws InterruptedException {
-        execute(account, user, DstInfo.calculate());
+    public void execute(Strategy strategy, Account account, User user) throws InterruptedException {
+        execute(strategy, account, user, DstInfo.calculate());
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
-    void execute(Account account, User user, DstInfo dst) throws InterruptedException {
+    void execute(Strategy strategy, Account account, User user, DstInfo dst) throws InterruptedException {
         LocalDate today = LocalDate.now();
 
         // 1. 휴장 확인 (waitForOrderTime 전으로 이동: 휴장이면 대기 없이 즉시 return)
         if (!isMarketOpen(today, account)) return;
 
         // 2. 잔고 조회
-        AccountBalance balance = kisAccountPort.getBalance(account);
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), account.ticker().name(), balance.holdings(), balance.usdDeposit());
+        AccountBalance balance = kisAccountPort.getBalance(account, strategy.ticker());
+        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, balance);
+            notifyPort.notifyInsufficientBalance(account, balance, strategy.ticker());
             return;
         }
 
         // 3. 현재가 조회
-        BigDecimal price = kisPricePort.getPrice(account.ticker(), account);
+        BigDecimal price = kisPricePort.getPrice(strategy.ticker(), account);
         log.info("현재가: ${}", price);
 
         // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
-        InfinitePosition position = new InfinitePosition(balance, account.ticker(), price);
+        InfinitePosition position = new InfinitePosition(balance, strategy.ticker(), price, strategy.multiple());
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
                 account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
         savePlannedOrders(position, today, account);
@@ -89,7 +89,7 @@ public class TradingService implements ExecuteTradingUseCase {
         List<Order> corrections = applyCorrections(mainOrders, executions, today, account);
 
         // 10. 이력 저장 + 알림
-        saveAndNotify(balance, price, today, position, mainOrders, corrections, executions, user, account);
+        saveAndNotify(balance, price, today, position, mainOrders, corrections, executions, user, account, strategy.ticker());
     }
 
     // 전략 계산 결과를 orders에 PLANNED 상태로 저장
@@ -152,11 +152,11 @@ public class TradingService implements ExecuteTradingUseCase {
     private void saveAndNotify(AccountBalance balance, BigDecimal price, LocalDate today,
                                InfinitePosition position, List<Order> mainOrders,
                                List<Order> corrections, List<Execution> executions,
-                               User user, Account account) {
+                               User user, Account account, Strategy.Ticker ticker) {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
-        portfolioSnapshotPort.save(toSnapshot(balance, price, today, account));
+        portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, ticker));
         log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
         TradingReport report = buildReport(today, position, mainOrders, corrections, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
@@ -181,13 +181,13 @@ public class TradingService implements ExecuteTradingUseCase {
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price,
-                                          LocalDate today, Account account) {
+                                          LocalDate today, Account account, Strategy.Ticker ticker) {
         BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.holdings()))
                 .setScale(2, HALF_UP);
         BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
-                null, today, account.ticker(), balance.holdings(), balance.avgPrice(),
+                null, today, ticker, balance.holdings(), balance.avgPrice(),
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 

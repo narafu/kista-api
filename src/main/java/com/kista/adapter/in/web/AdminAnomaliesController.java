@@ -89,9 +89,7 @@ public class AdminAnomaliesController {
             UUID userId,
             String ownerNickname,
             String accountNoMasked,
-            String ticker,
-            String strategyType,
-            String strategyStatus
+            String broker
     ) {
         static AccountItem from(Account a, Map<UUID, User> userMap) {
             User user = a.userId() != null ? userMap.get(a.userId()) : null;
@@ -101,9 +99,7 @@ public class AdminAnomaliesController {
                     : "****";
             return new AccountItem(
                     a.id(), a.userId(), nickname, masked,
-                    a.ticker() != null ? a.ticker().name() : null,
-                    a.strategyType() != null ? a.strategyType().name() : null,
-                    a.strategyStatus() != null ? a.strategyStatus().name() : null);
+                    a.broker() != null ? a.broker().name() : null);
         }
     }
 }

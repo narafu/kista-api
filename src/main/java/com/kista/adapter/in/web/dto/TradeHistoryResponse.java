@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
