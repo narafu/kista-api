@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.user;
 
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
@@ -41,6 +42,10 @@ class UserEntity extends BaseAuditEntity {
     @Column(name = "last_reapplied_at")
     private Instant lastReappliedAt; // nullable — 쿨다운 기준 시각
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_channel", nullable = false, length = 20)
+    private NotificationChannel notificationChannel; // 알림 수단 (기본: TELEGRAM)
+
     protected UserEntity() {}
 
     static UserEntity fromModel(User user) {
@@ -55,11 +60,14 @@ class UserEntity extends BaseAuditEntity {
         e.telegramBotUsername = user.telegramBotUsername();
         e.createdAt = user.createdAt(); // null이면 @CreatedDate가 INSERT 시 자동 설정
         e.lastReappliedAt = user.lastReappliedAt();
+        e.notificationChannel = user.notificationChannel() != null
+                ? user.notificationChannel() : NotificationChannel.TELEGRAM;
         return e;
     }
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, createdAt, updatedAt, lastReappliedAt);
+                telegramBotToken, telegramChatId, telegramBotUsername, createdAt, updatedAt, lastReappliedAt,
+                notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
     }
 }

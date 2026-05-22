@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountRepository;
@@ -38,7 +39,7 @@ class AdminServiceTest {
     // (id, kakaoId, nickname, status, role, telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt)
     private User user(UUID id, User.UserStatus status) {
         return new User(id, "kakao-" + id, "테스트", status, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
     }
 
     @Test

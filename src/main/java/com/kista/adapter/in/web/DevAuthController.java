@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TokenResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
@@ -67,12 +68,13 @@ public class DevAuthController {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userRepository.findById(DEV_ADMIN_UUID).orElseGet(() ->
                 userRepository.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
-                        null, null, null, null, null, null)));
+                        null, null, null, null, null, null, NotificationChannel.TELEGRAM)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != User.UserRole.ADMIN) {
             admin = userRepository.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
                     User.UserStatus.ACTIVE, User.UserRole.ADMIN, admin.telegramBotToken(), admin.telegramChatId(),
-                    admin.telegramBotUsername(), admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt()));
+                    admin.telegramBotUsername(), admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt(),
+                    admin.notificationChannel() != null ? admin.notificationChannel() : NotificationChannel.TELEGRAM));
         }
         String token = jwtIssuerService.issue(admin.id(), User.UserRole.ADMIN); // ADMIN role ES256 서명
         return new TokenResponse(token, "bearer", 604800);

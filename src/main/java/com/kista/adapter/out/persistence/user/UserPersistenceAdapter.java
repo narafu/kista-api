@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.user;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.UserRepository;
 import lombok.AccessLevel;
@@ -53,7 +54,8 @@ public class UserPersistenceAdapter implements UserRepository {
         if (user.telegramBotToken() == null) return user;
         return new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 crypto.encrypt(user.telegramBotToken()), user.telegramChatId(), user.telegramBotUsername(),
-                user.createdAt(), user.updatedAt(), user.lastReappliedAt());
+                user.createdAt(), user.updatedAt(), user.lastReappliedAt(),
+                user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM);
     }
 
     // persistence 경계에서 telegramBotToken 복호화
@@ -62,6 +64,7 @@ public class UserPersistenceAdapter implements UserRepository {
         if (raw.telegramBotToken() == null) return raw;
         return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(), raw.role(),
                 crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername(),
-                raw.createdAt(), raw.updatedAt(), raw.lastReappliedAt());
+                raw.createdAt(), raw.updatedAt(), raw.lastReappliedAt(),
+                raw.notificationChannel() != null ? raw.notificationChannel() : NotificationChannel.TELEGRAM);
     }
 }

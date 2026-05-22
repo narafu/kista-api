@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
@@ -42,24 +43,24 @@ class UserServiceTest {
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(),
-                Instant.now().minus(25, ChronoUnit.HOURS));
+                Instant.now().minus(25, ChronoUnit.HOURS), NotificationChannel.TELEGRAM);
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
+                null, null, null, Instant.now(), Instant.now(), lastReappliedAt, NotificationChannel.TELEGRAM);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), lastReappliedAt);
+                null, null, null, Instant.now(), Instant.now(), lastReappliedAt, NotificationChannel.TELEGRAM);
     }
 
     @Test
@@ -160,7 +161,7 @@ class UserServiceTest {
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

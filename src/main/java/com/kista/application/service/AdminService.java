@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminDashboardUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
@@ -75,7 +76,8 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
                 user.telegramBotUsername(),
                 user.createdAt(),
                 null,
-                user.lastReappliedAt()
+                user.lastReappliedAt(),
+                user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
         );
         userRepository.save(updated);
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);

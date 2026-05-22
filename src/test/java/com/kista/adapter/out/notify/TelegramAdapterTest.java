@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,7 +136,7 @@ class TelegramAdapterTest {
     void notifyStrategyChanged_bodyContainsNicknameAccountAndAction() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
         Account acc = account(userId, "내SOXL계좌");
         TradingCycle tc = cycle(acc.id());
 
@@ -152,7 +153,7 @@ class TelegramAdapterTest {
     void notifyTradingReport_withUserBot_sendsToUserChatId() {
         UUID userId = UUID.randomUUID();
         User userWithBot = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                "user-bot-token", "user-chat-789", null, Instant.now(), Instant.now(), null);
+                "user-bot-token", "user-chat-789", null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
         Account acc = account(userId, "SOXL계좌");
         TradingSnapshot snapshot = new TradingSnapshot(10,
                 new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
@@ -175,7 +176,7 @@ class TelegramAdapterTest {
     void notifyTradingReport_noUserBot_skips() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
         Account acc = account(userId, "노봇계좌");
         TradingSnapshot snapshot = new TradingSnapshot(10,
                 new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));

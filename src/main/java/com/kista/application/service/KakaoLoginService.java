@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;
@@ -47,7 +48,8 @@ public class KakaoLoginService implements KakaoLoginUseCase {
             user = userRepository.save(new User(
                     user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                    user.createdAt(), user.updatedAt(), user.lastReappliedAt()
+                    user.createdAt(), user.updatedAt(), user.lastReappliedAt(),
+                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
             ));
         }
         return user;

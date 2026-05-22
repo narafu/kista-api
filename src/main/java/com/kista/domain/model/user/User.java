@@ -14,7 +14,8 @@ public record User(
         String telegramBotUsername,     // 텔레그램 봇 username (저장 시 getMe로 취득, 평문, null 가능)
         Instant createdAt,
         Instant updatedAt,
-        Instant lastReappliedAt         // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
+        Instant lastReappliedAt,        // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
+        NotificationChannel notificationChannel // 알림 수단 (기본: TELEGRAM)
 ) {
     public enum UserRole { USER, ADMIN }
 

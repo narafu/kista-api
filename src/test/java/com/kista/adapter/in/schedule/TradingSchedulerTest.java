@@ -2,6 +2,7 @@ package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.AccountRepository;
@@ -53,7 +54,7 @@ class TradingSchedulerTest {
 
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null);
+                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
     }
 
     @Test
