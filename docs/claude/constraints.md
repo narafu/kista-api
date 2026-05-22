@@ -1,5 +1,29 @@
 ## 핵심 제약 사항
 
+### Account ↔ Strategy 분리 (V35 이후)
+- `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — strategyType/strategyStatus/ticker/multiple 없음
+- `Strategy` record 필드 8개: `id, accountId, type(StrategyType), status(StrategyStatus), ticker(Ticker), multiple(BigDecimal), createdAt, updatedAt`
+- `StrategyType`, `StrategyStatus`, `Ticker` 모두 `Strategy` record의 nested enum
+- `MAX_STRATEGIES_PER_ACCOUNT = 1` (`StrategyService` 상수) — 운영 정책, 확장 시 상수만 변경
+- V35 마이그레이션: accounts/strategies/orders/trade_histories/portfolio_snapshots/kis_tokens TRUNCATE (기존 데이터 초기화)
+
+### 변경된 포트 시그니처 (V35 이후)
+- `ExecuteTradingUseCase.execute(Strategy strategy, Account account, User user)` — Strategy 파라미터 추가
+- `KisAccountPort.getBalance(Account account, Strategy.Ticker ticker)` — ticker 파라미터 추가
+- `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, Strategy.Ticker)` — ticker 파라미터 추가
+- `UserNotificationPort.notifyStrategyChanged(User, Account, Strategy, String action)` — Strategy 파라미터 추가
+- `InfinitePosition(AccountBalance, Strategy.Ticker, BigDecimal price, BigDecimal multiple)` — multiple 추가, `unitAmount = B ÷ 20 × multiple`
+
+### MetaController (enum SSOT)
+- `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
+- `/api/meta/strategy-types`, `/api/meta/tickers`, `/api/meta/brokers`, `/api/meta/strategy-statuses` — 개별 조회
+- `Strategy.StrategyType`/`StrategyStatus`, `Strategy.Ticker`, `Account.Broker` enum에 label/description 필드 추가 (DTO `from()` 팩토리)
+- UI는 이 엔드포인트로 라벨/available tickers/default값 수신 — enum 리터럴 UI 하드코딩 금지
+
+### 파일 인코딩 주의 (BOM)
+- 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
+- 일괄 제거: `grep -rl $'\xef\xbb\xbf' src --include="*.java" | while read f; do sed -i '1s/^\xef\xbb\xbf//' "$f"; done`
+
 ### 수량 변수명 규칙 (V26 전수 통일 완료)
 - **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `PortfolioSnapshot`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `TradeHistory`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
@@ -14,17 +38,17 @@
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
-### Ticker enum (단일 진실 공급원)
-- `Ticker` enum: `TQQQ("NASD", 0.15)`, `SOXL("AMS", 0.20)`, `USD("NASD", 0.20)` — `exchangeCode` + `targetProfitRate` 통합 관리
-- `Account.ticker: Ticker` — 기존 `symbol: String` + `exchangeCode: String` 두 필드 대체
-- `resolveExchangeCode()` 메서드 삭제됨 — `ticker.getExchangeCode()`로 대체
-- PRIVACY 전략: 항상 서버에서 `Ticker.SOXL` 강제 (클라이언트 입력 무시) — `register()` 참고
-- INFINITE 전략: 지정 없으면 기본 `Ticker.TQQQ`, exchangeCode는 Ticker가 자동 결정
-- DB: `strategies.ticker` 컬럼에 Ticker.name() 저장 (V22에서 accounts.symbol → strategies.ticker 이관), `exchange_code` 컬럼 V14 마이그레이션으로 제거됨
-- `AccountPersistenceAdapter`: `Ticker.valueOf(strategyEntity.getTicker())`으로 변환
-- `Ticker.tryParse(String)` — `Optional<Ticker>` 반환, KIS 응답 종목코드를 안전하게 enum 변환 (valueOf 실패 시 empty)
-- KIS 응답 모델(`Execution`, `PresentBalanceResult.Item`, `PeriodProfitResult.Item`, `DailyTransaction`, `ReservationOrder`) — `Ticker ticker` 전환 완료, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
-- **`symbolName: String`은 유지** — KIS `ovrs_item_name`(종목 표시명) / `prdt_name`(상품명)은 enum 후보 아님
+### Ticker enum (V35 이후: Strategy.Ticker nested enum)
+- **`Ticker`는 `Strategy.Ticker`로 이동** — `domain/model/strategy/Ticker.java` 삭제됨, 현재 `Strategy` record의 nested enum
+- import 경로: `import com.kista.domain.model.strategy.Strategy.Ticker;` (구 `com.kista.domain.model.strategy.Ticker` 아님)
+- `Strategy.Ticker` enum: `TQQQ("NASD", 0.15, label, desc)`, `SOXL("AMS", 0.20, ...)`, `USD("NASD", 0.20, ...)` — exchangeCode/targetProfitRate/label/description 필드 포함
+- `Strategy.Ticker.tryParse(String)` — `Optional<Strategy.Ticker>` 반환, KIS 응답 종목코드 안전 변환
+- PRIVACY 전략: 항상 서버에서 `Strategy.Ticker.SOXL` 강제 (`StrategyService.register/update`)
+- INFINITE 전략: 지정 없으면 기본 `Strategy.Ticker.TQQQ`
+- DB: `strategies.ticker` 컬럼에 `Ticker.name()` 저장, `StrategyPersistenceAdapter`에서 `Strategy.Ticker.valueOf(e.getTicker())`로 변환
+- KIS 응답 모델 — `Strategy.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
+- **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `Strategy.ticker()` 사용
+- **`symbolName: String`은 유지** — KIS `ovrs_item_name`/`prdt_name`은 enum 후보 아님
 
 ### Swagger 개발 도구
 - `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
