@@ -1,0 +1,133 @@
+package com.kista.adapter.in.web;
+
+import com.kista.adapter.in.web.dto.TradingCycleRequest;
+import com.kista.adapter.in.web.dto.TradingCycleResponse;
+import com.kista.domain.port.in.DeleteTradingCycleUseCase;
+import com.kista.domain.port.in.GetTradingCycleUseCase;
+import com.kista.domain.port.in.PauseTradingCycleUseCase;
+import com.kista.domain.port.in.RegisterTradingCycleUseCase;
+import com.kista.domain.port.in.ResumeTradingCycleUseCase;
+import com.kista.domain.port.in.UpdateTradingCycleUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+
+@Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
+@RestController
+@RequiredArgsConstructor
+public class TradingCycleController {
+
+    private final RegisterTradingCycleUseCase registerCycle;
+    private final UpdateTradingCycleUseCase updateCycle;
+    private final DeleteTradingCycleUseCase deleteCycle;
+    private final GetTradingCycleUseCase getCycle;
+    private final PauseTradingCycleUseCase pauseCycle;
+    private final ResumeTradingCycleUseCase resumeCycle;
+
+    // 계좌의 거래 사이클 목록 조회
+    @Operation(summary = "거래 사이클 목록 조회")
+    @GetMapping("/api/accounts/{accountId}/trading-cycles")
+    public List<TradingCycleResponse> list(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId) {
+        return getCycle.listByAccountId(accountId, userId).stream()
+                .map(TradingCycleResponse::from)
+                .toList();
+    }
+
+    // 거래 사이클 등록
+    @Operation(summary = "거래 사이클 등록")
+    @PostMapping("/api/accounts/{accountId}/trading-cycles")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TradingCycleResponse register(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody TradingCycleRequest request) {
+        try {
+            return TradingCycleResponse.from(
+                    registerCycle.register(userId, accountId, request.toRegisterCommand())
+            );
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    // 거래 사이클 수정 (ticker, multiple만 변경 가능)
+    @Operation(summary = "거래 사이클 수정")
+    @PutMapping("/api/trading-cycles/{id}")
+    public TradingCycleResponse update(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody TradingCycleRequest request) {
+        try {
+            return TradingCycleResponse.from(
+                    updateCycle.update(id, userId, request.toUpdateCommand())
+            );
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 거래 사이클 삭제
+    @Operation(summary = "거래 사이클 삭제")
+    @DeleteMapping("/api/trading-cycles/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            deleteCycle.delete(id, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 거래 사이클 중지 (ACTIVE → PAUSED)
+    @Operation(summary = "거래 사이클 중지")
+    @PatchMapping("/api/trading-cycles/{id}/pause")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void pause(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            pauseCycle.pause(id, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 거래 사이클 재개 (PAUSED → ACTIVE)
+    @Operation(summary = "거래 사이클 재개")
+    @PatchMapping("/api/trading-cycles/{id}/resume")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resume(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            resumeCycle.resume(id, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+}

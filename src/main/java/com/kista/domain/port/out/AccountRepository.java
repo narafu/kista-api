@@ -17,8 +17,6 @@ public interface AccountRepository {
                 () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
     }
     int countByUserId(UUID userId);
-    // ACTIVE 사용자의 ACTIVE 계좌 전체 조회 (스케줄러용)
-    List<Account> findAllActive();
     Account save(Account account);
     void delete(UUID id);
     long countAll(); // 전체 계좌 수 (대시보드 통계용)

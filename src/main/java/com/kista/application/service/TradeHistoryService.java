@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import com.kista.domain.port.out.TradeHistoryPort;

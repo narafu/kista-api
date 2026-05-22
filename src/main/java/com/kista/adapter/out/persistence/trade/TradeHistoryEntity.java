@@ -2,8 +2,12 @@ package com.kista.adapter.out.persistence.trade;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,12 +15,18 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "trade_histories")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 class TradeHistoryEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "UUID")
     private UUID id;
+
+    @Column(name = "account_id", nullable = false, columnDefinition = "UUID") // FK → accounts(id), V8 추가·V36에서 NOT NULL 강제
+    private UUID accountId;
 
     @Column(name = "trade_date", nullable = false)
     private LocalDate tradeDate;
@@ -49,42 +59,6 @@ class TradeHistoryEntity extends BaseCreatedAtEntity {
     @Column(nullable = false, length = 10)
     private Order.OrderStatus status;
 
-    @Column(name = "kis_order_id", length = 30)
-    private String kisOrderId;
-
-    @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
-    private UUID accountId;
-
-    protected TradeHistoryEntity() {}
-
-    TradeHistoryEntity(UUID id, LocalDate tradeDate, Ticker ticker, String strategy,
-                       Order.OrderType orderType, Order.OrderDirection direction,
-                       int quantity, BigDecimal price, BigDecimal amountUsd,
-                       Order.OrderStatus status, String kisOrderId, UUID accountId) {
-        this.id = id;
-        this.tradeDate = tradeDate;
-        this.ticker = ticker;
-        this.strategy = strategy;
-        this.orderType = orderType;
-        this.direction = direction;
-        this.quantity = quantity;
-        this.price = price;
-        this.amountUsd = amountUsd;
-        this.status = status;
-        this.kisOrderId = kisOrderId;
-        this.accountId = accountId;
-    }
-
-    UUID getId() { return id; }
-    LocalDate getTradeDate() { return tradeDate; }
-    Ticker getTicker() { return ticker; }
-    String getStrategy() { return strategy; }
-    Order.OrderType getOrderType() { return orderType; }
-    Order.OrderDirection getDirection() { return direction; }
-    int getQuantity() { return quantity; }
-    BigDecimal getPrice() { return price; }
-    BigDecimal getAmountUsd() { return amountUsd; }
-    Order.OrderStatus getStatus() { return status; }
-    String getKisOrderId() { return kisOrderId; }
-    UUID getAccountId() { return accountId; }
+    @Column(name = "order_id", length = 30) // 증권사 주문번호 (broker 무관)
+    private String orderId;
 }

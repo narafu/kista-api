@@ -1,11 +1,7 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.account.*;
-import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.order.*;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.kis.*;
-import com.kista.domain.model.admin.*;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -18,7 +14,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -119,6 +117,53 @@ class StatisticsControllerTest {
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
                         .param("from", "2024-01-01").param("to", "2024-12-31")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void prices_returns_200_with_ticker_price_list() throws Exception {
+        Map<Ticker, BigDecimal> priceMap = new LinkedHashMap<>();
+        priceMap.put(Ticker.TQQQ, new BigDecimal("120.50"));
+        priceMap.put(Ticker.SOXL, new BigDecimal("35.20"));
+        when(statisticsUseCase.getPrices(eq(ACCOUNT_ID), any(), any()))
+                .thenReturn(priceMap);
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
+                        .param("tickers", "TQQQ", "SOXL")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prices[0].ticker").value("TQQQ"))
+                .andExpect(jsonPath("$.prices[0].price").value(120.50))
+                .andExpect(jsonPath("$.prices[1].ticker").value("SOXL"))
+                .andExpect(jsonPath("$.prices[1].price").value(35.20));
+    }
+
+    @Test
+    void prices_returns_400_when_tickers_empty() throws Exception {
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void prices_returns_403_when_not_owner() throws Exception {
+        when(statisticsUseCase.getPrices(any(), any(), any()))
+                .thenThrow(new SecurityException("접근 불가"));
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
+                        .param("tickers", "TQQQ")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void prices_returns_503_on_kis_error() throws Exception {
+        when(statisticsUseCase.getPrices(any(), any(), any()))
+                .thenThrow(new RuntimeException("KIS API 오류"));
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
+                        .param("tickers", "TQQQ")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isServiceUnavailable());
     }

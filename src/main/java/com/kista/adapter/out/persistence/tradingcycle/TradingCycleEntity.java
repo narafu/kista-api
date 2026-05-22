@@ -1,6 +1,6 @@
-package com.kista.adapter.out.persistence.account;
+package com.kista.adapter.out.persistence.tradingcycle;
 
-import com.kista.domain.model.account.Account;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -8,14 +8,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "strategies")
+@Table(name = "trading_cycle")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-class StrategyEntity extends BaseAuditEntity {
+class TradingCycleEntity extends BaseAuditEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -27,12 +28,19 @@ class StrategyEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 20)
-    private Account.StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
+    private TradingCycle.Type type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
-    private String ticker; // 거래 종목 코드 (Ticker name, 예: SOXL)
+    private TradingCycle.Ticker ticker; // 거래 종목 코드
+
+    @Column(name = "multiple", nullable = false, precision = 4, scale = 1)
+    private BigDecimal multiple; // 배수 (기본값 1.0)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private Account.StrategyStatus status; // 실행 상태 (ACTIVE, PAUSED)
+    private TradingCycle.Status status; // 실행 상태 (ACTIVE, PAUSED)
+
+    @Column(name = "initial_usd_deposit", precision = 20, scale = 2)
+    private BigDecimal initialUsdDeposit; // 사이클 시작 시 초기 입금액 (메타 기록용, nullable)
 }

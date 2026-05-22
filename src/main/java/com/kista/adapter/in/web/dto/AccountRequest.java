@@ -1,39 +1,29 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.Ticker;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
-        @Schema(description = "KIS 계좌번호 8자리 (등록 시 필수, 수정 시 무시)", example = "74420614")
+        @Schema(description = "KIS 계좌번호 8자리 (등록 시 필수)", example = "74420614")
         String accountNo,
-        @Schema(description = "KIS API 앱 키", example = "PSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxE")
+        @Schema(description = "KIS API 앱 키", example = "PSxxxxxxxxxx")
         String kisAppKey,
-        @Schema(description = "KIS API 앱 시크릿", example = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-        String kisSecretKey,
-        @Schema(description = "KIS 계좌상품코드 (기본값 \"01\")", example = "01")
-        String kisAccountType,
-        @Schema(description = "매매 전략 (등록 시 필수)", example = "INFINITE")
-        @NotNull Account.StrategyType strategyType,
-        @Schema(description = "거래 종목 (선택, PRIVACY=SOXL 고정, INFINITE 기본=TQQQ)", example = "TQQQ")
-        Ticker ticker
+        @Schema(description = "KIS API 앱 시크릿")
+        String kisSecretKey
 ) {
     public RegisterAccountUseCase.Command toRegisterCommand() {
         return new RegisterAccountUseCase.Command(
-                nickname, accountNo, kisAppKey, kisSecretKey,
-                kisAccountType, strategyType, ticker
+                nickname, accountNo, kisAppKey, kisSecretKey, null
         );
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
         return new UpdateAccountUseCase.Command(
-                nickname, kisAppKey, kisSecretKey, ticker, strategyType
+                nickname, kisAppKey, kisSecretKey
         );
     }
 }

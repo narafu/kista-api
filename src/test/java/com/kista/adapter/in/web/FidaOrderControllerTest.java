@@ -5,9 +5,10 @@ import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
 import com.kista.domain.port.in.FidaOrderRequest;
+import com.kista.domain.port.out.PrivacyTradeSaveResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -52,7 +53,7 @@ class FidaOrderControllerTest {
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
-        given(executeFidaOrderUseCase.execute(any())).willReturn(masterId);
+        given(executeFidaOrderUseCase.execute(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
 
         mockMvc.perform(post("/api/internal/fida-orders")
                         .header("X-Internal-Token", VALID_TOKEN)

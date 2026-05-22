@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.PortfolioSnapshot;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
@@ -45,7 +45,7 @@ class DashboardControllerTest {
         TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", null, Instant.now());
+                Order.OrderStatus.PLACED, "KIS001", UUID.randomUUID(), Instant.now());
         when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(h));
 
         mockMvc.perform(get("/api/trades"))

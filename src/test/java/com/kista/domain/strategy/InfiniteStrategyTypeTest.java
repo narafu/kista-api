@@ -3,7 +3,7 @@ package com.kista.domain.strategy;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +35,7 @@ class InfiniteStrategyTypeTest {
         // LOC SELL: 10/4=2, LIMIT SELL: 10-2=8
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"),
                 new BigDecimal("1000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"), BigDecimal.ONE);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -54,7 +54,7 @@ class InfiniteStrategyTypeTest {
         // G=22×1.20=26.40, BUY①: floor(50/2/22)=1, BUY②: floor(50/2/26.40)=0
         AccountBalance balance = new AccountBalance(0, null,
                 new BigDecimal("1000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"), BigDecimal.ONE);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -68,7 +68,7 @@ class InfiniteStrategyTypeTest {
         // A=5, Q=200, D=50 → B=1050, K=52.50, T≈19.05 (후반), K(52.50)>D(50)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("50"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"), BigDecimal.ONE);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -82,7 +82,7 @@ class InfiniteStrategyTypeTest {
         // A=5, Q=200, D=100 → B=1100, K=55, T≈18.18 (후반), K(55)<=D(100)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("100"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"), BigDecimal.ONE);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -98,7 +98,7 @@ class InfiniteStrategyTypeTest {
         // B=2000, K=100, A=currentPrice=10, G=10×1.15=11.50
         // BUY①: floor(100/2/10)=5, BUY②: floor(100/2/11.50)=4 → 주문 있음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("10"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("10"), BigDecimal.ONE);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 

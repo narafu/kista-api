@@ -1,7 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class TradeHistoryServiceTest {
         TradeHistory h = new TradeHistory(UUID.randomUUID(), from, Ticker.SOXL, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", null, Instant.now());
+                Order.OrderStatus.PLACED, "KIS001", UUID.randomUUID(), Instant.now());
         when(tradeHistoryPort.findBy(from, to, Ticker.SOXL)).thenReturn(List.of(h));
 
         List<TradeHistory> result = sut.getHistory(from, to, Ticker.SOXL);

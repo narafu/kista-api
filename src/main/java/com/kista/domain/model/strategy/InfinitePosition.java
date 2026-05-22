@@ -1,5 +1,7 @@
 package com.kista.domain.model.strategy;
 
+import com.kista.domain.model.tradingcycle.TradingCycle;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -8,8 +10,9 @@ import static java.math.RoundingMode.HALF_UP;
 
 public record InfinitePosition(
         AccountBalance balance,
-        Ticker ticker,
-        BigDecimal currentPrice
+        TradingCycle.Ticker ticker,    // 거래 종목
+        BigDecimal currentPrice,
+        BigDecimal multiple        // 배수 (기본값 1.0)
 ) {
     private static final int TOTAL_ROUNDS = 20;
 
@@ -38,7 +41,11 @@ public record InfinitePosition(
     }
 
     public BigDecimal unitAmount() {
-        return totalAssets().divide(BigDecimal.valueOf(TOTAL_ROUNDS), 2, HALF_UP);
+        // B ÷ 20 × multiple
+        return totalAssets()
+                .divide(BigDecimal.valueOf(TOTAL_ROUNDS), 2, HALF_UP)
+                .multiply(multiple)
+                .setScale(2, HALF_UP);
     }
 
     public double currentRound() {

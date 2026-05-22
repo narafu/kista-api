@@ -31,6 +31,15 @@
 - `TelegramAdapterTest`는 `new TradingSnapshot(quantity, averagePrice, priceOffsetRate, targetPrice)` 직접 생성 3곳 — 필드 변경 시 3곳 수정
 - `AccountBalance` 생성자 직접 사용: `InfiniteStrategyTypeTest`, `TelegramAdapterTest`, `TradingServiceTest` — 필드 변경 시 3개 모두 수정
 
+### 통합 테스트에서 타 패키지 FK 삽입 패턴
+- `AccountJpaRepository`·`UserJpaRepository`는 package-private → `trade` 등 다른 패키지의 `@SpringBootTest`에서 직접 주입 불가
+- FK 제약이 필요한 선행 행은 `@Autowired JdbcTemplate`으로 직접 SQL 삽입 후 `@Transactional` 롤백 활용:
+  ```java
+  jdbcTemplate.update("INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())", userId, "kakao_" + userId, "ACTIVE", "USER");
+  jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())", accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
+  ```
+- `TradeHistoryPersistenceAdapterTest` 패턴 참고
+
 ### 테스트 DB
 
 통합 테스트는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).

@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.domain.model.order.PortfolioSnapshot;
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

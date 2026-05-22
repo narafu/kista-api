@@ -1,6 +1,6 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 
 import java.time.LocalDate;

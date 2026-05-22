@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.domain.model.strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.AccessLevel;
@@ -39,9 +39,9 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
 
     private TradeHistoryEntity toEntity(TradeHistory h) {
         return new TradeHistoryEntity(
-                h.id(), h.tradeDate(), h.ticker(), h.strategy(),
-                h.orderType(), h.direction(), h.quantity(), h.price(),
-                h.amountUsd(), h.status(), h.kisOrderId(), h.accountId()
+                h.id(), h.accountId(), h.tradeDate(), h.ticker(), h.strategy(),
+                h.orderType(), h.direction(), h.price(), h.quantity(),
+                h.amountUsd(), h.status(), h.orderId()
         );
     }
 
@@ -49,7 +49,7 @@ public class TradeHistoryPersistenceAdapter implements TradeHistoryPort {
         return new TradeHistory(
                 e.getId(), e.getTradeDate(), e.getTicker(), e.getStrategy(),
                 e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
-                e.getAmountUsd(), e.getStatus(), e.getKisOrderId(),
+                e.getAmountUsd(), e.getStatus(), e.getOrderId(),
                 e.getAccountId(), e.getCreatedAt()
         );
     }
