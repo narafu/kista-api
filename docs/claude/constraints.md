@@ -80,8 +80,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V32__drop_updated_at_from_privacy_tables.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거, V32: privacy_trades_master/detail에서 updated_at 컬럼 제거)
+- 현재 최신: `V34__nullable_avg_price_in_privacy_trades_master.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거, V32: privacy_trades_master/detail에서 updated_at 컬럼 제거, V33: strategies.multiple 컬럼 추가, V34: privacy_trades_master.avg_price NOT NULL 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
+- **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입·컬럼 존재만 확인, `NOT NULL` 등 제약 불일치는 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)

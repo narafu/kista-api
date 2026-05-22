@@ -61,6 +61,7 @@ domain      →  외부 의존 없음
 |--------|--------|
 | 환경변수 추가/제거 | `application.yml` + `.env.example` + `docker-compose.yml` 동시 반영 |
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
+| JPA Entity 컬럼 변경 (`nullable`, `length`, 타입 등) | Flyway 마이그레이션과 반드시 크로스체크 — Entity의 `nullable = false` 여부와 DB 제약이 불일치하면 런타임까지 오류 미발생, 실제 null 삽입 시 `DataIntegrityViolationException` 발생 (v34 avg_price 사례) |
 | strategies 테이블 변경 | `StrategyEntity` + `StrategyJpaRepository` + `AccountPersistenceAdapter` + `AccountPersistenceAdapterTest`(`strategyEntity()` 헬퍼에 새 필드 세팅 필수 — 누락 시 `buildDomain()` NPE) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
