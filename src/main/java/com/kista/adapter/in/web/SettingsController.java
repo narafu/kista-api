@@ -68,11 +68,15 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateNotificationChannel(@AuthenticationPrincipal UUID userId,
                                            @RequestBody Map<String, String> body) {
+        String raw = body.get("channel");
+        if (raw == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "channel 필드가 필요합니다.");
+        }
         try {
-            NotificationChannel channel = NotificationChannel.valueOf(body.get("channel").toUpperCase());
+            NotificationChannel channel = NotificationChannel.valueOf(raw.toUpperCase());
             updateNotificationChannel.updateNotificationChannel(userId, channel);
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유효하지 않은 채널: " + body.get("channel"));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유효하지 않은 채널: " + raw);
         }
     }
 }
