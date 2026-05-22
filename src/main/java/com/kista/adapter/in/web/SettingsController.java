@@ -1,7 +1,9 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.port.in.GetUserUseCase;
+import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,6 +25,7 @@ public class SettingsController {
 
     private final UpdateUserTelegramUseCase updateUserTelegram;
     private final GetUserUseCase getUser;
+    private final UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경
 
     // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
     @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
@@ -56,5 +59,20 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeTelegram(@AuthenticationPrincipal UUID userId) {
         updateUserTelegram.removeTelegram(userId);
+    }
+
+    // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택)
+    @Operation(summary = "알림 채널 변경", description = "TELEGRAM / FCM / ALL 중 선택. body: {\"channel\": \"FCM\"}")
+    @ApiResponse(responseCode = "204", description = "변경 성공")
+    @PatchMapping("/notification-channel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateNotificationChannel(@AuthenticationPrincipal UUID userId,
+                                           @RequestBody Map<String, String> body) {
+        try {
+            NotificationChannel channel = NotificationChannel.valueOf(body.get("channel").toUpperCase());
+            updateNotificationChannel.updateNotificationChannel(userId, channel);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유효하지 않은 채널: " + body.get("channel"));
+        }
     }
 }

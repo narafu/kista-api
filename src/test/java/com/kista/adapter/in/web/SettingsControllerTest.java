@@ -1,7 +1,9 @@
 package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.port.in.GetUserUseCase;
+import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -18,11 +20,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,6 +39,7 @@ class SettingsControllerTest {
     @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockBean UpdateUserTelegramUseCase updateUserTelegram;
     @MockBean GetUserUseCase getUser;
+    @MockBean UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경 UseCase
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -74,5 +79,26 @@ class SettingsControllerTest {
                         .content(objectMapper.writeValueAsString(body))
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateNotificationChannel_fcm_returns204() throws Exception {
+        mockMvc.perform(patch("/api/settings/notification-channel")
+                        .with(csrf())
+                        .with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"channel\":\"FCM\"}"))
+                .andExpect(status().isNoContent());
+        verify(updateNotificationChannel).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
+    }
+
+    @Test
+    void updateNotificationChannel_invalidValue_returns400() throws Exception {
+        mockMvc.perform(patch("/api/settings/notification-channel")
+                        .with(csrf())
+                        .with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"channel\":\"INVALID\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

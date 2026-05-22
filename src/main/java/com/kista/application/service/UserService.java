@@ -8,6 +8,7 @@ import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
+import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
@@ -28,7 +29,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase {
+public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
 
     private final UserRepository userRepository;
     private final UserNotificationPort notificationPort;
@@ -153,6 +154,15 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         findOrThrow(userId); // 존재 확인 — 없으면 NoSuchElementException
         userRepository.delete(userId);
         log.info("사용자 탈퇴: userId={}", userId);
+    }
+
+    @Override
+    public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
+        User user = findOrThrow(userId);
+        userRepository.save(new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
+                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
+                user.createdAt(), null, user.lastReappliedAt(), channel));
+        log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
     }
 
     private User withStatus(User user, User.UserStatus newStatus) {
