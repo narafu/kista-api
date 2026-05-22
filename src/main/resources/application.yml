@@ -88,6 +88,9 @@ internal:
   api:
     token: ${INTERNAL_API_TOKEN:}
 
+firebase:
+  service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+
 logging:
   level:
     root: INFO
