@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -40,8 +40,8 @@ class MetaControllerTest {
 
     @Test
     void getBundle_authenticated_returns200WithAllSections() throws Exception {
-        int strategyTypeCount = Strategy.StrategyType.values().length;
-        int tickerCount = Strategy.Ticker.values().length;
+        int strategyTypeCount = TradingCycle.Type.values().length;
+        int tickerCount = TradingCycle.Ticker.values().length;
 
         mockMvc.perform(get("/api/meta")
                         .with(authentication(mockAuth())))

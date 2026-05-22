@@ -3,7 +3,7 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.account.*;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.admin.*;

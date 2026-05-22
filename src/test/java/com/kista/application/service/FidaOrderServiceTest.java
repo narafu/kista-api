@@ -1,6 +1,6 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.FidaOrderRequest;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.PrivacyTradeSaveResult;

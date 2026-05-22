@@ -64,6 +64,15 @@
 - `KisAccountAdapter.fetchMargin()`: KisMarginPort 주입 경유 (직접 TTTC2101R 호출 아님) — USD 행 필터는 `currency()` 필드 기준
 - `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` / `foreignBalance()` — KIS API 필드명(`crcy_cd` 등) 아님
 
+### 복수종목 현재가 API (HHDFS76410000, KisPriceAdapter)
+- TR ID: `HHDFS76410000`
+- PATH: `/uapi/overseas-price/v1/quotations/inquire-asking-multprice`
+- 파라미터: `AUTH=""`, `EXCD1/SYMB1` ~ `EXCD10/SYMB10` (빈 슬롯은 `""` 채움, 최대 10개)
+- EXCD 변환: `ticker.getExchangeCode()` 기반 — `NASD`→`NAS`, `AMS`→`AMS`
+- 응답: `output1.last` ~ `output10.last` (빈 슬롯은 null 또는 `""` → skip)
+- 포트: `KisPricePort.getPrices(List<Ticker>, Account) → Map<Ticker, BigDecimal>`
+- 주의: PATH/응답 키는 첫 로컬 통합 테스트 시 실제 응답 로그로 재확인 권장
+
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
 - `KisHttpClient` mock 시 `buildHeaders(anyString(), any(Account.class))` 스텁 필요 (V2: Account 파라미터)

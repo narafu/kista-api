@@ -1,0 +1,40 @@
+package com.kista.adapter.out.persistence.tradingcycle;
+
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "trading_cycle_history")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+class TradingCycleHistoryEntity extends BaseCreatedAtEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "UUID")
+    private UUID id;
+
+    @Column(name = "trading_cycle_id", nullable = false, columnDefinition = "UUID")
+    private UUID tradingCycleId; // FK → trading_cycle.id (UUID 간접 참조, ON DELETE CASCADE)
+
+    @Column(name = "trade_date", nullable = false)
+    private LocalDate tradeDate; // 매매 일자
+
+    @Column(name = "usd_deposit", nullable = false, precision = 20, scale = 2)
+    private BigDecimal usdDeposit; // 통합주문가능금액
+
+    @Column(name = "avg_price", nullable = false, precision = 20, scale = 4)
+    private BigDecimal avgPrice; // 평균 매입 단가
+
+    @Column(name = "holdings", nullable = false, precision = 20, scale = 4)
+    private BigDecimal holdings; // 보유 수량
+}

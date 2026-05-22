@@ -1,13 +1,13 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.StrategyRequest;
-import com.kista.adapter.in.web.dto.StrategyResponse;
-import com.kista.domain.port.in.DeleteStrategyUseCase;
-import com.kista.domain.port.in.GetStrategyUseCase;
-import com.kista.domain.port.in.PauseStrategyUseCase;
-import com.kista.domain.port.in.RegisterStrategyUseCase;
-import com.kista.domain.port.in.ResumeStrategyUseCase;
-import com.kista.domain.port.in.UpdateStrategyUseCase;
+import com.kista.adapter.in.web.dto.TradingCycleRequest;
+import com.kista.adapter.in.web.dto.TradingCycleResponse;
+import com.kista.domain.port.in.DeleteTradingCycleUseCase;
+import com.kista.domain.port.in.GetTradingCycleUseCase;
+import com.kista.domain.port.in.PauseTradingCycleUseCase;
+import com.kista.domain.port.in.RegisterTradingCycleUseCase;
+import com.kista.domain.port.in.ResumeTradingCycleUseCase;
+import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,40 +21,40 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-@Tag(name = "전략", description = "계좌별 매매 전략 등록·조회·수정·삭제·중지·재개")
+@Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
 @RestController
 @RequiredArgsConstructor
-public class StrategyController {
+public class TradingCycleController {
 
-    private final RegisterStrategyUseCase registerStrategy;
-    private final UpdateStrategyUseCase updateStrategy;
-    private final DeleteStrategyUseCase deleteStrategy;
-    private final GetStrategyUseCase getStrategy;
-    private final PauseStrategyUseCase pauseStrategy;
-    private final ResumeStrategyUseCase resumeStrategy;
+    private final RegisterTradingCycleUseCase registerCycle;
+    private final UpdateTradingCycleUseCase updateCycle;
+    private final DeleteTradingCycleUseCase deleteCycle;
+    private final GetTradingCycleUseCase getCycle;
+    private final PauseTradingCycleUseCase pauseCycle;
+    private final ResumeTradingCycleUseCase resumeCycle;
 
-    // 계좌의 전략 목록 조회
-    @Operation(summary = "전략 목록 조회")
-    @GetMapping("/api/accounts/{accountId}/strategies")
-    public List<StrategyResponse> list(
+    // 계좌의 거래 사이클 목록 조회
+    @Operation(summary = "거래 사이클 목록 조회")
+    @GetMapping("/api/accounts/{accountId}/trading-cycles")
+    public List<TradingCycleResponse> list(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return getStrategy.listByAccountId(accountId, userId).stream()
-                .map(StrategyResponse::from)
+        return getCycle.listByAccountId(accountId, userId).stream()
+                .map(TradingCycleResponse::from)
                 .toList();
     }
 
-    // 전략 등록
-    @Operation(summary = "전략 등록")
-    @PostMapping("/api/accounts/{accountId}/strategies")
+    // 거래 사이클 등록
+    @Operation(summary = "거래 사이클 등록")
+    @PostMapping("/api/accounts/{accountId}/trading-cycles")
     @ResponseStatus(HttpStatus.CREATED)
-    public StrategyResponse register(
+    public TradingCycleResponse register(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
-            @Valid @RequestBody StrategyRequest request) {
+            @Valid @RequestBody TradingCycleRequest request) {
         try {
-            return StrategyResponse.from(
-                    registerStrategy.register(userId, accountId, request.toRegisterCommand())
+            return TradingCycleResponse.from(
+                    registerCycle.register(userId, accountId, request.toRegisterCommand())
             );
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
@@ -65,16 +65,16 @@ public class StrategyController {
         }
     }
 
-    // 전략 수정 (ticker, multiple만 변경 가능)
-    @Operation(summary = "전략 수정")
-    @PutMapping("/api/strategies/{id}")
-    public StrategyResponse update(
+    // 거래 사이클 수정 (ticker, multiple만 변경 가능)
+    @Operation(summary = "거래 사이클 수정")
+    @PutMapping("/api/trading-cycles/{id}")
+    public TradingCycleResponse update(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
-            @RequestBody StrategyRequest request) {
+            @RequestBody TradingCycleRequest request) {
         try {
-            return StrategyResponse.from(
-                    updateStrategy.update(id, userId, request.toUpdateCommand())
+            return TradingCycleResponse.from(
+                    updateCycle.update(id, userId, request.toUpdateCommand())
             );
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
@@ -83,15 +83,15 @@ public class StrategyController {
         }
     }
 
-    // 전략 삭제
-    @Operation(summary = "전략 삭제")
-    @DeleteMapping("/api/strategies/{id}")
+    // 거래 사이클 삭제
+    @Operation(summary = "거래 사이클 삭제")
+    @DeleteMapping("/api/trading-cycles/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         try {
-            deleteStrategy.delete(id, userId);
+            deleteCycle.delete(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -99,15 +99,15 @@ public class StrategyController {
         }
     }
 
-    // 전략 중지 (ACTIVE → PAUSED)
-    @Operation(summary = "전략 중지")
-    @PatchMapping("/api/strategies/{id}/pause")
+    // 거래 사이클 중지 (ACTIVE → PAUSED)
+    @Operation(summary = "거래 사이클 중지")
+    @PatchMapping("/api/trading-cycles/{id}/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void pause(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         try {
-            pauseStrategy.pause(id, userId);
+            pauseCycle.pause(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
@@ -115,15 +115,15 @@ public class StrategyController {
         }
     }
 
-    // 전략 재개 (PAUSED → ACTIVE)
-    @Operation(summary = "전략 재개")
-    @PatchMapping("/api/strategies/{id}/resume")
+    // 거래 사이클 재개 (PAUSED → ACTIVE)
+    @Operation(summary = "거래 사이클 재개")
+    @PatchMapping("/api/trading-cycles/{id}/resume")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resume(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         try {
-            resumeStrategy.resume(id, userId);
+            resumeCycle.resume(id, userId);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {

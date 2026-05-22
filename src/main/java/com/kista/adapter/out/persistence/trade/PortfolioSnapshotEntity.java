@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;

@@ -1,4 +1,4 @@
-package com.kista.domain.model.strategy;
+package com.kista.domain.model.tradingcycle;
 
 import com.kista.domain.model.account.Account;
 import lombok.Getter;
@@ -11,19 +11,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public record Strategy(
-        UUID id,                  // PK
-        UUID accountId,           // FK → accounts.id
-        StrategyType type,        // 매매 전략 종류
-        StrategyStatus status,    // 전략 실행 상태
-        Ticker ticker,            // 거래 종목 (exchangeCode 포함)
-        BigDecimal multiple,      // 배수 (기본값 1.0)
+public record TradingCycle(
+        UUID id,                        // PK
+        UUID accountId,                 // FK → accounts.id
+        Type type,                      // 매매 전략 종류
+        Status status,                  // 전략 실행 상태
+        Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
+        BigDecimal multiple,            // 배수 (기본값 1.0)
+        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (메타 기록용)
         Instant createdAt,
         Instant updatedAt
 ) {
     @Getter
     @RequiredArgsConstructor
-    public enum StrategyType {
+    public enum Type {
         INFINITE(                                                // TQQQ/SOXL/USD 모두 지원
             EnumSet.of(Ticker.TQQQ, Ticker.SOXL, Ticker.USD),
             "무한매수",
@@ -53,7 +54,7 @@ public record Strategy(
 
     @Getter
     @RequiredArgsConstructor
-    public enum StrategyStatus {
+    public enum Status {
         ACTIVE("활성"),  // 매매 스케줄링 실행 중
         PAUSED("중지");  // 매매 중지 (스케줄링 제외)
 
@@ -83,7 +84,7 @@ public record Strategy(
     // 소속 계좌 소유권 불일치 시 SecurityException → 컨트롤러 403
     public void verifyOwnedBy(Account account) {
         if (!accountId.equals(account.id())) {
-            throw new SecurityException("전략에 대한 접근 권한이 없습니다");
+            throw new SecurityException("거래 사이클에 대한 접근 권한이 없습니다");
         }
     }
 

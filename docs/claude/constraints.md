@@ -1,23 +1,27 @@
 ## 핵심 제약 사항
 
-### Account ↔ Strategy 분리 (V35 이후)
-- `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — strategyType/strategyStatus/ticker/multiple 없음
-- `Strategy` record 필드 8개: `id, accountId, type(StrategyType), status(StrategyStatus), ticker(Ticker), multiple(BigDecimal), createdAt, updatedAt`
-- `StrategyType`, `StrategyStatus`, `Ticker` 모두 `Strategy` record의 nested enum
-- `MAX_STRATEGIES_PER_ACCOUNT = 1` (`StrategyService` 상수) — 운영 정책, 확장 시 상수만 변경
+### Account ↔ TradingCycle 분리 (V38 이후)
+- `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
+- `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), multiple, initialUsdDeposit, createdAt, updatedAt`
+- `Type`, `Status`, `Ticker` 모두 `TradingCycle` record의 nested enum — 구 `Strategy.StrategyType/StrategyStatus/Ticker` 대체
+- `MAX_CYCLES_PER_ACCOUNT = 1` (`TradingCycleService` 상수) — 운영 정책, 확장 시 상수만 변경
+- `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
 - V35 마이그레이션: accounts/strategies/orders/trade_histories/portfolio_snapshots/kis_tokens TRUNCATE (기존 데이터 초기화)
+- V38 마이그레이션: `strategies` → `trading_cycle` 테이블 리네임 + `initial_usd_deposit` 컬럼 추가
+- V39 마이그레이션: `trading_cycle_history` 테이블 신설 — `UNIQUE(trading_cycle_id, trade_date)`, `ON DELETE CASCADE`
 
-### 변경된 포트 시그니처 (V35 이후)
-- `ExecuteTradingUseCase.execute(Strategy strategy, Account account, User user)` — Strategy 파라미터 추가
-- `KisAccountPort.getBalance(Account account, Strategy.Ticker ticker)` — ticker 파라미터 추가
-- `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, Strategy.Ticker)` — ticker 파라미터 추가
-- `UserNotificationPort.notifyStrategyChanged(User, Account, Strategy, String action)` — Strategy 파라미터 추가
-- `InfinitePosition(AccountBalance, Strategy.Ticker, BigDecimal price, BigDecimal multiple)` — multiple 추가, `unitAmount = B ÷ 20 × multiple`
+### 변경된 포트 시그니처 (V38 이후)
+- `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
+- `KisAccountPort.getBalance(Account account, TradingCycle.Ticker ticker)` — TradingCycle.Ticker
+- `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
+- `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
+- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price, BigDecimal multiple)` — TradingCycle.Ticker
+- `TradingCycleHistoryRepository` 신설 — `save(TradingCycleHistory)`, `findByCycleIdAndDate`, `findRecentByCycleId`
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
 - `/api/meta/strategy-types`, `/api/meta/tickers`, `/api/meta/brokers`, `/api/meta/strategy-statuses` — 개별 조회
-- `Strategy.StrategyType`/`StrategyStatus`, `Strategy.Ticker`, `Account.Broker` enum에 label/description 필드 추가 (DTO `from()` 팩토리)
+- `TradingCycle.Type`/`TradingCycle.Status`, `TradingCycle.Ticker`, `Account.Broker` enum에 label/description 필드 포함 (DTO `from()` 팩토리)
 - UI는 이 엔드포인트로 라벨/available tickers/default값 수신 — enum 리터럴 UI 하드코딩 금지
 
 ### 파일 인코딩 주의 (BOM)
@@ -38,16 +42,16 @@
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
-### Ticker enum (V35 이후: Strategy.Ticker nested enum)
-- **`Ticker`는 `Strategy.Ticker`로 이동** — `domain/model/strategy/Ticker.java` 삭제됨, 현재 `Strategy` record의 nested enum
-- import 경로: `import com.kista.domain.model.strategy.Strategy.Ticker;` (구 `com.kista.domain.model.strategy.Ticker` 아님)
-- `Strategy.Ticker` enum: `TQQQ("NASD", 0.15, label, desc)`, `SOXL("AMS", 0.20, ...)`, `USD("NASD", 0.20, ...)` — exchangeCode/targetProfitRate/label/description 필드 포함
-- `Strategy.Ticker.tryParse(String)` — `Optional<Strategy.Ticker>` 반환, KIS 응답 종목코드 안전 변환
-- PRIVACY 전략: 항상 서버에서 `Strategy.Ticker.SOXL` 강제 (`StrategyService.register/update`)
-- INFINITE 전략: 지정 없으면 기본 `Strategy.Ticker.TQQQ`
-- DB: `strategies.ticker` 컬럼에 `Ticker.name()` 저장, `StrategyPersistenceAdapter`에서 `Strategy.Ticker.valueOf(e.getTicker())`로 변환
-- KIS 응답 모델 — `Strategy.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
-- **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `Strategy.ticker()` 사용
+### Ticker enum (V38 이후: TradingCycle.Ticker nested enum)
+- **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
+- **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
+- `TradingCycle.Ticker` enum: `TQQQ("NASD", 0.15, label, desc)`, `SOXL("AMS", 0.20, ...)`, `USD("NASD", 0.20, ...)` — exchangeCode/targetProfitRate/label/description 필드 포함
+- `TradingCycle.Ticker.tryParse(String)` — `Optional<TradingCycle.Ticker>` 반환, KIS 응답 종목코드 안전 변환
+- PRIVACY 전략: 항상 서버에서 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycleService.register/update`)
+- INFINITE 전략: 지정 없으면 기본 `TradingCycle.Ticker.TQQQ`
+- DB: `trading_cycle.ticker` 컬럼에 `Ticker.name()` 저장, `TradingCyclePersistenceAdapter`에서 `TradingCycle.Ticker.valueOf(e.getTicker())`로 변환
+- KIS 응답 모델 — `TradingCycle.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
+- **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `tradingCycle.ticker()` 사용
 - **`symbolName: String`은 유지** — KIS `ovrs_item_name`/`prdt_name`은 enum 후보 아님
 
 ### Swagger 개발 도구
@@ -66,8 +70,8 @@
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
-- TradingScheduler cron: `0 0 4 * * TUE-SAT` (화~토 04:00 KST) — V2 멀티계좌 스케줄 (변경 금지)
-- 멀티계좌 순차 실행: `AccountRepository.findAllActive()` → 계좌별 `execute(Account, User)` — 한 계좌 실패 시 다음 계좌 계속 (격리)
+- TradingScheduler cron: `0 0 4 * * TUE-SAT` (화~토 04:00 KST) — 변경 금지
+- 사이클 단위 순차 실행: `TradingCycleRepository.findAllActive()` → 사이클별 `execute(TradingCycle, Account, User)` — 한 사이클 실패 시 다음 계속 (격리)
 
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
@@ -104,10 +108,10 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V34__nullable_avg_price_in_privacy_trades_master.sql` (V27: accounts.broker 컬럼, V28: planned_orders→orders rename·PENDING→PLANNED/EXECUTED→PLACED, V29: orders/kis_tokens에 updated_at 추가, V30: privacy_trades_master에 current_cycle_realized_pnl 추가, V31: privacy_trades_detail.quantity NOT NULL 제거, V32: privacy_trades_master/detail에서 updated_at 컬럼 제거, V33: strategies.multiple 컬럼 추가, V34: privacy_trades_master.avg_price NOT NULL 제거)
+- 현재 최신: `V39__create_trading_cycle_history.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입·컬럼 존재만 확인, `NOT NULL` 등 제약 불일치는 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
-- PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (V22 패턴 참고)
+- PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME` — V22/V36 패턴 참고)
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
@@ -207,11 +211,12 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
 
-### strategies 테이블 분리 (V11)
-- `accounts.strategy`/`strategy_status` → `strategies` 테이블로 분리 (account:strategy = 1:N 대비 설계)
-- `AccountPersistenceAdapter.save()`: `account.id()==null` → `StrategyEntity` 신규 생성, `!=null` → 기존 로드 후 type/status 업데이트
-- `save()` 내 `buildDomain(AccountEntity, StrategyEntity)` 헬퍼로 이중 `findByAccountId` 쿼리 방지 — `toDomain()`은 조회 경로(`findById` 등) 전용
-- `findAllActive()`: native SQL, `JOIN strategies s ON s.account_id = a.id WHERE ... AND s.status = 'ACTIVE'`, `SELECT DISTINCT` (향후 1:N 중복 방지)
+### trading_cycle 테이블 (V11→V38 이력)
+- V11: `accounts.strategy`/`strategy_status` → `strategies` 테이블로 분리 (account:cycle = 1:N 대비 설계)
+- V38: `strategies` → `trading_cycle`으로 리네임 + `initial_usd_deposit` 컬럼 추가
+- `TradingCyclePersistenceAdapter`: `toDomain`/`toEntity` 매핑, `initialUsdDeposit` 포함
+- `findAllActive()`: native SQL, `JOIN trading_cycle tc ON tc.account_id = a.id WHERE ... AND tc.status = 'ACTIVE'`
+- `trading_cycle_history` (V39): 사이클별 일별 스냅샷 — `TradingService.execute()` 종료 시 1건 append. `DataIntegrityViolationException` catch+log.warn으로 같은 날 중복 실행 무시
 
 ### reapply 쿨다운 정책
 - PENDING 사용자: 1시간마다 재신청 가능 (누락 대비 알림 재발송, 무한 요청 방지)

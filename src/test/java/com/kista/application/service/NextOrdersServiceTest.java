@@ -2,13 +2,14 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisPricePort;
-import com.kista.domain.port.out.StrategyRepository;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.strategy.TradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ import static org.mockito.Mockito.when;
 class NextOrdersServiceTest {
 
     @Mock AccountRepository accountRepository;
-    @Mock StrategyRepository strategyRepository;
+    @Mock TradingCycleRepository cycleRepository;
     @Mock KisAccountPort kisAccountPort;
     @Mock KisPricePort kisPricePort;
     @Mock TradingStrategy tradingStrategy;
@@ -43,7 +44,7 @@ class NextOrdersServiceTest {
     static final UUID ACCOUNT_ID = UUID.randomUUID();
     static final UUID USER_ID = UUID.randomUUID();
     static final UUID OTHER_USER_ID = UUID.randomUUID();
-    static final UUID STRATEGY_ID = UUID.randomUUID();
+    static final UUID CYCLE_ID = UUID.randomUUID();
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
     // Account 10개 필드 생성자
@@ -53,11 +54,10 @@ class NextOrdersServiceTest {
             Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
-    // Strategy record
-    static final Strategy STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.StrategyType.INFINITE,
-            Strategy.StrategyStatus.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
-            Instant.now(), Instant.now()
+    static final TradingCycle CYCLE = new TradingCycle(
+            CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
+            TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+            null, Instant.now(), Instant.now()
     );
 
     static final AccountBalance NORMAL_BALANCE = new AccountBalance(
@@ -68,8 +68,7 @@ class NextOrdersServiceTest {
 
     @BeforeEach
     void setUp() {
-        // NextOrdersService(accountRepository, strategyRepository, kisAccountPort, kisPricePort, tradingStrategy)
-        service = new NextOrdersService(accountRepository, strategyRepository, kisAccountPort, kisPricePort, tradingStrategy);
+        service = new NextOrdersService(accountRepository, cycleRepository, kisAccountPort, kisPricePort, tradingStrategy);
     }
 
     @Test
@@ -78,7 +77,7 @@ class NextOrdersServiceTest {
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
-        when(strategyRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(cycleRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(CYCLE));
         // getBalance(account, ticker) - 2개 파라미터
         when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(NORMAL_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
@@ -115,7 +114,7 @@ class NextOrdersServiceTest {
     @Test
     void preview_calls_buildOrders_even_when_balance_should_skip() {
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ACCOUNT);
-        when(strategyRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(cycleRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(CYCLE));
         when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(LOW_BALANCE);
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))

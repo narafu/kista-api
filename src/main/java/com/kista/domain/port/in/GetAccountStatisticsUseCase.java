@@ -6,9 +6,12 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.kis.ReservationOrder;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface GetAccountStatisticsUseCase {
@@ -24,4 +27,7 @@ public interface GetAccountStatisticsUseCase {
 
     // 예약주문 목록 조회
     List<ReservationOrder> getReservationOrders(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+
+    // 복수 종목 현재가 조회 (KIS HHDFS76410000)
+    Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
 }

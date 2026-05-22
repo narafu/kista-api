@@ -1,5 +1,5 @@
 package com.kista.domain.model.order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -17,7 +17,7 @@ public record TradeHistory(
         BigDecimal price,
         BigDecimal amountUsd,
         Order.OrderStatus status,
-        String kisOrderId,
-        UUID accountId,  // FK → accounts(id), V8에서 추가 (nullable)
+        String orderId,
+        UUID accountId,  // FK → accounts(id), V8 추가·V36에서 NOT NULL 강제
         Instant createdAt
 ) {}

@@ -5,7 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

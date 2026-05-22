@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

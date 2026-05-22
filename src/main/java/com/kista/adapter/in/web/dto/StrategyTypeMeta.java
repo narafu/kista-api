@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -13,7 +13,7 @@ public record StrategyTypeMeta(
         String defaultTicker,          // 기본 선택 티커 name()
         BigDecimal defaultMultiple     // 기본 배수
 ) {
-    public static StrategyTypeMeta from(Strategy.StrategyType t) {
+    public static StrategyTypeMeta from(TradingCycle.Type t) {
         return new StrategyTypeMeta(
                 t.name(), t.getLabel(), t.getDescription(),
                 t.getAvailableTickers().stream()

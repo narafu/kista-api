@@ -1,12 +1,12 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.StrategyRepository;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,14 +29,14 @@ class TradingSchedulerTest {
 
     @Mock ExecuteTradingUseCase useCase;
     @Mock AccountRepository accountRepository;
-    @Mock StrategyRepository strategyRepository;
+    @Mock TradingCycleRepository cycleRepository;
     @Mock UserRepository userRepository;
     @Mock NotifyPort notifyPort;
     @InjectMocks TradingScheduler scheduler;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
-    private static final UUID STRATEGY_ID = UUID.randomUUID();
+    private static final UUID CYCLE_ID = UUID.randomUUID();
 
     // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 없음)
     private Account mockAccount() {
@@ -45,11 +45,10 @@ class TradingSchedulerTest {
                 Account.Broker.KIS, Instant.now(), Instant.now());
     }
 
-    // Strategy record
-    private Strategy mockStrategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.StrategyType.INFINITE,
-                Strategy.StrategyStatus.ACTIVE, Strategy.Ticker.SOXL, BigDecimal.ONE,
-                Instant.now(), Instant.now());
+    private TradingCycle mockCycle() {
+        return new TradingCycle(CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
     }
 
     private User mockUser() {
@@ -60,20 +59,20 @@ class TradingSchedulerTest {
     @Test
     void run_callsExecuteForEachActiveStrategy() throws InterruptedException {
         Account account = mockAccount();
-        Strategy strategy = mockStrategy();
+        TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         scheduler.run();
 
-        verify(useCase).execute(strategy, account, user);
+        verify(useCase).execute(cycle, account, user);
     }
 
     @Test
     void run_noActiveStrategies_doesNotCallExecute() throws InterruptedException {
-        when(strategyRepository.findAllActive()).thenReturn(List.of());
+        when(cycleRepository.findAllActive()).thenReturn(List.of());
 
         scheduler.run();
 
@@ -83,9 +82,9 @@ class TradingSchedulerTest {
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
         Account account = mockAccount();
-        Strategy strategy = mockStrategy();
+        TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         doThrow(new InterruptedException("interrupted")).when(useCase).execute(any(), any(), any());
@@ -97,30 +96,30 @@ class TradingSchedulerTest {
     }
 
     @Test
-    void run_unexpectedException_continuesNextStrategy() throws InterruptedException {
+    void run_unexpectedException_continuesNextCycle() throws InterruptedException {
         Account account = mockAccount();
-        Strategy strategy1 = mockStrategy();
-        Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT_ID,
-                Strategy.StrategyType.INFINITE, Strategy.StrategyStatus.ACTIVE,
-                Strategy.Ticker.SOXL, BigDecimal.ONE, Instant.now(), Instant.now());
+        TradingCycle cycle1 = mockCycle();
+        TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT_ID,
+                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE,
+                TradingCycle.Ticker.SOXL, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
         User user = mockUser();
-        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy1, strategy2));
+        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle1, cycle2));
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        doThrow(new RuntimeException("api error")).when(useCase).execute(eq(strategy1), any(), any());
+        doThrow(new RuntimeException("api error")).when(useCase).execute(eq(cycle1), any(), any());
 
         scheduler.run();
 
-        // strategy1 실패해도 strategy2 실행 확인
-        verify(useCase).execute(eq(strategy2), any(), any());
+        verify(useCase).execute(eq(cycle2), any(), any());
     }
 
     @Test
     void run_unexpectedException_notifiesAdminViaNotifyPort() throws InterruptedException {
         Account account = mockAccount();
-        Strategy strategy = mockStrategy();
+        TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(strategyRepository.findAllActive()).thenReturn(List.of(strategy));
+        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");

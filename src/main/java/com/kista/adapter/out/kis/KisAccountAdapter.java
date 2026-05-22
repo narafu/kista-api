@@ -3,7 +3,7 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisMarginPort;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ public class KisAccountAdapter implements KisAccountPort {
     private final KisMarginPort kisMarginPort;
 
     @Override
-    public AccountBalance getBalance(Account account, Strategy.Ticker ticker) {
+    public AccountBalance getBalance(Account account, TradingCycle.Ticker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
         BigDecimal usdDeposit = fetchMargin(account);
 
@@ -36,7 +36,7 @@ public class KisAccountAdapter implements KisAccountPort {
         return new AccountBalance(holding.quantity(), avgPrice, usdDeposit);
     }
 
-    private HoldingResult fetchHolding(Account account, Strategy.Ticker ticker) {
+    private HoldingResult fetchHolding(Account account, TradingCycle.Ticker ticker) {
         HttpHeaders headers = kisHttpClient.buildHeaders(BALANCE_TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());

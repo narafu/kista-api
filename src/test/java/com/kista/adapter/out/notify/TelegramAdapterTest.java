@@ -2,7 +2,7 @@ package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
 import com.kista.domain.model.user.User;
@@ -49,11 +49,10 @@ class TelegramAdapterTest {
                 Account.Broker.KIS, Instant.now(), Instant.now());
     }
 
-    // Strategy record
-    private Strategy strategy(UUID accountId) {
-        return new Strategy(UUID.randomUUID(), accountId, Strategy.StrategyType.INFINITE,
-                Strategy.StrategyStatus.ACTIVE, Strategy.Ticker.SOXL, BigDecimal.ONE,
-                Instant.now(), Instant.now());
+    private TradingCycle cycle(UUID accountId) {
+        return new TradingCycle(UUID.randomUUID(), accountId, TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
     }
 
     @Test
@@ -84,8 +83,7 @@ class TelegramAdapterTest {
 
         Account acc = account(UUID.randomUUID(), "테스트");
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        // notifyInsufficientBalance(Account, AccountBalance, Strategy.Ticker) - 3 params
-        adapter.notifyInsufficientBalance(acc, balance, Strategy.Ticker.SOXL);
+        adapter.notifyInsufficientBalance(acc, balance, TradingCycle.Ticker.SOXL);
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         String text = bodyCaptor.getValue().get("text");
@@ -139,11 +137,10 @@ class TelegramAdapterTest {
         User user = new User(userId, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null);
         Account acc = account(userId, "내SOXL계좌");
-        Strategy str = strategy(acc.id());
+        TradingCycle tc = cycle(acc.id());
 
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        // notifyStrategyChanged(User, Account, Strategy, String) - 4 params
-        adapter.notifyStrategyChanged(user, acc, str, "중지");
+        adapter.notifyStrategyChanged(user, acc, tc, "중지");
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         String text = bodyCaptor.getValue().get("text");

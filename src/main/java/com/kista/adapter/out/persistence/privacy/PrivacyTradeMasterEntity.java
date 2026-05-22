@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.privacy;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

@@ -3,8 +3,8 @@ package com.kista.adapter.out.notify;
 import com.kista.application.service.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -48,7 +48,7 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(Account account, AccountBalance b, Strategy.Ticker ticker) {
+    public void notifyInsufficientBalance(Account account, AccountBalance b, TradingCycle.Ticker ticker) {
         send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
                 ticker.name(), b.holdings(), b.usdDeposit()));
     }
@@ -96,10 +96,10 @@ public class TelegramAdapter implements NotifyPort, UserNotificationPort {
     }
 
     @Override
-    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
+    public void notifyStrategyChanged(User user, Account account, TradingCycle cycle, String action) {
         String text = String.format("사용자 %s이 계좌 %s의 %s(%s) 전략을 %s했습니다",
                 user.nickname(), account.nickname(),
-                strategy.type().name(), strategy.ticker().name(), action);
+                cycle.type().name(), cycle.ticker().name(), action);
         send(text); // 관리자 봇으로 전송
     }
 

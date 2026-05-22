@@ -7,20 +7,24 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.kis.ReservationOrder;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
+import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -35,6 +39,7 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     private final KisMarginPort kisMarginPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
     private final KisReservationOrderPort kisReservationOrderPort;
+    private final KisPricePort kisPricePort;
 
     @Override
     public PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId,
@@ -81,6 +86,13 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         return kisReservationOrderPort.getReservationOrders(from, to, account);
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        return kisPricePort.getPrices(tickers, account);
     }
 
 }

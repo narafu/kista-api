@@ -1,13 +1,13 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.out.AccountRepository;
-import com.kista.domain.port.out.StrategyRepository;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
     private final TradeHistoryPort tradeHistoryPort;
     private final AccountRepository accountRepository;
-    private final StrategyRepository strategyRepository;
+    private final TradingCycleRepository cycleRepository;
 
     @Override
     public AdminAnomalies getAnomalies() {
@@ -38,20 +38,20 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
         List<Account> allAccounts = accountRepository.findAll();
 
-        // PAUSED 전략이 있는 계좌
+        // PAUSED 사이클이 있는 계좌
         List<Account> pausedAccounts = allAccounts.stream()
-                .filter(a -> strategyRepository.findByAccountId(a.id()).stream()
-                        .anyMatch(s -> s.status() == Strategy.StrategyStatus.PAUSED))
+                .filter(a -> cycleRepository.findByAccountId(a.id()).stream()
+                        .anyMatch(c -> c.status() == TradingCycle.Status.PAUSED))
                 .toList();
 
         // 최근 7일 거래 있는 accountId 집합
         Set<UUID> activeAccountIds = tradeHistoryPort.findAll(today.minusDays(7), today)
                 .stream().map(TradeHistory::accountId).collect(Collectors.toSet());
 
-        // ACTIVE 전략이 있지만 7일 내 거래 없는 계좌
+        // ACTIVE 사이클이 있지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
-                .filter(a -> strategyRepository.findByAccountId(a.id()).stream()
-                        .anyMatch(s -> s.status() == Strategy.StrategyStatus.ACTIVE))
+                .filter(a -> cycleRepository.findByAccountId(a.id()).stream()
+                        .anyMatch(c -> c.status() == TradingCycle.Status.ACTIVE))
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();
 

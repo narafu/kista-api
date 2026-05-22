@@ -2,7 +2,8 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
@@ -40,6 +41,7 @@ class TradingServiceTest {
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
+    @Mock TradingCycleHistoryRepository cycleHistoryRepository;
 
     TradingService service;
 
@@ -65,11 +67,11 @@ class TradingServiceTest {
             Account.Broker.KIS, Instant.now(), Instant.now()
     );
 
-    // Strategy record - Account↔Strategy 분리 후 별도 엔티티
-    static final Strategy STRATEGY = new Strategy(
-            UUID.randomUUID(), ACCOUNT.id(), Strategy.StrategyType.INFINITE,
-            Strategy.StrategyStatus.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
-            Instant.now(), Instant.now()
+    // TradingCycle record
+    static final TradingCycle CYCLE = new TradingCycle(
+            UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
+            TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+            null, Instant.now(), Instant.now()
     );
 
     static final User USER = new User(
@@ -84,7 +86,7 @@ class TradingServiceTest {
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
-                orderPort, realtimeNotificationPort);
+                orderPort, realtimeNotificationPort, cycleHistoryRepository);
     }
 
     @Test
@@ -109,7 +111,7 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
 
-        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+        service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
         verify(kisAccountPort).getBalance(ACCOUNT, Ticker.SOXL);
@@ -149,7 +151,7 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
 
-        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+        service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(tradeHistoryPort, times(2)).save(any(TradeHistory.class));
     }
@@ -158,7 +160,7 @@ class TradingServiceTest {
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
 
-        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+        service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
         verify(kisAccountPort, never()).getBalance(any(), any());
@@ -172,7 +174,7 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(LOW_BALANCE);
 
-        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+        service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyInsufficientBalance(ACCOUNT, LOW_BALANCE, Ticker.SOXL);
         verify(kisPricePort, never()).getPrice(any(), any());

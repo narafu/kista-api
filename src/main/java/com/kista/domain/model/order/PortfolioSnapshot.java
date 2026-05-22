@@ -1,5 +1,5 @@
 package com.kista.domain.model.order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
 import java.time.Instant;

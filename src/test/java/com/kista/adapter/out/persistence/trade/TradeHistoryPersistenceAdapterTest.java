@@ -1,17 +1,20 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.TradeHistory;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,12 +26,30 @@ class TradeHistoryPersistenceAdapterTest {
     @Autowired
     private TradeHistoryPersistenceAdapter adapter;
 
-    private TradeHistory history(LocalDate date, Ticker ticker, String kisOrderId) {
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private UUID accountId;
+
+    @BeforeEach
+    void setUp() {
+        UUID userId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+        // account_id FK 제약을 위해 users → accounts 순으로 삽입 (트랜잭션 롤백으로 정리)
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                userId, "test_kakao_" + userId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "74420614", "appKey", "appSecret", "01", "KIS");
+    }
+
+    private TradeHistory history(LocalDate date, Ticker ticker, String orderId) {
         return new TradeHistory(
                 null, date, ticker, "SOXL_DIVISION",
                 Order.OrderType.LOC, Order.OrderDirection.BUY,
                 5, new BigDecimal("20.0000"), new BigDecimal("100.00"),
-                Order.OrderStatus.PLACED, kisOrderId, null, null
+                Order.OrderStatus.PLACED, orderId, accountId, null
         );
     }
 
@@ -52,7 +73,7 @@ class TradeHistoryPersistenceAdapterTest {
         assertThat(saved.price()).isEqualByComparingTo("20.0000");
         assertThat(saved.amountUsd()).isEqualByComparingTo("100.00");
         assertThat(saved.status()).isEqualTo(Order.OrderStatus.PLACED);
-        assertThat(saved.kisOrderId()).isEqualTo("ORD-001");
+        assertThat(saved.orderId()).isEqualTo("ORD-001");
     }
 
     @Test
@@ -70,13 +91,13 @@ class TradeHistoryPersistenceAdapterTest {
     }
 
     @Test
-    void save_allows_null_kisOrderId() {
+    void save_allows_null_orderId() {
         LocalDate today = LocalDate.of(2024, 6, 15);
         adapter.save(history(today, Ticker.SOXL, null));
 
         List<TradeHistory> result = adapter.findBy(today, today, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).kisOrderId()).isNull();
+        assertThat(result.get(0).orderId()).isNull();
     }
 }

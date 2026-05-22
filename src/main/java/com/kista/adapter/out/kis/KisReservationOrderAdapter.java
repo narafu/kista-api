@@ -6,7 +6,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.kis.ReservationOrder;
 import com.kista.domain.model.order.ReservationOrderCommand;
 import com.kista.domain.model.kis.ReservationOrderReceipt;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
