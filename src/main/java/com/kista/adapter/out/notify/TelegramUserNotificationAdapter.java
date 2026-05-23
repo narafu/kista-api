@@ -1,6 +1,6 @@
 package com.kista.adapter.out.notify;
 
-import com.kista.application.service.NewUserRegisteredEvent;
+import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.tradingcycle.TradingCycle;

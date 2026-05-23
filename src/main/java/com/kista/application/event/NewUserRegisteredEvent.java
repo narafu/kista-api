@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.event;
 
 import com.kista.domain.model.user.User;
 
