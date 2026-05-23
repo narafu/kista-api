@@ -29,8 +29,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     @Override
     public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
-        // KIS 키 유효성 검증 — 실패 시 InvalidKisKeyException 전파
-        kisTokenPort.testToken(cmd.kisAppKey(), cmd.kisSecretKey());
         if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
