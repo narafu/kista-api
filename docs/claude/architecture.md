@@ -97,6 +97,7 @@ domain      →  외부 의존 없음
 | 새 admin 엔드포인트 추가 (`AdminXxxController`) | `AdminXxxService` + `AdminXxxUseCase`(domain/port/in) + `AdminXxxControllerTest`(`@MockBean` 필수: JwtDecoder + 사용하는 모든 UseCase) |
 | `OrderController`에 엔드포인트 추가 | `GetNextOrdersUseCase` + `PlaceReservationOrderUseCase` **둘 다** `@MockBean` 필수 (`OrderControllerTest`) |
 | KIS 응답 도메인 모델(`Execution`/`PresentBalanceResult.Item`/`PeriodProfitResult.Item`/`DailyTransaction`/`ReservationOrder`) 필드 변경 | 해당 KIS 어댑터(`flatMap+tryParse` 매핑) + 어댑터 단위 테스트 fixture + `kista-ui/types/trade.ts` |
+| `User` 도메인 레코드에 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + **`UserResponse.from()` 반환값** + `kista-ui/types/user.ts` — `UserResponse` 누락 시 프론트엔드 API 응답에서 해당 필드 미포함 |
 | `privacy_trades_master` 스키마 변경 | `PrivacyTradeMasterEntity` + `PrivacyTradeDetailEntity`(cascade 영향) + V번호 마이그레이션 |
 | `privacy_trades_detail` 스키마 변경 | `PrivacyTradeDetailEntity` + V번호 마이그레이션 |
 | 수량 관련 Domain record 필드 추가 | 해당 JPA Entity + Flyway 마이그레이션 + KIS 어댑터 매핑부 + DTO `from()` + kista-ui `types/` 동시 수정 |
