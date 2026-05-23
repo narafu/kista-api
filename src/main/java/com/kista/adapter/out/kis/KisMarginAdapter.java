@@ -12,7 +12,6 @@ import org.springframework.util.MultiValueMap;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -20,8 +19,7 @@ public class KisMarginAdapter implements KisMarginPort {
 
     private static final String PATH = "/uapi/overseas-stock/v1/trading/foreign-margin";
     private static final String TR_ID = "TTTC2101R"; // 해외증거금 통화별조회
-    // USD·KRW 두 통화만 반환
-    private static final Set<String> TARGET_CURRENCIES = Set.of("USD", "KRW");
+    private static final String TARGET_NATION = "미국";
 
     private final KisHttpClient kisHttpClient;
 
@@ -39,22 +37,21 @@ public class KisMarginAdapter implements KisMarginPort {
             return Collections.emptyList();
         }
 
-        // crcy_cd 기준으로 USD·KRW 행만 필터링
+        // natn_name == "미국" 행만 필터링 — crcy_cd 기준 시 동일 itgr_ord_psbl_amt 중복 행 발생
         return response.output().stream()
-                .filter(o -> TARGET_CURRENCIES.contains(o.crcyCd()))
+                .filter(o -> TARGET_NATION.equals(o.natnName()))
                 .map(o -> new MarginItem(
                         o.crcyCd(),
-                        KisResponseParser.parseBd(o.itgrOrdPsblAmt()),
-                        KisResponseParser.parseBd(o.frcrDnclAmt2())
+                        KisResponseParser.parseBd(o.itgrOrdPsblAmt())
                 ))
                 .toList();
     }
 
     record MarginResponse(@JsonProperty("output") List<Output> output) {
         record Output(
-                @JsonProperty("crcy_cd") String crcyCd,                   // 통화코드 (USD, KRW 등)
-                @JsonProperty("itgr_ord_psbl_amt") String itgrOrdPsblAmt, // 통합주문가능금액
-                @JsonProperty("frcr_dncl_amt_2") String frcrDnclAmt2      // 외화잔고
+                @JsonProperty("natn_name") String natnName,               // 국가명 (미국, 일본 등)
+                @JsonProperty("crcy_cd") String crcyCd,                   // 통화코드 (USD 등)
+                @JsonProperty("itgr_ord_psbl_amt") String itgrOrdPsblAmt  // 통합주문가능금액
         ) {}
     }
 }

@@ -17,6 +17,8 @@
 - `TTTS3012R` (해외주식 잔고): `CANO`, `ACNT_PRDT_CD`, `OVRS_EXCG_CD=NASD`(실전 미국전체), `TR_CRCY_CD=USD`, `CTX_AREA_FK200=""`, `CTX_AREA_NK200=""`
 - `TTTC2101R` (해외증거금 통화별조회): `CANO`, `ACNT_PRDT_CD` — 응답 `output` 목록에서 `natn_name=="미국"` 행의 `itgr_ord_psbl_amt`를 `usdDeposit`으로 사용
   - `frcr_dncl_amt_2`(환전된 외화만) 대신 `itgr_ord_psbl_amt`(통합주문가능금액) 사용 — 원화 자동 환전 포함
+  - **필터 기준: `natn_name == "미국"` 단일 행** — `crcy_cd == "USD"`로 필터하면 동일 `itgr_ord_psbl_amt` 값을 가진 중복 행이 여러 개 반환됨
+  - `MarginItem` 도메인 모델: `currency`, `integratedOrderableAmount` 2개 필드만 — `frcr_dncl_amt_2`(foreignBalance) 불필요, 제거됨
 - API 파라미터 불확실 시 `kis-coding-mcp`의 `search_overseas_stock_api` + `read_source_code`로 공식 확인
 
 ### 주문 API (KisOrderAdapter)
