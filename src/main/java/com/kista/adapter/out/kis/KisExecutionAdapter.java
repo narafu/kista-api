@@ -29,19 +29,19 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Account account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());
         params.add("ACNT_PRDT_CD", account.kisAccountType());
-        params.add("PDNO", "%");                       // 전종목
+        params.add("PDNO", ticker.name());              // 전략 종목만 조회
         params.add("ORD_STRT_DT", from.format(FMT));
         params.add("ORD_END_DT", to.format(FMT));
-        params.add("SLL_BUY_DVSN", "00");             // 전체
-        params.add("CCLD_NCCS_DVSN", "00");           // 전체
-        params.add("OVRS_EXCG_CD", "NASD");           // 미국 전체
-        params.add("SORT_SQN", "DS");                 // 정순
+        params.add("SLL_BUY_DVSN", "00");              // 전체
+        params.add("CCLD_NCCS_DVSN", "00");            // 전체
+        params.add("OVRS_EXCG_CD", ticker.exchangeCode()); // 전략 종목 거래소
+        params.add("SORT_SQN", "DS");                  // 정순
         params.add("ORD_DT", "");
         params.add("ORD_GNO_BRNO", "");
         params.add("ODNO", "");
@@ -54,18 +54,16 @@ public class KisExecutionAdapter implements KisExecutionPort {
             return Collections.emptyList();
         }
         return response.output().stream()
-                .flatMap(item -> Ticker.tryParse(item.pdno())
-                        .map(ticker -> new Execution(
-                                KisResponseParser.parseDate(item.ordDt(), from),
-                                ticker,
-                                KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
-                                KisResponseParser.parseIntSafe(item.filledQuantity()),
-                                KisResponseParser.parseBd(item.ftCcldUnpr3()),
-                                KisResponseParser.parseBd(item.ccldAmt()),
-                                item.odno()
-                        ))
-                        .stream()
-                )
+                .filter(item -> ticker.name().equals(item.pdno()))
+                .map(item -> new Execution(
+                        KisResponseParser.parseDate(item.ordDt(), from),
+                        ticker,
+                        KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
+                        KisResponseParser.parseIntSafe(item.filledQuantity()),
+                        KisResponseParser.parseBd(item.ftCcldUnpr3()),
+                        KisResponseParser.parseBd(item.ccldAmt()),
+                        item.odno()
+                ))
                 .toList();
     }
 

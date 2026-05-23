@@ -73,6 +73,8 @@ public record TradingCycle(
         private final String label;                // 표시 이름
         private final String description;          // 종목 설명
 
+        public String exchangeCode() { return exchangeCode; }
+
         // KIS 응답 String → Ticker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
         public static Optional<Ticker> tryParse(String name) {
             if (name == null) return Optional.empty();

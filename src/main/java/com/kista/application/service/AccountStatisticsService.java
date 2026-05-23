@@ -17,12 +17,14 @@ import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.KisReservationOrderPort;
+import com.kista.domain.port.out.TradingCycleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +35,7 @@ import java.util.UUID;
 public class AccountStatisticsService implements GetAccountStatisticsUseCase {
 
     private final AccountRepository accountRepository;
+    private final TradingCycleRepository tradingCycleRepository;
     private final KisProfitPort kisProfitPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;
@@ -55,7 +58,14 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
                                       LocalDate from, LocalDate to) {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-        return kisExecutionPort.getExecutions(from, to, account);
+        Ticker ticker = tradingCycleRepository.findByAccountId(accountId).stream()
+                .filter(c -> c.status() == com.kista.domain.model.tradingcycle.TradingCycle.Status.ACTIVE)
+                .findFirst()
+                .or(() -> tradingCycleRepository.findByAccountId(accountId).stream().findFirst())
+                .map(com.kista.domain.model.tradingcycle.TradingCycle::ticker)
+                .orElse(null);
+        if (ticker == null) return Collections.emptyList();
+        return kisExecutionPort.getExecutions(from, to, ticker, account);
     }
 
     @Override
