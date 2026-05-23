@@ -55,7 +55,7 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
                                       LocalDate from, LocalDate to) {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-        return kisExecutionPort.getExecutions(from, account);
+        return kisExecutionPort.getExecutions(from, to, account);
     }
 
     @Override

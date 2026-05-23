@@ -7,5 +7,5 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface KisExecutionPort {
-    List<Execution> getExecutions(LocalDate date, Account account);
+    List<Execution> getExecutions(LocalDate from, LocalDate to, Account account);
 }

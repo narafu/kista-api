@@ -87,7 +87,7 @@ public class TradingService implements ExecuteTradingUseCase {
         waitForPostClose(dst);
 
         // 8. 체결 내역 조회
-        List<Execution> executions = kisExecutionPort.getExecutions(today, account);
+        List<Execution> executions = kisExecutionPort.getExecutions(today, today, account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 9. 보정 주문

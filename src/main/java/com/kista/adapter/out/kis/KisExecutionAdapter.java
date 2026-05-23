@@ -29,20 +29,19 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private final KisHttpClient kisHttpClient;
 
     @Override
-    public List<Execution> getExecutions(LocalDate date, Account account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
-        String dateStr = date.format(FMT);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());
         params.add("ACNT_PRDT_CD", account.kisAccountType());
-        params.add("PDNO", "%");              // 전종목
-        params.add("ORD_STRT_DT", dateStr);
-        params.add("ORD_END_DT", dateStr);
-        params.add("SLL_BUY_DVSN", "00");    // 전체
-        params.add("CCLD_NCCS_DVSN", "00");  // 전체
-        params.add("OVRS_EXCG_CD", "NASD");  // 미국 전체
-        params.add("SORT_SQN", "DS");        // 정순
+        params.add("PDNO", "%");                       // 전종목
+        params.add("ORD_STRT_DT", from.format(FMT));
+        params.add("ORD_END_DT", to.format(FMT));
+        params.add("SLL_BUY_DVSN", "00");             // 전체
+        params.add("CCLD_NCCS_DVSN", "00");           // 전체
+        params.add("OVRS_EXCG_CD", "NASD");           // 미국 전체
+        params.add("SORT_SQN", "DS");                 // 정순
         params.add("ORD_DT", "");
         params.add("ORD_GNO_BRNO", "");
         params.add("ODNO", "");
@@ -57,7 +56,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
         return response.output().stream()
                 .flatMap(item -> Ticker.tryParse(item.pdno())
                         .map(ticker -> new Execution(
-                                date,
+                                KisResponseParser.parseDate(item.ordDt(), from),
                                 ticker,
                                 KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
                                 KisResponseParser.parseIntSafe(item.filledQuantity()),
@@ -73,11 +72,12 @@ public class KisExecutionAdapter implements KisExecutionPort {
     record ExecutionListResponse(@JsonProperty("output") List<OutputItem> output) {
         record OutputItem(
                 @JsonProperty("pdno") String pdno,                     // 종목코드
+                @JsonProperty("ord_dt") String ordDt,                  // 주문일자 (YYYYMMDD)
                 @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd, // 매도매수구분: 01=매도, 02=매수
-                @JsonProperty("ft_ccld_qty") String filledQuantity,     // FT체결수량
-                @JsonProperty("ft_ccld_unpr3") String ftCcldUnpr3,     // FT체결단가
-                @JsonProperty("ft_ccld_amt3") String ccldAmt,          // FT체결금액
-                @JsonProperty("odno") String odno                       // 주문번호
+                @JsonProperty("ft_ccld_qty") String filledQuantity,    // FT체결수량
+                @JsonProperty("ft_ccld_unpr3") String ftCcldUnpr3,    // FT체결단가
+                @JsonProperty("ft_ccld_amt3") String ccldAmt,         // FT체결금액
+                @JsonProperty("odno") String odno                      // 주문번호
         ) {}
     }
 }

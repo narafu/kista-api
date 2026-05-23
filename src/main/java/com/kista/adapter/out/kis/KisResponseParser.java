@@ -3,6 +3,9 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.order.Order;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 // KIS API 응답 문자열 파싱 공용 헬퍼 — 패키지 내부 전용
 final class KisResponseParser {
@@ -24,5 +27,12 @@ final class KisResponseParser {
     // sll_buy_dvsn_cd: 01=매도, 02=매수
     static Order.OrderDirection parseDirection(String sllBuyDvsnCd) {
         return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
+    }
+
+    // KIS YYYYMMDD 문자열 → LocalDate, 파싱 실패 시 fallback 반환
+    static LocalDate parseDate(String yyyymmdd, LocalDate fallback) {
+        if (yyyymmdd == null || yyyymmdd.isBlank()) return fallback;
+        try { return LocalDate.parse(yyyymmdd.trim(), DateTimeFormatter.BASIC_ISO_DATE); }
+        catch (DateTimeParseException e) { return fallback; }
     }
 }
