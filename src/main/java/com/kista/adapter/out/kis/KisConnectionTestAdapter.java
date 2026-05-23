@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.kista.domain.port.out.KisConnectionTestPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +20,8 @@ import java.util.Map;
 public class KisConnectionTestAdapter implements KisConnectionTestPort {
 
     private final RestTemplate kisRestTemplate;  // kisRestTemplate 빈명 일치 필수
-    private final KisProperties kisProperties;   // KIS 기본 설정 (baseUrl 등)
+    @Value("${kis.base-url}")
+    private final String kisBaseUrl;
 
     @Override
     public boolean test(String appKey, String appSecret) {
@@ -33,7 +35,7 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
         try {
             // KIS OAuth 토큰 발급 시도 — 성공 시 true, 인증 실패/네트워크 오류 시 false
             kisRestTemplate.exchange(
-                    kisProperties.baseUrl() + "/oauth2/tokenP",
+                    kisBaseUrl + "/oauth2/tokenP",
                     HttpMethod.POST,
                     new HttpEntity<>(body, headers),
                     String.class

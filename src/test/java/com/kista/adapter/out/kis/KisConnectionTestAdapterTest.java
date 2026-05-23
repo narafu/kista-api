@@ -27,11 +27,11 @@ class KisConnectionTestAdapterTest {
 
     KisConnectionTestAdapter adapter;
 
-    private static final KisProperties TEST_PROPS = new KisProperties("https://openapi.koreainvestment.com:9443");
+    private static final String BASE_URL = "https://openapi.koreainvestment.com:9443";
 
     @BeforeEach
     void setUp() {
-        adapter = new KisConnectionTestAdapter(kisRestTemplate, TEST_PROPS);
+        adapter = new KisConnectionTestAdapter(kisRestTemplate, BASE_URL);
     }
 
     @Test

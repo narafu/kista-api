@@ -177,6 +177,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### Lombok @MappedSuperclass 상속 주의
 - `@MappedSuperclass` 부모 클래스 필드의 getter/setter는 서브클래스의 `@Getter`/`@Setter`로 생성되지 않음
 - `BaseAuditEntity` 같은 공통 엔티티 부모에 직접 `@Getter @Setter(AccessLevel.PACKAGE)` 추가 필요
+- `@Setter(AccessLevel.PACKAGE)` 범위는 **선언 클래스 패키지 기준** — `BaseAuditEntity`(`adapter.out.persistence`)의 setter는 하위 패키지(`adapter.out.persistence.account` 등)에서 접근 불가. 서브패키지 어댑터/테스트에서 `setCreatedAt()`/`setUpdatedAt()` 호출 시 컴파일 오류 발생
 
 ### 자체 JWT 인증 (ECC P-256)
 - `JwtIssuerService`: `jwt.signing-key` EC P-256 JWK로 ES256 JWT 발급 (TTL: 7일 = 604_800_000ms)
@@ -227,6 +228,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### ArchUnit 규칙 예외 (adapter.out)
 - `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용
 - TelegramAdapter(adapter.out)에서 NewUserRegisteredEvent(application.service) 참조 가능
+
+### 도메인 포트 인터페이스와 타입 위치 규칙
+- `domain/port/in` 또는 `domain/port/out` 인터페이스의 파라미터·반환 타입으로 쓰이는 record/class는 반드시 `domain/model/` 하위에 위치 — `adapter/in/web/dto/`에 두면 `domain → adapter` ArchUnit 규칙 위반
+- `application/service`도 마찬가지로 `adapter` 패키지 import 금지 (`application → adapter` 규칙)
+- 컨트롤러 DTO와 겹치는 타입이 있으면 `domain/model/<도메인>` 패키지로 이동 후 DTO에서 re-import
 
 ### 공유 DTO @Valid 제약
 - `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)

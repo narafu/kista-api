@@ -5,6 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.KisTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -30,8 +31,9 @@ public class KisTokenAdapter implements KisTokenPort {
 
     // KisHttpClient를 주입받지 않음 — KisHttpClient가 KisTokenPort에 의존하므로 순환 방지
     private final RestTemplate kisRestTemplate;
-    private final KisProperties kisProperties;
     private final KisTokenCachePort kisTokenCachePort;
+    @Value("${kis.base-url}")
+    private final String kisBaseUrl;
 
     @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
@@ -54,7 +56,7 @@ public class KisTokenAdapter implements KisTokenPort {
 
         // KIS OAuth 토큰 발급 요청 (RestTemplate 직접 호출 — KisHttpClient 경유 불가)
         TokenResponse response = kisRestTemplate.exchange(
-                kisProperties.baseUrl() + "/oauth2/tokenP",
+                kisBaseUrl + "/oauth2/tokenP",
                 HttpMethod.POST,
                 new HttpEntity<>(body, headers),
                 TokenResponse.class
@@ -79,7 +81,7 @@ public class KisTokenAdapter implements KisTokenPort {
                     "appsecret", appSecret
             );
             kisRestTemplate.exchange(
-                    kisProperties.baseUrl() + "/oauth2/tokenP",
+                    kisBaseUrl + "/oauth2/tokenP",
                     HttpMethod.POST,
                     new HttpEntity<>(body, headers),
                     TokenResponse.class

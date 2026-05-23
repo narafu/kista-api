@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,12 +18,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class KisHttpClient {
 
     private final RestTemplate kisRestTemplate;
-    private final KisProperties props;
     private final KisTokenPort kisTokenPort;
-
-    public KisProperties props() {
-        return props;
-    }
+    @Value("${kis.base-url}")
+    private final String baseUrl;
 
     // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
     public HttpHeaders buildHeaders(String trId, Account account) {
@@ -39,7 +37,7 @@ public class KisHttpClient {
 
     public <T> T get(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder
-                .fromUriString(props.baseUrl() + path)
+                .fromUriString(baseUrl + path)
                 .queryParams(params)
                 .toUriString();
         return kisRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
@@ -47,7 +45,7 @@ public class KisHttpClient {
 
     public <T> T post(String path, HttpHeaders headers, Object body, Class<T> responseType) {
         return kisRestTemplate.exchange(
-                props.baseUrl() + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
+                baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
         ).getBody();
     }
 }

@@ -15,7 +15,7 @@ import java.time.Instant;
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
+@Setter(AccessLevel.PACKAGE)
 public abstract class BaseAuditEntity {
 
     @CreatedDate
