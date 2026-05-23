@@ -9,6 +9,7 @@ import com.kista.domain.port.in.AdminUserActionUseCase;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
+    private final TradingCycleRepository cycleRepository;
     private final ApproveUserUseCase approveUserUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
@@ -87,9 +89,11 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
 
     @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
-        // 존재 확인 후 삭제 (FK ON DELETE CASCADE로 accounts/audit_logs 자동 삭제)
         userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
+        // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
+        cycleRepository.deleteByUserId(targetUserId);
+        accountRepository.deleteByUserId(targetUserId);
         userRepository.delete(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);

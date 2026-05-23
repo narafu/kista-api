@@ -8,12 +8,14 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -52,6 +54,9 @@ class UserEntity extends BaseAuditEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "notification_channel", nullable = false, length = 20)
     private NotificationChannel notificationChannel; // 알림 수단 (기본: TELEGRAM)
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
     static UserEntity fromModel(User user) {
         UserEntity e = new UserEntity();

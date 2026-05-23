@@ -6,6 +6,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ class AdminServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock AccountRepository accountRepository;
+    @Mock TradingCycleRepository cycleRepository;
     @Mock ApproveUserUseCase approveUserUseCase;
     @Mock AuditLogPort auditLogPort;
 
@@ -97,12 +99,15 @@ class AdminServiceTest {
     }
 
     @Test
-    void deleteUser_deletesAndLogsAudit() {
+    void deleteUser_softDeletesCascadeAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
         when(userRepository.findById(targetId)).thenReturn(Optional.of(user(targetId, User.UserStatus.ACTIVE)));
 
         adminService.deleteUser(adminId, targetId);
 
+        // 사이클 → 계좌 → 사용자 순 소프트 삭제 cascade 검증
+        verify(cycleRepository).deleteByUserId(targetId);
+        verify(accountRepository).deleteByUserId(targetId);
         verify(userRepository).delete(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }

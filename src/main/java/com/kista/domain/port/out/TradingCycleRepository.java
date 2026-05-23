@@ -22,6 +22,8 @@ public interface TradingCycleRepository {
 
     TradingCycle save(TradingCycle cycle);
     void delete(UUID id);
+    void deleteByAccountId(UUID accountId); // 계좌 삭제 시 사이클 일괄 소프트 삭제
+    void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 사이클 일괄 소프트 삭제
 
     // 같은 계좌에 같은 type 중복 방지
     boolean existsByAccountIdAndType(UUID accountId, TradingCycle.Type type);

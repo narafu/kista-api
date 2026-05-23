@@ -7,6 +7,7 @@ import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.KisTokenPort;
+import com.kista.domain.port.out.TradingCycleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     private final AccountRepository accountRepository;
     private final KisTokenPort kisTokenPort;
+    private final TradingCycleRepository cycleRepository;
 
     @Override
     public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
@@ -69,6 +71,8 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     public void delete(UUID accountId, UUID requesterId) {
         Account account = accountRepository.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
+        // 계좌에 속한 사이클 먼저 소프트 삭제 (FK CASCADE 대체)
+        cycleRepository.deleteByAccountId(accountId);
         accountRepository.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
     }

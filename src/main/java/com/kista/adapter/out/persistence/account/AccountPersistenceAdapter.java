@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,7 +52,12 @@ public class AccountPersistenceAdapter implements AccountRepository {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.deleteById(id); // strategies는 ON DELETE CASCADE로 자동 삭제
+        jpaRepository.softDeleteById(id, Instant.now());
+    }
+
+    @Override
+    public void deleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 
     @Override

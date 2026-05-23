@@ -8,6 +8,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,7 +47,7 @@ public class UserPersistenceAdapter implements UserRepository {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.deleteById(id); // 연관 데이터(accounts, audit_logs)는 FK ON DELETE CASCADE 처리
+        jpaRepository.softDeleteById(id, Instant.now());
     }
 
     // persistence 경계에서 telegramBotToken 암호화

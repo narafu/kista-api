@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,7 +45,17 @@ class TradingCyclePersistenceAdapter implements TradingCycleRepository {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.deleteById(id);
+        jpaRepository.softDeleteById(id, Instant.now());
+    }
+
+    @Override
+    public void deleteByAccountId(UUID accountId) {
+        jpaRepository.softDeleteByAccountId(accountId, Instant.now());
+    }
+
+    @Override
+    public void deleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 
     @Override

@@ -7,12 +7,15 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "trading_cycle")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -43,4 +46,7 @@ class TradingCycleEntity extends BaseAuditEntity {
 
     @Column(name = "initial_usd_deposit", precision = 20, scale = 2)
     private BigDecimal initialUsdDeposit; // 사이클 시작 시 초기 입금액 (메타 기록용, nullable)
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 }

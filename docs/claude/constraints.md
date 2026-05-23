@@ -112,6 +112,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입·컬럼 존재만 확인, `NOT NULL` 등 제약 불일치는 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME` — V22/V36 패턴 참고)
+- 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (V42 `uq_privacy_trades_master_date_ticker` 사례). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
@@ -239,6 +240,16 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
 - `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)
 
+### 테이블 재생성 패턴 FK 제약명 주의 (V22 사례)
+- `ALTER TABLE t RENAME TO t_old` 후 `CREATE TABLE t (...REFERENCES ...)` 인라인 선언 시 PostgreSQL이 `t_old`의 기존 제약명과 충돌 → 자동으로 숫자 접미사(`_fkey1`) 부여
+- 인라인 `REFERENCES` 대신 `CONSTRAINT 명시_fkey FOREIGN KEY (...)` 형식 사용 권장 — 명시적 이름으로 충돌 없이 생성됨
+- 기존 접미사 제약 정리: `ALTER TABLE t RENAME CONSTRAINT old_fkey1 TO old_fkey;` 후 다음 마이그레이션에서 정상 이름으로 참조 가능
+- 실제 제약명 확인: `SELECT conname FROM pg_constraint WHERE conrelid = 'table'::regclass AND contype = 'f';`
+
+### .env 파일 멀티라인 값 금지
+- JSON 환경변수(예: `FIREBASE_SERVICE_ACCOUNT_JSON`)는 반드시 한 줄로 직렬화 — `.env` 파서는 줄바꿈을 값 끝으로 인식, 첫 줄 이후 무시됨
+- 변환: `python3 -c "import json; content=open('.env.prod').read(); start=content.index('KEY=')+4; print(json.dumps(json.loads(content[start:].strip()), separators=(',',':')))"`
+
 ### ADMIN 권한 관리
 - `users.role` PostgreSQL 네이티브 ENUM (`user_role`: USER/ADMIN) — V17
 - ADMIN seed: 환경변수 `ADMIN_KAKAO_IDS` (쉼표 구분 String) — `UserService.register()` / `KakaoLoginService.login()`에서 idempotent promote
@@ -247,3 +258,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `/api/admin/**` → `hasRole("ADMIN")` (SecurityConfig)
 - `audit_logs`: 관리자 액션 영구 기록 (admin_id, action, target_type, target_id, payload JSONB)
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 자동 발급
+
+### 소프트 삭제(Soft Delete) 패턴 (V43 이후)
+- 대상 테이블: `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼으로 논리 삭제
+- Entity: `@SQLRestriction("deleted_at IS NULL")` 선언 → JPQL 자동 필터 (Hibernate 6)
+- **`nativeQuery = true` 쿼리는 `@SQLRestriction` 미적용** — `AND tc.deleted_at IS NULL` 수동 명시 필수 (`findAllActiveCycles` 등)
+- JPA Repository: `@Modifying @Query("UPDATE XxxEntity SET deletedAt = :now WHERE id = :id")` 패턴
+- Cascade 순서: 서비스 레이어에서 사이클 → 계좌 → 사용자 순으로 명시 처리 (DB FK CASCADE 미작동)
+- 새 엔티티에 소프트 삭제 추가 시: Entity `@SQLRestriction` + `deleted_at` 필드 + V마이그레이션 `ALTER TABLE ... ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE` + Repository soft delete 쿼리 + Adapter 구현

@@ -1,11 +1,14 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
+import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
+import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +35,8 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
 
     @Mock UserRepository userRepository;
+    @Mock AccountRepository accountRepository;
+    @Mock TradingCycleRepository cycleRepository;
     @Mock UserNotificationPort notificationPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
