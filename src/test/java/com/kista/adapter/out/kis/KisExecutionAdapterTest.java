@@ -34,9 +34,7 @@ class KisExecutionAdapterTest {
     @Mock KisHttpClient kisHttpClient;
     @InjectMocks KisExecutionAdapter adapter;
 
-    private static final KisProperties TEST_PROPS = new KisProperties(
-            "https://api.test.com", "key", "secret"
-    );
+    private static final KisProperties TEST_PROPS = new KisProperties("https://api.test.com");
     private static final LocalDate DATE = LocalDate.of(2024, 6, 15);
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",

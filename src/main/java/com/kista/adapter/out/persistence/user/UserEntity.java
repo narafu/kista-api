@@ -4,12 +4,19 @@ import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class UserEntity extends BaseAuditEntity {
 
     @Id
@@ -45,8 +52,6 @@ class UserEntity extends BaseAuditEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "notification_channel", nullable = false, length = 20)
     private NotificationChannel notificationChannel; // 알림 수단 (기본: TELEGRAM)
-
-    protected UserEntity() {}
 
     static UserEntity fromModel(User user) {
         UserEntity e = new UserEntity();

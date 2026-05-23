@@ -2,12 +2,19 @@ package com.kista.adapter.out.persistence.kistoken;
 
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "kis_tokens")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class KisTokenEntity extends BaseAuditEntity {
 
     @Id
@@ -20,15 +27,9 @@ class KisTokenEntity extends BaseAuditEntity {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
-    protected KisTokenEntity() {}
-
     KisTokenEntity(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
         this.accountId = accountId;
         this.accessToken = accessToken;
         this.expiresAt = expiresAt;
     }
-
-    UUID getAccountId() { return accountId; }
-    String getAccessToken() { return accessToken; }
-    OffsetDateTime getExpiresAt() { return expiresAt; }
 }

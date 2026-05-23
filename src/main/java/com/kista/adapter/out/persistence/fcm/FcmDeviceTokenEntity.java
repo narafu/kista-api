@@ -1,11 +1,19 @@
 package com.kista.adapter.out.persistence.fcm;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "fcm_device_tokens")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class FcmDeviceTokenEntity {
 
     @Id
@@ -25,8 +33,6 @@ class FcmDeviceTokenEntity {
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 
-    protected FcmDeviceTokenEntity() {}
-
     static FcmDeviceTokenEntity of(UUID userId, String token, String platform) {
         FcmDeviceTokenEntity e = new FcmDeviceTokenEntity();
         e.userId = userId;
@@ -34,9 +40,4 @@ class FcmDeviceTokenEntity {
         e.platform = platform;
         return e;
     }
-
-    UUID getUserId() { return userId; }
-    String getToken() { return token; }
-    String getPlatform() { return platform; }
-    Instant getCreatedAt() { return createdAt; }
 }

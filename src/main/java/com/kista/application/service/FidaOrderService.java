@@ -1,9 +1,9 @@
 package com.kista.application.service;
 
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
-import com.kista.domain.port.in.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.port.out.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

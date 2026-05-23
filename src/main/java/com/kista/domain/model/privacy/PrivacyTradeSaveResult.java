@@ -1,4 +1,4 @@
-package com.kista.domain.port.out;
+package com.kista.domain.model.privacy;
 
 import java.util.UUID;
 

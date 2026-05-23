@@ -48,8 +48,6 @@ class AccountPersistenceAdapterTest {
         e.setKisSecretKey("enc:appSecret");
         e.setKisAccountType("01");
         e.setBroker(Account.Broker.KIS);
-        e.setCreatedAt(Instant.now());
-        e.setUpdatedAt(Instant.now());
         return e;
     }
 

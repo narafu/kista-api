@@ -27,9 +27,7 @@ class KisConnectionTestAdapterTest {
 
     KisConnectionTestAdapter adapter;
 
-    private static final KisProperties TEST_PROPS = new KisProperties(
-            "https://openapi.koreainvestment.com:9443", "key", "secret"
-    );
+    private static final KisProperties TEST_PROPS = new KisProperties("https://openapi.koreainvestment.com:9443");
 
     @BeforeEach
     void setUp() {

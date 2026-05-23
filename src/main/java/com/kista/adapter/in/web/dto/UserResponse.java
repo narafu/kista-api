@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -17,7 +18,9 @@ public record UserResponse(
         @Schema(description = "역할 (USER/ADMIN)", example = "USER")
         User.UserRole role,
         @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
-        String telegramBotUsername
+        String telegramBotUsername,
+        @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL)", example = "TELEGRAM")
+        NotificationChannel notificationChannel
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
@@ -26,7 +29,8 @@ public record UserResponse(
                 user.status(),
                 user.telegramChatId() != null,
                 user.role(),
-                user.telegramBotUsername()
+                user.telegramBotUsername(),
+                user.notificationChannel()
         );
     }
 }

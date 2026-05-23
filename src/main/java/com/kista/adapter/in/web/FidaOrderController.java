@@ -2,8 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.FidaOrderResponse;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
-import com.kista.domain.port.in.FidaOrderRequest;
-import com.kista.domain.port.out.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

@@ -2,9 +2,9 @@ package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
-import com.kista.domain.port.in.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.port.out.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

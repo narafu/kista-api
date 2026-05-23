@@ -3,6 +3,10 @@ package com.kista.adapter.out.persistence.trade;
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,6 +14,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "portfolio_snapshots")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
 
     @Id
@@ -45,8 +52,6 @@ class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
     @Column(name = "account_id") // FK → accounts(id), V8에서 추가 (nullable)
     private UUID accountId;
 
-    protected PortfolioSnapshotEntity() {}
-
     PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int holdings,
                             BigDecimal avgPrice, BigDecimal currentPrice,
                             BigDecimal marketValueUsd, BigDecimal usdDeposit,
@@ -62,15 +67,4 @@ class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
         this.totalAssetUsd = totalAssetUsd;
         this.accountId = accountId;
     }
-
-    UUID getId() { return id; }
-    LocalDate getSnapshotDate() { return snapshotDate; }
-    Ticker getTicker() { return ticker; }
-    int getHoldings() { return holdings; }
-    BigDecimal getAvgPrice() { return avgPrice; }
-    BigDecimal getCurrentPrice() { return currentPrice; }
-    BigDecimal getMarketValueUsd() { return marketValueUsd; }
-    BigDecimal getUsdDeposit() { return usdDeposit; }
-    BigDecimal getTotalAssetUsd() { return totalAssetUsd; }
-    UUID getAccountId() { return accountId; }
 }

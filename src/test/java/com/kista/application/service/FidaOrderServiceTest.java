@@ -1,9 +1,9 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.port.out.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

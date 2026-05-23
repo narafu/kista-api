@@ -1,4 +1,4 @@
-package com.kista.domain.port.in;
+package com.kista.domain.model.privacy;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
