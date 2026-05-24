@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,7 @@ import java.util.UUID;
 @Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 public class TradingCycleController {
 
     private final RegisterTradingCycleUseCase registerCycle;
@@ -44,8 +46,10 @@ public class TradingCycleController {
                     .map(TradingCycleResponse::from)
                     .toList();
         } catch (SecurityException e) {
+            log.warn("거래 사이클 목록 조회 권한 거부: accountId={}, userId={}", accountId, userId);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
+            log.warn("거래 사이클 목록 조회 - 계좌 없음: accountId={}", accountId);
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
