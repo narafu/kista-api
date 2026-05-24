@@ -73,17 +73,24 @@ public class KisPriceAdapter implements KisPricePort {
 
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
         for (MultiPriceResponse.Output2 item : response.output2()) {
-            if (item.symb() == null || item.last() == null || item.last().isBlank()) {
-                log.warn("복수종목 현재가 응답 항목 누락: symb={}, last={}", item.symb(), item.last());
+            if (item.symb() == null) continue;
+            // last(현재가) 우선, 비어있으면 base(전일종가) fallback — 장 마감 시 last가 빈 ETF 대응
+            String price = (item.last() != null && !item.last().isBlank()) ? item.last()
+                         : (item.base() != null && !item.base().isBlank()) ? item.base()
+                         : null;
+            if (price == null) {
+                log.warn("복수종목 현재가 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
                 continue;
             }
-            log.debug("복수종목 현재가 응답: symb={}, last={}", item.symb(), item.last());
+            if (item.last() == null || item.last().isBlank()) {
+                log.info("복수종목 현재가 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
+            }
             Ticker t = Ticker.tryParse(item.symb()).orElse(null);
             if (t == null) {
                 log.warn("복수종목 현재가 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
                 continue;
             }
-            result.put(t, KisResponseParser.parseBd(item.last()));
+            result.put(t, KisResponseParser.parseBd(price));
         }
 
         // 요청했으나 응답에서 누락된 종목 경고
@@ -105,10 +112,11 @@ public class KisPriceAdapter implements KisPricePort {
     ) {
         record Output(@JsonProperty("nrec") String nrec) {}
 
-        // symb: 종목코드 — Ticker 매핑 키, last: 현재가(Last Price)
+        // symb: 종목코드, last: 현재가(체결가), base: 전일종가(last 빈값 시 fallback)
         record Output2(
             @JsonProperty("symb") String symb,
-            @JsonProperty("last") String last
+            @JsonProperty("last") String last,
+            @JsonProperty("base") String base
         ) {}
     }
 }
