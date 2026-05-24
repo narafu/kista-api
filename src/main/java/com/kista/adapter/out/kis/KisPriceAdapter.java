@@ -22,14 +22,16 @@ import java.util.Map;
 @Slf4j
 public class KisPriceAdapter implements KisPricePort {
 
-    private static final String PATH  = "/uapi/overseas-price/v1/quotations/price";
-    private static final String TR_ID = "HHDFS00000300";
+    private static final String SINGLE_PATH  = "/uapi/overseas-price/v1/quotations/price";
+    private static final String SINGLE_TR_ID = "HHDFS00000300";
+    private static final String MULTI_PATH   = "/uapi/overseas-price/v1/quotations/multprice";
+    private static final String MULTI_TR_ID  = "HHDFS76220000";
 
     private final KisHttpClient kisHttpClient;
 
     @Override
     public BigDecimal getPrice(Ticker ticker, Account account) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(TR_ID, account);
+        HttpHeaders headers = kisHttpClient.buildHeaders(SINGLE_TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         // KIS exchangeCode: NASD→NAS, AMS→AMS
@@ -37,7 +39,7 @@ public class KisPriceAdapter implements KisPricePort {
         params.add("EXCD", excd);
         params.add("SYMB", ticker.name());
 
-        PriceResponse response = kisHttpClient.get(PATH, headers, params, PriceResponse.class);
+        PriceResponse response = kisHttpClient.get(SINGLE_PATH, headers, params, PriceResponse.class);
 
         if (response == null || response.output() == null || response.output().last() == null) {
             throw new IllegalStateException("가격 조회 실패: " + ticker);
@@ -47,20 +49,52 @@ public class KisPriceAdapter implements KisPricePort {
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
-        // 검증된 단건 가격 API(HHDFS00000300)로 각 종목 순차 조회 — 복수 호가 API(HHDFS76410000) 미사용
+        if (tickers.isEmpty()) return Map.of();
+
+        HttpHeaders headers = kisHttpClient.buildHeaders(MULTI_TR_ID, account);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("AUTH", "");
+        params.add("NREC", String.valueOf(tickers.size()));
+
+        for (int i = 0; i < tickers.size(); i++) {
+            Ticker ticker = tickers.get(i);
+            String num = String.format("%02d", i + 1); // "01", "02", "03"
+            String excd = ticker.getExchangeCode().equals("NASD") ? "NAS" : ticker.getExchangeCode();
+            params.add("EXCD_" + num, excd);
+            params.add("SYMB_" + num, ticker.name());
+        }
+
+        MultiPriceResponse response = kisHttpClient.get(MULTI_PATH, headers, params, MultiPriceResponse.class);
+
+        if (response == null || response.output2() == null) {
+            log.warn("복수종목 현재가 응답 없음: output2 null");
+            return Map.of();
+        }
+
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-        for (Ticker ticker : tickers) {
-            try {
-                BigDecimal price = getPrice(ticker, account);
-                result.put(ticker, price);
-            } catch (Exception e) {
-                log.warn("종목 가격 조회 실패 (skip): ticker={}, error={}", ticker, e.getMessage());
-            }
+        for (MultiPriceResponse.Output2 item : response.output2()) {
+            if (item.symb() == null || item.last() == null || item.last().isBlank()) continue;
+            Ticker.tryParse(item.symb()).ifPresent(t ->
+                result.put(t, KisResponseParser.parseBd(item.last()))
+            );
         }
         return result;
     }
 
     record PriceResponse(@JsonProperty("output") Output output) {
         record Output(@JsonProperty("last") String last) {}
+    }
+
+    record MultiPriceResponse(
+        @JsonProperty("output") Output output,
+        @JsonProperty("output2") List<Output2> output2
+    ) {
+        record Output(@JsonProperty("nrec") String nrec) {}
+
+        // symb: 종목코드 — Ticker 매핑 키, last: 현재가(Last Price)
+        record Output2(
+            @JsonProperty("symb") String symb,
+            @JsonProperty("last") String last
+        ) {}
     }
 }

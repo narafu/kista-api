@@ -72,9 +72,12 @@
 - `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` / `foreignBalance()` — KIS API 필드명(`crcy_cd` 등) 아님
 
 ### 복수종목 현재가 (KisPriceAdapter)
-- `getPrices(List<Ticker>, Account)` — 단건 API(`HHDFS00000300`)를 ticker별 순차 호출로 구현 (복수 호가 API `HHDFS76410000`은 운영 미동작 확인으로 제거됨)
-- ticker별 실패는 skip+log.warn 처리, 성공분만 Map에 담아 반환
-- EXCD 변환: `ticker.getExchangeCode()` 기반 — `NASD`→`NAS`, `AMS`→`AMS` (`getPrice()`도 동일 변환 적용, 기존 `"NAS"` 하드코딩 버그 수정됨)
+- `getPrices(List<Ticker>, Account)` — 복수검색 API(`HHDFS76220000`, `/uapi/overseas-price/v1/quotations/multprice`) 단건 호출로 구현
+  - 파라미터: `AUTH=""`, `NREC=종목수`, `EXCD_01`/`SYMB_01` … `EXCD_10`/`SYMB_10` (2자리 zero-padded, 최대 10종목)
+  - 응답: `output.nrec`, `output2[]`(종목별) — `symb`(종목코드), `last`(현재가) 필드 사용
+  - `Ticker.tryParse(symb)`로 enum 외 종목 silent drop
+- `getPrice(Ticker, Account)` — 단건 API(`HHDFS00000300`) 유지
+- EXCD 변환: `ticker.getExchangeCode()` 기반 — `NASD`→`NAS`, `AMS`→`AMS` (단건/복수 공통 적용)
 
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
