@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -26,14 +25,11 @@ class TradingCycleHistoryEntity extends BaseCreatedAtEntity {
     @Column(name = "trading_cycle_id", nullable = false, columnDefinition = "UUID")
     private UUID tradingCycleId; // FK → trading_cycle.id (UUID 간접 참조, ON DELETE CASCADE)
 
-    @Column(name = "trade_date", nullable = false)
-    private LocalDate tradeDate; // 매매 일자
-
     @Column(name = "usd_deposit", nullable = false, precision = 20, scale = 2)
     private BigDecimal usdDeposit; // 통합주문가능금액
 
-    @Column(name = "avg_price", nullable = false, precision = 20, scale = 4)
-    private BigDecimal avgPrice; // 평균 매입 단가
+    @Column(name = "avg_price", precision = 20, scale = 4)
+    private BigDecimal avgPrice; // 평균 매입 단가 (보유수량 0이면 null)
 
     @Column(name = "holdings", nullable = false, precision = 20, scale = 4)
     private BigDecimal holdings; // 보유 수량

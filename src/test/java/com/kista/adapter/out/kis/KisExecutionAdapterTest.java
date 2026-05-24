@@ -51,7 +51,7 @@ class KisExecutionAdapterTest {
     void getExecutions_nullResponse_returnsEmptyList() {
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(null);
 
-        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
+        List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).isEmpty();
     }
@@ -62,7 +62,7 @@ class KisExecutionAdapterTest {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(null);
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
+        List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).isEmpty();
     }
@@ -72,12 +72,12 @@ class KisExecutionAdapterTest {
     void getExecutions_selnByovCls01_returnsSell() {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(
                 List.of(new KisExecutionAdapter.ExecutionListResponse.OutputItem(
-                        "SOXL", "01", "5", "25.00", "125.00", "ORD001"
+                        "SOXL", "20240615", "01", "5", "25.00", "125.00", "ORD001"
                 ))
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
+        List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).direction()).isEqualTo(Order.OrderDirection.SELL);
@@ -88,12 +88,12 @@ class KisExecutionAdapterTest {
     void getExecutions_otherSelnByovCls_returnsBuyWithFields() {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(
                 List.of(new KisExecutionAdapter.ExecutionListResponse.OutputItem(
-                        "SOXL", "02", "10", "30.50", "305.00", "ORD002"
+                        "SOXL", "20240615", "02", "10", "30.50", "305.00", "ORD002"
                 ))
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
+        List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);
@@ -111,12 +111,12 @@ class KisExecutionAdapterTest {
     void getExecutions_blankFields_parsedSafely() {
         KisExecutionAdapter.ExecutionListResponse response = new KisExecutionAdapter.ExecutionListResponse(
                 List.of(new KisExecutionAdapter.ExecutionListResponse.OutputItem(
-                        "SOXL", "02", "", "", "", "ORD003"
+                        "SOXL", "20240615", "02", "", "", "", "ORD003"
                 ))
         );
         when(kisHttpClient.get(anyString(), any(), any(), any())).thenReturn(response);
 
-        List<Execution> result = adapter.getExecutions(DATE, ACCOUNT);
+        List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
         Execution e = result.get(0);

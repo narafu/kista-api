@@ -6,9 +6,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -24,14 +22,9 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryReposi
     }
 
     @Override
-    public Optional<TradingCycleHistory> findByCycleIdAndDate(UUID cycleId, LocalDate date) {
-        return jpaRepository.findByTradingCycleIdAndTradeDate(cycleId, date).map(this::toDomain);
-    }
-
-    @Override
     public List<TradingCycleHistory> findRecentByCycleId(UUID cycleId, int limit) {
         // limit 무시하고 top10 조회 — 단순 구현, 필요 시 @Query로 동적 limit 추가
-        return jpaRepository.findTop10ByTradingCycleIdOrderByTradeDateDesc(cycleId).stream()
+        return jpaRepository.findTop10ByTradingCycleIdOrderByCreatedAtDesc(cycleId).stream()
                 .limit(limit)
                 .map(this::toDomain)
                 .toList();
@@ -39,7 +32,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryReposi
 
     private TradingCycleHistory toDomain(TradingCycleHistoryEntity e) {
         return new TradingCycleHistory(
-                e.getId(), e.getTradingCycleId(), e.getTradeDate(),
+                e.getId(), e.getTradingCycleId(),
                 e.getUsdDeposit(), e.getAvgPrice(), e.getHoldings(),
                 e.getCreatedAt()
         );
@@ -49,7 +42,6 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryReposi
         TradingCycleHistoryEntity e = new TradingCycleHistoryEntity();
         e.setId(h.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setTradingCycleId(h.tradingCycleId());
-        e.setTradeDate(h.tradeDate());
         e.setUsdDeposit(h.usdDeposit());
         e.setAvgPrice(h.avgPrice());
         e.setHoldings(h.holdings());

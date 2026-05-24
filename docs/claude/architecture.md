@@ -130,7 +130,8 @@ domain      →  외부 의존 없음
 - `TelegramAdapter` 접근 경로: `r.snapshot().X()` (포맷 문자열 변경 금지)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — 사이클 단위 루프
 - `TradingScheduler`: `cycleRepository.findAllActive()` → 사이클 단위 loop (격리 try-catch)
-- `TradingService.execute()` 종료 시 `TradingCycleHistoryRepository.save()` — 사이클별 일별 스냅샷 1건 append
+- `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (holdings=0, avgPrice=null, usdDeposit=initialUsdDeposit) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append
+- `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
 
 ### PRIVACY 전략 패턴 (기준 매매표)
 - `privacy_trades_master` (`adapter/out/persistence/privacy/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)

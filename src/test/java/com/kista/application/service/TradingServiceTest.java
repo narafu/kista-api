@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
@@ -29,7 +30,6 @@ import static org.mockito.Mockito.*;
 class TradingServiceTest {
 
     @Mock KisHolidayPort kisHolidayPort;
-    @Mock KisAccountPort kisAccountPort;
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
@@ -51,14 +51,7 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    static final AccountBalance NORMAL_BALANCE = new AccountBalance(
-            10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
-
-    static final AccountBalance FRESH_BALANCE = new AccountBalance(
-            0, BigDecimal.ZERO, new BigDecimal("1000.00"));
-
-    static final AccountBalance LOW_BALANCE = new AccountBalance(
-            0, BigDecimal.ZERO, BigDecimal.ZERO);
+    static final AccountBalance LOW_BALANCE = new AccountBalance(0, null, BigDecimal.ZERO);
 
     // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 제거됨)
     static final Account ACCOUNT = new Account(
@@ -74,6 +67,14 @@ class TradingServiceTest {
             null, Instant.now(), Instant.now()
     );
 
+    // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
+    static final TradingCycleHistory NORMAL_HISTORY = new TradingCycleHistory(
+            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+    static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
+            null, CYCLE.id(), new BigDecimal("1000.00"), null, BigDecimal.ZERO, null);
+    static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
+            null, CYCLE.id(), BigDecimal.ZERO, null, BigDecimal.ZERO, null);
+
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
             null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM
@@ -82,7 +83,7 @@ class TradingServiceTest {
     @BeforeEach
     void setUp() {
         service = new TradingService(
-                kisHolidayPort, kisAccountPort,
+                kisHolidayPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
@@ -101,26 +102,26 @@ class TradingServiceTest {
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(NORMAL_BALANCE);
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
-        when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
-        verify(kisAccountPort).getBalance(ACCOUNT, Ticker.SOXL);
+        verify(cycleHistoryRepository).findRecentByCycleId(CYCLE.id(), 1);
         verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT);
         verify(orderPort).saveAll(anyList());
         verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
-        verify(kisExecutionPort).getExecutions(any(), eq(ACCOUNT));
+        verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
         verify(correctionStrategy).correct(any(), any(), any());
         verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
@@ -141,14 +142,14 @@ class TradingServiceTest {
                 Order.OrderStatus.PLANNED, null);
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(FRESH_BALANCE);
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(mainOrder, corrOrder);
-        when(kisExecutionPort.getExecutions(any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
@@ -163,7 +164,7 @@ class TradingServiceTest {
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
-        verify(kisAccountPort, never()).getBalance(any(), any());
+        verify(cycleHistoryRepository, never()).findRecentByCycleId(any(), anyInt());
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
@@ -172,11 +173,11 @@ class TradingServiceTest {
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(kisAccountPort.getBalance(ACCOUNT, Ticker.SOXL)).thenReturn(LOW_BALANCE);
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
-        verify(notifyPort).notifyInsufficientBalance(ACCOUNT, LOW_BALANCE, Ticker.SOXL);
+        verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), eq(LOW_BALANCE), eq(Ticker.SOXL));
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(orderPort, never()).saveAll(any());
         verify(tradeHistoryPort, never()).save(any());

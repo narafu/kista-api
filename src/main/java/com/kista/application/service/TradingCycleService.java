@@ -10,7 +10,9 @@ import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
 import com.kista.domain.port.in.UpdateTradingCycleUseCase;
+import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.TradingCycleHistoryRepository;
 import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserRepository;
@@ -34,6 +36,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
 
     private final TradingCycleRepository cycleRepository;
+    private final TradingCycleHistoryRepository cycleHistoryRepository;
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final UserNotificationPort notificationPort;
@@ -62,6 +65,12 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
                 ticker, multiple, cmd.initialUsdDeposit(), null, null
         );
         TradingCycle saved = cycleRepository.save(cycle);
+
+        // 초기 스냅샷 저장: 입금액 기준, 보유 없음
+        cycleHistoryRepository.save(new TradingCycleHistory(
+                null, saved.id(), saved.initialUsdDeposit(), null, BigDecimal.ZERO, null
+        ));
+
         log.info("거래 사이클 등록: accountId={}, cycleId={}, type={}", accountId, saved.id(), saved.type());
         return saved;
     }

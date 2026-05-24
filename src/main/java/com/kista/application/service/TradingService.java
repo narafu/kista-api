@@ -14,12 +14,12 @@ import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
+
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
+
 import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
@@ -32,7 +32,6 @@ import static java.math.RoundingMode.HALF_UP;
 public class TradingService implements ExecuteTradingUseCase {
 
     private final KisHolidayPort kisHolidayPort;               // 미국 시장 개장일 확인
-    private final KisAccountPort kisAccountPort;               // 계좌 잔고 조회
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
     private final KisOrderPort kisOrderPort;                   // 주문 접수
     private final KisExecutionPort kisExecutionPort;           // 당일 체결 내역 조회
@@ -58,9 +57,13 @@ public class TradingService implements ExecuteTradingUseCase {
         // 1. 휴장 확인 (waitForOrderTime 전으로 이동: 휴장이면 대기 없이 즉시 return)
         if (!isMarketOpen(today, account)) return;
 
-        // 2. 잔고 조회
-        AccountBalance balance = kisAccountPort.getBalance(account, cycle.ticker());
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
+        // 2. 잔고 조회 (TradingCycleHistory 기반)
+        TradingCycleHistory latestHistory = cycleHistoryRepository.findRecentByCycleId(cycle.id(), 1)
+                .stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
+        AccountBalance balance = new AccountBalance(
+                latestHistory.holdings().intValue(), latestHistory.avgPrice(), latestHistory.usdDeposit());
+        log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
         if (balance.shouldSkip()) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
@@ -163,7 +166,7 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
         portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
         log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
-        saveCycleHistory(balance, cycle, today); // 사이클별 일별 스냅샷 저장
+        saveCycleHistory(balance, cycle); // 사이클별 스냅샷 저장
         TradingReport report = buildReport(today, position, mainOrders, corrections, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
         log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
@@ -177,20 +180,15 @@ public class TradingService implements ExecuteTradingUseCase {
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
     }
 
-    // execute() 종료 시 일별 1건 적재 — UNIQUE 충돌(동일 trade_date 재실행) 시 무시
-    private void saveCycleHistory(AccountBalance balance, TradingCycle cycle, LocalDate today) {
-        try {
-            LocalDate tradeDate = today.atStartOfDay(ZoneId.of("Asia/Seoul")).toLocalDate();
-            TradingCycleHistory history = new TradingCycleHistory(
-                    null, cycle.id(), tradeDate,
-                    balance.usdDeposit(), balance.avgPrice(),
-                    BigDecimal.valueOf(balance.holdings()), null
-            );
-            cycleHistoryRepository.save(history);
-            log.info("[{}] 거래 사이클 이력 저장 완료: cycleId={}, tradeDate={}", cycle.id(), tradeDate, today);
-        } catch (DataIntegrityViolationException e) {
-            log.warn("[cycleId={}] 거래 사이클 이력 중복 무시: trade_date={}", cycle.id(), today);
-        }
+    // execute() 종료 시 1건 적재
+    private void saveCycleHistory(AccountBalance balance, TradingCycle cycle) {
+        TradingCycleHistory history = new TradingCycleHistory(
+                null, cycle.id(),
+                balance.usdDeposit(), balance.avgPrice(),
+                BigDecimal.valueOf(balance.holdings()), null
+        );
+        cycleHistoryRepository.save(history);
+        log.info("[cycleId={}] 거래 사이클 이력 저장 완료", cycle.id());
     }
 
     private TradeHistory toHistory(Order o, java.util.UUID accountId) {

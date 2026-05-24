@@ -12,15 +12,16 @@
 - `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
 - V35 마이그레이션: accounts/strategies/orders/trade_histories/portfolio_snapshots/kis_tokens TRUNCATE (기존 데이터 초기화)
 - V38 마이그레이션: `strategies` → `trading_cycle` 테이블 리네임 + `initial_usd_deposit` 컬럼 추가
-- V39 마이그레이션: `trading_cycle_history` 테이블 신설 — `UNIQUE(trading_cycle_id, trade_date)`, `ON DELETE CASCADE`
+- V39 마이그레이션: `trading_cycle_history` 테이블 신설 — ON DELETE CASCADE
+- V44 마이그레이션: `trading_cycle_history.trade_date` 컬럼 및 UNIQUE 제약 제거, `avg_price` nullable 허용
 
 ### 변경된 포트 시그니처 (V38 이후)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
-- `KisAccountPort.getBalance(Account account, TradingCycle.Ticker ticker)` — TradingCycle.Ticker
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
 - `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price, BigDecimal multiple)` — TradingCycle.Ticker
-- `TradingCycleHistoryRepository` 신설 — `save(TradingCycleHistory)`, `findByCycleIdAndDate`, `findRecentByCycleId`
+- `TradingCycleHistoryRepository` — `save(TradingCycleHistory)`, `findRecentByCycleId(cycleId, limit)` (`findByCycleIdAndDate` V44에서 제거됨)
+- **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryRepository.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
