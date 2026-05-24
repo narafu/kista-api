@@ -17,6 +17,7 @@
 
 ### 변경된 포트 시그니처 (V38 이후)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
+- `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
 - `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price, BigDecimal multiple)` — TradingCycle.Ticker
@@ -76,7 +77,7 @@
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
 - TradingScheduler cron: `0 0 4 * * TUE-SAT` (화~토 04:00 KST) — 변경 금지
-- 사이클 단위 순차 실행: `TradingCycleRepository.findAllActive()` → 사이클별 `execute(TradingCycle, Account, User)` — 한 사이클 실패 시 다음 계속 (격리)
+- 사이클 단위 순차 실행: `TradingCycleRepository.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
 
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지

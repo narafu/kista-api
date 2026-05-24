@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -32,21 +33,31 @@ public class TradingScheduler {
         List<TradingCycle> cycles = cycleRepository.findAllActive();
         log.info("매매 스케줄 시작 — ACTIVE 사이클 {}개", cycles.size());
 
+        // 사이클별 계좌·사용자 조회 — 조회 실패한 사이클은 skip
+        List<ExecuteTradingUseCase.BatchContext> contexts = new ArrayList<>();
         for (TradingCycle cycle : cycles) {
-            // 사이클별 독립 실행 — 한 사이클 실패 시 다음 사이클 계속
             try {
                 Account account = accountRepository.findByIdOrThrow(cycle.accountId());
                 User user = userRepository.findById(account.userId())
                         .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
-                useCase.execute(cycle, account, user);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("[cycleId={}] 매매 스케줄 인터럽트: {}", cycle.id(), e.getMessage());
+                contexts.add(new ExecuteTradingUseCase.BatchContext(cycle, account, user));
             } catch (Exception e) {
-                log.error("[cycleId={}] 매매 스케줄 오류: {}", cycle.id(), e.getMessage(), e);
+                log.error("[cycleId={}] 컨텍스트 조회 오류: {}", cycle.id(), e.getMessage(), e);
                 notifyPort.notifyError(e);
             }
         }
+
+        // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
+        try {
+            useCase.executeBatch(contexts);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("매매 스케줄 인터럽트: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("매매 스케줄 오류: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
+        }
+
         log.info("매매 스케줄 완료");
     }
 }

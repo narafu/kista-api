@@ -3,6 +3,7 @@ package com.kista.application.service;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.account.*;
 import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.order.*;
@@ -21,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
@@ -50,8 +52,56 @@ public class TradingService implements ExecuteTradingUseCase {
         execute(cycle, account, user, DstInfo.calculate());
     }
 
+    @Override
+    public void executeBatch(List<BatchContext> contexts) throws InterruptedException {
+        executeBatch(contexts, DstInfo.calculate());
+    }
+
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
+    void executeBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
+        if (contexts.isEmpty()) return;
+
+        // 고유 ticker 수집 → 복수종목 현재가 1회 일괄 조회
+        List<Ticker> tickers = contexts.stream()
+                .map(c -> c.cycle().ticker())
+                .distinct().toList();
+        Map<Ticker, BigDecimal> prices = fetchPricesBatch(tickers, contexts.get(0).account());
+
+        for (BatchContext ctx : contexts) {
+            try {
+                BigDecimal price = prices.get(ctx.cycle().ticker());
+                if (price == null) {
+                    // 배치 응답 누락 시 단건 fallback
+                    price = kisPricePort.getPrice(ctx.cycle().ticker(), ctx.account());
+                }
+                execute(ctx.cycle(), ctx.account(), ctx.user(), dst, price);
+            } catch (InterruptedException e) {
+                throw e; // 인터럽트는 상위로 전파
+            } catch (Exception e) {
+                log.error("[cycleId={}] 실행 오류: {}", ctx.cycle().id(), e.getMessage(), e);
+                notifyPort.notifyError(e);
+            }
+        }
+    }
+
+    private Map<Ticker, BigDecimal> fetchPricesBatch(List<Ticker> tickers, Account account) {
+        try {
+            return kisPricePort.getPrices(tickers, account);
+        } catch (Exception e) {
+            log.warn("복수종목 현재가 일괄 조회 실패, 단건 fallback 사용: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로: 가격은 내부에서 lazy-fetch)
     void execute(TradingCycle cycle, Account account, User user, DstInfo dst) throws InterruptedException {
+        execute(cycle, account, user, dst, null); // null → early-exit 이후 단건 조회
+    }
+
+    // price == null: early-exit 통과 후 단건 getPrice() 호출 (단건 경로)
+    // price != null: 배치에서 미리 조회한 값 사용 (배치 경로)
+    private void execute(TradingCycle cycle, Account account, User user, DstInfo dst, BigDecimal price)
+            throws InterruptedException {
         LocalDate today = LocalDate.now();
 
         // 1. 휴장 확인 (waitForOrderTime 전으로 이동: 휴장이면 대기 없이 즉시 return)
@@ -70,12 +120,12 @@ public class TradingService implements ExecuteTradingUseCase {
             return;
         }
 
-        // 3. 현재가 조회
-        BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
-        log.info("현재가: ${}", price);
+        // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: 여기서 단건 조회)
+        BigDecimal resolvedPrice = (price != null) ? price : kisPricePort.getPrice(cycle.ticker(), account);
+        log.info("현재가: ${}", resolvedPrice);
 
         // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
-        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price, cycle.multiple());
+        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), resolvedPrice, cycle.multiple());
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
                 account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
         savePlannedOrders(position, today, account);
@@ -97,7 +147,7 @@ public class TradingService implements ExecuteTradingUseCase {
         List<Order> corrections = applyCorrections(mainOrders, executions, today, account);
 
         // 10. 이력 저장 + 알림
-        saveAndNotify(balance, price, today, position, mainOrders, corrections, executions, user, account, cycle);
+        saveAndNotify(balance, resolvedPrice, today, position, mainOrders, corrections, executions, user, account, cycle);
     }
 
     // 전략 계산 결과를 orders에 PLANNED 상태로 저장

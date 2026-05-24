@@ -73,6 +73,7 @@ domain      →  외부 의존 없음
 | `trading_cycle` 테이블 변경 | `TradingCycleEntity`(persistence/tradingcycle/) + `TradingCycleJpaRepository` + `TradingCyclePersistenceAdapter` |
 | `TradingCycle` record 필드 추가/제거 | `TradingCycleEntity` + `TradingCyclePersistenceAdapter`(toEntity/toDomain) + `TradingCycleService` + `TradingCycleRequest`/`TradingCycleResponse` + 테스트에서 `new TradingCycle(...)` 직접 생성 호출처 (`TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`, `NextOrdersServiceTest`) |
 | `TradingService` 필드 추가 | `TradingCycleHistoryRepository` mock 추가 필수 (`TradingServiceTest`) |
+| `ExecuteTradingUseCase` 메서드 추가/변경 | `TradingService`(구현) + `TradingScheduler`(호출 방식) + `TradingServiceTest` + `TradingSchedulerTest`(verify 대상 변경) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
 | `AccountService` UseCase 추가 | `AccountController` 필드 + 엔드포인트 동시 추가 |

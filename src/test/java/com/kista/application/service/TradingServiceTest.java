@@ -8,6 +8,7 @@ import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
+import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
@@ -21,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -182,5 +184,81 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(any());
         verify(tradeHistoryPort, never()).save(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
+    }
+
+    // ── executeBatch 테스트 ────────────────────────────────────────────────────
+
+    @Test
+    void executeBatch_fetchesPricesOnce_notPerCycle() throws InterruptedException {
+        // 두 사이클이 같은 ticker → getPrices() 1회, getPrice() 0회
+        TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
+                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
+        TradingCycleHistory history2 = new TradingCycleHistory(
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(cycleHistoryRepository.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+
+        service.executeBatch(List.of(
+                new BatchContext(CYCLE, ACCOUNT, USER),
+                new BatchContext(cycle2, ACCOUNT, USER)
+        ), PAST_DST);
+
+        verify(kisPricePort, times(1)).getPrices(anyList(), eq(ACCOUNT));
+        verify(kisPricePort, never()).getPrice(any(), any());
+    }
+
+    @Test
+    void executeBatch_oneCycleFails_continuesWithNextAndNotifiesAdmin() throws InterruptedException {
+        // CYCLE → 예외 발생, cycle2 → 정상 실행
+        TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
+                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
+        TradingCycleHistory history2 = new TradingCycleHistory(
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
+        // CYCLE: 휴장일 체크 전 잔고 조회에서 예외 (이미 isMarketOpen 다음이므로 isMarketOpen도 stub 필요)
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        RuntimeException ex = new RuntimeException("잔고 조회 오류");
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenThrow(ex);
+        when(cycleHistoryRepository.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+
+        service.executeBatch(List.of(
+                new BatchContext(CYCLE, ACCOUNT, USER),
+                new BatchContext(cycle2, ACCOUNT, USER)
+        ), PAST_DST);
+
+        verify(notifyPort).notifyError(ex);
+        // cycle2는 정상 실행 → portfolioSnapshotPort.save 호출 확인
+        verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
+    }
+
+    @Test
+    void executeBatch_getPricesFails_fallsBackToGetPrice() throws InterruptedException {
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenThrow(new RuntimeException("API 오류"));
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT); // fallback 호출 확인
     }
 }

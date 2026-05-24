@@ -5,12 +5,14 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
+import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
 import com.kista.domain.port.out.AccountRepository;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.TradingCycleRepository;
 import com.kista.domain.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,8 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,7 +60,7 @@ class TradingSchedulerTest {
     }
 
     @Test
-    void run_callsExecuteForEachActiveStrategy() throws InterruptedException {
+    void run_callsExecuteBatchWithAllContexts() throws InterruptedException {
         Account account = mockAccount();
         TradingCycle cycle = mockCycle();
         User user = mockUser();
@@ -68,16 +70,22 @@ class TradingSchedulerTest {
 
         scheduler.run();
 
-        verify(useCase).execute(cycle, account, user);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
+        verify(useCase).executeBatch(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new BatchContext(cycle, account, user));
     }
 
     @Test
-    void run_noActiveStrategies_doesNotCallExecute() throws InterruptedException {
+    void run_noActiveStrategies_callsExecuteBatchWithEmptyList() throws InterruptedException {
         when(cycleRepository.findAllActive()).thenReturn(List.of());
 
         scheduler.run();
 
-        verify(useCase, never()).execute(any(), any(), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
+        verify(useCase).executeBatch(captor.capture());
+        assertThat(captor.getValue()).isEmpty();
     }
 
     @Test
@@ -88,7 +96,7 @@ class TradingSchedulerTest {
         when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        doThrow(new InterruptedException("interrupted")).when(useCase).execute(any(), any(), any());
+        doThrow(new InterruptedException("interrupted")).when(useCase).executeBatch(any());
 
         scheduler.run();
 
@@ -97,26 +105,37 @@ class TradingSchedulerTest {
     }
 
     @Test
-    void run_unexpectedException_continuesNextCycle() throws InterruptedException {
-        Account account = mockAccount();
+    void run_contextBuildFails_skipsFailedCycleAndNotifiesAdmin() throws InterruptedException {
+        // cycle1 계좌 조회 실패 → skip + notifyError, cycle2는 contexts에 포함되어 executeBatch 호출
         TradingCycle cycle1 = mockCycle();
-        TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT_ID,
-                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE,
-                TradingCycle.Ticker.SOXL, BigDecimal.ONE,
+        UUID cycleId2 = UUID.randomUUID();
+        UUID accountId2 = UUID.randomUUID();
+        TradingCycle cycle2 = new TradingCycle(cycleId2, accountId2, TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, BigDecimal.ONE,
                 null, Instant.now(), Instant.now());
+        Account account2 = new Account(accountId2, USER_ID, "계좌2",
+                "99999999", "key2", "secret2", "01",
+                Account.Broker.KIS, Instant.now(), Instant.now());
         User user = mockUser();
+
         when(cycleRepository.findAllActive()).thenReturn(List.of(cycle1, cycle2));
-        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
+        RuntimeException ex = new RuntimeException("계좌 없음");
+        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
+        when(accountRepository.findByIdOrThrow(accountId2)).thenReturn(account2);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        doThrow(new RuntimeException("api error")).when(useCase).execute(eq(cycle1), any(), any());
 
         scheduler.run();
 
-        verify(useCase).execute(eq(cycle2), any(), any());
+        verify(notifyPort).notifyError(ex);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
+        verify(useCase).executeBatch(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).cycle()).isEqualTo(cycle2);
     }
 
     @Test
-    void run_unexpectedException_notifiesAdminViaNotifyPort() throws InterruptedException {
+    void run_executeBatchException_notifiesAdminViaNotifyPort() throws InterruptedException {
         Account account = mockAccount();
         TradingCycle cycle = mockCycle();
         User user = mockUser();
@@ -124,7 +143,7 @@ class TradingSchedulerTest {
         when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
-        doThrow(ex).when(useCase).execute(any(), any(), any());
+        doThrow(ex).when(useCase).executeBatch(any());
 
         scheduler.run();
 
