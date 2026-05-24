@@ -78,6 +78,13 @@ public class KisPriceAdapter implements KisPricePort {
                 result.put(t, KisResponseParser.parseBd(item.last()))
             );
         }
+
+        // USD는 주식 가격 API로 조회 불가(통화) — 통화 헤지용 전략에서 1 USD = $1.00 기준가 고정
+        for (Ticker ticker : tickers) {
+            if (ticker == Ticker.USD && !result.containsKey(Ticker.USD)) {
+                result.put(Ticker.USD, BigDecimal.ONE);
+            }
+        }
         return result;
     }
 
