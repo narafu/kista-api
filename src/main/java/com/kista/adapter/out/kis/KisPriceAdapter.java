@@ -73,16 +73,23 @@ public class KisPriceAdapter implements KisPricePort {
 
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
         for (MultiPriceResponse.Output2 item : response.output2()) {
-            if (item.symb() == null || item.last() == null || item.last().isBlank()) continue;
-            Ticker.tryParse(item.symb()).ifPresent(t ->
-                result.put(t, KisResponseParser.parseBd(item.last()))
-            );
+            if (item.symb() == null || item.last() == null || item.last().isBlank()) {
+                log.warn("복수종목 현재가 응답 항목 누락: symb={}, last={}", item.symb(), item.last());
+                continue;
+            }
+            log.debug("복수종목 현재가 응답: symb={}, last={}", item.symb(), item.last());
+            Ticker t = Ticker.tryParse(item.symb()).orElse(null);
+            if (t == null) {
+                log.warn("복수종목 현재가 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
+                continue;
+            }
+            result.put(t, KisResponseParser.parseBd(item.last()));
         }
 
-        // USD는 주식 가격 API로 조회 불가(통화) — 통화 헤지용 전략에서 1 USD = $1.00 기준가 고정
+        // 요청했으나 응답에서 누락된 종목 경고
         for (Ticker ticker : tickers) {
-            if (ticker == Ticker.USD && !result.containsKey(Ticker.USD)) {
-                result.put(Ticker.USD, BigDecimal.ONE);
+            if (!result.containsKey(ticker)) {
+                log.warn("복수종목 현재가 응답에 해당 종목 없음: ticker={}, excd={}", ticker, ticker.getExchangeCode());
             }
         }
         return result;
