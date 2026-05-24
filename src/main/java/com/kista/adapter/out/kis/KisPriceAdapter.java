@@ -41,10 +41,22 @@ public class KisPriceAdapter implements KisPricePort {
 
         PriceResponse response = kisHttpClient.get(SINGLE_PATH, headers, params, PriceResponse.class);
 
-        if (response == null || response.output() == null || response.output().last() == null) {
+        if (response == null || response.output() == null) {
             throw new IllegalStateException("가격 조회 실패: " + ticker);
         }
-        return new BigDecimal(response.output().last());
+        // last(현재가) 우선, 비어있으면 base(전일종가) fallback
+        String last = response.output().last();
+        String base = response.output().base();
+        String price = (last != null && !last.isBlank()) ? last
+                     : (base != null && !base.isBlank()) ? base
+                     : null;
+        if (price == null) {
+            throw new IllegalStateException("가격 조회 실패(last·base 모두 빈값): " + ticker);
+        }
+        if (last == null || last.isBlank()) {
+            log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
+        }
+        return new BigDecimal(price);
     }
 
     @Override
@@ -93,17 +105,27 @@ public class KisPriceAdapter implements KisPricePort {
             result.put(t, KisResponseParser.parseBd(price));
         }
 
-        // 요청했으나 응답에서 누락된 종목 경고
+        // 복수종목 응답에 없는 종목 → 단건 API fallback
         for (Ticker ticker : tickers) {
             if (!result.containsKey(ticker)) {
-                log.warn("복수종목 현재가 응답에 해당 종목 없음: ticker={}, excd={}", ticker, ticker.getExchangeCode());
+                log.warn("복수종목 현재가 응답 누락 — 단건 API fallback 시도: ticker={}, excd={}", ticker, ticker.getExchangeCode());
+                try {
+                    BigDecimal price = getPrice(ticker, account);
+                    result.put(ticker, price);
+                    log.info("단건 API fallback 성공: ticker={}, price={}", ticker, price);
+                } catch (Exception e) {
+                    log.warn("단건 API fallback도 실패: ticker={}", ticker);
+                }
             }
         }
         return result;
     }
 
     record PriceResponse(@JsonProperty("output") Output output) {
-        record Output(@JsonProperty("last") String last) {}
+        record Output(
+            @JsonProperty("last") String last,
+            @JsonProperty("base") String base  // 전일종가 — last 빈값 시 fallback
+        ) {}
     }
 
     record MultiPriceResponse(

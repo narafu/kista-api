@@ -27,7 +27,7 @@ public record TradingCycle(
     public enum Type {
         INFINITE(                                                // TQQQ/SOXL/USD 모두 지원
             EnumSet.of(Ticker.TQQQ, Ticker.SOXL, Ticker.USD),
-            "무한매수",
+            "INFINITE",
             "20분할 LOC 매매 전략",
             Ticker.TQQQ,
             new BigDecimal("1.0")
