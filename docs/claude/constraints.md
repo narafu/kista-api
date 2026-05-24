@@ -1,5 +1,9 @@
 ## 핵심 제약 사항
 
+### GlobalExceptionHandler 자동 예외 처리
+- `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `PrivacyTradeConflictException` → 409 — Controller에서 별도 catch/rethrow 불필요 (단, `SecurityException`→403, KIS 오류→503은 컨트롤러에서 직접 처리)
+- **모든 엔드포인트에 SecurityException catch 필수**: 목록 조회(`GET /api/accounts/{id}/trading-cycles`) 포함 소유권 검증이 있는 모든 서비스 메서드를 호출하는 엔드포인트는 `SecurityException → 403` 처리 필수 — 누락 시 Spring 기본 핸들러가 500 반환 → 프론트엔드에서 해당 데이터가 빈 배열/null로 처리됨
+
 ### Account ↔ TradingCycle 분리 (V38 이후)
 - `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
 - `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), multiple, initialUsdDeposit, createdAt, updatedAt`

@@ -9,4 +9,8 @@ import java.util.UUID;
 
 interface PrivacyTradeMasterJpaRepository extends JpaRepository<PrivacyTradeMasterEntity, UUID> {
     Optional<PrivacyTradeMasterEntity> findByTradeDateAndTicker(LocalDate tradeDate, Ticker ticker);
+
+    // trade_date >= today인 행 중 가장 미래 거래일의 SOXL 기준가 조회
+    Optional<PrivacyTradeMasterEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(
+            LocalDate today, Ticker ticker);
 }

@@ -59,3 +59,4 @@ node_modules/
 #supabase 로컬 상태 및 데이터
 .supabase/
 package-lock.json
+supabase/.temp

@@ -13,6 +13,11 @@
 - **해외주식 API 응답은 lowercase** (`ovrs_pdno`, `ovrs_cblc_qty`, `frcr_evlu_amt2` 등)
 - 국내주식 API는 UPPERCASE — 혼동 주의, `@JsonProperty` 값 반드시 소문자로
 
+### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
+- `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `KisStatisticsController:240`, `Map<Ticker,BigDecimal>` 응답, `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
+- `GET /api/accounts/{accountId}/margin` — `KisStatisticsController:155`, `List<MarginItem>` 응답, USD 예수금은 `currency=="USD"` 행의 `integratedOrderableAmount`
+- `GET /api/privacy-trades/current-base` — `PrivacyTradeController`, trade_date>=오늘 중 가장 미래 SOXL 기준가(`currentCycleStart`), 없으면 404
+
 ### 잔고 조회 API 파라미터
 - `TTTS3012R` (해외주식 잔고): `CANO`, `ACNT_PRDT_CD`, `OVRS_EXCG_CD=NASD`(실전 미국전체), `TR_CRCY_CD=USD`, `CTX_AREA_FK200=""`, `CTX_AREA_NK200=""`
 - `TTTC2101R` (해외증거금 통화별조회): `CANO`, `ACNT_PRDT_CD` — 응답 `output` 목록에서 `natn_name=="미국"` 행의 `itgr_ord_psbl_amt`를 `usdDeposit`으로 사용

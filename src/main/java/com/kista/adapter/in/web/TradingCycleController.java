@@ -39,9 +39,15 @@ public class TradingCycleController {
     public List<TradingCycleResponse> list(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return getCycle.listByAccountId(accountId, userId).stream()
-                .map(TradingCycleResponse::from)
-                .toList();
+        try {
+            return getCycle.listByAccountId(accountId, userId).stream()
+                    .map(TradingCycleResponse::from)
+                    .toList();
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     // 거래 사이클 등록

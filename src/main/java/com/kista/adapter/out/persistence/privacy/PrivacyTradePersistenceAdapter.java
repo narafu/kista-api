@@ -1,15 +1,18 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -99,6 +102,14 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
         return a.compareTo(b) == 0;
+    }
+
+    @Override
+    public Optional<PrivacyCurrentBase> findCurrentBase() {
+        // trade_date >= 오늘인 행 중 가장 미래 거래일의 SOXL 기준가 조회
+        return masterRepository
+                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(LocalDate.now(), Ticker.SOXL)
+                .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(), e.getTradeDate()));
     }
 
     private static boolean quantityEquals(Integer a, Integer b) {
