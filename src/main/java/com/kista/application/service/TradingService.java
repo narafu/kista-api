@@ -10,6 +10,7 @@ import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.admin.*;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
+import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
@@ -18,12 +19,15 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
@@ -32,7 +36,7 @@ import static java.math.RoundingMode.HALF_UP;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TradingService implements ExecuteTradingUseCase {
+public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCase {
 
     private final KisHolidayPort kisHolidayPort;               // 미국 시장 개장일 확인
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
@@ -47,6 +51,40 @@ public class TradingService implements ExecuteTradingUseCase {
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
     private final TradingCycleHistoryRepository cycleHistoryRepository; // 사이클별 일별 스냅샷 저장
+    private final AccountRepository accountRepository;         // preview 소유권 검증
+    private final TradingCycleRepository cycleRepository;      // preview ACTIVE 사이클 조회
+
+    // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
+    // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
+    @Override
+    @Transactional(readOnly = true)
+    public Result preview(UUID accountId, UUID requesterId) {
+        Account account = accountRepository.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+
+        TradingCycle cycle = cycleRepository.findByAccountId(accountId).stream()
+                .filter(c -> c.status() == TradingCycle.Status.ACTIVE)
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("활성 거래 사이클이 없습니다: " + accountId));
+
+        LocalDate today = LocalDate.now();
+
+        // 잔고 로드 (execute()와 공통 helper)
+        BalanceLoad load = loadBalance(cycle);
+        if (load.isSkip()) {
+            return new Result(today, null, List.of(), load.skipReason());
+        }
+        AccountBalance balance = load.balance();
+
+        return switch (cycle.type()) {
+            case INFINITE -> {
+                BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
+                InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "preview:" + accountId);
+                yield new Result(today, calc.position(), calc.orders(), null);
+            }
+            case PRIVACY -> new Result(today, null, List.of(), SkipReason.UNSUPPORTED_STRATEGY);
+        };
+    }
 
     @Override
     public void execute(TradingCycle cycle, Account account, User user) throws InterruptedException {
@@ -117,35 +155,29 @@ public class TradingService implements ExecuteTradingUseCase {
         // 1. 휴장 확인 (공통)
         if (!isMarketOpen(today, account)) return;
 
-        // 2. 잔고 조회 (공통, TradingCycleHistory 기반)
-        TradingCycleHistory latestHistory = cycleHistoryRepository.findRecentByCycleId(cycle.id(), 1)
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
-        AccountBalance balance = new AccountBalance(
-                latestHistory.holdings().intValue(), latestHistory.avgPrice(), latestHistory.usdDeposit());
-        log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
-        if (balance.shouldSkip()) {
+        // 2. 잔고 로드 (공통 helper)
+        BalanceLoad load = loadBalance(cycle);
+        if (load.skipReason() == SkipReason.NO_CYCLE_HISTORY) {
+            throw new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id());
+        }
+        if (load.skipReason() == SkipReason.INSUFFICIENT_BALANCE) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
+            notifyPort.notifyInsufficientBalance(account, load.balance(), cycle.ticker());
             return;
         }
+        AccountBalance balance = load.balance();
+        log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // 3, 4. 현재가 조회 + PLANNED 주문 생성 (전략별)
         TradingSnapshot snapshot = null;
         switch (cycle.type()) {
             case INFINITE -> {
-                BigDecimal resolvedPrice = price;
-                // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: 여기서 단건 조회)
-                log.info("현재가: ${}", resolvedPrice);
-                // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
-                if (balance.holdings() == 0 && resolvedPrice == null) {
-                    throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
-                }
-                InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), resolvedPrice, cycle.multiple());
-                log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
-                        account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
-                savePlannedOrders(position, today, account);
-                snapshot = position.toSnapshot();
+                // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: executeBatch에서 주입)
+                log.info("현재가: ${}", price);
+                // 4. 전략 계산 + PLANNED 저장 (공통 helper)
+                InfiniteCalc calc = calcInfinite(balance, cycle, price, today, account.nickname());
+                savePlannedOrders(calc.orders(), account);
+                snapshot = calc.position().toSnapshot();
             }
             case PRIVACY -> {
                 // TODO: privacy_trades_master/detail에서 오늘 기준가 조회 → Order PLANNED 저장
@@ -182,14 +214,50 @@ public class TradingService implements ExecuteTradingUseCase {
         saveAndNotify(balance, price, snapshot, today, mainOrders, corrections, executions, user, account, cycle);
     }
 
-    // 전략 계산 결과를 orders에 PLANNED 상태로 저장
-    private void savePlannedOrders(InfinitePosition position, LocalDate today, Account account) {
-        List<Order> templates = tradingStrategy.buildOrders(position, today);
+    // 이미 계산된 templates를 orders에 PLANNED 상태로 저장
+    private void savePlannedOrders(List<Order> templates, Account account) {
         List<Order> planned = templates.stream()
                 .map(o -> Order.plan(o, account.id()))
                 .toList();
         orderPort.saveAll(planned);
         log.info("[{}] 계획 주문 {}건 저장 (PLANNED)", account.nickname(), planned.size());
+    }
+
+    // 잔고 로드 결과 — 정상이면 balance non-null, skip이면 skipReason non-null
+    private record BalanceLoad(AccountBalance balance, SkipReason skipReason) {
+        boolean isSkip() { return skipReason != null; }
+    }
+
+    // 잔고 로드 + skip 판정 (execute/preview 공통)
+    private BalanceLoad loadBalance(TradingCycle cycle) {
+        var latestOpt = cycleHistoryRepository.findRecentByCycleId(cycle.id(), 1).stream().findFirst();
+        if (latestOpt.isEmpty()) {
+            return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
+        }
+        TradingCycleHistory latest = latestOpt.get();
+        AccountBalance balance = new AccountBalance(
+                latest.holdings().intValue(), latest.avgPrice(), latest.usdDeposit());
+        if (balance.shouldSkip()) {
+            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
+        }
+        return new BalanceLoad(balance, null);
+    }
+
+    // INFINITE 전략 계산 결과 묶음
+    private record InfiniteCalc(InfinitePosition position, List<Order> orders) {}
+
+    // INFINITE 전략 계산 (execute/preview 공통) — holdings==0 && price==null 방어
+    private InfiniteCalc calcInfinite(AccountBalance balance, TradingCycle cycle,
+                                      BigDecimal price, LocalDate today, String label) {
+        if (balance.holdings() == 0 && price == null) {
+            throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
+        }
+        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price, cycle.multiple());
+        List<Order> orders = tradingStrategy.buildOrders(position, today);
+        log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
+                label, position.priceOffsetRate(), position.currentRound(),
+                position.unitAmount(), orders.size());
+        return new InfiniteCalc(position, orders);
     }
 
     // orders에서 PLANNED 조회 후 KIS에 일괄 접수, 완료 즉시 PLACED 기록

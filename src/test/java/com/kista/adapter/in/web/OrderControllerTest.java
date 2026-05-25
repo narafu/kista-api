@@ -59,7 +59,7 @@ class OrderControllerTest {
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"), BigDecimal.ONE);
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
-        return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order));
+        return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order), null);
     }
 
     // --- /orders/preview (다음 주문 미리보기) ---
@@ -75,7 +75,8 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.position.ticker").value("SOXL"))
                 .andExpect(jsonPath("$.position.currentPrice").value(22.00))
                 .andExpect(jsonPath("$.orders[0].direction").value("BUY"))
-                .andExpect(jsonPath("$.orders[0].orderType").value("LOC"));
+                .andExpect(jsonPath("$.orders[0].orderType").value("LOC"))
+                .andExpect(jsonPath("$.skipReason").doesNotExist());
     }
 
     @Test

@@ -72,7 +72,7 @@ domain      →  외부 의존 없음
 | 새 Flyway 마이그레이션 | 해당 Entity + JpaRepository |
 | JPA Entity 컬럼 변경 (`nullable`, `length`, 타입 등) | Flyway 마이그레이션과 반드시 크로스체크 — Entity의 `nullable = false` 여부와 DB 제약이 불일치하면 런타임까지 오류 미발생, 실제 null 삽입 시 `DataIntegrityViolationException` 발생 (v34 avg_price 사례) |
 | `trading_cycle` 테이블 변경 | `TradingCycleEntity`(persistence/tradingcycle/) + `TradingCycleJpaRepository` + `TradingCyclePersistenceAdapter` |
-| `TradingCycle` record 필드 추가/제거 | `TradingCycleEntity` + `TradingCyclePersistenceAdapter`(toEntity/toDomain) + `TradingCycleService` + `TradingCycleRequest`/`TradingCycleResponse` + 테스트에서 `new TradingCycle(...)` 직접 생성 호출처 (`TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`, `NextOrdersServiceTest`) |
+| `TradingCycle` record 필드 추가/제거 | `TradingCycleEntity` + `TradingCyclePersistenceAdapter`(toEntity/toDomain) + `TradingCycleService` + `TradingCycleRequest`/`TradingCycleResponse` + 테스트에서 `new TradingCycle(...)` 직접 생성 호출처 (`TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`) |
 | `TradingService` 필드 추가 | `TradingCycleHistoryRepository` mock 추가 필수 (`TradingServiceTest`) |
 | `ExecuteTradingUseCase` 메서드 추가/변경 | `TradingService`(구현) + `TradingScheduler`(호출 방식) + `TradingServiceTest` + `TradingSchedulerTest`(verify 대상 변경) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
@@ -92,8 +92,8 @@ domain      →  외부 의존 없음
 | `UpdateAccountUseCase.Command` 필드 추가 | `AccountService.update()`에 적용 로직 + `AccountRequest.toUpdateCommand()` 동시 수정 |
 | `Account` record 필드 추가/제거 | `AccountEntity` + `AccountPersistenceAdapter`(toEntity/buildDomain) + `AccountService`(register/update/withStrategyStatus 3곳) + `AccountRequest`(toRegisterCommand/toUpdateCommand) + `AccountResponse.from()` + `RegisterAccountUseCase.Command` + `UpdateAccountUseCase.Command` + 테스트 9개(`AccountServiceTest` — `new Account` 및 `new UpdateAccountUseCase.Command` 직접 호출 포함, `AccountPersistenceAdapterTest`, `TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`, `KisPortfolioAdapterTest`, `KisProfitAdapterTest`, `KisOrderAdapterTest`, `KisExecutionAdapterTest`) |
 | `NotifyPort` 시그니처 변경 | `TelegramAdapter` + `TradingService` + `TelegramAdapterTest` + `TradingServiceTest` |
-| `KisAccountPort.getBalance` 시그니처 변경 | `KisAccountAdapter` + `TradingService` + `NextOrdersService` + 관련 테스트의 mock stub |
-| `InfinitePosition` 생성자/공개 메서드 변경 | `InfinitePositionTest` + `InfiniteStrategyTypeTest` + `TradingServiceTest` + `TradingSchedulerTest` (`new InfinitePosition(...)` 직접 생성 포함) |
+| `KisAccountPort.getBalance` 시그니처 변경 | `KisAccountAdapter` + `TradingService` + 관련 테스트의 mock stub |
+| `InfinitePosition` 생성자/공개 메서드 변경 | `InfinitePositionTest` + `InfiniteStrategyTypeTest` + `TradingService.calcInfinite()` + `TradingSchedulerTest` (`new InfinitePosition(...)` 직접 생성 포함) |
 | `StatisticsController` 응답 타입 변경 | `StatisticsControllerTest`의 JSONPath 업데이트 필수 (예: `$.totalAssetUsd` → `$.summary.totalAssetUsd`) |
 | `User.role` 변경 또는 `UserRole` 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + `JwtIssuerService` claim |
 | `AdminBootstrapProperties.kakaoIds` 변경 | `application.yml` + `.env.example` + `docker-compose.yml` + Render env |
@@ -135,6 +135,7 @@ domain      →  외부 의존 없음
 - `TradingScheduler`: `cycleRepository.findAllActive()` → 사이클 단위 loop (격리 try-catch)
 - `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (holdings=0, avgPrice=null, usdDeposit=initialUsdDeposit) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
+- `TradingService` helper SSOT: `loadBalance(TradingCycle)` — 잔고 로드+skip 판정(`BalanceLoad` record 반환), `calcInfinite(balance, cycle, price, today, label)` — `InfinitePosition` 생성+`buildOrders()` 호출(`InfiniteCalc` record 반환). `preview()`와 `execute()` 모두 이 helper 경유 — `AccountBalance`/`InfinitePosition` 생성 방식 변경 시 이 두 helper만 수정
 - `TradingService.execute()` 전략 분기: `switch(cycle.type())` 두 블록 구조 — ① steps 3-4(현재가+PLANNED 생성) ② steps 7-9(PostClose 대기+체결+보정). 공통: 1,2,5,6,10. PRIVACY는 두 블록 모두 TODO
 - PRIVACY execute() null guard 패턴: `resolvedPrice=null`, `snapshot=null` → `saveAndNotify`에서 `price != null`(portfolioSnapshot 생략), `snapshot != null`(텔레그램 리포트 생략) 조건 가드 유지 필수
 - `executeBatch`: INFINITE 사이클만 현재가 일괄조회 + 단건 fallback 대상 — PRIVACY 사이클은 `price=null`로 `execute()` 전달

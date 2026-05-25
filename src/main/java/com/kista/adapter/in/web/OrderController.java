@@ -77,7 +77,7 @@ public class OrderController {
             @AuthenticationPrincipal UUID userId) {
         try {
             GetNextOrdersUseCase.Result result = getNextOrders.preview(accountId, userId);
-            return NextOrdersResponse.from(result.tradeDate(), result.position(), result.orders());
+            return NextOrdersResponse.from(result);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {

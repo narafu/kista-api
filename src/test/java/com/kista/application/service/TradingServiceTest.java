@@ -9,6 +9,8 @@ import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
+import com.kista.domain.port.in.GetNextOrdersUseCase;
+import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.TradingStrategy;
@@ -23,8 +25,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -44,6 +49,8 @@ class TradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock TradingCycleHistoryRepository cycleHistoryRepository;
+    @Mock AccountRepository accountRepository;
+    @Mock TradingCycleRepository cycleRepository;
 
     TradingService service;
 
@@ -89,7 +96,8 @@ class TradingServiceTest {
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
-                orderPort, realtimeNotificationPort, cycleHistoryRepository);
+                orderPort, realtimeNotificationPort, cycleHistoryRepository,
+                accountRepository, cycleRepository);
     }
 
     @Test
@@ -258,5 +266,95 @@ class TradingServiceTest {
         verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT); // 단건 fallback 시도 확인
         verify(notifyPort).notifyError(any(IllegalStateException.class)); // 현재가 null → 실패
         verify(tradeHistoryPort, never()).save(any()); // 현재가 조회 실패로 주문 없음
+    }
+
+    // ── preview 테스트 ────────────────────────────────────────────────────────
+
+    @Test
+    void preview_returnsResult_whenHistoryExistsAndInfinite() {
+        Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
+
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
+        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(order));
+
+        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isNull();
+        assertThat(result.position()).isNotNull();
+        assertThat(result.position().ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.position().currentPrice()).isEqualByComparingTo(PRICE);
+        assertThat(result.orders()).hasSize(1);
+        // execute()와 달리 savePlannedOrders 미호출
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
+    void preview_returnsSkipNoCycleHistory_whenNoHistory() {
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of());
+
+        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
+        assertThat(result.position()).isNull();
+        assertThat(result.orders()).isEmpty();
+        verify(kisPricePort, never()).getPrice(any(), any());
+    }
+
+    @Test
+    void preview_returnsSkipInsufficientBalance_whenShouldSkip() {
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+
+        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
+        assertThat(result.position()).isNull();
+        assertThat(result.orders()).isEmpty();
+        verify(kisPricePort, never()).getPrice(any(), any());
+    }
+
+    @Test
+    void preview_returnsSkipUnsupportedStrategy_whenPrivacy() {
+        TradingCycle privacyCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
+                null, Instant.now(), Instant.now());
+
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
+        when(cycleHistoryRepository.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+
+        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isEqualTo(SkipReason.UNSUPPORTED_STRATEGY);
+        assertThat(result.position()).isNull();
+        assertThat(result.orders()).isEmpty();
+    }
+
+    @Test
+    void preview_throwsSecurityException_whenNotOwner() {
+        UUID otherId = UUID.randomUUID();
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+
+        assertThatThrownBy(() -> service.preview(ACCOUNT.id(), otherId))
+                .isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    void preview_throwsNoSuchElementException_whenNoActiveCycle() {
+        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.preview(ACCOUNT.id(), ACCOUNT.userId()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("활성 거래 사이클이 없습니다");
     }
 }
