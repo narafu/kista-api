@@ -100,16 +100,19 @@ git remote set-url origin git@github.com:narafu/kista-api.git
 ### kis-trade-mcp 재시작
 ```bash
 # 소스: ~/workspace/open-trading-api/MCP/Kis Trading MCP
+# `KeyError: 'my_acct'` 오류 = ENV=live로 실행 시 재시작마다 yaml 재생성 → docker exec sed 수정은 무의미, 이미지 재빌드 필수
 docker stop kis-trade-mcp && docker rm kis-trade-mcp
 docker build -t kis-trade-mcp:latest ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP
 docker run -d -p 3001:3000 --name kis-trade-mcp \
-  --.env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/..env.live \
+  --env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/.env.live \
   -e KIS_APP_KEY=<kista .env의 KIS_APP_KEY> \
   -e "KIS_APP_SECRET=<kista .env의 KIS_APP_SECRET>" \
   -e KIS_HTS_ID=<kista .env의 KIS_HTS_ID> \
   -e KIS_ACCT_STOCK=<kista .env의 KIS_ACCOUNT_NO> \
+  -e KIS_PROD_TYPE=01 \
   kis-trade-mcp:latest
 # KIS_ACCOUNT_NO → KIS_ACCT_STOCK (변수명 다름 주의)
+# KIS_PROD_TYPE=01 필수 — .env.live에 빈값으로 있어서 누락 시 my_prod='' → changeTREnv 분기 미적용
 ```
 
 ### .mcp.json 경로 이식성

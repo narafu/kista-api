@@ -25,30 +25,17 @@ public record TradingCycle(
     @Getter
     @RequiredArgsConstructor
     public enum Type {
-        INFINITE(                                                // TQQQ/SOXL/USD 모두 지원
-            EnumSet.of(Ticker.TQQQ, Ticker.SOXL, Ticker.USD),
-            "무한매수",
-            "20분할 LOC 매매 전략",
-            Ticker.TQQQ,
-            new BigDecimal("1.0")
-        ),
-        PRIVACY(                                                 // SOXL 전용 (서버 강제)
-            EnumSet.of(Ticker.SOXL),
-            "기준매매표",
-            "기준 매매표 기반 전략 (SOXL 전용)",
-            Ticker.SOXL,
-            new BigDecimal("1.0")
-        );
+        INFINITE("20분할 LOC 매매 전략"),          // 모든 Ticker 지원
+        PRIVACY("Fanding 기준 매매표 기반 전략 (SOXL 전용)"); // SOXL 전용 (서버 강제)
 
-        private final Set<Ticker> availableTickers; // 사용 가능한 티커 집합
-        private final String label;                 // 한국어 표시 이름
-        private final String description;           // 전략 설명
-        private final Ticker defaultTicker;         // 기본 선택 티커
-        private final BigDecimal defaultMultiple;   // 기본 배수
+        private final String description; // 전략 설명
 
-        public boolean isSupported(Ticker ticker) {
-            if (ticker == null) return false;
-            return availableTickers.contains(ticker);
+        // INFINITE: 전체 Ticker, PRIVACY: SOXL 단일 — Ticker 추가 시 자동 반영
+        public Set<Ticker> availableTickers() {
+            return switch (this) {
+                case PRIVACY -> EnumSet.of(Ticker.SOXL);
+                case INFINITE -> EnumSet.allOf(Ticker.class);
+            };
         }
     }
 
@@ -63,38 +50,48 @@ public record TradingCycle(
 
     @Getter
     @RequiredArgsConstructor
+    public enum ExchangeCode { // KIS 주문 API 사용 OVRS_EXCG_CD
+        NASD("나스닥"),
+        NYSE("뉴욕"),
+        AMEX("아멕스");
+
+        private final String label; // 한국어 표시 이름
+    }
+
+    @Getter
+    @RequiredArgsConstructor
+    public enum ExcdCode { // KIS 시세 API 사용 EXCD_01
+        NAS("나스닥"),
+        NYS("뉴욕"),
+        AMS("아멕스");
+
+        private final String label; // 한국어 표시 이름
+    }
+
+    @Getter
+    @RequiredArgsConstructor
     public enum Ticker {
-        TQQQ("NASD", new BigDecimal("0.15"), "TQQQ", "ProShares UltraPro QQQ (3x NASDAQ-100)"), // NASDAQ
-        SOXL("AMS",  new BigDecimal("0.20"), "SOXL", "Direxion Daily Semiconductors Bull 3x"),    // NYSE ARCA
-        USD("NASD",  new BigDecimal("0.20"), "USD",  "미국달러 (통화 헤지용)");                   // NASDAQ
+        TQQQ(ExchangeCode.NASD, ExcdCode.NAS, new BigDecimal("0.15"), "PROSHARES QQQ 3X"),
+        SOXL(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"),
+        USD(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"),
+        MAGX(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"),
+        FNGU(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
+        BULZ(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
 
-        private final String exchangeCode;         // KIS OVRS_EXCG_CD
-        private final BigDecimal targetProfitRate; // 익절 목표 수익률
-        private final String label;                // 표시 이름
-        private final String description;          // 종목 설명
-
-        public String exchangeCode() { return exchangeCode; }
+        private final ExchangeCode exchangeCode;        // KIS OVRS_EXCG_CD
+        private final ExcdCode excdCode;                // KIS EXCD_01
+        private final BigDecimal targetProfitRate;       // 익절 목표 수익률
+        private final String description;               // 종목 설명(search_info)
 
         // KIS 응답 String → Ticker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
         public static Optional<Ticker> tryParse(String name) {
             if (name == null) return Optional.empty();
-            try { return Optional.of(valueOf(name.trim())); }
-            catch (IllegalArgumentException e) { return Optional.empty(); }
+            try {
+                return Optional.of(valueOf(name.trim()));
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
         }
     }
 
-    // 소속 계좌 소유권 불일치 시 SecurityException → 컨트롤러 403
-    public void verifyOwnedBy(Account account) {
-        if (!accountId.equals(account.id())) {
-            throw new SecurityException("거래 사이클에 대한 접근 권한이 없습니다");
-        }
-    }
-
-    // PRIVACY → SOXL 강제, INFINITE → 요청값 (null이면 TQQQ)
-    public Ticker resolveDefaultTicker(Ticker requested) {
-        return switch (type) {
-            case PRIVACY -> Ticker.SOXL;
-            case INFINITE -> requested != null ? requested : Ticker.TQQQ;
-        };
-    }
 }

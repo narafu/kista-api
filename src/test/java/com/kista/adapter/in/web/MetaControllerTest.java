@@ -55,25 +55,20 @@ class MetaControllerTest {
     }
 
     @Test
-    void getStrategyTypes_authenticated_returnsCodeLabelAvailableTickers() throws Exception {
+    void getStrategyTypes_authenticated_returnsCodeAndAvailableTickers() throws Exception {
         mockMvc.perform(get("/api/meta/strategy-types")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("INFINITE"))
-                .andExpect(jsonPath("$[0].label").value("무한매수"))
-                .andExpect(jsonPath("$[0].availableTickers").isArray())
-                .andExpect(jsonPath("$[0].defaultTicker").exists())
-                .andExpect(jsonPath("$[0].defaultMultiple").exists());
+                .andExpect(jsonPath("$[0].availableTickers").isArray());
     }
 
     @Test
-    void getTickers_authenticated_returnsCodeAndExchangeCode() throws Exception {
+    void getTickers_authenticated_returnsCode() throws Exception {
         mockMvc.perform(get("/api/meta/tickers")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("TQQQ"))
-                .andExpect(jsonPath("$[0].exchangeCode").value("NASD"))
-                .andExpect(jsonPath("$[0].label").exists())
                 .andExpect(jsonPath("$[0].description").exists())
                 .andExpect(jsonPath("$[0].targetProfitRate").exists());
     }

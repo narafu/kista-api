@@ -6,6 +6,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.kis.ReservationOrder;
 import com.kista.domain.model.order.ReservationOrderCommand;
 import com.kista.domain.model.kis.ReservationOrderReceipt;
+import com.kista.domain.model.tradingcycle.TradingCycle.ExchangeCode;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
     private static final String LIST_TR_ID = "TTTT3039R";  // 미국 예약주문 조회 (실전)
     private static final String BUY_TR_ID  = "TTTT3014U";  // 미국 예약주문 매수 (실전)
     private static final String SELL_TR_ID = "TTTT3016U";  // 미국 예약주문 매도 (실전)
-    private static final String EXCHANGE_CODE = "NASD";     // 나스닥 (미국 전체)
+    private static final String EXCHANGE_CODE = ExchangeCode.NASD.name(); // 나스닥 (미국 전체)
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final KisHttpClient kisHttpClient;

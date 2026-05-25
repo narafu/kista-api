@@ -56,13 +56,11 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
             throw new IllegalStateException("이미 등록된 전략 종류입니다: " + cmd.type());
         }
 
-        // ticker 결정: PRIVACY → SOXL 강제, 그 외 → 요청값 (null이면 타입 기본값)
-        Ticker ticker = resolveTicker(cmd.type(), cmd.ticker(), cmd.type().getDefaultTicker());
         BigDecimal multiple = cmd.multiple() != null ? cmd.multiple() : BigDecimal.ONE;
 
         TradingCycle cycle = new TradingCycle(
                 null, accountId, cmd.type(), TradingCycle.Status.ACTIVE,
-                ticker, multiple, cmd.initialUsdDeposit(), null, null
+                cmd.ticker(), multiple, cmd.initialUsdDeposit(), null, null
         );
         TradingCycle saved = cycleRepository.save(cycle);
 
@@ -81,8 +79,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
         Account account = accountRepository.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
 
-        // ticker 결정: PRIVACY → SOXL 강제, 그 외 → 요청값 (null이면 기존값 유지)
-        Ticker updatedTicker = resolveTicker(cycle.type(), cmd.ticker(), cycle.ticker());
+        Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : cycle.ticker();
         BigDecimal updatedMultiple = cmd.multiple() != null ? cmd.multiple() : cycle.multiple();
 
         TradingCycle updated = new TradingCycle(
@@ -152,10 +149,4 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 
-    private Ticker resolveTicker(TradingCycle.Type type, Ticker requested, Ticker fallback) {
-        return switch (type) {           // switch expression — 새 Type 추가 시 컴파일 오류로 강제
-            case PRIVACY -> Ticker.SOXL; // PRIVACY는 항상 SOXL 고정
-            case INFINITE -> requested != null ? requested : fallback;
-        };
-    }
 }

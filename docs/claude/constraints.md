@@ -61,6 +61,7 @@
 - `/api/meta/strategy-types`, `/api/meta/tickers`, `/api/meta/brokers`, `/api/meta/strategy-statuses` — 개별 조회
 - `TradingCycle.Type`/`TradingCycle.Status`, `TradingCycle.Ticker`, `Account.Broker` enum에 label/description 필드 포함 (DTO `from()` 팩토리)
 - UI는 이 엔드포인트로 라벨/available tickers/default값 수신 — enum 리터럴 UI 하드코딩 금지
+- `TickerMeta` 응답 필드: `code`/`label`/`description`/`targetProfitRate` — `exchangeCode`/`excdCode`는 KIS 내부 코드이므로 UI 미노출
 
 ### 파일 인코딩 주의 (BOM)
 - 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
@@ -83,10 +84,11 @@
 ### Ticker enum (V38 이후: TradingCycle.Ticker nested enum)
 - **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
 - **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
-- `TradingCycle.Ticker` enum: `TQQQ("NASD", 0.15, label, desc)`, `SOXL("AMS", 0.20, ...)`, `USD("NASD", 0.20, ...)` — exchangeCode/targetProfitRate/label/description 필드 포함
+- `TradingCycle.Ticker` enum: `TQQQ(ExchangeCode.NASD, ExcdCode.NAS, 0.15, desc)`, `SOXL(ExchangeCode.AMEX, ExcdCode.AMS, 0.20, ...)` — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드 포함 (label 없음). 새 종목 추가 시 두 코드 체계 모두 지정 필수
 - `TradingCycle.Ticker.tryParse(String)` — `Optional<TradingCycle.Ticker>` 반환, KIS 응답 종목코드 안전 변환
-- PRIVACY 전략: 항상 서버에서 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycleService.register/update`)
-- INFINITE 전략: 지정 없으면 기본 `TradingCycle.Ticker.TQQQ`
+- PRIVACY 전략: 항상 서버에서 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycle.Type.resolveTicker()` — 도메인 규칙)
+- INFINITE 전략: 지정 없으면 `Ticker` 선언 순서 첫 번째(현재 TQQQ) — `Type.resolveTicker(requested)` 단일 파라미터 시그니처, `availableTickers().iterator().next()` fallback
+- `TradingCycle.Type` enum: `description` 필드만 보유 (label/defaultTicker/defaultMultiple 없음). `availableTickers()` 메서드가 INFINITE→allOf, PRIVACY→{SOXL} 동적 반환
 - DB: `trading_cycle.ticker` 컬럼에 `Ticker.name()` 저장, `TradingCyclePersistenceAdapter`에서 `TradingCycle.Ticker.valueOf(e.getTicker())`로 변환
 - KIS 응답 모델 — `TradingCycle.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
 - **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `tradingCycle.ticker()` 사용

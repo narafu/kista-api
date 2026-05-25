@@ -3,6 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.domain.port.in.RegisterFcmTokenUseCase;
 import com.kista.domain.port.in.UnregisterFcmTokenUseCase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FcmController.class)
+@Execution(ExecutionMode.SAME_THREAD)
 class FcmControllerTest {
 
     @Autowired MockMvc mockMvc;
