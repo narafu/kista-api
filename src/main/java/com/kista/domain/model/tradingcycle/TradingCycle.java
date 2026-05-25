@@ -27,14 +27,14 @@ public record TradingCycle(
     public enum Type {
         INFINITE(                                                // TQQQ/SOXL/USD 모두 지원
             EnumSet.of(Ticker.TQQQ, Ticker.SOXL, Ticker.USD),
-            "INFINITE",
+            "무한매수",
             "20분할 LOC 매매 전략",
             Ticker.TQQQ,
             new BigDecimal("1.0")
         ),
         PRIVACY(                                                 // SOXL 전용 (서버 강제)
             EnumSet.of(Ticker.SOXL),
-            "PRIVACY",
+            "기준매매표",
             "기준 매매표 기반 전략 (SOXL 전용)",
             Ticker.SOXL,
             new BigDecimal("1.0")

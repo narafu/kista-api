@@ -133,6 +133,10 @@ domain      →  외부 의존 없음
 - `TradingScheduler`: `cycleRepository.findAllActive()` → 사이클 단위 loop (격리 try-catch)
 - `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (holdings=0, avgPrice=null, usdDeposit=initialUsdDeposit) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
+- `TradingCycle.Type` label은 **한국어 문자열** (`INFINITE="무한매수"`, `PRIVACY="기준매매표"`) — `MetaControllerTest`가 `/api/meta` 응답의 label 값을 직접 검증하므로 영문으로 변경 시 테스트 실패
+- `TradingService.execute()` 전략 분기: `switch(cycle.type())` 두 블록 구조 — ① steps 3-4(현재가+PLANNED 생성) ② steps 7-9(PostClose 대기+체결+보정). 공통: 1,2,5,6,10. PRIVACY는 두 블록 모두 TODO
+- PRIVACY execute() null guard 패턴: `resolvedPrice=null`, `snapshot=null` → `saveAndNotify`에서 `price != null`(portfolioSnapshot 생략), `snapshot != null`(텔레그램 리포트 생략) 조건 가드 유지 필수
+- `executeBatch`: INFINITE 사이클만 현재가 일괄조회 + 단건 fallback 대상 — PRIVACY 사이클은 `price=null`로 `execute()` 전달
 
 ### PRIVACY 전략 패턴 (기준 매매표)
 - `privacy_trades_master` (`adapter/out/persistence/privacy/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)

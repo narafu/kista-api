@@ -1,5 +1,37 @@
 ## 핵심 제약 사항
 
+### RESTful API 설계 원칙
+
+**URI 규칙**
+- 리소스 식별: 명사 복수형 — `/accounts`, `/trading-cycles`, `/orders`
+- 계층 표현: 소속 관계 `/accounts/{id}/trading-cycles` — 독립 리소스는 루트 수준
+- 동사 URI 금지: `/getAccount`, `/createOrder` 형태 사용 불가 — HTTP 메서드로 표현
+- 상태 전이 예외: `/trading-cycles/{id}/pause`, `/trading-cycles/{id}/resume` — PATCH + 서브 경로 패턴
+
+**HTTP 메서드**
+- `GET`: 안전·멱등 — 상태 변경 사이드이펙트 금지
+- `POST`: 생성 (비멱등) — 응답 201 + `Location` 헤더
+- `PUT`: 전체 교체 (멱등)
+- `PATCH`: 부분 수정 — pause/resume/status 변경
+- `DELETE`: 삭제 (멱등) — 성공 시 204 No Content
+
+**HTTP 상태 코드 (이 프로젝트 매핑)**
+- `200`: 조회·수정 성공
+- `201`: 생성 성공 (`Location` 헤더 포함)
+- `204`: 삭제 성공 (바디 없음)
+- `400`: `IllegalArgumentException` — 잘못된 파라미터
+- `401`: 인증 없음 (JWT 미포함·만료)
+- `403`: `SecurityException` — 소유권 불일치·권한 없음
+- `404`: `NoSuchElementException` — 리소스 없음
+- `409`: `PrivacyTradeConflictException` — 중복·충돌
+- `422`: `InvalidKisKeyException` — KIS 자격증명 검증 실패
+- `429`: `CooldownException` — 재신청 쿨다운
+- `503`: KIS API 오류 — 외부 서비스 불가
+
+**응답 형식**
+- 도메인 record 직접 반환 금지 → `XxxResponse.from(domain)` DTO 사용 (예외: `StatisticsController`는 KIS live 모델 그대로 반환 — kista-ui normalizer 필요)
+- 오류 응답: `GlobalExceptionHandler`가 일관된 형식으로 처리 — 컨트롤러에서 별도 catch/rethrow 불필요
+
 ### GlobalExceptionHandler 자동 예외 처리
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `PrivacyTradeConflictException` → 409 — Controller에서 별도 catch/rethrow 불필요 (단, `SecurityException`→403, KIS 오류→503은 컨트롤러에서 직접 처리)
 - **모든 엔드포인트에 SecurityException catch 필수**: 목록 조회(`GET /api/accounts/{id}/trading-cycles`) 포함 소유권 검증이 있는 모든 서비스 메서드를 호출하는 엔드포인트는 `SecurityException → 403` 처리 필수 — 누락 시 Spring 기본 핸들러가 500 반환 → 프론트엔드에서 해당 데이터가 빈 배열/null로 처리됨

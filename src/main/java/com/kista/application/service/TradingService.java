@@ -61,17 +61,18 @@ public class TradingService implements ExecuteTradingUseCase {
     void executeBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         if (contexts.isEmpty()) return;
 
-        // 고유 ticker 수집 → 복수종목 현재가 1회 일괄 조회
+        // INFINITE 사이클만 현재가 일괄 조회 (PRIVACY는 현재가 불필요)
         List<Ticker> tickers = contexts.stream()
+                .filter(c -> c.cycle().type() == TradingCycle.Type.INFINITE)
                 .map(c -> c.cycle().ticker())
                 .distinct().toList();
-        Map<Ticker, BigDecimal> prices = fetchPricesBatch(tickers, contexts.get(0).account());
+        Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesBatch(tickers, contexts.get(0).account());
 
         for (BatchContext ctx : contexts) {
             try {
                 BigDecimal price = prices.get(ctx.cycle().ticker());
-                if (price == null) {
-                    // 배치 응답 누락 시 단건 fallback
+                if (price == null && ctx.cycle().type() == TradingCycle.Type.INFINITE) {
+                    // 배치 응답 누락 시 단건 fallback (INFINITE만)
                     price = kisPricePort.getPrice(ctx.cycle().ticker(), ctx.account());
                 }
                 execute(ctx.cycle(), ctx.account(), ctx.user(), dst, price);
@@ -104,10 +105,10 @@ public class TradingService implements ExecuteTradingUseCase {
             throws InterruptedException {
         LocalDate today = LocalDate.now();
 
-        // 1. 휴장 확인 (waitForOrderTime 전으로 이동: 휴장이면 대기 없이 즉시 return)
+        // 1. 휴장 확인 (공통)
         if (!isMarketOpen(today, account)) return;
 
-        // 2. 잔고 조회 (TradingCycleHistory 기반)
+        // 2. 잔고 조회 (공통, TradingCycleHistory 기반)
         TradingCycleHistory latestHistory = cycleHistoryRepository.findRecentByCycleId(cycle.id(), 1)
                 .stream().findFirst()
                 .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
@@ -120,34 +121,54 @@ public class TradingService implements ExecuteTradingUseCase {
             return;
         }
 
-        // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: 여기서 단건 조회)
-        BigDecimal resolvedPrice = (price != null) ? price : kisPricePort.getPrice(cycle.ticker(), account);
-        log.info("현재가: ${}", resolvedPrice);
+        // 3, 4. 현재가 조회 + PLANNED 주문 생성 (전략별)
+        BigDecimal resolvedPrice = null;
+        TradingSnapshot snapshot = null;
+        switch (cycle.type()) {
+            case INFINITE -> {
+                // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: 여기서 단건 조회)
+                resolvedPrice = (price != null) ? price : kisPricePort.getPrice(cycle.ticker(), account);
+                log.info("현재가: ${}", resolvedPrice);
+                // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
+                InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), resolvedPrice, cycle.multiple());
+                log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
+                        account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
+                savePlannedOrders(position, today, account);
+                snapshot = position.toSnapshot();
+            }
+            case PRIVACY -> {
+                // TODO: privacy_trades_master/detail에서 오늘 기준가 조회 → Order PLANNED 저장
+            }
+            default -> throw new IllegalStateException("미구현 전략 타입: " + cycle.type());
+        }
 
-        // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
-        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), resolvedPrice, cycle.multiple());
-        log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
-                account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
-        savePlannedOrders(position, today, account);
-
-        // 5. 주문 시각까지 대기 (계획 저장 후 대기로 이동)
+        // 5. 주문 시각까지 대기 (공통, 계획 저장 후 대기)
         waitForOrderTime(dst);
 
-        // 6. orders(PLANNED) 조회 → KIS 일괄 접수 (execute 단계)
+        // 6. orders(PLANNED) 조회 → KIS 일괄 접수 (공통)
         List<Order> mainOrders = executePlannedOrders(today, account);
 
-        // 7. 장 후 체결 확인 대기
-        waitForPostClose(dst);
+        // 7, 8, 9. 장 후 체결 확인 + 보정 주문 (전략별)
+        List<Order> corrections = List.of();
+        List<Execution> executions = List.of();
+        switch (cycle.type()) {
+            case INFINITE -> {
+                // 7. 장 후 체결 확인 대기
+                waitForPostClose(dst);
+                // 8. 체결 내역 조회
+                executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
+                log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
+                // 9. 보정 주문
+                corrections = applyCorrections(mainOrders, executions, today, account);
+            }
+            case PRIVACY -> {
+                // TODO: PRIVACY 체결 확인·보정 (필요 시)
+            }
+            default -> throw new IllegalStateException("미구현 전략 타입: " + cycle.type());
+        }
 
-        // 8. 체결 내역 조회
-        List<Execution> executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
-        log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
-
-        // 9. 보정 주문
-        List<Order> corrections = applyCorrections(mainOrders, executions, today, account);
-
-        // 10. 이력 저장 + 알림
-        saveAndNotify(balance, resolvedPrice, today, position, mainOrders, corrections, executions, user, account, cycle);
+        // 10. 이력 저장 + 알림 (공통)
+        saveAndNotify(balance, resolvedPrice, snapshot, today, mainOrders, corrections, executions, user, account, cycle);
     }
 
     // 전략 계산 결과를 orders에 PLANNED 상태로 저장
@@ -207,19 +228,22 @@ public class TradingService implements ExecuteTradingUseCase {
         return corrections;
     }
 
-    private void saveAndNotify(AccountBalance balance, BigDecimal price, LocalDate today,
-                               InfinitePosition position, List<Order> mainOrders,
-                               List<Order> corrections, List<Execution> executions,
-                               User user, Account account, TradingCycle cycle) {
+    private void saveAndNotify(AccountBalance balance, BigDecimal price, TradingSnapshot snapshot,
+                               LocalDate today, List<Order> mainOrders, List<Order> corrections,
+                               List<Execution> executions, User user, Account account, TradingCycle cycle) {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
-        portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
-        log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
+        if (price != null) { // PRIVACY TODO: 현재가 미조회 시 포트폴리오 스냅샷 생략
+            portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
+            log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
+        }
         saveCycleHistory(balance, cycle); // 사이클별 스냅샷 저장
-        TradingReport report = buildReport(today, position, mainOrders, corrections, executions);
-        userNotificationPort.notifyTradingReport(user, account, report);
-        log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
+        if (snapshot != null) { // PRIVACY TODO: 스냅샷 미생성 시 텔레그램 리포트 생략
+            TradingReport report = buildReport(today, snapshot, mainOrders, corrections, executions);
+            userNotificationPort.notifyTradingReport(user, account, report);
+            log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
+        }
         // 체결 건별 SSE 실시간 알림 (@Transactional 외부에서 호출 — 이미 DB 저장 완료 후)
         for (Execution e : executions) {
             TradeEvent event = e.direction() == SELL
@@ -261,7 +285,7 @@ public class TradingService implements ExecuteTradingUseCase {
                 price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 
-    private TradingReport buildReport(LocalDate today, InfinitePosition position,
+    private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,
                                       List<Order> mainOrders, List<Order> corrections,
                                       List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
@@ -272,6 +296,6 @@ public class TradingService implements ExecuteTradingUseCase {
                 .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TradingReport(today, position.toSnapshot(), mainOrders, corrections, totalBought, totalSold);
+        return new TradingReport(today, snapshot, mainOrders, corrections, totalBought, totalSold);
     }
 }
