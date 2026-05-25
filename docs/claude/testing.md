@@ -6,10 +6,12 @@
 ### static 필드 forward reference 주의
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
 
-### TradingService execute() lazy-price-fetch 패턴
-- `execute(cycle, account, user, DstInfo dst)` (package-private) 는 `execute(..., null)` 위임 — null price = early-exit(market, balance) 통과 후 `kisPricePort.getPrice()` lazy 호출
-- **gotcha**: `execute(dst)` 안에서 `getPrice()`를 먼저 호출하면 market closed / 잔고부족 early-exit 테스트가 `NeverWantedButInvoked`로 실패
-- `executeBatch(List, DstInfo)` package-private 오버로드 존재 — `execute(DstInfo)` 와 동일한 sleep 우회 패턴 (테스트에서 DstInfo 직접 주입)
+### TradingService execute() 가격 주입 패턴
+- `execute(cycle, account, user, DstInfo dst)` (package-private) 는 `execute(..., null)` 위임 — price=null 그대로 INFINITE 블록까지 전달 (lazy getPrice 없음)
+- INFINITE 블록: `resolvedPrice = price`. holdings=0 && price=null → `IllegalStateException("현재가 조회 실패")` 발생
+- 따라서 holdings=0(신규 계좌) 테스트는 `executeBatch` 경로 사용 필수 — `getPrices` stub으로 PRICE 주입
+- `portfolioSnapshotPort.save()` 는 `price != null` 조건 가드 — 단건 경로(price=null)에서는 미호출. 테스트에서 `verify(portfolioSnapshotPort, never()).save(any())` 가 정상
+- `executeBatch(List, DstInfo)` package-private 오버로드 존재 — DstInfo 직접 주입으로 sleep 우회
 - "한 사이클 실패 시 다음 계속" 격리 로직은 `TradingService.executeBatch()` 내부 → `TradingServiceTest`에서 검증. `TradingSchedulerTest`는 context 빌드 실패(계좌/사용자 조회 오류) 격리만 검증
 
 ### @WebMvcTest + Spring Security 패턴

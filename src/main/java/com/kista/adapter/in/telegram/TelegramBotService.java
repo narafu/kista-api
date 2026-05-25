@@ -86,8 +86,8 @@ class TelegramBotService {
         try {
             PortfolioSnapshot s = getPortfolioUseCase.getCurrent();
             return String.format(
-                    "<b>포트폴리오 현황 [%s]</b>%n보유: %d주 @ $%.4f%n현재가: $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
-                    s.snapshotDate(), s.holdings(), s.avgPrice(), s.currentPrice(),
+                    "<b>포트폴리오 현황 [%s]</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
+                    s.snapshotDate(), s.holdings(), s.avgPrice(),
                     s.marketValueUsd(), s.usdDeposit(), s.totalAssetUsd());
         } catch (NoSuchElementException e) {
             return "포트폴리오 데이터가 없습니다.";

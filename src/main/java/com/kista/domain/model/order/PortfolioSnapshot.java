@@ -12,8 +12,7 @@ public record PortfolioSnapshot(
         Ticker ticker,             // 거래 종목
         int holdings,              // 보유 수량
         BigDecimal avgPrice,       // 평균 매입가 (USD)
-        BigDecimal currentPrice,   // 현재 시장가 (USD)
-        BigDecimal marketValueUsd, // 평가액 (USD) = currentPrice × holdings
+        BigDecimal marketValueUsd, // 평가액 (USD) = 현재가 × holdings
         BigDecimal usdDeposit,     // USD 예수금
         BigDecimal totalAssetUsd,  // 총 자산 (USD) = marketValueUsd + usdDeposit
         UUID accountId,            // FK → accounts(id), V8에서 추가 (nullable)

@@ -19,8 +19,6 @@ public record PortfolioSnapshotResponse(
         int holdings,
         @Schema(description = "평균매입단가 (USD)", example = "72.50")
         BigDecimal avgPrice,
-        @Schema(description = "현재가 (USD)", example = "85.20")
-        BigDecimal currentPrice,
         @Schema(description = "평가금액 (USD)", example = "2556.00")
         BigDecimal marketValueUsd,
         @Schema(description = "예수금 (통합주문가능금액, USD)", example = "500.00")
@@ -33,7 +31,7 @@ public record PortfolioSnapshotResponse(
     public static PortfolioSnapshotResponse from(PortfolioSnapshot s) {
         return new PortfolioSnapshotResponse(
                 s.id(), s.snapshotDate(), s.ticker(), s.holdings(),
-                s.avgPrice(), s.currentPrice(), s.marketValueUsd(),
+                s.avgPrice(), s.marketValueUsd(),
                 s.usdDeposit(), s.totalAssetUsd(), s.createdAt());
     }
 }

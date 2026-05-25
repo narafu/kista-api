@@ -31,7 +31,7 @@ public class PortfolioSnapshotPersistenceAdapter implements PortfolioSnapshotPor
     private PortfolioSnapshotEntity toEntity(PortfolioSnapshot s) {
         return new PortfolioSnapshotEntity(
                 s.id(), s.snapshotDate(), s.ticker(), s.holdings(),
-                s.avgPrice(), s.currentPrice(), s.marketValueUsd(),
+                s.avgPrice(), s.marketValueUsd(),
                 s.usdDeposit(), s.totalAssetUsd(), s.accountId()
         );
     }
@@ -39,7 +39,7 @@ public class PortfolioSnapshotPersistenceAdapter implements PortfolioSnapshotPor
     private PortfolioSnapshot toDomain(PortfolioSnapshotEntity e) {
         return new PortfolioSnapshot(
                 e.getId(), e.getSnapshotDate(), e.getTicker(), e.getHoldings(),
-                e.getAvgPrice(), e.getCurrentPrice(), e.getMarketValueUsd(),
+                e.getAvgPrice(), e.getMarketValueUsd(),
                 e.getUsdDeposit(), e.getTotalAssetUsd(), e.getAccountId(), e.getCreatedAt()
         );
     }

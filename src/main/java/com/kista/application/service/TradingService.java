@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -66,15 +67,11 @@ public class TradingService implements ExecuteTradingUseCase {
                 .filter(c -> c.cycle().type() == TradingCycle.Type.INFINITE)
                 .map(c -> c.cycle().ticker())
                 .distinct().toList();
-        Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesBatch(tickers, contexts.get(0).account());
+        Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesComplete(tickers, contexts.get(0).account());
 
         for (BatchContext ctx : contexts) {
             try {
                 BigDecimal price = prices.get(ctx.cycle().ticker());
-                if (price == null && ctx.cycle().type() == TradingCycle.Type.INFINITE) {
-                    // 배치 응답 누락 시 단건 fallback (INFINITE만)
-                    price = kisPricePort.getPrice(ctx.cycle().ticker(), ctx.account());
-                }
                 execute(ctx.cycle(), ctx.account(), ctx.user(), dst, price);
             } catch (InterruptedException e) {
                 throw e; // 인터럽트는 상위로 전파
@@ -85,13 +82,25 @@ public class TradingService implements ExecuteTradingUseCase {
         }
     }
 
-    private Map<Ticker, BigDecimal> fetchPricesBatch(List<Ticker> tickers, Account account) {
+    private Map<Ticker, BigDecimal> fetchPricesComplete(List<Ticker> tickers, Account account) {
+        Map<Ticker, BigDecimal> prices;
         try {
-            return kisPricePort.getPrices(tickers, account);
+            prices = new HashMap<>(kisPricePort.getPrices(tickers, account));
         } catch (Exception e) {
             log.warn("복수종목 현재가 일괄 조회 실패, 단건 fallback 사용: {}", e.getMessage());
-            return Map.of();
+            prices = new HashMap<>();
         }
+        // 배치 응답 누락 ticker → 단건으로 보완
+        for (Ticker ticker : tickers) {
+            if (!prices.containsKey(ticker)) {
+                try {
+                    prices.put(ticker, kisPricePort.getPrice(ticker, account));
+                } catch (Exception e) {
+                    log.warn("[{}] 단건 현재가 조회 실패: {}", ticker.name(), e.getMessage());
+                }
+            }
+        }
+        return prices;
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로: 가격은 내부에서 lazy-fetch)
@@ -122,14 +131,16 @@ public class TradingService implements ExecuteTradingUseCase {
         }
 
         // 3, 4. 현재가 조회 + PLANNED 주문 생성 (전략별)
-        BigDecimal resolvedPrice = null;
         TradingSnapshot snapshot = null;
         switch (cycle.type()) {
             case INFINITE -> {
+                BigDecimal resolvedPrice = price;
                 // 3. 현재가 (배치 경로: 이미 조회됨 / 단건 경로: 여기서 단건 조회)
-                resolvedPrice = (price != null) ? price : kisPricePort.getPrice(cycle.ticker(), account);
                 log.info("현재가: ${}", resolvedPrice);
                 // 4. 전략 계산 → orders에 PLANNED 저장 (plan 단계)
+                if (balance.holdings() == 0 && resolvedPrice == null) {
+                    throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
+                }
                 InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), resolvedPrice, cycle.multiple());
                 log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}",
                         account.nickname(), position.priceOffsetRate(), position.currentRound(), position.unitAmount());
@@ -168,7 +179,7 @@ public class TradingService implements ExecuteTradingUseCase {
         }
 
         // 10. 이력 저장 + 알림 (공통)
-        saveAndNotify(balance, resolvedPrice, snapshot, today, mainOrders, corrections, executions, user, account, cycle);
+        saveAndNotify(balance, price, snapshot, today, mainOrders, corrections, executions, user, account, cycle);
     }
 
     // 전략 계산 결과를 orders에 PLANNED 상태로 저장
@@ -282,7 +293,7 @@ public class TradingService implements ExecuteTradingUseCase {
                 .setScale(2, HALF_UP);
         return new PortfolioSnapshot(
                 null, today, ticker, balance.holdings(), balance.avgPrice(),
-                price, marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
+                marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 
     private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,

@@ -37,9 +37,6 @@ class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
     @Column(name = "avg_price", nullable = false, precision = 12, scale = 4)
     private BigDecimal avgPrice;
 
-    @Column(name = "current_price", nullable = false, precision = 12, scale = 4)
-    private BigDecimal currentPrice;
-
     @Column(name = "market_value_usd", nullable = false, precision = 12, scale = 2)
     private BigDecimal marketValueUsd;
 
@@ -53,15 +50,13 @@ class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
     private UUID accountId;
 
     PortfolioSnapshotEntity(UUID id, LocalDate snapshotDate, Ticker ticker, int holdings,
-                            BigDecimal avgPrice, BigDecimal currentPrice,
-                            BigDecimal marketValueUsd, BigDecimal usdDeposit,
-                            BigDecimal totalAssetUsd, UUID accountId) {
+                            BigDecimal avgPrice, BigDecimal marketValueUsd,
+                            BigDecimal usdDeposit, BigDecimal totalAssetUsd, UUID accountId) {
         this.id = id;
         this.snapshotDate = snapshotDate;
         this.ticker = ticker;
         this.holdings = holdings;
         this.avgPrice = avgPrice;
-        this.currentPrice = currentPrice;
         this.marketValueUsd = marketValueUsd;
         this.usdDeposit = usdDeposit;
         this.totalAssetUsd = totalAssetUsd;
