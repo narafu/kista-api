@@ -40,7 +40,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
         params.add("ORD_END_DT", to.format(FMT));
         params.add("SLL_BUY_DVSN", "00");              // 전체
         params.add("CCLD_NCCS_DVSN", "00");            // 전체
-        params.add("OVRS_EXCG_CD", ticker.exchangeCode()); // 전략 종목 거래소
+        params.add("OVRS_EXCG_CD", ticker.getExchangeCode().name()); // 전략 종목 거래소
         params.add("SORT_SQN", "DS");                  // 정순
         params.add("ORD_DT", "");
         params.add("ORD_GNO_BRNO", "");

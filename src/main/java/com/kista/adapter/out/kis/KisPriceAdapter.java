@@ -35,7 +35,7 @@ public class KisPriceAdapter implements KisPricePort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         // KIS exchangeCode: NASD→NAS, AMS→AMS
-        String excd = ticker.getExchangeCode().equals("NASD") ? "NAS" : ticker.getExchangeCode();
+        String excd = ticker.getExcdCode().name();
         params.add("EXCD", excd);
         params.add("SYMB", ticker.name());
 
@@ -71,7 +71,7 @@ public class KisPriceAdapter implements KisPricePort {
         for (int i = 0; i < tickers.size(); i++) {
             Ticker ticker = tickers.get(i);
             String num = String.format("%02d", i + 1); // "01", "02", "03"
-            String excd = ticker.getExchangeCode().equals("NASD") ? "NAS" : ticker.getExchangeCode();
+            String excd = ticker.getExcdCode().name();
             params.add("EXCD_" + num, excd);
             params.add("SYMB_" + num, ticker.name());
         }

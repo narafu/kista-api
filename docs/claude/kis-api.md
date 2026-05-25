@@ -77,7 +77,9 @@
   - 응답: `output.nrec`, `output2[]`(종목별) — `symb`(종목코드), `last`(현재가) 필드 사용
   - `Ticker.tryParse(symb)`로 enum 외 종목 silent drop
 - `getPrice(Ticker, Account)` — 단건 API(`HHDFS00000300`) 유지
-- EXCD 변환: `ticker.getExchangeCode()` 기반 — `NASD`→`NAS`, `AMS`→`AMS` (단건/복수 공통 적용)
+- KIS 거래소 코드 두 체계 혼용: `OVRS_EXCG_CD` (주문·체결·잔고·예약주문 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
+- `TradingCycle.ExchangeCode` enum → `OVRS_EXCG_CD` 용, `TradingCycle.ExcdCode` enum → `EXCD` 용 — `Ticker`가 두 필드 모두 보유
+- KIS 응답 모델(`PresentBalanceResult.Item`, `PeriodProfitResult.Item`, `ReservationOrder`)의 `exchangeCode: String`은 수신값이므로 enum 변환 대상 아님
 
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용

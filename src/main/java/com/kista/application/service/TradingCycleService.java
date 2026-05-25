@@ -57,7 +57,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
         }
 
         // ticker 결정: PRIVACY → SOXL 강제, 그 외 → 요청값 (null이면 타입 기본값)
-        Ticker ticker = resolveTicker(cmd.type(), cmd.ticker(), cmd.type().getDefaultTicker());
+        Ticker ticker = cmd.type().resolveTicker(cmd.ticker(), cmd.type().getDefaultTicker());
         BigDecimal multiple = cmd.multiple() != null ? cmd.multiple() : BigDecimal.ONE;
 
         TradingCycle cycle = new TradingCycle(
@@ -82,7 +82,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
         account.verifyOwnedBy(requesterId);
 
         // ticker 결정: PRIVACY → SOXL 강제, 그 외 → 요청값 (null이면 기존값 유지)
-        Ticker updatedTicker = resolveTicker(cycle.type(), cmd.ticker(), cycle.ticker());
+        Ticker updatedTicker = cycle.type().resolveTicker(cmd.ticker(), cycle.ticker());
         BigDecimal updatedMultiple = cmd.multiple() != null ? cmd.multiple() : cycle.multiple();
 
         TradingCycle updated = new TradingCycle(
@@ -152,10 +152,4 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 
-    private Ticker resolveTicker(TradingCycle.Type type, Ticker requested, Ticker fallback) {
-        return switch (type) {           // switch expression — 새 Type 추가 시 컴파일 오류로 강제
-            case PRIVACY -> Ticker.SOXL; // PRIVACY는 항상 SOXL 고정
-            case INFINITE -> requested != null ? requested : fallback;
-        };
-    }
 }

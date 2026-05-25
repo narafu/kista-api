@@ -67,12 +67,11 @@ class MetaControllerTest {
     }
 
     @Test
-    void getTickers_authenticated_returnsCodeAndExchangeCode() throws Exception {
+    void getTickers_authenticated_returnsCodeAndLabel() throws Exception {
         mockMvc.perform(get("/api/meta/tickers")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("TQQQ"))
-                .andExpect(jsonPath("$[0].exchangeCode").value("NASD"))
                 .andExpect(jsonPath("$[0].label").exists())
                 .andExpect(jsonPath("$[0].description").exists())
                 .andExpect(jsonPath("$[0].targetProfitRate").exists());

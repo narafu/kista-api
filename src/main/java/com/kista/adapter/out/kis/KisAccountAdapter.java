@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.TradingCycle.ExchangeCode;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisMarginPort;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +42,7 @@ public class KisAccountAdapter implements KisAccountPort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());
         params.add("ACNT_PRDT_CD", account.kisAccountType());
-        params.add("OVRS_EXCG_CD", "NASD");     // 실전 미국전체
+        params.add("OVRS_EXCG_CD", ExchangeCode.NASD.name()); // 실전 미국전체
         params.add("TR_CRCY_CD", "USD");
         params.add("CTX_AREA_FK200", "");
         params.add("CTX_AREA_NK200", "");
