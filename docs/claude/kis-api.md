@@ -16,7 +16,7 @@
 ### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
 - `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `KisStatisticsController:240`, `Map<Ticker,BigDecimal>` 응답, `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
 - `GET /api/accounts/{accountId}/margin` — `KisStatisticsController:155`, `List<MarginItem>` 응답, USD 예수금은 `currency=="USD"` 행의 `integratedOrderableAmount`
-- `GET /api/privacy-trades/current-base` — `PrivacyTradeController`, trade_date>=오늘 중 가장 미래 SOXL 기준가(`currentCycleStart`), 없으면 404
+- `GET /api/privacy-trades/base/latest` — `PrivacyTradeController`, trade_date>=오늘 중 가장 미래 SOXL 기준가(`currentCycleStart`), 없으면 404
 
 ### 잔고 조회 API 파라미터
 - `TTTS3012R` (해외주식 잔고): `CANO`, `ACNT_PRDT_CD`, `OVRS_EXCG_CD=NASD`(실전 미국전체), `TR_CRCY_CD=USD`, `CTX_AREA_FK200=""`, `CTX_AREA_NK200=""`

@@ -24,10 +24,11 @@ application/
 adapter/in/
   schedule/      ← TradingScheduler (월~금 04:00 KST, 멀티계좌)
   web/           ← REST Controller + DTO
-                    - AccountController: 계좌 CRUD (POST/GET/PUT/DELETE /api/accounts)
+                    - AccountController: 계좌 CRUD (POST/GET/PUT/DELETE /api/accounts) + KIS 연결 테스트(POST /connection-tests)
+                    - AdminUserController: 사용자 목록(GET) + 상태변경(PATCH /{id}/status — ACTIVE=승인·REJECTED=거절 통합) + 역할변경(PATCH /{id}/role) + 삭제(DELETE /{id})
                     - TradingCycleController: 사이클 CRUD + pause/resume (GET/POST /api/accounts/{id}/trading-cycles, PUT/DELETE/PATCH /api/trading-cycles/{id})
                     - MetaController: enum 메타데이터 SSOT (GET /api/meta/**) — UI 라벨/설명/available tickers. Cache-Control max-age=1h
-                    - OrderController: 예약주문(POST /reservation-orders) + 다음 주문 미리보기(GET /orders/next)
+                    - OrderController: 예약주문(POST /reservation-orders) + 다음 주문 미리보기(GET /orders/preview)
                     - FidaOrderController: 서버 간 내부 주문 수신 (POST /api/internal/fida-orders, X-Internal-Token 인증)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService

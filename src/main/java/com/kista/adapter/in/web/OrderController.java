@@ -70,7 +70,7 @@ public class OrderController {
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
-    @GetMapping("/orders/next")
+    @GetMapping("/orders/preview")
     public NextOrdersResponse getNext(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,

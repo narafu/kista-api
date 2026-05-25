@@ -65,6 +65,12 @@ curl https://kista-api.onrender.com/actuator/health
 bash -c "cd /mnt/d/src/study/kista/kista-ui && npx tsc --noEmit"
 ```
 
+### kista-ui URL 변경 연동 (멀티 레포)
+# kista-api URL 변경 후 kista-ui에 전달하는 방법:
+# 1) 이 대화의 변경 목록을 kista-ui 세션에 붙여넣기 (가장 빠름)
+# 2) kista-ui 세션에서: git -C /Users/narafu/workspace/kista/kista-api diff HEAD~1
+# kista-api 세션에서 절대경로로 kista-ui 파일 직접 편집 가능하나 git 커밋은 kista-ui 세션에서 따로 수행
+
 ### Git 구조 (Claude Code 세션 필수 지식)
 # kista-api와 kista-ui는 각각 독립 git 저장소 — 루트 /kista에는 git 없음
 # 커밋 전 author 확인 필수: git config user.name / git config user.email — 올바른 값: narafu / narafu@kakao.com

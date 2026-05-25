@@ -61,7 +61,7 @@ class AuthControllerTest {
         Instant retryAfter = Instant.now().plus(1, ChronoUnit.HOURS);
         doThrow(new Account.CooldownException(retryAfter)).when(approveUser).reapply(USER_ID);
 
-        mockMvc.perform(post("/api/auth/reapply")
+        mockMvc.perform(post("/api/auth/approval-requests")
                         .with(csrf())
                         .with(authentication(auth())))
                 .andExpect(status().isTooManyRequests());

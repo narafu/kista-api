@@ -80,9 +80,9 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "재신청 불가 상태"),
             @ApiResponse(responseCode = "429", description = "쿨다운 중 — 응답 body에 재신청 가능 시각(ISO-8601) 포함")
     })
-    @PostMapping("/reapply")
+    @PostMapping("/approval-requests")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void reapply(@AuthenticationPrincipal UUID userId) {
+    public void requestApproval(@AuthenticationPrincipal UUID userId) {
         try {
             approveUser.reapply(userId);
         } catch (Account.CooldownException e) {

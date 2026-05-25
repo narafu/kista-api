@@ -37,25 +37,19 @@ public class AdminUserController {
         return AdminUserResponse.fromList(users);
     }
 
-    // 사용자 승인
-    @Operation(summary = "사용자 승인")
-    @PostMapping("/{userId}/approve")
+    // 사용자 상태 변경 — ACTIVE(승인) / REJECTED(거절)
+    @Operation(summary = "사용자 상태 변경", description = "status: ACTIVE(승인), REJECTED(거절)")
+    @PatchMapping("/{userId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void approveUser(@PathVariable UUID userId, @AuthenticationPrincipal UUID adminId) {
+    public void updateStatus(@PathVariable UUID userId,
+                             @RequestBody StatusRequest body,
+                             @AuthenticationPrincipal UUID adminId) {
         try {
-            userAction.approveUser(adminId, userId);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
-    }
-
-    // 사용자 거절
-    @Operation(summary = "사용자 거절")
-    @PostMapping("/{userId}/reject")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void rejectUser(@PathVariable UUID userId, @AuthenticationPrincipal UUID adminId) {
-        try {
-            userAction.rejectUser(adminId, userId);
+            switch (body.status()) {
+                case "ACTIVE"   -> userAction.approveUser(adminId, userId);
+                case "REJECTED" -> userAction.rejectUser(adminId, userId);
+                default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
+            }
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
@@ -87,5 +81,6 @@ public class AdminUserController {
         }
     }
 
+    record StatusRequest(String status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)
     record RoleRequest(User.UserRole role) {} // 역할 변경 요청 body
 }

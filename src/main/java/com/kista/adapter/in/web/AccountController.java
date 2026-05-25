@@ -125,7 +125,7 @@ public class AccountController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검증 완료 (success 필드로 결과 확인)"),
     })
-    @PostMapping("/test-connection")
+    @PostMapping("/connection-tests")
     public TestConnectionResponse testConnection(
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {

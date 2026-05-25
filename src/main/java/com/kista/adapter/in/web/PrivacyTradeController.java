@@ -25,8 +25,8 @@ public class PrivacyTradeController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "오늘 이후 날짜의 기준 매매표 없음")
     })
-    @GetMapping("/current-base")
-    public PrivacyCurrentBaseResponse getCurrentBase() {
+    @GetMapping("/base/latest")
+    public PrivacyCurrentBaseResponse getLatestBase() {
         // GlobalExceptionHandler가 NoSuchElementException → 404 처리
         return PrivacyCurrentBaseResponse.from(getPrivacyCurrentBaseUseCase.getPrivacyCurrentBase());
     }

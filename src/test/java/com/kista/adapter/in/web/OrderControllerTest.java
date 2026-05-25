@@ -62,13 +62,13 @@ class OrderControllerTest {
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order));
     }
 
-    // --- /orders/next (다음 주문 미리보기) ---
+    // --- /orders/preview (다음 주문 미리보기) ---
 
     @Test
     void next_returns_200_with_orders_and_position() throws Exception {
         when(getNextOrders.preview(eq(ACCOUNT_ID), any())).thenReturn(buildNextResult());
 
-        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/next")
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeDate").value(LocalDate.now().toString()))
@@ -82,7 +82,7 @@ class OrderControllerTest {
     void next_returns_403_when_not_owner() throws Exception {
         when(getNextOrders.preview(any(), any())).thenThrow(new SecurityException("접근 불가"));
 
-        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/next")
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isForbidden());
     }
@@ -91,7 +91,7 @@ class OrderControllerTest {
     void next_returns_404_when_account_not_found() throws Exception {
         when(getNextOrders.preview(any(), any())).thenThrow(new NoSuchElementException("계좌 없음"));
 
-        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/next")
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isNotFound());
     }
@@ -100,7 +100,7 @@ class OrderControllerTest {
     void next_returns_503_on_kis_error() throws Exception {
         when(getNextOrders.preview(any(), any())).thenThrow(new RuntimeException("KIS API 오류"));
 
-        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/next")
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isServiceUnavailable());
     }

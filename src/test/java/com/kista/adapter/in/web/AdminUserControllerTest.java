@@ -80,7 +80,20 @@ class AdminUserControllerTest {
     void approveUser_withAdminToken_returns204() throws Exception {
         doNothing().when(userAction).approveUser(any(), any());
 
-        mockMvc.perform(post("/api/admin/users/{id}/approve", UUID.randomUUID())
+        mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\"}")
+                        .with(authentication(adminToken())))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void rejectUser_withAdminToken_returns204() throws Exception {
+        doNothing().when(userAction).rejectUser(any(), any());
+
+        mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"REJECTED\"}")
                         .with(authentication(adminToken())))
                 .andExpect(status().isNoContent());
     }

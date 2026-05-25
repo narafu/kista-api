@@ -65,7 +65,7 @@ class AccountControllerTest {
     void testConnection_success_returns200() throws Exception {
         when(connectionTest.test(anyString(), anyString())).thenReturn(true);
 
-        mockMvc.perform(post("/api/accounts/test-connection")
+        mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(mockAuth())))
@@ -75,7 +75,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_anonymous_returns401() throws Exception {
-        mockMvc.perform(post("/api/accounts/test-connection")
+        mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()))
