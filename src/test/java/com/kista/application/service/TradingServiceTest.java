@@ -13,7 +13,8 @@ import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
-import com.kista.domain.strategy.TradingStrategy;
+import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.PrivacyTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +41,8 @@ class TradingServiceTest {
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
-    @Mock TradingStrategy tradingStrategy;
+    @Mock InfiniteTradingStrategy infiniteStrategy;
+    @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock CorrectionStrategy correctionStrategy;
     @Mock TradeHistoryPort tradeHistoryPort;
     @Mock PortfolioSnapshotPort portfolioSnapshotPort;
@@ -95,7 +97,7 @@ class TradingServiceTest {
         service = new TradingService(
                 kisHolidayPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
-                tradingStrategy, correctionStrategy,
+                infiniteStrategy, privacyStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
                 accountPort, cyclePort, privacyTradePort);
@@ -114,7 +116,7 @@ class TradingServiceTest {
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
@@ -154,7 +156,7 @@ class TradingServiceTest {
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
-        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
@@ -210,7 +212,7 @@ class TradingServiceTest {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
-        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
@@ -240,7 +242,7 @@ class TradingServiceTest {
         RuntimeException ex = new RuntimeException("잔고 조회 오류");
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenThrow(ex);
         when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
-        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
@@ -280,7 +282,7 @@ class TradingServiceTest {
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
-        when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());

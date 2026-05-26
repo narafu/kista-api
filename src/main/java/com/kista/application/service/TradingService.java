@@ -16,16 +16,21 @@ import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CorrectionStrategy;
-import com.kista.domain.strategy.TradingStrategy;
+import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.PrivacyTradingStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.UUID;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
@@ -40,7 +45,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
     private final KisOrderPort kisOrderPort;                   // 주문 접수
     private final KisExecutionPort kisExecutionPort;           // 당일 체결 내역 조회
-    private final TradingStrategy tradingStrategy;             // 매수/매도 수량·가격 계산
+    private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
+    private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
     private final CorrectionStrategy correctionStrategy;       // 미체결 주문 보정
     private final TradeHistoryPort tradeHistoryPort;           // 거래 이력 저장
     private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
@@ -106,13 +112,16 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 .distinct().toList();
         Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesComplete(tickers, contexts.get(0).account());
 
-        // 기준 매매표 조회 - PRIVACY
-        var privacyTradeBase = privacyTradePort.findTodayTrade(LocalDate.now()); // KST(=JVM default) → Adapter 내부에서 UTC 변환
+        // 기준 매매표 조회 - PRIVACY 사이클이 있는 경우에만 (KST → Adapter 내부에서 UTC 변환)
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.cycle().type() == TradingCycle.Type.PRIVACY);
+        PrivacyTradeBase privacyBase = hasPrivacy
+                ? privacyTradePort.findTodayTrade(LocalDate.now()).orElse(null)
+                : null;
 
         for (BatchContext ctx : contexts) {
             try {
                 BigDecimal price = prices.get(ctx.cycle().ticker());
-                execute(ctx.cycle(), ctx.account(), ctx.user(), dst, price, privacyTradeBase);
+                execute(ctx.cycle(), ctx.account(), ctx.user(), dst, price, privacyBase);
             } catch (InterruptedException e) {
                 throw e; // 인터럽트는 상위로 전파
             } catch (Exception e) {
@@ -180,8 +189,12 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 snapshot = calc.position().toSnapshot();
             }
             case PRIVACY -> {
-                PrivacyCalc calc = calcPrivacy(balance, cycle.multiple(), privacyTradeBase);
-                savePlannedOrders(calc.orders(), account);
+                if (privacyTradeBase == null) {
+                    log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", account.nickname());
+                    return;
+                }
+                List<Order> privacyOrders = calcPrivacy(balance, cycle.multiple(), privacyTradeBase);
+                savePlannedOrders(privacyOrders, account);
             }
             default -> throw new IllegalStateException("미구현 전략 타입: " + cycle.type());
         }
@@ -195,7 +208,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 7, 8, 9. 장 후 체결 확인 + 보정 주문 (INFINITE)
         List<Order> corrections = List.of();
         List<Execution> executions = List.of();
-        if (Objects.equals(cycle.type(), TradingCycle.Type.INFINITE)) {
+        if (cycle.type() == TradingCycle.Type.INFINITE) {
             // 7. 장 후 체결 확인 대기
             waitForPostClose(dst);
             // 8. 체결 내역 조회
@@ -251,21 +264,16 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
         }
         InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price, cycle.multiple());
-        List<Order> orders = tradingStrategy.buildOrders(position, today);
+        List<Order> orders = infiniteStrategy.buildOrders(position, today);
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 label, position.priceOffsetRate(), position.currentRound(),
                 position.unitAmount(), orders.size());
         return new InfiniteCalc(position, orders);
     }
 
-    // PRIVACY 전략 계산 결과 묶음
-    private record PrivacyCalc(PrivacyTradeBase position, List<Order> orders) {
-    }
-
     // PRIVACY 전략 계산
-    private PrivacyCalc calcPrivacy(AccountBalance balance, BigDecimal multiple, PrivacyTradeBase privacyTradeBase) {
-        List<Order> orders = tradingStrategy.buildOrders(balance, multiple, privacyTradeBase);
-        return new PrivacyCalc(privacyTradeBase, orders);
+    private List<Order> calcPrivacy(AccountBalance balance, BigDecimal multiple, PrivacyTradeBase privacyTradeBase) {
+        return privacyStrategy.buildOrders(balance, multiple, privacyTradeBase);
     }
 
     // orders에서 PLANNED 조회 후 KIS에 일괄 접수, 완료 즉시 PLACED 기록

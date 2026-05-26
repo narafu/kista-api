@@ -2,7 +2,11 @@ package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.*;
+import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyTradeConflictException;
+import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +17,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -117,15 +120,17 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     }
 
     @Override
-    public PrivacyTradeBase findTodayTrade(LocalDate today) {
+    public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
         // today는 KST 일자 — getByTradeDateAndTicker 내부에서 UTC 변환
-        var entity = this.getByTradeDateAndTicker(today, Ticker.SOXL).orElse(null);
-        LocalDate kstTradeDate = TradeDateConverter.toKst(Objects.requireNonNull(entity).getTradeDate()); // UTC DB → KST 도메인
-        var orders = entity.getOrders().stream().map(p -> new PrivacyTradeBase.PrivacyTrade(
-                kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()
-        )).toList();
-
-        return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(), orders);
+        return this.getByTradeDateAndTicker(today, Ticker.SOXL)
+                .map(entity -> {
+                    LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
+                    List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()
+                            .map(p -> new PrivacyTradeBase.PrivacyTrade(
+                                    kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()))
+                            .toList();
+                    return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(), trades);
+                });
     }
 
     private static boolean quantityEquals(Integer a, Integer b) {

@@ -1,7 +1,7 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -15,7 +15,7 @@ import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
-public class InfiniteStrategy implements TradingStrategy {
+public class InfiniteStrategy implements InfiniteTradingStrategy {
 
     @Override
     public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
