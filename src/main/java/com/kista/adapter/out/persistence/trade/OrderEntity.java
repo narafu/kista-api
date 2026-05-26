@@ -29,7 +29,7 @@ class OrderEntity extends BaseAuditEntity {
     private UUID accountId; // FK → accounts.id
 
     @Column(name = "trade_date", nullable = false)
-    private LocalDate tradeDate;
+    private LocalDate tradeDate; // DB는 UTC(=US 거래일) 저장, 코드는 KST로 다룸 — TradeDateConverter 경유
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)

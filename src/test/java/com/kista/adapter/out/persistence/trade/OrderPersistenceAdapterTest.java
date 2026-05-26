@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,9 +49,11 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void findPlannedByAccountAndDate_returnsMappedDomainObjects() {
+        // DB는 UTC 저장 — adapter가 KST TODAY를 UTC(TODAY-1)로 변환해서 조회
+        LocalDate utcDate = TradeDateConverter.toUtc(TODAY);
         OrderEntity entity = new OrderEntity();
         entity.setAccountId(ACCOUNT_ID);
-        entity.setTradeDate(TODAY);
+        entity.setTradeDate(utcDate); // DB에는 UTC 저장
         entity.setTicker(Ticker.SOXL);
         entity.setOrderType(Order.OrderType.LOC);
         entity.setDirection(Order.OrderDirection.BUY);
@@ -59,15 +62,16 @@ class OrderPersistenceAdapterTest {
         entity.setStatus(Order.OrderStatus.PLANNED);
 
         when(repository.findByAccountIdAndTradeDateAndStatus(
-                ACCOUNT_ID, TODAY, Order.OrderStatus.PLANNED))
+                ACCOUNT_ID, utcDate, Order.OrderStatus.PLANNED)) // UTC 변환 후 조회
                 .thenReturn(List.of(entity));
 
-        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY);
+        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY); // KST로 호출
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.get(0).quantity()).isEqualTo(5);
         assertThat(result.get(0).status()).isEqualTo(Order.OrderStatus.PLANNED);
+        assertThat(result.get(0).tradeDate()).isEqualTo(TODAY); // toDomain: UTC → KST 복원
     }
 
     @Test

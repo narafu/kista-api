@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.*;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
@@ -108,7 +107,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesComplete(tickers, contexts.get(0).account());
 
         // 기준 매매표 조회 - PRIVACY
-        var privacyTradeBase = privacyTradePort.findTodayTrade(LocalDate.now(ZoneOffset.UTC));
+        var privacyTradeBase = privacyTradePort.findTodayTrade(LocalDate.now()); // KST(=JVM default) → Adapter 내부에서 UTC 변환
 
         for (BatchContext ctx : contexts) {
             try {
@@ -178,7 +177,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 // 4. 전략 계산 + PLANNED 저장 (공통 helper)
                 InfiniteCalc calc = calcInfinite(balance, cycle, price, today, account.nickname());
                 savePlannedOrders(calc.orders(), account);
-//                snapshot = calc.position().toSnapshot();
+                snapshot = calc.position().toSnapshot();
             }
             case PRIVACY -> {
                 PrivacyCalc calc = calcPrivacy(balance, cycle.multiple(), privacyTradeBase);
