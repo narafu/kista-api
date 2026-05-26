@@ -1,5 +1,10 @@
 ## 핵심 제약 사항
 
+### domain/port/out/ 네이밍 규칙
+- 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `TradingCyclePort`)
+- Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
+- `*Repository` 접미사 사용 금지 — JpaRepository와 혼동 유발
+
 ### RESTful API 설계 원칙
 
 **URI 규칙**
@@ -303,6 +308,15 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `/api/admin/**` → `hasRole("ADMIN")` (SecurityConfig)
 - `audit_logs`: 관리자 액션 영구 기록 (admin_id, action, target_type, target_id, payload JSONB)
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 자동 발급
+
+### tradeDate 변환 정책 (KST 코드 ↔ UTC=US 거래일 DB)
+- 도메인 `tradeDate`(LocalDate): **KST 일자** — 예: KST 2026-05-27 04:30 매매 → KST `2026-05-27`
+- DB `trade_date` 컬럼: **UTC 일자 = US 거래일** — 예: ET 2026-05-26 거래일 → DB `2026-05-26`
+- 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일` (KST 04:30 매매 기준 단순 ±1일 규칙)
+- 적용 위치: `OrderPersistenceAdapter`, `TradeHistoryPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드만 — JPA `@Converter` 자동 적용 금지 (가시성)
+- FIDA 외부 입력: UTC 송신 → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출 (persistence가 다시 UTC로 변환하므로 원본 UTC 일자가 DB에 정확히 저장됨)
+- 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — 의미 추적을 위해 `TradeDateConverter` 헬퍼 경유 필수
+- `com.kista.common` 패키지: 유틸리티 헬퍼 위치 (도메인 무관, 어댑터·서비스 공용)
 
 ### 소프트 삭제(Soft Delete) 패턴 (V43 이후)
 - 대상 테이블: `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼으로 논리 삭제

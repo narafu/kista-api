@@ -123,3 +123,14 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - 인증이 필요한 MCP는 `stdio` 타입 + `sh -c "npx mcp-remote <url> --header \"Authorization: Bearer ${TOKEN_VAR}\""` 패턴, 토큰은 `~/.zshrc`에 `export TOKEN_VAR=...`
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
+
+### git commit 메시지 — Bash 도구 사용 시
+# @'...'@ 히어스트링은 PowerShell 전용 — Bash 도구에서 쓰면 @ 가 메시지 앞뒤에 붙음
+# Bash 도구에서는 아래 큰따옴표 방식 사용:
+```bash
+git commit -m "제목
+
+본문
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
