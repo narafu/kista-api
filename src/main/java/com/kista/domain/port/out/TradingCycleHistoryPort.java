@@ -5,7 +5,7 @@ import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import java.util.List;
 import java.util.UUID;
 
-public interface TradingCycleHistoryRepository {
+public interface TradingCycleHistoryPort {
     TradingCycleHistory save(TradingCycleHistory history);
 
     List<TradingCycleHistory> findRecentByCycleId(UUID cycleId, int limit);

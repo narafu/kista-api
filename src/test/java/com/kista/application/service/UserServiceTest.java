@@ -5,12 +5,12 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,9 +34,9 @@ import static org.mockito.Mockito.*;
 @DisplayName("UserService 단위 테스트")
 class UserServiceTest {
 
-    @Mock UserRepository userRepository;
-    @Mock AccountRepository accountRepository;
-    @Mock TradingCycleRepository cycleRepository;
+    @Mock UserPort userPort;
+    @Mock AccountPort accountPort;
+    @Mock TradingCyclePort cyclePort;
     @Mock UserNotificationPort notificationPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
@@ -72,8 +72,8 @@ class UserServiceTest {
     @DisplayName("신규 사용자 등록 시 PENDING 저장 + 커밋 후 알림 이벤트 발행")
     void register_new_user_saves_pending_and_publishes_event() {
         UUID uid = UUID.randomUUID();
-        when(userRepository.findByKakaoId("kakao-123")).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         User result = userService.register("kakao-123", "홍길동", uid);
 
@@ -88,12 +88,12 @@ class UserServiceTest {
     void register_existing_user_returns_without_saving() {
         UUID uid = UUID.randomUUID();
         User existing = pendingUser(uid);
-        when(userRepository.findByKakaoId("kakao-123")).thenReturn(Optional.of(existing));
+        when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.of(existing));
 
         User result = userService.register("kakao-123", "홍길동", uid);
 
         assertThat(result).isEqualTo(existing);
-        verify(userRepository, never()).save(any());
+        verify(userPort, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -101,12 +101,12 @@ class UserServiceTest {
     @DisplayName("REJECTED 상태 사용자 재신청 시 PENDING 전환 + 관리자 재알림")
     void reapply_rejected_user_sets_pending_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(rejectedUser(userId)));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(rejectedUser(userId)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u ->
+        verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(notificationPort).notifyNewUser(any());
     }
@@ -116,7 +116,7 @@ class UserServiceTest {
     void reapply_pending_within_1h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
         // 30분 전에 마지막 재신청
-        when(userRepository.findById(userId)).thenReturn(Optional.of(
+        when(userPort.findById(userId)).thenReturn(Optional.of(
                 pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES))));
 
         assertThatThrownBy(() -> userService.reapply(userId))
@@ -127,13 +127,13 @@ class UserServiceTest {
     @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 알림")
     void reapply_pending_after_1h_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(
+        when(userPort.findById(userId)).thenReturn(Optional.of(
                 pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS))));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u ->
+        verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(notificationPort).notifyNewUser(any());
     }
@@ -142,19 +142,19 @@ class UserServiceTest {
     @DisplayName("PENDING lastReappliedAt=null 이면 즉시 재신청 허용")
     void reapply_pending_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.PENDING));
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.PENDING));
     }
 
     @Test
     @DisplayName("REJECTED 24시간 이내 재신청 시 CooldownException")
     void reapply_rejected_within_24h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(
+        when(userPort.findById(userId)).thenReturn(Optional.of(
                 rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS))));
 
         assertThatThrownBy(() -> userService.reapply(userId))
@@ -167,24 +167,24 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(user));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.PENDING));
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.PENDING));
     }
 
     @Test
     @DisplayName("거절 시 lastReappliedAt 갱신 (24h 카운트다운 시작)")
     void reject_sets_lastReappliedAt() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reject(userId);
 
-        verify(userRepository).save(argThat(u ->
+        verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.REJECTED && u.lastReappliedAt() != null));
     }
 
@@ -192,12 +192,12 @@ class UserServiceTest {
     @DisplayName("승인 시 ACTIVE 전환 + 승인 알림")
     void approve_sets_active_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.approve(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.ACTIVE));
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.ACTIVE));
         verify(notificationPort).notifyApproved(any());
     }
 
@@ -205,12 +205,12 @@ class UserServiceTest {
     @DisplayName("거절 시 REJECTED 전환 + 거절 알림")
     void reject_sets_rejected_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reject(userId);
 
-        verify(userRepository).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
         verify(notificationPort).notifyRejected(any());
     }
 
@@ -220,8 +220,8 @@ class UserServiceTest {
         // given
         UUID uid = UUID.randomUUID();
         when(bootstrapProps.isAdmin("12345")).thenReturn(true);
-        when(userRepository.findByKakaoId("12345")).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findByKakaoId("12345")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
         User result = userService.register("12345", "adminName", uid);
@@ -237,8 +237,8 @@ class UserServiceTest {
         // given
         UUID uid = UUID.randomUUID();
         when(bootstrapProps.isAdmin("99999")).thenReturn(false);
-        when(userRepository.findByKakaoId("99999")).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findByKakaoId("99999")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
         User result = userService.register("99999", "userName", uid);
@@ -249,21 +249,21 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("회원 탈퇴 시 userRepository.delete 호출")
+    @DisplayName("회원 탈퇴 시 userPort.delete 호출")
     void deleteMe_removesUser() {
         UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+        when(userPort.findById(id)).thenReturn(Optional.of(pendingUser(id)));
 
         userService.deleteMe(id);
 
-        verify(userRepository).delete(id);
+        verify(userPort).delete(id);
     }
 
     @Test
     @DisplayName("존재하지 않는 사용자 탈퇴 시 NoSuchElementException")
     void deleteMe_userNotFound_throws() {
         UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
+        when(userPort.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.deleteMe(id))
                 .isInstanceOf(NoSuchElementException.class);

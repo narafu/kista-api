@@ -6,8 +6,8 @@ import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
-import com.kista.domain.port.out.AccountRepository;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
     private final TradeHistoryPort tradeHistoryPort;
-    private final AccountRepository accountRepository;
-    private final TradingCycleRepository cycleRepository;
+    private final AccountPort accountPort;
+    private final TradingCyclePort cyclePort;
 
     @Override
     public AdminAnomalies getAnomalies() {
@@ -36,11 +36,11 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
         List<TradeHistory> failedTrades = tradeHistoryPort.findAll(today.minusDays(30), today)
                 .stream().filter(t -> t.status() == Order.OrderStatus.FAILED).toList();
 
-        List<Account> allAccounts = accountRepository.findAll();
+        List<Account> allAccounts = accountPort.findAll();
 
         // PAUSED 사이클이 있는 계좌
         List<Account> pausedAccounts = allAccounts.stream()
-                .filter(a -> cycleRepository.findByAccountId(a.id()).stream()
+                .filter(a -> cyclePort.findByAccountId(a.id()).stream()
                         .anyMatch(c -> c.status() == TradingCycle.Status.PAUSED))
                 .toList();
 
@@ -50,7 +50,7 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
         // ACTIVE 사이클이 있지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
-                .filter(a -> cycleRepository.findByAccountId(a.id()).stream()
+                .filter(a -> cyclePort.findByAccountId(a.id()).stream()
                         .anyMatch(c -> c.status() == TradingCycle.Status.ACTIVE))
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();

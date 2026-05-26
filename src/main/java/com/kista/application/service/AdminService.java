@@ -7,10 +7,10 @@ import com.kista.domain.port.in.AdminDashboardUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.TradingCycleRepository;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,22 +27,22 @@ import java.util.UUID;
 @Transactional
 public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, AdminDashboardUseCase {
 
-    private final UserRepository userRepository;
-    private final AccountRepository accountRepository;
-    private final TradingCycleRepository cycleRepository;
+    private final UserPort userPort;
+    private final AccountPort accountPort;
+    private final TradingCyclePort cyclePort;
     private final ApproveUserUseCase approveUserUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
     @Override
     @Transactional(readOnly = true)
     public List<User> listAll() {
-        return userRepository.findAll();
+        return userPort.findAll();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<User> listByStatus(User.UserStatus status) {
-        return userRepository.findAllByStatus(status);
+        return userPort.findAllByStatus(status);
     }
 
     @Override
@@ -64,7 +64,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
     @Override
     public void changeRole(UUID adminId, UUID targetUserId, User.UserRole role) {
         // 사용자 존재 확인
-        User user = userRepository.findById(targetUserId)
+        User user = userPort.findById(targetUserId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
         // role만 교체, updatedAt=null (JPA @LastModifiedDate 자동 처리)
         User updated = new User(
@@ -81,7 +81,7 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
                 user.lastReappliedAt(),
                 user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
         );
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,
                 Map.of("newRole", role.name()));
@@ -89,12 +89,12 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
 
     @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
-        userRepository.findById(targetUserId)
+        userPort.findById(targetUserId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
         // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
-        cycleRepository.deleteByUserId(targetUserId);
-        accountRepository.deleteByUserId(targetUserId);
-        userRepository.delete(targetUserId);
+        cyclePort.deleteByUserId(targetUserId);
+        accountPort.deleteByUserId(targetUserId);
+        userPort.delete(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
     }
@@ -102,12 +102,12 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
     @Override
     @Transactional(readOnly = true)
     public AdminStats getStats() {
-        List<User> all = userRepository.findAll();
+        List<User> all = userPort.findAll();
         long totalUsers = all.size();
         long pendingCount = all.stream().filter(u -> u.status() == User.UserStatus.PENDING).count();
         long activeCount = all.stream().filter(u -> u.status() == User.UserStatus.ACTIVE).count();
         long rejectedCount = all.stream().filter(u -> u.status() == User.UserStatus.REJECTED).count();
-        long totalAccounts = accountRepository.countAll();
+        long totalAccounts = accountPort.countAll();
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }
 }

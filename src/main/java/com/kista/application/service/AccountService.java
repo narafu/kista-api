@@ -5,9 +5,9 @@ import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisTokenPort;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,13 +25,13 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
 
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
-    private final AccountRepository accountRepository;
+    private final AccountPort accountPort;
     private final KisTokenPort kisTokenPort;
-    private final TradingCycleRepository cycleRepository;
+    private final TradingCyclePort cyclePort;
 
     @Override
     public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
-        if (accountRepository.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
+        if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
         Account account = new Account(
@@ -41,14 +41,14 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 Account.Broker.KIS,
                 null, null
         );
-        Account saved = accountRepository.save(account);
+        Account saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
         return saved;
     }
 
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
+        Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         // 키 변경 시에만 유효성 검증
         String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
@@ -64,28 +64,28 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 account.kisAccountType(), account.broker(),
                 account.createdAt(), null
         );
-        return accountRepository.save(updated);
+        return accountPort.save(updated);
     }
 
     @Override
     public void delete(UUID accountId, UUID requesterId) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
+        Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         // 계좌에 속한 사이클 먼저 소프트 삭제 (FK CASCADE 대체)
-        cycleRepository.deleteByAccountId(accountId);
-        accountRepository.delete(accountId);
+        cyclePort.deleteByAccountId(accountId);
+        accountPort.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<Account> listByUser(UUID userId) {
-        return accountRepository.findByUserId(userId);
+        return accountPort.findByUserId(userId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Account getById(UUID id) {
-        return accountRepository.findByIdOrThrow(id);
+        return accountPort.findByIdOrThrow(id);
     }
 }

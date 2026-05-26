@@ -48,9 +48,10 @@ class TradingServiceTest {
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
-    @Mock TradingCycleHistoryRepository cycleHistoryRepository;
-    @Mock AccountRepository accountRepository;
-    @Mock TradingCycleRepository cycleRepository;
+    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock AccountPort accountPort;
+    @Mock TradingCyclePort cyclePort;
+    @Mock PrivacyTradePort privacyTradePort;
 
     TradingService service;
 
@@ -96,8 +97,8 @@ class TradingServiceTest {
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 tradingStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
-                orderPort, realtimeNotificationPort, cycleHistoryRepository,
-                accountRepository, cycleRepository);
+                orderPort, realtimeNotificationPort, cycleHistoryPort,
+                accountPort, cyclePort, privacyTradePort);
     }
 
     @Test
@@ -112,7 +113,7 @@ class TradingServiceTest {
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
@@ -124,7 +125,7 @@ class TradingServiceTest {
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
-        verify(cycleHistoryRepository).findRecentByCycleId(CYCLE.id(), 1);
+        verify(cycleHistoryPort).findRecentByCycleId(CYCLE.id(), 1);
         verify(kisPricePort, never()).getPrice(any(), any()); // 단건 경로: 가격은 executeBatch가 배치 조회
         verify(orderPort).saveAll(anyList());
         verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
@@ -152,7 +153,7 @@ class TradingServiceTest {
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
@@ -174,7 +175,7 @@ class TradingServiceTest {
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
-        verify(cycleHistoryRepository, never()).findRecentByCycleId(any(), anyInt());
+        verify(cycleHistoryPort, never()).findRecentByCycleId(any(), anyInt());
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
@@ -183,7 +184,7 @@ class TradingServiceTest {
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
@@ -207,8 +208,8 @@ class TradingServiceTest {
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(cycleHistoryRepository.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
@@ -237,8 +238,8 @@ class TradingServiceTest {
         // CYCLE: 휴장일 체크 전 잔고 조회에서 예외 (이미 isMarketOpen 다음이므로 isMarketOpen도 stub 필요)
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         RuntimeException ex = new RuntimeException("잔고 조회 오류");
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenThrow(ex);
-        when(cycleHistoryRepository.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenThrow(ex);
+        when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
@@ -259,7 +260,7 @@ class TradingServiceTest {
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenThrow(new RuntimeException("API 오류"));
         // getPrice 단건 fallback도 실패(null 반환) → price=null → holdings=0 → IllegalStateException
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 
@@ -275,9 +276,9 @@ class TradingServiceTest {
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
 
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
         when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
@@ -295,9 +296,9 @@ class TradingServiceTest {
 
     @Test
     void preview_returnsSkipNoCycleHistory_whenNoHistory() {
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of());
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of());
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -309,9 +310,9 @@ class TradingServiceTest {
 
     @Test
     void preview_returnsSkipInsufficientBalance_whenShouldSkip() {
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryRepository.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -328,9 +329,9 @@ class TradingServiceTest {
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
                 null, Instant.now(), Instant.now());
 
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
-        when(cycleHistoryRepository.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
+        when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -342,7 +343,7 @@ class TradingServiceTest {
     @Test
     void preview_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
 
         assertThatThrownBy(() -> service.preview(ACCOUNT.id(), otherId))
                 .isInstanceOf(SecurityException.class);
@@ -350,8 +351,8 @@ class TradingServiceTest {
 
     @Test
     void preview_throwsNoSuchElementException_whenNoActiveCycle() {
-        when(accountRepository.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cycleRepository.findByAccountId(ACCOUNT.id())).thenReturn(List.of());
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.preview(ACCOUNT.id(), ACCOUNT.userId()))
                 .isInstanceOf(NoSuchElementException.class)

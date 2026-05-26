@@ -7,7 +7,7 @@ import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import com.kista.domain.port.out.KakaoOAuthPort;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,7 +23,7 @@ public class KakaoLoginService implements KakaoLoginUseCase {
     private final KakaoOAuthPort kakaoOAuthPort;
     private final RegisterUserUseCase registerUser;
     private final GetUserUseCase getUser;
-    private final UserRepository userRepository; // idempotent ADMIN promote용
+    private final UserPort userPort; // idempotent ADMIN promote용
     private final AdminBootstrapProperties bootstrapProps; // ADMIN seed 목록
 
     @Override
@@ -45,7 +45,7 @@ public class KakaoLoginService implements KakaoLoginUseCase {
         // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
         if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != User.UserRole.ADMIN) {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
-            user = userRepository.save(new User(
+            user = userPort.save(new User(
                     user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                     user.createdAt(), user.updatedAt(), user.lastReappliedAt(),

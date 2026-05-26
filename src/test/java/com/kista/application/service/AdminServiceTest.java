@@ -4,10 +4,10 @@ import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.TradingCycleRepository;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,9 +29,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
 
-    @Mock UserRepository userRepository;
-    @Mock AccountRepository accountRepository;
-    @Mock TradingCycleRepository cycleRepository;
+    @Mock UserPort userPort;
+    @Mock AccountPort accountPort;
+    @Mock TradingCyclePort cyclePort;
     @Mock ApproveUserUseCase approveUserUseCase;
     @Mock AuditLogPort auditLogPort;
 
@@ -47,12 +47,12 @@ class AdminServiceTest {
     @Test
     void getStats_returnsCorrectCounts() {
         UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID(), id3 = UUID.randomUUID();
-        when(userRepository.findAll()).thenReturn(List.of(
+        when(userPort.findAll()).thenReturn(List.of(
                 user(id1, User.UserStatus.PENDING),
                 user(id2, User.UserStatus.ACTIVE),
                 user(id3, User.UserStatus.REJECTED)
         ));
-        when(accountRepository.countAll()).thenReturn(5L);
+        when(accountPort.countAll()).thenReturn(5L);
 
         AdminStats stats = adminService.getStats();
 
@@ -87,13 +87,13 @@ class AdminServiceTest {
     void changeRole_updatesRoleAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
         User existing = user(targetId, User.UserStatus.ACTIVE);
-        when(userRepository.findById(targetId)).thenReturn(Optional.of(existing));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userPort.findById(targetId)).thenReturn(Optional.of(existing));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService.changeRole(adminId, targetId, User.UserRole.ADMIN);
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
+        verify(userPort).save(captor.capture());
         assertThat(captor.getValue().role()).isEqualTo(User.UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
     }
@@ -101,14 +101,14 @@ class AdminServiceTest {
     @Test
     void deleteUser_softDeletesCascadeAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userRepository.findById(targetId)).thenReturn(Optional.of(user(targetId, User.UserStatus.ACTIVE)));
+        when(userPort.findById(targetId)).thenReturn(Optional.of(user(targetId, User.UserStatus.ACTIVE)));
 
         adminService.deleteUser(adminId, targetId);
 
         // 사이클 → 계좌 → 사용자 순 소프트 삭제 cascade 검증
-        verify(cycleRepository).deleteByUserId(targetId);
-        verify(accountRepository).deleteByUserId(targetId);
-        verify(userRepository).delete(targetId);
+        verify(cyclePort).deleteByUserId(targetId);
+        verify(accountPort).deleteByUserId(targetId);
+        verify(userPort).delete(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }
 }

@@ -73,7 +73,7 @@ domain      →  외부 의존 없음
 | JPA Entity 컬럼 변경 (`nullable`, `length`, 타입 등) | Flyway 마이그레이션과 반드시 크로스체크 — Entity의 `nullable = false` 여부와 DB 제약이 불일치하면 런타임까지 오류 미발생, 실제 null 삽입 시 `DataIntegrityViolationException` 발생 (v34 avg_price 사례) |
 | `trading_cycle` 테이블 변경 | `TradingCycleEntity`(persistence/tradingcycle/) + `TradingCycleJpaRepository` + `TradingCyclePersistenceAdapter` |
 | `TradingCycle` record 필드 추가/제거 | `TradingCycleEntity` + `TradingCyclePersistenceAdapter`(toEntity/toDomain) + `TradingCycleService` + `TradingCycleRequest`/`TradingCycleResponse` + 테스트에서 `new TradingCycle(...)` 직접 생성 호출처 (`TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`) |
-| `TradingService` 필드 추가 | `TradingCycleHistoryRepository` mock 추가 필수 (`TradingServiceTest`) |
+| `TradingService` 필드 추가 | `TradingCycleHistoryPort` mock 추가 필수 (`TradingServiceTest`) |
 | `ExecuteTradingUseCase` 메서드 추가/변경 | `TradingService`(구현) + `TradingScheduler`(호출 방식) + `TradingServiceTest` + `TradingSchedulerTest`(verify 대상 변경) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |

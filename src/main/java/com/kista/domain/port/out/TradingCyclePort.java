@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface TradingCycleRepository {
+public interface TradingCyclePort {
     List<TradingCycle> findByAccountId(UUID accountId);
     Optional<TradingCycle> findById(UUID id);
 

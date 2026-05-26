@@ -11,11 +11,11 @@ import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
 import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
-import com.kista.domain.port.out.AccountRepository;
-import com.kista.domain.port.out.TradingCycleHistoryRepository;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,24 +35,24 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
 
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
 
-    private final TradingCycleRepository cycleRepository;
-    private final TradingCycleHistoryRepository cycleHistoryRepository;
-    private final AccountRepository accountRepository;
-    private final UserRepository userRepository;
+    private final TradingCyclePort cyclePort;
+    private final TradingCycleHistoryPort cycleHistoryPort;
+    private final AccountPort accountPort;
+    private final UserPort userPort;
     private final UserNotificationPort notificationPort;
 
     @Override
     public TradingCycle register(UUID userId, UUID accountId, RegisterTradingCycleUseCase.Command cmd) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
+        Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(userId);
 
         // 사이클 수 제한
-        if (cycleRepository.findByAccountId(accountId).size() >= MAX_CYCLES_PER_ACCOUNT) {
+        if (cyclePort.findByAccountId(accountId).size() >= MAX_CYCLES_PER_ACCOUNT) {
             throw new IllegalStateException("계좌당 최대 " + MAX_CYCLES_PER_ACCOUNT + "개의 거래 사이클만 등록할 수 있습니다");
         }
 
         // 같은 type 중복 방지
-        if (cycleRepository.existsByAccountIdAndType(accountId, cmd.type())) {
+        if (cyclePort.existsByAccountIdAndType(accountId, cmd.type())) {
             throw new IllegalStateException("이미 등록된 전략 종류입니다: " + cmd.type());
         }
 
@@ -62,10 +62,10 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
                 null, accountId, cmd.type(), TradingCycle.Status.ACTIVE,
                 cmd.ticker(), multiple, cmd.initialUsdDeposit(), null, null
         );
-        TradingCycle saved = cycleRepository.save(cycle);
+        TradingCycle saved = cyclePort.save(cycle);
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음
-        cycleHistoryRepository.save(new TradingCycleHistory(
+        cycleHistoryPort.save(new TradingCycleHistory(
                 null, saved.id(), saved.initialUsdDeposit(), null, BigDecimal.ZERO, null
         ));
 
@@ -75,8 +75,8 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
 
     @Override
     public TradingCycle update(UUID cycleId, UUID requesterId, UpdateTradingCycleUseCase.Command cmd) {
-        TradingCycle cycle = cycleRepository.findByIdOrThrow(cycleId);
-        Account account = accountRepository.findByIdOrThrow(cycle.accountId());
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
 
         Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : cycle.ticker();
@@ -86,25 +86,25 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
                 cycle.id(), cycle.accountId(), cycle.type(), cycle.status(),
                 updatedTicker, updatedMultiple, cycle.initialUsdDeposit(), cycle.createdAt(), null
         );
-        return cycleRepository.save(updated);
+        return cyclePort.save(updated);
     }
 
     @Override
     public void delete(UUID cycleId, UUID requesterId) {
-        TradingCycle cycle = cycleRepository.findByIdOrThrow(cycleId);
-        Account account = accountRepository.findByIdOrThrow(cycle.accountId());
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
-        cycleRepository.delete(cycleId);
+        cyclePort.delete(cycleId);
         log.info("거래 사이클 삭제: cycleId={}, requesterId={}", cycleId, requesterId);
     }
 
     @Override
     public void pause(UUID cycleId, UUID requesterId) {
-        TradingCycle cycle = cycleRepository.findByIdOrThrow(cycleId);
-        Account account = accountRepository.findByIdOrThrow(cycle.accountId());
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
         TradingCycle paused = withStatus(cycle, TradingCycle.Status.PAUSED);
-        cycleRepository.save(paused);
+        cyclePort.save(paused);
         log.info("거래 사이클 중지: cycleId={}", cycleId);
         User user = findUserOrThrow(requesterId);
         notificationPort.notifyStrategyChanged(user, account, paused, "중지");
@@ -112,11 +112,11 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
 
     @Override
     public void resume(UUID cycleId, UUID requesterId) {
-        TradingCycle cycle = cycleRepository.findByIdOrThrow(cycleId);
-        Account account = accountRepository.findByIdOrThrow(cycle.accountId());
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
         TradingCycle active = withStatus(cycle, TradingCycle.Status.ACTIVE);
-        cycleRepository.save(active);
+        cyclePort.save(active);
         log.info("거래 사이클 재개: cycleId={}", cycleId);
         User user = findUserOrThrow(requesterId);
         notificationPort.notifyStrategyChanged(user, account, active, "재개");
@@ -125,16 +125,16 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
     @Override
     @Transactional(readOnly = true)
     public List<TradingCycle> listByAccountId(UUID accountId, UUID requesterId) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
+        Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-        return cycleRepository.findByAccountId(accountId);
+        return cyclePort.findByAccountId(accountId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public TradingCycle getById(UUID cycleId, UUID requesterId) {
-        TradingCycle cycle = cycleRepository.findByIdOrThrow(cycleId);
-        Account account = accountRepository.findByIdOrThrow(cycle.accountId());
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
         return cycle;
     }
@@ -145,7 +145,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
     }
 
     private User findUserOrThrow(UUID userId) {
-        return userRepository.findById(userId)
+        return userPort.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 

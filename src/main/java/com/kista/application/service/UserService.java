@@ -11,12 +11,12 @@ import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,9 +34,9 @@ import java.util.UUID;
 @Transactional
 public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
 
-    private final UserRepository userRepository;
-    private final AccountRepository accountRepository;
-    private final TradingCycleRepository cycleRepository;
+    private final UserPort userPort;
+    private final AccountPort accountPort;
+    private final TradingCyclePort cyclePort;
     private final UserNotificationPort notificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
@@ -46,14 +46,14 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public User register(String kakaoId, String nickname, UUID userId) {
         // 기존 사용자면 반환, 신규이면 역할/상태 결정 후 저장 + 관리자 알림
-        return userRepository.findByKakaoId(kakaoId).orElseGet(() -> {
+        return userPort.findByKakaoId(kakaoId).orElseGet(() -> {
             // ADMIN seed 여부에 따라 역할/상태 결정
             boolean isAdminSeed = bootstrapProps.isAdmin(kakaoId);
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
                     null, null, null, null, null, null, NotificationChannel.TELEGRAM);
-            User saved = userRepository.save(newUser);
+            User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
             eventPublisher.publishEvent(new NewUserRegisteredEvent(saved));
@@ -65,7 +65,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void approve(UUID userId) {
         User user = findOrThrow(userId);
         User updated = withStatus(user, User.UserStatus.ACTIVE);
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
         notificationPort.notifyApproved(updated);
         realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.ACTIVE);
@@ -78,7 +78,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.REJECTED, user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, Instant.now(),
                 user.notificationChannel());
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
         realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
@@ -108,7 +108,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.PENDING, user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, now,
                 user.notificationChannel());
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
         notificationPort.notifyNewUser(updated);
     }
@@ -116,19 +116,19 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     @Transactional(readOnly = true)
     public User getById(UUID id) {
-        return userRepository.findById(id)
+        return userPort.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public User getByKakaoId(String kakaoId) {
-        return userRepository.findByKakaoId(kakaoId)
+        return userPort.findByKakaoId(kakaoId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoId));
     }
 
     private User findOrThrow(UUID userId) {
-        return userRepository.findById(userId)
+        return userPort.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 
@@ -140,7 +140,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 botToken, chatId, botUsername, user.createdAt(), null, user.lastReappliedAt(),
                 user.notificationChannel());
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
     }
 
@@ -150,7 +150,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 null, null, null, user.createdAt(), null, user.lastReappliedAt(),
                 user.notificationChannel());
-        userRepository.save(updated);
+        userPort.save(updated);
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
 
@@ -158,16 +158,16 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void deleteMe(UUID userId) {
         findOrThrow(userId); // 존재 확인 — 없으면 NoSuchElementException
         // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
-        cycleRepository.deleteByUserId(userId);
-        accountRepository.deleteByUserId(userId);
-        userRepository.delete(userId);
+        cyclePort.deleteByUserId(userId);
+        accountPort.deleteByUserId(userId);
+        userPort.delete(userId);
         log.info("사용자 탈퇴: userId={}", userId);
     }
 
     @Override
     public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
         User user = findOrThrow(userId);
-        userRepository.save(new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
+        userPort.save(new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                 user.createdAt(), null, user.lastReappliedAt(), channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);

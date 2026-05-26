@@ -3,7 +3,7 @@ package com.kista.adapter.out.persistence.user;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-public class UserPersistenceAdapter implements UserRepository {
+public class UserPersistenceAdapter implements UserPort {
 
     private final UserJpaRepository jpaRepository;
     private final AesCryptoService crypto; // telegramBotToken AES-256 암호화/복호화

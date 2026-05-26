@@ -6,7 +6,7 @@ import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.UserPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,7 +36,7 @@ public class DevAuthController {
     private final RegisterUserUseCase registerUser;
     private final ApproveUserUseCase  approveUser;
     private final JwtIssuerService    jwtIssuerService; // 자체 발급 ES256 JWT
-    private final UserRepository      userRepository;   // ADMIN 테스트 유저 직접 저장용
+    private final UserPort      userPort;   // ADMIN 테스트 유저 직접 저장용
 
     @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용", description = "지정한 userId를 APPROVED 상태로 변경. Telegram 없이 로컬 승인 처리 시 사용.")
     @ApiResponse(responseCode = "200", description = "승인 성공")
@@ -66,12 +66,12 @@ public class DevAuthController {
     @PostMapping("/dev-admin-token")
     public TokenResponse devAdminToken() {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
-        User admin = userRepository.findById(DEV_ADMIN_UUID).orElseGet(() ->
-                userRepository.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
+        User admin = userPort.findById(DEV_ADMIN_UUID).orElseGet(() ->
+                userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                         null, null, null, null, null, null, NotificationChannel.TELEGRAM)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != User.UserRole.ADMIN) {
-            admin = userRepository.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
+            admin = userPort.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
                     User.UserStatus.ACTIVE, User.UserRole.ADMIN, admin.telegramBotToken(), admin.telegramChatId(),
                     admin.telegramBotUsername(), admin.createdAt(), admin.updatedAt(), admin.lastReappliedAt(),
                     admin.notificationChannel() != null ? admin.notificationChannel() : NotificationChannel.TELEGRAM));

@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.tradingcycle;
 
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class TradingCyclePersistenceAdapter implements TradingCycleRepository {
+class TradingCyclePersistenceAdapter implements TradingCyclePort {
 
     private final TradingCycleJpaRepository jpaRepository;
 
