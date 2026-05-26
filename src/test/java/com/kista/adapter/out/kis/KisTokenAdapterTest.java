@@ -86,10 +86,37 @@ class KisTokenAdapterTest {
 
         adapter.getToken(ACCOUNT_ID, "key", "secret");
 
+        // double-check 패턴으로 findValidToken이 2회 호출됨 (1차: 락 전, 2차: 락 후)
         ArgumentCaptor<OffsetDateTime> thresholdCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-        verify(kisTokenCachePort).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
-        // 전달된 threshold가 현재 시각보다 최소 59초 이상 미래여야 함 (1분 버퍼)
-        assertThat(thresholdCaptor.getValue()).isAfter(OffsetDateTime.now().plusSeconds(59));
+        verify(kisTokenCachePort, times(2)).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
+        // 두 번 모두 threshold가 현재 시각보다 최소 59초 이상 미래여야 함 (1분 버퍼)
+        thresholdCaptor.getAllValues().forEach(t ->
+                assertThat(t).isAfter(OffsetDateTime.now().plusSeconds(59)));
+    }
+
+    @Test
+    @DisplayName("testToken: 키 유효 시 발급 토큰을 캐시에 저장")
+    void testToken_whenValid_savesTokenToCache() {
+        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisTokenAdapter.TokenResponse.class)))
+                .thenReturn(ResponseEntity.ok(new KisTokenAdapter.TokenResponse("test-token", "2099-12-31 23:59:59")));
+
+        adapter.testToken(ACCOUNT_ID, "key", "secret");
+
+        verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("test-token"), any());
+    }
+
+    @Test
+    @DisplayName("getToken: 캐시 miss 후 lock 내 2차 조회(double-check)에서 hit 시 KIS API 미호출")
+    void getToken_doubleCheck_preventsRedundantIssue() {
+        // 1차 miss, 2차 hit (다른 스레드가 이미 발급한 상황 시뮬레이션)
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
+                .thenReturn(Optional.empty())   // 1차 조회
+                .thenReturn(Optional.of("concurrent-token")); // 2차 조회 (lock 내)
+
+        String result = adapter.getToken(ACCOUNT_ID, "key", "secret");
+
+        assertThat(result).isEqualTo("concurrent-token");
+        verifyNoInteractions(kisRestTemplate);
     }
 
     @Test

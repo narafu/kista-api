@@ -175,6 +175,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
   - `curl -s -X POST http://localhost:8080/api/auth/dev-approve/<UUID>`
   - UUID 확인: `docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "SELECT id, nickname, status FROM users ORDER BY created_at DESC LIMIT 5;"`
 
+### Adapter 내부 중첩 타입 접근 제어자
+- 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
+- 예: `KisConnectionTestAdapter.TokenCheckResponse`, `KisOrderAdapter.OrderResponse` 패턴
+- `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
+
 ### Lombok 패턴
 - `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지
 - package-private 타입을 생성자에서 참조 시: `@RequiredArgsConstructor(access = AccessLevel.PACKAGE)` (ClassEscapesItsScope 회피)

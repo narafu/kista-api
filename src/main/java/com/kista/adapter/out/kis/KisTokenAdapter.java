@@ -20,6 +20,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 @RequiredArgsConstructor
@@ -29,6 +32,9 @@ public class KisTokenAdapter implements KisTokenPort {
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    // 계좌별 락 — 동시 요청 시 중복 발급 방지
+    private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+
     // KisHttpClient를 주입받지 않음 — KisHttpClient가 KisTokenPort에 의존하므로 순환 방지
     private final RestTemplate kisRestTemplate;
     private final KisTokenCachePort kisTokenCachePort;
@@ -37,12 +43,45 @@ public class KisTokenAdapter implements KisTokenPort {
 
     @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
-        // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
-        Optional<String> cached = kisTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
+        // 1차 조회 — 락 없이 빠른 경로
+        Optional<String> cached = kisTokenCachePort.findValidToken(accountId, threshold());
         if (cached.isPresent()) {
             return cached.get();
         }
-        return fetchAndCacheToken(accountId, appKey, appSecret);
+        // 캐시 miss 시 accountId별 락으로 경합 차단 — 같은 계좌 동시 호출이 N번 발급하는 것 방지
+        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // 2차 조회 (double-check) — 다른 스레드가 이미 발급했을 수 있음
+            return kisTokenCachePort.findValidToken(accountId, threshold())
+                    .orElseGet(() -> fetchAndCacheToken(accountId, appKey, appSecret));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void testToken(UUID accountId, String appKey, String appSecret) {
+        // 키 유효성 검증 겸 토큰 발급 — 성공 시 캐시에 저장하여 직후 KIS API 호출 시 재발급 방지
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            Map<String, String> body = Map.of(
+                    "grant_type", "client_credentials",
+                    "appkey", appKey,
+                    "appsecret", appSecret
+            );
+            TokenResponse response = kisRestTemplate.exchange(
+                    kisBaseUrl + "/oauth2/tokenP",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    TokenResponse.class
+            ).getBody();
+            OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
+            kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+        } catch (Exception e) {
+            throw new Account.InvalidKisKeyException();
+        }
     }
 
     private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
@@ -69,26 +108,9 @@ public class KisTokenAdapter implements KisTokenPort {
         return response.accessToken();
     }
 
-    @Override
-    public void testToken(String appKey, String appSecret) {
-        // KIS OAuth2 직접 호출 — accountId 없이 키 유효성만 검증, DB 캐시 저장 안 함
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            Map<String, String> body = Map.of(
-                    "grant_type", "client_credentials",
-                    "appkey", appKey,
-                    "appsecret", appSecret
-            );
-            kisRestTemplate.exchange(
-                    kisBaseUrl + "/oauth2/tokenP",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    TokenResponse.class
-            );
-        } catch (Exception e) {
-            throw new Account.InvalidKisKeyException();
-        }
+    // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
+    private OffsetDateTime threshold() {
+        return OffsetDateTime.now(KST).plusMinutes(1);
     }
 
     OffsetDateTime parseExpiry(String raw) {

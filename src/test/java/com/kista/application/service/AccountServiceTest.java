@@ -137,7 +137,7 @@ class AccountServiceTest {
     void update_키변경시_testToken호출() {
         Account existing = activeAccount(userId);
         when(accountRepository.findByIdOrThrow(accountId)).thenReturn(existing);
-        doNothing().when(kisTokenPort).testToken(any(), any());
+        doNothing().when(kisTokenPort).testToken(any(), any(), any());
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command(
@@ -145,6 +145,6 @@ class AccountServiceTest {
         );
         accountService.update(accountId, userId, cmd);
 
-        verify(kisTokenPort).testToken("newAppKey", existing.kisSecretKey());
+        verify(kisTokenPort).testToken(accountId, "newAppKey", existing.kisSecretKey());
     }
 }

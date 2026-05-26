@@ -54,7 +54,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
         String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
         String newSecretKey = cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey();
         if (cmd.kisAppKey() != null || cmd.kisSecretKey() != null) {
-            kisTokenPort.testToken(newAppKey, newSecretKey);
+            kisTokenPort.testToken(accountId, newAppKey, newSecretKey);
         }
         Account updated = new Account(
                 account.id(), account.userId(),

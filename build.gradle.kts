@@ -91,6 +91,7 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-XX:+EnableDynamicAgentLoading")
+    systemProperty("user.timezone", "Asia/Seoul") // 테스트도 KST로 고정 — host TZ 무관하게 일관성 보장
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")

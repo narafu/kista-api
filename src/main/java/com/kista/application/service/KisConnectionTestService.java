@@ -5,6 +5,8 @@ import com.kista.domain.port.out.KisConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class KisConnectionTestService implements KisConnectionTestUseCase {
@@ -12,7 +14,7 @@ public class KisConnectionTestService implements KisConnectionTestUseCase {
     private final KisConnectionTestPort connectionTestPort; // 아웃바운드 포트 — adapter.out 구현체 주입
 
     @Override
-    public boolean test(String appKey, String appSecret) {
-        return connectionTestPort.test(appKey, appSecret);
+    public boolean test(String appKey, String appSecret, UUID accountId) {
+        return connectionTestPort.test(appKey, appSecret, accountId);
     }
 }

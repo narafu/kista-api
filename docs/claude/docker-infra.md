@@ -1,5 +1,11 @@
 ## Docker / 인프라
 
+### JVM 기본 TimeZone (KST 고정)
+- Render 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
+- 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
+- `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
+- UTC가 필요한 호출처는 `LocalDate.now(ZoneOffset.UTC)` 명시적으로 사용
+
 ### Render 무료 티어 런타임 OOM
 - 증상: `Out of memory (used over 512Mi)` — 앱 강제 종료
 - 원인: Heap + Metaspace + CodeCache + OS 합산이 512MB 초과

@@ -63,7 +63,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_success_returns200() throws Exception {
-        when(connectionTest.test(anyString(), anyString())).thenReturn(true);
+        when(connectionTest.test(anyString(), anyString(), any())).thenReturn(true);
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
