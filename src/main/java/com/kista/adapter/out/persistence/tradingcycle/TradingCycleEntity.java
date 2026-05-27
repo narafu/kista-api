@@ -37,9 +37,6 @@ class TradingCycleEntity extends BaseAuditEntity {
     @Column(name = "ticker", nullable = false, length = 20)
     private TradingCycle.Ticker ticker; // 거래 종목 코드
 
-    @Column(name = "multiple", nullable = false, precision = 4, scale = 1)
-    private BigDecimal multiple; // 배수 (기본값 1.0)
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private TradingCycle.Status status; // 실행 상태 (ACTIVE, PAUSED)

@@ -9,7 +9,6 @@ import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
-import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
@@ -30,7 +29,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateTradingCycleUseCase,
+public class TradingCycleService implements RegisterTradingCycleUseCase,
         DeleteTradingCycleUseCase, GetTradingCycleUseCase, PauseTradingCycleUseCase, ResumeTradingCycleUseCase {
 
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
@@ -56,11 +55,9 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
             throw new IllegalStateException("이미 등록된 전략 종류입니다: " + cmd.type());
         }
 
-        BigDecimal multiple = cmd.multiple() != null ? cmd.multiple() : BigDecimal.ONE;
-
         TradingCycle cycle = new TradingCycle(
                 null, accountId, cmd.type(), TradingCycle.Status.ACTIVE,
-                cmd.ticker(), multiple, cmd.initialUsdDeposit(), null, null
+                cmd.ticker(), cmd.initialUsdDeposit(), null, null
         );
         TradingCycle saved = cyclePort.save(cycle);
 
@@ -71,22 +68,6 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
 
         log.info("거래 사이클 등록: accountId={}, cycleId={}, type={}", accountId, saved.id(), saved.type());
         return saved;
-    }
-
-    @Override
-    public TradingCycle update(UUID cycleId, UUID requesterId, UpdateTradingCycleUseCase.Command cmd) {
-        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
-
-        Ticker updatedTicker = cmd.ticker() != null ? cmd.ticker() : cycle.ticker();
-        BigDecimal updatedMultiple = cmd.multiple() != null ? cmd.multiple() : cycle.multiple();
-
-        TradingCycle updated = new TradingCycle(
-                cycle.id(), cycle.accountId(), cycle.type(), cycle.status(),
-                updatedTicker, updatedMultiple, cycle.initialUsdDeposit(), cycle.createdAt(), null
-        );
-        return cyclePort.save(updated);
     }
 
     @Override
@@ -141,7 +122,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase, UpdateT
 
     private TradingCycle withStatus(TradingCycle c, TradingCycle.Status status) {
         return new TradingCycle(c.id(), c.accountId(), c.type(), status,
-                c.ticker(), c.multiple(), c.initialUsdDeposit(), c.createdAt(), null);
+                c.ticker(), c.initialUsdDeposit(), c.createdAt(), null);
     }
 
     private User findUserOrThrow(UUID userId) {

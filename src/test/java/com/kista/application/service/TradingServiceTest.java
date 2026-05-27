@@ -75,8 +75,8 @@ class TradingServiceTest {
     // TradingCycle record
     static final TradingCycle CYCLE = new TradingCycle(
             UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
-            TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
-            null, Instant.now(), Instant.now()
+            TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
+            Instant.now(), Instant.now()
     );
 
     // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
@@ -203,8 +203,8 @@ class TradingServiceTest {
     void executeBatch_fetchesPricesOnce_notPerCycle() throws InterruptedException {
         // 두 사이클이 같은 ticker → getPrices() 1회, getPrice() 0회
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
-                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
+                Instant.now(), Instant.now());
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
 
@@ -230,8 +230,8 @@ class TradingServiceTest {
     void executeBatch_oneCycleFails_continuesWithNextAndNotifiesAdmin() throws InterruptedException {
         // CYCLE → 예외 발생, cycle2 → 정상 실행
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
-                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, null,
+                Instant.now(), Instant.now());
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
 
@@ -328,8 +328,8 @@ class TradingServiceTest {
     void preview_returnsSkipUnsupportedStrategy_whenPrivacy() {
         TradingCycle privacyCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
+                Instant.now(), Instant.now());
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));

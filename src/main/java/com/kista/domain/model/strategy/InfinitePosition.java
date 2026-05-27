@@ -11,8 +11,7 @@ import static java.math.RoundingMode.HALF_UP;
 public record InfinitePosition(
         AccountBalance balance,
         TradingCycle.Ticker ticker,    // 거래 종목
-        BigDecimal currentPrice,
-        BigDecimal multiple        // 배수 (기본값 1.0)
+        BigDecimal currentPrice
 ) {
     private static final int TOTAL_ROUNDS = 20;
 
@@ -41,11 +40,9 @@ public record InfinitePosition(
     }
 
     public BigDecimal unitAmount() {
-        // B ÷ 20 × multiple
+        // B ÷ 20
         return totalAssets()
-                .divide(BigDecimal.valueOf(TOTAL_ROUNDS), 2, HALF_UP)
-                .multiply(multiple)
-                .setScale(2, HALF_UP);
+                .divide(BigDecimal.valueOf(TOTAL_ROUNDS), 2, HALF_UP);
     }
 
     public double currentRound() {

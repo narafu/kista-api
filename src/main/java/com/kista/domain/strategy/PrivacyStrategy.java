@@ -25,7 +25,18 @@ import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 public class PrivacyStrategy implements PrivacyTradingStrategy {
 
     @Override
-    public List<Order> buildOrders(AccountBalance balance, BigDecimal multiple, PrivacyTradeBase privacyTradeBase) {
+    public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
+        // initialUsdDeposit ÷ currentCycleStart = 배수 (소수 둘째자리 내림)
+        if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
+            throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
+        }
+        BigDecimal start = privacyTradeBase.currentCycleStart();
+        if (start == null || start.signum() <= 0) {
+            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + start);
+        }
+        BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
+        log.info("[PRIVACY] 배수 산출: initialUsdDeposit={}, currentCycleStart={}, multiple={}", initialUsdDeposit, start, multiple);
+
         List<BuyEntry> buyEntries = new ArrayList<>();
         List<PrivacyTrade> explicitSells = new ArrayList<>();
         PrivacyTrade nullSellTemplate = null; // null quantity SELL — "잔량 전부 매도" 후보

@@ -129,7 +129,8 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                             .map(p -> new PrivacyTradeBase.PrivacyTrade(
                                     kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()))
                             .toList();
-                    return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(), trades);
+                    return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
+                            entity.getCurrentCycleStart(), trades);
                 });
     }
 

@@ -12,6 +12,7 @@ public record PrivacyTradeBase(
         UUID id,
         BigDecimal avgPrice,
         int holdings,
+        BigDecimal currentCycleStart, // 현재 사이클 기준가 — PRIVACY multiple 동적 산출 기준
         List<PrivacyTrade> trades
 ) {
     public record PrivacyTrade(

@@ -20,7 +20,7 @@ class InfinitePositionTest {
     void case_q0() {
         // A=20, M=0, D=0, B=2000, K=100.00, T=0.0
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("20"), BigDecimal.ONE);
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("20"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("20");
         assertThat(pos.holdings()).isEqualTo(0);
@@ -40,7 +40,7 @@ class InfinitePositionTest {
     void case_q10() {
         // A=20, M=200, D=210, B=3000, K=150.00, T=200/150=1.33
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("2800"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21"), BigDecimal.ONE);
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("20");
         assertThat(pos.holdings()).isEqualTo(10);
@@ -60,7 +60,7 @@ class InfinitePositionTest {
     void case_q100() {
         // A=5, M=500, D=600, B=2000, K=100.00, T=500/100=5.0
         AccountBalance balance = new AccountBalance(100, new BigDecimal("5"), new BigDecimal("1500"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("6"), BigDecimal.ONE);
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("6"));
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("5");
         assertThat(pos.holdings()).isEqualTo(100);
@@ -79,7 +79,7 @@ class InfinitePositionTest {
     @DisplayName("TQQQ: targetProfitRate=0.15, targetPrice=A×1.15")
     void case_tqqq_targetProfitRate() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("50"), BigDecimal.ONE);
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("50"));
 
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.1500"); // TQQQ targetProfitRate=0.15
         assertThat(pos.referencePrice()).isEqualByComparingTo("57.50"); // 50×1.15

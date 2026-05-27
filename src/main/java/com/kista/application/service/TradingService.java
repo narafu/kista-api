@@ -190,7 +190,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", account.nickname());
                     return;
                 }
-                List<Order> privacyOrders = calcPrivacy(balance, cycle.multiple(), privacyTradeBase);
+                List<Order> privacyOrders = calcPrivacy(balance, cycle.initialUsdDeposit(), privacyTradeBase);
                 savePlannedOrders(privacyOrders, account);
             }
             default -> throw new IllegalStateException("미구현 전략 타입: " + cycle.type());
@@ -273,7 +273,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         if (balance.holdings() == 0 && price == null) {
             throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
         }
-        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price, cycle.multiple());
+        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price);
         List<Order> orders = infiniteStrategy.buildOrders(position, today);
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 label, position.priceOffsetRate(), position.currentRound(),
@@ -282,8 +282,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     }
 
     // PRIVACY 전략 계산
-    private List<Order> calcPrivacy(AccountBalance balance, BigDecimal multiple, PrivacyTradeBase privacyTradeBase) {
-        return privacyStrategy.buildOrders(balance, multiple, privacyTradeBase);
+    private List<Order> calcPrivacy(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
+        return privacyStrategy.buildOrders(balance, initialUsdDeposit, privacyTradeBase);
     }
 
     // orders에서 PLANNED 조회 후 KIS에 일괄 접수, 완료 즉시 PLACED 기록

@@ -8,5 +8,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface PrivacyTradingStrategy {
-    List<Order> buildOrders(AccountBalance balance, BigDecimal multiple, PrivacyTradeBase privacyTradeBase);
+    // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
+    List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase);
 }

@@ -17,16 +17,14 @@ public record TradingCycleResponse(
         String status,
         @Schema(description = "거래 종목", example = "TQQQ")
         String ticker,
-        @Schema(description = "배수", example = "1.0")
-        BigDecimal multiple,
-        @Schema(description = "초기 입금액 (메타 기록용)", example = "1000.00")
+        @Schema(description = "초기 입금액 (PRIVACY: 배수 산출 기준)", example = "2000.00")
         BigDecimal initialUsdDeposit
 ) {
     public static TradingCycleResponse from(TradingCycle c) {
         return new TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
-                c.ticker().name(), c.multiple(), c.initialUsdDeposit()
+                c.ticker().name(), c.initialUsdDeposit()
         );
     }
 }

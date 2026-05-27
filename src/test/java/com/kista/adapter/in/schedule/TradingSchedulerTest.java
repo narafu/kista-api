@@ -50,8 +50,8 @@ class TradingSchedulerTest {
 
     private TradingCycle mockCycle() {
         return new TradingCycle(CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, null,
+                Instant.now(), Instant.now());
     }
 
     private User mockUser() {
@@ -111,8 +111,8 @@ class TradingSchedulerTest {
         UUID cycleId2 = UUID.randomUUID();
         UUID accountId2 = UUID.randomUUID();
         TradingCycle cycle2 = new TradingCycle(cycleId2, accountId2, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, null,
+                Instant.now(), Instant.now());
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
                 "99999999", "key2", "secret2", "01",
                 Account.Broker.KIS, Instant.now(), Instant.now());
@@ -131,7 +131,7 @@ class TradingSchedulerTest {
         ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
         verify(useCase).executeBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().getFirst.cycle()).isEqualTo(cycle2);
+        assertThat(captor.getValue().getFirst().cycle()).isEqualTo(cycle2);
     }
 
     @Test

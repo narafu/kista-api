@@ -43,7 +43,7 @@
 
 ### Account ↔ TradingCycle 분리 (V38 이후)
 - `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
-- `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), multiple, initialUsdDeposit, createdAt, updatedAt`
+- `TradingCycle` record 필드 8개: `id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, createdAt, updatedAt`
 - `Type`, `Status`, `Ticker` 모두 `TradingCycle` record의 nested enum — 구 `Strategy.StrategyType/StrategyStatus/Ticker` 대체
 - `MAX_CYCLES_PER_ACCOUNT = 1` (`TradingCycleService` 상수) — 운영 정책, 확장 시 상수만 변경
 - `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
@@ -51,13 +51,14 @@
 - V38 마이그레이션: `strategies` → `trading_cycle` 테이블 리네임 + `initial_usd_deposit` 컬럼 추가
 - V39 마이그레이션: `trading_cycle_history` 테이블 신설 — ON DELETE CASCADE
 - V44 마이그레이션: `trading_cycle_history.trade_date` 컬럼 및 UNIQUE 제약 제거, `avg_price` nullable 허용
+- V46 마이그레이션: `trading_cycle.multiple` 컬럼 제거 — PRIVACY 배수는 `floor(initialUsdDeposit / currentCycleStart, 2)` 동적 산출로 대체
 
 ### 변경된 포트 시그니처 (V38 이후)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
 - `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
-- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price, BigDecimal multiple)` — TradingCycle.Ticker
+- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price)` — TradingCycle.Ticker, multiple 제거 (V46)
 - `TradingCycleHistoryPort` — `save(TradingCycleHistory)`, `findRecentByCycleId(cycleId, limit)` (`findByCycleIdAndDate` V44에서 제거됨)
 - **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryPort.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
 
@@ -153,7 +154,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V39__create_trading_cycle_history.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설)
+- 현재 최신: `V46__drop_multiple_from_trading_cycle.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설, V40: fcm_device_tokens, V41: notification_channel, V42: trading_cycle 컬럼 재정렬, V43: soft delete, V44: trading_cycle_history 변경, V45: portfolio_snapshots current_price 컬럼 제거, V46: trading_cycle.multiple 컬럼 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입·컬럼 존재만 확인, `NOT NULL` 등 제약 불일치는 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME` — V22/V36 패턴 참고)

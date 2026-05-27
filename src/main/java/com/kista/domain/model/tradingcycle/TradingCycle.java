@@ -17,16 +17,15 @@ public record TradingCycle(
         Type type,                      // 매매 전략 종류
         Status status,                  // 전략 실행 상태
         Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
-        BigDecimal multiple,            // 배수 (기본값 1.0)
-        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (메타 기록용)
+        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
         Instant createdAt,
         Instant updatedAt
 ) {
     @Getter
     @RequiredArgsConstructor
     public enum Type {
-        INFINITE("20분할 LOC 매매 전략"),          // 모든 Ticker 지원
-        PRIVACY("Fanding 기준 매매표 기반 전략 (SOXL 전용)"); // SOXL 전용 (서버 강제)
+        INFINITE("20분할 LOC 매매 전략"), // 모든 Ticker 지원
+        PRIVACY("Fanding 매매표 기반 전략"); // SOXL 전용
 
         private final String description; // 전략 설명
 

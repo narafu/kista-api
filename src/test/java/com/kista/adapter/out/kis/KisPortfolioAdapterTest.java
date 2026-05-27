@@ -61,8 +61,8 @@ class KisPortfolioAdapterTest {
         PresentBalanceResult result = adapter.getPresentBalance(ACCOUNT);
 
         assertThat(result.items()).hasSize(1);
-        assertThat(result.items().getFirst.ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.items().getFirst.holdings()).isEqualTo(10);
+        assertThat(result.items().getFirst().ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.items().getFirst().holdings()).isEqualTo(10);
         assertThat(result.totalAssetUsd()).isEqualByComparingTo("1000.00");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("2.0");
     }
