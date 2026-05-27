@@ -427,11 +427,11 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");
     }
 
-    // 최소금액 기준: INFINITE = 현재가 × 20 × 2, PRIVACY = currentCycleStart / 2
+    // 최소금액 기준: INFINITE = 현재가 × 20 × 2 * 1.1, PRIVACY = currentCycleStart / 2
     private BigDecimal resolveMinRequired(TradingCycle cycle, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
         return switch (cycle.type()) {
             case INFINITE -> price != null
-                    ? price.multiply(BigDecimal.valueOf(40)).setScale(2, HALF_UP)
+                    ? price.multiply(BigDecimal.valueOf(44)).setScale(2, HALF_UP)
                     : null;
             case PRIVACY -> privacyTradeBase != null
                     ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
