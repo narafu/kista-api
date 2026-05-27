@@ -68,7 +68,6 @@ class UserEntity extends BaseAuditEntity {
         e.telegramBotToken = user.telegramBotToken();
         e.telegramChatId = user.telegramChatId();
         e.telegramBotUsername = user.telegramBotUsername();
-        e.createdAt = user.createdAt(); // null이면 @CreatedDate가 INSERT 시 자동 설정
         e.lastReappliedAt = user.lastReappliedAt();
         e.notificationChannel = user.notificationChannel() != null
                 ? user.notificationChannel() : NotificationChannel.TELEGRAM;
@@ -77,7 +76,7 @@ class UserEntity extends BaseAuditEntity {
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, createdAt, updatedAt, lastReappliedAt,
+                telegramBotToken, telegramChatId, telegramBotUsername, lastReappliedAt,
                 notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
     }
 }

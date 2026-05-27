@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.user.User;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,9 +25,9 @@ public class AdminAccountController {
 
     @GetMapping
     public List<AdminAccountResponse> listAccounts() {
-        // 사용자 맵 빌드 (userId → User) — N+1 방지 일괄 조회
-        Map<UUID, User> userMap = listUsers.listAll().stream()
-                .collect(Collectors.toMap(User::id, Function.identity()));
+        // 사용자 맵 빌드 (userId → AdminUserView) — N+1 방지 일괄 조회
+        Map<UUID, AdminUserView> userMap = listUsers.listAll().stream()
+                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
         return listAccounts.listAll().stream()
                 .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId())))
                 .toList();
@@ -41,7 +41,7 @@ public class AdminAccountController {
             String accountNoMasked, // "****1234"
             String broker           // Broker.name()
     ) {
-        static AdminAccountResponse from(Account a, User user) {
+        static AdminAccountResponse from(Account a, AdminUserView user) {
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             String masked = "****" + a.accountNo().substring(
                     Math.max(0, a.accountNo().length() - 4));

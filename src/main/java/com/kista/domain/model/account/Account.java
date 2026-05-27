@@ -14,9 +14,7 @@ public record Account(
         String kisAppKey,      // KIS App Key (복호화된 값)
         String kisSecretKey,   // KIS Secret Key (복호화된 값)
         String kisAccountType, // 계좌 상품 코드 (기본: 01)
-        Broker broker,         // 증권사 (기본: KIS)
-        Instant createdAt,
-        Instant updatedAt
+        Broker broker          // 증권사 (기본: KIS)
 ) {
     @Getter
     @RequiredArgsConstructor

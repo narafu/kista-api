@@ -415,7 +415,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 3. cycle 갱신 (initialUsdDeposit만 변경, 동일 ID 유지)
         TradingCycle rotated = new TradingCycle(
                 cycle.id(), cycle.accountId(), cycle.type(), TradingCycle.Status.ACTIVE,
-                cycle.ticker(), nextDeposit, cycle.cycleSeedType(), cycle.createdAt(), null
+                cycle.ticker(), nextDeposit, cycle.cycleSeedType()
         );
         cyclePort.save(rotated);
 

@@ -38,7 +38,7 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
     }
 
     private RegisterAccountUseCase.Command registerCmd() {
@@ -55,7 +55,7 @@ class AccountServiceTest {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
-                    a.kisAccountType(), a.broker(), a.createdAt(), a.updatedAt());
+                    a.kisAccountType(), a.broker());
         });
 
         Account result = accountService.register(userId, registerCmd());

@@ -66,8 +66,7 @@ class TradingCyclePersistenceAdapter implements TradingCyclePort {
     private TradingCycle toDomain(TradingCycleEntity e) {
         return new TradingCycle(
                 e.getId(), e.getAccountId(), e.getType(), e.getStatus(),
-                e.getTicker(), e.getInitialUsdDeposit(), e.getCycleSeedType(),
-                e.getCreatedAt(), e.getUpdatedAt()
+                e.getTicker(), e.getInitialUsdDeposit(), e.getCycleSeedType()
         );
     }
 

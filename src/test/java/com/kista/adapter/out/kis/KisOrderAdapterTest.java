@@ -42,7 +42,7 @@ class KisOrderAdapterTest {
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
-            Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS
     );
 
     @BeforeEach

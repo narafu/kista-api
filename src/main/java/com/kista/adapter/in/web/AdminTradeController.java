@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.TradeHistory;
-import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListTradesUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
@@ -34,8 +34,8 @@ public class AdminTradeController {
         // 계좌·사용자 맵 일괄 생성
         Map<UUID, Account> accountMap = listAccounts.listAll().stream()
                 .collect(Collectors.toMap(Account::id, Function.identity()));
-        Map<UUID, User> userMap = listUsers.listAll().stream()
-                .collect(Collectors.toMap(User::id, Function.identity()));
+        Map<UUID, AdminUserView> userMap = listUsers.listAll().stream()
+                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
         return listTrades.listAll().stream()
                 .map(t -> AdminTradeResponse.from(t, accountMap, userMap))
                 .toList();
@@ -54,11 +54,11 @@ public class AdminTradeController {
             BigDecimal price,
             String status            // PLACED | FILLED | FAILED
     ) {
-        static AdminTradeResponse from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, User> userMap) {
+        static AdminTradeResponse from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, AdminUserView> userMap) {
             // accountId → userId → nickname 순서로 역방향 조회
             Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
             UUID userId = account != null ? account.userId() : null;
-            User user = userId != null ? userMap.get(userId) : null;
+            AdminUserView user = userId != null ? userMap.get(userId) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             return new AdminTradeResponse(
                     t.id(), userId, nickname, t.tradeDate(), t.ticker().name(),

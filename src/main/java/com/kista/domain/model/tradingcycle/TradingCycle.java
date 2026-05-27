@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
@@ -18,9 +17,7 @@ public record TradingCycle(
         Status status,                  // 전략 실행 상태
         Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
         BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
-        CycleSeedType cycleSeedType,    // 사이클 종료 후 자동 재등록 정책
-        Instant createdAt,
-        Instant updatedAt
+        CycleSeedType cycleSeedType     // 사이클 종료 후 자동 재등록 정책
 ) {
     @Getter
     @RequiredArgsConstructor

@@ -61,7 +61,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
                 : TradingCycle.CycleSeedType.NONE;
         TradingCycle cycle = new TradingCycle(
                 null, accountId, cmd.type(), TradingCycle.Status.ACTIVE,
-                cmd.ticker(), cmd.initialUsdDeposit(), seedType, null, null
+                cmd.ticker(), cmd.initialUsdDeposit(), seedType
         );
         TradingCycle saved = cyclePort.save(cycle);
 
@@ -141,12 +141,12 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
 
     private TradingCycle withStatus(TradingCycle c, TradingCycle.Status status) {
         return new TradingCycle(c.id(), c.accountId(), c.type(), status,
-                c.ticker(), c.initialUsdDeposit(), c.cycleSeedType(), c.createdAt(), null);
+                c.ticker(), c.initialUsdDeposit(), c.cycleSeedType());
     }
 
     private TradingCycle withCycleSeedType(TradingCycle c, TradingCycle.CycleSeedType cycleSeedType) {
         return new TradingCycle(c.id(), c.accountId(), c.type(), c.status(),
-                c.ticker(), c.initialUsdDeposit(), cycleSeedType, c.createdAt(), null);
+                c.ticker(), c.initialUsdDeposit(), cycleSeedType);
     }
 
     private User findUserOrThrow(UUID userId) {

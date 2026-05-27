@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminDashboardUseCase;
@@ -8,6 +9,7 @@ import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -28,6 +30,7 @@ import java.util.UUID;
 public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, AdminDashboardUseCase {
 
     private final UserPort userPort;
+    private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
     private final ApproveUserUseCase approveUserUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
@@ -35,14 +38,14 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
 
     @Override
     @Transactional(readOnly = true)
-    public List<User> listAll() {
-        return userPort.findAll();
+    public List<AdminUserView> listAll() {
+        return adminUserViewPort.findAll();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<User> listByStatus(User.UserStatus status) {
-        return userPort.findAllByStatus(status);
+    public List<AdminUserView> listByStatus(User.UserStatus status) {
+        return adminUserViewPort.findAllByStatus(status);
     }
 
     @Override
@@ -76,8 +79,6 @@ public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCa
                 user.telegramBotToken(),
                 user.telegramChatId(),
                 user.telegramBotUsername(),
-                user.createdAt(),
-                null,
                 user.lastReappliedAt(),
                 user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
         );

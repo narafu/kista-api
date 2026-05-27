@@ -52,7 +52,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
-                    null, null, null, null, null, null, NotificationChannel.TELEGRAM);
+                    null, null, null, null, NotificationChannel.TELEGRAM);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
@@ -76,7 +76,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User user = findOrThrow(userId);
         // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.REJECTED, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, Instant.now(),
+                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), Instant.now(),
                 user.notificationChannel());
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
@@ -106,7 +106,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
 
         // PENDING 전환 + 재신청 시각 갱신
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.PENDING, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null, now,
+                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), now,
                 user.notificationChannel());
         userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
@@ -138,7 +138,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         String botUsername = telegramBotInfoPort.getUsername(botToken);
         User user = findOrThrow(userId);
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                botToken, chatId, botUsername, user.createdAt(), null, user.lastReappliedAt(),
+                botToken, chatId, botUsername, user.lastReappliedAt(),
                 user.notificationChannel());
         userPort.save(updated);
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
@@ -148,7 +148,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void removeTelegram(UUID userId) {
         User user = findOrThrow(userId);
         User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                null, null, null, user.createdAt(), null, user.lastReappliedAt(),
+                null, null, null, user.lastReappliedAt(),
                 user.notificationChannel());
         userPort.save(updated);
         log.info("텔레그램 설정 해제: userId={}", userId);
@@ -169,13 +169,13 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         User user = findOrThrow(userId);
         userPort.save(new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                user.createdAt(), null, user.lastReappliedAt(), channel));
+                user.lastReappliedAt(), channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
     }
 
     private User withStatus(User user, User.UserStatus newStatus) {
         return new User(user.id(), user.kakaoId(), user.nickname(), newStatus, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), user.createdAt(), null,
+                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                 user.lastReappliedAt(), user.notificationChannel());
     }
 }

@@ -48,24 +48,24 @@ class UserServiceTest {
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(),
+                null, null, null,
                 Instant.now().minus(25, ChronoUnit.HOURS), NotificationChannel.TELEGRAM);
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), lastReappliedAt, NotificationChannel.TELEGRAM);
+                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), lastReappliedAt, NotificationChannel.TELEGRAM);
+                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
     }
 
     @Test
@@ -166,7 +166,7 @@ class UserServiceTest {
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM);
         when(userPort.findById(userId)).thenReturn(Optional.of(user));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

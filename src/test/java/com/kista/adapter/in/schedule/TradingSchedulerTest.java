@@ -45,18 +45,18 @@ class TradingSchedulerTest {
     private Account mockAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "key", "secret", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
     }
 
     private TradingCycle mockCycle() {
         return new TradingCycle(CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, null,
-                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE);
     }
 
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test
@@ -112,10 +112,10 @@ class TradingSchedulerTest {
         UUID accountId2 = UUID.randomUUID();
         TradingCycle cycle2 = new TradingCycle(cycleId2, accountId2, TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, null,
-                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE);
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
                 "99999999", "key2", "secret2", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
         User user = mockUser();
 
         when(cyclePort.findAllActive()).thenReturn(List.of(cycle1, cycle2));

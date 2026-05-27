@@ -48,7 +48,7 @@ public class KakaoLoginService implements KakaoLoginUseCase {
             user = userPort.save(new User(
                     user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                    user.createdAt(), user.updatedAt(), user.lastReappliedAt(),
+                    user.lastReappliedAt(),
                     user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
             ));
         }

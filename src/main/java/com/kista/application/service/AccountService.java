@@ -38,8 +38,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
                 cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
-                Account.Broker.KIS,
-                null, null
+                Account.Broker.KIS
         );
         Account saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
@@ -61,8 +60,7 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
                 cmd.nickname() != null ? cmd.nickname() : account.nickname(),
                 account.accountNo(),
                 newAppKey, newSecretKey,
-                account.kisAccountType(), account.broker(),
-                account.createdAt(), null
+                account.kisAccountType(), account.broker()
         );
         return accountPort.save(updated);
     }

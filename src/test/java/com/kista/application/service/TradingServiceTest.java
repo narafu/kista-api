@@ -70,14 +70,14 @@ class TradingServiceTest {
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
-            Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS
     );
 
     // TradingCycle record
     static final TradingCycle CYCLE = new TradingCycle(
             UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
             TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-            TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now()
+            TradingCycle.CycleSeedType.NONE
     );
 
     // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
@@ -90,7 +90,7 @@ class TradingServiceTest {
 
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM
+            null, null, null, null, NotificationChannel.TELEGRAM
     );
 
     @BeforeEach
@@ -205,7 +205,7 @@ class TradingServiceTest {
         // 두 사이클이 같은 ticker → getPrices() 1회, getPrice() 0회
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE);
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
 
@@ -232,7 +232,7 @@ class TradingServiceTest {
         // CYCLE → 예외 발생, cycle2 → 정상 실행
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, null,
-                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE);
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
 
@@ -330,7 +330,7 @@ class TradingServiceTest {
         TradingCycle privacyCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
@@ -370,7 +370,7 @@ class TradingServiceTest {
         TradingCycle maintainCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, initDeposit,
-                TradingCycle.CycleSeedType.MAINTAIN, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.MAINTAIN);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
@@ -394,7 +394,7 @@ class TradingServiceTest {
         TradingCycle maxCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
-                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.MAX);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
@@ -420,7 +420,7 @@ class TradingServiceTest {
         TradingCycle maxCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
-                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.MAX);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
@@ -443,7 +443,7 @@ class TradingServiceTest {
         TradingCycle maxCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
-                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.MAX);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));

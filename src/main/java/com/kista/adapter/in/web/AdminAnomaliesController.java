@@ -2,8 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminAnomalies;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.TradeHistory;
-import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
@@ -38,8 +38,8 @@ public class AdminAnomaliesController {
         // 닉네임 조회용 맵 일괄 생성
         Map<UUID, Account> accountMap = listAccounts.listAll().stream()
                 .collect(Collectors.toMap(Account::id, Function.identity()));
-        Map<UUID, User> userMap = listUsers.listAll().stream()
-                .collect(Collectors.toMap(User::id, Function.identity()));
+        Map<UUID, AdminUserView> userMap = listUsers.listAll().stream()
+                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 
         List<FailedTradeItem> failedTrades = anomalies.failedTrades().stream()
                 .map(t -> FailedTradeItem.from(t, accountMap, userMap))
@@ -73,10 +73,10 @@ public class AdminAnomaliesController {
             int quantity,
             BigDecimal price
     ) {
-        static FailedTradeItem from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, User> userMap) {
+        static FailedTradeItem from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, AdminUserView> userMap) {
             Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
             UUID userId = account != null ? account.userId() : null;
-            User user = userId != null ? userMap.get(userId) : null;
+            AdminUserView user = userId != null ? userMap.get(userId) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             return new FailedTradeItem(
                     t.id(), t.accountId(), nickname, t.tradeDate(), t.ticker().name(),
@@ -91,8 +91,8 @@ public class AdminAnomaliesController {
             String accountNoMasked,
             String broker
     ) {
-        static AccountItem from(Account a, Map<UUID, User> userMap) {
-            User user = a.userId() != null ? userMap.get(a.userId()) : null;
+        static AccountItem from(Account a, Map<UUID, AdminUserView> userMap) {
+            AdminUserView user = a.userId() != null ? userMap.get(a.userId()) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             String masked = a.accountNo() != null
                     ? "****" + a.accountNo().substring(Math.max(0, a.accountNo().length() - 4))
