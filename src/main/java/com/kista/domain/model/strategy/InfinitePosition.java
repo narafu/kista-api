@@ -3,7 +3,6 @@ package com.kista.domain.model.strategy;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
@@ -88,13 +87,13 @@ public record InfinitePosition(
     // --- 수량 계산 로직 (주문 수량 계산 책임 위임) ---
 
     public int calcEarlyBuyQuantityByAvgPrice() {
-        BigDecimal denominator = averagePrice().multiply(BigDecimal.valueOf(2));
-        return unitAmount().divide(denominator, 0, FLOOR).intValue();
+        BigDecimal halfUnitAmount = unitAmount().divide(BigDecimal.valueOf(2), FLOOR);
+        return halfUnitAmount.divide(averagePrice(), 0, FLOOR).intValue();
     }
 
-    public int calcEarlyBuyQuantityByRefPrice() {
-        BigDecimal denominator = referencePrice().multiply(BigDecimal.valueOf(2));
-        return unitAmount().divide(denominator, 0, FLOOR).intValue();
+    public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
+        BigDecimal buyAmountByAvgPrice = averagePrice().multiply(BigDecimal.valueOf(buyQuantityByAvgPrice));
+        return unitAmount().subtract(buyAmountByAvgPrice).divide(referencePrice(), 0, FLOOR).intValue();
     }
 
     public int calcLateBuyQuantity() {

@@ -144,7 +144,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, B 계산에 사용
 - `currentRound`(T)는 floor 없이 소수점 허용
 - **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 T < 10 / T ≥ 10과 동치)
-- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②(K/2/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
+- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②((K − A×Q①)/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
 - **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
 
 ### KIS 계좌번호 DB 저장 방식

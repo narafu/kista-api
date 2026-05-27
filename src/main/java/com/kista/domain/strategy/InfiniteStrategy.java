@@ -36,7 +36,7 @@ public class InfiniteStrategy implements InfiniteTradingStrategy {
         }
 
         // LOC 매수 ② — 기준가 기준
-        int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice();
+        int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
         if (buyQuantity2 >= 1) {
             orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLANNED, null));
         }

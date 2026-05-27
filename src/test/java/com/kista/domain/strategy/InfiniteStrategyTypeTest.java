@@ -48,18 +48,21 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders 전반 Q=0: BUY①만 (BUY②<1주, SELL Q/4=0)")
+    @DisplayName("buildOrders 전반 Q=0: BUY①② + SELL 없음(Q/4=0) = 2건")
     void buildOrders_frontHalf_noQuantity() {
         // A=currentPrice=22, Q=0, D=1000 → B=1000, K=50
-        // G=22×1.20=26.40, BUY①: floor(50/2/22)=1, BUY②: floor(50/2/26.40)=0
+        // G=22×1.20=26.40
+        // BUY①: floor(50/2/22)=1(비용=22), BUY②: floor((50-22)/26.40)=floor(1.06)=1
+        // SELL: Q/4=0 → 없음
         AccountBalance balance = new AccountBalance(0, null,
                 new BigDecimal("1000"));
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"));
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
-        assertThat(orders).hasSize(1);
-        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY);
+        assertThat(orders).hasSize(2);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.averagePrice()) == 0);
+        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.referencePrice()) == 0);
     }
 
     @Test
