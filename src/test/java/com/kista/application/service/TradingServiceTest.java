@@ -403,7 +403,7 @@ class TradingServiceTest {
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
-        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem("USD", marginAmount)));
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem(Currency.USD, marginAmount, null)));
 
         service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -429,7 +429,7 @@ class TradingServiceTest {
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
-        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem("USD", marginAmount)));
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem(Currency.USD, marginAmount, null)));
 
         service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
 

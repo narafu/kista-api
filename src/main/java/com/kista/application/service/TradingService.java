@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.PortfolioSnapshot;
@@ -391,7 +392,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 return;
             }
             nextDeposit = margins.stream()
-                    .filter(m -> "USD".equals(m.currency()))
+                    .filter(m -> Currency.USD == m.currency())
                     .findFirst()
                     .map(com.kista.domain.model.kis.MarginItem::integratedOrderableAmount)
                     .orElse(null);

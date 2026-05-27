@@ -13,7 +13,7 @@ public record StrategyTypeMeta(
         return new StrategyTypeMeta(
                 t.name(), t.getDescription(),
                 t.availableTickers().stream()
-                        .map(Enum::name).sorted().toList()
+                        .map(Enum::name).toList()
         );
     }
 }
