@@ -63,7 +63,7 @@ class TradeHistoryPersistenceAdapterTest {
         List<TradeHistory> result = adapter.findBy(today, today, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        TradeHistory saved = result.get(0);
+        TradeHistory saved = result.getFirst();
         assertThat(saved.tradeDate()).isEqualTo(today);
         assertThat(saved.ticker()).isEqualTo(Ticker.SOXL);
         assertThat(saved.strategy()).isEqualTo("SOXL_DIVISION");
@@ -87,7 +87,7 @@ class TradeHistoryPersistenceAdapterTest {
         List<TradeHistory> result = adapter.findBy(inRange, inRange, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).tradeDate()).isEqualTo(inRange);
+        assertThat(result.getFirst().tradeDate()).isEqualTo(inRange);
     }
 
     @Test
@@ -98,6 +98,6 @@ class TradeHistoryPersistenceAdapterTest {
         List<TradeHistory> result = adapter.findBy(today, today, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).orderId()).isNull();
+        assertThat(result.getFirst().orderId()).isNull();
     }
 }

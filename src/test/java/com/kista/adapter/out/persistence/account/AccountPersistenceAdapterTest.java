@@ -107,7 +107,7 @@ class AccountPersistenceAdapterTest {
         List<Account> result = adapter.findByUserId(userId);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).userId()).isEqualTo(userId);
+        assertThat(result.getFirst().userId()).isEqualTo(userId);
     }
 
     @Test

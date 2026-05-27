@@ -68,10 +68,10 @@ class OrderPersistenceAdapterTest {
         List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY); // KST로 호출
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.get(0).quantity()).isEqualTo(5);
-        assertThat(result.get(0).status()).isEqualTo(Order.OrderStatus.PLANNED);
-        assertThat(result.get(0).tradeDate()).isEqualTo(TODAY); // toDomain: UTC → KST 복원
+        assertThat(result.getFirst().ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.getFirst().quantity()).isEqualTo(5);
+        assertThat(result.getFirst().status()).isEqualTo(Order.OrderStatus.PLANNED);
+        assertThat(result.getFirst().tradeDate()).isEqualTo(TODAY); // toDomain: UTC → KST 복원
     }
 
     @Test

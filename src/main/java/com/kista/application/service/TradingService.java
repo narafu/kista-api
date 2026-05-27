@@ -74,8 +74,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
 
         LocalDate today = LocalDate.now();
 
-        // 잔고 로드 (execute()와 공통 helper)
-        BalanceLoad load = loadBalance(cycle);
+        // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
+        BalanceLoad load = tryLoadBalance(cycle);
         if (load.isSkip()) {
             return new Result(today, null, List.of(), load.skipReason());
         }
@@ -110,7 +110,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 .filter(c -> c.cycle().type() == TradingCycle.Type.INFINITE)
                 .map(c -> c.cycle().ticker())
                 .distinct().toList();
-        Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesComplete(tickers, contexts.get(0).account());
+        Map<Ticker, BigDecimal> prices = tickers.isEmpty() ? Map.of() : fetchPricesComplete(tickers, contexts.getFirst().account());
 
         // 기준 매매표 조회 - PRIVACY 사이클이 있는 경우에만 (KST → Adapter 내부에서 UTC 변환)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.cycle().type() == TradingCycle.Type.PRIVACY);
@@ -166,11 +166,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 1. 휴장 확인 (공통)
         if (!isMarketOpen(today, account)) return;
 
-        // 2. 잔고 로드 (공통 helper)
-        BalanceLoad load = loadBalance(cycle);
-        if (load.skipReason() == SkipReason.NO_CYCLE_HISTORY) {
-            throw new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id());
-        }
+        // 2. 잔고 로드 (execute 전용 — 이력 없음은 데이터 무결성 오류)
+        BalanceLoad load = loadBalanceOrThrow(cycle);
         if (load.skipReason() == SkipReason.INSUFFICIENT_BALANCE) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(account, load.balance(), cycle.ticker());
@@ -238,13 +235,26 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         }
     }
 
-    // 잔고 로드 + skip 판정 (execute/preview 공통)
-    private BalanceLoad loadBalance(TradingCycle cycle) {
+    // 잔고 로드 — preview용: 이력 없음/잔고 부족 모두 skip 결과로 반환
+    private BalanceLoad tryLoadBalance(TradingCycle cycle) {
         var latestOpt = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream().findFirst();
         if (latestOpt.isEmpty()) {
             return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
         }
         TradingCycleHistory latest = latestOpt.get();
+        AccountBalance balance = new AccountBalance(
+                latest.holdings().intValue(), latest.avgPrice(), latest.usdDeposit());
+        if (balance.shouldSkip()) {
+            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
+        }
+        return new BalanceLoad(balance, null);
+    }
+
+    // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
+    private BalanceLoad loadBalanceOrThrow(TradingCycle cycle) {
+        TradingCycleHistory latest = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
         AccountBalance balance = new AccountBalance(
                 latest.holdings().intValue(), latest.avgPrice(), latest.usdDeposit());
         if (balance.shouldSkip()) {

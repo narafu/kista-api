@@ -41,6 +41,6 @@ class TradeHistoryServiceTest {
         List<TradeHistory> result = sut.getHistory(from, to, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.getFirst().ticker()).isEqualTo(Ticker.SOXL);
     }
 }

@@ -131,7 +131,7 @@ class TradingSchedulerTest {
         ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
         verify(useCase).executeBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().get(0).cycle()).isEqualTo(cycle2);
+        assertThat(captor.getValue().getFirst.cycle()).isEqualTo(cycle2);
     }
 
     @Test

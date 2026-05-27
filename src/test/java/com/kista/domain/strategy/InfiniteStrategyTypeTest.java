@@ -40,7 +40,7 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(4);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.averagePrice()) == 0);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.averagePrice()) == 0);
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.referencePrice()) == 0);
         assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
         assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8 && o.price().compareTo(position.targetPrice()) == 0);
@@ -59,7 +59,7 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY);
     }
 
     @Test
@@ -73,7 +73,7 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 50); // 200/4
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 50); // 200/4
     }
 
     @Test
@@ -87,7 +87,7 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(3);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY);
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 50); // 200/4
         assertThat(orders.get(2)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 150); // 200-50
     }
