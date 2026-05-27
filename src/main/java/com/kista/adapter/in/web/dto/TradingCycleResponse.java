@@ -18,13 +18,16 @@ public record TradingCycleResponse(
         @Schema(description = "거래 종목", example = "TQQQ")
         String ticker,
         @Schema(description = "초기 입금액 (PRIVACY: 배수 산출 기준)", example = "2000.00")
-        BigDecimal initialUsdDeposit
+        BigDecimal initialUsdDeposit,
+        @Schema(description = "연속 사이클 정책", example = "NONE")
+        String cycleSeedType
 ) {
     public static TradingCycleResponse from(TradingCycle c) {
         return new TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
-                c.ticker().name(), c.initialUsdDeposit()
+                c.ticker().name(), c.initialUsdDeposit(),
+                c.cycleSeedType() != null ? c.cycleSeedType().name() : TradingCycle.CycleSeedType.NONE.name()
         );
     }
 }

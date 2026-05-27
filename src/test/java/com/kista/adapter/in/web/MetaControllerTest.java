@@ -90,4 +90,23 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$[0].code").value("ACTIVE"))
                 .andExpect(jsonPath("$[0].label").value("활성"));
     }
+
+    @Test
+    void getCycleSeedTypes_authenticated_returnsAllThreeWithLabel() throws Exception {
+        mockMvc.perform(get("/api/meta/cycle-seed-types")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(TradingCycle.CycleSeedType.values().length))
+                .andExpect(jsonPath("$[0].code").value("NONE"))
+                .andExpect(jsonPath("$[0].label").value("연속 안함"));
+    }
+
+    @Test
+    void getBundle_authenticated_includesCycleSeedTypes() throws Exception {
+        mockMvc.perform(get("/api/meta")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cycleSeedTypes").isArray())
+                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(TradingCycle.CycleSeedType.values().length));
+    }
 }

@@ -31,6 +31,6 @@ class TradingCycleHistoryEntity extends BaseCreatedAtEntity {
     @Column(name = "avg_price", precision = 20, scale = 4)
     private BigDecimal avgPrice; // 평균 매입 단가 (보유수량 0이면 null)
 
-    @Column(name = "holdings", nullable = false, precision = 20, scale = 4)
-    private BigDecimal holdings; // 보유 수량
+    @Column(name = "holdings", nullable = false)
+    private int holdings; // 보유 수량 (양의 정수, 단주 단위)
 }

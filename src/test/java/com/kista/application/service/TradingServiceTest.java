@@ -54,6 +54,7 @@ class TradingServiceTest {
     @Mock AccountPort accountPort;
     @Mock TradingCyclePort cyclePort;
     @Mock PrivacyTradePort privacyTradePort;
+    @Mock KisMarginPort kisMarginPort;
 
     TradingService service;
 
@@ -76,16 +77,16 @@ class TradingServiceTest {
     static final TradingCycle CYCLE = new TradingCycle(
             UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
             TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-            Instant.now(), Instant.now()
+            TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now()
     );
 
     // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
     static final TradingCycleHistory NORMAL_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
     static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), new BigDecimal("1000.00"), null, BigDecimal.ZERO, null);
+            null, CYCLE.id(), new BigDecimal("1000.00"), null, 0, null);
     static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), BigDecimal.ZERO, null, BigDecimal.ZERO, null);
+            null, CYCLE.id(), BigDecimal.ZERO, null, 0, null);
 
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
@@ -100,7 +101,7 @@ class TradingServiceTest {
                 infiniteStrategy, privacyStrategy, correctionStrategy,
                 tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
-                accountPort, cyclePort, privacyTradePort);
+                accountPort, cyclePort, privacyTradePort, kisMarginPort);
     }
 
     @Test
@@ -204,9 +205,9 @@ class TradingServiceTest {
         // 두 사이클이 같은 ticker → getPrices() 1회, getPrice() 0회
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-                Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
         TradingCycleHistory history2 = new TradingCycleHistory(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
@@ -231,9 +232,9 @@ class TradingServiceTest {
         // CYCLE → 예외 발생, cycle2 → 정상 실행
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, null,
-                Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
         TradingCycleHistory history2 = new TradingCycleHistory(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), BigDecimal.TEN, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
@@ -329,7 +330,7 @@ class TradingServiceTest {
         TradingCycle privacyCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-                Instant.now(), Instant.now());
+                TradingCycle.CycleSeedType.NONE, Instant.now(), Instant.now());
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
@@ -359,5 +360,106 @@ class TradingServiceTest {
         assertThatThrownBy(() -> service.preview(ACCOUNT.id(), ACCOUNT.userId()))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("활성 거래 사이클이 없습니다");
+    }
+
+    // ── 연속 정책(cycleSeedType) 재등록 테스트 ─────────────────────────────────
+
+    @Test
+    void executeBatch_MAINTAIN_holdingsZero_rotatesWithSameDepositAndNotifiesUser() throws InterruptedException {
+        BigDecimal initDeposit = new BigDecimal("1000.00");
+        TradingCycle maintainCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, initDeposit,
+                TradingCycle.CycleSeedType.MAINTAIN, Instant.now(), Instant.now());
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(maintainCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(maintainCycle, ACCOUNT, USER)), PAST_DST);
+
+        // 재등록: initialUsdDeposit 동일 유지
+        verify(cyclePort).save(argThat(c -> c.initialUsdDeposit().compareTo(initDeposit) == 0));
+        // 성공 알림 발송
+        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), any(TradingCycle.class), eq("재등록"));
+    }
+
+    @Test
+    void executeBatch_MAX_holdingsZero_fetchesMarginAndRotatesAndNotifiesUser() throws InterruptedException {
+        BigDecimal marginAmount = new BigDecimal("2000.00");
+        TradingCycle maxCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
+                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem("USD", marginAmount)));
+
+        service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
+
+        // 재등록: KIS 증거금 USD 행 값으로 변경
+        verify(cyclePort).save(argThat(c -> c.initialUsdDeposit().compareTo(marginAmount) == 0));
+        // 성공 알림 발송
+        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), any(TradingCycle.class), eq("재등록"));
+    }
+
+    @Test
+    void executeBatch_MAX_belowMinRequired_skipsRotationAndNotifiesInsufficientBalance() throws InterruptedException {
+        // PRICE=22, minRequired = 22 × 40 = 880, marginAmount=500 < 880 → skip
+        BigDecimal marginAmount = new BigDecimal("500.00");
+        TradingCycle maxCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
+                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem("USD", marginAmount)));
+
+        service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(cyclePort, never()).save(any());
+        verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), any(AccountBalance.class), eq(Ticker.SOXL));
+        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
+    }
+
+    @Test
+    void executeBatch_MAX_marginFails_skipsRotationAndNotifiesError() throws InterruptedException {
+        TradingCycle maxCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
+                TradingCycle.CycleSeedType.MAX, Instant.now(), Instant.now());
+        RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(kisMarginPort.getMargin(ACCOUNT)).thenThrow(kisError);
+
+        service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(cyclePort, never()).save(any());
+        // rotateCycleIfConsecutive 내부 catch → notifyError (executeBatch 바깥 catch와 별개)
+        verify(notifyPort, atLeastOnce()).notifyError(any());
+        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 }

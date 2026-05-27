@@ -18,6 +18,7 @@ public record TradingCycle(
         Status status,                  // 전략 실행 상태
         Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
         BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
+        CycleSeedType cycleSeedType,    // 사이클 종료 후 자동 재등록 정책
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -93,4 +94,17 @@ public record TradingCycle(
         }
     }
 
+    @Getter
+    @RequiredArgsConstructor
+    public enum CycleSeedType {
+        NONE("연속 안함"),    // 연속 사이클 없음
+        MAINTAIN("시드 유지"), // 종료 후 동일 initialUsdDeposit으로 재등록
+        MAX("시드 MAX");      // 종료 후 현재 USD 잔고 전액을 initialUsdDeposit으로 재등록
+
+        private final String label; // 한국어 표시 이름
+
+        public boolean isConsecutive() {
+            return this != NONE;
+        }
+    }
 }

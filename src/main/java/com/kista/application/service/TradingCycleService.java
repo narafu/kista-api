@@ -9,6 +9,7 @@ import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
+import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
@@ -20,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -30,7 +30,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 public class TradingCycleService implements RegisterTradingCycleUseCase,
-        DeleteTradingCycleUseCase, GetTradingCycleUseCase, PauseTradingCycleUseCase, ResumeTradingCycleUseCase {
+        DeleteTradingCycleUseCase, GetTradingCycleUseCase, PauseTradingCycleUseCase,
+        ResumeTradingCycleUseCase, UpdateTradingCycleUseCase {
 
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
 
@@ -55,15 +56,18 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
             throw new IllegalStateException("이미 등록된 전략 종류입니다: " + cmd.type());
         }
 
+        TradingCycle.CycleSeedType seedType = cmd.cycleSeedType() != null
+                ? cmd.cycleSeedType()
+                : TradingCycle.CycleSeedType.NONE;
         TradingCycle cycle = new TradingCycle(
                 null, accountId, cmd.type(), TradingCycle.Status.ACTIVE,
-                cmd.ticker(), cmd.initialUsdDeposit(), null, null
+                cmd.ticker(), cmd.initialUsdDeposit(), seedType, null, null
         );
         TradingCycle saved = cyclePort.save(cycle);
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음
         cycleHistoryPort.save(new TradingCycleHistory(
-                null, saved.id(), saved.initialUsdDeposit(), null, BigDecimal.ZERO, null
+                null, saved.id(), saved.initialUsdDeposit(), null, 0, null
         ));
 
         log.info("거래 사이클 등록: accountId={}, cycleId={}, type={}", accountId, saved.id(), saved.type());
@@ -120,9 +124,29 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         return cycle;
     }
 
+    @Override
+    public TradingCycle update(UUID cycleId, UUID requesterId, UpdateTradingCycleUseCase.Command cmd) {
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
+        account.verifyOwnedBy(requesterId);
+
+        TradingCycle.CycleSeedType seedType = cmd.cycleSeedType() != null
+                ? cmd.cycleSeedType()
+                : cycle.cycleSeedType();
+        TradingCycle updated = withCycleSeedType(cycle, seedType);
+        TradingCycle saved = cyclePort.save(updated);
+        log.info("거래 사이클 수정: cycleId={}, cycleSeedType={}", cycleId, seedType);
+        return saved;
+    }
+
     private TradingCycle withStatus(TradingCycle c, TradingCycle.Status status) {
         return new TradingCycle(c.id(), c.accountId(), c.type(), status,
-                c.ticker(), c.initialUsdDeposit(), c.createdAt(), null);
+                c.ticker(), c.initialUsdDeposit(), c.cycleSeedType(), c.createdAt(), null);
+    }
+
+    private TradingCycle withCycleSeedType(TradingCycle c, TradingCycle.CycleSeedType cycleSeedType) {
+        return new TradingCycle(c.id(), c.accountId(), c.type(), c.status(),
+                c.ticker(), c.initialUsdDeposit(), cycleSeedType, c.createdAt(), null);
     }
 
     private User findUserOrThrow(UUID userId) {

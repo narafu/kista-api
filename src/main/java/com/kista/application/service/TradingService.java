@@ -25,12 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
@@ -58,6 +53,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final AccountPort accountPort;         // preview 소유권 검증
     private final TradingCyclePort cyclePort;      // preview ACTIVE 사이클 조회
     private final PrivacyTradePort privacyTradePort;
+    private final KisMarginPort kisMarginPort;     // MAX 재등록 시 USD 잔고 조회
 
     // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -216,7 +212,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         }
 
         // 10. 이력 저장 + 알림 (공통)
-        saveAndNotify(balance, price, snapshot, today, mainOrders, corrections, executions, user, account, cycle);
+        saveAndNotify(balance, price, snapshot, today, mainOrders, corrections, executions, user, account, cycle, privacyTradeBase);
     }
 
     // 이미 계산된 templates를 orders에 PLANNED 상태로 저장
@@ -242,8 +238,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
         }
         TradingCycleHistory latest = latestOpt.get();
-        AccountBalance balance = new AccountBalance(
-                latest.holdings().intValue(), latest.avgPrice(), latest.usdDeposit());
+        AccountBalance balance = new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
         if (balance.shouldSkip()) {
             return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
         }
@@ -256,7 +251,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
         AccountBalance balance = new AccountBalance(
-                latest.holdings().intValue(), latest.avgPrice(), latest.usdDeposit());
+                latest.holdings(), latest.avgPrice(), latest.usdDeposit());
         if (balance.shouldSkip()) {
             return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
         }
@@ -335,7 +330,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
 
     private void saveAndNotify(AccountBalance balance, BigDecimal price, TradingSnapshot snapshot,
                                LocalDate today, List<Order> mainOrders, List<Order> corrections,
-                               List<Execution> executions, User user, Account account, TradingCycle cycle) {
+                               List<Execution> executions, User user, Account account, TradingCycle cycle,
+                               PrivacyTradeBase privacyTradeBase) {
         mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         corrections.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
         log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
@@ -343,7 +339,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
             log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
         }
-        saveCycleHistory(balance, cycle); // 사이클별 스냅샷 저장
+        saveCycleHistory(balance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
         if (snapshot != null) { // PRIVACY TODO: 스냅샷 미생성 시 텔레그램 리포트 생략
             TradingReport report = buildReport(today, snapshot, mainOrders, corrections, executions);
             userNotificationPort.notifyTradingReport(user, account, report);
@@ -359,15 +355,87 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
     }
 
-    // execute() 종료 시 1건 적재
-    private void saveCycleHistory(AccountBalance balance, TradingCycle cycle) {
+    // execute() 종료 시 1건 적재, 사이클 종료 시 연속 정책 처리
+    private void saveCycleHistory(AccountBalance balance, TradingCycle cycle,
+                                   Account account, User user, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
         TradingCycleHistory history = new TradingCycleHistory(
                 null, cycle.id(),
                 balance.usdDeposit(), balance.avgPrice(),
-                BigDecimal.valueOf(balance.holdings()), null
+                balance.holdings(), null
         );
         cycleHistoryPort.save(history);
         log.info("[cycleId={}] 거래 사이클 이력 저장 완료", cycle.id());
+
+        if (history.holdings() == 0 && cycle.cycleSeedType().isConsecutive()) {
+            log.info("[cycleId={}] 사이클 종료 — 연속 정책 실행: {}", cycle.id(), cycle.cycleSeedType());
+            rotateCycleIfConsecutive(cycle, account, user, price, privacyTradeBase);
+        } else if (history.holdings() == 0) {
+            log.info("[cycleId={}] 사이클 종료 (연속 없음)", cycle.id());
+        }
+    }
+
+    // 사이클 종료 후 cycleSeedType에 따라 initialUsdDeposit 갱신 + 새 이력 생성
+    private void rotateCycleIfConsecutive(TradingCycle cycle, Account account, User user,
+                                           BigDecimal price, PrivacyTradeBase privacyTradeBase) {
+        // 1. nextInitialUsdDeposit 계산
+        BigDecimal nextDeposit;
+        if (cycle.cycleSeedType() == TradingCycle.CycleSeedType.MAINTAIN) {
+            nextDeposit = cycle.initialUsdDeposit();
+        } else { // MAX
+            List<com.kista.domain.model.kis.MarginItem> margins;
+            try {
+                margins = kisMarginPort.getMargin(account);
+            } catch (Exception e) {
+                log.error("[cycleId={}] MAX 재등록 — KIS 잔고 조회 실패: {}", cycle.id(), e.getMessage());
+                notifyPort.notifyError(e);
+                return;
+            }
+            nextDeposit = margins.stream()
+                    .filter(m -> "USD".equals(m.currency()))
+                    .findFirst()
+                    .map(com.kista.domain.model.kis.MarginItem::integratedOrderableAmount)
+                    .orElse(null);
+            if (nextDeposit == null) {
+                log.warn("[cycleId={}] MAX 재등록 — USD 잔고 행 없음", cycle.id());
+                notifyPort.notifyError(new IllegalStateException("MAX 재등록 실패: USD 잔고 없음 cycleId=" + cycle.id()));
+                return;
+            }
+        }
+
+        // 2. 최소금액 가드
+        BigDecimal minRequired = resolveMinRequired(cycle, price, privacyTradeBase);
+        if (minRequired != null && nextDeposit.compareTo(minRequired) < 0) {
+            log.warn("[cycleId={}] 재등록 취소 — 잔고 부족: {} < 최소 {}", cycle.id(), nextDeposit, minRequired);
+            notifyPort.notifyInsufficientBalance(account,
+                    new AccountBalance(0, null, nextDeposit), cycle.ticker());
+            return;
+        }
+
+        // 3. cycle 갱신 (initialUsdDeposit만 변경, 동일 ID 유지)
+        TradingCycle rotated = new TradingCycle(
+                cycle.id(), cycle.accountId(), cycle.type(), TradingCycle.Status.ACTIVE,
+                cycle.ticker(), nextDeposit, cycle.cycleSeedType(), cycle.createdAt(), null
+        );
+        cyclePort.save(rotated);
+
+        // 4. 새 시작점 이력 (holdings=0, avgPrice=null)
+        cycleHistoryPort.save(new TradingCycleHistory(
+                null, cycle.id(), nextDeposit, null, 0, null
+        ));
+        log.info("[cycleId={}] 사이클 재등록 완료: {} → initialUsdDeposit={}", cycle.id(), cycle.cycleSeedType(), nextDeposit);
+        userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");
+    }
+
+    // 최소금액 기준: INFINITE = 현재가 × 20 × 2, PRIVACY = currentCycleStart / 2
+    private BigDecimal resolveMinRequired(TradingCycle cycle, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
+        return switch (cycle.type()) {
+            case INFINITE -> price != null
+                    ? price.multiply(BigDecimal.valueOf(40)).setScale(2, HALF_UP)
+                    : null;
+            case PRIVACY -> privacyTradeBase != null
+                    ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
+                    : null;
+        };
     }
 
     private TradeHistory toHistory(Order o, java.util.UUID accountId) {

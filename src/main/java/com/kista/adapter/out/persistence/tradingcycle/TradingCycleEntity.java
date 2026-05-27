@@ -44,6 +44,10 @@ class TradingCycleEntity extends BaseAuditEntity {
     @Column(name = "initial_usd_deposit", precision = 20, scale = 2)
     private BigDecimal initialUsdDeposit; // 사이클 시작 시 초기 입금액 (메타 기록용, nullable)
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cycle_seed_type", nullable = false, length = 10)
+    private TradingCycle.CycleSeedType cycleSeedType; // 사이클 종료 후 자동 재등록 정책
+
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 }

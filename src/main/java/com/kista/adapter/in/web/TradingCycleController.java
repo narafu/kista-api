@@ -7,6 +7,7 @@ import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
+import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class TradingCycleController {
 
     private final RegisterTradingCycleUseCase registerCycle;
+    private final UpdateTradingCycleUseCase updateCycle;
     private final DeleteTradingCycleUseCase deleteCycle;
     private final GetTradingCycleUseCase getCycle;
     private final PauseTradingCycleUseCase pauseCycle;
@@ -70,6 +72,24 @@ public class TradingCycleController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    // 거래 사이클 수정 (cycleSeedType 등 메타 변경)
+    @Operation(summary = "거래 사이클 수정")
+    @PutMapping("/api/trading-cycles/{id}")
+    public TradingCycleResponse update(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody TradingCycleRequest request) {
+        try {
+            return TradingCycleResponse.from(
+                    updateCycle.update(id, userId, request.toUpdateCommand())
+            );
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
 
