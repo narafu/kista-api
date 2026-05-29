@@ -97,7 +97,15 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "preview:" + accountId);
                 yield new Result(today, calc.position(), calc.orders(), null);
             }
-            case PRIVACY -> new Result(today, null, List.of(), SkipReason.UNSUPPORTED_STRATEGY);
+            case PRIVACY -> {
+                // 스케줄러 phaseA와 동일: 기준매매표 없으면 skip
+                PrivacyTradeBase base = privacyTradePort.findTodayTrade(today).orElse(null);
+                if (base == null) {
+                    yield new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
+                }
+                List<Order> orders = calcPrivacy(balance, cycle.initialUsdDeposit(), base);
+                yield new Result(today, null, orders, null);
+            }
         };
     }
 

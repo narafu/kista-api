@@ -21,12 +21,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -332,21 +335,48 @@ class TradingServiceTest {
     }
 
     @Test
-    void preview_returnsSkipUnsupportedStrategy_whenPrivacy() {
+    void preview_returnsSkipNoPrivacyBase_whenPrivacyAndNoBase() {
         TradingCycle privacyCycle = new TradingCycle(
                 UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("1000.00"),
                 TradingCycle.CycleSeedType.NONE);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
         when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
-        assertThat(result.skipReason()).isEqualTo(SkipReason.UNSUPPORTED_STRATEGY);
+        assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
         assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
+    }
+
+    @Test
+    void preview_returnsOrders_whenPrivacyAndBaseExists() {
+        TradingCycle privacyCycle = new TradingCycle(
+                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
+                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("1000.00"),
+                TradingCycle.CycleSeedType.NONE);
+        PrivacyTradeBase base = new PrivacyTradeBase(
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
+        Order buyOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
+                Order.OrderStatus.PLANNED, null);
+
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
+        when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
+        when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
+
+        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isNull();
+        assertThat(result.position()).isNull(); // PRIVACY는 InfinitePosition 없음
+        assertThat(result.orders()).hasSize(1);
+        verify(orderPort, never()).saveAll(any()); // DB INSERT 없음
     }
 
     @Test
