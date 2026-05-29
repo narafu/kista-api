@@ -62,13 +62,13 @@ public class KisAccountAdapter implements KisAccountPort {
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
 
-    // 해외증거금 통화별조회(TTTC2101R)에서 USD 행의 integratedOrderableAmount 반환
-    // frcr_dncl_amt_2(환전된 외화만)가 아닌 통합주문가능금액 사용 — 원화 자동 환전 케이스 포함
+    // 해외증거금 통화별조회(TTTC2101R)에서 USD 행의 purchasableAmount 반환
+    // purchasableAmount = max(itgr_ord_psbl_amt, frcr_ord_psbl_amt1) — 통합증거금 ON/OFF 모두 정확
     private BigDecimal fetchMargin(Account account) {
         return kisMarginPort.getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()
-                .map(item -> item.integratedOrderableAmount())
+                .map(item -> item.purchasableAmount())
                 .orElse(BigDecimal.ZERO);
     }
 

@@ -465,7 +465,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             nextDeposit = margins.stream()
                     .filter(m -> Currency.USD == m.currency())
                     .findFirst()
-                    .map(com.kista.domain.model.kis.MarginItem::integratedOrderableAmount)
+                    .map(com.kista.domain.model.kis.MarginItem::purchasableAmount)
                     .orElse(null);
             if (nextDeposit == null) {
                 log.warn("[cycleId={}] MAX 재등록 — USD 잔고 행 없음", cycle.id());
