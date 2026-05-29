@@ -202,7 +202,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 7, 8, 9. 장 후 체결 확인 + 보정 주문 (INFINITE)
         List<Order> corrections = List.of();
         List<Execution> executions = List.of();
-        if (cycle.type() == TradingCycle.Type.INFINITE) {
+        if (cycle.type() == TradingCycle.Type.INFINITE) { // TODO 장 마감 후 현재가(종가) 조회 로직 -> (unitAmount - 체결내역) / 종가 갯수 주문
             // 7. 장 후 체결 확인 대기
             waitForPostClose(dst);
             // 8. 체결 내역 조회

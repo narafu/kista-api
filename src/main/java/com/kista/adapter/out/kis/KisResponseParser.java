@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.order.Order;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -27,6 +28,14 @@ final class KisResponseParser {
     // sll_buy_dvsn_cd: 01=매도, 02=매수
     static Order.OrderDirection parseDirection(String sllBuyDvsnCd) {
         return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
+    }
+
+    // KIS 요청 가격 파라미터 포맷팅 (LOC/MOC는 "0", LIMIT은 소수 2자리)
+    static String formatPrice(Order.OrderType type, BigDecimal price) {
+        return switch (type) {
+            case LOC, MOC -> "0";
+            case LIMIT    -> price.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        };
     }
 
     // KIS YYYYMMDD 문자열 → LocalDate, 파싱 실패 시 fallback 반환

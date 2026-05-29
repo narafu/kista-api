@@ -43,7 +43,7 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 
-    @Column(nullable = false, precision = 12, scale = 4)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
     @Column(nullable = false)

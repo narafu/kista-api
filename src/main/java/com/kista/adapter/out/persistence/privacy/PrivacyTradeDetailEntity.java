@@ -35,7 +35,7 @@ class PrivacyTradeDetailEntity extends BaseCreatedAtEntity {
     @Column(nullable = false, length = 10)
     private Order.OrderType orderType;         // LOC / MOC / LIMIT
 
-    @Column(nullable = false, precision = 12, scale = 4)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
     @Column

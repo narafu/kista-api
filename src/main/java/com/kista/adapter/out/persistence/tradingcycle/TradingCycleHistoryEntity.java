@@ -28,7 +28,7 @@ class TradingCycleHistoryEntity extends BaseCreatedAtEntity {
     @Column(name = "usd_deposit", nullable = false, precision = 20, scale = 2)
     private BigDecimal usdDeposit; // 통합주문가능금액
 
-    @Column(name = "avg_price", precision = 20, scale = 4)
+    @Column(name = "avg_price", precision = 20, scale = 2)
     private BigDecimal avgPrice; // 평균 매입 단가 (보유수량 0이면 null)
 
     @Column(name = "holdings", nullable = false)

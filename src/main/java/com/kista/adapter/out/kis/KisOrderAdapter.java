@@ -56,10 +56,7 @@ public class KisOrderAdapter implements KisOrderPort {
     }
 
     private String resolvePrice(Order.OrderType type, BigDecimal price) {
-        return switch (type) {
-            case LOC, MOC -> "0";           // LOC/MOC는 가격 무관하므로 0 입력
-            case LIMIT    -> price.toPlainString();
-        };
+        return KisResponseParser.formatPrice(type, price);
     }
 
     record OrderResponse(@JsonProperty("output") Output output) {
