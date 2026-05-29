@@ -115,6 +115,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE)); // 시작가 + 종가 모두
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -123,20 +124,21 @@ class TradingServiceTest {
                 .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
         verify(cycleHistoryPort).findRecentByCycleId(CYCLE.id(), 1);
-        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 경로: 가격은 executeBatch가 배치 조회
+        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
+        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose) 각 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
-        verify(correctionStrategy).correct(any(), any(), any());
-        verify(portfolioSnapshotPort, never()).save(any()); // price=null → 포트폴리오 스냅샷 생략
+        verify(correctionStrategy).correct(any(), any(), anyList(), any());
+        verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class)); // price=PRICE → 스냅샷 저장
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
     }
 
@@ -163,7 +165,7 @@ class TradingServiceTest {
                 .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(mainOrder, corrOrder);
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of(corrOrder));
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of(corrOrder));
 
         // holdings=0 신규 계좌는 executeBatch 경로(getPrices)로만 가격 수신 가능
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
@@ -173,26 +175,30 @@ class TradingServiceTest {
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
+        // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyMarketClosed();
         verify(cycleHistoryPort, never()).findRecentByCycleId(any(), anyInt());
-        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
+        // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
         verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), eq(LOW_BALANCE), eq(Ticker.SOXL));
-        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(orderPort, never()).saveAll(any());
         verify(tradeHistoryPort, never()).save(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
@@ -201,8 +207,8 @@ class TradingServiceTest {
     // ── executeBatch 테스트 ────────────────────────────────────────────────────
 
     @Test
-    void executeBatch_fetchesPricesOnce_notPerCycle() throws InterruptedException {
-        // 두 사이클이 같은 ticker → getPrices() 1회, getPrice() 0회
+    void executeBatch_fetchesPricesTwice_startAndClose_notPerCycle() throws InterruptedException {
+        // 두 사이클이 같은 ticker → getPrices() 2회(시작가+종가), getPrice() 0회
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
                 TradingCycle.CycleSeedType.NONE);
@@ -216,14 +222,14 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
 
         service.executeBatch(List.of(
                 new BatchContext(CYCLE, ACCOUNT, USER),
                 new BatchContext(cycle2, ACCOUNT, USER)
         ), PAST_DST);
 
-        verify(kisPricePort, times(1)).getPrices(anyList(), eq(ACCOUNT));
+        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose)
         verify(kisPricePort, never()).getPrice(any(), any());
     }
 
@@ -246,7 +252,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
 
         service.executeBatch(List.of(
                 new BatchContext(CYCLE, ACCOUNT, USER),
@@ -378,7 +384,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
 
         service.executeBatch(List.of(new BatchContext(maintainCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -402,7 +408,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem(Currency.USD, marginAmount, null)));
 
         service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
@@ -428,7 +434,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem(Currency.USD, marginAmount, null)));
 
         service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
@@ -452,7 +458,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(correctionStrategy.correct(any(), any(), any())).thenReturn(List.of());
+        when(correctionStrategy.correct(any(), any(), anyList(), any())).thenReturn(List.of());
         when(kisMarginPort.getMargin(ACCOUNT)).thenThrow(kisError);
 
         service.executeBatch(List.of(new BatchContext(maxCycle, ACCOUNT, USER)), PAST_DST);
