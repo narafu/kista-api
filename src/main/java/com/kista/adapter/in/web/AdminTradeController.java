@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.model.order.TradeHistory;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.AdminListAccountsUseCase;
 import com.kista.domain.port.in.AdminListTradesUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
@@ -54,7 +54,7 @@ public class AdminTradeController {
             BigDecimal price,
             String status            // PLACED | FILLED | FAILED
     ) {
-        static AdminTradeResponse from(TradeHistory t, Map<UUID, Account> accountMap, Map<UUID, AdminUserView> userMap) {
+        static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap, Map<UUID, AdminUserView> userMap) {
             // accountId → userId → nickname 순서로 역방향 조회
             Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
             UUID userId = account != null ? account.userId() : null;

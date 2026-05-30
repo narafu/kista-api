@@ -2,10 +2,8 @@ package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.order.TradeHistory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -16,8 +14,6 @@ public record TradeHistoryResponse(
         LocalDate tradeDate,
         @Schema(description = "거래 종목", example = "SOXL")
         Ticker ticker,
-        @Schema(description = "적용 전략", example = "INFINITE")
-        String strategy,
         @Schema(description = "주문 유형 (LOC/MOC/LIMIT)", example = "LOC")
         Order.OrderType orderType,
         @Schema(description = "매매 방향 (BUY/SELL)", example = "BUY")
@@ -26,19 +22,15 @@ public record TradeHistoryResponse(
         int quantity,
         @Schema(description = "주문 단가 (USD)", example = "85.50")
         BigDecimal price,
-        @Schema(description = "주문 금액 (USD)", example = "427.50")
-        BigDecimal amountUsd,
-        @Schema(description = "주문 상태 (PLACED/FILLED/FAILED)", example = "PLACED")
+        @Schema(description = "주문 상태 (PLACED/FAILED)", example = "PLACED")
         Order.OrderStatus status,
         @Schema(description = "증권사 주문번호", example = "0000123456")
-        String orderId,
-        @Schema(description = "생성 일시 (UTC)", example = "2025-01-15T07:00:01Z")
-        Instant createdAt
+        String orderId
 ) {
-    public static TradeHistoryResponse from(TradeHistory h) {
+    public static TradeHistoryResponse from(Order o) {
         return new TradeHistoryResponse(
-                h.id(), h.tradeDate(), h.ticker(), h.strategy(),
-                h.orderType(), h.direction(), h.quantity(), h.price(),
-                h.amountUsd(), h.status(), h.orderId(), h.createdAt());
+                o.id(), o.tradeDate(), o.ticker(),
+                o.orderType(), o.direction(), o.quantity(), o.price(),
+                o.status(), o.kisOrderId());
     }
 }
