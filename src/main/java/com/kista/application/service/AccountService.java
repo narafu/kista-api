@@ -6,7 +6,6 @@ import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisTokenPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +25,6 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
     private final AccountPort accountPort;
-    private final KisTokenPort kisTokenPort;
     private final TradingCyclePort cyclePort;
 
     @Override
@@ -49,17 +47,11 @@ public class AccountService implements RegisterAccountUseCase, UpdateAccountUseC
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
-        // 키 변경 시에만 유효성 검증
-        String newAppKey = cmd.kisAppKey() != null ? cmd.kisAppKey() : account.kisAppKey();
-        String newSecretKey = cmd.kisSecretKey() != null ? cmd.kisSecretKey() : account.kisSecretKey();
-        if (cmd.kisAppKey() != null || cmd.kisSecretKey() != null) {
-            kisTokenPort.testToken(accountId, newAppKey, newSecretKey);
-        }
         Account updated = new Account(
                 account.id(), account.userId(),
                 cmd.nickname() != null ? cmd.nickname() : account.nickname(),
                 account.accountNo(),
-                newAppKey, newSecretKey,
+                account.kisAppKey(), account.kisSecretKey(),
                 account.kisAccountType(), account.broker()
         );
         return accountPort.save(updated);

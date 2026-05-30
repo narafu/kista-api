@@ -22,8 +22,6 @@ public record AccountRequest(
     }
 
     public UpdateAccountUseCase.Command toUpdateCommand() {
-        return new UpdateAccountUseCase.Command(
-                nickname, kisAppKey, kisSecretKey
-        );
+        return new UpdateAccountUseCase.Command(nickname);
     }
 }

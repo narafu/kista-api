@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisTokenPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +26,6 @@ import static org.mockito.Mockito.*;
 class AccountServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock KisTokenPort kisTokenPort;
     @Mock TradingCyclePort cyclePort;
     @InjectMocks AccountService accountService;
 
@@ -81,7 +79,7 @@ class AccountServiceTest {
         UUID otherId = UUID.randomUUID();
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, cmd))
                 .isInstanceOf(SecurityException.class);
@@ -93,7 +91,7 @@ class AccountServiceTest {
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null);
+        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
         Account result = accountService.update(accountId, userId, cmd);
 
         assertThat(result.nickname()).isEqualTo("변경닉네임");
@@ -128,23 +126,9 @@ class AccountServiceTest {
                 .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
-                new UpdateAccountUseCase.Command("닉", null, null)))
+                new UpdateAccountUseCase.Command("닉")))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
-    @Test
-    @DisplayName("update: kisAppKey 변경 시 testToken 호출")
-    void update_키변경시_testToken호출() {
-        Account existing = activeAccount(userId);
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(existing);
-        doNothing().when(kisTokenPort).testToken(any(), any(), any());
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command(
-                "새닉네임", "newAppKey", null
-        );
-        accountService.update(accountId, userId, cmd);
-
-        verify(kisTokenPort).testToken(accountId, "newAppKey", existing.kisSecretKey());
-    }
 }

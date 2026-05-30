@@ -74,7 +74,7 @@ public class AccountController {
     }
 
     // 계좌 수정 (소유권 검증)
-    @Operation(summary = "계좌 수정", description = "별명, KIS 자격증명을 수정. 계좌번호는 수정 불가.")
+    @Operation(summary = "계좌 수정", description = "별명을 수정. 계좌번호 및 KIS 자격증명은 수정 불가.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
@@ -90,8 +90,6 @@ public class AccountController {
             return AccountResponse.from(
                     updateAccount.update(id, userId, request.toUpdateCommand())
             );
-        } catch (Account.InvalidKisKeyException e) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
