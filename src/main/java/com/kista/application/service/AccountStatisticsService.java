@@ -7,6 +7,7 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.kis.ReservationOrder;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
@@ -17,6 +18,7 @@ import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.KisReservationOrderPort;
+import com.kista.domain.port.out.TradingCycleHistoryPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,7 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final TradingCyclePort tradingCyclePort;
+    private final TradingCycleHistoryPort tradingCycleHistoryPort;
     private final KisProfitPort kisProfitPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;
@@ -103,6 +107,17 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         return kisPricePort.getPrices(tickers, account);
+    }
+
+    @Override
+    public List<AccountCycleHistoryEntry> getCycleHistory(UUID accountId, UUID requesterId,
+                                                           LocalDate from, LocalDate to) {
+        Account account = accountPort.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        // LocalDate → Instant 변환 (UTC 기준 자정)
+        var fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
+        var toInstant = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return tradingCycleHistoryPort.findByAccountId(accountId, fromInstant, toInstant);
     }
 
 }
