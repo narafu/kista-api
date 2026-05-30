@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ReservationOrderCommand;
 import com.kista.domain.model.kis.ReservationOrderReceipt;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisReservationOrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,12 +17,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ReservationOrderService implements PlaceReservationOrderUseCase {
 
-    private final AccountRepository accountRepository;
+    private final AccountPort accountPort;
     private final KisReservationOrderPort kisReservationOrderPort;
 
     @Override
     public ReservationOrderReceipt place(UUID accountId, UUID requesterId, ReservationOrderCommand command) {
-        Account account = accountRepository.findByIdOrThrow(accountId);
+        Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         log.info("예약주문 접수: accountId={}, ticker={}, direction={}, quantity={}, price={}",
                 accountId, command.ticker(), command.direction(), command.quantity(), command.price());

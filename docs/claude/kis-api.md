@@ -5,9 +5,22 @@
 - `KisTokenPort.getToken(UUID accountId, String appKey, String appSecret)` — V2: account_id 기반 독립 토큰 캐시 (`kis_tokens` PK = account_id UUID, V9 migration)
 - 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(accountId, now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
 - **`KisTokenAdapter`는 `KisHttpClient` 미사용** — `RestTemplate`+`KisProperties` 직접 주입 (`KisHttpClient`→`KisTokenPort`→`KisTokenAdapter` 순환 방지)
+- **토큰 발급 우회 경로 주의** — `/oauth2/tokenP`를 직접 호출하는 두 곳: `KisConnectionTestAdapter.test()` / `KisTokenAdapter.testToken()`. 두 곳 모두 `accountId` 파라미터 필수, 성공 시 `kisTokenCachePort.saveToken()` 저장 (누락 시 KIS에서 "접속요청 발행" 알림 매번 발생)
+- `testToken(accountId, appKey, appSecret)` — `AccountService.update()` 호출, 발급 토큰을 캐시 저장 → 직후 API 호출 재발급 방지
+- `KisConnectionTestPort.test(appKey, appSecret, UUID accountId)` — accountId=null이면 캐시 저장 생략 (등록 전 사전 검증), accountId 있으면 저장
+- `KisTokenAdapter.getToken()` — accountId별 `ReentrantLock` + double-check locking으로 동시 요청 경합 차단 (대시보드 동시 호출 시 N번 발급 방지)
 - 모든 KIS 포트 인터페이스에 `Account account` 파라미터 추가 (V2) — `getBalance(Account)`, `place(Order, Account)`, `isMarketOpen(LocalDate, Account)` 등
 - KIS 포트 인터페이스에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
+
+### KIS 주요 오류 코드
+- `EGW00202` "GW라우팅 중 오류가 발생했습니다" — KIS 게이트웨이 일시적 오류 (우리 코드 무관). 미국 공휴일 휴장일에 주문 접수 시도 시 발생. 재시도 로직 없음
+- `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisTokenAdapter`)
+
+### KIS 휴장 조회 API (`CTOS5011R`, KisHolidayAdapter)
+- `BASS_DT` = **한국 날짜 기준** — 미국 메모리얼 데이(ET 5/25 월) = 한국 5/26에 조회해야 정확 (JVM TZ=KST 고정으로 해결됨)
+- `output[]` 비어있으면 거래일, 있으면 휴장일
+- API 호출 실패 시 "개장으로 폴백" (`catch → return true`) — KIS 일시 장애 시 매매 진행 위험 있음
 
 ### 응답 필드명 대소문자 주의
 - **해외주식 API 응답은 lowercase** (`ovrs_pdno`, `ovrs_cblc_qty`, `frcr_evlu_amt2` 등)
@@ -30,6 +43,7 @@
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
 - `ORD_DVSN` 코드: LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, LOO(장개시지정가)=`32`, 지정가=`00`
 - LOC/MOC 주문 시 `OVRS_ORD_UNPR="0"` 입력
+- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — LOC/MOC=`"0"`, LIMIT=`setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류). 예약주문(`FT_ORD_UNPR3`)도 동일: `KisResponseParser.formatPrice(Order.OrderType.LIMIT, price)`
 
 ### 체결 조회 API (TTTS3035R, KisExecutionAdapter)
 - 파라미터: `CANO`, `ACNT_PRDT_CD`, `PDNO="%"`, `ORD_STRT_DT`, `ORD_END_DT` (INQR_STRT/END_DT 아님!)

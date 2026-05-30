@@ -1,4 +1,5 @@
 package com.kista.domain.model.order;
+
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
@@ -22,7 +23,9 @@ public record Order(
         MOC,   // Market On Close: 종가 시장가 주문
         LIMIT  // 일반 지정가 주문
     }
-    public enum OrderDirection { BUY, SELL }
+
+    public enum OrderDirection {BUY, SELL}
+
     public enum OrderStatus {
         PLANNED,  // DB 저장, KIS 접수 대기
         PLACED,   // KIS 접수 완료

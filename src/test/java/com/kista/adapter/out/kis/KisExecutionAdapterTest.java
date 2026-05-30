@@ -38,7 +38,7 @@ class KisExecutionAdapterTest {
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
-            Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS
     );
 
     @BeforeEach
@@ -80,7 +80,7 @@ class KisExecutionAdapterTest {
         List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).direction()).isEqualTo(Order.OrderDirection.SELL);
+        assertThat(result.getFirst().direction()).isEqualTo(Order.OrderDirection.SELL);
     }
 
     @Test
@@ -96,7 +96,7 @@ class KisExecutionAdapterTest {
         List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        Execution e = result.get(0);
+        Execution e = result.getFirst();
         assertThat(e.direction()).isEqualTo(Order.OrderDirection.BUY);
         assertThat(e.quantity()).isEqualTo(10);
         assertThat(e.price()).isEqualByComparingTo("30.50");
@@ -119,7 +119,7 @@ class KisExecutionAdapterTest {
         List<Execution> result = adapter.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        Execution e = result.get(0);
+        Execution e = result.getFirst();
         assertThat(e.quantity()).isEqualTo(0);
         assertThat(e.price()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(e.amountUsd()).isEqualByComparingTo(BigDecimal.ZERO);

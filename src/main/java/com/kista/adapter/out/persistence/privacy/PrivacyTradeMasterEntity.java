@@ -30,19 +30,19 @@ class PrivacyTradeMasterEntity extends BaseCreatedAtEntity {
     private UUID id;
 
     @Column(name = "trade_date", nullable = false)
-    private LocalDate tradeDate;              // 기준 매매표가 적용되는 거래일
+    private LocalDate tradeDate;              // DB는 UTC(=US 거래일) 저장, FIDA 수신값 그대로 보존 — TradeDateConverter 경유
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
     private Ticker ticker;                    // 대상 종목 (PRIVACY는 SOXL)
 
-    @Column(nullable = false, precision = 12, scale = 4)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal currentCycleStart;     // 현재 사이클 시작 시점의 기준 가격
 
-    @Column(nullable = false, precision = 12, scale = 4)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal currentCycleRealizedPnl;     // 현재 사이클 실현 수익($)
 
-    @Column(precision = 12, scale = 4)
+    @Column(precision = 12, scale = 2)
     private BigDecimal avgPrice;              // 보유 평단가
 
     @Column(nullable = false)

@@ -2,8 +2,10 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 public interface PrivacyTradePort {
@@ -13,4 +15,7 @@ public interface PrivacyTradePort {
 
     // trade_date >= 오늘인 행 중 가장 미래 거래일의 기준가 반환 (없으면 empty)
     Optional<PrivacyCurrentBase> findCurrentBase();
+
+    // 당일 기준 매매표 조회 — 미수신 일자면 empty
+    Optional<PrivacyTradeBase> findTodayTrade(LocalDate today);
 }

@@ -1,9 +1,11 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.CycleHistoryResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
@@ -221,6 +223,30 @@ public class KisStatisticsController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
+        }
+    }
+
+    // trading_cycle_history DB 조회 (KIS API 미사용)
+    @Operation(summary = "사이클 이력 조회", description = "DB의 trading_cycle_history 테이블 기반 계좌 거래 이력 조회. KIS API 미호출.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @GetMapping("/cycle-history")
+    public List<CycleHistoryResponse> getCycleHistory(
+            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "조회 시작일", example = "2025-01-01")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @Parameter(description = "조회 종료일", example = "2025-01-31")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        try {
+            List<AccountCycleHistoryEntry> history = statisticsUseCase.getCycleHistory(accountId, userId, from, to);
+            return history.stream().map(CycleHistoryResponse::from).toList();
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         }
     }
 

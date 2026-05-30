@@ -42,7 +42,7 @@ class CompositeUserNotificationAdapterTest {
                 UUID.randomUUID(), "kakaoId", "nickname",
                 User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null,
-                Instant.now(), Instant.now(), null,
+                null,
                 channel);
     }
 

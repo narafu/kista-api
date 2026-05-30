@@ -1,7 +1,7 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -15,7 +15,7 @@ import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
-public class InfiniteStrategy implements TradingStrategy {
+public class InfiniteStrategy implements InfiniteTradingStrategy {
 
     @Override
     public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
@@ -36,7 +36,7 @@ public class InfiniteStrategy implements TradingStrategy {
         }
 
         // LOC 매수 ② — 기준가 기준
-        int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice();
+        int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
         if (buyQuantity2 >= 1) {
             orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLANNED, null));
         }

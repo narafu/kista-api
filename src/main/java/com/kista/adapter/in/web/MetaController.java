@@ -29,7 +29,8 @@ public class MetaController {
     @GetMapping
     public ResponseEntity<MetaBundle> getBundle() {
         MetaBundle bundle = new MetaBundle(
-                getStrategyTypeList(), getTickerList(), getBrokerList(), getStrategyStatusList()
+                getStrategyTypeList(), getTickerList(), getBrokerList(),
+                getStrategyStatusList(), getCycleSeedTypeList()
         );
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
@@ -58,6 +59,12 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(getStrategyStatusList());
     }
 
+    @Operation(summary = "연속 사이클 정책 목록")
+    @GetMapping("/cycle-seed-types")
+    public ResponseEntity<List<EnumMeta>> getCycleSeedTypes() {
+        return ResponseEntity.ok().cacheControl(CACHE).body(getCycleSeedTypeList());
+    }
+
     private List<StrategyTypeMeta> getStrategyTypeList() {
         return Arrays.stream(TradingCycle.Type.values())
                 .map(StrategyTypeMeta::from)
@@ -79,6 +86,12 @@ public class MetaController {
     private List<EnumMeta> getStrategyStatusList() {
         return Arrays.stream(TradingCycle.Status.values())
                 .map(s -> new EnumMeta(s.name(), s.getLabel(), null))
+                .toList();
+    }
+
+    private List<EnumMeta> getCycleSeedTypeList() {
+        return Arrays.stream(TradingCycle.CycleSeedType.values())
+                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
                 .toList();
     }
 }

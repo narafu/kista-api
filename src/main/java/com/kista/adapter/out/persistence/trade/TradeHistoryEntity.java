@@ -29,7 +29,7 @@ class TradeHistoryEntity extends BaseCreatedAtEntity {
     private UUID accountId;
 
     @Column(name = "trade_date", nullable = false)
-    private LocalDate tradeDate;
+    private LocalDate tradeDate; // DB는 UTC(=US 거래일) 저장, 코드는 KST로 다룸 — TradeDateConverter 경유
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
@@ -46,7 +46,7 @@ class TradeHistoryEntity extends BaseCreatedAtEntity {
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 
-    @Column(nullable = false, precision = 12, scale = 4)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
     @Column(nullable = false)

@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface KisTokenPort {
     String getToken(UUID accountId, String appKey, String appSecret);
-    void testToken(String appKey, String appSecret); // 캐시 없는 1회성 유효성 검증용
+    void testToken(UUID accountId, String appKey, String appSecret); // 키 검증 후 토큰을 캐시에 저장
 }

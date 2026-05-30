@@ -39,7 +39,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
         List<PortfolioSnapshot> result = adapter.findRecent(7);
 
         assertThat(result).hasSize(1);
-        PortfolioSnapshot saved = result.get(0);
+        PortfolioSnapshot saved = result.getFirst();
         assertThat(saved.snapshotDate()).isEqualTo(today);
         assertThat(saved.ticker()).isEqualTo(Ticker.SOXL);
         assertThat(saved.holdings()).isEqualTo(10);
@@ -60,7 +60,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
         List<PortfolioSnapshot> result = adapter.findRecent(7);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).snapshotDate()).isEqualTo(today);
+        assertThat(result.getFirst().snapshotDate()).isEqualTo(today);
     }
 
     @Test
@@ -76,7 +76,7 @@ class PortfolioSnapshotPersistenceAdapterTest {
         List<PortfolioSnapshot> result = adapter.findRecent(7);
 
         assertThat(result).hasSize(3);
-        assertThat(result.get(0).snapshotDate()).isEqualTo(today);
+        assertThat(result.getFirst().snapshotDate()).isEqualTo(today);
         assertThat(result.get(1).snapshotDate()).isEqualTo(yesterday);
         assertThat(result.get(2).snapshotDate()).isEqualTo(twoDaysAgo);
     }

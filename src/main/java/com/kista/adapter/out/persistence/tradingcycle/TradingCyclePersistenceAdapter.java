@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.tradingcycle;
 
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class TradingCyclePersistenceAdapter implements TradingCycleRepository {
+class TradingCyclePersistenceAdapter implements TradingCyclePort {
 
     private final TradingCycleJpaRepository jpaRepository;
 
@@ -66,8 +66,7 @@ class TradingCyclePersistenceAdapter implements TradingCycleRepository {
     private TradingCycle toDomain(TradingCycleEntity e) {
         return new TradingCycle(
                 e.getId(), e.getAccountId(), e.getType(), e.getStatus(),
-                e.getTicker(), e.getMultiple(), e.getInitialUsdDeposit(),
-                e.getCreatedAt(), e.getUpdatedAt()
+                e.getTicker(), e.getInitialUsdDeposit(), e.getCycleSeedType()
         );
     }
 
@@ -78,8 +77,8 @@ class TradingCyclePersistenceAdapter implements TradingCycleRepository {
         e.setType(c.type());
         e.setStatus(c.status());
         e.setTicker(c.ticker());
-        e.setMultiple(c.multiple());
         e.setInitialUsdDeposit(c.initialUsdDeposit());
+        e.setCycleSeedType(c.cycleSeedType() != null ? c.cycleSeedType() : TradingCycle.CycleSeedType.NONE);
         return e;
     }
 }

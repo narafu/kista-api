@@ -90,7 +90,7 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         body.put("PDNO", command.ticker().name());
         body.put("OVRS_EXCG_CD", EXCHANGE_CODE);
         body.put("FT_ORD_QTY", String.valueOf(command.quantity()));
-        body.put("FT_ORD_UNPR3", command.price().toPlainString());
+        body.put("FT_ORD_UNPR3", KisResponseParser.formatPrice(Order.OrderType.LIMIT, command.price()));
 
         ReservationOrderResponse response = kisHttpClient.post(ORDER_PATH, headers, body, ReservationOrderResponse.class);
 

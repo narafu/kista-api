@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.account;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-public class AccountPersistenceAdapter implements AccountRepository {
+public class AccountPersistenceAdapter implements AccountPort {
 
     private final AccountJpaRepository jpaRepository;
     private final AesCryptoService crypto;
@@ -87,8 +87,7 @@ public class AccountPersistenceAdapter implements AccountRepository {
                 crypto.decrypt(e.getKisAppKey()),
                 crypto.decrypt(e.getKisSecretKey()),
                 e.getKisAccountType(),
-                e.getBroker(),
-                e.getCreatedAt(), e.getUpdatedAt()
+                e.getBroker()
         );
     }
 }

@@ -34,7 +34,7 @@ class PortfolioSnapshotEntity extends BaseCreatedAtEntity {
     @Column(nullable = false)
     private int holdings;
 
-    @Column(name = "avg_price", nullable = false, precision = 12, scale = 4)
+    @Column(name = "avg_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal avgPrice;
 
     @Column(name = "market_value_usd", nullable = false, precision = 12, scale = 2)

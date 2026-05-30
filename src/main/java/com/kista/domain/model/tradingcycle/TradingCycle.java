@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
@@ -17,38 +16,23 @@ public record TradingCycle(
         Type type,                      // 매매 전략 종류
         Status status,                  // 전략 실행 상태
         Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
-        BigDecimal multiple,            // 배수 (기본값 1.0)
-        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (메타 기록용)
-        Instant createdAt,
-        Instant updatedAt
+        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
+        CycleSeedType cycleSeedType     // 사이클 종료 후 자동 재등록 정책
 ) {
     @Getter
     @RequiredArgsConstructor
     public enum Type {
-        INFINITE(                                                // TQQQ/SOXL/USD 모두 지원
-                EnumSet.of(Ticker.TQQQ, Ticker.SOXL, Ticker.USD),
-                "무한매수",
-                "20분할 LOC 매매 전략",
-                Ticker.TQQQ,
-                new BigDecimal("1.0")
-        ),
-        PRIVACY(                                                 // SOXL 전용 (서버 강제)
-                EnumSet.of(Ticker.SOXL),
-                "기준매매표",
-                "기준 매매표 기반 전략 (SOXL 전용)",
-                Ticker.SOXL,
-                new BigDecimal("1.0")
-        );
+        INFINITE("20분할 LOC 매매 전략"), // 모든 Ticker 지원
+        PRIVACY("Fanding 매매표 기반 전략"); // SOXL 전용
 
-        private final Set<Ticker> availableTickers; // 사용 가능한 티커 집합
-        private final String label;                 // 한국어 표시 이름
-        private final String description;           // 전략 설명
-        private final Ticker defaultTicker;         // 기본 선택 티커
-        private final BigDecimal defaultMultiple;   // 기본 배수
+        private final String description; // 전략 설명
 
-        public boolean isSupported(Ticker ticker) {
-            if (ticker == null) return false;
-            return availableTickers.contains(ticker);
+        // INFINITE: 전체 Ticker, PRIVACY: SOXL 단일 — Ticker 추가 시 자동 반영
+        public Set<Ticker> availableTickers() {
+            return switch (this) {
+                case PRIVACY -> EnumSet.of(Ticker.SOXL);
+                case INFINITE -> EnumSet.allOf(Ticker.class);
+            };
         }
 
         // ticker 결정 규칙: PRIVACY는 SOXL 강제, 그 외는 요청값 우선 → fallback 순
@@ -92,15 +76,17 @@ public record TradingCycle(
     @Getter
     @RequiredArgsConstructor
     public enum Ticker {
-        TQQQ(ExchangeCode.NASD, ExcdCode.NAS, new BigDecimal("0.15"), "TQQQ", "ProShares UltraPro QQQ (3x NASDAQ-100)"), // NASDAQ
-        SOXL(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "SOXL", "Direxion Daily Semiconductors Bull 3x"),    // NYSE ARCA
-        USD(ExchangeCode.NASD, ExcdCode.NAS, new BigDecimal("0.20"), "USD", "미국달러 (통화 헤지용)");                   // NASDAQ
+        TQQQ(ExchangeCode.NASD, ExcdCode.NAS, new BigDecimal("0.15"), "PROSHARES QQQ 3X"),
+        SOXL(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"),
+        USD(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"),
+        MAGX(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"),
+        FNGU(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
+        BULZ(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
 
-        private final ExchangeCode exchangeCode;         // KIS OVRS_EXCG_CD
-        private final ExcdCode excdCode;         // KIS EXCD_01
-        private final BigDecimal targetProfitRate; // 익절 목표 수익률
-        private final String label;                // 표시 이름
-        private final String description;          // 종목 설명
+        private final ExchangeCode exchangeCode;        // KIS OVRS_EXCG_CD
+        private final ExcdCode excdCode;                // KIS EXCD_01
+        private final BigDecimal targetProfitRate;       // 익절 목표 수익률
+        private final String description;               // 종목 설명(search_info)
 
         // KIS 응답 String → Ticker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
         public static Optional<Ticker> tryParse(String name) {
@@ -113,4 +99,17 @@ public record TradingCycle(
         }
     }
 
+    @Getter
+    @RequiredArgsConstructor
+    public enum CycleSeedType {
+        NONE("연속 안함"),    // 연속 사이클 없음
+        MAINTAIN("시드 유지"), // 종료 후 동일 initialUsdDeposit으로 재등록
+        MAX("시드 MAX");      // 종료 후 현재 USD 잔고 전액을 initialUsdDeposit으로 재등록
+
+        private final String label; // 한국어 표시 이름
+
+        public boolean isConsecutive() {
+            return this != NONE;
+        }
+    }
 }

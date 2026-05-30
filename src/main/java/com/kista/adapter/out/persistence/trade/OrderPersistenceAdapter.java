@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.out.OrderPort;
 import lombok.AccessLevel;
@@ -27,7 +28,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         // PLANNED 상태인 오늘 계획 주문만 조회
         return repository
                 .findByAccountIdAndTradeDateAndStatus(
-                        accountId, tradeDate, Order.OrderStatus.PLANNED)
+                        accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED)
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -46,7 +47,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     private OrderEntity toEntity(Order o) {
         OrderEntity e = new OrderEntity();
         e.setAccountId(o.accountId());
-        e.setTradeDate(o.tradeDate());
+        e.setTradeDate(TradeDateConverter.toUtc(o.tradeDate())); // KST 도메인 → UTC DB
         e.setTicker(o.ticker());
         e.setOrderType(o.orderType());
         e.setDirection(o.direction());
@@ -59,7 +60,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     private Order toDomain(OrderEntity e) {
         return new Order(
-                e.getId(), e.getAccountId(), e.getTradeDate(), e.getTicker(),
+                e.getId(), e.getAccountId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
                 e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getKisOrderId()
         );

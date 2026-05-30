@@ -1,5 +1,10 @@
 ## 핵심 제약 사항
 
+### domain/port/out/ 네이밍 규칙
+- 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `TradingCyclePort`)
+- Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
+- `*Repository` 접미사 사용 금지 — JpaRepository와 혼동 유발
+
 ### RESTful API 설계 원칙
 
 **URI 규칙**
@@ -38,7 +43,7 @@
 
 ### Account ↔ TradingCycle 분리 (V38 이후)
 - `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
-- `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), multiple, initialUsdDeposit, createdAt, updatedAt`
+- `TradingCycle` record 필드 8개: `id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, createdAt, updatedAt`
 - `Type`, `Status`, `Ticker` 모두 `TradingCycle` record의 nested enum — 구 `Strategy.StrategyType/StrategyStatus/Ticker` 대체
 - `MAX_CYCLES_PER_ACCOUNT = 1` (`TradingCycleService` 상수) — 운영 정책, 확장 시 상수만 변경
 - `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
@@ -46,15 +51,16 @@
 - V38 마이그레이션: `strategies` → `trading_cycle` 테이블 리네임 + `initial_usd_deposit` 컬럼 추가
 - V39 마이그레이션: `trading_cycle_history` 테이블 신설 — ON DELETE CASCADE
 - V44 마이그레이션: `trading_cycle_history.trade_date` 컬럼 및 UNIQUE 제약 제거, `avg_price` nullable 허용
+- V46 마이그레이션: `trading_cycle.multiple` 컬럼 제거 — PRIVACY 배수는 `floor(initialUsdDeposit / currentCycleStart, 2)` 동적 산출로 대체
 
 ### 변경된 포트 시그니처 (V38 이후)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
 - `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
-- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price, BigDecimal multiple)` — TradingCycle.Ticker
-- `TradingCycleHistoryRepository` — `save(TradingCycleHistory)`, `findRecentByCycleId(cycleId, limit)` (`findByCycleIdAndDate` V44에서 제거됨)
-- **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryRepository.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
+- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price)` — TradingCycle.Ticker, multiple 제거 (V46)
+- `TradingCycleHistoryPort` — `save(TradingCycleHistory)`, `findRecentByCycleId(cycleId, limit)` (`findByCycleIdAndDate` V44에서 제거됨)
+- **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryPort.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
@@ -84,10 +90,11 @@
 ### Ticker enum (V38 이후: TradingCycle.Ticker nested enum)
 - **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
 - **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
-- `TradingCycle.Ticker` enum: `TQQQ(ExchangeCode.NASD, ExcdCode.NAS, 0.15, label, desc)`, `SOXL(ExchangeCode.AMEX, ExcdCode.AMS, 0.20, ...)`, `USD(ExchangeCode.NASD, ExcdCode.NAS, 0.20, ...)` — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/label/description 필드 포함. 새 종목 추가 시 두 코드 체계 모두 지정 필수
+- `TradingCycle.Ticker` enum: `TQQQ(ExchangeCode.NASD, ExcdCode.NAS, 0.15, desc)`, `SOXL(ExchangeCode.AMEX, ExcdCode.AMS, 0.20, ...)` — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드 포함 (label 없음). 새 종목 추가 시 두 코드 체계 모두 지정 필수
 - `TradingCycle.Ticker.tryParse(String)` — `Optional<TradingCycle.Ticker>` 반환, KIS 응답 종목코드 안전 변환
 - PRIVACY 전략: 항상 서버에서 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycle.Type.resolveTicker()` — 도메인 규칙)
-- INFINITE 전략: 지정 없으면 기본 `TradingCycle.Ticker.TQQQ` — `Type.resolveTicker(requested, fallback)` fallback으로 전달
+- INFINITE 전략: 지정 없으면 `Ticker` 선언 순서 첫 번째(현재 TQQQ) — `Type.resolveTicker(requested)` 단일 파라미터 시그니처, `availableTickers().iterator().next()` fallback
+- `TradingCycle.Type` enum: `description` 필드만 보유 (label/defaultTicker/defaultMultiple 없음). `availableTickers()` 메서드가 INFINITE→allOf, PRIVACY→{SOXL} 동적 반환
 - DB: `trading_cycle.ticker` 컬럼에 `Ticker.name()` 저장, `TradingCyclePersistenceAdapter`에서 `TradingCycle.Ticker.valueOf(e.getTicker())`로 변환
 - KIS 응답 모델 — `TradingCycle.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
 - **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `tradingCycle.ticker()` 사용
@@ -110,7 +117,7 @@
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
 - TradingScheduler cron: `0 0 4 * * TUE-SAT` (화~토 04:00 KST) — 변경 금지
-- 사이클 단위 순차 실행: `TradingCycleRepository.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
+- 사이클 단위 순차 실행: `TradingCyclePort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
 
 ### JPA 설정
 - `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
@@ -137,7 +144,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, B 계산에 사용
 - `currentRound`(T)는 floor 없이 소수점 허용
 - **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 T < 10 / T ≥ 10과 동치)
-- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②(K/2/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
+- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②((K − A×Q①)/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
 - **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
 
 ### KIS 계좌번호 DB 저장 방식
@@ -147,9 +154,10 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V39__create_trading_cycle_history.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설)
+- 현재 최신: `V46__drop_multiple_from_trading_cycle.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설, V40: fcm_device_tokens, V41: notification_channel, V42: trading_cycle 컬럼 재정렬, V43: soft delete, V44: trading_cycle_history 변경, V45: portfolio_snapshots current_price 컬럼 제거, V46: trading_cycle.multiple 컬럼 제거)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
-- **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입·컬럼 존재만 확인, `NOT NULL` 등 제약 불일치는 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
+- **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
+- **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME` — V22/V36 패턴 참고)
 - 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (V42 `uq_privacy_trades_master_date_ticker` 사례). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
@@ -173,6 +181,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 로컬 승인 방법: `POST /api/auth/dev-approve/{userId}` (`DevAuthController`, `@Profile("local")` 전용)
   - `curl -s -X POST http://localhost:8080/api/auth/dev-approve/<UUID>`
   - UUID 확인: `docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "SELECT id, nickname, status FROM users ORDER BY created_at DESC LIMIT 5;"`
+
+### Adapter 내부 중첩 타입 접근 제어자
+- 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
+- 예: `KisConnectionTestAdapter.TokenCheckResponse`, `KisOrderAdapter.OrderResponse` 패턴
+- `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### Lombok 패턴
 - `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지
@@ -297,6 +310,15 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `/api/admin/**` → `hasRole("ADMIN")` (SecurityConfig)
 - `audit_logs`: 관리자 액션 영구 기록 (admin_id, action, target_type, target_id, payload JSONB)
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 자동 발급
+
+### tradeDate 변환 정책 (KST 코드 ↔ UTC=US 거래일 DB)
+- 도메인 `tradeDate`(LocalDate): **KST 일자** — 예: KST 2026-05-27 04:30 매매 → KST `2026-05-27`
+- DB `trade_date` 컬럼: **UTC 일자 = US 거래일** — 예: ET 2026-05-26 거래일 → DB `2026-05-26`
+- 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일` (KST 04:30 매매 기준 단순 ±1일 규칙)
+- 적용 위치: `OrderPersistenceAdapter`, `TradeHistoryPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드만 — JPA `@Converter` 자동 적용 금지 (가시성)
+- FIDA 외부 입력: UTC 송신 → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출 (persistence가 다시 UTC로 변환하므로 원본 UTC 일자가 DB에 정확히 저장됨)
+- 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — 의미 추적을 위해 `TradeDateConverter` 헬퍼 경유 필수
+- `com.kista.common` 패키지: 유틸리티 헬퍼 위치 (도메인 무관, 어댑터·서비스 공용)
 
 ### 소프트 삭제(Soft Delete) 패턴 (V43 이후)
 - 대상 테이블: `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼으로 논리 삭제

@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.port.out.PrivacyTradePort;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,8 +33,9 @@ class FidaOrderServiceTest {
     @Test
     void execute_delegates_to_privacyTradePort() {
         UUID masterId = UUID.randomUUID();
+        LocalDate utcDate = LocalDate.now(); // FIDA 송신값 (UTC=US 거래일)
         FidaOrderRequest req = new FidaOrderRequest(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                utcDate, Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         when(privacyTradePort.saveMasterWithDetails(any())).thenReturn(new PrivacyTradeSaveResult(masterId, true));
@@ -41,7 +44,9 @@ class FidaOrderServiceTest {
 
         assertThat(result.id()).isEqualTo(masterId);
         assertThat(result.created()).isTrue();
-        verify(privacyTradePort).saveMasterWithDetails(req);
+        // FIDA UTC → KST 변환된 새 request로 포트 호출됨
+        verify(privacyTradePort).saveMasterWithDetails(
+                argThat(r -> r.tradeDate().equals(TradeDateConverter.toKst(utcDate))));
     }
 
     @Test

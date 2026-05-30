@@ -46,7 +46,7 @@ class TelegramAdapterTest {
     private Account account(UUID userId, String nickname) {
         return new Account(UUID.randomUUID(), userId, nickname,
                 "74420614", "key", "secret", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
     }
 
     @Test

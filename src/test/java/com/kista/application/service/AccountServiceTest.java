@@ -3,9 +3,9 @@ package com.kista.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.RegisterAccountUseCase;
 import com.kista.domain.port.in.UpdateAccountUseCase;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisTokenPort;
-import com.kista.domain.port.out.TradingCycleRepository;
+import com.kista.domain.port.out.TradingCyclePort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,9 +26,9 @@ import static org.mockito.Mockito.*;
 @DisplayName("AccountService 단위 테스트")
 class AccountServiceTest {
 
-    @Mock AccountRepository accountRepository;
+    @Mock AccountPort accountPort;
     @Mock KisTokenPort kisTokenPort;
-    @Mock TradingCycleRepository cycleRepository;
+    @Mock TradingCyclePort cyclePort;
     @InjectMocks AccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -38,7 +38,7 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
     }
 
     private RegisterAccountUseCase.Command registerCmd() {
@@ -50,25 +50,25 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
-        when(accountRepository.countByUserId(userId)).thenReturn(0);
-        when(accountRepository.save(any())).thenAnswer(inv -> {
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
-                    a.kisAccountType(), a.broker(), a.createdAt(), a.updatedAt());
+                    a.kisAccountType(), a.broker());
         });
 
         Account result = accountService.register(userId, registerCmd());
 
         assertThat(result.id()).isNotNull();
         assertThat(result.broker()).isEqualTo(Account.Broker.KIS);
-        verify(accountRepository).save(any());
+        verify(accountPort).save(any());
     }
 
     @Test
     @DisplayName("계좌 10개 초과 시 IllegalStateException 발생")
     void register_exceeds_limit_throws() {
-        when(accountRepository.countByUserId(userId)).thenReturn(10);
+        when(accountPort.countByUserId(userId)).thenReturn(10);
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
                 .isInstanceOf(IllegalStateException.class)
@@ -79,7 +79,7 @@ class AccountServiceTest {
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null);
 
@@ -90,8 +90,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("본인 계좌 수정 성공")
     void update_by_owner_success() {
-        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
-        when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임", null, null);
         Account result = accountService.update(accountId, userId, cmd);
@@ -103,28 +103,28 @@ class AccountServiceTest {
     @DisplayName("타 사용자 계좌 삭제 시 SecurityException 발생 (→ 403)")
     void delete_by_non_owner_throws_forbidden() {
         UUID otherId = UUID.randomUUID();
-        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
 
         assertThatThrownBy(() -> accountService.delete(accountId, userId))
                 .isInstanceOf(SecurityException.class);
 
-        verify(accountRepository, never()).delete(any(UUID.class));
+        verify(accountPort, never()).delete(any(UUID.class));
     }
 
     @Test
     @DisplayName("본인 계좌 삭제 성공")
     void delete_by_owner_success() {
-        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
 
         accountService.delete(accountId, userId);
 
-        verify(accountRepository).delete(accountId);
+        verify(accountPort).delete(accountId);
     }
 
     @Test
     @DisplayName("존재하지 않는 계좌 수정 시 NoSuchElementException 발생 (→ 404)")
     void update_not_found_throws() {
-        when(accountRepository.findByIdOrThrow(accountId))
+        when(accountPort.findByIdOrThrow(accountId))
                 .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
@@ -136,15 +136,15 @@ class AccountServiceTest {
     @DisplayName("update: kisAppKey 변경 시 testToken 호출")
     void update_키변경시_testToken호출() {
         Account existing = activeAccount(userId);
-        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(existing);
-        doNothing().when(kisTokenPort).testToken(any(), any());
-        when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(existing);
+        doNothing().when(kisTokenPort).testToken(any(), any(), any());
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command(
                 "새닉네임", "newAppKey", null
         );
         accountService.update(accountId, userId, cmd);
 
-        verify(kisTokenPort).testToken("newAppKey", existing.kisSecretKey());
+        verify(kisTokenPort).testToken(accountId, "newAppKey", existing.kisSecretKey());
     }
 }

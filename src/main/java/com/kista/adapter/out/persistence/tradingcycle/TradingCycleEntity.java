@@ -37,15 +37,16 @@ class TradingCycleEntity extends BaseAuditEntity {
     @Column(name = "ticker", nullable = false, length = 20)
     private TradingCycle.Ticker ticker; // 거래 종목 코드
 
-    @Column(name = "multiple", nullable = false, precision = 4, scale = 1)
-    private BigDecimal multiple; // 배수 (기본값 1.0)
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private TradingCycle.Status status; // 실행 상태 (ACTIVE, PAUSED)
 
     @Column(name = "initial_usd_deposit", precision = 20, scale = 2)
     private BigDecimal initialUsdDeposit; // 사이클 시작 시 초기 입금액 (메타 기록용, nullable)
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cycle_seed_type", nullable = false, length = 10)
+    private TradingCycle.CycleSeedType cycleSeedType; // 사이클 종료 후 자동 재등록 정책
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨

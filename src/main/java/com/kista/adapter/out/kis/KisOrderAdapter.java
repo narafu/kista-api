@@ -35,6 +35,9 @@ public class KisOrderAdapter implements KisOrderPort {
         body.put("ORD_DVSN", resolveOrderDvsn(order.orderType()));
         body.put("ORD_QTY", String.valueOf(order.quantity()));
         body.put("OVRS_ORD_UNPR", resolvePrice(order.orderType(), order.price()));
+        body.put("CTAC_TLNO", "");       // 연락전화번호 (빈값 허용)
+        body.put("MGCO_APTM_ODNO", ""); // 운용사지정주문번호 (빈값 허용)
+        body.put("SLL_TYPE", order.direction() == Order.OrderDirection.SELL ? "00" : ""); // 매도=00, 매수=빈값
         body.put("ORD_SVR_DVSN_CD", "0");
 
         OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
@@ -56,10 +59,7 @@ public class KisOrderAdapter implements KisOrderPort {
     }
 
     private String resolvePrice(Order.OrderType type, BigDecimal price) {
-        return switch (type) {
-            case LOC, MOC -> "0";           // LOC/MOC는 가격 무관하므로 0 입력
-            case LIMIT    -> price.toPlainString();
-        };
+        return KisResponseParser.formatPrice(type, price);
     }
 
     record OrderResponse(@JsonProperty("output") Output output) {

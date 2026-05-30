@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface UserRepository {
+public interface UserPort {
     Optional<User> findById(UUID id);
     Optional<User> findByKakaoId(String kakaoId);
     User save(User user);

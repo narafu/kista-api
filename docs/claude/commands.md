@@ -100,16 +100,19 @@ git remote set-url origin git@github.com:narafu/kista-api.git
 ### kis-trade-mcp 재시작
 ```bash
 # 소스: ~/workspace/open-trading-api/MCP/Kis Trading MCP
+# `KeyError: 'my_acct'` 오류 = ENV=live로 실행 시 재시작마다 yaml 재생성 → docker exec sed 수정은 무의미, 이미지 재빌드 필수
 docker stop kis-trade-mcp && docker rm kis-trade-mcp
 docker build -t kis-trade-mcp:latest ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP
 docker run -d -p 3001:3000 --name kis-trade-mcp \
-  --.env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/..env.live \
+  --env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/.env.live \
   -e KIS_APP_KEY=<kista .env의 KIS_APP_KEY> \
   -e "KIS_APP_SECRET=<kista .env의 KIS_APP_SECRET>" \
   -e KIS_HTS_ID=<kista .env의 KIS_HTS_ID> \
   -e KIS_ACCT_STOCK=<kista .env의 KIS_ACCOUNT_NO> \
+  -e KIS_PROD_TYPE=01 \
   kis-trade-mcp:latest
 # KIS_ACCOUNT_NO → KIS_ACCT_STOCK (변수명 다름 주의)
+# KIS_PROD_TYPE=01 필수 — .env.live에 빈값으로 있어서 누락 시 my_prod='' → changeTREnv 분기 미적용
 ```
 
 ### .mcp.json 경로 이식성
@@ -120,3 +123,34 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - 인증이 필요한 MCP는 `stdio` 타입 + `sh -c "npx mcp-remote <url> --header \"Authorization: Bearer ${TOKEN_VAR}\""` 패턴, 토큰은 `~/.zshrc`에 `export TOKEN_VAR=...`
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
+
+### Supabase 운영 DB → 로컬 DB 데이터 마이그레이션
+# 접속 정보 확인: supabase db dump --linked --dry-run (PGHOST/PGUSER/PGPASSWORD 출력)
+# cli_login_postgres 유저는 SET ROLE postgres 없이 테이블 접근 불가
+# COPY TO FILE 서버 권한 없음 → COPY TO STDOUT + -q(quiet) 조합 사용
+# pg_dump 버전 불일치(로컬 pg_dump < Supabase 서버) 시 psql+COPY 패턴으로 대체
+```bash
+# 운영 → CSV 내보내기
+docker exec kista-api-postgres-1 bash -c "
+  PGPASSWORD='<pw>' psql -h <supabase_host> -p 5432 \
+    -U 'cli_login_postgres.<ref_id>' -d postgres -q \
+    -c 'SET ROLE postgres; COPY public.<table> TO STDOUT CSV HEADER' \
+    > /tmp/<table>.csv"
+
+# 로컬 복원 (FK 종속 테이블 먼저 TRUNCATE)
+docker exec kista-api-postgres-1 psql -U kista -d kistadb \
+  -c "TRUNCATE TABLE <child>, <parent> CASCADE;"
+docker exec kista-api-postgres-1 psql -U kista -d kistadb \
+  -c "\COPY public.<table> FROM '/tmp/<table>.csv' CSV HEADER"
+```
+
+### git commit 메시지 — Bash 도구 사용 시
+# @'...'@ 히어스트링은 PowerShell 전용 — Bash 도구에서 쓰면 @ 가 메시지 앞뒤에 붙음
+# Bash 도구에서는 아래 큰따옴표 방식 사용:
+```bash
+git commit -m "제목
+
+본문
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```

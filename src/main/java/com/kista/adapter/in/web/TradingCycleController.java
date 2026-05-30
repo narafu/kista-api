@@ -75,7 +75,7 @@ public class TradingCycleController {
         }
     }
 
-    // 거래 사이클 수정 (ticker, multiple만 변경 가능)
+    // 거래 사이클 수정 (cycleSeedType 등 메타 변경)
     @Operation(summary = "거래 사이클 수정")
     @PutMapping("/api/trading-cycles/{id}")
     public TradingCycleResponse update(

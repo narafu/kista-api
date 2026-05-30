@@ -55,24 +55,20 @@ class MetaControllerTest {
     }
 
     @Test
-    void getStrategyTypes_authenticated_returnsCodeLabelAvailableTickers() throws Exception {
+    void getStrategyTypes_authenticated_returnsCodeAndAvailableTickers() throws Exception {
         mockMvc.perform(get("/api/meta/strategy-types")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("INFINITE"))
-                .andExpect(jsonPath("$[0].label").value("무한매수"))
-                .andExpect(jsonPath("$[0].availableTickers").isArray())
-                .andExpect(jsonPath("$[0].defaultTicker").exists())
-                .andExpect(jsonPath("$[0].defaultMultiple").exists());
+                .andExpect(jsonPath("$[0].availableTickers").isArray());
     }
 
     @Test
-    void getTickers_authenticated_returnsCodeAndLabel() throws Exception {
+    void getTickers_authenticated_returnsCode() throws Exception {
         mockMvc.perform(get("/api/meta/tickers")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("TQQQ"))
-                .andExpect(jsonPath("$[0].label").exists())
                 .andExpect(jsonPath("$[0].description").exists())
                 .andExpect(jsonPath("$[0].targetProfitRate").exists());
     }
@@ -93,5 +89,24 @@ class MetaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("ACTIVE"))
                 .andExpect(jsonPath("$[0].label").value("활성"));
+    }
+
+    @Test
+    void getCycleSeedTypes_authenticated_returnsAllThreeWithLabel() throws Exception {
+        mockMvc.perform(get("/api/meta/cycle-seed-types")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(TradingCycle.CycleSeedType.values().length))
+                .andExpect(jsonPath("$[0].code").value("NONE"))
+                .andExpect(jsonPath("$[0].label").value("연속 안함"));
+    }
+
+    @Test
+    void getBundle_authenticated_includesCycleSeedTypes() throws Exception {
+        mockMvc.perform(get("/api/meta")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cycleSeedTypes").isArray())
+                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(TradingCycle.CycleSeedType.values().length));
     }
 }

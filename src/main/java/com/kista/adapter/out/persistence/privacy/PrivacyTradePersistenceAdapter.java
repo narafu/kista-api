@@ -1,12 +1,14 @@
 package com.kista.adapter.out.persistence.privacy;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.FidaOrderRequest;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
-import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,8 +35,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     @Transactional
     public PrivacyTradeSaveResult saveMasterWithDetails(FidaOrderRequest request) {
-        Optional<PrivacyTradeMasterEntity> existing =
-                masterRepository.findByTradeDateAndTicker(request.tradeDate(), request.ticker());
+        Optional<PrivacyTradeMasterEntity> existing = this.getByTradeDateAndTicker(request.tradeDate(), request.ticker());
 
         if (existing.isPresent()) {
             // 동일 (tradeDate, ticker) 존재 — 내용 비교
@@ -48,7 +49,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
         // 신규 저장
         PrivacyTradeMasterEntity master = new PrivacyTradeMasterEntity();
-        master.setTradeDate(request.tradeDate());
+        master.setTradeDate(TradeDateConverter.toUtc(request.tradeDate())); // KST 도메인 → UTC DB
         master.setTicker(request.ticker());
         master.setCurrentCycleStart(request.currentCycleStart());
         master.setCurrentCycleRealizedPnl(request.currentCycleRealizedPnl());
@@ -68,6 +69,10 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         }
 
         return new PrivacyTradeSaveResult(masterRepository.save(master).getId(), true); // 201
+    }
+
+    private Optional<PrivacyTradeMasterEntity> getByTradeDateAndTicker(LocalDate kstDate, Ticker ticker) {
+        return masterRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB
     }
 
     private boolean isIdentical(PrivacyTradeMasterEntity master, FidaOrderRequest request) {
@@ -106,10 +111,27 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     public Optional<PrivacyCurrentBase> findCurrentBase() {
-        // trade_date >= 오늘인 행 중 가장 미래 거래일의 SOXL 기준가 조회
+        // trade_date(UTC) >= 오늘(UTC)인 행 중 가장 미래 SOXL 기준가 조회
+        LocalDate todayUtc = TradeDateConverter.toUtc(LocalDate.now()); // KST now → UTC
         return masterRepository
-                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(LocalDate.now(), Ticker.SOXL)
-                .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(), e.getTradeDate()));
+                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(todayUtc, Ticker.SOXL)
+                .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
+                        TradeDateConverter.toKst(e.getTradeDate()))); // UTC DB → KST 도메인
+    }
+
+    @Override
+    public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
+        // today는 KST 일자 — getByTradeDateAndTicker 내부에서 UTC 변환
+        return this.getByTradeDateAndTicker(today, Ticker.SOXL)
+                .map(entity -> {
+                    LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
+                    List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()
+                            .map(p -> new PrivacyTradeBase.PrivacyTrade(
+                                    kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()))
+                            .toList();
+                    return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
+                            entity.getCurrentCycleStart(), trades);
+                });
     }
 
     private static boolean quantityEquals(Integer a, Integer b) {

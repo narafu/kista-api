@@ -38,7 +38,7 @@ class KisPortfolioAdapterTest {
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "appKey", "appSecret", "01",
-            Account.Broker.KIS, Instant.now(), Instant.now()
+            Account.Broker.KIS
     );
 
     @BeforeEach
@@ -61,8 +61,8 @@ class KisPortfolioAdapterTest {
         PresentBalanceResult result = adapter.getPresentBalance(ACCOUNT);
 
         assertThat(result.items()).hasSize(1);
-        assertThat(result.items().get(0).ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.items().get(0).holdings()).isEqualTo(10);
+        assertThat(result.items().getFirst().ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.items().getFirst().holdings()).isEqualTo(10);
         assertThat(result.totalAssetUsd()).isEqualByComparingTo("1000.00");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("2.0");
     }

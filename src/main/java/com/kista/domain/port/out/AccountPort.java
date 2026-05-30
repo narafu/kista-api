@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface AccountRepository {
+public interface AccountPort {
     List<Account> findByUserId(UUID userId);
     Optional<Account> findById(UUID id);
 

@@ -37,7 +37,8 @@ public class AccountController {
     private final KisConnectionTestUseCase connectionTest; // KIS 자격증명 연결 테스트
 
     // 연결 테스트 요청/응답 DTO (컨트롤러 내부 전용)
-    record TestConnectionRequest(String appKey, String appSecret) {}
+    // accountId: 등록된 계좌 수정 시 전달하면 발급 토큰을 캐시에 저장 — 등록 전 사전 검증 시 null 허용
+    record TestConnectionRequest(String appKey, String appSecret, UUID accountId) {}
     record TestConnectionResponse(boolean success, String message) {}
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
@@ -129,7 +130,7 @@ public class AccountController {
     public TestConnectionResponse testConnection(
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
-        boolean success = connectionTest.test(request.appKey(), request.appSecret());
+        boolean success = connectionTest.test(request.appKey(), request.appSecret(), request.accountId());
         // 성공 시 message null, 실패 시 안내 메시지 반환
         String message = success ? null : "KIS API 인증에 실패했습니다. appKey 또는 appSecret을 확인하세요.";
         return new TestConnectionResponse(success, message);

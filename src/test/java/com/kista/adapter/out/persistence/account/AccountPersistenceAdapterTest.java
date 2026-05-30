@@ -58,7 +58,7 @@ class AccountPersistenceAdapterTest {
         // given: id=null 신규 계좌 (10개 필드)
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01",
-                Account.Broker.KIS, null, null);
+                Account.Broker.KIS);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);
@@ -107,7 +107,7 @@ class AccountPersistenceAdapterTest {
         List<Account> result = adapter.findByUserId(userId);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).userId()).isEqualTo(userId);
+        assertThat(result.getFirst().userId()).isEqualTo(userId);
     }
 
     @Test

@@ -6,10 +6,10 @@ import com.kista.domain.model.user.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
-import com.kista.domain.port.out.AccountRepository;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.TradingCycleRepository;
-import com.kista.domain.port.out.UserRepository;
+import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,9 +31,9 @@ import static org.mockito.Mockito.*;
 class TradingSchedulerTest {
 
     @Mock ExecuteTradingUseCase useCase;
-    @Mock AccountRepository accountRepository;
-    @Mock TradingCycleRepository cycleRepository;
-    @Mock UserRepository userRepository;
+    @Mock AccountPort accountPort;
+    @Mock TradingCyclePort cyclePort;
+    @Mock UserPort userPort;
     @Mock NotifyPort notifyPort;
     @InjectMocks TradingScheduler scheduler;
 
@@ -45,18 +45,18 @@ class TradingSchedulerTest {
     private Account mockAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "key", "secret", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
     }
 
     private TradingCycle mockCycle() {
         return new TradingCycle(CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, null,
+                TradingCycle.CycleSeedType.NONE);
     }
 
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, Instant.now(), Instant.now(), null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test
@@ -64,9 +64,9 @@ class TradingSchedulerTest {
         Account account = mockAccount();
         TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
-        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
+        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
 
         scheduler.run();
 
@@ -78,7 +78,7 @@ class TradingSchedulerTest {
 
     @Test
     void run_noActiveStrategies_callsExecuteBatchWithEmptyList() throws InterruptedException {
-        when(cycleRepository.findAllActive()).thenReturn(List.of());
+        when(cyclePort.findAllActive()).thenReturn(List.of());
 
         scheduler.run();
 
@@ -93,9 +93,9 @@ class TradingSchedulerTest {
         Account account = mockAccount();
         TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
-        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
+        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
         doThrow(new InterruptedException("interrupted")).when(useCase).executeBatch(any());
 
         scheduler.run();
@@ -111,18 +111,18 @@ class TradingSchedulerTest {
         UUID cycleId2 = UUID.randomUUID();
         UUID accountId2 = UUID.randomUUID();
         TradingCycle cycle2 = new TradingCycle(cycleId2, accountId2, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, BigDecimal.ONE,
-                null, Instant.now(), Instant.now());
+                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, null,
+                TradingCycle.CycleSeedType.NONE);
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
                 "99999999", "key2", "secret2", "01",
-                Account.Broker.KIS, Instant.now(), Instant.now());
+                Account.Broker.KIS);
         User user = mockUser();
 
-        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle1, cycle2));
+        when(cyclePort.findAllActive()).thenReturn(List.of(cycle1, cycle2));
         RuntimeException ex = new RuntimeException("계좌 없음");
-        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
-        when(accountRepository.findByIdOrThrow(accountId2)).thenReturn(account2);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
+        when(accountPort.findByIdOrThrow(accountId2)).thenReturn(account2);
+        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
 
         scheduler.run();
 
@@ -131,7 +131,7 @@ class TradingSchedulerTest {
         ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
         verify(useCase).executeBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().get(0).cycle()).isEqualTo(cycle2);
+        assertThat(captor.getValue().getFirst().cycle()).isEqualTo(cycle2);
     }
 
     @Test
@@ -139,9 +139,9 @@ class TradingSchedulerTest {
         Account account = mockAccount();
         TradingCycle cycle = mockCycle();
         User user = mockUser();
-        when(cycleRepository.findAllActive()).thenReturn(List.of(cycle));
-        when(accountRepository.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
+        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
         doThrow(ex).when(useCase).executeBatch(any());
 

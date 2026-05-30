@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminUserResponse;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
@@ -31,10 +32,10 @@ public class AdminUserController {
     public List<AdminUserResponse> listUsers(
             @RequestParam(required = false) User.UserStatus status,
             @AuthenticationPrincipal UUID adminId) {
-        List<User> users = status == null
+        List<AdminUserView> views = status == null
                 ? listUsers.listAll()
                 : listUsers.listByStatus(status);
-        return AdminUserResponse.fromList(users);
+        return AdminUserResponse.fromList(views);
     }
 
     // 사용자 상태 변경 — ACTIVE(승인) / REJECTED(거절)

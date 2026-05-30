@@ -3,6 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.port.in.GetNextOrdersUseCase;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,8 +11,9 @@ import java.util.List;
 
 public record NextOrdersResponse(
         LocalDate tradeDate,
-        PositionSnapshot position,
-        List<OrderItem> orders
+        PositionSnapshot position,                    // PRIVACY/skip 시 null
+        List<OrderItem> orders,
+        GetNextOrdersUseCase.SkipReason skipReason    // 정상이면 null
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
@@ -56,12 +58,12 @@ public record NextOrdersResponse(
         }
     }
 
-    public static NextOrdersResponse from(
-            LocalDate tradeDate, InfinitePosition position, List<Order> orders) {
+    public static NextOrdersResponse from(GetNextOrdersUseCase.Result result) {
         return new NextOrdersResponse(
-                tradeDate,
-                PositionSnapshot.from(position),
-                orders.stream().map(OrderItem::from).toList()
+                result.tradeDate(),
+                result.position() == null ? null : PositionSnapshot.from(result.position()),
+                result.orders().stream().map(OrderItem::from).toList(),
+                result.skipReason()
         );
     }
 }

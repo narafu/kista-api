@@ -1,5 +1,14 @@
 ## Docker / 인프라
 
+### JVM 기본 TimeZone (KST 고정)
+- Render 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
+- 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
+- `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
+- DB `tradeDate`(LocalDate) 컬럼만 **UTC = US 거래일** 의미로 저장 — 도메인은 KST 일자, persistence 경계에서 `TradeDateConverter`로 ±1일 변환
+- 변환 위치: `OrderPersistenceAdapter`, `TradeHistoryPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드
+- JPA `@Converter(autoApply=true)` 자동 적용 금지 — 가시성 위해 명시 호출만 사용
+- `LocalDate.now(ZoneOffset.UTC)` 직접 사용 금지 — KST `LocalDate.now()` 사용 후 Adapter 경계에서 `TradeDateConverter.toUtc()` 경유
+
 ### Render 무료 티어 런타임 OOM
 - 증상: `Out of memory (used over 512Mi)` — 앱 강제 종료
 - 원인: Heap + Metaspace + CodeCache + OS 합산이 512MB 초과
@@ -39,4 +48,10 @@
   - `~/.local/bin`은 `~/.zshrc`에서 이미 PATH 포함 — 스크립트 생성 즉시 사용 가능
   - 핵심: `wslpath -w "$(pwd)"` 로 WSL 경로 → Windows UNC 경로 변환 후 PowerShell `Set-Location` 으로 이동
   - Docker context: `desktop-windows`(기본) 대신 `--context desktop-linux` 지정 필수 (`docker context ls` 로 확인)
-- `docker-compose.yml`: `postgres:16` 서비스 (kistadb/kista/kista, 포트 5432)
+- `docker-compose.yml`: `postgres:17` 서비스 (kistadb/kista/kista, 포트 5432)
+
+### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
+- PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
+- 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop app postgres && docker compose rm -f postgres app` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ `docker compose up -d app` (Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
+- 복원 시 flyway_schema_history duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
+- `${DB_NAME:-}` 환경변수 미설정 시 `POSTGRES_DB=""` → kistadb 자동 생성 안 됨, postgres 기본 DB는 POSTGRES_USER값("kista") — 새 볼륨 후 반드시 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
