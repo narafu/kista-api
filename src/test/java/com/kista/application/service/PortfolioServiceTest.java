@@ -1,8 +1,9 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.order.PortfolioSnapshot;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.out.PortfolioSnapshotPort;
+import com.kista.domain.port.out.TradingCycleHistoryPort;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -23,23 +23,23 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PortfolioServiceTest {
 
-    @Mock
-    PortfolioSnapshotPort portfolioSnapshotPort;
+    @Mock TradingCycleHistoryPort cycleHistoryPort;
 
-    @InjectMocks
-    PortfolioService sut;
+    @InjectMocks PortfolioService sut;
 
     @Test
-    void getCurrent_returns_latest_snapshot() {
-        PortfolioSnapshot snap = snapshot(LocalDate.now());
-        when(portfolioSnapshotPort.findRecent(7)).thenReturn(List.of(snap));
+    @DisplayName("getCurrent: 가장 최근 이력 1건 반환")
+    void getCurrent_returns_latest_entry() {
+        AccountCycleHistoryEntry entry = entry(new BigDecimal("26.00"));
+        when(cycleHistoryPort.findRecentGlobal(1)).thenReturn(List.of(entry));
 
-        assertThat(sut.getCurrent()).isEqualTo(snap);
+        assertThat(sut.getCurrent()).isEqualTo(entry);
     }
 
     @Test
-    void getCurrent_throws_when_no_snapshot_in_last_7_days() {
-        when(portfolioSnapshotPort.findRecent(7)).thenReturn(List.of());
+    @DisplayName("getCurrent: 이력 없으면 NoSuchElementException")
+    void getCurrent_throws_when_no_history() {
+        when(cycleHistoryPort.findRecentGlobal(1)).thenReturn(List.of());
 
         assertThatThrownBy(() -> sut.getCurrent())
                 .isInstanceOf(NoSuchElementException.class)
@@ -47,17 +47,19 @@ class PortfolioServiceTest {
     }
 
     @Test
+    @DisplayName("getSnapshots: days 파라미터를 findRecentDaysGlobal에 위임")
     void getSnapshots_delegates_days_to_port() {
-        PortfolioSnapshot snap = snapshot(LocalDate.now());
-        when(portfolioSnapshotPort.findRecent(30)).thenReturn(List.of(snap));
+        AccountCycleHistoryEntry entry = entry(new BigDecimal("26.00"));
+        when(cycleHistoryPort.findRecentDaysGlobal(30)).thenReturn(List.of(entry));
 
         assertThat(sut.getSnapshots(30)).hasSize(1);
     }
 
-    private PortfolioSnapshot snapshot(LocalDate date) {
-        return new PortfolioSnapshot(UUID.randomUUID(), date, Ticker.SOXL, 100,
-                new BigDecimal("25.0000"),
-                new BigDecimal("2600.00"), new BigDecimal("1000.00"),
-                new BigDecimal("3600.00"), null, Instant.now());
+    private AccountCycleHistoryEntry entry(BigDecimal currentPrice) {
+        return new AccountCycleHistoryEntry(
+                UUID.randomUUID(), Ticker.SOXL,
+                new BigDecimal("1000.00"), currentPrice,
+                new BigDecimal("25.00"), 30,
+                Instant.now());
     }
 }
