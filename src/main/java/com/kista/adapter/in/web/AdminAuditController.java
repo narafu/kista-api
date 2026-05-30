@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "Admin - Audit", description = "관리자 감사 로그 API")
+@Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/audit-logs")
 @RequiredArgsConstructor

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-@Tag(name = "Admin - Dashboard", description = "관리자 대시보드 통계 API")
+@Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/dashboard")
 @RequiredArgsConstructor

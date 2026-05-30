@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-@Tag(name = "Admin - Users", description = "관리자 사용자 관리 API")
+@Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor

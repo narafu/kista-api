@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin")
-@Tag(name = "Admin")
+@Tag(name = "Admin", description = "관리자 API")
 public class AdminPingController {
 
     // Phase 2A 가드 검증용 최소 엔드포인트 — Phase 2B에서 실제 admin 엔드포인트로 대체

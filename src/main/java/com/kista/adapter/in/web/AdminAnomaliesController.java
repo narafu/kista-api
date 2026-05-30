@@ -21,7 +21,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Tag(name = "Admin - Anomalies", description = "관리자 이상 징후 탐지 API")
+@Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/anomalies")
 @RequiredArgsConstructor

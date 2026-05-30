@@ -14,7 +14,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Tag(name = "Admin - Accounts", description = "관리자 계좌 현황 API")
+@Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/accounts")
 @RequiredArgsConstructor
