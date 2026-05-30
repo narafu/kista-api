@@ -1,8 +1,8 @@
 package com.kista.application.service;
 
-import com.kista.domain.model.order.PortfolioSnapshot;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.port.in.GetPortfolioUseCase;
-import com.kista.domain.port.out.PortfolioSnapshotPort;
+import com.kista.domain.port.out.TradingCycleHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,17 +13,18 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 public class PortfolioService implements GetPortfolioUseCase {
 
-    private final PortfolioSnapshotPort portfolioSnapshotPort;
+    private final TradingCycleHistoryPort cycleHistoryPort;
 
     @Override
-    public PortfolioSnapshot getCurrent() {
-        return portfolioSnapshotPort.findRecent(7).stream()
+    public AccountCycleHistoryEntry getCurrent() {
+        // 전체 이력 중 가장 최근 1건 반환
+        return cycleHistoryPort.findRecentGlobal(1).stream()
                 .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("포트폴리오 스냅샷이 없습니다."));
+                .orElseThrow(() -> new NoSuchElementException("포트폴리오 데이터가 없습니다."));
     }
 
     @Override
-    public List<PortfolioSnapshot> getSnapshots(int days) {
-        return portfolioSnapshotPort.findRecent(days);
+    public List<AccountCycleHistoryEntry> getSnapshots(int days) {
+        return cycleHistoryPort.findRecentDaysGlobal(days);
     }
 }
