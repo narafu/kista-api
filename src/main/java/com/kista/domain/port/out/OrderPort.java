@@ -1,6 +1,7 @@
 package com.kista.domain.port.out;
 
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,4 +16,10 @@ public interface OrderPort {
 
     // kisOrderPort.place() 완료 후 PLACED 상태 + kisOrderId 기록
     void markPlaced(UUID orderId, String kisOrderId);
+
+    // 기간+종목 필터 조회 (대시보드·텔레그램 이력 조회용)
+    List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker);
+
+    // 기간 내 전체 계좌 조회 ticker 필터 없음 (관리자·이상징후 감지용)
+    List<Order> findAll(LocalDate from, LocalDate to);
 }

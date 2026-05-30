@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence.trade;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.OrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,25 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setStatus(Order.OrderStatus.PLACED);
         e.setKisOrderId(kisOrderId);
         repository.save(e);
+    }
+
+    @Override
+    public List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker) {
+        return repository
+                .findByTradeDateBetweenAndTicker(
+                        TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Order> findAll(LocalDate from, LocalDate to) {
+        return repository
+                .findByTradeDateBetween(TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     private OrderEntity toEntity(Order o) {
