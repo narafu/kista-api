@@ -47,7 +47,6 @@ class TradingServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock CorrectionStrategy correctionStrategy;
-    @Mock TradeHistoryPort tradeHistoryPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
@@ -101,7 +100,7 @@ class TradingServiceTest {
                 kisHolidayPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 infiniteStrategy, privacyStrategy, correctionStrategy,
-                tradeHistoryPort, notifyPort, userNotificationPort,
+                notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
                 accountPort, cyclePort, privacyTradePort, kisMarginPort);
     }

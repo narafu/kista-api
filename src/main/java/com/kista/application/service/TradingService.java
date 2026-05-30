@@ -42,7 +42,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
     private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
     private final CorrectionStrategy correctionStrategy;       // 잔여 unitAmount 보정 매수
-    private final TradeHistoryPort tradeHistoryPort;           // 거래 이력 저장
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
