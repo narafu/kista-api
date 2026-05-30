@@ -6,7 +6,6 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.model.order.TradeEvent;
-import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle;
@@ -44,7 +43,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
     private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
     private final CorrectionStrategy correctionStrategy;       // 잔여 unitAmount 보정 매수
-    private final TradeHistoryPort tradeHistoryPort;           // 거래 이력 저장
     private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
@@ -403,7 +401,13 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         List<Order> corrections = correctionStrategy.correct(position, closingPrice, executions, today)
                 .stream()
                 .map(o -> kisOrderPort.place(o, account))
+                .map(o -> new Order(null, account.id(), o.tradeDate(), o.ticker(), // accountId 주입
+                                    o.orderType(), o.direction(), o.quantity(), o.price(),
+                                    o.status(), o.kisOrderId()))
                 .toList();
+        if (!corrections.isEmpty()) {
+            orderPort.saveAll(corrections); // corrections를 orders 테이블에 저장
+        }
         log.info("[{}] 보정 주문 {}건", account.nickname(), corrections.size());
         return corrections;
     }
@@ -412,9 +416,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                                LocalDate today, List<Order> mainOrders, List<Order> corrections,
                                List<Execution> executions, User user, Account account, TradingCycle cycle,
                                PrivacyTradeBase privacyTradeBase) {
-        mainOrders.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
-        corrections.forEach(o -> tradeHistoryPort.save(toHistory(o, account.id())));
-        log.info("[{}] 거래 이력 {}건 저장", account.nickname(), mainOrders.size() + corrections.size());
         if (price != null) { // PRIVACY TODO: 현재가 미조회 시 포트폴리오 스냅샷 생략
             portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
             log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
@@ -516,15 +517,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
                     : null;
         };
-    }
-
-    private TradeHistory toHistory(Order o, java.util.UUID accountId) {
-        BigDecimal amountUsd = o.price().multiply(BigDecimal.valueOf(o.quantity()))
-                .setScale(2, HALF_UP);
-        return new TradeHistory(
-                null, o.tradeDate(), o.ticker(), "SOXL_DIVISION",
-                o.orderType(), o.direction(), o.quantity(), o.price(),
-                amountUsd, o.status(), o.kisOrderId(), accountId, null);
     }
 
     private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price,

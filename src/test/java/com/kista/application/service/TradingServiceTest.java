@@ -47,7 +47,6 @@ class TradingServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock CorrectionStrategy correctionStrategy;
-    @Mock TradeHistoryPort tradeHistoryPort;
     @Mock PortfolioSnapshotPort portfolioSnapshotPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
@@ -102,7 +101,7 @@ class TradingServiceTest {
                 kisHolidayPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 infiniteStrategy, privacyStrategy, correctionStrategy,
-                tradeHistoryPort, portfolioSnapshotPort, notifyPort, userNotificationPort,
+                portfolioSnapshotPort, notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
                 accountPort, cyclePort, privacyTradePort, kisMarginPort);
     }
@@ -146,7 +145,7 @@ class TradingServiceTest {
     }
 
     @Test
-    void execute_tradeHistories_savedForMainAndCorrectionOrders() throws InterruptedException {
+    void execute_corrections_savedToOrders_withAccountId() throws InterruptedException {
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null);
         Order mainOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
@@ -173,7 +172,8 @@ class TradingServiceTest {
         // holdings=0 신규 계좌는 executeBatch 경로(getPrices)로만 가격 수신 가능
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(tradeHistoryPort, times(2)).save(any(TradeHistory.class));
+        // Phase A saveAll(planned) 1회 + applyCorrections saveAll(corrections) 1회 = 2회
+        verify(orderPort, times(2)).saveAll(anyList());
     }
 
     @Test
@@ -203,7 +203,6 @@ class TradingServiceTest {
         verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), eq(LOW_BALANCE), eq(Ticker.SOXL));
         verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(orderPort, never()).saveAll(any());
-        verify(tradeHistoryPort, never()).save(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
@@ -278,7 +277,6 @@ class TradingServiceTest {
 
         verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT); // 단건 fallback 시도 확인
         verify(notifyPort).notifyError(any(IllegalStateException.class)); // 현재가 null → 실패
-        verify(tradeHistoryPort, never()).save(any()); // 현재가 조회 실패로 주문 없음
     }
 
     // ── preview 테스트 ────────────────────────────────────────────────────────
