@@ -57,14 +57,13 @@ class AdminAnomaliesControllerTest {
     @Test
     void getAnomalies_adminRole_returns200() throws Exception {
         when(anomaliesUseCase.getAnomalies())
-                .thenReturn(new AdminAnomalies(List.of(), List.of(), List.of()));
+                .thenReturn(new AdminAnomalies(List.of(), List.of()));
         when(listAccounts.listAll()).thenReturn(List.of());
         when(listUsers.listAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/anomalies")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.failedTrades").isArray())
                 .andExpect(jsonPath("$.pausedAccounts").isArray())
                 .andExpect(jsonPath("$.inactiveAccounts").isArray());
     }

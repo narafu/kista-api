@@ -47,7 +47,7 @@ class TradingServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock CorrectionStrategy correctionStrategy;
-    @Mock PortfolioSnapshotPort portfolioSnapshotPort;
+    @Mock TradeHistoryPort tradeHistoryPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
@@ -84,11 +84,11 @@ class TradingServiceTest {
 
     // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
     static final TradingCycleHistory NORMAL_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
+            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null);
     static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), new BigDecimal("1000.00"), null, 0, null);
+            null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
     static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), BigDecimal.ZERO, null, 0, null);
+            null, CYCLE.id(), BigDecimal.ZERO, null, null, 0, null);
 
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
@@ -101,7 +101,7 @@ class TradingServiceTest {
                 kisHolidayPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 infiniteStrategy, privacyStrategy, correctionStrategy,
-                portfolioSnapshotPort, notifyPort, userNotificationPort,
+                tradeHistoryPort, notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
                 accountPort, cyclePort, privacyTradePort, kisMarginPort);
     }
@@ -140,7 +140,6 @@ class TradingServiceTest {
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
         verify(correctionStrategy).correct(any(), any(), anyList(), any());
-        verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class)); // price=PRICE → 스냅샷 저장
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
     }
 
@@ -215,7 +214,7 @@ class TradingServiceTest {
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
                 TradingCycle.CycleSeedType.NONE);
         TradingCycleHistory history2 = new TradingCycleHistory(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
@@ -242,7 +241,7 @@ class TradingServiceTest {
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, null,
                 TradingCycle.CycleSeedType.NONE);
         TradingCycleHistory history2 = new TradingCycleHistory(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), 10, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
@@ -262,8 +261,8 @@ class TradingServiceTest {
         ), PAST_DST);
 
         verify(notifyPort).notifyError(ex);
-        // cycle2는 정상 실행 → portfolioSnapshotPort.save 호출 확인
-        verify(portfolioSnapshotPort).save(any(PortfolioSnapshot.class));
+        // cycle2는 정상 실행 → cycleHistoryPort.save 호출 확인
+        verify(cycleHistoryPort, atLeastOnce()).save(any());
     }
 
     @Test

@@ -1,9 +1,8 @@
 package com.kista.adapter.in.telegram;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.PortfolioSnapshot;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,10 +55,10 @@ class TelegramBotServiceTest {
 
     @Test
     void status_command_returns_portfolio_info() {
-        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
-                100, new BigDecimal("25.0000"),
-                new BigDecimal("2600.00"), new BigDecimal("1000.00"),
-                new BigDecimal("3600.00"), null, Instant.now());
+        AccountCycleHistoryEntry snap = new AccountCycleHistoryEntry(
+                UUID.randomUUID(), Ticker.SOXL,
+                new BigDecimal("1000.00"), new BigDecimal("26.00"),
+                new BigDecimal("25.0000"), 100, Instant.now());
         when(getPortfolioUseCase.getCurrent()).thenReturn(snap);
 
         sut.handle(update("/status"));

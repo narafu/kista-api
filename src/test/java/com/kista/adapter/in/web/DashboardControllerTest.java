@@ -1,9 +1,8 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.PortfolioSnapshot;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import org.junit.jupiter.api.Test;
@@ -42,11 +41,10 @@ class DashboardControllerTest {
 
     @Test
     void getTrades_returns_200_with_list() throws Exception {
-        TradeHistory h = new TradeHistory(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL, "SOXL_DIVISION",
+        Order o = new Order(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
-                new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", UUID.randomUUID(), Instant.now());
-        when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(h));
+                new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001");
+        when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(o));
 
         mockMvc.perform(get("/api/trades"))
                 .andExpect(status().isOk())
@@ -56,10 +54,10 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioCurrent_returns_200() throws Exception {
-        PortfolioSnapshot snap = new PortfolioSnapshot(UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
-                100, new BigDecimal("25.0000"),
-                new BigDecimal("2600.00"), new BigDecimal("1000.00"),
-                new BigDecimal("3600.00"), null, Instant.now());
+        AccountCycleHistoryEntry snap = new AccountCycleHistoryEntry(
+                UUID.randomUUID(), Ticker.SOXL,
+                new BigDecimal("1000.00"), new BigDecimal("26.00"),
+                new BigDecimal("25.0000"), 100, Instant.now());
         when(getPortfolioUseCase.getCurrent()).thenReturn(snap);
 
         mockMvc.perform(get("/api/portfolio/current"))

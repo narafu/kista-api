@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.PortfolioSnapshot;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
@@ -43,7 +42,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
     private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
     private final CorrectionStrategy correctionStrategy;       // 잔여 unitAmount 보정 매수
-    private final PortfolioSnapshotPort portfolioSnapshotPort; // 포트폴리오 스냅샷 저장
+    private final TradeHistoryPort tradeHistoryPort;           // 거래 이력 저장
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
@@ -416,10 +415,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                                LocalDate today, List<Order> mainOrders, List<Order> corrections,
                                List<Execution> executions, User user, Account account, TradingCycle cycle,
                                PrivacyTradeBase privacyTradeBase) {
-        if (price != null) { // PRIVACY TODO: 현재가 미조회 시 포트폴리오 스냅샷 생략
-            portfolioSnapshotPort.save(toSnapshot(balance, price, today, account, cycle.ticker()));
-            log.info("[{}] 포트폴리오 스냅샷 저장 완료", account.nickname());
-        }
         saveCycleHistory(balance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
         if (snapshot != null) { // PRIVACY TODO: 스냅샷 미생성 시 텔레그램 리포트 생략
             TradingReport report = buildReport(today, snapshot, mainOrders, corrections, executions);
@@ -517,17 +512,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
                     : null;
         };
-    }
-
-    private PortfolioSnapshot toSnapshot(AccountBalance balance, BigDecimal price,
-                                         LocalDate today, Account account, TradingCycle.Ticker ticker) {
-        BigDecimal marketValue = price.multiply(BigDecimal.valueOf(balance.holdings()))
-                .setScale(2, HALF_UP);
-        BigDecimal totalAsset = marketValue.add(balance.usdDeposit())
-                .setScale(2, HALF_UP);
-        return new PortfolioSnapshot(
-                null, today, ticker, balance.holdings(), balance.avgPrice(),
-                marketValue, balance.usdDeposit(), totalAsset, account.id(), null);
     }
 
     private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,

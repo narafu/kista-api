@@ -2,8 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.order.TradeHistory;
-import com.kista.domain.port.out.TradeHistoryPort;
+import com.kista.domain.port.out.OrderPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +21,7 @@ import static org.mockito.Mockito.when;
 class TradeHistoryServiceTest {
 
     @Mock
-    TradeHistoryPort tradeHistoryPort;
+    OrderPort orderPort;
 
     @InjectMocks
     TradeHistoryService sut;
@@ -32,13 +30,12 @@ class TradeHistoryServiceTest {
     void getHistory_delegates_to_port() {
         LocalDate from = LocalDate.of(2026, 4, 1);
         LocalDate to = LocalDate.of(2026, 4, 28);
-        TradeHistory h = new TradeHistory(UUID.randomUUID(), from, Ticker.SOXL, "SOXL_DIVISION",
+        Order o = new Order(UUID.randomUUID(), UUID.randomUUID(), from, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
-                new BigDecimal("25.00"), new BigDecimal("250.00"),
-                Order.OrderStatus.PLACED, "KIS001", UUID.randomUUID(), Instant.now());
-        when(tradeHistoryPort.findBy(from, to, Ticker.SOXL)).thenReturn(List.of(h));
+                new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001");
+        when(orderPort.findBy(from, to, Ticker.SOXL)).thenReturn(List.of(o));
 
-        List<TradeHistory> result = sut.getHistory(from, to, Ticker.SOXL);
+        List<Order> result = sut.getHistory(from, to, Ticker.SOXL);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().ticker()).isEqualTo(Ticker.SOXL);
