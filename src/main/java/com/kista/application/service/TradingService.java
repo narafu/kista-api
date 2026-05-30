@@ -441,8 +441,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
         TradingCycleHistory history = new TradingCycleHistory(
                 null, cycle.id(),
-                balance.usdDeposit(), balance.avgPrice(),
-                balance.holdings(), null
+                balance.usdDeposit(), price,          // currentPrice (PRIVACY/초기 등록은 null)
+                balance.avgPrice(), balance.holdings(), null
         );
         cycleHistoryPort.save(history);
         log.info("[cycleId={}] 거래 사이클 이력 저장 완료", cycle.id());
@@ -501,7 +501,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
 
         // 4. 새 시작점 이력 (holdings=0, avgPrice=null)
         cycleHistoryPort.save(new TradingCycleHistory(
-                null, cycle.id(), nextDeposit, null, 0, null
+                null, cycle.id(), nextDeposit, price, null, 0, null
         ));
         log.info("[cycleId={}] 사이클 재등록 완료: {} → initialUsdDeposit={}", cycle.id(), cycle.cycleSeedType(), nextDeposit);
         userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");

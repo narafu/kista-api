@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.tradingcycle;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,4 +23,13 @@ interface TradingCycleHistoryJpaRepository extends JpaRepository<TradingCycleHis
             @Param("accountId") UUID accountId,
             @Param("from") Instant from,
             @Param("to") Instant to);
+
+    // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용
+    List<TradingCycleHistoryEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // 특정 시점 이후 이력 전체 — 차트용 시계열
+    @Query("SELECT tch FROM TradingCycleHistoryEntity tch " +
+           "WHERE tch.createdAt >= :cutoff " +
+           "ORDER BY tch.createdAt DESC")
+    List<TradingCycleHistoryEntity> findRecentSinceCutoff(@Param("cutoff") Instant cutoff);
 }
