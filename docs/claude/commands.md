@@ -124,6 +124,26 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
 
+### Supabase 운영 DB → 로컬 DB 데이터 마이그레이션
+# 접속 정보 확인: supabase db dump --linked --dry-run (PGHOST/PGUSER/PGPASSWORD 출력)
+# cli_login_postgres 유저는 SET ROLE postgres 없이 테이블 접근 불가
+# COPY TO FILE 서버 권한 없음 → COPY TO STDOUT + -q(quiet) 조합 사용
+# pg_dump 버전 불일치(로컬 pg_dump < Supabase 서버) 시 psql+COPY 패턴으로 대체
+```bash
+# 운영 → CSV 내보내기
+docker exec kista-api-postgres-1 bash -c "
+  PGPASSWORD='<pw>' psql -h <supabase_host> -p 5432 \
+    -U 'cli_login_postgres.<ref_id>' -d postgres -q \
+    -c 'SET ROLE postgres; COPY public.<table> TO STDOUT CSV HEADER' \
+    > /tmp/<table>.csv"
+
+# 로컬 복원 (FK 종속 테이블 먼저 TRUNCATE)
+docker exec kista-api-postgres-1 psql -U kista -d kistadb \
+  -c "TRUNCATE TABLE <child>, <parent> CASCADE;"
+docker exec kista-api-postgres-1 psql -U kista -d kistadb \
+  -c "\COPY public.<table> FROM '/tmp/<table>.csv' CSV HEADER"
+```
+
 ### git commit 메시지 — Bash 도구 사용 시
 # @'...'@ 히어스트링은 PowerShell 전용 — Bash 도구에서 쓰면 @ 가 메시지 앞뒤에 붙음
 # Bash 도구에서는 아래 큰따옴표 방식 사용:
