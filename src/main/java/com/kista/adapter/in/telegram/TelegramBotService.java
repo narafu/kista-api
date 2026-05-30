@@ -1,8 +1,8 @@
 package com.kista.adapter.in.telegram;
 
-import com.kista.domain.model.order.PortfolioSnapshot;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.order.TradeHistory;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.GetPortfolioUseCase;
 import com.kista.domain.port.in.GetTradeHistoryUseCase;
 import lombok.RequiredArgsConstructor;
@@ -84,11 +84,15 @@ class TelegramBotService {
 
     private String buildStatusMessage() {
         try {
-            PortfolioSnapshot s = getPortfolioUseCase.getCurrent();
+            AccountCycleHistoryEntry s = getPortfolioUseCase.getCurrent();
+            // currentPrice가 null이면 평가액 0으로 처리
+            double marketValue = s.currentPrice() != null
+                    ? s.currentPrice().doubleValue() * s.holdings() : 0.0;
+            double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
+            double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
             return String.format(
-                    "<b>포트폴리오 현황 [%s]</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
-                    s.snapshotDate(), s.holdings(), s.avgPrice(),
-                    s.marketValueUsd(), s.usdDeposit(), s.totalAssetUsd());
+                    "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
+                    s.holdings(), avgPrice, marketValue, s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
         } catch (NoSuchElementException e) {
             return "포트폴리오 데이터가 없습니다.";
         }
@@ -97,7 +101,7 @@ class TelegramBotService {
     private String buildHistoryMessage(int days) {
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(days);
-        List<TradeHistory> list = getTradeHistoryUseCase.getHistory(from, to, Ticker.SOXL);
+        List<Order> list = getTradeHistoryUseCase.getHistory(from, to, Ticker.SOXL);
         if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
         StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
         list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",
