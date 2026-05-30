@@ -4,11 +4,10 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.TradeHistory;
 import com.kista.domain.port.in.AdminAnomaliesUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.TradingCyclePort;
-import com.kista.domain.port.out.TradeHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,17 +23,13 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
-    private final TradeHistoryPort tradeHistoryPort;
+    private final OrderPort orderPort;
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
 
     @Override
     public AdminAnomalies getAnomalies() {
         LocalDate today = LocalDate.now();
-
-        // 최근 30일 FAILED 거래
-        List<TradeHistory> failedTrades = tradeHistoryPort.findAll(today.minusDays(30), today)
-                .stream().filter(t -> t.status() == Order.OrderStatus.FAILED).toList();
 
         List<Account> allAccounts = accountPort.findAll();
 
@@ -45,8 +40,8 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
                 .toList();
 
         // 최근 7일 거래 있는 accountId 집합
-        Set<UUID> activeAccountIds = tradeHistoryPort.findAll(today.minusDays(7), today)
-                .stream().map(TradeHistory::accountId).collect(Collectors.toSet());
+        Set<UUID> activeAccountIds = orderPort.findAll(today.minusDays(7), today)
+                .stream().map(Order::accountId).collect(Collectors.toSet());
 
         // ACTIVE 사이클이 있지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
@@ -55,6 +50,6 @@ public class AdminAnomaliesService implements AdminAnomaliesUseCase {
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();
 
-        return new AdminAnomalies(failedTrades, pausedAccounts, inactiveAccounts);
+        return new AdminAnomalies(pausedAccounts, inactiveAccounts);
     }
 }
