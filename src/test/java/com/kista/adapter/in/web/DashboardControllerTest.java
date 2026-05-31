@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -68,9 +67,9 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioSnapshots_returns_200() throws Exception {
-        when(getPortfolioUseCase.getSnapshots(anyInt())).thenReturn(List.of());
+        when(getPortfolioUseCase.getSnapshots(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/portfolio/snapshots?days=7"))
+        mockMvc.perform(get("/api/portfolio/snapshots?from=2026-01-01&to=2026-01-31"))
                 .andExpect(status().isOk());
     }
 

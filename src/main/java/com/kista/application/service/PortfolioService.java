@@ -6,6 +6,7 @@ import com.kista.domain.port.out.TradingCycleHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -24,7 +25,7 @@ public class PortfolioService implements GetPortfolioUseCase {
     }
 
     @Override
-    public List<AccountCycleHistoryEntry> getSnapshots(int days) {
-        return cycleHistoryPort.findRecentDaysGlobal(days);
+    public List<AccountCycleHistoryEntry> getSnapshots(LocalDate from, LocalDate to) {
+        return cycleHistoryPort.findBetween(from, to);
     }
 }

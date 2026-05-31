@@ -59,7 +59,7 @@
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
 - `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price)` — TradingCycle.Ticker, multiple 제거 (V46)
-- `TradingCycleHistoryPort` — `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findRecentDaysGlobal(days)`
+- `TradingCycleHistoryPort` — `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findBetween(LocalDate from, LocalDate to)`
 - **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryPort.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
 - **`PortfolioSnapshot` 완전 제거** — `GetPortfolioUseCase`는 `AccountCycleHistoryEntry` 반환, `PortfolioSnapshotResponse.from(AccountCycleHistoryEntry)`에서 `marketValueUsd`/`totalAssetUsd` computed
 

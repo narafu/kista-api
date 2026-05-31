@@ -5,7 +5,7 @@
 - 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
 - DB `tradeDate`(LocalDate) 컬럼만 **UTC = US 거래일** 의미로 저장 — 도메인은 KST 일자, persistence 경계에서 `TradeDateConverter`로 ±1일 변환
-- 변환 위치: `OrderPersistenceAdapter`, `TradeHistoryPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드
+- 변환 위치: `OrderPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드
 - JPA `@Converter(autoApply=true)` 자동 적용 금지 — 가시성 위해 명시 호출만 사용
 - `LocalDate.now(ZoneOffset.UTC)` 직접 사용 금지 — KST `LocalDate.now()` 사용 후 Adapter 경계에서 `TradeDateConverter.toUtc()` 경유
 

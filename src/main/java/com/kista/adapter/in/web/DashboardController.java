@@ -51,13 +51,19 @@ public class DashboardController {
         return PortfolioSnapshotResponse.from(getPortfolioUseCase.getCurrent());
     }
 
-    @Operation(summary = "포트폴리오 스냅샷 목록", description = "최근 N일간의 포트폴리오 스냅샷 목록 반환.")
+    @Operation(summary = "포트폴리오 스냅샷 목록", description = "지정 기간의 포트폴리오 스냅샷 목록 반환. 기본: 최근 30일.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/portfolio/snapshots")
     public List<PortfolioSnapshotResponse> getPortfolioSnapshots(
-            @Parameter(description = "조회 기간 (일 수, 기본: 30)", example = "30")
-            @RequestParam(defaultValue = "30") int days) {
-        return getPortfolioUseCase.getSnapshots(days)
+            @Parameter(description = "조회 시작일 (기본: 오늘 - 30일)", example = "2025-01-01")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @Parameter(description = "조회 종료일 (기본: 오늘)", example = "2025-01-31")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
+        LocalDate resolvedTo = to != null ? to : LocalDate.now();
+        return getPortfolioUseCase.getSnapshots(resolvedFrom, resolvedTo)
                 .stream().map(PortfolioSnapshotResponse::from).toList();
     }
 

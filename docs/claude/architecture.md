@@ -137,7 +137,7 @@ domain      →  외부 의존 없음
 - `TradingScheduler`: `cycleRepository.findAllActive()` → 사이클 단위 loop (격리 try-catch)
 - `TradingCycleHistory` 필드: `id, tradingCycleId, usdDeposit, currentPrice(nullable), avgPrice(nullable), holdings, createdAt` — `currentPrice`는 실행 시점 현재가 (PRIVACY·초기 등록 시 null)
 - `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (currentPrice=null, avgPrice=null, holdings=0) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append (currentPrice=실행가, PRIVACY는 null)
-- `TradingCycleHistoryPort` 메서드: `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findRecentDaysGlobal(days)`
+- `TradingCycleHistoryPort` 메서드: `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findBetween(LocalDate from, LocalDate to)` — from/to는 LocalDate, KST 기준 Instant 변환 후 조회
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
 - `TradingService` helper SSOT: `loadBalance(TradingCycle)` — 잔고 로드+skip 판정(`BalanceLoad` record 반환), `calcInfinite(balance, cycle, price, today, label)` — `InfinitePosition` 생성+`buildOrders()` 호출(`InfiniteCalc` record 반환). `preview()`와 `execute()` 모두 이 helper 경유 — `AccountBalance`/`InfinitePosition` 생성 방식 변경 시 이 두 helper만 수정
 - `TradingService.execute()` 전략 분기: `switch(cycle.type())` 두 블록 구조 — ① steps 3-4(현재가+PLANNED 생성) ② steps 7-9(PostClose 대기+체결+보정). 공통: 1,2,5,6,10. PRIVACY는 두 블록 모두 TODO

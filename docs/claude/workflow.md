@@ -9,6 +9,6 @@
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
 
 ### TradingService 기록 테이블 구분
-- `trade_histories`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 각 1행, order_type/direction/quantity/price/status 포함)
-- `portfolio_snapshots`: 실행 단위 자산 평가 스냅샷 — 실행당 1건 (holdings/avg_price/current_price/total_asset_usd 등)
-- `trading_cycle_history`: 사이클 단위 잔고 스냅샷 — 실행당 1건 append. `UNIQUE(trading_cycle_id, trade_date)` — 동일 trade_date 중복 시 무시(log.warn). 필드: usd_deposit/avg_price/holdings
+- `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
+- `trading_cycle_history`: 사이클 단위 잔고 스냅샷 — 실행당 1건 append. `UNIQUE(trading_cycle_id, trade_date)` — 동일 trade_date 중복 시 무시(log.warn). 필드: usd_deposit/avg_price/holdings/current_price
+- `trade_histories`·`portfolio_snapshots` 테이블은 V51·V50에서 DROP됨 — 참조 금지

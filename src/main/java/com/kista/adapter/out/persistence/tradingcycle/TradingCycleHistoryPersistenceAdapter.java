@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +57,11 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
     }
 
     @Override
-    public List<AccountCycleHistoryEntry> findRecentDaysGlobal(int days) {
-        Instant cutoff = Instant.now().atZone(ZoneId.of("Asia/Seoul")).minusDays(days).toInstant();
-        List<TradingCycleHistoryEntity> entities = jpaRepository.findRecentSinceCutoff(cutoff);
+    public List<AccountCycleHistoryEntry> findBetween(LocalDate from, LocalDate to) {
+        ZoneId kst = ZoneId.of("Asia/Seoul");
+        Instant fromInstant = from.atStartOfDay(kst).toInstant();
+        Instant toInstant = to.plusDays(1).atStartOfDay(kst).toInstant(); // to 당일 포함
+        List<TradingCycleHistoryEntity> entities = jpaRepository.findBetweenDates(fromInstant, toInstant);
         Map<UUID, TradingCycle.Ticker> tickerMap = buildTickerMapFromEntities(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }

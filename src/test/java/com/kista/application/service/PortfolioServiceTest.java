@@ -12,12 +12,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,12 +49,12 @@ class PortfolioServiceTest {
     }
 
     @Test
-    @DisplayName("getSnapshots: days 파라미터를 findRecentDaysGlobal에 위임")
-    void getSnapshots_delegates_days_to_port() {
+    @DisplayName("getSnapshots: from/to 파라미터를 findBetween에 위임")
+    void getSnapshots_delegates_date_range_to_port() {
         AccountCycleHistoryEntry entry = entry(new BigDecimal("26.00"));
-        when(cycleHistoryPort.findRecentDaysGlobal(30)).thenReturn(List.of(entry));
+        when(cycleHistoryPort.findBetween(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(entry));
 
-        assertThat(sut.getSnapshots(30)).hasSize(1);
+        assertThat(sut.getSnapshots(LocalDate.now().minusDays(30), LocalDate.now())).hasSize(1);
     }
 
     private AccountCycleHistoryEntry entry(BigDecimal currentPrice) {
