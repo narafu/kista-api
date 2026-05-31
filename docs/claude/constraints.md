@@ -76,7 +76,7 @@
 
 ### 수량 변수명 규칙 (V26 전수 통일 완료)
 - **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `TradingCycleHistory`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
-- **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `TradeHistory`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
+- **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
 - DB 컬럼: `trading_cycle_history.holdings`, `privacy_trades_master.holdings`(보유) / `orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
 - KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
@@ -155,7 +155,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V50__drop_portfolio_snapshots.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설, V40: fcm_device_tokens, V41: notification_channel, V42: trading_cycle 컬럼 재정렬, V43: soft delete, V44: trading_cycle_history 변경, V45: portfolio_snapshots current_price 컬럼 제거, V46: trading_cycle.multiple 컬럼 제거, V47: cycle_seed_type 추가 + holdings INT 변환, V48: numeric scale 2 통일, V49: trading_cycle_history 재생성(current_price NUMERIC(12,2) 추가, avg_price 앞), V50: portfolio_snapshots DROP)
+- 현재 최신: `V51__drop_trade_histories.sql` (V27: accounts.broker, V28: planned_orders→orders rename, V29: orders/kis_tokens updated_at, V30: privacy_trades_master current_cycle_realized_pnl, V31: privacy_trades_detail.quantity nullable, V32: privacy updated_at 제거, V33: strategies.multiple, V34: privacy avg_price nullable, V35: TRUNCATE, V36: trade_histories 재생성(account_id NOT NULL·kis_order_id→order_id), V37: 미사용(번호 없음), V38: `strategies`→`trading_cycle` 리네임 + `initial_usd_deposit`, V39: `trading_cycle_history` 신설, V40: fcm_device_tokens, V41: notification_channel, V42: trading_cycle 컬럼 재정렬, V43: soft delete, V44: trading_cycle_history 변경, V45: portfolio_snapshots current_price 컬럼 제거, V46: trading_cycle.multiple 컬럼 제거, V47: cycle_seed_type 추가 + holdings INT 변환, V48: numeric scale 2 통일, V49: trading_cycle_history current_price 컬럼 추가, V50: portfolio_snapshots DROP, V51: trade_histories DROP)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
@@ -316,7 +316,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 도메인 `tradeDate`(LocalDate): **KST 일자** — 예: KST 2026-05-27 04:30 매매 → KST `2026-05-27`
 - DB `trade_date` 컬럼: **UTC 일자 = US 거래일** — 예: ET 2026-05-26 거래일 → DB `2026-05-26`
 - 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일` (KST 04:30 매매 기준 단순 ±1일 규칙)
-- 적용 위치: `OrderPersistenceAdapter`, `TradeHistoryPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드만 — JPA `@Converter` 자동 적용 금지 (가시성)
+- 적용 위치: `OrderPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드만 — JPA `@Converter` 자동 적용 금지 (가시성)
 - FIDA 외부 입력: UTC 송신 → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출 (persistence가 다시 UTC로 변환하므로 원본 UTC 일자가 DB에 정확히 저장됨)
 - 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — 의미 추적을 위해 `TradeDateConverter` 헬퍼 경유 필수
 - `com.kista.common` 패키지: 유틸리티 헬퍼 위치 (도메인 무관, 어댑터·서비스 공용)
