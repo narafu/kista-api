@@ -49,7 +49,7 @@
   jdbcTemplate.update("INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())", userId, "kakao_" + userId, "ACTIVE", "USER");
   jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())", accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
   ```
-- `TradeHistoryPersistenceAdapterTest` 패턴 참고
+- 타 패키지 FK 삽입 패턴: `OrderPersistenceAdapterTest` 참고 (TradeHistoryPersistenceAdapterTest 삭제됨)
 
 ### 테스트 DB
 
@@ -60,7 +60,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
 `application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
-- DB 연결 필요 통합 테스트: `PortfolioSnapshotPersistenceAdapterTest`, `TradeHistoryPersistenceAdapterTest` — Docker Desktop 미실행 시 `java.net.ConnectException` 실패
+- DB 연결 필요 통합 테스트: 현재 없음 (PortfolioSnapshotPersistenceAdapterTest·TradeHistoryPersistenceAdapterTest 삭제됨 — V50·V51)
 
 ### 전략 테스트 분리 원칙
 - `InfinitePositionTest` (`domain/model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)

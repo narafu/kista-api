@@ -7,6 +7,11 @@
 
 ### RESTful API 설계 원칙
 
+**날짜 범위 쿼리 파라미터 컨벤션**
+- 모든 날짜 범위 파라미터는 `from` / `to` (LocalDate, ISO 형식 `YYYY-MM-DD`) 사용 — `startDate/endDate`, `days` 사용 금지
+- 기본값: `from = LocalDate.now().minusDays(30)`, `to = LocalDate.now()` (컨트롤러에서 null 체크)
+- kista-ui: `buildDateQuery({ from, to })` 헬퍼 사용 (`lib/api/trades.ts`)
+
 **URI 규칙**
 - 리소스 식별: 명사 복수형 — `/accounts`, `/trading-cycles`, `/orders`
 - 계층 표현: 소속 관계 `/accounts/{id}/trading-cycles` — 독립 리소스는 루트 수준
