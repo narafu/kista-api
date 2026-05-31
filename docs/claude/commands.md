@@ -40,7 +40,7 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  
 
 ### Docker (로컬)
 ```bash
-docker compose up -d                                            # 앱 + PostgreSQL + Prometheus + Grafana
+docker compose up -d                                            # PostgreSQL + Prometheus + Grafana (앱은 IntelliJ 또는 bootRun으로 별도 실행)
 docker compose up -d postgres                                   # DB만 기동
 docker compose build <service> && docker compose up -d --force-recreate <service>
 ```
