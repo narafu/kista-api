@@ -41,6 +41,15 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
     }
 
     @Override
+    public List<AccountCycleHistoryEntry> findByCycleIdAndDateRange(UUID cycleId, Instant from, Instant to) {
+        TradingCycle.Ticker ticker = cycleJpaRepository.findById(cycleId)
+                .map(TradingCycleEntity::getTicker).orElse(null);
+        Map<UUID, TradingCycle.Ticker> tickerMap = ticker != null ? Map.of(cycleId, ticker) : Map.of();
+        return jpaRepository.findByCycleIdAndDateRange(cycleId, from, to).stream()
+                .map(e -> toEntry(e, tickerMap)).toList();
+    }
+
+    @Override
     public List<AccountCycleHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to) {
         Map<UUID, TradingCycle.Ticker> tickerMap = buildTickerMapByAccountId(accountId);
         return jpaRepository.findByAccountIdAndDateRange(accountId, from, to).stream()

@@ -27,6 +27,16 @@ interface TradingCycleHistoryJpaRepository extends JpaRepository<TradingCycleHis
     // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용
     List<TradingCycleHistoryEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    // 전략(사이클) ID 기준 날짜 범위 조회
+    @Query("SELECT tch FROM TradingCycleHistoryEntity tch " +
+           "WHERE tch.tradingCycleId = :cycleId " +
+           "AND tch.createdAt >= :from AND tch.createdAt < :to " +
+           "ORDER BY tch.createdAt DESC")
+    List<TradingCycleHistoryEntity> findByCycleIdAndDateRange(
+            @Param("cycleId") UUID cycleId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
     // 날짜 범위 이력 전체 — 차트용 시계열 (from 이상 to 미만)
     @Query("SELECT tch FROM TradingCycleHistoryEntity tch " +
            "WHERE tch.createdAt >= :from AND tch.createdAt < :to " +

@@ -1,8 +1,10 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.CycleHistoryResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
+import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
@@ -13,11 +15,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -34,6 +38,7 @@ public class TradingCycleController {
     private final GetTradingCycleUseCase getCycle;
     private final PauseTradingCycleUseCase pauseCycle;
     private final ResumeTradingCycleUseCase resumeCycle;
+    private final GetAccountStatisticsUseCase statisticsUseCase;
 
     // 계좌의 거래 사이클 목록 조회
     @Operation(summary = "거래 사이클 목록 조회")
@@ -134,6 +139,24 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId) {
         try {
             resumeCycle.resume(id, userId);
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // 전략(사이클) 기준 거래 이력 조회
+    @Operation(summary = "전략 거래 이력 조회")
+    @GetMapping("/api/trading-cycles/{strategyId}/history")
+    public List<CycleHistoryResponse> getStrategyHistory(
+            @PathVariable UUID strategyId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        try {
+            return statisticsUseCase.getStrategyCycleHistory(strategyId, userId, from, to).stream()
+                    .map(CycleHistoryResponse::from).toList();
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {

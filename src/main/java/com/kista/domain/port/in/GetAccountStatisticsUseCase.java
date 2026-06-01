@@ -34,4 +34,7 @@ public interface GetAccountStatisticsUseCase {
 
     // 계좌 기준 trading_cycle_history 조회 (DB, KIS API 미사용)
     List<AccountCycleHistoryEntry> getCycleHistory(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+
+    // 전략(사이클) 기준 trading_cycle_history 조회 (DB, KIS API 미사용)
+    List<AccountCycleHistoryEntry> getStrategyCycleHistory(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to);
 }

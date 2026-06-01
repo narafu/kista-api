@@ -16,6 +16,9 @@ public interface TradingCycleHistoryPort {
     // 계좌 ID 기준 이력 조회 (ticker 포함, 날짜 범위 필터)
     List<AccountCycleHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to);
 
+    // 전략(사이클) ID 기준 이력 조회 (날짜 범위 필터)
+    List<AccountCycleHistoryEntry> findByCycleIdAndDateRange(UUID cycleId, Instant from, Instant to);
+
     // 전체 이력 중 가장 최근 N건 (대시보드·텔레그램 현황 조회)
     List<AccountCycleHistoryEntry> findRecentGlobal(int limit);
 

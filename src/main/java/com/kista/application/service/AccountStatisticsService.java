@@ -120,4 +120,15 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
         return tradingCycleHistoryPort.findByAccountId(accountId, fromInstant, toInstant);
     }
 
+    @Override
+    public List<AccountCycleHistoryEntry> getStrategyCycleHistory(UUID strategyId, UUID requesterId,
+                                                                   LocalDate from, LocalDate to) {
+        var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
+        account.verifyOwnedBy(requesterId);
+        var fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
+        var toInstant = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return tradingCycleHistoryPort.findByCycleIdAndDateRange(strategyId, fromInstant, toInstant);
+    }
+
 }
