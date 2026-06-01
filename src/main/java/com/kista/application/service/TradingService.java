@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
@@ -78,7 +79,10 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("활성 거래 사이클이 없습니다: " + accountId));
 
-        LocalDate today = LocalDate.now();
+        // 스케줄러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
+        LocalDate today = LocalTime.now().isBefore(LocalTime.of(4, 0))
+                ? LocalDate.now()
+                : LocalDate.now().plusDays(1);
 
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         BalanceLoad load = tryLoadBalance(cycle);
@@ -90,6 +94,11 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         return switch (cycle.type()) {
             case INFINITE -> {
                 BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
+                if (balance.shouldSkip(price)) {
+                    // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해
+                    InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price);
+                    yield new Result(today, position, List.of(), SkipReason.INSUFFICIENT_BALANCE);
+                }
                 InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "preview:" + accountId);
                 yield new Result(today, calc.position(), calc.orders(), null);
             }
@@ -219,6 +228,11 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         return switch (cycle.type()) {
             case INFINITE -> {
                 BigDecimal price = startPrices.get(cycle.ticker());
+                if (balance.shouldSkip(price)) {
+                    log.info("0회차 단위금액 부족 — 매매 건너뜀: [{}]", account.nickname());
+                    notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
+                    yield null;
+                }
                 InfiniteCalc calc = calcInfinite(balance, cycle, price, today, account.nickname());
                 savePlannedOrders(calc.orders(), account);
                 yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null);

@@ -72,7 +72,7 @@ public class OrderController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/orders/preview")
-    public NextOrdersResponse getNext(
+    public NextOrdersResponse preview(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {

@@ -143,6 +143,11 @@ domain      →  외부 의존 없음
 - `TradingService.execute()` 전략 분기: `switch(cycle.type())` 두 블록 구조 — ① steps 3-4(현재가+PLANNED 생성) ② steps 7-9(PostClose 대기+체결+보정). 공통: 1,2,5,6,10. PRIVACY는 두 블록 모두 TODO
 - PRIVACY execute() null guard 패턴: `resolvedPrice=null`, `snapshot=null` → `saveAndNotify`에서 `price != null`(portfolioSnapshot 생략), `snapshot != null`(텔레그램 리포트 생략) 조건 가드 유지 필수
 - `executeBatch`: INFINITE 사이클만 현재가 일괄조회 + 단건 fallback 대상 — PRIVACY 사이클은 `price=null`로 `execute()` 전달
+- **`preview()` today 오프셋**: 스케줄러는 KST 04:00 실행 → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴. 미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남 (KST 04:00 이후 미리보기 = 내일 매매 기준)
+- **`INSUFFICIENT_BALANCE` skip 시 position 포함**: INFINITE `preview()` 블록에서 `shouldSkip(price)` true여도 `InfinitePosition`을 Result에 포함 — 프론트에서 단위금액·현재가·부족 금액 표시 목적. `position=null` 관행의 의도된 예외
+- **`AccountBalance.shouldSkip(price)` 오버로드**: 0회차(holdings==0)에서 `unitAmount(=usdDeposit/20) < currentPrice`면 매수 수량 0이 되는 케이스. 현재가 파라미터 오버로드로 포착 — `tryLoadBalance()`의 `shouldSkip()` 통과 후 INFINITE 블록에서 추가 검증
+- **0회차 미리보기 주문 패턴**: holdings=0에서 LOC매수①=FLOOR(unitAmount/2/currentPrice) — unitAmount/2 < currentPrice면 0주(생략)되고 LOC매수②만 기준가에 생성됨. 매도 수량=holdings/4=0으로 생략 — 정상 동작. 0회차에서 priceOffsetRate=targetProfitRate이므로 referencePrice=targetPrice (두 KPI 카드 동일값 표시)
+- **dev-token 소유권 제한**: `POST /api/auth/dev-token`은 고정 UUID(`...0001`) 소유 계좌만 접근 가능 — 다른 사용자 계좌 미리보기 디버깅 시 403. DB에서 `trading_cycle_history` 직접 조회로 대체
 
 ### PRIVACY 전략 패턴 (기준 매매표)
 - `privacy_trades_master` (`adapter/out/persistence/privacy/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
