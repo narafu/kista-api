@@ -19,8 +19,10 @@
 
 ### KIS 휴장 조회 API (`CTOS5011R`, KisHolidayAdapter)
 - `BASS_DT` = **한국 날짜 기준** — 미국 메모리얼 데이(ET 5/25 월) = 한국 5/26에 조회해야 정확 (JVM TZ=KST 고정으로 해결됨)
+- **`NATN_CD=840` 필수** (미국 국가코드) — 누락 시 KIS 404 반환 → 폴백으로 공휴일 미감지
 - `output[]` 비어있으면 거래일, 있으면 휴장일
 - API 호출 실패 시 "개장으로 폴백" (`catch → return true`) — KIS 일시 장애 시 매매 진행 위험 있음
+- `EGW00202` on 정상 거래일 = 코드 문제 아님, KIS 계좌 설정 문제 (레버리지 ETF 거래 미승인 등)
 
 ### 응답 필드명 대소문자 주의
 - **해외주식 API 응답은 lowercase** (`ovrs_pdno`, `ovrs_cblc_qty`, `frcr_evlu_amt2` 등)

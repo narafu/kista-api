@@ -33,6 +33,7 @@ public class KisHolidayAdapter implements KisHolidayPort {
             params.add("BASS_DT", date.format(FMT));
             params.add("CTX_AREA_KEY", "");
             params.add("CTX_AREA_NK", "");
+            params.add("NATN_CD", "840"); // 미국 국가코드 — 누락 시 KIS 404 반환
 
             HolidayResponse response = kisHttpClient.get(PATH, headers, params, HolidayResponse.class);
             // output[]가 비어있으면 해당 날짜는 거래일
