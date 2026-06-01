@@ -45,7 +45,8 @@
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
 - `ORD_DVSN` 코드: LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, LOO(장개시지정가)=`32`, 지정가=`00`
 - LOC/MOC 주문 시 `OVRS_ORD_UNPR="0"` 입력
-- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — LOC/MOC=`"0"`, LIMIT=`setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류). 예약주문(`FT_ORD_UNPR3`)도 동일: `KisResponseParser.formatPrice(Order.OrderType.LIMIT, price)`
+- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류). 예약주문(`FT_ORD_UNPR3`)도 동일: `KisResponseParser.formatPrice(Order.OrderType.LIMIT, price)`
+- LOC(장마감지정가)에 `"0"` 전송 금지 — KIS가 $0 이하 체결 불가 주문으로 판단해 EGW00202 반환. KIS API 스펙: `"0"`은 시장가(MOC/시장가)에만 허용
 
 ### 체결 조회 API (TTTS3035R, KisExecutionAdapter)
 - 파라미터: `CANO`, `ACNT_PRDT_CD`, `PDNO="%"`, `ORD_STRT_DT`, `ORD_END_DT` (INQR_STRT/END_DT 아님!)

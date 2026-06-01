@@ -51,10 +51,11 @@ class KisOrderAdapterTest {
     }
 
     @Test
-    @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 가격=0, 상태=PLACED")
+    @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 실제 가격 전달(지정가이므로 0 금지)")
     void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
+        BigDecimal locPrice = new BigDecimal("25.50");
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
+                10, locPrice, Order.OrderStatus.PLACED, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -64,7 +65,7 @@ class KisOrderAdapterTest {
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
         Map<?, ?> body = bodyCaptor.getValue();
         assertThat(body.get("ORD_DVSN")).isEqualTo("34");
-        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
+        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("25.50");
     }
 
     @Test

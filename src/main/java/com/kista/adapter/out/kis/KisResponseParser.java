@@ -30,11 +30,11 @@ final class KisResponseParser {
         return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
     }
 
-    // KIS 요청 가격 파라미터 포맷팅 (LOC/MOC는 "0", LIMIT은 소수 2자리)
+    // KIS 요청 가격 포맷팅: MOC(시장가)만 "0", LOC/LIMIT(지정가)는 실제 가격 소수 2자리
     static String formatPrice(Order.OrderType type, BigDecimal price) {
         return switch (type) {
-            case LOC, MOC -> "0";
-            case LIMIT    -> price.setScale(2, RoundingMode.HALF_UP).toPlainString();
+            case MOC            -> "0";
+            case LOC, LIMIT     -> price.setScale(2, RoundingMode.HALF_UP).toPlainString();
         };
     }
 
