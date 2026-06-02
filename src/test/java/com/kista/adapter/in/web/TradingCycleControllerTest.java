@@ -54,12 +54,13 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void executeManually_success_returns202() throws Exception {
-        doNothing().when(manualExecute).execute(any(), any());
+    void executeManually_success_returns200WithOrders() throws Exception {
+        when(manualExecute.execute(any(), any())).thenReturn(List.of());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
-                .andExpect(status().isAccepted()); // 202
+                .andExpect(status().isOk()) // 200
+                .andExpect(jsonPath("$.orders").isArray());
     }
 
     @Test

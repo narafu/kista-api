@@ -2,8 +2,10 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.CancelOrdersResponse;
 import com.kista.adapter.in.web.dto.CycleHistoryResponse;
+import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
@@ -152,15 +154,15 @@ public class TradingCycleController {
         }
     }
 
-    // INFINITE 사이클 수동 실행 — 즉시 LOC 주문 접수, 스케줄러가 장마감 30분전 보정 처리
+    // INFINITE 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
     @Operation(summary = "매매 수동 실행 (INFINITE 전용)")
     @PostMapping("/api/trading-cycles/{id}/execute")
-    public ResponseEntity<Void> executeManually(
+    public ResponseEntity<ExecuteOrdersResponse> executeManually(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         try {
-            manualExecute.execute(id, userId);
-            return ResponseEntity.accepted().build();
+            List<Order> placed = manualExecute.execute(id, userId);
+            return ResponseEntity.ok(ExecuteOrdersResponse.from(placed));
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (IllegalStateException e) {
