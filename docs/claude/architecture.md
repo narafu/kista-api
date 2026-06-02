@@ -112,6 +112,7 @@ domain      →  외부 의존 없음
 | `User` 도메인 레코드에 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + **`UserResponse.from()` 반환값** + `kista-ui/types/user.ts` — `UserResponse` 누락 시 프론트엔드 API 응답에서 해당 필드 미포함 |
 | `privacy_trades_master` 스키마 변경 | `PrivacyTradeMasterEntity` + `PrivacyTradeDetailEntity`(cascade 영향) + V번호 마이그레이션 |
 | `privacy_trades_detail` 스키마 변경 | `PrivacyTradeDetailEntity` + V번호 마이그레이션 |
+| `MarketCalendarRefreshPort` 메서드 추가 | `AlpacaCalendarAdapter`(구현) + `MarketHolidayStorePort`(월별이면 `replaceByMonth` 추가) + `UsMarketHolidayJpaRepository`(쿼리 추가) + `MarketCalendarPersistenceAdapter`(구현) |
 | 수량 관련 Domain record 필드 추가 | 해당 JPA Entity + Flyway 마이그레이션 + KIS 어댑터 매핑부 + DTO `from()` + kista-ui `types/` 동시 수정 |
 
 ### 인증 userId 추출 패턴
