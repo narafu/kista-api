@@ -26,7 +26,7 @@ adapter/in/
   web/           ← REST Controller + DTO
                     - AccountController: 계좌 CRUD (POST/GET/PUT/DELETE /api/accounts) + KIS 연결 테스트(POST /connection-tests)
                     - AdminUserController: 사용자 목록(GET) + 상태변경(PATCH /{id}/status — ACTIVE=승인·REJECTED=거절 통합) + 역할변경(PATCH /{id}/role) + 삭제(DELETE /{id})
-                    - TradingCycleController: 사이클 CRUD + pause/resume (GET/POST /api/accounts/{id}/trading-cycles, PUT/DELETE/PATCH /api/trading-cycles/{id})
+                    - TradingCycleController: 사이클 CRUD + pause/resume + 수동실행 (GET/POST /api/accounts/{id}/trading-cycles, PUT/DELETE/PATCH /api/trading-cycles/{id}, POST /api/trading-cycles/{id}/execute)
                     - MetaController: enum 메타데이터 SSOT (GET /api/meta/**) — UI 라벨/설명/available tickers. Cache-Control max-age=1h
                     - OrderController: 예약주문(POST /reservation-orders) + 다음 주문 미리보기(GET /orders/preview)
                     - FidaOrderController: 서버 간 내부 주문 수신 (POST /api/internal/fida-orders, X-Internal-Token 인증)
@@ -83,12 +83,13 @@ domain      →  외부 의존 없음
 | JPA Entity 컬럼 변경 (`nullable`, `length`, 타입 등) | Flyway 마이그레이션과 반드시 크로스체크 — Entity의 `nullable = false` 여부와 DB 제약이 불일치하면 런타임까지 오류 미발생, 실제 null 삽입 시 `DataIntegrityViolationException` 발생 (v34 avg_price 사례) |
 | `trading_cycle` 테이블 변경 | `TradingCycleEntity`(persistence/tradingcycle/) + `TradingCycleJpaRepository` + `TradingCyclePersistenceAdapter` |
 | `TradingCycle` record 필드 추가/제거 | `TradingCycleEntity` + `TradingCyclePersistenceAdapter`(toEntity/toDomain) + `TradingCycleService` + `TradingCycleRequest`/`TradingCycleResponse` + 테스트에서 `new TradingCycle(...)` 직접 생성 호출처 (`TradingServiceTest`, `TradingSchedulerTest`, `TelegramAdapterTest`) |
-| `TradingService` 필드 추가 | `TradingCycleHistoryPort` mock 추가 필수 (`TradingServiceTest`) |
+| `TradingService` 필드 추가 | `TradingServiceTest`: `@Mock` 추가 + `@BeforeEach`의 `new TradingService(...)` 생성자 인수 추가 필수 (`@InjectMocks` 미사용, 직접 생성자 호출) |
 | `ExecuteTradingUseCase` 메서드 추가/변경 | `TradingService`(구현) + `TradingScheduler`(호출 방식) + `TradingServiceTest` + `TradingSchedulerTest`(verify 대상 변경) |
 | Port 인터페이스 수정 | 구현 Adapter + 테스트 Mock |
 | `KisOrderPort` 시그니처 변경 | `TradingService` + `FidaOrderService` + 관련 테스트 |
 | `AccountService` UseCase 추가 | `AccountController` 필드 + 엔드포인트 동시 추가 |
 | 컨트롤러에 새 UseCase 필드 추가 | 해당 `@WebMvcTest` 테스트에 `@MockBean` 추가 필수 (누락 시 `ApplicationContext` 실패) |
+| `TradingCycleController`에 UseCase 필드 추가 | `TradingCycleControllerTest`에 `@MockBean` 추가 필수 |
 | 매매 공식 변경 | `InfiniteStrategyTypeTest` |
 | `InfinitePosition` 공개 메서드 변경 | `InfinitePositionTest` + `InfiniteStrategyTypeTest` |
 | `TradingSnapshot` 필드 변경 | `TelegramAdapterTest` (`new TradingSnapshot(...)` 3곳) + `TradingReport` |
