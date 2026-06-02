@@ -3,6 +3,7 @@ package com.kista.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ReservationOrderCommand;
 import com.kista.domain.model.kis.ReservationOrderReceipt;
+import com.kista.domain.port.in.CancelReservationOrderUseCase;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisReservationOrderPort;
@@ -15,7 +16,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReservationOrderService implements PlaceReservationOrderUseCase {
+public class ReservationOrderService implements PlaceReservationOrderUseCase, CancelReservationOrderUseCase {
 
     private final AccountPort accountPort;
     private final KisReservationOrderPort kisReservationOrderPort;
@@ -30,4 +31,13 @@ public class ReservationOrderService implements PlaceReservationOrderUseCase {
         return kisReservationOrderPort.placeReservationOrder(command, account);
     }
 
+    @Override
+    public void cancel(UUID accountId, UUID requesterId, String reservationOrderId, String receiptDate) {
+        Account account = accountPort.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        log.info("예약주문 취소: accountId={}, reservationOrderId={}, receiptDate={}",
+                accountId, reservationOrderId, receiptDate);
+        // KIS 예외는 그대로 전파 → 컨트롤러에서 503 처리
+        kisReservationOrderPort.cancelReservationOrder(reservationOrderId, receiptDate, account);
+    }
 }

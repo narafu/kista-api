@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.NextOrdersResponse;
 import com.kista.adapter.in.web.dto.ReservationOrderRequest;
 import com.kista.domain.model.kis.ReservationOrderReceipt;
+import com.kista.domain.port.in.CancelReservationOrderUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class OrderController {
 
     private final PlaceReservationOrderUseCase placeReservationOrderUseCase;
+    private final CancelReservationOrderUseCase cancelReservationOrderUseCase;
     private final GetNextOrdersUseCase getNextOrders;
 
     // 미국 해외주식 예약주문 접수 (TTTT3014U 매수 / TTTT3016U 매도)
@@ -46,6 +48,33 @@ public class OrderController {
             @RequestBody @Valid ReservationOrderRequest request) {
         try {
             return placeReservationOrderUseCase.place(accountId, userId, request.toCommand());
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
+        }
+    }
+
+    // 예약주문 취소 (TTTT3017U) — RSVN_ORD_RCIT_DT + OVRS_RSVN_ODNO 필요
+    @Operation(summary = "예약주문 취소", description = "KIS API를 통해 접수된 예약주문을 취소합니다 (TTTT3017U). receiptDate는 예약주문접수일자(YYYYMMDD).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "예약주문 취소 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
+            @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
+    })
+    @DeleteMapping("/reservation-orders/{reservationOrderId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelReservationOrder(
+            @Parameter(description = "계좌 ID") @PathVariable UUID accountId,
+            @Parameter(description = "해외예약주문번호 (OVRS_RSVN_ODNO)") @PathVariable String reservationOrderId,
+            @Parameter(description = "예약주문접수일자 YYYYMMDD (RSVN_ORD_RCIT_DT)", example = "20250610")
+            @RequestParam String receiptDate,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            cancelReservationOrderUseCase.cancel(accountId, userId, reservationOrderId, receiptDate);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {

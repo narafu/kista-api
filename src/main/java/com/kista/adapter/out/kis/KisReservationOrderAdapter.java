@@ -28,11 +28,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KisReservationOrderAdapter implements KisReservationOrderPort {
 
-    private static final String LIST_PATH  = "/uapi/overseas-stock/v1/trading/order-resv-list";
-    private static final String ORDER_PATH = "/uapi/overseas-stock/v1/trading/order-resv";
-    private static final String LIST_TR_ID = "TTTT3039R";  // 미국 예약주문 조회 (실전)
-    private static final String BUY_TR_ID  = "TTTT3014U";  // 미국 예약주문 매수 (실전)
-    private static final String SELL_TR_ID = "TTTT3016U";  // 미국 예약주문 매도 (실전)
+    private static final String LIST_PATH   = "/uapi/overseas-stock/v1/trading/order-resv-list";
+    private static final String ORDER_PATH  = "/uapi/overseas-stock/v1/trading/order-resv";
+    private static final String CANCEL_PATH = "/uapi/overseas-stock/v1/trading/order-resv-ccnl";
+    private static final String LIST_TR_ID   = "TTTT3039R"; // 미국 예약주문 조회 (실전)
+    private static final String BUY_TR_ID    = "TTTT3014U"; // 미국 예약주문 매수 (실전)
+    private static final String SELL_TR_ID   = "TTTT3016U"; // 미국 예약주문 매도 (실전)
+    private static final String CANCEL_TR_ID = "TTTT3017U"; // 미국 예약주문 취소 (실전)
     private static final String EXCHANGE_CODE = ExchangeCode.NASD.name(); // 나스닥 (미국 전체)
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -103,6 +105,19 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
             receiptDate = response.output().rsvnOrdRcitDt() != null ? response.output().rsvnOrdRcitDt() : "";
         }
         return new ReservationOrderReceipt(kisOrderId, reservationOrderId, receiptDate);
+    }
+
+    @Override
+    public void cancelReservationOrder(String reservationOrderId, String receiptDate, Account account) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(CANCEL_TR_ID, account);
+
+        Map<String, String> body = new HashMap<>();
+        body.put("CANO", account.accountNo());
+        body.put("ACNT_PRDT_CD", account.kisAccountType());
+        body.put("RSVN_ORD_RCIT_DT", receiptDate);       // 예약주문접수일자 (YYYYMMDD)
+        body.put("OVRS_RSVN_ODNO", reservationOrderId);   // 해외예약주문번호
+
+        kisHttpClient.post(CANCEL_PATH, headers, body, Void.class);
     }
 
     record ReservationListResponse(@JsonProperty("output") List<Output> output) {

@@ -14,4 +14,7 @@ public interface KisReservationOrderPort {
 
     // 미국 해외주식 예약주문 접수 (매수: TTTT3014U, 매도: TTTT3016U)
     ReservationOrderReceipt placeReservationOrder(ReservationOrderCommand command, Account account);
+
+    // 미국 해외주식 예약주문 취소 (TTTT3017U). 실패 시 RuntimeException 전파.
+    void cancelReservationOrder(String reservationOrderId, String receiptDate, Account account);
 }

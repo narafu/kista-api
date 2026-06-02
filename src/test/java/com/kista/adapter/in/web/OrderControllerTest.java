@@ -9,6 +9,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.admin.*;
+import com.kista.domain.port.in.CancelReservationOrderUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import org.junit.jupiter.api.Test;
@@ -30,9 +31,12 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,6 +49,7 @@ class OrderControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockBean JwtDecoder jwtDecoder;
     @MockBean PlaceReservationOrderUseCase placeReservationOrderUseCase;
+    @MockBean CancelReservationOrderUseCase cancelReservationOrderUseCase;
     @MockBean GetNextOrdersUseCase getNextOrders;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -138,5 +143,54 @@ class OrderControllerTest {
                         .with(authentication(mockAuth()))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
+    }
+
+    // --- /reservation-orders/{reservationOrderId} (예약주문 취소) ---
+
+    @Test
+    void cancelReservationOrder_returns_204_on_success() throws Exception {
+        doNothing().when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
+
+        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
+                        .param("receiptDate", "20260610")
+                        .with(authentication(mockAuth()))
+                        .with(csrf()))
+                .andExpect(status().isNoContent()); // 204
+    }
+
+    @Test
+    void cancelReservationOrder_returns_403_when_not_owner() throws Exception {
+        doThrow(new SecurityException("접근 불가"))
+                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
+
+        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
+                        .param("receiptDate", "20260610")
+                        .with(authentication(mockAuth()))
+                        .with(csrf()))
+                .andExpect(status().isForbidden()); // 403
+    }
+
+    @Test
+    void cancelReservationOrder_returns_404_when_account_not_found() throws Exception {
+        doThrow(new NoSuchElementException("계좌 없음"))
+                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
+
+        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
+                        .param("receiptDate", "20260610")
+                        .with(authentication(mockAuth()))
+                        .with(csrf()))
+                .andExpect(status().isNotFound()); // 404
+    }
+
+    @Test
+    void cancelReservationOrder_returns_503_on_kis_error() throws Exception {
+        doThrow(new RuntimeException("KIS API 오류"))
+                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
+
+        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
+                        .param("receiptDate", "20260610")
+                        .with(authentication(mockAuth()))
+                        .with(csrf()))
+                .andExpect(status().isServiceUnavailable()); // 503
     }
 }
