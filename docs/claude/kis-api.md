@@ -14,7 +14,10 @@
 - Base URL: `https://openapi.koreainvestment.com:9443`
 
 ### KIS 주요 오류 코드
-- `EGW00202` "GW라우팅 중 오류가 발생했습니다" — KIS 게이트웨이 일시적 오류 (우리 코드 무관). 미국 공휴일 휴장일에 주문 접수 시도 시 발생. 재시도 로직 없음
+- `EGW00202` "GW라우팅 중 오류가 발생했습니다" — 두 가지 원인:
+  1. **미국 공휴일에 주문 접수**: `KisHolidayAdapter` 404 폴백 → 휴장일에 주문 시도 → KIS 거부
+  2. **LOC 주문에 가격 "0" 전송**: LOC(장마감지정가)는 실제 limit price 필수. `"0"` 전송 시 "$0 이하 체결" 불가 조건으로 판단해 거부 (과거 `formatPrice(LOC,price)="0"` 버그, 수정 완료)
+  - 재시도 로직 없음 — 원인 제거로만 해결
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisTokenAdapter`)
 
 ### KIS 휴장 조회 API (`CTOS5011R`, KisHolidayAdapter)
@@ -22,7 +25,6 @@
 - **`NATN_CD=840` 필수** (미국 국가코드) — 누락 시 KIS 404 반환 → 폴백으로 공휴일 미감지
 - `output[]` 비어있으면 거래일, 있으면 휴장일
 - API 호출 실패 시 "개장으로 폴백" (`catch → return true`) — KIS 일시 장애 시 매매 진행 위험 있음
-- `EGW00202` on 정상 거래일 = 코드 문제 아님, KIS 계좌 설정 문제 (레버리지 ETF 거래 미승인 등)
 
 ### 응답 필드명 대소문자 주의
 - **해외주식 API 응답은 lowercase** (`ovrs_pdno`, `ovrs_cblc_qty`, `frcr_evlu_amt2` 등)
@@ -44,7 +46,7 @@
 ### 주문 API (KisOrderAdapter)
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
 - `ORD_DVSN` 코드: LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, LOO(장개시지정가)=`32`, 지정가=`00`
-- LOC/MOC 주문 시 `OVRS_ORD_UNPR="0"` 입력
+- MOC(장마감시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
 - **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류). 예약주문(`FT_ORD_UNPR3`)도 동일: `KisResponseParser.formatPrice(Order.OrderType.LIMIT, price)`
 - LOC(장마감지정가)에 `"0"` 전송 금지 — KIS가 $0 이하 체결 불가 주문으로 판단해 EGW00202 반환. KIS API 스펙: `"0"`은 시장가(MOC/시장가)에만 허용
 
