@@ -88,6 +88,11 @@ internal:
   api:
     token: ${INTERNAL_API_TOKEN:}
 
+alpaca:
+  base-url: https://paper-api.alpaca.markets
+  api-key: ${ALPACA_API_KEY:}
+  api-secret: ${ALPACA_API_SECRET:}
+
 firebase:
   service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
 

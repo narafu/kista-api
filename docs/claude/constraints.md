@@ -5,6 +5,12 @@
 - Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
 - `*Repository` 접미사 사용 금지 — JpaRepository와 혼동 유발
 
+### adapter/out 간 JpaRepository 접근 제한
+- `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
+- 다른 패키지 adapter에서 DB 조작이 필요하면 도메인 포트(`domain/port/out/`) 경유 필수
+- 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(domain.port.out) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
+- 참고: `KisTokenAdapter`(adapter.out.kis) → `KisTokenCachePort` → `KisTokenPersistenceAdapter`(persistence.kistoken)
+
 ### RESTful API 설계 원칙
 
 **날짜 범위 쿼리 파라미터 컨벤션**

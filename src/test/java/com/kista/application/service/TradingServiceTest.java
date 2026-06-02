@@ -40,7 +40,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TradingServiceTest {
 
-    @Mock KisHolidayPort kisHolidayPort;
+    @Mock MarketCalendarPort marketCalendarPort;
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
@@ -97,7 +97,7 @@ class TradingServiceTest {
     @BeforeEach
     void setUp() {
         service = new TradingService(
-                kisHolidayPort,
+                marketCalendarPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
                 infiniteStrategy, privacyStrategy, correctionStrategy,
                 notifyPort, userNotificationPort,
@@ -117,7 +117,7 @@ class TradingServiceTest {
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE)); // 시작가 + 종가 모두
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
@@ -129,7 +129,7 @@ class TradingServiceTest {
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
-        verify(kisHolidayPort).isMarketOpen(any(), eq(ACCOUNT));
+        verify(marketCalendarPort).isMarketOpen(any());
         verify(cycleHistoryPort).findRecentByCycleId(CYCLE.id(), 1);
         verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose) 각 1회
@@ -157,7 +157,7 @@ class TradingServiceTest {
                 Order.OrderStatus.PLANNED, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
@@ -178,7 +178,7 @@ class TradingServiceTest {
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
         // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(false);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
@@ -193,7 +193,7 @@ class TradingServiceTest {
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
         // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
@@ -216,7 +216,7 @@ class TradingServiceTest {
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
@@ -245,7 +245,7 @@ class TradingServiceTest {
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
         // CYCLE: 휴장일 체크 전 잔고 조회에서 예외 (이미 isMarketOpen 다음이므로 isMarketOpen도 stub 필요)
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         RuntimeException ex = new RuntimeException("잔고 조회 오류");
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenThrow(ex);
         when(cycleHistoryPort.findRecentByCycleId(cycle2.id(), 1)).thenReturn(List.of(history2));
@@ -268,7 +268,7 @@ class TradingServiceTest {
     void executeBatch_getPricesFails_cycleFailsAndNotifiesAdmin() throws InterruptedException {
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenThrow(new RuntimeException("API 오류"));
         // getPrice 단건 fallback도 실패(null 반환) → price=null → holdings=0 → IllegalStateException
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
@@ -405,7 +405,7 @@ class TradingServiceTest {
                 TradingCycle.CycleSeedType.MAINTAIN);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maintainCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
@@ -429,7 +429,7 @@ class TradingServiceTest {
                 TradingCycle.CycleSeedType.MAX);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
@@ -455,7 +455,7 @@ class TradingServiceTest {
                 TradingCycle.CycleSeedType.MAX);
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());
@@ -479,7 +479,7 @@ class TradingServiceTest {
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
-        when(kisHolidayPort.isMarketOpen(any(), eq(ACCOUNT))).thenReturn(true);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of());

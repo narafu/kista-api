@@ -54,6 +54,7 @@ adapter/out/
     trade/       ← Order (Entity + Repo + Adapter) — TradeHistory·PortfolioSnapshot 삭제됨
     privacy/     ← PrivacyTradeMasterEntity + PrivacyTradeDetailEntity + PrivacyTradePersistenceAdapter (PrivacyTradePort 구현)
   notify/        ← TelegramAdapter (NotifyPort 구현)
+  alpaca/        ← AlpacaCalendarAdapter (MarketCalendarRefreshPort 구현) — Alpaca Markets API
 ```
 
 ### 레이어 의존 방향
@@ -64,6 +65,12 @@ application →  domain (model + port)
 adapter.out →  domain.port.out (Port 구현)
 domain      →  외부 의존 없음
 ```
+
+### 신규 외부 서비스 어댑터 구조 패턴
+`adapter/out/<서비스명>/` 아래 3파일로 구성 (KakaoConfig, TelegramConfig, AlpacaConfig 동일 패턴):
+- `*Properties.java` — `@ConfigurationProperties(prefix="...")` record
+- `*Config.java` — `@Configuration` + `@EnableConfigurationProperties(*Properties.class)` + RestTemplate `@Bean`
+- `*Adapter.java` — `@Component`, Port 구현, RestTemplate + Properties 주입
 
 ---
 

@@ -36,7 +36,7 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCase {
 
-    private final KisHolidayPort kisHolidayPort;               // 미국 시장 개장일 확인
+    private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
     private final KisOrderPort kisOrderPort;                   // 주문 접수
     private final KisExecutionPort kisExecutionPort;           // 당일 체결 내역 조회
@@ -212,7 +212,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         Account account = ctx.account();
 
         // 1. 휴장 확인
-        if (!isMarketOpen(today, account)) return null;
+        if (!isMarketOpen(today)) return null;
 
         // 2. 잔고 로드
         BalanceLoad load = loadBalanceOrThrow(cycle);
@@ -390,9 +390,9 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     }
 
     // false 반환 시 알림 발송 후 Phase A에서 null 반환 (해당 사이클 skip)
-    private boolean isMarketOpen(LocalDate today, Account account) {
-        boolean open = kisHolidayPort.isMarketOpen(today, account);
-        log.info("[{}] 시장 개장 여부: {}", account.nickname(), open);
+    private boolean isMarketOpen(LocalDate today) {
+        boolean open = marketCalendarPort.isMarketOpen(today);
+        log.info("시장 개장 여부: {}", open);
         if (!open) {
             log.info("휴장일 — 매매 건너뜀");
             notifyPort.notifyMarketClosed();
