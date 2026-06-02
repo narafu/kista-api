@@ -27,10 +27,11 @@ public record Order(
     public enum OrderDirection {BUY, SELL}
 
     public enum OrderStatus {
-        PLANNED,  // DB 저장, KIS 접수 대기
-        PLACED,   // KIS 접수 완료
-        FILLED,   // 체결 완료
-        FAILED    // 실패
+        PLANNED,    // DB 저장, KIS 접수 대기
+        PLACED,     // KIS 접수 완료
+        FILLED,     // 체결 완료
+        FAILED,     // 실패
+        CANCELLED   // 사용자 취소 요청으로 KIS 취소 접수 완료
     }
 
     // 전략 계산 결과(template)를 특정 계좌의 PLANNED 주문으로 변환

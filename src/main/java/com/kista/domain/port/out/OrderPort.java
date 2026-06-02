@@ -5,6 +5,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderPort {
@@ -25,4 +26,10 @@ public interface OrderPort {
 
     // 기간 내 전체 계좌 조회 ticker 필터 없음 (관리자·이상징후 감지용)
     List<Order> findAll(LocalDate from, LocalDate to);
+
+    // 단건 조회 (취소 전 상태 확인용)
+    Optional<Order> findById(UUID orderId);
+
+    // 취소 완료 → CANCELLED 상태로 변경
+    void markCancelled(UUID orderId);
 }
