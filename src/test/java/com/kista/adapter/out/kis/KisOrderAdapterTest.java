@@ -138,4 +138,39 @@ class KisOrderAdapterTest {
         assertThat(result.kisOrderId()).isNull();
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);
     }
+
+    @Test
+    @DisplayName("cancel: TTTT1004U + CANCEL_PATH 호출, RVSE_CNCL_DVSN_CD=02, ORGN_ODNO=기존주문번호")
+    void cancel_sendsCorrectParameters() {
+        Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), TRADE_DATE, Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
+                Order.OrderStatus.PLACED, "ORD_123");
+        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        adapter.cancel(order, ACCOUNT);
+
+        verify(kisHttpClient).buildHeaders(eq("TTTT1004U"), eq(ACCOUNT));
+        verify(kisHttpClient).post(
+                eq("/uapi/overseas-stock/v1/trading/order-rvsecncl"),
+                any(), bodyCaptor.capture(), any());
+        Map<?, ?> body = bodyCaptor.getValue();
+        assertThat(body.get("RVSE_CNCL_DVSN_CD")).isEqualTo("02");
+        assertThat(body.get("ORGN_ODNO")).isEqualTo("ORD_123");
+        assertThat(body.get("ORD_QTY")).isEqualTo("0");
+        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("cancel: KIS 오류(RuntimeException) 전파")
+    void cancel_kisError_propagatesException() {
+        Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), TRADE_DATE, Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
+                Order.OrderStatus.PLACED, "ORD_456");
+        when(kisHttpClient.post(anyString(), any(), any(), any()))
+                .thenThrow(new RuntimeException("KIS 오류"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> adapter.cancel(order, ACCOUNT));
+    }
 }

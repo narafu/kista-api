@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -73,6 +74,20 @@ public class OrderPersistenceAdapter implements OrderPort {
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<Order> findById(UUID orderId) {
+        return repository.findById(orderId).map(this::toDomain);
+    }
+
+    @Override
+    public void markCancelled(UUID orderId) {
+        // 명시적 save로 CANCELLED 상태 기록
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        e.setStatus(Order.OrderStatus.CANCELLED);
+        repository.save(e);
     }
 
     private OrderEntity toEntity(Order o) {

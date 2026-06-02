@@ -16,9 +16,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KisOrderAdapter implements KisOrderPort {
 
-    private static final String PATH      = "/uapi/overseas-stock/v1/trading/order";
-    private static final String BUY_TR_ID  = "TTTT1002U"; // 미국 해외주식 매수 주문
-    private static final String SELL_TR_ID = "TTTT1006U"; // 미국 해외주식 매도 주문
+    private static final String PATH        = "/uapi/overseas-stock/v1/trading/order";
+    private static final String CANCEL_PATH = "/uapi/overseas-stock/v1/trading/order-rvsecncl";
+    private static final String BUY_TR_ID   = "TTTT1002U"; // 미국 해외주식 매수 주문
+    private static final String SELL_TR_ID  = "TTTT1006U"; // 미국 해외주식 매도 주문
+    private static final String CANCEL_TR_ID = "TTTT1004U"; // 미국 해외주식 정정취소주문
 
     private final KisHttpClient kisHttpClient;
 
@@ -48,6 +50,25 @@ public class KisOrderAdapter implements KisOrderPort {
                 null, null, order.tradeDate(), order.ticker(), order.orderType(), order.direction(),
                 order.quantity(), order.price(), Order.OrderStatus.PLACED, odno
         );
+    }
+
+    @Override
+    public void cancel(Order order, Account account) {
+        HttpHeaders headers = kisHttpClient.buildHeaders(CANCEL_TR_ID, account);
+
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("CANO", account.accountNo());
+        body.put("ACNT_PRDT_CD", account.kisAccountType());
+        body.put("OVRS_EXCG_CD", order.ticker().getExchangeCode().name());
+        body.put("PDNO", order.ticker().name());
+        body.put("ORGN_ODNO", order.kisOrderId());  // 원주문번호 (PLACED 시 KIS가 부여)
+        body.put("RVSE_CNCL_DVSN_CD", "02");        // 02=취소 (01=정정)
+        body.put("ORD_QTY", "0");                    // 취소 시 0 고정
+        body.put("OVRS_ORD_UNPR", "0");              // 취소 시 0 고정
+        body.put("MGCO_APTM_ODNO", "");
+        body.put("ORD_SVR_DVSN_CD", "0");
+
+        kisHttpClient.post(CANCEL_PATH, headers, body, Void.class);
     }
 
     private String resolveOrderDvsn(Order.OrderType type) {
