@@ -16,7 +16,6 @@ import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.UserPort;
-import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +43,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final KisExecutionPort kisExecutionPort;           // 당일 체결 내역 조회
     private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
     private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
-    private final CorrectionStrategy correctionStrategy;       // 잔여 unitAmount 보정 매수
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
@@ -291,33 +289,24 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         };
     }
 
-    // Phase C: 체결 조회 + 보정 주문(INFINITE) + 이력 저장 + 알림
+    // Phase C: 체결 조회(INFINITE) + 이력 저장 + 알림
     private void phaseC(CyclePlacedState ps, Map<Ticker, BigDecimal> closingPrices, LocalDate today) {
         CycleState state = ps.state();
         TradingCycle cycle = state.ctx().cycle();
         Account account = state.ctx().account();
         User user = state.ctx().user();
 
-        List<Order> corrections = List.of();
         List<Execution> executions = List.of();
 
         if (cycle.type() == TradingCycle.Type.INFINITE) {
             // 8. 체결 내역 조회
             executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
             log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
-
-            // 9. 보정 주문 — 종가 누락 시 skip
-            BigDecimal closingPrice = closingPrices.get(cycle.ticker());
-            if (closingPrice != null) {
-                corrections = applyCorrections(state.position(), closingPrice, executions, today, account);
-            } else {
-                log.warn("[{}] 종가 조회 실패 — 보정 주문 생략", account.nickname());
-            }
         }
 
-        // 10. 이력 저장 + 알림
+        // 9. 이력 저장 + 알림
         saveAndNotify(state.balance(), state.startPrice(), state.snapshot(), today,
-                ps.mainOrders(), corrections, executions, user, account, cycle, state.privacyBase());
+                ps.mainOrders(), executions, user, account, cycle, state.privacyBase());
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
@@ -492,30 +481,13 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         log.info("PostClose 대기 완료");
     }
 
-    // 잔여 unitAmount만큼 종가로 보정 매수 — CorrectionStrategy가 알고리즘 담당
-    private List<Order> applyCorrections(InfinitePosition position, BigDecimal closingPrice,
-                                         List<Execution> executions, LocalDate today, Account account) {
-        List<Order> corrections = correctionStrategy.correct(position, closingPrice, executions, today)
-                .stream()
-                .map(o -> kisOrderPort.place(o, account))
-                .map(o -> new Order(null, account.id(), o.tradeDate(), o.ticker(), // accountId 주입
-                                    o.orderType(), o.direction(), o.quantity(), o.price(),
-                                    o.status(), o.kisOrderId()))
-                .toList();
-        if (!corrections.isEmpty()) {
-            orderPort.saveAll(corrections); // corrections를 orders 테이블에 저장
-        }
-        log.info("[{}] 보정 주문 {}건", account.nickname(), corrections.size());
-        return corrections;
-    }
-
     private void saveAndNotify(AccountBalance balance, BigDecimal price, TradingSnapshot snapshot,
-                               LocalDate today, List<Order> mainOrders, List<Order> corrections,
+                               LocalDate today, List<Order> mainOrders,
                                List<Execution> executions, User user, Account account, TradingCycle cycle,
                                PrivacyTradeBase privacyTradeBase) {
         saveCycleHistory(balance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
         if (snapshot != null) { // PRIVACY TODO: 스냅샷 미생성 시 텔레그램 리포트 생략
-            TradingReport report = buildReport(today, snapshot, mainOrders, corrections, executions);
+            TradingReport report = buildReport(today, snapshot, mainOrders, executions);
             userNotificationPort.notifyTradingReport(user, account, report);
             log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
         }
@@ -613,8 +585,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     }
 
     private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,
-                                      List<Order> mainOrders, List<Order> corrections,
-                                      List<Execution> executions) {
+                                      List<Order> mainOrders, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
                 .filter(e -> e.direction() == BUY)
                 .map(Execution::amountUsd)
@@ -623,6 +594,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TradingReport(today, snapshot, mainOrders, corrections, totalBought, totalSold);
+        return new TradingReport(today, snapshot, mainOrders, totalBought, totalSold);
     }
 }

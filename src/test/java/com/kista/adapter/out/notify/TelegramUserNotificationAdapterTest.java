@@ -81,7 +81,7 @@ class TelegramUserNotificationAdapterTest {
         TradingSnapshot snapshot = new TradingSnapshot(10,
                 new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
         return new TradingReport(
-                LocalDate.of(2024, 6, 15), snapshot, List.of(), List.of(),
+                LocalDate.of(2024, 6, 15), snapshot, List.of(),
                 new BigDecimal("66.00"), new BigDecimal("35.00"));
     }
 }

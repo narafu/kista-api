@@ -57,7 +57,6 @@ class CompositeUserNotificationAdapterTest {
                 LocalDate.now(),
                 snapshot,
                 List.<Order>of(),                    // mainOrders
-                List.<Order>of(),                    // correctionOrders
                 new BigDecimal("500.00"),            // totalBoughtUsd
                 new BigDecimal("200.00"));           // totalSoldUsd
     }
