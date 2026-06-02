@@ -15,12 +15,17 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import com.kista.domain.port.in.CancelOrderUseCase;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TradingCycleController.class)
@@ -38,6 +43,7 @@ class TradingCycleControllerTest {
     @MockBean ResumeTradingCycleUseCase resumeCycle;
     @MockBean GetAccountStatisticsUseCase statisticsUseCase;
     @MockBean ManualExecuteTradingUseCase manualExecute;
+    @MockBean CancelOrderUseCase cancelOrder;
 
     private static final UUID CYCLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -101,5 +107,37 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNotFound()); // 404 — GlobalExceptionHandler 처리
+    }
+
+    @Test
+    void cancelExecute_success_returnsCancelResult() throws Exception {
+        when(cancelOrder.cancelByCycle(any(), any()))
+                .thenReturn(new CancelOrderUseCase.CancelResult(2, 1));
+
+        mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cancelledCount").value(2))
+                .andExpect(jsonPath("$.failedCount").value(1));
+    }
+
+    @Test
+    void cancelExecute_notOwner_returns403() throws Exception {
+        doThrow(new SecurityException("소유권 불일치"))
+                .when(cancelOrder).cancelByCycle(any(), any());
+
+        mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelExecute_notFound_returns404() throws Exception {
+        doThrow(new NoSuchElementException("사이클 없음"))
+                .when(cancelOrder).cancelByCycle(any(), any());
+
+        mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isNotFound());
     }
 }

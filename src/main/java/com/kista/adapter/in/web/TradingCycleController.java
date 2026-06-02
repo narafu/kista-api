@@ -1,8 +1,10 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.CancelOrdersResponse;
 import com.kista.adapter.in.web.dto.CycleHistoryResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
+import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
@@ -42,6 +44,7 @@ public class TradingCycleController {
     private final ResumeTradingCycleUseCase resumeCycle;
     private final GetAccountStatisticsUseCase statisticsUseCase;
     private final ManualExecuteTradingUseCase manualExecute; // 수동 실행
+    private final CancelOrderUseCase cancelOrder;            // 주문 취소
 
     // 계좌의 거래 사이클 목록 조회
     @Operation(summary = "거래 사이클 목록 조회")
@@ -164,6 +167,21 @@ public class TradingCycleController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()); // 409 오늘 이미 실행
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); // 400 PRIVACY 등
+        }
+    }
+
+    // 오늘 수동 실행으로 PLACED된 사이클 주문 전체 취소 (best-effort)
+    @Operation(summary = "수동 실행 주문 취소 (오늘 PLACED 주문 전체)")
+    @DeleteMapping("/api/trading-cycles/{id}/execute")
+    public CancelOrdersResponse cancelExecute(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            return CancelOrdersResponse.from(cancelOrder.cancelByCycle(id, userId));
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
 
