@@ -20,6 +20,6 @@ public record ReservationOrderRequest(
         @NotNull @Positive BigDecimal price
 ) {
     public ReservationOrderCommand toCommand() {
-        return new ReservationOrderCommand(ticker, direction, quantity, price);
+        return new ReservationOrderCommand(ticker, direction, quantity, price, Order.OrderType.LIMIT);
     }
 }

@@ -91,8 +91,9 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         body.put("ACNT_PRDT_CD", account.kisAccountType());
         body.put("PDNO", command.ticker().name());
         body.put("OVRS_EXCG_CD", EXCHANGE_CODE);
+        body.put("ORD_DVSN", resolveOrderDvsn(command.orderType())); // LOC=34, LIMIT=00
         body.put("FT_ORD_QTY", String.valueOf(command.quantity()));
-        body.put("FT_ORD_UNPR3", KisResponseParser.formatPrice(Order.OrderType.LIMIT, command.price()));
+        body.put("FT_ORD_UNPR3", KisResponseParser.formatPrice(command.orderType(), command.price()));
 
         ReservationOrderResponse response = kisHttpClient.post(ORDER_PATH, headers, body, ReservationOrderResponse.class);
 
@@ -118,6 +119,14 @@ public class KisReservationOrderAdapter implements KisReservationOrderPort {
         body.put("OVRS_RSVN_ODNO", reservationOrderId);   // 해외예약주문번호
 
         kisHttpClient.post(CANCEL_PATH, headers, body, Void.class);
+    }
+
+    private String resolveOrderDvsn(Order.OrderType type) {
+        return switch (type) {
+            case LOC   -> "34"; // 장마감지정가(LOC)
+            case MOC   -> "33"; // 장마감시장가(MOC)
+            case LIMIT -> "00"; // 지정가
+        };
     }
 
     record ReservationListResponse(@JsonProperty("output") List<Output> output) {

@@ -121,7 +121,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
 
     @Override
     public List<Order> execute(UUID cycleId, UUID requesterId) {
-        // 동기 검증: 소유권·타입·상태·이중 실행 방지
+        // 동기 검증: 소유권·타입·상태
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
         Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId); // SecurityException → 403
@@ -129,41 +129,106 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             throw new IllegalArgumentException("INFINITE 사이클만 수동 실행 가능합니다");
         if (cycle.status() != TradingCycle.Status.ACTIVE)
             throw new IllegalArgumentException("ACTIVE 상태의 사이클만 수동 실행 가능합니다");
-        LocalDate today = LocalDate.now();
+
+        // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~10:00, 비DST 06:00~10:00)면 즉시 거부
+        DstInfo dst = DstInfo.immediate();
+        DstInfo.MarketSession session = dst.currentSession();
+        if (session == DstInfo.MarketSession.BLOCKED) {
+            String range = dst.isDst() ? "05:00~10:00" : "06:00~10:00";
+            throw new IllegalStateException("주문 불가 시간대입니다 (KST " + range + " LOC 불가)");
+        }
+
+        // 스케줄러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
+        LocalDate today = LocalTime.now().isBefore(LocalTime.of(4, 0))
+                ? LocalDate.now()
+                : LocalDate.now().plusDays(1);
+
+        // 이중 실행 방지 (예약주문도 PLACED로 기록되므로 동일하게 체크)
         if (!orderPort.findPlacedByAccountAndDate(account.id(), today).isEmpty())
             throw new IllegalStateException("오늘 이미 실행된 사이클입니다");
         User user = userPort.findById(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
 
-        // Phase A: 현재가 조회 + PLANNED 주문 생성·저장 (동기)
+        // 장 시작 전 → 예약주문(LOC) 접수 (동기) + 이력·알림 (비동기)
+        if (session == DstInfo.MarketSession.RESERVATION) {
+            return executeReservation(cycle, account, user, today);
+        }
+
+        // 장 시작 후 → 일반 LOC 직접 접수 (Phase A/B 동기, Phase C 비동기)
         Map<Ticker, BigDecimal> startPrices = fetchPricesComplete(List.of(cycle.ticker()), account);
         CycleState state = phaseA(new BatchContext(cycle, account, user), startPrices, null, today);
         if (state == null) return List.of(); // 휴장 또는 잔고 부족
 
-        // Phase B: KIS 주문 접수 (동기) — validation에서 오늘 PLACED 없음이 보장되므로 통상 isManualCorrection=false
         List<Order> placed = state.isManualCorrection()
                 ? executeCorrectionOrders(today, state)
                 : executePlannedOrders(today, account);
 
-        // Phase C: PostClose 대기 후 체결 조회·이력·알림 (비동기)
         CyclePlacedState placedState = new CyclePlacedState(state, placed);
-        DstInfo dst = DstInfo.immediate();
         Thread.startVirtualThread(() -> {
             try {
                 waitForPostClose(dst);
-                Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(
-                        List.of(cycle.ticker()), account);
+                Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(List.of(cycle.ticker()), account);
                 phaseC(placedState, closingPrices, today);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("수동 실행 Phase C 인터럽트: cycleId={}", cycleId);
             } catch (Exception e) {
-                log.error("수동 실행 Phase C 오류: cycleId={}", cycleId, e.getMessage(), e);
+                log.error("수동 실행 Phase C 오류: cycleId={}", cycleId, e);
                 notifyPort.notifyError(e);
             }
         });
 
         return placed;
+    }
+
+    // 장 시작 전 수동 실행: 예약주문(LOC) 접수 (동기) + 이력·알림 (비동기)
+    // kisOrderId 형식: "{ovrs_rsvn_odno}|{receipt_date}" — 파이프 유무로 취소 라우팅 구분
+    private List<Order> executeReservation(TradingCycle cycle, Account account, User user, LocalDate today) {
+        // 잔고 로드
+        BalanceLoad load = loadBalanceOrThrow(cycle);
+        if (load.isSkip()) {
+            log.info("잔고 부족 — 예약주문 건너뜀: [{}]", account.nickname());
+            notifyPort.notifyInsufficientBalance(account, load.balance(), cycle.ticker());
+            return List.of();
+        }
+        AccountBalance balance = load.balance();
+
+        // 현재가 조회 (주문 가격 계산용)
+        BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
+        if (balance.shouldSkip(price)) {
+            log.info("0회차 단위금액 부족 — 예약주문 건너뜀: [{}]", account.nickname());
+            notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
+            return List.of();
+        }
+
+        // 전략 계산 + PLANNED 저장
+        InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "예약:" + account.nickname());
+        savePlannedOrders(calc.orders(), account);
+
+        // 각 PLANNED 주문을 KIS 예약주문(LOC)으로 접수 → PLACED 기록
+        List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
+        for (Order p : planned) {
+            ReservationOrderCommand cmd = new ReservationOrderCommand(
+                    p.ticker(), p.direction(), p.quantity(), p.price(), p.orderType());
+            ReservationOrderReceipt receipt = kisReservationOrderPort.placeReservationOrder(cmd, account);
+            orderPort.markPlaced(p.id(), receipt.reservationOrderId() + "|" + receipt.receiptDate());
+        }
+        log.info("[{}] 예약주문 {}건 접수 완료", account.nickname(), planned.size());
+
+        // 이력 저장 + 알림 (비동기 — 체결은 KIS가 자동 처리하므로 PostClose 대기 불필요)
+        TradingSnapshot snapshot = calc.position().toSnapshot();
+        Thread.startVirtualThread(() -> {
+            try {
+                saveCycleHistory(balance, cycle, account, user, price, null);
+                TradingReport report = buildReport(today, snapshot, List.of(), List.of());
+                userNotificationPort.notifyTradingReport(user, account, report);
+            } catch (Exception e) {
+                log.error("예약주문 이력·알림 오류: cycleId={}", cycle.id(), e);
+                notifyPort.notifyError(e);
+            }
+        });
+
+        return orderPort.findPlacedByAccountAndDate(account.id(), today);
     }
 
     @Override

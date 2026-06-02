@@ -4,8 +4,9 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import java.math.BigDecimal;
 
 public record ReservationOrderCommand(
-        Ticker ticker,                 // 거래 종목
+        Ticker ticker,                  // 거래 종목
         Order.OrderDirection direction, // 매수/매도
-        int quantity,                  // 주문수량
-        BigDecimal price               // 주문단가 (USD)
+        int quantity,                   // 주문수량
+        BigDecimal price,               // 주문단가 (USD)
+        Order.OrderType orderType       // 주문 유형 (LOC=34, LIMIT=00 등)
 ) {}

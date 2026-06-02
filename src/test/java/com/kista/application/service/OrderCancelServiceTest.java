@@ -7,6 +7,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
+import com.kista.domain.port.out.KisReservationOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class OrderCancelServiceTest {
 
     @Mock OrderPort orderPort;
     @Mock KisOrderPort kisOrderPort;
+    @Mock KisReservationOrderPort kisReservationOrderPort;
     @Mock AccountPort accountPort;
     @Mock TradingCyclePort cyclePort;
     @InjectMocks OrderCancelService service;
@@ -173,6 +175,43 @@ class OrderCancelServiceTest {
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    // --- 예약주문 취소 라우팅 ---
+
+    @Test
+    @DisplayName("cancelOrder: kisOrderId에 '|' 포함 → 예약주문 취소 API 호출 (TTTT3017U)")
+    void cancelOrder_reservationOrder_usesReservationCancelApi() {
+        // kisOrderId = "RSV12345|20260602" 형식 (예약주문)
+        Order reservationOrder = new Order(orderId, accountId, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                Order.OrderStatus.PLACED, "RSV12345|20260602");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(reservationOrder));
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        // 예약주문 취소 API 호출됨, 일반 취소는 호출 안 됨
+        verify(kisReservationOrderPort).cancelReservationOrder("RSV12345", "20260602", ownedAccount);
+        verifyNoInteractions(kisOrderPort);
+        verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: 예약주문 포함 시 예약 취소 API 사용")
+    void cancelByCycle_reservationOrder_usesReservationCancelApi() {
+        Order reservationOrder = placedOrder(UUID.randomUUID(), "RSV99|20260602");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
+                .thenReturn(List.of(reservationOrder));
+
+        CancelOrderUseCase.CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(1);
+        verify(kisReservationOrderPort).cancelReservationOrder("RSV99", "20260602", ownedAccount);
+        verifyNoInteractions(kisOrderPort);
     }
 
     // ---

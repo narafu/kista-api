@@ -55,6 +55,7 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
     @Mock UserPort userPort;
+    @Mock KisReservationOrderPort kisReservationOrderPort;
 
     TradingService service;
 
@@ -101,7 +102,8 @@ class TradingServiceTest {
                 infiniteStrategy, privacyStrategy,
                 notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
-                accountPort, cyclePort, privacyTradePort, kisMarginPort, userPort);
+                accountPort, cyclePort, privacyTradePort, kisMarginPort, userPort,
+                kisReservationOrderPort);
     }
 
     @Test
@@ -137,6 +139,30 @@ class TradingServiceTest {
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
+    }
+
+    @Test
+    void executeBatch_manualCorrectionMode_skipsPhaseCToPreventDuplicateNotification() throws InterruptedException {
+        // 수동 실행으로 이미 PLACED 주문이 존재 → isManualCorrection=true → Phase C 위임
+        Order alreadyPlaced = new Order(UUID.randomUUID(), ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
+        Order correctionOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-002");
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        // 오늘 이미 PLACED 주문 존재 → 보정 모드
+        when(orderPort.findPlacedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlaced));
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE); // 보정 현재가 단건 조회
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // Phase C 스킵 → 체결 조회·이력 저장·텔레그램 모두 미호출
+        verify(kisExecutionPort, never()).getExecutions(any(), any(), any(), any());
+        verify(cycleHistoryPort, never()).save(any());
+        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
     @Test
