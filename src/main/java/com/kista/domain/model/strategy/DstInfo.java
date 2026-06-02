@@ -35,4 +35,13 @@ public record DstInfo(
         Instant postClose = nowKst.toLocalDate().atTime(postTime).atZone(KST).toInstant();
         return new DstInfo(isDst, orderAt, postClose);
     }
+
+    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose는 정상 계산
+    public static DstInfo immediate() {
+        ZonedDateTime now = ZonedDateTime.now(KST);
+        boolean isDst = NY.getRules().isDaylightSavings(now.toInstant());
+        LocalTime postTime = isDst ? LocalTime.of(5, 10) : LocalTime.of(6, 10);
+        Instant postClose = now.toLocalDate().atTime(postTime).atZone(KST).toInstant();
+        return new DstInfo(isDst, Instant.now().minusMillis(1), postClose);
+    }
 }

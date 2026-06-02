@@ -6,6 +6,7 @@ import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
+import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
 import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -39,6 +41,7 @@ public class TradingCycleController {
     private final PauseTradingCycleUseCase pauseCycle;
     private final ResumeTradingCycleUseCase resumeCycle;
     private final GetAccountStatisticsUseCase statisticsUseCase;
+    private final ManualExecuteTradingUseCase manualExecute; // 수동 실행
 
     // 계좌의 거래 사이클 목록 조회
     @Operation(summary = "거래 사이클 목록 조회")
@@ -143,6 +146,24 @@ public class TradingCycleController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    // INFINITE 사이클 수동 실행 — 즉시 LOC 주문 접수, 스케줄러가 장마감 30분전 보정 처리
+    @Operation(summary = "매매 수동 실행 (INFINITE 전용)")
+    @PostMapping("/api/trading-cycles/{id}/execute")
+    public ResponseEntity<Void> executeManually(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        try {
+            manualExecute.execute(id, userId);
+            return ResponseEntity.accepted().build();
+        } catch (SecurityException e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()); // 409 오늘 이미 실행
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); // 400 PRIVACY 등
         }
     }
 

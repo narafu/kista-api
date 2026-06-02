@@ -13,7 +13,9 @@ import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
+import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.UserPort;
 import com.kista.domain.strategy.CorrectionStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
@@ -34,7 +36,7 @@ import static java.math.RoundingMode.HALF_UP;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCase {
+public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCase, ManualExecuteTradingUseCase {
 
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
@@ -52,15 +54,17 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final TradingCyclePort cyclePort;      // preview ACTIVE 사이클 조회
     private final PrivacyTradePort privacyTradePort;
     private final KisMarginPort kisMarginPort;     // MAX 재등록 시 USD 잔고 조회
+    private final UserPort userPort;               // 수동 실행 시 사용자 조회
 
     // Phase A 결과: 사이클별 잔고·전략 계산 상태
     private record CycleState(
             BatchContext ctx,
             AccountBalance balance,
-            InfinitePosition position,     // INFINITE만 non-null
-            TradingSnapshot snapshot,      // INFINITE만 non-null
-            BigDecimal startPrice,         // INFINITE만 non-null
-            PrivacyTradeBase privacyBase   // PRIVACY만 non-null (cycle 재등록 시 최소금액 산정용)
+            InfinitePosition position,      // INFINITE만 non-null
+            TradingSnapshot snapshot,       // INFINITE만 non-null
+            BigDecimal startPrice,          // INFINITE만 non-null
+            PrivacyTradeBase privacyBase,   // PRIVACY만 non-null (cycle 재등록 시 최소금액 산정용)
+            boolean isManualCorrection      // 수동 실행 감지 시 true — Phase B에서 보정 주문만 접수
     ) {}
 
     // Phase B 결과: Phase A 상태 + KIS 접수된 주문 목록
@@ -115,6 +119,36 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     }
 
     @Override
+    public void execute(UUID cycleId, UUID requesterId) {
+        // 동기 검증: 소유권·타입·상태·이중 실행 방지
+        TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        Account account = accountPort.findByIdOrThrow(cycle.accountId());
+        account.verifyOwnedBy(requesterId); // SecurityException → 403
+        if (cycle.type() != TradingCycle.Type.INFINITE)
+            throw new IllegalArgumentException("INFINITE 사이클만 수동 실행 가능합니다");
+        if (cycle.status() != TradingCycle.Status.ACTIVE)
+            throw new IllegalArgumentException("ACTIVE 상태의 사이클만 수동 실행 가능합니다");
+        LocalDate today = LocalDate.now();
+        if (!orderPort.findPlacedByAccountAndDate(account.id(), today).isEmpty())
+            throw new IllegalStateException("오늘 이미 실행된 사이클입니다");
+        User user = userPort.findById(account.userId())
+                .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
+
+        // 비동기: waitForOrderTime 없이 즉시 LOC 접수 → 스케줄러는 이후 보정 주문 처리
+        Thread.startVirtualThread(() -> {
+            try {
+                executeBatch(List.of(new BatchContext(cycle, account, user)), DstInfo.immediate());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("수동 실행 인터럽트: cycleId={}", cycleId);
+            } catch (Exception e) {
+                log.error("수동 실행 오류: cycleId={}", cycleId, e.getMessage(), e);
+                notifyPort.notifyError(e);
+            }
+        });
+    }
+
+    @Override
     public void execute(TradingCycle cycle, Account account, User user) throws InterruptedException {
         executeBatch(List.of(new BatchContext(cycle, account, user)));
     }
@@ -160,11 +194,13 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 공통 대기 — 주문 시각까지 (모든 사이클이 공유하는 단 1회)
         waitForOrderTime(dst);
 
-        // Phase B — 사이클별: PLANNED → KIS 접수
+        // Phase B — 사이클별: PLANNED → KIS 접수 (수동 실행 감지 시 보정 주문만)
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             try {
-                List<Order> mainOrders = executePlannedOrders(today, state.ctx().account());
+                List<Order> mainOrders = state.isManualCorrection()
+                        ? executeCorrectionOrders(today, state)
+                        : executePlannedOrders(today, state.ctx().account());
                 placedStates.add(new CyclePlacedState(state, mainOrders));
             } catch (Exception e) {
                 log.error("[cycleId={}] Phase B 오류: {}", state.ctx().cycle().id(), e.getMessage(), e);
@@ -227,6 +263,12 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 3. 전략별 PLANNED 주문 생성·저장
         return switch (cycle.type()) {
             case INFINITE -> {
+                // 수동 실행 감지: 오늘 PLACED 주문이 있으면 보정 주문 모드로 전환
+                List<Order> todayPlaced = orderPort.findPlacedByAccountAndDate(account.id(), today);
+                if (!todayPlaced.isEmpty()) {
+                    log.info("[{}] 수동 실행 감지 — 보정 주문 모드", account.nickname());
+                    yield new CycleState(ctx, balance, null, null, null, null, true);
+                }
                 BigDecimal price = startPrices.get(cycle.ticker());
                 if (balance.shouldSkip(price)) {
                     log.info("0회차 단위금액 부족 — 매매 건너뜀: [{}]", account.nickname());
@@ -235,7 +277,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 }
                 InfiniteCalc calc = calcInfinite(balance, cycle, price, today, account.nickname());
                 savePlannedOrders(calc.orders(), account);
-                yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null);
+                yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null, false);
             }
             case PRIVACY -> {
                 if (privacyBase == null) {
@@ -244,7 +286,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 }
                 List<Order> privacyOrders = calcPrivacy(balance, cycle.initialUsdDeposit(), privacyBase);
                 savePlannedOrders(privacyOrders, account);
-                yield new CycleState(ctx, balance, null, null, null, privacyBase);
+                yield new CycleState(ctx, balance, null, null, null, privacyBase, false);
             }
         };
     }
@@ -380,6 +422,49 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         }).toList();
         log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());
         return placed;
+    }
+
+    // 수동 실행 보정: 3PM 현재가 기준 이상적 주문 재계산 후 아침 PLACED 주문과 차이만큼 추가 접수
+    private List<Order> executeCorrectionOrders(LocalDate today, CycleState state) {
+        Account account = state.ctx().account();
+        TradingCycle cycle = state.ctx().cycle();
+        AccountBalance balance = state.balance();
+
+        // 3PM 현재가로 이상적 주문 재계산
+        BigDecimal currentPrice = kisPricePort.getPrice(cycle.ticker(), account);
+        InfiniteCalc idealCalc = calcInfinite(balance, cycle, currentPrice, today,
+                "보정:" + account.nickname());
+
+        // 아침 PLACED 주문 수량 합산
+        List<Order> morningPlaced = orderPort.findPlacedByAccountAndDate(account.id(), today);
+        int morningBuyQty  = morningPlaced.stream()
+                .filter(o -> o.direction() == BUY).mapToInt(Order::quantity).sum();
+        int morningSellQty = morningPlaced.stream()
+                .filter(o -> o.direction() == SELL).mapToInt(Order::quantity).sum();
+
+        // 이상 수량 vs 아침 PLACED 수량 비교
+        int idealBuyQty  = idealCalc.orders().stream()
+                .filter(o -> o.direction() == BUY).mapToInt(Order::quantity).sum();
+        int idealSellQty = idealCalc.orders().stream()
+                .filter(o -> o.direction() == SELL).mapToInt(Order::quantity).sum();
+
+        // 보정 주문 생성
+        List<Order> corrections = new ArrayList<>();
+        int correctionBuy  = idealBuyQty  - morningBuyQty;
+        int correctionSell = idealSellQty - morningSellQty;
+        if (correctionBuy > 0)
+            corrections.add(new Order(null, account.id(), today, cycle.ticker(),
+                    Order.OrderType.LOC, BUY, correctionBuy, currentPrice, Order.OrderStatus.PLANNED, null));
+        if (correctionSell > 0)
+            corrections.add(new Order(null, account.id(), today, cycle.ticker(),
+                    Order.OrderType.LOC, SELL, correctionSell, currentPrice, Order.OrderStatus.PLANNED, null));
+
+        if (corrections.isEmpty()) {
+            log.info("[{}] 보정 주문 불필요 — 수량 차이 없음", account.nickname());
+            return List.of();
+        }
+        savePlannedOrders(corrections, account);
+        return executePlannedOrders(today, account);
     }
 
     private void waitForOrderTime(DstInfo dst) throws InterruptedException {

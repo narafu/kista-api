@@ -36,6 +36,17 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
+        return repository
+                .findByAccountIdAndTradeDateAndStatus(
+                        accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public void markPlaced(UUID orderId, String kisOrderId) {
         // 명시적 save로 dirty checking 의존 없이 PLACED + kisOrderId 기록
         OrderEntity e = repository.findById(orderId)
