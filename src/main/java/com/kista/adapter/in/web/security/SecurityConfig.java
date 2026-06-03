@@ -39,7 +39,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/**").permitAll() // management port(8081) 전용, Render에서 외부 미노출
                         .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/telegram/webhook").permitAll()
                         .requestMatchers("/api/auth/status-stream").authenticated() // 상태 SSE 연결은 인증 필수
