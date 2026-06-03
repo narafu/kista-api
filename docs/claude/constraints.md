@@ -87,7 +87,7 @@
 
 ### 수량 변수명 규칙 (V26 전수 통일 완료)
 - **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `TradingCycleHistory`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
-- **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`, `ReservationOrderCommand`, `ReservationOrder.orderedQuantity/filledQuantity`
+- **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
 - DB 컬럼: `trading_cycle_history.holdings`, `privacy_trades_master.holdings`(보유) / `orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
 - KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`

@@ -53,7 +53,7 @@
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
 - `ORD_DVSN` 코드: LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, LOO(장개시지정가)=`32`, 지정가=`00`
 - MOC(장마감시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
-- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류). 예약주문(`FT_ORD_UNPR3`)도 동일: `KisResponseParser.formatPrice(Order.OrderType.LIMIT, price)`
+- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류)
 - LOC(장마감지정가)에 `"0"` 전송 금지 — KIS가 $0 이하 체결 불가 주문으로 판단해 EGW00202 반환. KIS API 스펙: `"0"`은 시장가(MOC/시장가)에만 허용
 
 ### 체결 조회 API (TTTS3035R, KisExecutionAdapter)
@@ -102,9 +102,10 @@
   - 응답: `output.nrec`, `output2[]`(종목별) — `symb`(종목코드), `last`(현재가) 필드 사용
   - `Ticker.tryParse(symb)`로 enum 외 종목 silent drop
 - `getPrice(Ticker, Account)` — 단건 API(`HHDFS00000300`) 유지
-- KIS 거래소 코드 두 체계 혼용: `OVRS_EXCG_CD` (주문·체결·잔고·예약주문 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
+- KIS 거래소 코드 두 체계 혼용: `OVRS_EXCG_CD` (주문·체결·잔고 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
 - `TradingCycle.ExchangeCode` enum → `OVRS_EXCG_CD` 용, `TradingCycle.ExcdCode` enum → `EXCD` 용 — `Ticker`가 두 필드 모두 보유
-- KIS 응답 모델(`PresentBalanceResult.Item`, `PeriodProfitResult.Item`, `ReservationOrder`)의 `exchangeCode: String`은 수신값이므로 enum 변환 대상 아님
+- KIS 응답 모델(`PresentBalanceResult.Item`, `PeriodProfitResult.Item`)의 `exchangeCode: String`은 수신값이므로 enum 변환 대상 아님
+- **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API(`TTTT1002U`/`TTTT1006U`)가 프리마켓·정규장·애프터마켓 전 구간에서 LOC/MOC 모두 지원하므로 예약주문 API 불필요 — kista에서 완전 제거됨
 
 ### KIS Adapter 단위 테스트
 - Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용

@@ -8,6 +8,13 @@
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 사이클 계속 실행
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
 
+### DstInfo.MarketSession (수동 실행 시간대 판단)
+- `DIRECT`: 프리마켓+정규장 전 구간 — 주문 가능 (DST: 17:00~05:00 / 비DST: 18:00~06:00 KST)
+- `BLOCKED`: 장마감~프리마켓 전 — 주문 불가 (DST: 05:00~17:00 / 비DST: 06:00~18:00 KST)
+- `TradingService.execute()` 수동 실행 진입 시 BLOCKED이면 `IllegalStateException` → 컨트롤러 503
+- `GET /api/market/session`: UI 수동 실행 버튼 활성화 판단용, `{ session: "DIRECT"|"BLOCKED", isDst: boolean }` 반환
+- kista-ui `NextOrderPreviewCard`: BLOCKED이거나 오늘이 휴장일이면 "지금 실행" 버튼 disabled + title 툴팁
+
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
 - `trading_cycle_history`: 사이클 단위 잔고 스냅샷 — 실행당 1건 append. `UNIQUE(trading_cycle_id, trade_date)` — 동일 trade_date 중복 시 무시(log.warn). 필드: usd_deposit/avg_price/holdings/current_price

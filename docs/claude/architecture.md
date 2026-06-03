@@ -11,7 +11,7 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
                    import 경로: com.kista.domain.model.tradingcycle.TradingCycle.Ticker (구 Strategy.Ticker 아님)
                    필드: id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, createdAt, updatedAt
     strategy/    ← InfinitePosition, AccountBalance, TradingSnapshot, TradingReport, DstInfo (Ticker/StrategyType은 TradingCycle nested enum으로 이동)
-    order/       ← Order, TradeEvent, ReservationOrderCommand (TradeHistory·PortfolioSnapshot 제거됨)
+    order/       ← Order, TradeEvent (TradeHistory·PortfolioSnapshot·ReservationOrderCommand 제거됨)
     kis/         ← KIS 응답 record (Execution, PresentBalanceResult, PeriodProfitResult, DailyTransaction* 등)
     admin/       ← AdminAnomalies, AdminStats, AuditLog
   strategy/      ← InfiniteTradingStrategy/PrivacyTradingStrategy 인터페이스 + InfiniteStrategy/PrivacyStrategy 구현 — @Component 허용 예외 (ArchUnit)
