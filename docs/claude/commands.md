@@ -45,6 +45,14 @@ docker compose up -d postgres                                   # DB만 기동
 docker compose build <service> && docker compose up -d --force-recreate <service>
 ```
 
+### 로컬 서버 로그 (IntelliJ 실행 시)
+```bash
+tail -f /tmp/kista-api.log                                      # 실시간 로그 확인
+tail -100 /tmp/kista-api.log                                    # 최근 100줄
+```
+# application-local.yml에 logging.file.name: /tmp/kista-api.log 설정됨
+# IntelliJ에서 앱 재시작 후부터 파일에 기록됨
+
 ### Render 배포 모니터링
 ```bash
 # 운영 로그 실시간 조회 (render-cli)

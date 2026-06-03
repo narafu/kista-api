@@ -157,7 +157,11 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     ? executeCorrectionOrders(today, state)
                     : executePlannedOrders(today, account);
         } catch (Exception e) {
-            orderPort.deletePlannedByAccountAndDate(account.id(), today);
+            try {
+                orderPort.deletePlannedByAccountAndDate(account.id(), today);
+            } catch (Exception cleanup) {
+                log.warn("PLANNED 주문 정리 실패 (원본 오류: {}): {}", e.getMessage(), cleanup.getMessage());
+            }
             throw e;
         }
 

@@ -7,6 +7,7 @@ import com.kista.domain.port.out.OrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -82,6 +83,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    @Transactional
     public void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
         // KIS 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
         repository.deleteAllByAccountIdAndTradeDateAndStatus(

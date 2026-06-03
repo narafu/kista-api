@@ -43,7 +43,15 @@ public class KisOrderAdapter implements KisOrderPort {
         body.put("ORD_SVR_DVSN_CD", "0");
 
         OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
-        String odno = (response != null && response.output() != null) ? response.output().odno() : null;
+
+        // rt_cd != "0" = KIS 비즈니스 오류 (HTTP 200이어도 실패) — msg_cd/msg1 포함해 예외 발생
+        if (response == null || !"0".equals(response.rtCd())) {
+            String code = response != null ? response.msgCd() : "N/A";
+            String msg  = response != null ? response.msg1()  : "응답 없음";
+            throw new RuntimeException("KIS 주문 실패 [" + code + "]: " + msg);
+        }
+
+        String odno = response.output() != null ? response.output().odno() : null;
 
         // id=null, accountId=null — KIS 응답 객체이므로 DB PK 없음, 호출자가 markPlaced()로 별도 처리
         return new Order(
@@ -83,7 +91,12 @@ public class KisOrderAdapter implements KisOrderPort {
         return KisResponseParser.formatPrice(type, price);
     }
 
-    record OrderResponse(@JsonProperty("output") Output output) {
+    record OrderResponse(
+            @JsonProperty("rt_cd")  String rtCd,
+            @JsonProperty("msg_cd") String msgCd,
+            @JsonProperty("msg1")   String msg1,
+            @JsonProperty("output") Output output
+    ) {
         record Output(@JsonProperty("ODNO") String odno) {}
     }
 }
