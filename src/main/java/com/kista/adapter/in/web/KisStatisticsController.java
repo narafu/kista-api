@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "통계", description = "KIS API 기반 계좌별 손익·체결·잔고·증거금·예약주문 조회")
+@Tag(name = "통계", description = "KIS API 기반 계좌별 손익·체결·잔고·증거금 조회")
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
