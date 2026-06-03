@@ -52,6 +52,7 @@ tail -100 logs/kista-api.log                                    # 최근 100줄
 ```
 # application-local.yml에 logging.file.name: {프로젝트루트}/logs/kista-api.log 설정됨
 # IntelliJ에서 앱 재시작 후부터 파일에 기록됨
+# IntelliJ MCP 플러그인: mcp__ide__getDiagnostics — 코드 오류/경고 확인 (런타임 로그 아님)
 
 ### Render 배포 모니터링
 ```bash
