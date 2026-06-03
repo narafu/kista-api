@@ -169,6 +169,11 @@ public class TradingCycleController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()); // 409 오늘 이미 실행
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); // 400 PRIVACY 등
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage()); // 404 사이클/계좌/사용자 없음
+        } catch (Exception e) {
+            log.warn("수동 실행 KIS API 오류: id={}, {}", id, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         }
     }
 

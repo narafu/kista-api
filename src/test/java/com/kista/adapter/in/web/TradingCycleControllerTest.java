@@ -111,6 +111,16 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void executeManually_kisApiError_returns503() throws Exception {
+        doThrow(new RuntimeException("KIS API 연결 오류"))
+                .when(manualExecute).execute(any(), any());
+
+        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isServiceUnavailable()); // 503
+    }
+
+    @Test
     void cancelExecute_success_returnsCancelResult() throws Exception {
         when(cancelOrder.cancelByCycle(any(), any()))
                 .thenReturn(new CancelOrderUseCase.CancelResult(2, 1));
