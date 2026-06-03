@@ -26,6 +26,9 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNewUserRegistered(NewUserRegisteredEvent event) {
+        if (event.user().status() == User.UserStatus.ACTIVE) {
+            return; // 관리자 시드 등 이미 승인된 사용자는 알림 불필요
+        }
         notifyNewUser(event.user());
     }
 

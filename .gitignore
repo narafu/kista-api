@@ -50,9 +50,6 @@ docker-compose.override.yml
 # Gradle 컴파일 바이너리 출력
 bin/
 
-# mcp
-.mcp.json
-
 # Node.js 의존성 폴더
 node_modules/
 
