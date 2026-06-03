@@ -1,24 +1,16 @@
 package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kista.adapter.in.web.dto.ReservationOrderRequest;
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.account.*;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.*;
-import com.kista.domain.model.kis.*;
-import com.kista.domain.model.admin.*;
-import com.kista.domain.port.in.CancelReservationOrderUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
-import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,14 +23,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(OrderController.class)
@@ -48,8 +35,6 @@ class OrderControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean JwtDecoder jwtDecoder;
-    @MockBean PlaceReservationOrderUseCase placeReservationOrderUseCase;
-    @MockBean CancelReservationOrderUseCase cancelReservationOrderUseCase;
     @MockBean GetNextOrdersUseCase getNextOrders;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -66,8 +51,6 @@ class OrderControllerTest {
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order), null);
     }
-
-    // --- /orders/preview (다음 주문 미리보기) ---
 
     @Test
     void next_returns_200_with_orders_and_position() throws Exception {
@@ -109,88 +92,5 @@ class OrderControllerTest {
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isServiceUnavailable());
-    }
-
-    // --- /reservation-orders (예약주문 접수) ---
-
-    @Test
-    void reservationOrder_returns_201_on_success() throws Exception {
-        ReservationOrderReceipt receipt = new ReservationOrderReceipt("ORD-001", "RSV-001", "20260519");
-        when(placeReservationOrderUseCase.place(eq(ACCOUNT_ID), any(), any())).thenReturn(receipt);
-
-        ReservationOrderRequest request = new ReservationOrderRequest(
-                Ticker.SOXL, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
-
-        mockMvc.perform(post("/api/accounts/" + ACCOUNT_ID + "/reservation-orders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isCreated());
-    }
-
-    @Test
-    void reservationOrder_returns_403_when_not_owner() throws Exception {
-        when(placeReservationOrderUseCase.place(any(), any(), any()))
-                .thenThrow(new SecurityException("접근 불가"));
-
-        ReservationOrderRequest request = new ReservationOrderRequest(
-                Ticker.SOXL, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"));
-
-        mockMvc.perform(post("/api/accounts/" + ACCOUNT_ID + "/reservation-orders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isForbidden());
-    }
-
-    // --- /reservation-orders/{reservationOrderId} (예약주문 취소) ---
-
-    @Test
-    void cancelReservationOrder_returns_204_on_success() throws Exception {
-        doNothing().when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
-
-        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
-                        .param("receiptDate", "20260610")
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isNoContent()); // 204
-    }
-
-    @Test
-    void cancelReservationOrder_returns_403_when_not_owner() throws Exception {
-        doThrow(new SecurityException("접근 불가"))
-                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
-
-        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
-                        .param("receiptDate", "20260610")
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isForbidden()); // 403
-    }
-
-    @Test
-    void cancelReservationOrder_returns_404_when_account_not_found() throws Exception {
-        doThrow(new NoSuchElementException("계좌 없음"))
-                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
-
-        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
-                        .param("receiptDate", "20260610")
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isNotFound()); // 404
-    }
-
-    @Test
-    void cancelReservationOrder_returns_503_on_kis_error() throws Exception {
-        doThrow(new RuntimeException("KIS API 오류"))
-                .when(cancelReservationOrderUseCase).cancel(any(), any(), any(), any());
-
-        mockMvc.perform(delete("/api/accounts/" + ACCOUNT_ID + "/reservation-orders/RSV-001")
-                        .param("receiptDate", "20260610")
-                        .with(authentication(mockAuth()))
-                        .with(csrf()))
-                .andExpect(status().isServiceUnavailable()); // 503
     }
 }

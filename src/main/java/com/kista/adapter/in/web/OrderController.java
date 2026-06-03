@@ -1,17 +1,12 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.NextOrdersResponse;
-import com.kista.adapter.in.web.dto.ReservationOrderRequest;
-import com.kista.domain.model.kis.ReservationOrderReceipt;
-import com.kista.domain.port.in.CancelReservationOrderUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
-import com.kista.domain.port.in.PlaceReservationOrderUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,68 +16,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-@Tag(name = "주문", description = "미국 해외주식 예약주문 접수 및 다음 주문 미리보기")
+@Tag(name = "주문", description = "다음 주문 미리보기")
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final PlaceReservationOrderUseCase placeReservationOrderUseCase;
-    private final CancelReservationOrderUseCase cancelReservationOrderUseCase;
     private final GetNextOrdersUseCase getNextOrders;
-
-    // 미국 해외주식 예약주문 접수 (TTTT3014U 매수 / TTTT3016U 매도)
-    @Operation(summary = "예약주문 접수", description = "KIS API를 통해 미국 해외주식 예약주문 접수. 매수: TTTT3014U, 매도: TTTT3016U.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "예약주문 접수 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
-    })
-    @PostMapping("/reservation-orders")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ReservationOrderReceipt placeReservationOrder(
-            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId,
-            @RequestBody @Valid ReservationOrderRequest request) {
-        try {
-            return placeReservationOrderUseCase.place(accountId, userId, request.toCommand());
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
-        }
-    }
-
-    // 예약주문 취소 (TTTT3017U) — RSVN_ORD_RCIT_DT + OVRS_RSVN_ODNO 필요
-    @Operation(summary = "예약주문 취소", description = "KIS API를 통해 접수된 예약주문을 취소합니다 (TTTT3017U). receiptDate는 예약주문접수일자(YYYYMMDD).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "예약주문 취소 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
-    })
-    @DeleteMapping("/reservation-orders/{reservationOrderId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void cancelReservationOrder(
-            @Parameter(description = "계좌 ID") @PathVariable UUID accountId,
-            @Parameter(description = "해외예약주문번호 (OVRS_RSVN_ODNO)") @PathVariable String reservationOrderId,
-            @Parameter(description = "예약주문접수일자 YYYYMMDD (RSVN_ORD_RCIT_DT)", example = "20250610")
-            @RequestParam String receiptDate,
-            @AuthenticationPrincipal UUID userId) {
-        try {
-            cancelReservationOrderUseCase.cancel(accountId, userId, reservationOrderId, receiptDate);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "KIS API 호출 실패: " + e.getMessage());
-        }
-    }
 
     // 다음 주문 미리보기 — DB 미저장, 휴장일·전략 무관하게 스케줄러 INSERT 대상을 강제 계산
     @Operation(

@@ -28,7 +28,8 @@ adapter/in/
                     - AdminUserController: 사용자 목록(GET) + 상태변경(PATCH /{id}/status — ACTIVE=승인·REJECTED=거절 통합) + 역할변경(PATCH /{id}/role) + 삭제(DELETE /{id})
                     - TradingCycleController: 사이클 CRUD + pause/resume + 수동실행 (GET/POST /api/accounts/{id}/trading-cycles, PUT/DELETE/PATCH /api/trading-cycles/{id}, POST /api/trading-cycles/{id}/execute)
                     - MetaController: enum 메타데이터 SSOT (GET /api/meta/**) — UI 라벨/설명/available tickers. Cache-Control max-age=1h
-                    - OrderController: 예약주문(POST /reservation-orders) + 다음 주문 미리보기(GET /orders/preview)
+                    - OrderController: 다음 주문 미리보기(GET /orders/preview)
+                    - MarketHolidayController: 월별 휴장일 조회(GET /api/market/holidays) + 현재 세션 조회(GET /api/market/session — DIRECT/BLOCKED)
                     - FidaOrderController: 서버 간 내부 주문 수신 (POST /api/internal/fida-orders, X-Internal-Token 인증)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService
@@ -108,8 +109,8 @@ domain      →  외부 의존 없음
 | `User.role` 변경 또는 `UserRole` 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + `JwtIssuerService` claim |
 | `AdminBootstrapProperties.kakaoIds` 변경 | `application.yml` + `.env.example` + `docker-compose.yml` + Render env |
 | 새 admin 엔드포인트 추가 (`AdminXxxController`) | `AdminXxxService` + `AdminXxxUseCase`(domain/port/in) + `AdminXxxControllerTest`(`@MockBean` 필수: JwtDecoder + 사용하는 모든 UseCase) |
-| `OrderController`에 엔드포인트 추가 | `GetNextOrdersUseCase` + `PlaceReservationOrderUseCase` **둘 다** `@MockBean` 필수 (`OrderControllerTest`) |
-| KIS 응답 도메인 모델(`Execution`/`PresentBalanceResult.Item`/`PeriodProfitResult.Item`/`DailyTransaction`/`ReservationOrder`) 필드 변경 | 해당 KIS 어댑터(`flatMap+tryParse` 매핑) + 어댑터 단위 테스트 fixture + `kista-ui/types/trade.ts` |
+| `OrderController`에 엔드포인트 추가 | `GetNextOrdersUseCase` `@MockBean` 필수 (`OrderControllerTest`) |
+| KIS 응답 도메인 모델(`Execution`/`PresentBalanceResult.Item`/`PeriodProfitResult.Item`/`DailyTransaction`) 필드 변경 | 해당 KIS 어댑터(`flatMap+tryParse` 매핑) + 어댑터 단위 테스트 fixture + `kista-ui/types/trade.ts` |
 | `User` 도메인 레코드에 필드 추가 | `UserEntity` + `UserPersistenceAdapter` + 모든 `new User(...)` 호출처 + **`UserResponse.from()` 반환값** + `kista-ui/types/user.ts` — `UserResponse` 누락 시 프론트엔드 API 응답에서 해당 필드 미포함 |
 | `privacy_trades_master` 스키마 변경 | `PrivacyTradeMasterEntity` + `PrivacyTradeDetailEntity`(cascade 영향) + V번호 마이그레이션 |
 | `privacy_trades_detail` 스키마 변경 | `PrivacyTradeDetailEntity` + V번호 마이그레이션 |

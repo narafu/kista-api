@@ -5,7 +5,6 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
-import com.kista.domain.port.out.KisReservationOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,6 @@ public class OrderCancelService implements CancelOrderUseCase {
 
     private final OrderPort orderPort;
     private final KisOrderPort kisOrderPort;
-    private final KisReservationOrderPort kisReservationOrderPort; // 예약주문 취소 (TTTT3017U)
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
 
@@ -80,16 +78,8 @@ public class OrderCancelService implements CancelOrderUseCase {
         orderPort.markCancelled(orderId);
     }
 
-    // kisOrderId에 "|" 포함이면 예약주문 — TTTT3017U 취소, 아니면 일반 주문 — TTTT1004U 취소
+    // 일반 주문 취소 (TTTT1004U)
     private void cancelViaKis(Order order, Account account) {
-        String kisOrderId = order.kisOrderId();
-        if (kisOrderId != null && kisOrderId.contains("|")) {
-            // 예약주문 취소: "{ovrs_rsvn_odno}|{receipt_date}" 파싱
-            String[] parts = kisOrderId.split("\\|", 2);
-            kisReservationOrderPort.cancelReservationOrder(parts[0], parts[1], account);
-        } else {
-            // 일반 LOC 주문 취소
-            kisOrderPort.cancel(order, account);
-        }
+        kisOrderPort.cancel(order, account);
     }
 }

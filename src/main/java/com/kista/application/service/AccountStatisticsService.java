@@ -6,7 +6,6 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.kis.ReservationOrder;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
@@ -17,7 +16,6 @@ import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
-import com.kista.domain.port.out.KisReservationOrderPort;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +43,6 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
-    private final KisReservationOrderPort kisReservationOrderPort;
     private final KisPricePort kisPricePort;
 
     @Override
@@ -92,14 +89,6 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         return kisDailyTransactionPort.getDailyTransactions(from, to, account);
-    }
-
-    @Override
-    public List<ReservationOrder> getReservationOrders(UUID accountId, UUID requesterId,
-                                                        LocalDate from, LocalDate to) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
-        return kisReservationOrderPort.getReservationOrders(from, to, account);
     }
 
     @Override

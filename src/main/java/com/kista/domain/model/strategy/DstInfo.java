@@ -14,23 +14,19 @@ public record DstInfo(
 
     // 수동 실행 시 주문 가능 시간대
     public enum MarketSession {
-        RESERVATION, // 10:00~22:30(DST)/23:30(비DST) — KIS 예약주문(LOC) 사용
-        DIRECT,      // 22:30/23:30~05:00/06:00 — 일반 LOC 주문 사용
-        BLOCKED      // 05:00/06:00~10:00 — 주문 불가 (예약 수신 전, 장 마감 후)
+        DIRECT,  // 프리마켓+정규장: 주문 가능 (DST: 17:00~05:00, 비DST: 18:00~06:00)
+        BLOCKED  // 장마감 후~프리마켓 전: 주문 불가 (DST: 05:00~17:00, 비DST: 06:00~18:00)
     }
 
     // 현재 KST 시각 기준 주문 가능 시간대 판단
     public MarketSession currentSession() {
         LocalTime t = LocalTime.now(KST);
-        // DST: 장마감 05:00, 장시작 22:30 / 비DST: 장마감 06:00, 장시작 23:30
-        LocalTime marketClose = isDst ? LocalTime.of(5, 0) : LocalTime.of(6, 0);
-        LocalTime marketOpen  = isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30);
-        // blocked: [marketClose, 10:00)
-        if (!t.isBefore(marketClose) && t.isBefore(LocalTime.of(10, 0))) return MarketSession.BLOCKED;
-        // direct: [00:00, marketClose) OR [marketOpen, 24:00)
-        if (t.isBefore(marketClose) || !t.isBefore(marketOpen)) return MarketSession.DIRECT;
-        // reservation: [10:00, marketOpen)
-        return MarketSession.RESERVATION;
+        // DST: 장마감 05:00, 프리마켓시작 17:00 / 비DST: 장마감 06:00, 프리마켓시작 18:00
+        LocalTime marketClose    = isDst ? LocalTime.of(5, 0)  : LocalTime.of(6, 0);
+        LocalTime premarketStart = isDst ? LocalTime.of(17, 0) : LocalTime.of(18, 0);
+        // blocked: [marketClose, premarketStart)
+        if (!t.isBefore(marketClose) && t.isBefore(premarketStart)) return MarketSession.BLOCKED;
+        return MarketSession.DIRECT;
     }
 
     private static final ZoneId NY  = ZoneId.of("America/New_York");
