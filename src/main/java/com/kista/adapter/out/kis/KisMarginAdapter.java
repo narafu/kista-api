@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Currency;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.port.out.KisMarginPort;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class KisMarginAdapter implements KisMarginPort {
         MarginResponse response = kisHttpClient.get(PATH, headers, params, MarginResponse.class);
 
         if (response == null || response.output() == null) {
-            return Collections.emptyList();
+            throw new KisApiException("증거금 조회 응답 없음", null);
         }
 
         // natn_name == "미국" 행만 필터링 — crcy_cd 기준 시 동일 itgr_ord_psbl_amt 중복 행 발생

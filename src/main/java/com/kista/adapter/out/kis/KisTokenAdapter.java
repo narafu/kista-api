@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.KisTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
@@ -85,27 +86,33 @@ public class KisTokenAdapter implements KisTokenPort {
     }
 
     private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        Map<String, String> body = Map.of(
-                "grant_type", "client_credentials",
-                "appkey", appKey,
-                "appsecret", appSecret
-        );
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            Map<String, String> body = Map.of(
+                    "grant_type", "client_credentials",
+                    "appkey", appKey,
+                    "appsecret", appSecret
+            );
 
-        // KIS OAuth 토큰 발급 요청 (RestTemplate 직접 호출 — KisHttpClient 경유 불가)
-        TokenResponse response = kisRestTemplate.exchange(
-                kisBaseUrl + "/oauth2/tokenP",
-                HttpMethod.POST,
-                new HttpEntity<>(body, headers),
-                TokenResponse.class
-        ).getBody();
+            // KIS OAuth 토큰 발급 요청 (RestTemplate 직접 호출 — KisHttpClient 경유 불가)
+            TokenResponse response = kisRestTemplate.exchange(
+                    kisBaseUrl + "/oauth2/tokenP",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    TokenResponse.class
+            ).getBody();
 
-        OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
+            OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
 
-        // 발급된 토큰을 account_id 기준으로 DB에 upsert
-        kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-        return response.accessToken();
+            // 발급된 토큰을 account_id 기준으로 DB에 upsert
+            kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+            return response.accessToken();
+        } catch (Account.InvalidKisKeyException e) {
+            throw e; // KIS 키 검증 실패는 그대로 전파
+        } catch (Exception e) {
+            throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
+        }
     }
 
     // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지

@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisPricePort;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,7 @@ public class KisPriceAdapter implements KisPricePort {
         PriceResponse response = kisHttpClient.get(SINGLE_PATH, headers, params, PriceResponse.class);
 
         if (response == null || response.output() == null) {
-            throw new IllegalStateException("가격 조회 실패: " + ticker);
+            throw new KisApiException("가격 조회 응답 없음: " + ticker, null);
         }
         // last(현재가) 우선, 비어있으면 base(전일종가) fallback
         String last = response.output().last();
@@ -51,7 +52,7 @@ public class KisPriceAdapter implements KisPricePort {
                      : (base != null && !base.isBlank()) ? base
                      : null;
         if (price == null) {
-            throw new IllegalStateException("가격 조회 실패(last·base 모두 빈값): " + ticker);
+            throw new KisApiException("가격 조회 응답 없음(last·base 모두 빈값): " + ticker, null);
         }
         if (last == null || last.isBlank()) {
             log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
