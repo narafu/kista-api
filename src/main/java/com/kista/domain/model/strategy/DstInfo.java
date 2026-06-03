@@ -2,6 +2,7 @@ package com.kista.domain.model.strategy;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -58,7 +59,11 @@ public record DstInfo(
         ZonedDateTime now = ZonedDateTime.now(KST);
         boolean isDst = NY.getRules().isDaylightSavings(now.toInstant());
         LocalTime postTime = isDst ? LocalTime.of(5, 10) : LocalTime.of(6, 10);
-        Instant postClose = now.toLocalDate().atTime(postTime).atZone(KST).toInstant();
+        // postTime이 이미 지났으면 내일 날짜 사용 (같은 날 05:10 KST 이후 호출 시 과거 Instant 방지)
+        LocalDate targetDate = now.toLocalTime().isBefore(postTime)
+                ? now.toLocalDate()
+                : now.toLocalDate().plusDays(1);
+        Instant postClose = targetDate.atTime(postTime).atZone(KST).toInstant();
         return new DstInfo(isDst, Instant.now().minusMillis(1), postClose);
     }
 }

@@ -9,8 +9,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -29,18 +27,29 @@ public class KisOrderAdapter implements KisOrderPort {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
         HttpHeaders headers = kisHttpClient.buildHeaders(trId, account);
 
-        Map<String, String> body = new LinkedHashMap<>();
-        body.put("CANO", account.accountNo());
-        body.put("ACNT_PRDT_CD", account.kisAccountType());
-        body.put("OVRS_EXCG_CD", order.ticker().getExchangeCode().name());
-        body.put("PDNO", order.ticker().name());
-        body.put("ORD_DVSN", resolveOrderDvsn(order.orderType()));
-        body.put("ORD_QTY", String.valueOf(order.quantity()));
-        body.put("OVRS_ORD_UNPR", resolvePrice(order.orderType(), order.price()));
-        body.put("CTAC_TLNO", "");       // 연락전화번호 (빈값 허용)
-        body.put("MGCO_APTM_ODNO", ""); // 운용사지정주문번호 (빈값 허용)
-        body.put("SLL_TYPE", order.direction() == Order.OrderDirection.SELL ? "00" : ""); // 매도=00, 매수=빈값
-        body.put("ORD_SVR_DVSN_CD", "0");
+        // autotrade 성공 패턴과 동일한 필드 순서 및 raw JSON String 포맷으로 전송
+        String body = String.format("""
+                {
+                    "ORD_SVR_DVSN_CD": "0",
+                    "CANO": "%s",
+                    "ACNT_PRDT_CD": "%s",
+                    "ORD_DVSN": "%s",
+                    "OVRS_EXCG_CD": "%s",
+                    "PDNO": "%s",
+                    "OVRS_ORD_UNPR": "%s",
+                    "ORD_QTY": "%s",
+                    "SLL_TYPE": "%s",
+                    "CTAC_TLNO": "",
+                    "MGCO_APTM_ODNO": ""
+                }""",
+                account.accountNo(),
+                account.kisAccountType(),
+                resolveOrderDvsn(order.orderType()),
+                order.ticker().getExchangeCode().name(),
+                order.ticker().name(),
+                resolvePrice(order.orderType(), order.price()),
+                order.quantity(),
+                order.direction() == Order.OrderDirection.SELL ? "00" : "");
 
         OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
 
@@ -64,17 +73,25 @@ public class KisOrderAdapter implements KisOrderPort {
     public void cancel(Order order, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(CANCEL_TR_ID, account);
 
-        Map<String, String> body = new LinkedHashMap<>();
-        body.put("CANO", account.accountNo());
-        body.put("ACNT_PRDT_CD", account.kisAccountType());
-        body.put("OVRS_EXCG_CD", order.ticker().getExchangeCode().name());
-        body.put("PDNO", order.ticker().name());
-        body.put("ORGN_ODNO", order.kisOrderId());  // 원주문번호 (PLACED 시 KIS가 부여)
-        body.put("RVSE_CNCL_DVSN_CD", "02");        // 02=취소 (01=정정)
-        body.put("ORD_QTY", "0");                    // 취소 시 0 고정
-        body.put("OVRS_ORD_UNPR", "0");              // 취소 시 0 고정
-        body.put("MGCO_APTM_ODNO", "");
-        body.put("ORD_SVR_DVSN_CD", "0");
+        // place()와 동일하게 raw JSON String으로 전송 — Map+Jackson 직렬화 시 EGW00202 발생
+        String body = String.format("""
+                {
+                    "CANO": "%s",
+                    "ACNT_PRDT_CD": "%s",
+                    "OVRS_EXCG_CD": "%s",
+                    "PDNO": "%s",
+                    "ORGN_ODNO": "%s",
+                    "RVSE_CNCL_DVSN_CD": "02",
+                    "ORD_QTY": "0",
+                    "OVRS_ORD_UNPR": "0",
+                    "MGCO_APTM_ODNO": "",
+                    "ORD_SVR_DVSN_CD": "0"
+                }""",
+                account.accountNo(),
+                account.kisAccountType(),
+                order.ticker().getExchangeCode().name(),
+                order.ticker().name(),
+                order.kisOrderId());
 
         kisHttpClient.post(CANCEL_PATH, headers, body, Void.class);
     }

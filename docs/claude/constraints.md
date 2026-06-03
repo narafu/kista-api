@@ -11,42 +11,6 @@
 - 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(domain.port.out) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
 - 참고: `KisTokenAdapter`(adapter.out.kis) → `KisTokenCachePort` → `KisTokenPersistenceAdapter`(persistence.kistoken)
 
-### RESTful API 설계 원칙
-
-**날짜 범위 쿼리 파라미터 컨벤션**
-- 모든 날짜 범위 파라미터는 `from` / `to` (LocalDate, ISO 형식 `YYYY-MM-DD`) 사용 — `startDate/endDate`, `days` 사용 금지
-- 기본값: `from = LocalDate.now().minusDays(30)`, `to = LocalDate.now()` (컨트롤러에서 null 체크)
-- kista-ui: `buildDateQuery({ from, to })` 헬퍼 사용 (`lib/api/trades.ts`)
-
-**URI 규칙**
-- 리소스 식별: 명사 복수형 — `/accounts`, `/trading-cycles`, `/orders`
-- 계층 표현: 소속 관계 `/accounts/{id}/trading-cycles` — 독립 리소스는 루트 수준
-- 동사 URI 금지: `/getAccount`, `/createOrder` 형태 사용 불가 — HTTP 메서드로 표현
-- 상태 전이 예외: `/trading-cycles/{id}/pause`, `/trading-cycles/{id}/resume` — PATCH + 서브 경로 패턴
-
-**HTTP 메서드**
-- `GET`: 안전·멱등 — 상태 변경 사이드이펙트 금지
-- `POST`: 생성 (비멱등) — 응답 201 + `Location` 헤더
-- `PUT`: 전체 교체 (멱등)
-- `PATCH`: 부분 수정 — pause/resume/status 변경
-- `DELETE`: 삭제 (멱등) — 성공 시 204 No Content
-
-**HTTP 상태 코드 (이 프로젝트 매핑)**
-- `200`: 조회·수정 성공
-- `201`: 생성 성공 (`Location` 헤더 포함)
-- `204`: 삭제 성공 (바디 없음)
-- `400`: `IllegalArgumentException` — 잘못된 파라미터
-- `401`: 인증 없음 (JWT 미포함·만료)
-- `403`: `SecurityException` — 소유권 불일치·권한 없음
-- `404`: `NoSuchElementException` — 리소스 없음
-- `409`: `PrivacyTradeConflictException` — 중복·충돌
-- `422`: `InvalidKisKeyException` — KIS 자격증명 검증 실패
-- `429`: `CooldownException` — 재신청 쿨다운
-- `503`: KIS API 오류 — 외부 서비스 불가
-
-**응답 형식**
-- 도메인 record 직접 반환 금지 → `XxxResponse.from(domain)` DTO 사용 (예외: `StatisticsController`는 KIS live 모델 그대로 반환 — kista-ui normalizer 필요)
-- 오류 응답: `GlobalExceptionHandler`가 일관된 형식으로 처리 — 컨트롤러에서 별도 catch/rethrow 불필요
 
 ### GlobalExceptionHandler 자동 예외 처리
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `PrivacyTradeConflictException` → 409 — Controller에서 별도 catch/rethrow 불필요 (단, `SecurityException`→403, KIS 오류→503은 컨트롤러에서 직접 처리)
@@ -112,17 +76,6 @@
 - **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `tradingCycle.ticker()` 사용
 - **`symbolName: String`은 유지** — KIS `ovrs_item_name`/`prdt_name`은 enum 후보 아님
 
-### Swagger 개발 도구
-- `OpenApiConfig.java` (`adapter/in/web/security/`) — Bearer JWT SecurityScheme 전역 등록 (자물쇠 버튼)
-- `@SecurityRequirements` (빈 어노테이션) — 특정 엔드포인트의 자물쇠 아이콘 제거
-- `DevAuthController.java` (`adapter/in/web/`, `@Profile("local")`) — 로컬 전용 dev-token 발급
-- `@Schema` 추가 위치: DTO (`adapter/in/web/dto/`)에만 — `domain/model/`은 ArchUnit이 막지 않아도 "외부 의존성 0" 원칙으로 금지 (StatisticsController가 반환하는 PeriodProfitResult 등 도메인 객체는 springdoc 자동 introspection에 맡김)
-- Java record에서 `@Schema`는 생성자 파라미터(필드 선언)에 직접 붙임
-- 컨트롤러 클래스에 `@Tag(name="...", description="...")` — Swagger UI 그룹 레이블
-  - `POST /api/auth/dev-token` → 고정 UUID `00000000-0000-0000-0000-000000000001` 테스트 유저 자동 생성·승인 + JWT 반환
-  - 응답 JSON: `{"accessToken":"...","tokenType":"bearer","expiresIn":604800}` — 필드명 `accessToken` (`token` 아님)
-  - dev-token 서명: `jwt.signing-key`(application-local.yml, gitignored) EC 개인키로 ES256 서명 — JwtIssuerService 사용
-  - 카카오 OAuth 직접 처리
 
 ### Virtual Thread
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
@@ -200,10 +153,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### Lombok 패턴
-- `@Slf4j` + `@RequiredArgsConstructor` 표준 — 수동 로거/생성자 작성 금지
-- package-private 타입을 생성자에서 참조 시: `@RequiredArgsConstructor(access = AccessLevel.PACKAGE)` (ClassEscapesItsScope 회피)
-- `@Value` 필드를 Lombok 생성자에 포함하려면 `lombok.config`에 `lombok.copyableAnnotations += org.springframework.beans.factory.annotation.Value` 필요 (이미 설정됨)
-- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치시킬 것 — 불일치 시 NoUniqueBeanDefinitionException
+- `@Slf4j` + `@RequiredArgsConstructor` 표준
+- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치 — 불일치 시 NoUniqueBeanDefinitionException
 
 ### AES-256 암호화 위치 (V2)
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화
@@ -217,9 +168,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
 
 ### Spring Security Filter 이중 등록 방지
-- `@Component` Filter를 `SecurityFilterChain.addFilterBefore()`로 추가 시 서블릿 필터 체인에도 자동 등록되어 이중 실행
-- `SecurityConfig`에 `FilterRegistrationBean<MyFilter>.setEnabled(false)` 빈 선언으로 비활성화 (현재 `JwtAuthFilter`, `InternalTokenAuthFilter` 모두 적용됨)
-- `SecurityConfig`에 새 Filter 주입 필드 추가 시 `@Import(SecurityConfig.class)` 사용하는 **모든** `@WebMvcTest` 테스트에 해당 Filter 클래스도 `@Import` 목록에 추가 필수 — 누락 시 `NoSuchBeanDefinitionException`으로 컨텍스트 실패 (실패가 캐시돼 무관한 테스트까지 `IllegalStateException` 전파)
+- `@Component` Filter + `addFilterBefore()` 조합 시 `FilterRegistrationBean.setEnabled(false)` 필수 (이중 실행 방지)
+- `SecurityConfig`에 새 Filter 추가 시 `@Import(SecurityConfig.class)` 사용하는 **모든** `@WebMvcTest`에도 해당 Filter `@Import` 필수 — 누락 시 `NoSuchBeanDefinitionException` → 다른 테스트까지 `IllegalStateException` 전파
 
 ### 서버 간 내부 인증 (InternalTokenAuthFilter)
 - `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (미설정 시 항상 401)
@@ -235,9 +185,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `InvalidKisKeyException`(domain/model/) → Controller에서 422(UNPROCESSABLE_ENTITY) 변환 — register/update 공통 적용
 
 ### @EnableJpaAuditing 위치
-- `@EnableJpaAuditing`을 `@SpringBootApplication`에 두면 `@WebMvcTest` 슬라이스 테스트가 `BeanCreationException` 실패 — JPA 인프라 없음
-- 반드시 별도 `@Configuration` 클래스로 분리: `adapter/out/persistence/JpaAuditingConfig.java`
-- `@WebMvcTest`는 persistence 패키지의 `@Configuration`을 로드하지 않아 충돌 없음
+- `@SpringBootApplication` 아닌 별도 `JpaAuditingConfig.java` (`adapter/out/persistence/`)에 선언 — 아니면 `@WebMvcTest` `BeanCreationException` 발생
 
 ### Lombok @MappedSuperclass 상속 주의
 - `@MappedSuperclass` 부모 클래스 필드의 getter/setter는 서브클래스의 `@Getter`/`@Setter`로 생성되지 않음
@@ -277,12 +225,6 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
 
-### trading_cycle 테이블 (V11→V38 이력)
-- V11: `accounts.strategy`/`strategy_status` → `strategies` 테이블로 분리 (account:cycle = 1:N 대비 설계)
-- V38: `strategies` → `trading_cycle`으로 리네임 + `initial_usd_deposit` 컬럼 추가
-- `TradingCyclePersistenceAdapter`: `toDomain`/`toEntity` 매핑, `initialUsdDeposit` 포함
-- `findAllActive()`: native SQL, `JOIN trading_cycle tc ON tc.account_id = a.id WHERE ... AND tc.status = 'ACTIVE'`
-- `trading_cycle_history` (V39): 사이클별 일별 스냅샷 — `TradingService.execute()` 종료 시 1건 append. `DataIntegrityViolationException` catch+log.warn으로 같은 날 중복 실행 무시
 
 ### reapply 쿨다운 정책
 - PENDING 사용자: 1시간마다 재신청 가능 (누락 대비 알림 재발송, 무한 요청 방지)
@@ -332,10 +274,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — 의미 추적을 위해 `TradeDateConverter` 헬퍼 경유 필수
 - `com.kista.common` 패키지: 유틸리티 헬퍼 위치 (도메인 무관, 어댑터·서비스 공용)
 
-### 소프트 삭제(Soft Delete) 패턴 (V43 이후)
-- 대상 테이블: `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼으로 논리 삭제
-- Entity: `@SQLRestriction("deleted_at IS NULL")` 선언 → JPQL 자동 필터 (Hibernate 6)
+### 소프트 삭제(Soft Delete) 패턴
+- `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언
 - **`nativeQuery = true` 쿼리는 `@SQLRestriction` 미적용** — `AND tc.deleted_at IS NULL` 수동 명시 필수 (`findAllActiveCycles` 등)
-- JPA Repository: `@Modifying @Query("UPDATE XxxEntity SET deletedAt = :now WHERE id = :id")` 패턴
 - Cascade 순서: 서비스 레이어에서 사이클 → 계좌 → 사용자 순으로 명시 처리 (DB FK CASCADE 미작동)
-- 새 엔티티에 소프트 삭제 추가 시: Entity `@SQLRestriction` + `deleted_at` 필드 + V마이그레이션 `ALTER TABLE ... ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE` + Repository soft delete 쿼리 + Adapter 구현

@@ -20,7 +20,6 @@ import org.springframework.http.HttpHeaders;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,14 +60,13 @@ class KisOrderAdapterTest {
                 new KisOrderAdapter.OrderResponse("0", "KISC0000", "정상처리", new KisOrderAdapter.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
 
-        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         adapter.place(order, ACCOUNT);
 
         verify(kisHttpClient).buildHeaders(eq("TTTT1002U"), eq(ACCOUNT));
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
-        Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("ORD_DVSN")).isEqualTo("34");
-        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("25.50");
+        assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"34\"");
+        assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"25.50\"");
     }
 
     @Test
@@ -80,12 +78,12 @@ class KisOrderAdapterTest {
                 new KisOrderAdapter.OrderResponse("0", "KISC0000", "정상처리", new KisOrderAdapter.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
 
-        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         adapter.place(order, ACCOUNT);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
-        assertThat(bodyCaptor.getValue().get("ORD_DVSN")).isEqualTo("33");
-        assertThat(bodyCaptor.getValue().get("OVRS_ORD_UNPR")).isEqualTo("0");
+        assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"33\"");
+        assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"0\"");
     }
 
     @Test
@@ -98,12 +96,12 @@ class KisOrderAdapterTest {
                 new KisOrderAdapter.OrderResponse("0", "KISC0000", "정상처리", new KisOrderAdapter.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
 
-        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         adapter.place(order, ACCOUNT);
 
         verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
-        assertThat(bodyCaptor.getValue().get("ORD_DVSN")).isEqualTo("00");
-        assertThat(bodyCaptor.getValue().get("OVRS_ORD_UNPR")).isEqualTo("25.50");
+        assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"00\"");
+        assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"25.50\"");
     }
 
     @Test
@@ -157,18 +155,18 @@ class KisOrderAdapterTest {
                 Order.OrderStatus.PLACED, "ORD_123");
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
-        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         adapter.cancel(order, ACCOUNT);
 
         verify(kisHttpClient).buildHeaders(eq("TTTT1004U"), eq(ACCOUNT));
         verify(kisHttpClient).post(
                 eq("/uapi/overseas-stock/v1/trading/order-rvsecncl"),
                 any(), bodyCaptor.capture(), any());
-        Map<?, ?> body = bodyCaptor.getValue();
-        assertThat(body.get("RVSE_CNCL_DVSN_CD")).isEqualTo("02");
-        assertThat(body.get("ORGN_ODNO")).isEqualTo("ORD_123");
-        assertThat(body.get("ORD_QTY")).isEqualTo("0");
-        assertThat(body.get("OVRS_ORD_UNPR")).isEqualTo("0");
+        String body = bodyCaptor.getValue();
+        assertThat(body).contains("\"RVSE_CNCL_DVSN_CD\": \"02\"");
+        assertThat(body).contains("\"ORGN_ODNO\": \"ORD_123\"");
+        assertThat(body).contains("\"ORD_QTY\": \"0\"");
+        assertThat(body).contains("\"OVRS_ORD_UNPR\": \"0\"");
     }
 
     @Test
