@@ -47,6 +47,9 @@ docker compose build <service> && docker compose up -d --force-recreate <service
 
 ### Render 배포 모니터링
 ```bash
+# 운영 로그 실시간 조회 (render-cli)
+render logs                                                     # kista-api 운영 로그
+
 # 헬스 체크
 curl https://kista-api.onrender.com/actuator/health
 # 배포 실패 진단: mcp__render__list_deploys → status 확인 후 아래 에러 로그 조회
@@ -56,6 +59,12 @@ curl https://kista-api.onrender.com/actuator/health
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
 # 로컬 Docker 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB) — kista-kista-api-1 아님
 # 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
+```
+
+### kista-ui 운영 로그 조회
+```bash
+# 운영 로그 실시간 조회 (vercel-cli)
+vercel logs                                                     # kista-ui 운영 로그
 ```
 
 ### kista-ui TypeScript 타입 체크 (WSL 환경)

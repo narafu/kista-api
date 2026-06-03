@@ -205,11 +205,14 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "예약:" + account.nickname());
         savePlannedOrders(calc.orders(), account);
 
-        // 각 PLANNED 주문을 KIS 예약주문(LOC)으로 접수 → PLACED 기록
+        // 각 PLANNED 주문을 KIS 예약주문(지정가)으로 접수 → PLACED 기록
+        // 예약주문 API(TTTT3014U)는 지정가(LIMIT, ORD_DVSN=00)만 지원 — LOC/MOC 불가(EGW00202)
+        // LOC → LIMIT (동일 가격 유지), MOC → LIMIT (현재가 기준)
         List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
         for (Order p : planned) {
+            BigDecimal reservationPrice = p.orderType() == Order.OrderType.MOC ? price : p.price();
             ReservationOrderCommand cmd = new ReservationOrderCommand(
-                    p.ticker(), p.direction(), p.quantity(), p.price(), p.orderType());
+                    p.ticker(), p.direction(), p.quantity(), reservationPrice, Order.OrderType.LIMIT);
             ReservationOrderReceipt receipt = kisReservationOrderPort.placeReservationOrder(cmd, account);
             orderPort.markPlaced(p.id(), receipt.reservationOrderId() + "|" + receipt.receiptDate());
         }
