@@ -21,6 +21,17 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - 생성 성공(201): `Location` 헤더에 신규 리소스 URI 포함
 - 행위 표현 예외: `/pause`, `/resume` 등 상태 전이는 PATCH + 서브 리소스 경로 허용
 
+## 빠른 시작
+
+```bash
+./gradlew bootRun --args='--spring.profiles.active=local'  # 로컬 실행
+./gradlew test                                              # 전체 테스트
+./gradlew compileJava                                       # 컴파일 검증
+docker compose up -d postgres                               # DB만 기동
+```
+
+필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격)
+
 ## 작업 방식
 
 - 독립적으로 병렬 처리 가능한 작업은 서브에이전트를 적극 활용

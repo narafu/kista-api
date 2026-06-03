@@ -76,17 +76,10 @@ curl https://kista-api.onrender.com/actuator/health
 vercel logs                                                     # kista-ui 운영 로그
 ```
 
-### kista-ui TypeScript 타입 체크 (WSL 환경)
-```bash
-# npm run build는 lightningcss native module 오류로 WSL에서 실패
-# 타입 오류 확인은 tsc 직접 사용
-bash -c "cd /mnt/d/src/study/kista/kista-ui && npx tsc --noEmit"
-```
-
 ### kista-ui URL 변경 연동 (멀티 레포)
 # kista-api URL 변경 후 kista-ui에 전달하는 방법:
 # 1) 이 대화의 변경 목록을 kista-ui 세션에 붙여넣기 (가장 빠름)
-# 2) kista-ui 세션에서: git -C /Users/narafu/workspace/kista/kista-api diff HEAD~1
+# 2) kista-ui 세션에서: git -C /Users/phs/workspace/kista/kista-api diff HEAD~1
 # kista-api 세션에서 절대경로로 kista-ui 파일 직접 편집 가능하나 git 커밋은 kista-ui 세션에서 따로 수행
 
 ### Git 구조 (Claude Code 세션 필수 지식)
@@ -141,26 +134,6 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - 인증이 필요한 MCP는 `stdio` 타입 + `sh -c "npx mcp-remote <url> --header \"Authorization: Bearer ${TOKEN_VAR}\""` 패턴, 토큰은 `~/.zshrc`에 `export TOKEN_VAR=...`
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
-
-### Supabase 운영 DB → 로컬 DB 데이터 마이그레이션
-# 접속 정보 확인: supabase db dump --linked --dry-run (PGHOST/PGUSER/PGPASSWORD 출력)
-# cli_login_postgres 유저는 SET ROLE postgres 없이 테이블 접근 불가
-# COPY TO FILE 서버 권한 없음 → COPY TO STDOUT + -q(quiet) 조합 사용
-# pg_dump 버전 불일치(로컬 pg_dump < Supabase 서버) 시 psql+COPY 패턴으로 대체
-```bash
-# 운영 → CSV 내보내기
-docker exec kista-api-postgres-1 bash -c "
-  PGPASSWORD='<pw>' psql -h <supabase_host> -p 5432 \
-    -U 'cli_login_postgres.<ref_id>' -d postgres -q \
-    -c 'SET ROLE postgres; COPY public.<table> TO STDOUT CSV HEADER' \
-    > /tmp/<table>.csv"
-
-# 로컬 복원 (FK 종속 테이블 먼저 TRUNCATE)
-docker exec kista-api-postgres-1 psql -U kista -d kistadb \
-  -c "TRUNCATE TABLE <child>, <parent> CASCADE;"
-docker exec kista-api-postgres-1 psql -U kista -d kistadb \
-  -c "\COPY public.<table> FROM '/tmp/<table>.csv' CSV HEADER"
-```
 
 ### git commit 메시지 — Bash 도구 사용 시
 # @'...'@ 히어스트링은 PowerShell 전용 — Bash 도구에서 쓰면 @ 가 메시지 앞뒤에 붙음

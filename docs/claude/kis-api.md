@@ -96,7 +96,7 @@
 - 어댑터 내부에 파싱 헬퍼 직접 정의 금지 — KisResponseParser 사용
 - `parseIntSafe`: `(int) Double.parseDouble()` 경유 — KIS 응답이 `"5.0"` 같은 소수 형식일 수 있음
 - `KisAccountAdapter.fetchMargin()`: KisMarginPort 주입 경유 (직접 TTTC2101R 호출 아님) — USD 행 필터는 `currency()` 필드 기준
-- `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` / `foreignBalance()` — KIS API 필드명(`crcy_cd` 등) 아님
+- `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` — KIS API 필드명(`crcy_cd` 등) 아님
 
 ### 복수종목 현재가 (KisPriceAdapter)
 - `getPrices(List<Ticker>, Account)` — 복수검색 API(`HHDFS76220000`, `/uapi/overseas-price/v1/quotations/multprice`) 단건 호출로 구현
