@@ -82,6 +82,13 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // KIS 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
+        repository.deleteAllByAccountIdAndTradeDateAndStatus(
+                accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED);
+    }
+
+    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         OrderEntity e = repository.findById(orderId)

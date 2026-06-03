@@ -13,6 +13,10 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByAccountIdAndTradeDateAndStatus(
             UUID accountId, LocalDate tradeDate, Order.OrderStatus status);
 
+    // KIS 접수 실패 시 누적 PLANNED 주문 정리
+    void deleteAllByAccountIdAndTradeDateAndStatus(
+            UUID accountId, LocalDate tradeDate, Order.OrderStatus status);
+
     // 기간+종목 필터 (대시보드용)
     List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 

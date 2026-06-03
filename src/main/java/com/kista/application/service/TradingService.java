@@ -150,9 +150,16 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         CycleState state = phaseA(new BatchContext(cycle, account, user), startPrices, null, today);
         if (state == null) return List.of(); // 휴장 또는 잔고 부족
 
-        List<Order> placed = state.isManualCorrection()
-                ? executeCorrectionOrders(today, state)
-                : executePlannedOrders(today, account);
+        // KIS 접수 실패 시 PLANNED 주문 정리 — 재시도 때 중복 누적 방지
+        List<Order> placed;
+        try {
+            placed = state.isManualCorrection()
+                    ? executeCorrectionOrders(today, state)
+                    : executePlannedOrders(today, account);
+        } catch (Exception e) {
+            orderPort.deletePlannedByAccountAndDate(account.id(), today);
+            throw e;
+        }
 
         CyclePlacedState placedState = new CyclePlacedState(state, placed);
         Thread.startVirtualThread(() -> {

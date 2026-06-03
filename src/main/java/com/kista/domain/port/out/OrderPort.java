@@ -30,6 +30,9 @@ public interface OrderPort {
     // 단건 조회 (취소 전 상태 확인용)
     Optional<Order> findById(UUID orderId);
 
+    // KIS 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
+    void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+
     // 취소 완료 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
 }
