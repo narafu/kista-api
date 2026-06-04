@@ -16,8 +16,6 @@ import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.UserPort;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
-import com.kista.domain.strategy.PrivacyTradingStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,18 +39,18 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final KisPricePort kisPricePort;                   // 현재 주가 조회
     private final KisOrderPort kisOrderPort;                   // 주문 접수
     private final KisExecutionPort kisExecutionPort;           // 당일 체결 내역 조회
-    private final InfiniteTradingStrategy infiniteStrategy;    // INFINITE 전략 — 수량·가격 계산
-    private final PrivacyTradingStrategy privacyStrategy;      // PRIVACY 전략 — 기준 매매표 적용
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
     private final UserNotificationPort userNotificationPort;   // 사용자별 텔레그램 알림 (매매 결과)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
-    private final TradingCycleHistoryPort cycleHistoryPort; // 사이클별 일별 스냅샷 저장
-    private final AccountPort accountPort;         // preview 소유권 검증
-    private final TradingCyclePort cyclePort;      // preview ACTIVE 사이클 조회
+    private final TradingCycleHistoryPort cycleHistoryPort;    // 사이클별 일별 스냅샷 저장
+    private final AccountPort accountPort;                     // preview 소유권 검증
+    private final TradingCyclePort cyclePort;                  // preview ACTIVE 사이클 조회
     private final PrivacyTradePort privacyTradePort;
-    private final KisMarginPort kisMarginPort;                   // MAX 재등록 시 USD 잔고 조회
-    private final UserPort userPort;                             // 수동 실행 시 사용자 조회
+    private final KisMarginPort kisMarginPort;                 // MAX 재등록 시 USD 잔고 조회
+    private final UserPort userPort;                           // 수동 실행 시 사용자 조회
+    private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
+    private final TradingOrderPlanner orderPlanner;            // 전략 계산 + 주문 저장 헬퍼
 
     // Phase A 결과: 사이클별 잔고·전략 계산 상태
     private record CycleState(
@@ -87,7 +85,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 : LocalDate.now().plusDays(1);
 
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
-        BalanceLoad load = tryLoadBalance(cycle);
+        TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(cycle);
         if (load.isSkip()) {
             return new Result(today, null, List.of(), load.skipReason());
         }
@@ -101,7 +99,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price);
                     yield new Result(today, position, List.of(), SkipReason.INSUFFICIENT_BALANCE);
                 }
-                InfiniteCalc calc = calcInfinite(balance, cycle, price, today, "preview:" + accountId);
+                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, "preview:" + accountId);
                 yield new Result(today, calc.position(), calc.orders(), null);
             }
             case PRIVACY -> {
@@ -110,7 +108,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 if (base == null) {
                     yield new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
                 }
-                List<Order> orders = calcPrivacy(balance, cycle.initialUsdDeposit(), base);
+                List<Order> orders = orderPlanner.calcPrivacy(balance, cycle.initialUsdDeposit(), base);
                 yield new Result(today, null, orders, null);
             }
         };
@@ -291,7 +289,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         if (!isMarketOpen(today)) return null;
 
         // 2. 잔고 로드
-        BalanceLoad load = loadBalanceOrThrow(cycle);
+        TradingBalanceLoader.BalanceLoad load = balanceLoader.loadBalanceOrThrow(cycle);
         if (load.skipReason() == SkipReason.INSUFFICIENT_BALANCE) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
             notifyPort.notifyInsufficientBalance(account, load.balance(), cycle.ticker());
@@ -315,8 +313,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
                     yield null;
                 }
-                InfiniteCalc calc = calcInfinite(balance, cycle, price, today, account.nickname());
-                savePlannedOrders(calc.orders(), account);
+                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, account.nickname());
+                orderPlanner.savePlannedOrders(calc.orders(), account);
                 yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null, false);
             }
             case PRIVACY -> {
@@ -324,8 +322,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                     log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", account.nickname());
                     yield null;
                 }
-                List<Order> privacyOrders = calcPrivacy(balance, cycle.initialUsdDeposit(), privacyBase);
-                savePlannedOrders(privacyOrders, account);
+                List<Order> privacyOrders = orderPlanner.calcPrivacy(balance, cycle.initialUsdDeposit(), privacyBase);
+                orderPlanner.savePlannedOrders(privacyOrders, account);
                 yield new CycleState(ctx, balance, null, null, null, privacyBase, false);
             }
         };
@@ -377,72 +375,6 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         return prices;
     }
 
-    // 이미 계산된 templates를 orders에 PLANNED 상태로 저장
-    private void savePlannedOrders(List<Order> templates, Account account) {
-        List<Order> planned = templates.stream()
-                .map(o -> Order.plan(o, account.id()))
-                .toList();
-        orderPort.saveAll(planned);
-        log.info("[{}] 계획 주문 {}건 저장 (PLANNED)", account.nickname(), planned.size());
-    }
-
-    // 잔고 로드 결과 — 정상이면 balance non-null, skip이면 skipReason non-null
-    private record BalanceLoad(AccountBalance balance, SkipReason skipReason) {
-        boolean isSkip() {
-            return skipReason != null;
-        }
-    }
-
-    // 잔고 로드 — preview용: 이력 없음/잔고 부족 모두 skip 결과로 반환
-    private BalanceLoad tryLoadBalance(TradingCycle cycle) {
-        var latestOpt = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream().findFirst();
-        if (latestOpt.isEmpty()) {
-            return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
-        }
-        TradingCycleHistory latest = latestOpt.get();
-        AccountBalance balance = new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
-        if (balance.shouldSkip()) {
-            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
-        }
-        return new BalanceLoad(balance, null);
-    }
-
-    // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
-    private BalanceLoad loadBalanceOrThrow(TradingCycle cycle) {
-        TradingCycleHistory latest = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
-        AccountBalance balance = new AccountBalance(
-                latest.holdings(), latest.avgPrice(), latest.usdDeposit());
-        if (balance.shouldSkip()) {
-            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
-        }
-        return new BalanceLoad(balance, null);
-    }
-
-    // INFINITE 전략 계산 결과 묶음
-    private record InfiniteCalc(InfinitePosition position, List<Order> orders) {
-    }
-
-    // INFINITE 전략 계산 (execute/preview 공통) — holdings==0 && price==null 방어
-    private InfiniteCalc calcInfinite(AccountBalance balance, TradingCycle cycle,
-                                      BigDecimal price, LocalDate today, String label) {
-        if (balance.holdings() == 0 && price == null) {
-            throw new IllegalStateException("현재가 조회 실패: " + cycle.ticker().name());
-        }
-        InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price);
-        List<Order> orders = infiniteStrategy.buildOrders(position, today);
-        log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
-                label, position.priceOffsetRate(), position.currentRound(),
-                position.unitAmount(), orders.size());
-        return new InfiniteCalc(position, orders);
-    }
-
-    // PRIVACY 전략 계산
-    private List<Order> calcPrivacy(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
-        return privacyStrategy.buildOrders(balance, initialUsdDeposit, privacyTradeBase);
-    }
-
     // orders에서 PLANNED 조회 후 KIS에 일괄 접수, 완료 즉시 PLACED 기록
     private List<Order> executePlannedOrders(LocalDate today, Account account) {
         List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
@@ -466,7 +398,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
 
         // 3PM 현재가로 이상적 주문 재계산
         BigDecimal currentPrice = kisPricePort.getPrice(cycle.ticker(), account);
-        InfiniteCalc idealCalc = calcInfinite(balance, cycle, currentPrice, today,
+        TradingOrderPlanner.InfiniteCalc idealCalc = orderPlanner.calcInfinite(balance, cycle, currentPrice, today,
                 "보정:" + account.nickname());
 
         // 아침 PLACED 주문 수량 합산
@@ -497,7 +429,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             log.info("[{}] 보정 주문 불필요 — 수량 차이 없음", account.nickname());
             return List.of();
         }
-        savePlannedOrders(corrections, account);
+        orderPlanner.savePlannedOrders(corrections, account);
         return executePlannedOrders(today, account);
     }
 

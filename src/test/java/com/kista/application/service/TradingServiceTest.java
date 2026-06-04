@@ -94,13 +94,16 @@ class TradingServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
+        TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
+        TradingOrderPlanner orderPlanner = new TradingOrderPlanner(infiniteStrategy, privacyStrategy, orderPort);
         service = new TradingService(
                 marketCalendarPort,
                 kisPricePort, kisOrderPort, kisExecutionPort,
-                infiniteStrategy, privacyStrategy,
                 notifyPort, userNotificationPort,
                 orderPort, realtimeNotificationPort, cycleHistoryPort,
-                accountPort, cyclePort, privacyTradePort, kisMarginPort, userPort);
+                accountPort, cyclePort, privacyTradePort, kisMarginPort, userPort,
+                balanceLoader, orderPlanner);
     }
 
     @Test

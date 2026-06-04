@@ -1,0 +1,53 @@
+package com.kista.application.service;
+
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
+import com.kista.domain.port.out.TradingCycleHistoryPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+// package-private — application/service 패키지 전용
+@Component
+@RequiredArgsConstructor
+@Slf4j
+class TradingBalanceLoader {
+
+    private final TradingCycleHistoryPort cycleHistoryPort;
+
+    // 잔고 로드 결과 — 정상이면 balance non-null, skip이면 skipReason non-null
+    record BalanceLoad(AccountBalance balance, SkipReason skipReason) {
+        boolean isSkip() {
+            return skipReason != null;
+        }
+    }
+
+    // 잔고 로드 — preview용: 이력 없음/잔고 부족 모두 skip 결과로 반환
+    BalanceLoad tryLoadBalance(TradingCycle cycle) {
+        var latestOpt = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream().findFirst();
+        if (latestOpt.isEmpty()) {
+            return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
+        }
+        TradingCycleHistory latest = latestOpt.get();
+        AccountBalance balance = new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+        if (balance.shouldSkip()) {
+            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
+        }
+        return new BalanceLoad(balance, null);
+    }
+
+    // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
+    BalanceLoad loadBalanceOrThrow(TradingCycle cycle) {
+        TradingCycleHistory latest = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
+        AccountBalance balance = new AccountBalance(
+                latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+        if (balance.shouldSkip()) {
+            return new BalanceLoad(balance, SkipReason.INSUFFICIENT_BALANCE);
+        }
+        return new BalanceLoad(balance, null);
+    }
+}
