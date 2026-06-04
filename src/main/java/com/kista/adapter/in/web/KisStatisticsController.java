@@ -104,17 +104,17 @@ public class KisStatisticsController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
         try {
-            PresentBalanceResult result = statisticsUseCase.getPresentBalance(accountId, userId);
-            return normalizePortfolio(result);
+            PresentBalanceResult balance = statisticsUseCase.getPresentBalance(accountId, userId);
+            return normalizePortfolio(balance);
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         }
     }
 
     // PresentBalanceResult(KIS raw) → PortfolioSummaryResponse(kista-ui 호환 포맷) 변환
-    private PortfolioSummaryResponse normalizePortfolio(PresentBalanceResult result) {
+    private PortfolioSummaryResponse normalizePortfolio(PresentBalanceResult balance) {
         // output1: 종목별 잔고 → PositionDto 목록으로 변환
-        List<PortfolioSummaryResponse.PositionDto> positions = result.items().stream()
+        List<PortfolioSummaryResponse.PositionDto> positions = balance.items().stream()
                 .map(item -> new PortfolioSummaryResponse.PositionDto(
                         item.ticker(),
                         item.holdings(),
@@ -129,9 +129,9 @@ public class KisStatisticsController {
 
         // output3: 계좌 전체 요약 → SummaryDto 변환
         PortfolioSummaryResponse.SummaryDto summary = new PortfolioSummaryResponse.SummaryDto(
-                result.totalAssetUsd(),
-                result.totalEvalProfit(),
-                result.totalReturnRate()
+                balance.totalAssetUsd(),
+                balance.totalEvalProfit(),
+                balance.totalReturnRate()
         );
 
         return new PortfolioSummaryResponse(positions, summary);

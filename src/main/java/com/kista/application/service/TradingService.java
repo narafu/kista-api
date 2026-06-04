@@ -52,7 +52,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
     private final TradingOrderPlanner orderPlanner;            // 전략 계산 + 주문 저장 헬퍼
 
-    // Phase A 결과: 사이클별 잔고·전략 계산 상태
+    // planAndSaveOrders 결과: 사이클별 잔고·전략 계산 상태
     private record CycleState(
             BatchContext ctx,
             AccountBalance balance,
@@ -60,10 +60,10 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             TradingSnapshot snapshot,       // INFINITE만 non-null
             BigDecimal startPrice,          // INFINITE만 non-null
             PrivacyTradeBase privacyBase,   // PRIVACY만 non-null (cycle 재등록 시 최소금액 산정용)
-            boolean isManualCorrection      // 수동 실행 감지 시 true — Phase B에서 보정 주문만 접수
+            boolean isManualCorrection      // 수동 실행 감지 시 true — KIS 접수 단계에서 보정 주문만 접수
     ) {}
 
-    // Phase B 결과: Phase A 상태 + KIS 접수된 주문 목록
+    // KIS 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
 
     // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
@@ -103,7 +103,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 yield new Result(today, calc.position(), calc.orders(), null);
             }
             case PRIVACY -> {
-                // 스케줄러 phaseA와 동일: 기준매매표 없으면 skip
+                // 스케줄러 planAndSaveOrders와 동일: 기준매매표 없으면 skip
                 PrivacyTradeBase base = privacyTradePort.findTodayTrade(today).orElse(null);
                 if (base == null) {
                     yield new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
@@ -143,9 +143,9 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         User user = userPort.findById(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
 
-        // 일반 LOC 직접 접수 (Phase A/B 동기, Phase C 비동기)
+        // 일반 LOC 직접 접수 (planAndSaveOrders/B 동기, recordAndNotifyExecutions 비동기)
         Map<Ticker, BigDecimal> startPrices = fetchPricesComplete(List.of(cycle.ticker()), account);
-        CycleState state = phaseA(new BatchContext(cycle, account, user), startPrices, null, today);
+        CycleState state = planAndSaveOrders(new BatchContext(cycle, account, user), startPrices, null, today);
         if (state == null) return List.of(); // 휴장 또는 잔고 부족
 
         // KIS 접수 실패 시 PLANNED 주문 정리 — 재시도 때 중복 누적 방지
@@ -168,12 +168,12 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
             try {
                 waitForPostClose(dst);
                 Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(List.of(cycle.ticker()), account);
-                phaseC(placedState, closingPrices, today);
+                recordAndNotifyExecutions(placedState, closingPrices, today);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("수동 실행 Phase C 인터럽트: cycleId={}", cycleId);
+                log.warn("수동 실행 recordAndNotifyExecutions 인터럽트: cycleId={}", cycleId);
             } catch (Exception e) {
-                log.error("수동 실행 Phase C 오류: cycleId={}", cycleId, e);
+                log.error("수동 실행 recordAndNotifyExecutions 오류: cycleId={}", cycleId, e);
                 notifyPort.notifyError(e);
             }
         });
@@ -211,14 +211,14 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        // Phase A — 사이클별: 휴장 확인 + 잔고 로드 + PLANNED 주문 생성·저장
+        // planAndSaveOrders — 사이클별: 휴장 확인 + 잔고 로드 + PLANNED 주문 생성·저장
         List<CycleState> states = new ArrayList<>();
         for (BatchContext ctx : contexts) {
             try {
-                CycleState state = phaseA(ctx, startPrices, privacyBase, today);
+                CycleState state = planAndSaveOrders(ctx, startPrices, privacyBase, today);
                 if (state != null) states.add(state);
             } catch (Exception e) {
-                log.error("[cycleId={}] Phase A 오류: {}", ctx.cycle().id(), e.getMessage(), e);
+                log.error("[cycleId={}] planAndSaveOrders 오류: {}", ctx.cycle().id(), e.getMessage(), e);
                 notifyPort.notifyError(e);
             }
         }
@@ -227,7 +227,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 공통 대기 — 주문 시각까지 (모든 사이클이 공유하는 단 1회)
         waitForOrderTime(dst);
 
-        // Phase B — 사이클별: PLANNED → KIS 접수 (수동 실행 감지 시 보정 주문만)
+        // KIS 접수 — 사이클별: PLANNED → KIS 접수 (수동 실행 감지 시 보정 주문만)
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             try {
@@ -236,25 +236,25 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
                         : executePlannedOrders(today, state.ctx().account());
                 placedStates.add(new CyclePlacedState(state, mainOrders));
             } catch (Exception e) {
-                log.error("[cycleId={}] Phase B 오류: {}", state.ctx().cycle().id(), e.getMessage(), e);
+                log.error("[cycleId={}] KIS 접수 오류: {}", state.ctx().cycle().id(), e.getMessage(), e);
                 notifyPort.notifyError(e);
             }
         }
 
-        // 수동 보정 모드 사이클 제외 — Phase C는 수동 실행 스레드가 담당 (중복 알림 방지)
-        List<CyclePlacedState> phaseCStates = placedStates.stream()
+        // 수동 보정 모드 사이클 제외 — recordAndNotifyExecutions는 수동 실행 스레드가 담당 (중복 알림 방지)
+        List<CyclePlacedState> recordAndNotifyExecutionsStates = placedStates.stream()
                 .filter(ps -> !ps.state().isManualCorrection())
                 .toList();
 
         // INFINITE 사이클 없으면 PostClose 대기 생략 — PRIVACY는 체결·보정이 없으므로 바로 이력 저장
-        boolean hasInfinite = phaseCStates.stream()
+        boolean hasInfinite = recordAndNotifyExecutionsStates.stream()
                 .anyMatch(ps -> ps.state().ctx().cycle().type() == TradingCycle.Type.INFINITE);
         if (!hasInfinite) {
-            for (CyclePlacedState ps : phaseCStates) {
+            for (CyclePlacedState ps : recordAndNotifyExecutionsStates) {
                 try {
-                    phaseC(ps, Map.of(), today);
+                    recordAndNotifyExecutions(ps, Map.of(), today);
                 } catch (Exception e) {
-                    log.error("[cycleId={}] Phase C 오류(PRIVACY): {}", ps.state().ctx().cycle().id(), e.getMessage(), e);
+                    log.error("[cycleId={}] recordAndNotifyExecutions 오류(PRIVACY): {}", ps.state().ctx().cycle().id(), e.getMessage(), e);
                     notifyPort.notifyError(e);
                 }
             }
@@ -267,20 +267,20 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         // 장 마감 후 종가 일괄 조회 (INFINITE ticker만, 1회)
         Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(infiniteTickers, contexts.getFirst().account());
 
-        // Phase C — 사이클별: 체결 조회 + 이력 저장 + 알림
-        for (CyclePlacedState ps : phaseCStates) {
+        // recordAndNotifyExecutions — 사이클별: 체결 조회 + 이력 저장 + 알림
+        for (CyclePlacedState ps : recordAndNotifyExecutionsStates) {
             try {
-                phaseC(ps, closingPrices, today);
+                recordAndNotifyExecutions(ps, closingPrices, today);
             } catch (Exception e) {
-                log.error("[cycleId={}] Phase C 오류: {}", ps.state().ctx().cycle().id(), e.getMessage(), e);
+                log.error("[cycleId={}] recordAndNotifyExecutions 오류: {}", ps.state().ctx().cycle().id(), e.getMessage(), e);
                 notifyPort.notifyError(e);
             }
         }
     }
 
-    // Phase A: 휴장 확인 + 잔고 로드 + PLANNED 주문 생성·저장
+    // planAndSaveOrders: 휴장 확인 + 잔고 로드 + PLANNED 주문 생성·저장
     // null 반환: 휴장이거나 잔고 부족 — 해당 사이클 이후 단계 모두 skip
-    private CycleState phaseA(BatchContext ctx, Map<Ticker, BigDecimal> startPrices,
+    private CycleState planAndSaveOrders(BatchContext ctx, Map<Ticker, BigDecimal> startPrices,
                                PrivacyTradeBase privacyBase, LocalDate today) {
         TradingCycle cycle = ctx.cycle();
         Account account = ctx.account();
@@ -329,8 +329,8 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         };
     }
 
-    // Phase C: 체결 조회(INFINITE) + 이력 저장 + 알림
-    private void phaseC(CyclePlacedState ps, Map<Ticker, BigDecimal> closingPrices, LocalDate today) {
+    // recordAndNotifyExecutions: 체결 조회(INFINITE) + 이력 저장 + 알림
+    private void recordAndNotifyExecutions(CyclePlacedState ps, Map<Ticker, BigDecimal> closingPrices, LocalDate today) {
         CycleState state = ps.state();
         TradingCycle cycle = state.ctx().cycle();
         Account account = state.ctx().account();
@@ -440,7 +440,7 @@ public class TradingService implements ExecuteTradingUseCase, GetNextOrdersUseCa
         log.info("주문 시각 도달");
     }
 
-    // false 반환 시 알림 발송 후 Phase A에서 null 반환 (해당 사이클 skip)
+    // false 반환 시 알림 발송 후 planAndSaveOrders에서 null 반환 (해당 사이클 skip)
     private boolean isMarketOpen(LocalDate today) {
         boolean open = marketCalendarPort.isMarketOpen(today);
         log.info("시장 개장 여부: {}", open);
