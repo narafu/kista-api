@@ -27,6 +27,8 @@
 ### 현재 포트 시그니처
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
 - `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
+- `GetNextOrdersUseCase.preview(UUID accountId, UUID requesterId)` → `Result(tradeDate, position, orders, skipReason)` — `TradingPreviewService` 구현
+- `ManualExecuteTradingUseCase.execute(UUID cycleId, UUID requesterId)` → `List<Order>` — `ManualTradingService` 구현
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
 - `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
 - `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price)` — TradingCycle.Ticker, multiple 제거 (V46)
@@ -231,6 +233,8 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ### @Transactional 내부 외부 시스템 호출 금지
 - RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
+- 도메인 이벤트 클래스 위치: `application/event/` — `TradingCyclePausedEvent`, `TradingCycleResumedEvent`, `NewUserRegisteredEvent`
+- 리스너 위치: `adapter/out/` — ArchUnit 규칙상 adapter.out → application 의존 허용
 
 
 ### reapply 쿨다운 정책
