@@ -1,7 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.application.config.AdminBootstrapProperties;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.KakaoLoginUseCase;

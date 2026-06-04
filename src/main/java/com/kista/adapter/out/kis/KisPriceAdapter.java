@@ -98,12 +98,12 @@ public class KisPriceAdapter implements KisPricePort {
             if (item.last() == null || item.last().isBlank()) {
                 log.info("복수종목 현재가 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
             }
-            Ticker t = Ticker.tryParse(item.symb()).orElse(null);
-            if (t == null) {
+            Ticker ticker = Ticker.tryParse(item.symb()).orElse(null);
+            if (ticker == null) {
                 log.warn("복수종목 현재가 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
                 continue;
             }
-            result.put(t, KisResponseParser.parseBd(price));
+            result.put(ticker, KisResponseParser.parseBd(price));
         }
 
         // 복수종목 응답에 없는 종목 → 단건 API fallback

@@ -87,26 +87,36 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
     @Override
     public void pause(UUID cycleId, UUID requesterId) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        // 중복 상태 guard — 이미 중지된 사이클은 재중지 불가
+        if (cycle.status() == TradingCycle.Status.PAUSED) {
+            throw new IllegalStateException("이미 중지된 사이클입니다: " + cycleId);
+        }
         Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
+        // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
+        User user = findUserOrThrow(requesterId);
         TradingCycle paused = withStatus(cycle, TradingCycle.Status.PAUSED);
         cyclePort.save(paused);
         log.info("거래 사이클 중지: cycleId={}", cycleId);
         // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
-        User user = findUserOrThrow(requesterId);
         eventPublisher.publishEvent(new TradingCyclePausedEvent(user, account, paused));
     }
 
     @Override
     public void resume(UUID cycleId, UUID requesterId) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
+        // 중복 상태 guard — 이미 활성화된 사이클은 재활성화 불가
+        if (cycle.status() == TradingCycle.Status.ACTIVE) {
+            throw new IllegalStateException("이미 활성화된 사이클입니다: " + cycleId);
+        }
         Account account = accountPort.findByIdOrThrow(cycle.accountId());
         account.verifyOwnedBy(requesterId);
+        // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
+        User user = findUserOrThrow(requesterId);
         TradingCycle active = withStatus(cycle, TradingCycle.Status.ACTIVE);
         cyclePort.save(active);
         log.info("거래 사이클 재개: cycleId={}", cycleId);
         // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
-        User user = findUserOrThrow(requesterId);
         eventPublisher.publishEvent(new TradingCycleResumedEvent(user, account, active));
     }
 

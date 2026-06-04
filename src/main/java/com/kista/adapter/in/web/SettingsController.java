@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;

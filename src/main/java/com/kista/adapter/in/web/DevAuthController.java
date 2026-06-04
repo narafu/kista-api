@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TokenResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;

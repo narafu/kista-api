@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 

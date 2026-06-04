@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
@@ -19,16 +19,16 @@ public record FidaOrderResponse(
         int holdings,
         List<Order> orders
 ) {
-    public static FidaOrderResponse of(UUID id, FidaOrderRequest request) {
+    public static FidaOrderResponse of(UUID id, FidaOrderCommand command) {
         return new FidaOrderResponse(
                 id,
-                request.tradeDate(),
-                request.ticker(),
-                request.currentCycleStart(),
-                request.currentCycleRealizedPnl(),
-                request.avgPrice(),
-                request.holdings(),
-                request.orders()
+                command.tradeDate(),
+                command.ticker(),
+                command.currentCycleStart(),
+                command.currentCycleRealizedPnl(),
+                command.avgPrice(),
+                command.holdings(),
+                command.orders()
         );
     }
 }

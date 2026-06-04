@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.user;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.UserPort;
 import lombok.AccessLevel;

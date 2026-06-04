@@ -7,7 +7,7 @@ import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
-import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -49,7 +49,7 @@ class FidaOrderControllerTest {
     @Test
     void placeFidaOrder_returns_201_with_body() throws Exception {
         UUID masterId = UUID.randomUUID();
-        FidaOrderRequest req = new FidaOrderRequest(
+        FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
@@ -80,7 +80,7 @@ class FidaOrderControllerTest {
         Order buyNullQty = new Order(null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderDirection.BUY, null,
                 new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null);
-        FidaOrderRequest req = new FidaOrderRequest(
+        FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQty));
 

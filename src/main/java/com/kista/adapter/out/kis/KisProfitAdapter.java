@@ -3,6 +3,7 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.PeriodProfitResult;
+import com.kista.domain.model.tradingcycle.TradingCycle.ExchangeCode;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisProfitPort;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class KisProfitAdapter implements KisProfitPort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("CANO", account.accountNo());
         params.add("ACNT_PRDT_CD", account.kisAccountType());
-        params.add("OVRS_EXCG_CD", "NASD");  // 미국 전체
+        params.add("OVRS_EXCG_CD", ExchangeCode.NASD.name()); // 미국 전체
         params.add("NATN_CD", "");
         params.add("CRCY_CD", "USD");
         params.add("PDNO", "");              // 전종목

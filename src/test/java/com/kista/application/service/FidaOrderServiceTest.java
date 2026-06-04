@@ -2,7 +2,7 @@ package com.kista.application.service;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class FidaOrderServiceTest {
     void execute_delegates_to_privacyTradePort() {
         UUID masterId = UUID.randomUUID();
         LocalDate utcDate = LocalDate.now(); // FIDA 송신값 (UTC=US 거래일)
-        FidaOrderRequest req = new FidaOrderRequest(
+        FidaOrderCommand req = new FidaOrderCommand(
                 utcDate, Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
@@ -52,7 +52,7 @@ class FidaOrderServiceTest {
     @Test
     void execute_returns_existing_when_not_created() {
         UUID masterId = UUID.randomUUID();
-        FidaOrderRequest req = new FidaOrderRequest(
+        FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 

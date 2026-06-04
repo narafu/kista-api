@@ -22,4 +22,11 @@ public record User(
         ACTIVE,   // 승인 완료, 서비스 이용 가능
         REJECTED  // 거절됨 (재신청 가능)
     }
+
+    public enum NotificationChannel {
+        NONE,       // 알림 없음
+        TELEGRAM,   // 텔레그램 봇 알림
+        FCM,        // Firebase Cloud Messaging 푸시
+        ALL         // 텔레그램 + FCM 동시 발송
+    }
 }

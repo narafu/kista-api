@@ -65,4 +65,56 @@ class HexagonalArchitectureTest {
                 .should().beAnnotatedWith(org.springframework.stereotype.Service.class);
         rule.check(classes);
     }
+
+    @Test
+    @DisplayName("domain/port/out 인터페이스는 *Port 접미사를 가져야 한다")
+    void outbound_port_interfaces_must_have_Port_suffix() {
+        ArchRule rule = classes()
+                .that().resideInAPackage("com.kista.domain.port.out..")
+                .and().areInterfaces()
+                .should().haveSimpleNameEndingWith("Port");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("persistence JpaRepository는 *JpaRepository 접미사를 가져야 한다")
+    void persistence_jpa_repositories_must_have_JpaRepository_suffix() {
+        ArchRule rule = classes()
+                .that().resideInAPackage("com.kista.adapter.out.persistence..")
+                .and().areInterfaces()
+                .and().areAssignableTo(org.springframework.data.jpa.repository.JpaRepository.class)
+                .should().haveSimpleNameEndingWith("JpaRepository");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("persistence JpaRepository는 package-private이어야 한다")
+    void persistence_jpa_repositories_must_be_package_private() {
+        ArchRule rule = classes()
+                .that().resideInAPackage("com.kista.adapter.out.persistence..")
+                .and().areInterfaces()
+                .and().haveSimpleNameEndingWith("JpaRepository")
+                .should().bePackagePrivate();
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("application.service는 org.springframework.web에 의존하지 않는다")
+    void application_service_must_not_depend_on_spring_web() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.application.service..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("org.springframework.web..");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("application.service는 org.springframework.http.HttpStatus에 의존하지 않는다")
+    void application_service_must_not_depend_on_http_status() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.application.service..")
+                .should().dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.http.HttpStatus");
+        rule.check(classes);
+    }
 }

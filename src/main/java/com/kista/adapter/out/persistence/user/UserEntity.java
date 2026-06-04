@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.user;
 
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import jakarta.persistence.*;

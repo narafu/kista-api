@@ -1,7 +1,7 @@
 package com.kista.adapter.out.notify;
 
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import org.junit.jupiter.api.BeforeEach;

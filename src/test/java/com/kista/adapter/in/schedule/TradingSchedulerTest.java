@@ -2,7 +2,7 @@ package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.user.NotificationChannel;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;

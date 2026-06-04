@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.FidaOrderRequest;
+import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
@@ -34,30 +34,30 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     @Transactional
-    public PrivacyTradeSaveResult saveMasterWithDetails(FidaOrderRequest request) {
-        Optional<PrivacyTradeMasterEntity> existing = this.getByTradeDateAndTicker(request.tradeDate(), request.ticker());
+    public PrivacyTradeSaveResult saveMasterWithDetails(FidaOrderCommand command) {
+        Optional<PrivacyTradeMasterEntity> existing = this.getByTradeDateAndTicker(command.tradeDate(), command.ticker());
 
         if (existing.isPresent()) {
             // 동일 (tradeDate, ticker) 존재 — 내용 비교
             PrivacyTradeMasterEntity master = existing.get();
-            if (isIdentical(master, request)) {
+            if (isIdentical(master, command)) {
                 return new PrivacyTradeSaveResult(master.getId(), false); // 200
             }
             throw new PrivacyTradeConflictException(
-                    "기존 매매표와 내용이 다릅니다: tradeDate=" + request.tradeDate() + ", ticker=" + request.ticker());
+                    "기존 매매표와 내용이 다릅니다: tradeDate=" + command.tradeDate() + ", ticker=" + command.ticker());
         }
 
         // 신규 저장
         PrivacyTradeMasterEntity master = new PrivacyTradeMasterEntity();
-        master.setTradeDate(TradeDateConverter.toUtc(request.tradeDate())); // KST 도메인 → UTC DB
-        master.setTicker(request.ticker());
-        master.setCurrentCycleStart(request.currentCycleStart());
-        master.setCurrentCycleRealizedPnl(request.currentCycleRealizedPnl());
-        master.setAvgPrice(request.avgPrice());
-        master.setHoldings(request.holdings());
+        master.setTradeDate(TradeDateConverter.toUtc(command.tradeDate())); // KST 도메인 → UTC DB
+        master.setTicker(command.ticker());
+        master.setCurrentCycleStart(command.currentCycleStart());
+        master.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());
+        master.setAvgPrice(command.avgPrice());
+        master.setHoldings(command.holdings());
 
         // BUY → SELL 순 정렬 후 detail 생성 — cascade로 함께 저장
-        List<Order> sorted = request.orders().stream().sorted(ORDER_SORT).toList();
+        List<Order> sorted = command.orders().stream().sorted(ORDER_SORT).toList();
         for (Order order : sorted) {
             PrivacyTradeDetailEntity detail = new PrivacyTradeDetailEntity();
             detail.setPrivacyTrade(master);
@@ -75,11 +75,11 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         return masterRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB
     }
 
-    private boolean isIdentical(PrivacyTradeMasterEntity master, FidaOrderRequest request) {
-        if (master.getCurrentCycleStart().compareTo(request.currentCycleStart()) != 0) return false;
-        if (master.getCurrentCycleRealizedPnl().compareTo(request.currentCycleRealizedPnl()) != 0) return false;
-        if (!bigDecimalEquals(master.getAvgPrice(), request.avgPrice())) return false;
-        if (master.getHoldings() != request.holdings()) return false;
+    private boolean isIdentical(PrivacyTradeMasterEntity master, FidaOrderCommand command) {
+        if (master.getCurrentCycleStart().compareTo(command.currentCycleStart()) != 0) return false;
+        if (master.getCurrentCycleRealizedPnl().compareTo(command.currentCycleRealizedPnl()) != 0) return false;
+        if (!bigDecimalEquals(master.getAvgPrice(), command.avgPrice())) return false;
+        if (master.getHoldings() != command.holdings()) return false;
 
         // detail 비교 — 동일한 정렬 기준으로 맞춘 후 순서대로 비교
         List<PrivacyTradeDetailEntity> existingDetails = master.getOrders().stream()
@@ -89,7 +89,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                                 ? b.getPrice().compareTo(a.getPrice())
                                 : a.getPrice().compareTo(b.getPrice())))
                 .toList();
-        List<Order> incomingOrders = request.orders().stream().sorted(ORDER_SORT).toList();
+        List<Order> incomingOrders = command.orders().stream().sorted(ORDER_SORT).toList();
 
         if (existingDetails.size() != incomingOrders.size()) return false;
         for (int i = 0; i < existingDetails.size(); i++) {
