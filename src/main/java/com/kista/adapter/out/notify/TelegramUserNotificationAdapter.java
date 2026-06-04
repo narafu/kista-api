@@ -1,6 +1,8 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.application.event.NewUserRegisteredEvent;
+import com.kista.application.event.TradingCyclePausedEvent;
+import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.tradingcycle.TradingCycle;
@@ -22,6 +24,18 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
+
+    // TradingCycleService가 발행한 중지 이벤트를 커밋 성공 후에만 수신
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCyclePaused(TradingCyclePausedEvent event) {
+        notifyStrategyChanged(event.user(), event.account(), event.cycle(), "중지");
+    }
+
+    // TradingCycleService가 발행한 재개 이벤트를 커밋 성공 후에만 수신
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCycleResumed(TradingCycleResumedEvent event) {
+        notifyStrategyChanged(event.user(), event.account(), event.cycle(), "재개");
+    }
 
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

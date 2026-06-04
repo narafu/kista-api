@@ -2,7 +2,6 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
@@ -11,13 +10,15 @@ import com.kista.domain.port.in.RegisterTradingCycleUseCase;
 import com.kista.domain.port.in.ResumeTradingCycleUseCase;
 import com.kista.domain.port.in.UpdateTradingCycleUseCase;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.application.event.TradingCyclePausedEvent;
+import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
 import com.kista.domain.port.out.TradingCyclePort;
-import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
     private final TradingCycleHistoryPort cycleHistoryPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
-    private final UserNotificationPort notificationPort;
+    private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
     public TradingCycle register(UUID userId, UUID accountId, RegisterTradingCycleUseCase.Command cmd) {
@@ -91,8 +92,9 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         TradingCycle paused = withStatus(cycle, TradingCycle.Status.PAUSED);
         cyclePort.save(paused);
         log.info("거래 사이클 중지: cycleId={}", cycleId);
+        // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
         User user = findUserOrThrow(requesterId);
-        notificationPort.notifyStrategyChanged(user, account, paused, "중지");
+        eventPublisher.publishEvent(new TradingCyclePausedEvent(user, account, paused));
     }
 
     @Override
@@ -103,8 +105,9 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         TradingCycle active = withStatus(cycle, TradingCycle.Status.ACTIVE);
         cyclePort.save(active);
         log.info("거래 사이클 재개: cycleId={}", cycleId);
+        // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
         User user = findUserOrThrow(requesterId);
-        notificationPort.notifyStrategyChanged(user, account, active, "재개");
+        eventPublisher.publishEvent(new TradingCycleResumedEvent(user, account, active));
     }
 
     @Override
