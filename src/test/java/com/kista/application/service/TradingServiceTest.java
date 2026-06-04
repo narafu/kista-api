@@ -145,11 +145,11 @@ class TradingServiceTest {
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         // 오늘 이미 PLACED 주문 존재 → 보정 모드
         when(orderPort.findPlacedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlaced));
-        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE); // 보정 현재가 단건 조회
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 
+        verify(kisPricePort, never()).getPrice(any(), any()); // startPrices 재사용 — 단건 조회 생략
         // Phase C 스킵 → 체결 조회·이력 저장·텔레그램 모두 미호출
         verify(kisExecutionPort, never()).getExecutions(any(), any(), any(), any());
         verify(cycleHistoryPort, never()).save(any());
@@ -158,15 +158,16 @@ class TradingServiceTest {
 
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
-        // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        // 휴장 확인이 executeBatch() 최상단으로 이동 → 가격 조회 전 조기 반환
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 
+        verify(marketCalendarPort).isMarketOpen(any());
         verify(notifyPort).notifyMarketClosed();
+        verify(kisPricePort, never()).getPrices(anyList(), any()); // 휴장 시 KIS 가격 조회 생략
+        verify(kisPricePort, never()).getPrice(any(), any());
         verify(cycleHistoryPort, never()).findRecentByCycleId(any(), anyInt());
-        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }

@@ -76,6 +76,9 @@ class TradingService implements ExecuteTradingUseCase {
 
         LocalDate today = LocalDate.now();
 
+        // 시장 개장 여부 확인 (1회) — 모든 사이클 공통, 가격 조회 전 조기 반환
+        if (!isMarketOpen(today)) return;
+
         // 시작 시점 현재가 일괄 조회 (INFINITE)
         List<Ticker> infiniteTickers = contexts.stream()
                 .filter(c -> c.cycle().type() == TradingCycle.Type.INFINITE)
@@ -164,10 +167,7 @@ class TradingService implements ExecuteTradingUseCase {
         TradingCycle cycle = ctx.cycle();
         Account account = ctx.account();
 
-        // 1. 휴장 확인
-        if (!isMarketOpen(today)) return null;
-
-        // 2. 잔고 로드
+        // 1. 잔고 로드
         TradingBalanceLoader.BalanceLoad load = balanceLoader.loadBalanceOrThrow(cycle);
         if (load.skipReason() == SkipReason.INSUFFICIENT_BALANCE) {
             log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
@@ -177,14 +177,14 @@ class TradingService implements ExecuteTradingUseCase {
         AccountBalance balance = load.balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // 3. 전략별 PLANNED 주문 생성·저장
+        // 2. 전략별 PLANNED 주문 생성·저장
         return switch (cycle.type()) {
             case INFINITE -> {
                 // 수동 실행 감지: 오늘 PLACED 주문이 있으면 보정 주문 모드로 전환
                 List<Order> todayPlaced = orderPort.findPlacedByAccountAndDate(account.id(), today);
                 if (!todayPlaced.isEmpty()) {
                     log.info("[{}] 수동 실행 감지 — 보정 주문 모드", account.nickname());
-                    yield new CycleState(ctx, balance, null, null, null, null, true);
+                    yield new CycleState(ctx, balance, null, null, startPrices.get(cycle.ticker()), null, true);
                 }
                 BigDecimal price = startPrices.get(cycle.ticker());
                 if (balance.shouldSkip(price)) {
@@ -275,8 +275,12 @@ class TradingService implements ExecuteTradingUseCase {
         TradingCycle cycle = state.ctx().cycle();
         AccountBalance balance = state.balance();
 
-        // 3PM 현재가로 이상적 주문 재계산
-        BigDecimal currentPrice = kisPricePort.getPrice(cycle.ticker(), account);
+        // 이상적 주문 재계산 — executeBatch 시작 시 조회한 startPrices 재사용 (~30분 전)
+        BigDecimal currentPrice = state.startPrice();
+        if (currentPrice == null) {
+            log.warn("[{}] 보정 주문 생략 — 시작가 없음 (가격 조회 실패)", account.nickname());
+            return List.of();
+        }
         TradingOrderPlanner.InfiniteCalc idealCalc = orderPlanner.calcInfinite(balance, cycle, currentPrice, today,
                 "보정:" + account.nickname());
 
