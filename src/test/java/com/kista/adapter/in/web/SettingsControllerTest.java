@@ -10,7 +10,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -36,10 +36,10 @@ class SettingsControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockBean UpdateUserTelegramUseCase updateUserTelegram;
-    @MockBean GetUserUseCase getUser;
-    @MockBean UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경 UseCase
+    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean UpdateUserTelegramUseCase updateUserTelegram;
+    @MockitoBean GetUserUseCase getUser;
+    @MockitoBean UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경 UseCase
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

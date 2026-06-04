@@ -10,7 +10,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,8 +34,8 @@ class OrderControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean JwtDecoder jwtDecoder;
-    @MockBean GetNextOrdersUseCase getNextOrders;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean GetNextOrdersUseCase getNextOrders;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");

@@ -39,12 +39,12 @@ class PrivacyStrategyTest {
         return new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("30.00"), holdings, BASE_CYCLE_START, trades);
     }
 
-    private static PrivacyTrade buy(int qty, String price) {
-        return new PrivacyTrade(DATE, TICKER, LOC, BUY, qty, new BigDecimal(price));
+    private static PrivacyTrade buy(int quantity, String price) {
+        return new PrivacyTrade(DATE, TICKER, LOC, BUY, quantity, new BigDecimal(price));
     }
 
-    private static PrivacyTrade sell(int qty, String price) {
-        return new PrivacyTrade(DATE, TICKER, LIMIT, SELL, qty, new BigDecimal(price));
+    private static PrivacyTrade sell(int quantity, String price) {
+        return new PrivacyTrade(DATE, TICKER, LIMIT, SELL, quantity, new BigDecimal(price));
     }
 
     private static PrivacyTrade sellNull(String price) {

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -32,10 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminTradeControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockBean JwtDecoder jwtDecoder;
-    @MockBean AdminListTradesUseCase listTrades;
-    @MockBean AdminListAccountsUseCase listAccounts;
-    @MockBean AdminListUsersUseCase listUsers;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean AdminListTradesUseCase listTrades;
+    @MockitoBean AdminListAccountsUseCase listAccounts;
+    @MockitoBean AdminListUsersUseCase listUsers;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");

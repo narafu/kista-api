@@ -7,7 +7,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,12 +31,12 @@ class AccountControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockBean RegisterAccountUseCase registerAccount;
-    @MockBean UpdateAccountUseCase updateAccount;
-    @MockBean DeleteAccountUseCase deleteAccount;
-    @MockBean GetAccountUseCase getAccount;
-    @MockBean KisConnectionTestUseCase connectionTest;
+    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean RegisterAccountUseCase registerAccount;
+    @MockitoBean UpdateAccountUseCase updateAccount;
+    @MockitoBean DeleteAccountUseCase deleteAccount;
+    @MockitoBean GetAccountUseCase getAccount;
+    @MockitoBean KisConnectionTestUseCase connectionTest;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

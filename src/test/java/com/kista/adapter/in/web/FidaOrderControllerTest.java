@@ -14,7 +14,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -41,8 +41,8 @@ class FidaOrderControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
-    @MockBean JwtDecoder jwtDecoder;
-    @MockBean ExecuteFidaOrderUseCase executeFidaOrderUseCase;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean ExecuteFidaOrderUseCase executeFidaOrderUseCase;
 
     private static final String VALID_TOKEN = "test-internal-token";
 

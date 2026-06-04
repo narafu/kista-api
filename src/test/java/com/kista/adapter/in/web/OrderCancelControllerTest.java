@@ -6,7 +6,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,8 +29,8 @@ class OrderCancelControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockBean JwtDecoder jwtDecoder;
-    @MockBean CancelOrderUseCase cancelOrderUseCase;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean CancelOrderUseCase cancelOrderUseCase;
 
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
     private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");

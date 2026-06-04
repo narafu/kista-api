@@ -6,7 +6,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,16 +34,16 @@ class TradingCycleControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockBean JwtDecoder jwtDecoder;
-    @MockBean RegisterTradingCycleUseCase registerCycle;
-    @MockBean UpdateTradingCycleUseCase updateCycle;
-    @MockBean DeleteTradingCycleUseCase deleteCycle;
-    @MockBean GetTradingCycleUseCase getCycle;
-    @MockBean PauseTradingCycleUseCase pauseCycle;
-    @MockBean ResumeTradingCycleUseCase resumeCycle;
-    @MockBean GetAccountStatisticsUseCase statisticsUseCase;
-    @MockBean ManualExecuteTradingUseCase manualExecute;
-    @MockBean CancelOrderUseCase cancelOrder;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean RegisterTradingCycleUseCase registerCycle;
+    @MockitoBean UpdateTradingCycleUseCase updateCycle;
+    @MockitoBean DeleteTradingCycleUseCase deleteCycle;
+    @MockitoBean GetTradingCycleUseCase getCycle;
+    @MockitoBean PauseTradingCycleUseCase pauseCycle;
+    @MockitoBean ResumeTradingCycleUseCase resumeCycle;
+    @MockitoBean GetAccountStatisticsUseCase statisticsUseCase;
+    @MockitoBean ManualExecuteTradingUseCase manualExecute;
+    @MockitoBean CancelOrderUseCase cancelOrder;
 
     private static final UUID CYCLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");

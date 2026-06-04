@@ -13,7 +13,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -40,13 +40,13 @@ class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockBean ApproveUserUseCase approveUser;
-    @MockBean GetUserUseCase getUser;
-    @MockBean SseEmitterRegistry sseEmitterRegistry;
-    @MockBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
-    @MockBean KakaoLoginUseCase kakaoLoginUseCase; // 카카오 로그인 유스케이스
-    @MockBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
-    @MockBean DeleteMeUseCase deleteMe;             // 회원 탈퇴 유스케이스
+    @MockitoBean ApproveUserUseCase approveUser;
+    @MockitoBean GetUserUseCase getUser;
+    @MockitoBean SseEmitterRegistry sseEmitterRegistry;
+    @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
+    @MockitoBean KakaoLoginUseCase kakaoLoginUseCase; // 카카오 로그인 유스케이스
+    @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
+    @MockitoBean DeleteMeUseCase deleteMe;             // 회원 탈퇴 유스케이스
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
