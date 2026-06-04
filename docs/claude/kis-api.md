@@ -98,6 +98,10 @@
 - `KisAccountAdapter.fetchMargin()`: KisMarginPort 주입 경유 (직접 TTTC2101R 호출 아님) — USD 행 필터는 `currency()` 필드 기준
 - `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` — KIS API 필드명(`crcy_cd` 등) 아님
 
+### KIS 어댑터 상수 사용 규칙
+- `"NASD"`, `"AMEX"`, `"NYSE"` 리터럴 금지 → `ExchangeCode.NASD.name()` 등 enum 경유
+- `"USD"`, `"미국"` 필터값은 현재 리터럴 유지 (대응 enum 없음)
+
 ### 복수종목 현재가 (KisPriceAdapter)
 - `getPrices(List<Ticker>, Account)` — 복수검색 API(`HHDFS76220000`, `/uapi/overseas-price/v1/quotations/multprice`) 단건 호출로 구현
   - 파라미터: `AUTH=""`, `NREC=종목수`, `EXCD_01`/`SYMB_01` … `EXCD_10`/`SYMB_10` (2자리 zero-padded, 최대 10종목)

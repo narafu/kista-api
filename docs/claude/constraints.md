@@ -59,6 +59,16 @@
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
+### User nested enum 패턴
+- `User.Role`, `User.Status`, `User.NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum으로 선언
+- import: `import com.kista.domain.model.user.User.NotificationChannel` (독립 파일 `NotificationChannel.java` 삭제됨)
+- 새 사용자 관련 enum 추가 시 동일 패턴으로 `User` record 내부에 선언
+
+### 도메인 Command 명명 규칙
+- 도메인 포트 인바운드 파라미터/입력 모델: `*Command` suffix (예: `FidaOrderCommand`)
+- `*Request` suffix 사용 금지 — 외부 HTTP DTO 성격으로 오인됨
+- `domain/model/<도메인>/` 하위 위치 (ArchUnit domain 규칙 준수)
+
 ### Ticker enum (TradingCycle.Ticker nested enum)
 - **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
 - **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
@@ -173,6 +183,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
 
 ### 소유권 검증 예외 패턴 (V2)
+- Service 내 반복 검증은 `private Account requireOwnedAccount(UUID accountId, UUID requesterId)` 헬퍼로 추출 — `AccountStatisticsService` 패턴 참고
 - Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw
 - Controller에서 catch → `ResponseStatusException(HttpStatus.FORBIDDEN)` 변환
 - application 레이어가 Spring HTTP에 의존하지 않아 ArchUnit 규칙 준수
