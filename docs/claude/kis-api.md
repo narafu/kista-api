@@ -1,8 +1,8 @@
 ## KIS API
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
-- `KisHttpClient.buildHeaders(String trId, Account account)` — V2: Account 계좌별 자격증명으로 헤더 구성
-- `KisTokenPort.getToken(UUID accountId, String appKey, String appSecret)` — V2: account_id 기반 독립 토큰 캐시 (`kis_tokens` PK = account_id UUID, V9 migration)
+- `KisHttpClient.buildHeaders(String trId, Account account)` — Account 계좌별 자격증명으로 헤더 구성
+- `KisTokenPort.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`kis_tokens` PK = account_id UUID)
 - 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(accountId, now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
 - **`KisTokenAdapter`는 `KisHttpClient` 미사용** — `RestTemplate`+`KisProperties` 직접 주입 (`KisHttpClient`→`KisTokenPort`→`KisTokenAdapter` 순환 방지)
 - **토큰 발급 우회 경로 주의** — `/oauth2/tokenP`를 직접 호출하는 두 곳: `KisConnectionTestAdapter.test()` / `KisTokenAdapter.testToken()`. 두 곳 모두 `accountId` 파라미터 필수, 성공 시 `kisTokenCachePort.saveToken()` 저장 (누락 시 KIS에서 "접속요청 발행" 알림 매번 발생)

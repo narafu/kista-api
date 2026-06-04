@@ -16,19 +16,15 @@
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `PrivacyTradeConflictException` → 409 — Controller에서 별도 catch/rethrow 불필요 (단, `SecurityException`→403, KIS 오류→503은 컨트롤러에서 직접 처리)
 - **모든 엔드포인트에 SecurityException catch 필수**: 목록 조회(`GET /api/accounts/{id}/trading-cycles`) 포함 소유권 검증이 있는 모든 서비스 메서드를 호출하는 엔드포인트는 `SecurityException → 403` 처리 필수 — 누락 시 Spring 기본 핸들러가 500 반환 → 프론트엔드에서 해당 데이터가 빈 배열/null로 처리됨
 
-### Account ↔ TradingCycle 분리 (V38 이후)
+### Account ↔ TradingCycle 분리
 - `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
-- `TradingCycle` record 필드 8개: `id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, createdAt, updatedAt`
-- `Type`, `Status`, `Ticker` 모두 `TradingCycle` record의 nested enum — 구 `Strategy.StrategyType/StrategyStatus/Ticker` 대체
+- `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, cycleSeedType(CycleSeedType), createdAt, updatedAt`
+- `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `TradingCycle` record의 nested enum
 - `MAX_CYCLES_PER_ACCOUNT = 1` (`TradingCycleService` 상수) — 운영 정책, 확장 시 상수만 변경
 - `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
-- V35 마이그레이션: accounts/strategies/orders/trade_histories/portfolio_snapshots/kis_tokens TRUNCATE (기존 데이터 초기화)
-- V38 마이그레이션: `strategies` → `trading_cycle` 테이블 리네임 + `initial_usd_deposit` 컬럼 추가
-- V39 마이그레이션: `trading_cycle_history` 테이블 신설 — ON DELETE CASCADE
-- V44 마이그레이션: `trading_cycle_history.trade_date` 컬럼 및 UNIQUE 제약 제거, `avg_price` nullable 허용
-- V46 마이그레이션: `trading_cycle.multiple` 컬럼 제거 — PRIVACY 배수는 `floor(initialUsdDeposit / currentCycleStart, 2)` 동적 산출로 대체
+- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
-### 변경된 포트 시그니처 (V38 이후)
+### 현재 포트 시그니처
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
 - `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
 - `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
@@ -49,7 +45,7 @@
 - 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
 - 일괄 제거: `grep -rl $'\xef\xbb\xbf' src --include="*.java" | while read f; do sed -i '1s/^\xef\xbb\xbf//' "$f"; done`
 
-### 수량 변수명 규칙 (V26 전수 통일 완료)
+### 수량 변수명 규칙
 - **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `TradingCycleHistory`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
@@ -63,7 +59,7 @@
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
-### Ticker enum (V38 이후: TradingCycle.Ticker nested enum)
+### Ticker enum (TradingCycle.Ticker nested enum)
 - **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
 - **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
 - `TradingCycle.Ticker` enum: `TQQQ(ExchangeCode.NASD, ExcdCode.NAS, 0.15, desc)`, `SOXL(ExchangeCode.AMEX, ExcdCode.AMS, 0.20, ...)` — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드 포함 (label 없음). 새 종목 추가 시 두 코드 체계 모두 지정 필수
@@ -118,18 +114,18 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `74420614-01` 형태로 하나의 필드에 합치면 KIS API CANO 파라미터 오류 — 반드시 분리
 
 ### Flyway
-- `V1__`~`V5__.sql` **절대 수정 금지** — 새 마이그레이션은 `V6__...` 이후로 (V6~V8: V2 users/accounts 테이블, V9: kis_tokens account_id UUID PK)
-- 현재 최신: `V51__drop_trade_histories.sql` — 버전별 변경 이력은 `src/main/resources/db/migration/` SQL 파일 참조
+- `V1__init.sql` **수정 금지** — 새 마이그레이션은 `V2__...` 이후로
+- 현재 최신: `V1__init.sql` — V1~V52 squash 베이스라인 (2026-06-04)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
-- PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME` — V22/V36 패턴 참고)
-- 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (V42 `uq_privacy_trades_master_date_ticker` 사례). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
+- PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)
+- 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (`uq_privacy_trades_master_date_ticker` 같은 named UNIQUE). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
-- Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS` (V21 패턴)
-- **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발 (V8 누락으로 계좌삭제 500 발생)
-- PostgreSQL ENUM → VARCHAR 전환 시 `DROP TYPE` 실패 원인: `ALTER COLUMN TYPE` 후에도 DEFAULT 표현식(`'PENDING'::user_status`)에 ENUM 캐스팅이 남아 의존성 유지 → `DROP TYPE ... CASCADE`로 의존 DEFAULT 함께 제거 후 `SET DEFAULT '값'`으로 재설정 (V25 패턴)
+- Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS`
+- **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발
+- PostgreSQL ENUM → VARCHAR 전환 시 `DROP TYPE` 실패 원인: `ALTER COLUMN TYPE` 후에도 DEFAULT 표현식(`'PENDING'::user_status`)에 ENUM 캐스팅이 남아 의존성 유지 → `DROP TYPE ... CASCADE`로 의존 DEFAULT 함께 제거 후 `SET DEFAULT '값'`으로 재설정
 - Flyway checksum mismatch (로컬 마이그레이션 파일 수정 시): `DELETE FROM flyway_schema_history WHERE version = 'N'` + 해당 테이블 DROP → 앱 재시작 (로컬 전용 — 운영 DB에 절대 적용 금지)
 
 ### application-local.yml Docker 호환성
@@ -156,7 +152,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `@Slf4j` + `@RequiredArgsConstructor` 표준
 - `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치 — 불일치 시 NoUniqueBeanDefinitionException
 
-### AES-256 암호화 위치 (V2)
+### AES-256 암호화 위치
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화
 - `AccountPersistenceAdapter`가 `AesCryptoService` 주입받아 처리 — `AccountService`(application layer)는 평문만 다룸
 - ArchUnit 규칙(application → adapter 금지)으로 서비스가 암호화 서비스 직접 호출 불가
@@ -246,7 +242,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
 - `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)
 
-### 테이블 재생성 패턴 FK 제약명 주의 (V22 사례)
+### 테이블 재생성 패턴 FK 제약명 주의
 - `ALTER TABLE t RENAME TO t_old` 후 `CREATE TABLE t (...REFERENCES ...)` 인라인 선언 시 PostgreSQL이 `t_old`의 기존 제약명과 충돌 → 자동으로 숫자 접미사(`_fkey1`) 부여
 - 인라인 `REFERENCES` 대신 `CONSTRAINT 명시_fkey FOREIGN KEY (...)` 형식 사용 권장 — 명시적 이름으로 충돌 없이 생성됨
 - 기존 접미사 제약 정리: `ALTER TABLE t RENAME CONSTRAINT old_fkey1 TO old_fkey;` 후 다음 마이그레이션에서 정상 이름으로 참조 가능
@@ -257,7 +253,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 변환: `python3 -c "import json; content=open('.env.prod').read(); start=content.index('KEY=')+4; print(json.dumps(json.loads(content[start:].strip()), separators=(',',':')))"`
 
 ### ADMIN 권한 관리
-- `users.role` PostgreSQL 네이티브 ENUM (`user_role`: USER/ADMIN) — V17
+- `users.role` VARCHAR(20) (`USER` / `ADMIN`) — 네이티브 ENUM 아님
 - ADMIN seed: 환경변수 `ADMIN_KAKAO_IDS` (쉼표 구분 String) — `UserService.register()` / `KakaoLoginService.login()`에서 idempotent promote
 - JWT claim: `"role": "ADMIN"` — `JwtIssuerService.issue(uuid, role)`
 - `JwtAuthFilter`: `ROLE_USER` / `ROLE_ADMIN` authorities 자동 부여
