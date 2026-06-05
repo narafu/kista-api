@@ -128,26 +128,12 @@ class TradingService implements ExecuteTradingUseCase {
                 .filter(ps -> !ps.state().isManualCorrection())
                 .toList();
 
-        // INFINITE 사이클 없으면 PostClose 대기 생략 — PRIVACY는 체결·보정이 없으므로 바로 이력 저장
-        boolean hasInfinite = recordAndNotifyExecutionsStates.stream()
-                .anyMatch(ps -> ps.state().ctx().cycle().type() == TradingCycle.Type.INFINITE);
-        if (!hasInfinite) {
-            for (CyclePlacedState ps : recordAndNotifyExecutionsStates) {
-                try {
-                    recordAndNotifyExecutions(ps, Map.of(), today);
-                } catch (Exception e) {
-                    log.error("[cycleId={}] recordAndNotifyExecutions 오류(PRIVACY): {}", ps.state().ctx().cycle().id(), e.getMessage(), e);
-                    notifyPort.notifyError(e);
-                }
-            }
-            return;
-        }
-
         // 공통 대기 — PostClose까지 (모든 사이클이 공유하는 단 1회)
         waitForPostClose(dst);
 
         // 장 마감 후 종가 일괄 조회 (INFINITE ticker만, 1회)
-        Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(infiniteTickers, contexts.getFirst().account());
+        Map<Ticker, BigDecimal> closingPrices = infiniteTickers.isEmpty()
+                ? Map.of() : fetchPricesComplete(infiniteTickers, contexts.getFirst().account());
 
         // recordAndNotifyExecutions — 사이클별: 체결 조회 + 이력 저장 + 알림
         for (CyclePlacedState ps : recordAndNotifyExecutionsStates) {
