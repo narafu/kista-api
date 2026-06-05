@@ -195,6 +195,50 @@ class TradingServiceTest {
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }
 
+    @Test
+    void execute_withBuyExecution_savesPostTradeBalanceAndNotifiesPostTradeSnapshot() throws InterruptedException {
+        // 0회차(holdings=0) → 1주 매수 체결 → 이력: holdings=1, avgPrice=체결가 / 알림: 보유 1주
+        BigDecimal startPrice = new BigDecimal("20.00");
+        BigDecimal closingPrice = new BigDecimal("22.00"); // PRICE
+        BigDecimal executionPrice = new BigDecimal("20.50"); // LOC 체결가 (개장가~종가 사이)
+        BigDecimal executionAmount = new BigDecimal("20.50"); // 1주 × $20.50
+
+        Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null);
+        UUID plannedId = UUID.randomUUID();
+        Order planned = new Order(plannedId, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, startPrice,
+                Order.OrderStatus.PLANNED, null);
+        Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001");
+        Execution buyExecution = new Execution(LocalDate.now(), Ticker.SOXL,
+                Order.OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
+
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, startPrice))  // 1st: 시작가
+                .thenReturn(Map.of(Ticker.SOXL, closingPrice)); // 2nd: 종가
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY)); // holdings=0
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(template));
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
+                .thenReturn(List.of(planned));
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT)))
+                .thenReturn(List.of(buyExecution));
+
+        service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
+
+        // 이력: holdings=1, avgPrice=체결가, closingPrice=종가 저장 (버그 #2 수정 검증)
+        verify(cycleHistoryPort).save(argThat(h ->
+                h.holdings() == 1
+                && h.avgPrice() != null && h.avgPrice().compareTo(executionPrice) == 0
+                && h.closingPrice() != null && h.closingPrice().compareTo(closingPrice) == 0));
+        // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
+        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT),
+                argThat(r -> r.snapshot().holdings() == 1));
+    }
+
     // ── executeBatch 테스트 ────────────────────────────────────────────────────
 
     @Test

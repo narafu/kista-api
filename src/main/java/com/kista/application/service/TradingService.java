@@ -346,9 +346,15 @@ class TradingService implements ExecuteTradingUseCase {
                                LocalDate today, List<Order> mainOrders,
                                List<Execution> executions, User user, Account account, TradingCycle cycle,
                                PrivacyTradeBase privacyTradeBase) {
-        saveCycleHistory(balance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
+        // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
+        AccountBalance postBalance = executions.isEmpty() ? balance : calcPostTradeBalance(balance, executions);
+        saveCycleHistory(postBalance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
         if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
-            TradingReport report = buildReport(today, snapshot, mainOrders, executions);
+            // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
+            TradingSnapshot postSnapshot = price != null
+                    ? new InfinitePosition(postBalance, cycle.ticker(), price).toSnapshot()
+                    : snapshot;
+            TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
             userNotificationPort.notifyTradingReport(user, account, report);
             log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
         }
@@ -456,5 +462,30 @@ class TradingService implements ExecuteTradingUseCase {
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, snapshot, mainOrders, totalBought, totalSold);
+    }
+
+    // 체결 목록으로 매매 후 AccountBalance 계산
+    // 평단가 = (기존 매입금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
+    private AccountBalance calcPostTradeBalance(AccountBalance pre, List<Execution> executions) {
+        int totalBuyQty = executions.stream()
+                .filter(e -> e.direction() == BUY).mapToInt(Execution::quantity).sum();
+        int totalSellQty = executions.stream()
+                .filter(e -> e.direction() == SELL).mapToInt(Execution::quantity).sum();
+        BigDecimal totalBuyAmount = executions.stream()
+                .filter(e -> e.direction() == BUY).map(Execution::amountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalSellAmount = executions.stream()
+                .filter(e -> e.direction() == SELL).map(Execution::amountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int newHoldings = pre.holdings() + totalBuyQty - totalSellQty;
+        BigDecimal preAmount = (pre.holdings() == 0 || pre.avgPrice() == null)
+                ? BigDecimal.ZERO
+                : pre.avgPrice().multiply(BigDecimal.valueOf(pre.holdings()));
+        BigDecimal newAvgPrice = newHoldings > 0
+                ? preAmount.add(totalBuyAmount).divide(BigDecimal.valueOf(newHoldings), 4, HALF_UP)
+                : null;
+        BigDecimal newUsdDeposit = pre.usdDeposit().subtract(totalBuyAmount).add(totalSellAmount);
+        return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
     }
 }
