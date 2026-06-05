@@ -6,6 +6,7 @@ import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.KisTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisTokenAdapter implements KisTokenPort {
@@ -61,31 +63,8 @@ public class KisTokenAdapter implements KisTokenPort {
         }
     }
 
-    @Override
-    public void testToken(UUID accountId, String appKey, String appSecret) {
-        // 키 유효성 검증 겸 토큰 발급 — 성공 시 캐시에 저장하여 직후 KIS API 호출 시 재발급 방지
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            Map<String, String> body = Map.of(
-                    "grant_type", "client_credentials",
-                    "appkey", appKey,
-                    "appsecret", appSecret
-            );
-            TokenResponse response = kisRestTemplate.exchange(
-                    kisBaseUrl + "/oauth2/tokenP",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    TokenResponse.class
-            ).getBody();
-            OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-            kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-        } catch (Exception e) {
-            throw new Account.InvalidKisKeyException();
-        }
-    }
-
     private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
+        log.info("KIS 토큰 신규 발급: accountId={}", accountId);
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

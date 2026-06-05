@@ -16,10 +16,13 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.UUID;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -52,13 +55,24 @@ class KisConnectionTestAdapterTest {
     }
 
     @Test
-    @DisplayName("accountId 있으면 발급 토큰을 캐시에 저장")
-    void test_whenAccountIdPresent_savesTokenToCache() {
+    @DisplayName("accountId 있고 캐시 미스 시 KIS 호출 후 토큰 캐시 저장")
+    void test_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisConnectionTestAdapter.TokenCheckResponse.class)))
                 .thenReturn(ResponseEntity.ok(new KisConnectionTestAdapter.TokenCheckResponse("tok", "2099-12-31 23:59:59")));
 
         assertThat(adapter.test("appKey", "appSecret", ACCOUNT_ID)).isTrue();
         verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
+    }
+
+    @Test
+    @DisplayName("accountId 있고 캐시 히트 시 KIS 호출 없이 true 반환")
+    void test_whenAccountIdPresentAndCacheHit_returnsTrueWithoutKisCall() {
+        when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
+
+        assertThat(adapter.test("appKey", "appSecret", ACCOUNT_ID)).isTrue();
+        verifyNoInteractions(kisRestTemplate);
+        verify(kisTokenCachePort, never()).saveToken(any(), any(), any());
     }
 
     @Test
