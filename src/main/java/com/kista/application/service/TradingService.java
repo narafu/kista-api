@@ -79,13 +79,11 @@ class TradingService implements ExecuteTradingUseCase {
         // 시장 개장 여부 확인 (1회) — 모든 사이클 공통, 가격 조회 전 조기 반환
         if (!isMarketOpen(today)) return;
 
-        // 시작 시점 현재가 일괄 조회 (INFINITE)
-        List<Ticker> infiniteTickers = contexts.stream()
-                .filter(c -> c.cycle().type() == TradingCycle.Type.INFINITE)
+        // 시작 시점 현재가 일괄 조회
+        List<Ticker> cycleTickers = contexts.stream()
                 .map(c -> c.cycle().ticker())
                 .distinct().toList();
-        Map<Ticker, BigDecimal> startPrices = infiniteTickers.isEmpty()
-                ? Map.of() : fetchPricesComplete(infiniteTickers, contexts.getFirst().account());
+        Map<Ticker, BigDecimal> startPrices = fetchPricesComplete(cycleTickers, contexts.getFirst().account());
 
         // 기준 매매표 조회 (PRIVACY)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.cycle().type() == TradingCycle.Type.PRIVACY);
@@ -131,9 +129,8 @@ class TradingService implements ExecuteTradingUseCase {
         // 공통 대기 — PostClose까지 (모든 사이클이 공유하는 단 1회)
         waitForPostClose(dst);
 
-        // 장 마감 후 종가 일괄 조회 (INFINITE ticker만, 1회)
-        Map<Ticker, BigDecimal> closingPrices = infiniteTickers.isEmpty()
-                ? Map.of() : fetchPricesComplete(infiniteTickers, contexts.getFirst().account());
+        // 장 마감 후 종가 일괄 조회
+        Map<Ticker, BigDecimal> closingPrices = fetchPricesComplete(cycleTickers, contexts.getFirst().account());
 
         // recordAndNotifyExecutions — 사이클별: 체결 조회 + 이력 저장 + 알림
         for (CyclePlacedState ps : recordAndNotifyExecutionsStates) {
@@ -194,22 +191,18 @@ class TradingService implements ExecuteTradingUseCase {
         };
     }
 
-    // recordAndNotifyExecutions: 체결 조회(INFINITE) + 이력 저장 + 알림
+    // recordAndNotifyExecutions: 체결 조회 + 이력 저장 + 알림
     void recordAndNotifyExecutions(CyclePlacedState ps, Map<Ticker, BigDecimal> closingPrices, LocalDate today) {
         CycleState state = ps.state();
         TradingCycle cycle = state.ctx().cycle();
         Account account = state.ctx().account();
         User user = state.ctx().user();
 
-        List<Execution> executions = List.of();
+        // 8. 체결 내역 조회
+        List<Execution> executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
+        log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
-        if (cycle.type() == TradingCycle.Type.INFINITE) {
-            // 8. 체결 내역 조회
-            executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
-            log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
-        }
-
-        // 9. 이력 저장 + 알림 — INFINITE: 종가 사용, PRIVACY: closingPrices = Map.of() → null
+        // 9. 이력 저장 + 알림
         BigDecimal closingPrice = closingPrices.get(cycle.ticker());
         saveAndNotify(state.balance(), closingPrice, state.snapshot(), today,
                 ps.mainOrders(), executions, user, account, cycle, state.privacyBase());
@@ -359,7 +352,7 @@ class TradingService implements ExecuteTradingUseCase {
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
         TradingCycleHistory history = new TradingCycleHistory(
                 null, cycle.id(),
-                balance.usdDeposit(), price,          // closingPrice (PRIVACY/초기 등록은 null)
+                balance.usdDeposit(), price,          // closingPrice (초기 등록 시 null)
                 balance.avgPrice(), balance.holdings(), null
         );
         cycleHistoryPort.save(history);

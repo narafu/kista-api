@@ -131,14 +131,14 @@ domain      →  외부 의존 없음
 - `TelegramAdapter`/`TelegramUserNotificationAdapter` 접근 경로: `r.snapshot().X()` (포맷 문자열 변경 금지)
 - `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — 사이클 단위 루프
 - `TradingScheduler`: `cycleRepository.findAllActive()` → 사이클 단위 loop (격리 try-catch)
-- `TradingCycleHistory` 필드: `id, tradingCycleId, usdDeposit, currentPrice(nullable), avgPrice(nullable), holdings, createdAt` — `currentPrice`는 실행 시점 현재가 (PRIVACY·초기 등록 시 null)
-- `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (currentPrice=null, avgPrice=null, holdings=0) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append (currentPrice=실행가, PRIVACY는 null)
+- `TradingCycleHistory` 필드: `id, tradingCycleId, usdDeposit, currentPrice(nullable), avgPrice(nullable), holdings, createdAt` — `currentPrice`는 PostClose 종가 (초기 등록 시 null)
+- `TradingCycleHistory` 저장 시점: ① `TradingCycleService.register()` — 사이클 등록 시 초기 1건 (currentPrice=null, avgPrice=null, holdings=0) ② `TradingService.execute()` 종료 시 — 매매 실행 완료 후 1건 append (currentPrice=종가, 전략 공통)
 - `TradingCycleHistoryPort` 메서드: `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findBetween(LocalDate from, LocalDate to)` — from/to는 LocalDate, KST 기준 Instant 변환 후 조회
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
 - `TradingService` helper SSOT: `loadBalance(TradingCycle)` — 잔고 로드+skip 판정(`BalanceLoad` record 반환), `calcInfinite(balance, cycle, price, today, label)` — `InfinitePosition` 생성+`buildOrders()` 호출(`InfiniteCalc` record 반환). `preview()`와 `execute()` 모두 이 helper 경유 — `AccountBalance`/`InfinitePosition` 생성 방식 변경 시 이 두 helper만 수정
-- `TradingService.execute()` 전략 분기: `switch(cycle.type())` 두 블록 구조 — ① steps 3-4(현재가+PLANNED 생성) ② steps 7-9(PostClose 대기+체결+보정). 공통: 1,2,5,6,10. PRIVACY는 두 블록 모두 TODO
-- PRIVACY execute() null guard 패턴: `resolvedPrice=null`, `snapshot=null` → `saveAndNotify`에서 `price != null`(portfolioSnapshot 생략), `snapshot != null`(텔레그램 리포트 생략) 조건 가드 유지 필수
-- `executeBatch`: INFINITE 사이클만 현재가 일괄조회 + 단건 fallback 대상 — PRIVACY 사이클은 `price=null`로 `execute()` 전달
+- `TradingService.execute()` 전략 분기: `switch(cycle.type())`는 `planAndSaveOrders` 내부에만 존재 — 현재가 조회·체결 조회·이력 저장·알림은 전략 공통
+- PRIVACY execute() null guard 패턴: `snapshot=null` → `saveAndNotify`에서 `snapshot != null`(텔레그램 리포트 생략) 조건 가드 유지 필수
+- `executeBatch`: 전 사이클 현재가/종가 일괄조회 (단건 fallback 포함), 체결 조회도 전략 공통 수행
 - **`preview()` today 오프셋**: 스케줄러는 KST 04:00 실행 → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴. 미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남 (KST 04:00 이후 미리보기 = 내일 매매 기준)
 - **`INSUFFICIENT_BALANCE` skip 시 position 포함**: INFINITE `preview()` 블록에서 `shouldSkip(price)` true여도 `InfinitePosition`을 Result에 포함 — 프론트에서 단위금액·현재가·부족 금액 표시 목적. `position=null` 관행의 의도된 예외
 - **`AccountBalance.shouldSkip(price)` 오버로드**: 0회차(holdings==0)에서 `unitAmount(=usdDeposit/20) < currentPrice`면 매수 수량 0이 되는 케이스. 현재가 파라미터 오버로드로 포착 — `tryLoadBalance()`의 `shouldSkip()` 통과 후 INFINITE 블록에서 추가 검증
