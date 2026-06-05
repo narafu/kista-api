@@ -55,12 +55,18 @@ public class AccountController {
     @Operation(summary = "계좌 등록", description = "KIS 계좌 및 자격증명을 AES-256 암호화하여 저장.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "등록 성공"),
-            @ApiResponse(responseCode = "400", description = "이미 등록된 계좌이거나 잘못된 요청")
+            @ApiResponse(responseCode = "400", description = "이미 등록된 계좌이거나 잘못된 요청"),
+            @ApiResponse(responseCode = "422", description = "계좌번호가 KIS 자격증명과 일치하지 않음")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
+        // 계좌번호 실소유 검증 — 트랜잭션 외부에서 KIS API 호출 (제약: @Transactional 내 외부 호출 금지)
+        if (!connectionTest.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "계좌번호가 KIS 자격증명과 일치하지 않습니다");
+        }
         try {
             return AccountResponse.from(
                     registerAccount.register(userId, request.toRegisterCommand())
