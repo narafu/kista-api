@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -166,5 +167,29 @@ class StatisticsControllerTest {
                         .param("tickers", "TQQQ")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void cycleHistory_returns_200_with_date_params() throws Exception {
+        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), any(), any()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
+                        .param("from", "2024-01-01").param("to", "2024-12-31")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void cycleHistory_returns_200_without_date_params() throws Exception {
+        // '전체' 선택 시 from/to 없이 요청해도 200 반환
+        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), isNull(), isNull()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 }

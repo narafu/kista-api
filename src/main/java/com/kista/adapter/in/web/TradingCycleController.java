@@ -198,8 +198,8 @@ public class TradingCycleController {
     public List<CycleHistoryResponse> getStrategyHistory(
             @PathVariable UUID strategyId,
             @AuthenticationPrincipal UUID userId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         try {
             return statisticsUseCase.getStrategyCycleHistory(strategyId, userId, from, to).stream()
                     .map(CycleHistoryResponse::from).toList();

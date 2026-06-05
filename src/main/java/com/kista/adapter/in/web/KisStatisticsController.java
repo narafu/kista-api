@@ -193,10 +193,10 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "조회 시작일", example = "2025-01-01")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "조회 종료일", example = "2025-01-31")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @Parameter(description = "조회 시작일 (생략 시 전체)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @Parameter(description = "조회 종료일 (생략 시 전체)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         try {
             List<AccountCycleHistoryEntry> history = statisticsUseCase.getCycleHistory(accountId, userId, from, to);
             return history.stream().map(CycleHistoryResponse::from).toList();

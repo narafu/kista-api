@@ -18,6 +18,9 @@ import java.util.UUID;
 import com.kista.domain.port.in.CancelOrderUseCase;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -150,5 +153,29 @@ class TradingCycleControllerTest {
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void strategyHistory_returns_200_with_date_params() throws Exception {
+        when(statisticsUseCase.getStrategyCycleHistory(eq(CYCLE_ID), any(), any(), any()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
+                        .param("from", "2024-01-01").param("to", "2024-12-31")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void strategyHistory_returns_200_without_date_params() throws Exception {
+        // '전체' 선택 시 from/to 없이 요청해도 200 반환
+        when(statisticsUseCase.getStrategyCycleHistory(eq(CYCLE_ID), any(), isNull(), isNull()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 }

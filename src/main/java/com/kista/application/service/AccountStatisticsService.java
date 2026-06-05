@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Collections;
@@ -96,9 +97,8 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     public List<AccountCycleHistoryEntry> getCycleHistory(UUID accountId, UUID requesterId,
                                                            LocalDate from, LocalDate to) {
         Account account = requireOwnedAccount(accountId, requesterId);
-        // LocalDate → Instant 변환 (UTC 기준 자정)
-        var fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        var toInstant = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        var fromInstant = resolveFrom(from);
+        var toInstant = resolveTo(to);
         return tradingCycleHistoryPort.findByAccountId(accountId, fromInstant, toInstant);
     }
 
@@ -107,9 +107,19 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
                                                                    LocalDate from, LocalDate to) {
         var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
         Account account = requireOwnedAccount(cycle.accountId(), requesterId);
-        var fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        var toInstant = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        var fromInstant = resolveFrom(from);
+        var toInstant = resolveTo(to);
         return tradingCycleHistoryPort.findByCycleIdAndDateRange(strategyId, fromInstant, toInstant);
+    }
+
+    // null이면 전체 기간 — Epoch(1970-01-01)부터 내일까지
+    private Instant resolveFrom(LocalDate from) {
+        return from != null ? from.atStartOfDay(ZoneOffset.UTC).toInstant() : Instant.EPOCH;
+    }
+
+    private Instant resolveTo(LocalDate to) {
+        var resolved = to != null ? to : LocalDate.now(ZoneOffset.UTC);
+        return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 
     // 계좌 조회 + 소유권 검증 — 불일치 시 SecurityException (컨트롤러에서 403 변환)
