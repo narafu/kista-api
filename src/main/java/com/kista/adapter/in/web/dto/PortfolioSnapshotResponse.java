@@ -16,11 +16,11 @@ public record PortfolioSnapshotResponse(
         Ticker ticker,
         @Schema(description = "보유 수량", example = "30")
         int holdings,
-        @Schema(description = "실행 시점 현재가 (USD, null이면 PRIVACY 또는 초기 등록)", example = "26.00")
-        BigDecimal currentPrice,
+        @Schema(description = "종가 (USD, null이면 PRIVACY 또는 초기 등록)", example = "26.00")
+        BigDecimal closingPrice,
         @Schema(description = "평균매입단가 (USD, 보유수량 0이면 null)", example = "25.00")
         BigDecimal avgPrice,
-        @Schema(description = "평가금액 (USD) = currentPrice × holdings (currentPrice null이면 0)", example = "780.00")
+        @Schema(description = "평가금액 (USD) = closingPrice × holdings (closingPrice null이면 0)", example = "780.00")
         BigDecimal marketValueUsd,
         @Schema(description = "예수금 (통합주문가능금액, USD)", example = "500.00")
         BigDecimal usdDeposit,
@@ -30,13 +30,13 @@ public record PortfolioSnapshotResponse(
         Instant createdAt
 ) {
     public static PortfolioSnapshotResponse from(AccountCycleHistoryEntry e) {
-        BigDecimal marketValueUsd = e.currentPrice() != null
-                ? e.currentPrice().multiply(BigDecimal.valueOf(e.holdings())).setScale(2, RoundingMode.HALF_UP)
+        BigDecimal marketValueUsd = e.closingPrice() != null
+                ? e.closingPrice().multiply(BigDecimal.valueOf(e.holdings())).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
         BigDecimal totalAssetUsd = marketValueUsd.add(e.usdDeposit()).setScale(2, RoundingMode.HALF_UP);
         return new PortfolioSnapshotResponse(
                 e.id(), e.ticker(), e.holdings(),
-                e.currentPrice(), e.avgPrice(),
+                e.closingPrice(), e.avgPrice(),
                 marketValueUsd, e.usdDeposit(), totalAssetUsd,
                 e.createdAt());
     }

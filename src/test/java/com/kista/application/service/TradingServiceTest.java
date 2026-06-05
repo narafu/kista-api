@@ -99,16 +99,21 @@ class TradingServiceTest {
 
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
+        BigDecimal startPrice = new BigDecimal("20.00"); // 시작가 (Phase A, 04:00 KST)
+        // PRICE = "22.00" — 종가 (PostClose 이후)
+
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null);
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null);
         UUID plannedId = UUID.randomUUID();
         Order planned = new Order(plannedId, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, startPrice,
                 Order.OrderStatus.PLANNED, null);
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001");
 
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE)); // 시작가 + 종가 모두
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, startPrice)) // 1st: 시작가
+                .thenReturn(Map.of(Ticker.SOXL, PRICE));     // 2nd: 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -129,6 +134,9 @@ class TradingServiceTest {
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
+        // 종가(PRICE="22.00")가 저장되어야 함 — 시작가("20.00")가 저장되면 버그
+        verify(cycleHistoryPort).save(argThat(h -> h.closingPrice() != null
+                && h.closingPrice().compareTo(PRICE) == 0));
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
     }
 

@@ -85,9 +85,9 @@ class TelegramBotService {
     private String buildStatusMessage() {
         try {
             AccountCycleHistoryEntry s = getPortfolioUseCase.getCurrent();
-            // currentPrice가 null이면 평가액 0으로 처리
-            double marketValue = s.currentPrice() != null
-                    ? s.currentPrice().doubleValue() * s.holdings() : 0.0;
+            // closingPrice가 null이면 평가액 0으로 처리
+            double marketValue = s.closingPrice() != null
+                    ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
             double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
             double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
             return String.format(

@@ -223,8 +223,9 @@ class TradingService implements ExecuteTradingUseCase {
             log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
         }
 
-        // 9. 이력 저장 + 알림
-        saveAndNotify(state.balance(), state.startPrice(), state.snapshot(), today,
+        // 9. 이력 저장 + 알림 — INFINITE: 종가 사용, PRIVACY: closingPrices = Map.of() → null
+        BigDecimal closingPrice = closingPrices.get(cycle.ticker());
+        saveAndNotify(state.balance(), closingPrice, state.snapshot(), today,
                 ps.mainOrders(), executions, user, account, cycle, state.privacyBase());
     }
 
@@ -366,7 +367,7 @@ class TradingService implements ExecuteTradingUseCase {
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
         TradingCycleHistory history = new TradingCycleHistory(
                 null, cycle.id(),
-                balance.usdDeposit(), price,          // currentPrice (PRIVACY/초기 등록은 null)
+                balance.usdDeposit(), price,          // closingPrice (PRIVACY/초기 등록은 null)
                 balance.avgPrice(), balance.holdings(), null
         );
         cycleHistoryPort.save(history);

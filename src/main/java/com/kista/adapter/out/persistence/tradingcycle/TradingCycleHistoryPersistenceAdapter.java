@@ -97,7 +97,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
                 e.getId(),
                 tickerMap.get(e.getTradingCycleId()),
                 e.getUsdDeposit(),
-                e.getCurrentPrice(),
+                e.getClosingPrice(),
                 e.getAvgPrice(),
                 e.getHoldings(),
                 e.getCreatedAt()
@@ -107,7 +107,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
     private TradingCycleHistory toDomain(TradingCycleHistoryEntity e) {
         return new TradingCycleHistory(
                 e.getId(), e.getTradingCycleId(),
-                e.getUsdDeposit(), e.getCurrentPrice(), e.getAvgPrice(),
+                e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt()
         );
     }
@@ -117,7 +117,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
         e.setId(h.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setTradingCycleId(h.tradingCycleId());
         e.setUsdDeposit(h.usdDeposit());
-        e.setCurrentPrice(h.currentPrice());
+        e.setClosingPrice(h.closingPrice());
         e.setAvgPrice(h.avgPrice());
         e.setHoldings(h.holdings());
         return e;
