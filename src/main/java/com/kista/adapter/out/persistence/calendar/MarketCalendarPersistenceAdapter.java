@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.calendar;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.port.out.MarketCalendarPort;
 import com.kista.domain.port.out.MarketHolidayQueryPort;
 import com.kista.domain.port.out.MarketHolidayStorePort;
@@ -21,14 +22,16 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
 
     @Override
     public boolean isMarketOpen(LocalDate date) {
-        if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+        // date는 KST 도메인 날짜 — DB는 UTC(=US 거래일) 기준이므로 변환 필수
+        LocalDate utcDate = TradeDateConverter.toUtc(date);
+        if (utcDate.getDayOfWeek() == DayOfWeek.SATURDAY || utcDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return false;
         }
-        if (holidayRepository.countByYear(date.getYear()) == 0) {
-            log.error("{}년 시장 캘린더 데이터 없음 — 폐장으로 폴백 (refreshCalendar 미실행 의심)", date.getYear());
+        if (holidayRepository.countByYear(utcDate.getYear()) == 0) {
+            log.error("{}년 시장 캘린더 데이터 없음 — 폐장으로 폴백 (refreshCalendar 미실행 의심)", utcDate.getYear());
             return false;
         }
-        return !holidayRepository.existsByTradeDate(date);
+        return !holidayRepository.existsByTradeDate(utcDate);
     }
 
     @Override
