@@ -17,6 +17,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Instant;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -24,6 +26,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -39,6 +43,10 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
+    // 연결 테스트 직후 계좌번호 검증 시 재발급 방지 — KIS EGW00133(1분당 1회 제한) 우회용 단기 캐시
+    private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
+    private record TempTokenEntry(String token, Instant expiresAt) {}
+
     @Override
     public boolean test(String appKey, String appSecret, UUID accountId) {
         // 유효 캐시 토큰이 있으면 재발급 없이 성공 — KIS 발급 알림 및 횟수 제한 방지
@@ -50,12 +58,17 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
             }
         }
         try {
-            // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 캐시 저장
+            // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 영구 캐시, null이면 단기 캐시 저장
             TokenCheckResponse response = issueToken(appKey, appSecret);
-            if (accountId != null && response != null) {
-                // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
-                OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-                kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+            if (response != null) {
+                if (accountId != null) {
+                    // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
+                    OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
+                    kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+                } else {
+                    // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
+                    tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
+                }
             }
             return true;
         } catch (RestClientException e) {
@@ -66,19 +79,26 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
 
     @Override
     public boolean testAccountNo(String appKey, String appSecret, String accountNo) {
-        // 1단계: 토큰 발급 (캐시 없음 — accountId 미확정)
-        TokenCheckResponse tokenResponse;
-        try {
-            tokenResponse = issueToken(appKey, appSecret);
-        } catch (RestClientException e) {
-            log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-            return false;
+        // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
+        String token;
+        TempTokenEntry cached = tempTokenCache.get(appKey);
+        if (cached != null && Instant.now().isBefore(cached.expiresAt())) {
+            log.debug("계좌번호 검증: 단기 캐시 토큰 재사용 (appKey={}...)", appKey.substring(0, Math.min(8, appKey.length())));
+            token = cached.token();
+        } else {
+            try {
+                TokenCheckResponse tokenResponse = issueToken(appKey, appSecret);
+                if (tokenResponse == null) return false;
+                token = tokenResponse.accessToken();
+            } catch (RestClientException e) {
+                log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
+                return false;
+            }
         }
-        if (tokenResponse == null) return false;
 
         // 2단계: TTTC2101R 호출로 계좌번호 유효성 검증
         HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + tokenResponse.accessToken());
+        headers.set("authorization", "Bearer " + token);
         headers.set("appkey", appKey);
         headers.set("appsecret", appSecret);
         headers.set("tr_id", "TTTC2101R"); // 해외증거금 통화별조회
