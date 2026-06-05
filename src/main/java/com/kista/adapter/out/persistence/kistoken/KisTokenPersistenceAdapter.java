@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,8 +27,4 @@ public class KisTokenPersistenceAdapter implements KisTokenCachePort {
         repository.save(new KisTokenEntity(accountId, accessToken, expiresAt));
     }
 
-    @Override
-    public List<UUID> findExpiringAccountIds(OffsetDateTime threshold) {
-        return repository.findAccountIdsByExpiresAtBefore(threshold);
-    }
 }

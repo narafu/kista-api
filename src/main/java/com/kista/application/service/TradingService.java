@@ -91,7 +91,7 @@ class TradingService implements ExecuteTradingUseCase {
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        // planAndSaveOrders — 사이클별: 휴장 확인 + 잔고 로드 + PLANNED 주문 생성·저장
+        // planAndSaveOrders — 사이클별: 잔고 로드 + PLANNED 주문 생성·저장
         List<CycleState> states = new ArrayList<>();
         for (BatchContext ctx : contexts) {
             try {
@@ -261,37 +261,24 @@ class TradingService implements ExecuteTradingUseCase {
             log.warn("[{}] 보정 주문 생략 — 시작가 없음 (가격 조회 실패)", account.nickname());
             return List.of();
         }
-        TradingOrderPlanner.InfiniteCalc idealCalc = orderPlanner.calcInfinite(balance, cycle, currentPrice, today,
-                "보정:" + account.nickname());
 
-        // 아침 PLACED 주문 수량 합산
-        List<Order> morningPlaced = orderPort.findPlacedByAccountAndDate(account.id(), today);
-        int morningBuyQty  = morningPlaced.stream()
-                .filter(o -> o.direction() == BUY).mapToInt(Order::quantity).sum();
-        int morningSellQty = morningPlaced.stream()
-                .filter(o -> o.direction() == SELL).mapToInt(Order::quantity).sum();
+        List<Order> placedOrder = orderPort.findPlacedByAccountAndDate(account.id(), today)
+                .stream().filter(o -> o.direction() == BUY).toList();
 
-        // 이상 수량 vs 아침 PLACED 수량 비교
-        int idealBuyQty  = idealCalc.orders().stream()
-                .filter(o -> o.direction() == BUY).mapToInt(Order::quantity).sum();
-        int idealSellQty = idealCalc.orders().stream()
-                .filter(o -> o.direction() == SELL).mapToInt(Order::quantity).sum();
+        // todo placedOrder 순회하면서 주문 가격이 현재보다 10% 이상 클 경우 현재가로 재주문 (현재가보다 15%이상 크면 LOC 주문 시간에 주문 거부됨)
 
         // 보정 주문 생성
         List<Order> corrections = new ArrayList<>();
-        int correctionBuy  = idealBuyQty  - morningBuyQty;
-        int correctionSell = idealSellQty - morningSellQty;
-        if (correctionBuy > 0)
-            corrections.add(new Order(null, account.id(), today, cycle.ticker(),
-                    Order.OrderType.LOC, BUY, correctionBuy, currentPrice, Order.OrderStatus.PLANNED, null));
-        if (correctionSell > 0)
-            corrections.add(new Order(null, account.id(), today, cycle.ticker(),
-                    Order.OrderType.LOC, SELL, correctionSell, currentPrice, Order.OrderStatus.PLANNED, null));
+
+        // todo 추가 주문
+        corrections.add(new Order(null, account.id(), today, cycle.ticker(),
+                Order.OrderType.LOC, BUY, 1, currentPrice, Order.OrderStatus.PLANNED, null));
 
         if (corrections.isEmpty()) {
             log.info("[{}] 보정 주문 불필요 — 수량 차이 없음", account.nickname());
             return List.of();
         }
+
         orderPlanner.savePlannedOrders(corrections, account);
         return executePlannedOrders(today, account);
     }

@@ -153,7 +153,6 @@ class TradingServiceTest {
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         // 오늘 이미 PLACED 주문 존재 → 보정 모드
         when(orderPort.findPlacedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlaced));
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 

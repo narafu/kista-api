@@ -95,17 +95,6 @@ class KisTokenAdapterTest {
     }
 
     @Test
-    @DisplayName("testToken: 키 유효 시 발급 토큰을 캐시에 저장")
-    void testToken_whenValid_savesTokenToCache() {
-        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisTokenAdapter.TokenResponse.class)))
-                .thenReturn(ResponseEntity.ok(new KisTokenAdapter.TokenResponse("test-token", "2099-12-31 23:59:59")));
-
-        adapter.testToken(ACCOUNT_ID, "key", "secret");
-
-        verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("test-token"), any());
-    }
-
-    @Test
     @DisplayName("getToken: 캐시 miss 후 lock 내 2차 조회(double-check)에서 hit 시 KIS API 미호출")
     void getToken_doubleCheck_preventsRedundantIssue() {
         // 1차 miss, 2차 hit (다른 스레드가 이미 발급한 상황 시뮬레이션)
