@@ -7,6 +7,7 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
+import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
@@ -94,29 +95,46 @@ public class AccountStatisticsService implements GetAccountStatisticsUseCase {
     }
 
     @Override
-    public List<AccountCycleHistoryEntry> getCycleHistory(UUID accountId, UUID requesterId,
-                                                           LocalDate from, LocalDate to) {
+    public CycleHistoryPage getCycleHistory(UUID accountId, UUID requesterId,
+                                             LocalDate from, LocalDate to,
+                                             Instant cursor, int size) {
         Account account = requireOwnedAccount(accountId, requesterId);
-        var fromInstant = resolveFrom(from);
-        var toInstant = resolveTo(to);
-        return tradingCycleHistoryPort.findByAccountId(accountId, fromInstant, toInstant);
+        Instant fromInstant = resolveFrom(from);
+        // cursor 없으면 to(=내일)가 상한 — cursor는 그 이전 지점으로 좁혀감
+        Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
+        List<AccountCycleHistoryEntry> raw =
+                tradingCycleHistoryPort.findByAccountIdWithCursor(accountId, fromInstant, effectiveCursor, size + 1);
+        return toPage(raw, size);
     }
 
     @Override
-    public List<AccountCycleHistoryEntry> getStrategyCycleHistory(UUID strategyId, UUID requesterId,
-                                                                   LocalDate from, LocalDate to) {
+    public CycleHistoryPage getStrategyCycleHistory(UUID strategyId, UUID requesterId,
+                                                      LocalDate from, LocalDate to,
+                                                      Instant cursor, int size) {
         var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
         Account account = requireOwnedAccount(cycle.accountId(), requesterId);
-        var fromInstant = resolveFrom(from);
-        var toInstant = resolveTo(to);
-        return tradingCycleHistoryPort.findByCycleIdAndDateRange(strategyId, fromInstant, toInstant);
+        Instant fromInstant = resolveFrom(from);
+        Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
+        List<AccountCycleHistoryEntry> raw =
+                tradingCycleHistoryPort.findByCycleIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
+        return toPage(raw, size);
     }
 
-    // null이면 전체 기간 — Epoch(1970-01-01)부터 내일까지
+    // size+1 조회 결과로 hasMore 판단 후 CycleHistoryPage 생성
+    private CycleHistoryPage toPage(List<AccountCycleHistoryEntry> raw, int size) {
+        boolean hasMore = raw.size() > size;
+        List<AccountCycleHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
+        // 다음 커서 = 현재 페이지 마지막 항목의 createdAt (DESC 정렬이므로 가장 오래된 것)
+        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
+        return new CycleHistoryPage(items, nextCursor, hasMore);
+    }
+
+    // null이면 전체 기간 — Epoch(1970-01-01)부터 조회
     private Instant resolveFrom(LocalDate from) {
         return from != null ? from.atStartOfDay(ZoneOffset.UTC).toInstant() : Instant.EPOCH;
     }
 
+    // null이면 오늘 + 1일 (오늘 데이터 포함)
     private Instant resolveTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(ZoneOffset.UTC);
         return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();

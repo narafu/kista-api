@@ -1,11 +1,10 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.CycleHistoryResponse;
+import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
@@ -25,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -181,7 +181,7 @@ public class KisStatisticsController {
         }
     }
 
-    // trading_cycle_history DB 조회 (KIS API 미사용)
+    // trading_cycle_history DB 조회 (KIS API 미사용) — 커서 기반 페이지네이션
     @Operation(summary = "사이클 이력 조회", description = "DB의 trading_cycle_history 테이블 기반 계좌 거래 이력 조회. KIS API 미호출.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -189,17 +189,23 @@ public class KisStatisticsController {
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
     })
     @GetMapping("/cycle-history")
-    public List<CycleHistoryResponse> getCycleHistory(
+    public CycleHistoryPageResponse getCycleHistory(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "조회 시작일 (생략 시 전체)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일 (생략 시 전체)")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @Parameter(description = "커서 (이전 응답의 nextCursor)")
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "페이지 크기 (기본 50, 최대 200)")
+            @RequestParam(defaultValue = "50") int size) {
         try {
-            List<AccountCycleHistoryEntry> history = statisticsUseCase.getCycleHistory(accountId, userId, from, to);
-            return history.stream().map(CycleHistoryResponse::from).toList();
+            Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
+            // @Validated 없이는 @Max가 동작하지 않으므로 직접 상한 적용
+            return CycleHistoryPageResponse.from(
+                    statisticsUseCase.getCycleHistory(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         }

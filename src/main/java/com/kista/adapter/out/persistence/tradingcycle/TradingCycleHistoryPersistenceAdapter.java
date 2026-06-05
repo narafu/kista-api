@@ -75,6 +75,24 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }
 
+    @Override
+    public List<AccountCycleHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
+                                                                     Instant cursor, int limit) {
+        Map<UUID, TradingCycle.Ticker> tickerMap = buildTickerMapByAccountId(accountId);
+        return jpaRepository.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit))
+                .stream().map(e -> toEntry(e, tickerMap)).toList();
+    }
+
+    @Override
+    public List<AccountCycleHistoryEntry> findByCycleIdWithCursor(UUID cycleId, Instant from,
+                                                                   Instant cursor, int limit) {
+        TradingCycle.Ticker ticker = cycleJpaRepository.findById(cycleId)
+                .map(TradingCycleEntity::getTicker).orElse(null);
+        Map<UUID, TradingCycle.Ticker> tickerMap = ticker != null ? Map.of(cycleId, ticker) : Map.of();
+        return jpaRepository.findByCycleIdWithCursor(cycleId, from, cursor, PageRequest.of(0, limit))
+                .stream().map(e -> toEntry(e, tickerMap)).toList();
+    }
+
     // 계좌 ID로 사이클 목록을 조회해 cycleId → ticker 맵 구성
     private Map<UUID, TradingCycle.Ticker> buildTickerMapByAccountId(UUID accountId) {
         return cycleJpaRepository.findAllByAccountId(accountId).stream()

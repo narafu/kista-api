@@ -42,4 +42,27 @@ interface TradingCycleHistoryJpaRepository extends JpaRepository<TradingCycleHis
            "WHERE tch.createdAt >= :from AND tch.createdAt < :to " +
            "ORDER BY tch.createdAt DESC")
     List<TradingCycleHistoryEntity> findBetweenDates(@Param("from") Instant from, @Param("to") Instant to);
+
+    // 계좌 기준 커서 페이지네이션 — createdAt < cursor AND createdAt >= from, DESC
+    @Query("SELECT tch FROM TradingCycleHistoryEntity tch " +
+           "WHERE tch.tradingCycleId IN " +
+           "(SELECT tc.id FROM TradingCycleEntity tc WHERE tc.accountId = :accountId) " +
+           "AND tch.createdAt >= :from AND tch.createdAt < :cursor " +
+           "ORDER BY tch.createdAt DESC")
+    List<TradingCycleHistoryEntity> findByAccountIdWithCursor(
+            @Param("accountId") UUID accountId,
+            @Param("from") Instant from,
+            @Param("cursor") Instant cursor,
+            Pageable pageable);
+
+    // 전략(사이클) 기준 커서 페이지네이션
+    @Query("SELECT tch FROM TradingCycleHistoryEntity tch " +
+           "WHERE tch.tradingCycleId = :cycleId " +
+           "AND tch.createdAt >= :from AND tch.createdAt < :cursor " +
+           "ORDER BY tch.createdAt DESC")
+    List<TradingCycleHistoryEntity> findByCycleIdWithCursor(
+            @Param("cycleId") UUID cycleId,
+            @Param("from") Instant from,
+            @Param("cursor") Instant cursor,
+            Pageable pageable);
 }

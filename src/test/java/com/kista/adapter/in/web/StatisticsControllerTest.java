@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,26 +172,44 @@ class StatisticsControllerTest {
     }
 
     @Test
-    void cycleHistory_returns_200_with_date_params() throws Exception {
-        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), any(), any()))
-                .thenReturn(List.of());
+    void cycleHistory_returns_page_with_date_params() throws Exception {
+        var page = new CycleHistoryPage(List.of(), null, false);
+        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), any(), any(), isNull(), eq(50)))
+                .thenReturn(page);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
                         .param("from", "2024-01-01").param("to", "2024-12-31")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test
-    void cycleHistory_returns_200_without_date_params() throws Exception {
-        // '전체' 선택 시 from/to 없이 요청해도 200 반환
-        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), isNull(), isNull()))
-                .thenReturn(List.of());
+    void cycleHistory_returns_page_without_date_params() throws Exception {
+        // '전체' 선택 시 from/to 없어도 200 반환
+        var page = new CycleHistoryPage(List.of(), null, false);
+        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), isNull(), isNull(), isNull(), eq(50)))
+                .thenReturn(page);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void cycleHistory_returns_nextCursor_when_hasMore() throws Exception {
+        Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
+        var page = new CycleHistoryPage(List.of(), cursor, true);
+        when(statisticsUseCase.getCycleHistory(eq(ACCOUNT_ID), any(), any(), any(), any(), eq(50)))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
+                        .param("from", "2024-01-01").param("to", "2024-12-31")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasMore").value(true))
+                .andExpect(jsonPath("$.nextCursor").value("2024-06-01T00:00:00Z"));
     }
 }

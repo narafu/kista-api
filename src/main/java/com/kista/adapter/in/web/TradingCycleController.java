@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.CancelOrdersResponse;
-import com.kista.adapter.in.web.dto.CycleHistoryResponse;
+import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
@@ -27,6 +27,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -192,17 +193,21 @@ public class TradingCycleController {
         }
     }
 
-    // 전략(사이클) 기준 거래 이력 조회
+    // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
     @Operation(summary = "전략 거래 이력 조회")
     @GetMapping("/api/trading-cycles/{strategyId}/history")
-    public List<CycleHistoryResponse> getStrategyHistory(
+    public CycleHistoryPageResponse getStrategyHistory(
             @PathVariable UUID strategyId,
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "50") int size) {
         try {
-            return statisticsUseCase.getStrategyCycleHistory(strategyId, userId, from, to).stream()
-                    .map(CycleHistoryResponse::from).toList();
+            Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
+            return CycleHistoryPageResponse.from(
+                    statisticsUseCase.getStrategyCycleHistory(
+                            strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
         } catch (SecurityException e) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (NoSuchElementException e) {
