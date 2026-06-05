@@ -24,17 +24,6 @@
 - `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
-### 현재 포트 시그니처
-- `ExecuteTradingUseCase.execute(TradingCycle cycle, Account account, User user)` — TradingCycle 파라미터
-- `ExecuteTradingUseCase.executeBatch(List<BatchContext> contexts)` — 복수 사이클 일괄 실행 (현재가 1회 조회). `BatchContext`는 인터페이스 내 nested record `(TradingCycle cycle, Account account, User user)`
-- `GetNextOrdersUseCase.preview(UUID accountId, UUID requesterId)` → `Result(tradeDate, position, orders, skipReason)` — `TradingPreviewService` 구현
-- `ManualExecuteTradingUseCase.execute(UUID cycleId, UUID requesterId)` → `List<Order>` — `ManualTradingService` 구현
-- `NotifyPort.notifyInsufficientBalance(Account, AccountBalance, TradingCycle.Ticker)` — TradingCycle.Ticker
-- `UserNotificationPort.notifyStrategyChanged(User, Account, TradingCycle cycle, String action)` — TradingCycle
-- `InfinitePosition(AccountBalance, TradingCycle.Ticker, BigDecimal price)` — TradingCycle.Ticker, multiple 제거 (V46)
-- `TradingCycleHistoryPort` — `save`, `findRecentByCycleId(cycleId, limit)`, `findByAccountId(accountId, from, to)`, `findRecentGlobal(limit)`, `findBetween(LocalDate from, LocalDate to)`
-- **`TradingService`는 `KisAccountPort` 미사용** — 잔고는 `TradingCycleHistoryPort.findRecentByCycleId(cycleId, 1)` 최신 이력에서 읽음
-- **`PortfolioSnapshot` 완전 제거** — `GetPortfolioUseCase`는 `AccountCycleHistoryEntry` 반환, `PortfolioSnapshotResponse.from(AccountCycleHistoryEntry)`에서 `marketValueUsd`/`totalAssetUsd` computed
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
@@ -72,28 +61,20 @@
 - `domain/model/<도메인>/` 하위 위치 (ArchUnit domain 규칙 준수)
 
 ### Ticker enum (TradingCycle.Ticker nested enum)
-- **`Ticker`는 `TradingCycle.Ticker`** — `domain/model/tradingcycle/TradingCycle.java` 내 nested enum. 구 `Strategy.Ticker` 완전 삭제됨
-- **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` (구 `Strategy.Ticker` import 사용 금지)
-- `TradingCycle.Ticker` enum: `TQQQ(ExchangeCode.NASD, ExcdCode.NAS, 0.15, desc)`, `SOXL(ExchangeCode.AMEX, ExcdCode.AMS, 0.20, ...)` — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드 포함 (label 없음). 새 종목 추가 시 두 코드 체계 모두 지정 필수
-- `TradingCycle.Ticker.tryParse(String)` — `Optional<TradingCycle.Ticker>` 반환, KIS 응답 종목코드 안전 변환
-- PRIVACY 전략: 항상 서버에서 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycle.Type.resolveTicker()` — 도메인 규칙)
-- INFINITE 전략: 지정 없으면 `Ticker` 선언 순서 첫 번째(현재 TQQQ) — `Type.resolveTicker(requested)` 단일 파라미터 시그니처, `availableTickers().iterator().next()` fallback
-- `TradingCycle.Type` enum: `description` 필드만 보유 (label/defaultTicker/defaultMultiple 없음). `availableTickers()` 메서드가 INFINITE→allOf, PRIVACY→{SOXL} 동적 반환
-- DB: `trading_cycle.ticker` 컬럼에 `Ticker.name()` 저장, `TradingCyclePersistenceAdapter`에서 `TradingCycle.Ticker.valueOf(e.getTicker())`로 변환
-- KIS 응답 모델 — `TradingCycle.Ticker ticker` 필드 사용, 어댑터에서 `tryParse` 필터로 enum 외 종목 제거
-- **Account에서 ticker 제거됨** — `Account.ticker()` 호출 불가. 매매 시 `tradingCycle.ticker()` 사용
-- **`symbolName: String`은 유지** — KIS `ovrs_item_name`/`prdt_name`은 enum 후보 아님
+- **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` — 구 `Strategy.Ticker` 완전 삭제됨
+- `TradingCycle.Ticker` enum: TQQQ/SOXL — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드. 새 종목 추가 시 두 코드 체계 모두 지정 필수
+- PRIVACY 전략: 항상 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycle.Type.resolveTicker()`)
+- `TradingCycle.Ticker.tryParse(String)` — KIS 응답 종목코드 안전 변환 (`Optional` 반환)
+- **Account에서 ticker 제거됨** — 매매 시 `tradingCycle.ticker()` 사용
 
 
 ### Virtual Thread
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
-- TradingScheduler cron: `0 0 4 * * TUE-SAT` (화~토 04:00 KST) — 변경 금지
 - 사이클 단위 순차 실행: `TradingCyclePort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
 
 ### JPA 설정
-- `spring.jpa.open-in-view: false` 명시 — REST API이므로 불필요, 커넥션 점유 방지
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈
 - IDE 경고 "열을 해결할 수 없습니다" — Flyway 미적용 상태의 false positive. `compileJava BUILD SUCCESSFUL`이 실제 검증 기준
 - **`BaseAuditEntity` vs `BaseCreatedAtEntity`**: `createdAt`+`updatedAt` 필요 시 `BaseAuditEntity` 상속, `createdAt`만 필요 시 `BaseCreatedAtEntity` 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패)
@@ -102,7 +83,6 @@
 - **DB 컬럼**: PostgreSQL 네이티브 ENUM (`CREATE TYPE ... AS ENUM`) **사용 금지** — VARCHAR(20) 사용
 - **JPA 매핑**: `@Enumerated(EnumType.STRING)` 단독 사용 — `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 사용 금지
 - **Flyway**: `CREATE TYPE` 구문 작성 금지, 컬럼 정의는 `VARCHAR(20)` (값 길이 여유 있게)
-- 기존 네이티브 ENUM은 V25에서 VARCHAR로 전환 완료 (`user_status`, `user_role`, `strategy_type`, `strategy_status`)
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
@@ -137,15 +117,11 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS`
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발
-- PostgreSQL ENUM → VARCHAR 전환 시 `DROP TYPE` 실패 원인: `ALTER COLUMN TYPE` 후에도 DEFAULT 표현식(`'PENDING'::user_status`)에 ENUM 캐스팅이 남아 의존성 유지 → `DROP TYPE ... CASCADE`로 의존 DEFAULT 함께 제거 후 `SET DEFAULT '값'`으로 재설정
 - Flyway checksum mismatch (로컬 마이그레이션 파일 수정 시): `DELETE FROM flyway_schema_history WHERE version = 'N'` + 해당 테이블 DROP → 앱 재시작 (로컬 전용 — 운영 DB에 절대 적용 금지)
 
 ### application-local.yml Docker 호환성
 - datasource url/username/password는 반드시 `${DB_URL:...}` 형식 유지 — 하드코딩 시 Docker에서 주입한 `DB_URL=postgres:5432`가 무시되고 `localhost:5432`로 접속 시도
 
-### springdoc 버전 제약
-- Spring Boot 3.4.x(Spring Framework 6.2)는 springdoc **2.7.0 이상** 필요 — 2.6.x는 `NoSuchMethodError: ControllerAdviceBean` 발생
-- 현재: `springdoc = "2.8.4"` (`gradle/libs.versions.toml`)
 
 ### 텔레그램 로컬 테스트
 - `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 (ping은 성공해도 curl 타임아웃)
@@ -161,8 +137,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### Lombok 패턴
-- `@Slf4j` + `@RequiredArgsConstructor` 표준
-- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치 — 불일치 시 NoUniqueBeanDefinitionException
+- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치 — 불일치 시 `NoUniqueBeanDefinitionException`
 
 ### AES-256 암호화 위치
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화
@@ -237,15 +212,9 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 리스너 위치: `adapter/out/` — ArchUnit 규칙상 adapter.out → application 의존 허용
 
 
-### reapply 쿨다운 정책
-- PENDING 사용자: 1시간마다 재신청 가능 (누락 대비 알림 재발송, 무한 요청 방지)
-- REJECTED 사용자: 거절 후 24시간 후 재신청 가능
-- `lastReappliedAt` 단일 필드로 추적 — `reject()` 시 설정, `reapply()` 성공 시 갱신
-- 쿨다운 위반: `CooldownException(retryAfter: Instant)` → controller에서 429 변환
 
 ### ArchUnit 규칙 예외 (adapter.out)
-- `adapter.in → application` 의존 금지 / `adapter.out → application` 의존 허용
-- TelegramAdapter(adapter.out)에서 NewUserRegisteredEvent(application.service) 참조 가능
+- `adapter.out → application` 의존 허용 — TelegramAdapter(adapter.out)에서 NewUserRegisteredEvent(application.service) 참조 가능
 
 ### 도메인 포트 인터페이스와 타입 위치 규칙
 - `domain/port/in` 또는 `domain/port/out` 인터페이스의 파라미터·반환 타입으로 쓰이는 record/class는 반드시 `domain/model/` 하위에 위치 — `adapter/in/web/dto/`에 두면 `domain → adapter` ArchUnit 규칙 위반

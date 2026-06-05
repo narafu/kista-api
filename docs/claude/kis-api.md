@@ -65,14 +65,8 @@
 
 ### kis-trade-mcp (localhost:3001)
 - `open-trading-api/MCP/Kis Trading MCP` 소스, SSE 모드 Docker 컨테이너
-- docker run 시 반드시 KIS 자격증명 환경변수 전달 필요 (미전달 시 `ka._TRENV.my_acct` AttributeError)
-  - `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값)
-  - `KIS_ACCOUNT_NO` ≠ `KIS_ACCT_STOCK` — 변수명 다름 주의
-- `KeyError: 'my_acct'` 오류 시: `docker exec kis-trade-mcp grep -E "my_acct|my_prod" /root/KIS/config/kis_devlp.yaml` 확인
-  - `my_acct` 키 없으면: `sed -i '/my_acct_stock:/a my_acct: ...'`로 추가
-  - `my_prod: ''`(빈값)이면 `'01'`로 수정 — `changeTREnv()`가 `product=="01"` 분기에서만 계좌번호 설정함
-  - 영구 수정: `module/plugin/kis.py` 패치 후 컨테이너 재빌드 (이미 패치됨)
-- fastmcp 3.2.4 호환: `server.py` `stateless_http` 제거, `middleware.py`·`tools/base.py` `set_state`/`get_state` 모두 `await` 필요
+- docker run 시 KIS 자격증명 환경변수 필수: `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값 — 변수명 다름 주의)
+- 재시작/문제 발생 시: `commands.md`의 `kis-trade-mcp 재시작` 섹션 참고
 
 ### 기간손익 API (TTTS3039R, KisProfitAdapter)
 - TR ID: `TTTS3039R` (주의: `TTTS3027R` 아님 — 오기 주의)
@@ -113,9 +107,3 @@
 - KIS 응답 모델(`PresentBalanceResult.Item`, `PeriodProfitResult.Item`)의 `exchangeCode: String`은 수신값이므로 enum 변환 대상 아님
 - **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API(`TTTT1002U`/`TTTT1006U`)가 프리마켓·정규장·애프터마켓 전 구간에서 LOC/MOC 모두 지원하므로 예약주문 API 불필요 — kista에서 완전 제거됨
 
-### KIS Adapter 단위 테스트
-- Spring 컨텍스트 없이 `@ExtendWith(MockitoExtension.class)` 순수 Mockito 사용
-- `KisHttpClient` mock 시 `buildHeaders(anyString(), any(Account.class))` 스텁 필요 (V2: Account 파라미터)
-- `props()` stub은 CANO 파라미터에 `props().accountNo()` 쓰는 어댑터에서만 — KisProfitAdapter 등 props() 미사용 어댑터 @BeforeEach에 넣으면 `UnnecessaryStubbingException`
-- `KisTokenAdapterTest`: `@Mock RestTemplate kisRestTemplate` + 생성자 직접 생성 (`@InjectMocks` 사용 금지 — `KisHttpClient` mock이 없으므로)
-- Adapter 내부 `record` (예: `KisOrderAdapter.OrderResponse`)는 같은 패키지 테스트에서 직접 접근 가능
