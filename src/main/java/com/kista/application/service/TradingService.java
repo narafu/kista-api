@@ -170,13 +170,23 @@ class TradingService implements ExecuteTradingUseCase {
                     yield new CycleState(ctx, balance, null, null, startPrices.get(cycle.ticker()), null, true);
                 }
                 BigDecimal price = startPrices.get(cycle.ticker());
-                if (balance.shouldSkip(price)) {
-                    log.info("0회차 단위금액 부족 — 매매 건너뜀: [{}]", account.nickname());
+                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, account.nickname());
+                List<Order> orders = calc.orders();
+                // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
+                BigDecimal totalBuyAmount = orders.stream()
+                        .filter(o -> o.direction() == BUY)
+                        .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                int totalSellQuantity = orders.stream()
+                        .filter(o -> o.direction() == SELL)
+                        .mapToInt(Order::quantity).sum();
+                if (totalBuyAmount.compareTo(balance.usdDeposit()) > 0 || totalSellQuantity > balance.holdings()) {
+                    log.warn("[{}] 주문 유효성 실패 — 매수금액 ${} > 잔액 ${} 또는 매도수량 {} > 보유수량 {}",
+                            account.nickname(), totalBuyAmount, balance.usdDeposit(), totalSellQuantity, balance.holdings());
                     notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
                     yield null;
                 }
-                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, account.nickname());
-                orderPlanner.savePlannedOrders(calc.orders(), account);
+                orderPlanner.savePlannedOrders(orders, account);
                 yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null, false);
             }
             case PRIVACY -> {

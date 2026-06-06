@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
@@ -19,6 +18,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+
+import static com.kista.domain.model.order.Order.OrderDirection.BUY;
+import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 
 @Service
 @RequiredArgsConstructor
@@ -59,13 +61,21 @@ class TradingPreviewService implements GetNextOrdersUseCase {
         return switch (cycle.type()) {
             case INFINITE -> {
                 BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
-                if (balance.shouldSkip(price)) {
-                    // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해
-                    InfinitePosition position = new InfinitePosition(balance, cycle.ticker(), price);
-                    yield new Result(today, position, List.of(), SkipReason.INSUFFICIENT_BALANCE);
-                }
                 TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, "preview:" + accountId);
-                yield new Result(today, calc.position(), calc.orders(), null);
+                List<Order> orders = calc.orders();
+                // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
+                BigDecimal totalBuyAmount = orders.stream()
+                        .filter(o -> o.direction() == BUY)
+                        .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                int totalSellQuantity = orders.stream()
+                        .filter(o -> o.direction() == SELL)
+                        .mapToInt(Order::quantity).sum();
+                if (totalBuyAmount.compareTo(balance.usdDeposit()) > 0 || totalSellQuantity > balance.holdings()) {
+                    // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해
+                    yield new Result(today, calc.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
+                }
+                yield new Result(today, calc.position(), orders, null);
             }
             case PRIVACY -> {
                 // 스케줄러 planAndSaveOrders와 동일: 기준매매표 없으면 skip
