@@ -63,8 +63,9 @@ class TradingPreviewServiceTest {
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null);
     static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
             null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
+    // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
     static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), BigDecimal.ZERO, null, null, 0, null);
+            null, CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null);
 
     @BeforeEach
     void setUp() {
@@ -111,17 +112,23 @@ class TradingPreviewServiceTest {
     }
 
     @Test
-    void preview_returnsSkipInsufficientBalance_whenShouldSkip() {
+    void preview_returnsSkipInsufficientBalance_whenBuyAmountExceedsBalance() {
+        // 매수금액($20) > 잔액($10) → INSUFFICIENT_BALANCE skip
+        Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                Order.OrderStatus.PLANNED, null);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(overBudgetBuy));
 
         GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
-        assertThat(result.position()).isNull();
+        assertThat(result.position()).isNotNull(); // position은 프론트 참고용으로 유지
         assertThat(result.orders()).isEmpty();
-        verify(kisPricePort, never()).getPrice(any(), any());
     }
 
     @Test

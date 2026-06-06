@@ -12,7 +12,6 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
-import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -151,13 +150,7 @@ class TradingService implements ExecuteTradingUseCase {
         Account account = ctx.account();
 
         // 1. 잔고 로드
-        TradingBalanceLoader.BalanceLoad load = balanceLoader.loadBalanceOrThrow(cycle);
-        if (load.skipReason() == SkipReason.INSUFFICIENT_BALANCE) {
-            log.info("잔고 부족 — 매매 건너뜀: [{}]", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, load.balance(), cycle.ticker());
-            return null;
-        }
-        AccountBalance balance = load.balance();
+        AccountBalance balance = balanceLoader.loadBalanceOrThrow(cycle).balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // 2. 전략별 PLANNED 주문 생성·저장

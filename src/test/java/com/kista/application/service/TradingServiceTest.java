@@ -54,7 +54,8 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    static final AccountBalance LOW_BALANCE = new AccountBalance(0, null, BigDecimal.ZERO);
+    // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
+    static final AccountBalance LOW_BALANCE = new AccountBalance(5, new BigDecimal("20.00"), new BigDecimal("10.00"));
 
     // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 제거됨)
     static final Account ACCOUNT = new Account(
@@ -76,7 +77,7 @@ class TradingServiceTest {
     static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
             null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
     static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
-            null, CYCLE.id(), BigDecimal.ZERO, null, null, 0, null);
+            null, CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null);
 
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
@@ -181,10 +182,13 @@ class TradingServiceTest {
 
     @Test
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
-        // executeBatch는 Phase A 이전에 시작가를 일괄 조회 → getPrices 호출은 정상
+        // 매수금액($20) > 잔액($10) → skip + notify
+        Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null);
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(overBudgetBuy));
 
         service.execute(CYCLE, ACCOUNT, USER, PAST_DST);
 

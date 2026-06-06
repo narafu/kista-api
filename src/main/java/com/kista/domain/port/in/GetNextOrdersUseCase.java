@@ -21,7 +21,7 @@ public interface GetNextOrdersUseCase {
 
     enum SkipReason {
         NO_CYCLE_HISTORY,       // 사이클 이력 없음 (신규)
-        INSUFFICIENT_BALANCE,   // 잔고 부족 (shouldSkip)
+        INSUFFICIENT_BALANCE,   // 매수금액 > 잔액 or 매도수량 > 보유수량
         NO_PRIVACY_BASE         // PRIVACY 기준매매표 미수신
     }
 }
