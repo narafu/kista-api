@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
@@ -13,11 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -30,7 +27,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
     private final AccountPort accountPort;
     private final OrderPort orderPort;
     private final UserPort userPort;
-    private final TradingService tradingService; // package-private 헬퍼 접근용
+    private final TradingService tradingService; // planForManual 진입점 호출용
 
     @Override
     public List<Order> execute(UUID cycleId, UUID requesterId) {
@@ -63,10 +60,8 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
                 .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
 
         // 현재가 기준으로 계산해 PLANNED 저장 — KIS 접수는 스케줄러가 담당
-        Map<Ticker, BigDecimal> startPrices = tradingService.fetchPricesComplete(List.of(cycle.ticker()), account);
-        TradingService.CycleState state = tradingService.planAndSaveOrders(
-                new BatchContext(cycle, account, user), startPrices, null, today);
-        if (state == null) return List.of(); // 휴장 또는 잔고 부족
+        boolean planned = tradingService.planForManual(new BatchContext(cycle, account, user), today);
+        if (!planned) return List.of(); // 휴장 또는 잔고 부족
 
         // 저장된 PLANNED 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedByAccountAndDate(account.id(), today);

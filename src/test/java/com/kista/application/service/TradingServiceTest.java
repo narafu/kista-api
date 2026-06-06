@@ -91,13 +91,17 @@ class TradingServiceTest {
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(infiniteStrategy, privacyStrategy, orderPort);
         CycleRotationService rotationService = new CycleRotationService(
                 kisMarginPort, cyclePort, cycleHistoryPort, notifyPort, userNotificationPort);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, kisOrderPort, priceCapper);
+        TradingReporter reporter = new TradingReporter(
+                kisExecutionPort, userNotificationPort, realtimeNotificationPort,
+                cycleHistoryPort, rotationService);
         service = new TradingService(
-                marketCalendarPort,
-                kisPricePort, kisOrderPort, kisExecutionPort,
-                notifyPort, userNotificationPort,
-                orderPort, realtimeNotificationPort, cycleHistoryPort,
-                privacyTradePort,
-                balanceLoader, orderPlanner, rotationService);
+                marketCalendarPort, notifyPort,
+                orderPort, privacyTradePort,
+                balanceLoader, orderPlanner,
+                priceFetcher, orderExecutor, reporter);
     }
 
     @Test
