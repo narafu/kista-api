@@ -93,7 +93,9 @@ public record InfinitePosition(
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
         BigDecimal buyAmountByAvgPrice = averagePrice().multiply(BigDecimal.valueOf(buyQuantityByAvgPrice));
-        return unitAmount().subtract(buyAmountByAvgPrice).divide(referencePrice(), 0, FLOOR).intValue();
+        return unitAmount().subtract(buyAmountByAvgPrice)
+                .multiply(BigDecimal.ONE.add(ticker.getTargetProfitRate()))
+                .divide(referencePrice(), 0, FLOOR).intValue();
     }
 
     public int calcLateBuyQuantity() {

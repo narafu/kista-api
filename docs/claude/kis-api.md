@@ -20,6 +20,7 @@
   3. **주문 body를 Map(compact JSON)으로 전송**: KIS GW는 raw JSON String 포맷만 허용 — `KisOrderAdapter.place()`는 `String.format()` 방식 사용 (LinkedHashMap → Jackson 직렬화 금지)
   - 재시도 로직 없음 — 원인 제거로만 해결
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisTokenAdapter`)
+- `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > KIS 실잔고(DB 이력과 불일치) 또는 매수 금액 > 실가용자금. 주문 계산 후 2-조건 체크(`totalBuyAmount > usdDeposit OR totalSellQuantity > holdings`)로 사전 감지 가능
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능
