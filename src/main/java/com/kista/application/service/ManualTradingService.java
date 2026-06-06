@@ -30,7 +30,6 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
     private final AccountPort accountPort;
     private final OrderPort orderPort;
     private final UserPort userPort;
-    private final NotifyPort notifyPort;
     private final TradingService tradingService; // package-private 헬퍼 접근용
 
     @Override
@@ -56,48 +55,20 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
                 ? LocalDate.now()
                 : LocalDate.now().plusDays(1);
 
-        // 이중 실행 방지
-        if (!orderPort.findPlacedByAccountAndDate(account.id(), today).isEmpty())
-            throw new IllegalStateException("오늘 이미 실행된 사이클입니다");
+        // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
+        if (!orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today).isEmpty())
+            throw new IllegalStateException("오늘 이미 주문이 등록된 사이클입니다");
+
         User user = userPort.findById(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
 
-        // 일반 LOC 직접 접수 (planAndSaveOrders/B 동기, recordAndNotifyExecutions 비동기)
+        // 현재가 기준으로 계산해 PLANNED 저장 — KIS 접수는 스케줄러가 담당
         Map<Ticker, BigDecimal> startPrices = tradingService.fetchPricesComplete(List.of(cycle.ticker()), account);
         TradingService.CycleState state = tradingService.planAndSaveOrders(
                 new BatchContext(cycle, account, user), startPrices, null, today);
         if (state == null) return List.of(); // 휴장 또는 잔고 부족
 
-        // KIS 접수 실패 시 PLANNED 주문 정리 — 재시도 때 중복 누적 방지
-        List<Order> placed;
-        try {
-            placed = state.isManualCorrection()
-                    ? tradingService.executeCorrectionOrders(today, state)
-                    : tradingService.executePlannedOrders(today, account);
-        } catch (Exception e) {
-            try {
-                orderPort.deletePlannedByAccountAndDate(account.id(), today);
-            } catch (Exception cleanup) {
-                log.warn("PLANNED 주문 정리 실패 (원본 오류: {}): {}", e.getMessage(), cleanup.getMessage());
-            }
-            throw e;
-        }
-
-        TradingService.CyclePlacedState placedState = new TradingService.CyclePlacedState(state, placed);
-        Thread.startVirtualThread(() -> {
-            try {
-                tradingService.waitForPostClose(dst);
-                Map<Ticker, BigDecimal> closingPrices = tradingService.fetchPricesComplete(List.of(cycle.ticker()), account);
-                tradingService.recordAndNotifyExecutions(placedState, closingPrices, today);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("수동 실행 recordAndNotifyExecutions 인터럽트: cycleId={}", cycleId);
-            } catch (Exception e) {
-                log.error("수동 실행 recordAndNotifyExecutions 오류: cycleId={}", cycleId, e);
-                notifyPort.notifyError(e);
-            }
-        });
-
-        return placed;
+        // 저장된 PLANNED 주문 반환 (UI에서 예약 확인용)
+        return orderPort.findPlannedByAccountAndDate(account.id(), today);
     }
 }

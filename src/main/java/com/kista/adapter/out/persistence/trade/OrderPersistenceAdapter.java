@@ -91,6 +91,27 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    @Transactional
+    public void deletePlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // 가격 보정 시 BUY PLANNED만 삭제 — SELL PLANNED와 PLACED는 보존
+        repository.deleteAllByAccountIdAndTradeDateAndStatusAndDirection(
+                accountId, TradeDateConverter.toUtc(tradeDate),
+                Order.OrderStatus.PLANNED, Order.OrderDirection.BUY);
+    }
+
+    @Override
+    public List<Order> findPlannedOrPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // 스케줄러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
+        return repository
+                .findByAccountIdAndTradeDateAndStatusIn(
+                        accountId, TradeDateConverter.toUtc(tradeDate),
+                        List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         OrderEntity e = repository.findById(orderId)

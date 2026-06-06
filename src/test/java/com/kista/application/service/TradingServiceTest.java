@@ -119,6 +119,8 @@ class TradingServiceTest {
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template));
+        when(orderPort.findPlannedOrPlacedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
+                .thenReturn(List.of()); // 오늘 주문 없음 → 신규 계산
         when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any(LocalDate.class)))
                 .thenReturn(List.of(planned));
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
@@ -131,7 +133,7 @@ class TradingServiceTest {
         verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose) 각 1회
         verify(orderPort).saveAll(anyList());
-        verify(orderPort).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
+        verify(orderPort, atLeastOnce()).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(plannedId), eq("ORD-001"));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
@@ -142,26 +144,29 @@ class TradingServiceTest {
     }
 
     @Test
-    void executeBatch_manualCorrectionMode_skipsPhaseCToPreventDuplicateNotification() throws InterruptedException {
-        // 수동 실행으로 이미 PLACED 주문이 존재 → isManualCorrection=true → Phase C 위임
-        Order alreadyPlaced = new Order(UUID.randomUUID(), ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
-        Order correctionOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-002");
+    void executeBatch_todayOrdersExist_skipsPlanningAndProceedsToKis() throws InterruptedException {
+        // 수동 실행으로 이미 PLANNED 주문이 존재 → 재계산 skip, KIS 접수만 수행
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null);
+        Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        // 오늘 이미 PLACED 주문 존재 → 보정 모드
-        when(orderPort.findPlacedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlaced));
+        // 오늘 이미 PLANNED 주문 존재 → planAndSaveOrders에서 재계산 skip
+        when(orderPort.findPlannedOrPlacedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlanned));
+        when(orderPort.findPlannedByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(List.of(alreadyPlanned));
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(kisPricePort, never()).getPrice(any(), any()); // startPrices 재사용 — 단건 조회 생략
-        // Phase C 스킵 → 체결 조회·이력 저장·텔레그램 모두 미호출
-        verify(kisExecutionPort, never()).getExecutions(any(), any(), any(), any());
-        verify(cycleHistoryPort, never()).save(any());
-        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
+        // 재계산 없음 — saveAll 미호출
+        verify(orderPort, never()).saveAll(any());
+        // KIS 접수는 정상 수행
+        verify(kisOrderPort).place(any(), eq(ACCOUNT));
+        verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
     }
 
     @Test

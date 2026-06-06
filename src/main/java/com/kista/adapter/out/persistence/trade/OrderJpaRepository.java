@@ -17,6 +17,14 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     void deleteAllByAccountIdAndTradeDateAndStatus(
             UUID accountId, LocalDate tradeDate, Order.OrderStatus status);
 
+    // BUY PLANNED만 삭제 (가격 보정 시 재저장 준비)
+    void deleteAllByAccountIdAndTradeDateAndStatusAndDirection(
+            UUID accountId, LocalDate tradeDate, Order.OrderStatus status, Order.OrderDirection direction);
+
+    // PLANNED 또는 PLACED 조회 (스케줄러 재계산 skip 판정)
+    List<OrderEntity> findByAccountIdAndTradeDateAndStatusIn(
+            UUID accountId, LocalDate tradeDate, List<Order.OrderStatus> statuses);
+
     // 기간+종목 필터 (대시보드용)
     List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 

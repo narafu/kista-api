@@ -33,6 +33,12 @@ public interface OrderPort {
     // KIS 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
     void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate);
 
+    // BUY PLANNED만 삭제 (KIS 접수 전 가격 보정 시 재저장 준비)
+    void deletePlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
+
+    // 오늘 PLANNED 또는 PLACED 주문 조회 (스케줄러 재계산 skip 판정용)
+    List<Order> findPlannedOrPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+
     // 취소 완료 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
 }
