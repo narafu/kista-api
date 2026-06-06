@@ -29,14 +29,14 @@ public class KisPriceAdapter implements KisPricePort {
     private static final String MULTI_TR_ID  = "HHDFS76220000";
 
     private final KisHttpClient kisHttpClient;
+    private final KisExchangeRegistry exchangeRegistry;
 
     @Override
     public BigDecimal getPrice(Ticker ticker, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(SINGLE_TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
-        // KIS exchangeCode: NASD→NAS, AMS→AMS
-        String excd = ticker.getExcdCode().name();
+        String excd = exchangeRegistry.excd(ticker);
         params.add("EXCD", excd);
         params.add("SYMB", ticker.name());
 
@@ -72,7 +72,7 @@ public class KisPriceAdapter implements KisPricePort {
         for (int i = 0; i < tickers.size(); i++) {
             Ticker ticker = tickers.get(i);
             String num = String.format("%02d", i + 1); // "01", "02", "03"
-            String excd = ticker.getExcdCode().name();
+            String excd = exchangeRegistry.excd(ticker);
             params.add("EXCD_" + num, excd);
             params.add("SYMB_" + num, ticker.name());
         }
@@ -109,7 +109,7 @@ public class KisPriceAdapter implements KisPricePort {
         // 복수종목 응답에 없는 종목 → 단건 API fallback
         for (Ticker ticker : tickers) {
             if (!result.containsKey(ticker)) {
-                log.warn("복수종목 현재가 응답 누락 — 단건 API fallback 시도: ticker={}, excd={}", ticker, ticker.getExchangeCode());
+                log.warn("복수종목 현재가 응답 누락 — 단건 API fallback 시도: ticker={}", ticker);
                 try {
                     BigDecimal price = getPrice(ticker, account);
                     result.put(ticker, price);

@@ -27,6 +27,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final KisHttpClient kisHttpClient;
+    private final KisExchangeRegistry exchangeRegistry;
 
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
@@ -40,7 +41,7 @@ public class KisExecutionAdapter implements KisExecutionPort {
         params.add("ORD_END_DT", to.format(FMT));
         params.add("SLL_BUY_DVSN", "00");              // 전체
         params.add("CCLD_NCCS_DVSN", "00");            // 전체
-        params.add("OVRS_EXCG_CD", ticker.getExchangeCode().name()); // 전략 종목 거래소
+        params.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
         params.add("SORT_SQN", "DS");                  // 정순
         params.add("ORD_DT", "");
         params.add("ORD_GNO_BRNO", "");

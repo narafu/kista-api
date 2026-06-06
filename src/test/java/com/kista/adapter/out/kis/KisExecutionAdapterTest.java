@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 class KisExecutionAdapterTest {
 
     @Mock KisHttpClient kisHttpClient;
+    @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
     @InjectMocks KisExecutionAdapter adapter;
 
     private static final LocalDate DATE = LocalDate.of(2024, 6, 15);

@@ -5,7 +5,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
-import com.kista.domain.model.tradingcycle.TradingCycle.ExchangeCode;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +30,7 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final KisHttpClient kisHttpClient;
+    private final KisExchangeRegistry exchangeRegistry;
 
     @Override
     public DailyTransactionResult getDailyTransactions(LocalDate from, LocalDate to, Account account) {
@@ -41,7 +41,7 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
         params.add("ACNT_PRDT_CD", account.kisAccountType());
         params.add("ERLM_STRT_DT", from.format(FMT)); // 등록시작일자
         params.add("ERLM_END_DT", to.format(FMT));     // 등록종료일자
-        params.add("OVRS_EXCG_CD", ExchangeCode.NASD.name()); // 미국 전체
+        params.add("OVRS_EXCG_CD", exchangeRegistry.defaultUsExchange()); // 미국 전체
         params.add("PDNO", "");                         // 전종목
         params.add("SLL_BUY_DVSN_CD", "00");           // 00=전체, 01=매도, 02=매수
         params.add("LOAN_DVSN_CD", "");

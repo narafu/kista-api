@@ -21,6 +21,7 @@ public class KisOrderAdapter implements KisOrderPort {
     private static final String CANCEL_TR_ID = "TTTT1004U"; // 미국 해외주식 정정취소주문
 
     private final KisHttpClient kisHttpClient;
+    private final KisExchangeRegistry exchangeRegistry;
 
     @Override
     public Order place(Order order, Account account) {
@@ -45,7 +46,7 @@ public class KisOrderAdapter implements KisOrderPort {
                 account.accountNo(),
                 account.kisAccountType(),
                 resolveOrderDvsn(order.orderType()),
-                order.ticker().getExchangeCode().name(),
+                exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
                 resolvePrice(order.orderType(), order.price()),
                 order.quantity(),
@@ -89,7 +90,7 @@ public class KisOrderAdapter implements KisOrderPort {
                 }""",
                 account.accountNo(),
                 account.kisAccountType(),
-                order.ticker().getExchangeCode().name(),
+                exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
                 order.kisOrderId());
 

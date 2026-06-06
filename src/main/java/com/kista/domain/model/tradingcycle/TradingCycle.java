@@ -15,7 +15,7 @@ public record TradingCycle(
         UUID accountId,                 // FK → accounts.id
         Type type,                      // 매매 전략 종류
         Status status,                  // 전략 실행 상태
-        Ticker ticker,                  // 거래 종목 (exchangeCode 포함)
+        Ticker ticker,                  // 거래 종목 (매매 도메인 메타: 익절률 + 설명)
         BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
         CycleSeedType cycleSeedType     // 사이클 종료 후 자동 재등록 정책
 ) {
@@ -55,38 +55,16 @@ public record TradingCycle(
 
     @Getter
     @RequiredArgsConstructor
-    public enum ExchangeCode { // KIS 주문 API 사용 OVRS_EXCG_CD
-        NASD("나스닥"),
-        NYSE("뉴욕"),
-        AMEX("아멕스");
-
-        private final String label; // 한국어 표시 이름
-    }
-
-    @Getter
-    @RequiredArgsConstructor
-    public enum ExcdCode { // KIS 시세 API 사용 EXCD_01
-        NAS("나스닥"),
-        NYS("뉴욕"),
-        AMS("아멕스");
-
-        private final String label; // 한국어 표시 이름
-    }
-
-    @Getter
-    @RequiredArgsConstructor
     public enum Ticker {
-        TQQQ(ExchangeCode.NASD, ExcdCode.NAS, new BigDecimal("0.15"), "PROSHARES QQQ 3X"),
-        SOXL(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"),
-        USD(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"),
-        MAGX(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"),
-        FNGU(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
-        BULZ(ExchangeCode.AMEX, ExcdCode.AMS, new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
+        TQQQ(new BigDecimal("0.15"), "PROSHARES QQQ 3X"),
+        SOXL(new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"),
+        USD(new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"),
+        MAGX(new BigDecimal("0.20"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"),
+        FNGU(new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
+        BULZ(new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
 
-        private final ExchangeCode exchangeCode;        // KIS OVRS_EXCG_CD
-        private final ExcdCode excdCode;                // KIS EXCD_01
-        private final BigDecimal targetProfitRate;       // 익절 목표 수익률
-        private final String description;               // 종목 설명(search_info)
+        private final BigDecimal targetProfitRate;       // 익절 목표 수익률 (매매 도메인 정책)
+        private final String description;               // 종목 설명 (UI 메타)
 
         // KIS 응답 String → Ticker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
         public static Optional<Ticker> tryParse(String name) {

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.when;
 class KisProfitAdapterTest {
 
     @Mock KisHttpClient kisHttpClient;
+    @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
     @InjectMocks KisProfitAdapter adapter;
 
     private static final Account ACCOUNT = new Account(
