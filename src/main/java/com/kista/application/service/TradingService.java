@@ -1,7 +1,6 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
@@ -40,17 +39,16 @@ class TradingService implements ExecuteTradingUseCase {
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 매매 알림
     private final TradingCycleHistoryPort cycleHistoryPort;    // 사이클별 일별 스냅샷 저장
-    private final TradingCyclePort cyclePort;                  // ACTIVE 사이클 조회 + rotate
     private final PrivacyTradePort privacyTradePort;
-    private final KisMarginPort kisMarginPort;                 // MAX 재등록 시 USD 잔고 조회
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
     private final TradingOrderPlanner orderPlanner;            // 전략 계산 + 주문 저장 헬퍼
+    private final CycleRotationService cycleRotationService;   // 사이클 종료 후 재등록
 
     // planAndSaveOrders 결과: 사이클별 잔고·전략 계산 상태
     record CycleState(
             BatchContext ctx,
             AccountBalance balance,
-            InfinitePosition position,      // INFINITE만 non-null (신규 계산 시)
+            InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
             TradingSnapshot snapshot,       // INFINITE만 non-null (신규 계산 시)
             BigDecimal startPrice,          // INFINITE만 non-null
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (cycle 재등록 시 최소금액 산정용)
@@ -110,7 +108,7 @@ class TradingService implements ExecuteTradingUseCase {
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             try {
-                List<Order> mainOrders = executePlannedOrders(today, state.ctx().cycle(), state.ctx().account(), state.startPrice());
+                List<Order> mainOrders = executePlannedOrders(today, state);
                 placedStates.add(new CyclePlacedState(state, mainOrders));
             } catch (Exception e) {
                 log.error("[cycleId={}] KIS 접수 오류: {}", state.ctx().cycle().id(), e.getMessage(), e);
@@ -233,11 +231,14 @@ class TradingService implements ExecuteTradingUseCase {
     }
 
     // KIS 접수 전 BUY 가격 보정 + PLANNED 일괄 접수
-    // currentPrice가 null이면(가격 조회 실패) 보정 없이 그대로 접수
-    List<Order> executePlannedOrders(LocalDate today, TradingCycle cycle, Account account, BigDecimal currentPrice) {
-        // BUY 가격 보정: currentPrice × 1.10 초과 주문 재계산
-        if (currentPrice != null) {
-            capBuyOrders(today, cycle, account, currentPrice);
+    // position이 있고 currentPrice가 있을 때만 보정 (수동 선행 주문은 그대로 접수)
+    List<Order> executePlannedOrders(LocalDate today, CycleState state) {
+        TradingCycle cycle = state.ctx().cycle();
+        Account account = state.ctx().account();
+        BigDecimal currentPrice = state.startPrice();
+
+        if (currentPrice != null && state.position() != null) {
+            capBuyOrders(today, cycle, account, currentPrice, state.position());
         }
         List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
         List<Order> placed = planned.stream().map(p -> {
@@ -253,9 +254,11 @@ class TradingService implements ExecuteTradingUseCase {
     }
 
     // BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — 전략 공식 기반으로 가격 캡 적용 후 재저장
+    // K = position.unitAmount() (실값, 근사 아님), r = ticker.getTargetProfitRate()
     // min(원래가격, cap)으로 평단가·기준가를 각각 캡핑 → 공식(K/2/A, (K-A·q1)·(1+r)/G)으로 수량 재산정
     // 동일 가격으로 캡되면 단일 주문으로 병합
-    private void capBuyOrders(LocalDate today, TradingCycle cycle, Account account, BigDecimal currentPrice) {
+    private void capBuyOrders(LocalDate today, TradingCycle cycle, Account account,
+                              BigDecimal currentPrice, InfinitePosition position) {
         List<Order> buyOrders = orderPort.findPlannedByAccountAndDate(account.id(), today)
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
@@ -267,13 +270,8 @@ class TradingService implements ExecuteTradingUseCase {
         log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap,
                 buyOrders.stream().map(o -> o.price() + "×" + o.quantity()).toList());
 
-        // 단위금액 K 역산 (CycleState에 balance가 있지만 여기서는 position 재계산 없이 직접 산출)
-        // K = B ÷ 20 공식 — 잔고(balance)를 CycleState에서 가져올 수 없으므로 원래 BUY 금액 합산으로 K 추정
-        // buy①(K/2/A), buy②((K−A·q1)·(1+r)/G) → K = buy①·A·2 + buy②·G/(1+r) 역산 가능하나
-        // 가장 단순하게: 기존 주문의 총 USD = K 로 근사 (실제 공식과 floor 오차 범위 내)
-        BigDecimal k = buyOrders.stream()
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
+        BigDecimal targetProfitRate = cycle.ticker().getTargetProfitRate();
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
         // 주문이 1건이면 단순 캡 적용, 2건이면 각각 캡
@@ -296,7 +294,6 @@ class TradingService implements ExecuteTradingUseCase {
             Order buy2 = buyOrders.get(1);
             BigDecimal cappedAvg = buy1.price().min(cap);
             BigDecimal cappedRef = buy2.price().min(cap);
-            BigDecimal targetProfitRate = cycle.ticker().getTargetProfitRate();
 
             int qty1 = k.divide(BigDecimal.valueOf(2), 2, HALF_UP)
                     .divide(cappedAvg, 0, FLOOR).intValue();
@@ -366,7 +363,7 @@ class TradingService implements ExecuteTradingUseCase {
                                List<Execution> executions, User user, Account account, TradingCycle cycle,
                                PrivacyTradeBase privacyTradeBase) {
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
-        AccountBalance postBalance = executions.isEmpty() ? balance : calcPostTradeBalance(balance, executions);
+        AccountBalance postBalance = balance.applyExecutions(executions);
         saveCycleHistory(postBalance, cycle, account, user, price, privacyTradeBase); // 사이클별 스냅샷 저장
         if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
             // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
@@ -400,74 +397,10 @@ class TradingService implements ExecuteTradingUseCase {
 
         if (history.holdings() == 0 && cycle.cycleSeedType().isConsecutive()) {
             log.info("[cycleId={}] 사이클 종료 — 연속 정책 실행: {}", cycle.id(), cycle.cycleSeedType());
-            rotateCycleIfConsecutive(cycle, account, user, price, privacyTradeBase);
+            cycleRotationService.rotate(cycle, account, user, price, privacyTradeBase);
         } else if (history.holdings() == 0) {
             log.info("[cycleId={}] 사이클 종료 (연속 없음)", cycle.id());
         }
-    }
-
-    // 사이클 종료 후 cycleSeedType에 따라 initialUsdDeposit 갱신 + 새 이력 생성
-    private void rotateCycleIfConsecutive(TradingCycle cycle, Account account, User user,
-                                           BigDecimal price, PrivacyTradeBase privacyTradeBase) {
-        // 1. nextInitialUsdDeposit 계산
-        BigDecimal nextDeposit;
-        if (cycle.cycleSeedType() == TradingCycle.CycleSeedType.MAINTAIN) {
-            nextDeposit = cycle.initialUsdDeposit();
-        } else { // MAX
-            List<com.kista.domain.model.kis.MarginItem> margins;
-            try {
-                margins = kisMarginPort.getMargin(account);
-            } catch (Exception e) {
-                log.error("[cycleId={}] MAX 재등록 — KIS 잔고 조회 실패: {}", cycle.id(), e.getMessage());
-                notifyPort.notifyError(e);
-                return;
-            }
-            nextDeposit = margins.stream()
-                    .filter(m -> Currency.USD == m.currency())
-                    .findFirst()
-                    .map(com.kista.domain.model.kis.MarginItem::purchasableAmount)
-                    .orElse(null);
-            if (nextDeposit == null) {
-                log.warn("[cycleId={}] MAX 재등록 — USD 잔고 행 없음", cycle.id());
-                notifyPort.notifyError(new IllegalStateException("MAX 재등록 실패: USD 잔고 없음 cycleId=" + cycle.id()));
-                return;
-            }
-        }
-
-        // 2. 최소금액 가드
-        BigDecimal minRequired = resolveMinRequired(cycle, price, privacyTradeBase);
-        if (minRequired != null && nextDeposit.compareTo(minRequired) < 0) {
-            log.warn("[cycleId={}] 재등록 취소 — 잔고 부족: {} < 최소 {}", cycle.id(), nextDeposit, minRequired);
-            notifyPort.notifyInsufficientBalance(account,
-                    new AccountBalance(0, null, nextDeposit), cycle.ticker());
-            return;
-        }
-
-        // 3. cycle 갱신 (initialUsdDeposit만 변경, 동일 ID 유지)
-        TradingCycle rotated = new TradingCycle(
-                cycle.id(), cycle.accountId(), cycle.type(), TradingCycle.Status.ACTIVE,
-                cycle.ticker(), nextDeposit, cycle.cycleSeedType()
-        );
-        cyclePort.save(rotated);
-
-        // 4. 새 시작점 이력 (holdings=0, avgPrice=null)
-        cycleHistoryPort.save(new TradingCycleHistory(
-                null, cycle.id(), nextDeposit, price, null, 0, null
-        ));
-        log.info("[cycleId={}] 사이클 재등록 완료: {} → initialUsdDeposit={}", cycle.id(), cycle.cycleSeedType(), nextDeposit);
-        userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");
-    }
-
-    // 최소금액 기준: INFINITE = 현재가 × 20 × 2 * 1.1, PRIVACY = currentCycleStart / 2
-    private BigDecimal resolveMinRequired(TradingCycle cycle, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
-        return switch (cycle.type()) {
-            case INFINITE -> price != null
-                    ? price.multiply(BigDecimal.valueOf(44)).setScale(2, HALF_UP)
-                    : null;
-            case PRIVACY -> privacyTradeBase != null
-                    ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
-                    : null;
-        };
     }
 
     private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,
@@ -481,30 +414,5 @@ class TradingService implements ExecuteTradingUseCase {
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, snapshot, mainOrders, totalBought, totalSold);
-    }
-
-    // 체결 목록으로 매매 후 AccountBalance 계산
-    // 평단가 = (기존 매입금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
-    private AccountBalance calcPostTradeBalance(AccountBalance pre, List<Execution> executions) {
-        int totalBuyQty = executions.stream()
-                .filter(e -> e.direction() == BUY).mapToInt(Execution::quantity).sum();
-        int totalSellQty = executions.stream()
-                .filter(e -> e.direction() == SELL).mapToInt(Execution::quantity).sum();
-        BigDecimal totalBuyAmount = executions.stream()
-                .filter(e -> e.direction() == BUY).map(Execution::amountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalSellAmount = executions.stream()
-                .filter(e -> e.direction() == SELL).map(Execution::amountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        int newHoldings = pre.holdings() + totalBuyQty - totalSellQty;
-        BigDecimal preAmount = (pre.holdings() == 0 || pre.avgPrice() == null)
-                ? BigDecimal.ZERO
-                : pre.avgPrice().multiply(BigDecimal.valueOf(pre.holdings()));
-        BigDecimal newAvgPrice = newHoldings > 0
-                ? preAmount.add(totalBuyAmount).divide(BigDecimal.valueOf(newHoldings), 4, HALF_UP)
-                : null;
-        BigDecimal newUsdDeposit = pre.usdDeposit().subtract(totalBuyAmount).add(totalSellAmount);
-        return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
     }
 }
