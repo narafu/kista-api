@@ -22,12 +22,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "통계", description = "KIS API 기반 계좌별 손익·체결·잔고·증거금 조회")
@@ -57,10 +57,8 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         try {
             return statisticsUseCase.getPeriodProfit(accountId, userId, from, to);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (java.util.NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (SecurityException | NoSuchElementException e) {
+            throw e; // → GlobalExceptionHandler (403 / 404)
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         }
@@ -83,11 +81,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        try {
-            return statisticsUseCase.getTrades(accountId, userId, from, to);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        }
+        return statisticsUseCase.getTrades(accountId, userId, from, to);
     }
 
     // 체결기준현재잔고 조회 (CTRP6504R)
@@ -103,17 +97,12 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            PresentBalanceResult balance = statisticsUseCase.getPresentBalance(accountId, userId);
-            return normalizePortfolio(balance);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        }
+        PresentBalanceResult balance = statisticsUseCase.getPresentBalance(accountId, userId);
+        return normalizePortfolio(balance);
     }
 
     // PresentBalanceResult(KIS raw) → PortfolioSummaryResponse(kista-ui 호환 포맷) 변환
     private PortfolioSummaryResponse normalizePortfolio(PresentBalanceResult balance) {
-        // output1: 종목별 잔고 → PositionDto 목록으로 변환
         List<PortfolioSummaryResponse.PositionDto> positions = balance.items().stream()
                 .map(item -> new PortfolioSummaryResponse.PositionDto(
                         item.ticker(),
@@ -126,14 +115,11 @@ public class KisStatisticsController {
                         item.exchangeCode()
                 ))
                 .toList();
-
-        // output3: 계좌 전체 요약 → SummaryDto 변환
         PortfolioSummaryResponse.SummaryDto summary = new PortfolioSummaryResponse.SummaryDto(
                 balance.totalAssetUsd(),
                 balance.totalEvalProfit(),
                 balance.totalReturnRate()
         );
-
         return new PortfolioSummaryResponse(positions, summary);
     }
 
@@ -150,11 +136,7 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            return statisticsUseCase.getMargin(accountId, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        }
+        return statisticsUseCase.getMargin(accountId, userId);
     }
 
     // 일별거래내역 조회 (CTOS4001R)
@@ -174,11 +156,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        try {
-            return statisticsUseCase.getDailyTransactions(accountId, userId, from, to);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        }
+        return statisticsUseCase.getDailyTransactions(accountId, userId, from, to);
     }
 
     // trading_cycle_history DB 조회 (KIS API 미사용) — 커서 기반 페이지네이션
@@ -201,14 +179,9 @@ public class KisStatisticsController {
             @RequestParam(required = false) String cursor,
             @Parameter(description = "페이지 크기 (기본 50, 최대 200)")
             @RequestParam(defaultValue = "50") int size) {
-        try {
-            Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
-            // @Validated 없이는 @Max가 동작하지 않으므로 직접 상한 적용
-            return CycleHistoryPageResponse.from(
-                    statisticsUseCase.getCycleHistory(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        }
+        Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
+        return CycleHistoryPageResponse.from(
+                statisticsUseCase.getCycleHistory(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 
     // 복수 종목 현재가 조회 (HHDFS76410000)
@@ -237,8 +210,8 @@ public class KisStatisticsController {
         try {
             Map<Ticker, BigDecimal> result = statisticsUseCase.getPrices(accountId, userId, distinct);
             return MultiPriceResponse.from(result);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (SecurityException | NoSuchElementException e) {
+            throw e; // → GlobalExceptionHandler (403 / 404)
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         }

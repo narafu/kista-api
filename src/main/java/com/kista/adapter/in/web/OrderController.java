@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "주문", description = "다음 주문 미리보기")
@@ -48,10 +47,8 @@ public class OrderController {
         try {
             GetNextOrdersUseCase.Result result = getNextOrders.preview(accountId, userId);
             return NextOrdersResponse.from(result);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (SecurityException | java.util.NoSuchElementException e) {
+            throw e; // → GlobalExceptionHandler (403 / 404)
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "KIS API 호출 실패: " + e.getMessage());

@@ -30,7 +30,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
@@ -55,17 +54,9 @@ public class TradingCycleController {
     public List<TradingCycleResponse> list(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            return getCycle.listByAccountId(accountId, userId).stream()
-                    .map(TradingCycleResponse::from)
-                    .toList();
-        } catch (SecurityException e) {
-            log.warn("거래 사이클 목록 조회 권한 거부: accountId={}, userId={}", accountId, userId);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            log.warn("거래 사이클 목록 조회 - 계좌 없음: accountId={}", accountId);
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return getCycle.listByAccountId(accountId, userId).stream()
+                .map(TradingCycleResponse::from)
+                .toList();
     }
 
     // 거래 사이클 등록
@@ -76,17 +67,9 @@ public class TradingCycleController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody TradingCycleRequest request) {
-        try {
-            return TradingCycleResponse.from(
-                    registerCycle.register(userId, accountId, request.toRegisterCommand())
-            );
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (IllegalStateException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        return TradingCycleResponse.from(
+                registerCycle.register(userId, accountId, request.toRegisterCommand())
+        );
     }
 
     // 거래 사이클 수정 (cycleSeedType 등 메타 변경)
@@ -96,15 +79,9 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestBody TradingCycleRequest request) {
-        try {
-            return TradingCycleResponse.from(
-                    updateCycle.update(id, userId, request.toUpdateCommand())
-            );
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return TradingCycleResponse.from(
+                updateCycle.update(id, userId, request.toUpdateCommand())
+        );
     }
 
     // 거래 사이클 삭제
@@ -114,13 +91,7 @@ public class TradingCycleController {
     public void delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            deleteCycle.delete(id, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        deleteCycle.delete(id, userId);
     }
 
     // 거래 사이클 중지 (ACTIVE → PAUSED)
@@ -130,13 +101,7 @@ public class TradingCycleController {
     public void pause(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            pauseCycle.pause(id, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        pauseCycle.pause(id, userId);
     }
 
     // 거래 사이클 재개 (PAUSED → ACTIVE)
@@ -146,13 +111,7 @@ public class TradingCycleController {
     public void resume(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            resumeCycle.resume(id, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        resumeCycle.resume(id, userId);
     }
 
     // INFINITE 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
@@ -164,14 +123,11 @@ public class TradingCycleController {
         try {
             List<Order> placed = manualExecute.execute(id, userId);
             return ResponseEntity.ok(ExecuteOrdersResponse.from(placed));
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (IllegalStateException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()); // 409 오늘 이미 실행
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); // 400 PRIVACY 등
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage()); // 404 사이클/계좌/사용자 없음
+            // 주문 불가 시간대 or 오늘 이미 실행 → 409 Conflict
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        } catch (SecurityException | java.util.NoSuchElementException | IllegalArgumentException e) {
+            throw e; // → GlobalExceptionHandler (403 / 404 / 400)
         } catch (Exception e) {
             log.warn("수동 실행 KIS API 오류: id={}, {}", id, e.getMessage());
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
@@ -184,13 +140,7 @@ public class TradingCycleController {
     public CancelOrdersResponse cancelExecute(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            return CancelOrdersResponse.from(cancelOrder.cancelByCycle(id, userId));
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return CancelOrdersResponse.from(cancelOrder.cancelByCycle(id, userId));
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
@@ -203,15 +153,9 @@ public class TradingCycleController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "50") int size) {
-        try {
-            Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
-            return CycleHistoryPageResponse.from(
-                    statisticsUseCase.getStrategyCycleHistory(
-                            strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
+        return CycleHistoryPageResponse.from(
+                statisticsUseCase.getStrategyCycleHistory(
+                        strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 }

@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import lombok.extern.slf4j.Slf4j;
@@ -12,9 +13,29 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.NoSuchElementException;
 
 @Slf4j
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(SecurityException.class)
+    public ProblemDetail handleForbidden(SecurityException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        detail.setTitle("Access Denied");
+        return detail;
+    }
+
+    @ExceptionHandler(Account.InvalidKisKeyException.class)
+    public ProblemDetail handleInvalidKisKey(Account.InvalidKisKeyException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        detail.setTitle("Invalid KIS Credentials");
+        return detail;
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        detail.setTitle("Invalid State");
+        return detail;
+    }
 
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNotFound(NoSuchElementException ex) {

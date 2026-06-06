@@ -2,7 +2,6 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.KisConnectionTestUseCase;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "계좌", description = "계좌 등록·조회·수정·삭제")
@@ -67,16 +65,9 @@ public class AccountController {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "계좌번호가 KIS 자격증명과 일치하지 않습니다");
         }
-        try {
-            return AccountResponse.from(
-                    registerAccount.register(userId, request.toRegisterCommand())
-            );
-        } catch (Account.InvalidKisKeyException e) {
-            // KIS 앱키/시크릿 유효성 검증 실패 → 422 Unprocessable Entity
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
-        } catch (IllegalStateException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        return AccountResponse.from(
+                registerAccount.register(userId, request.toRegisterCommand())
+        );
     }
 
     // 계좌 수정 (소유권 검증)
@@ -92,15 +83,9 @@ public class AccountController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestBody AccountRequest request) {
-        try {
-            return AccountResponse.from(
-                    updateAccount.update(id, userId, request.toUpdateCommand())
-            );
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return AccountResponse.from(
+                updateAccount.update(id, userId, request.toUpdateCommand())
+        );
     }
 
     // 계좌 삭제 (소유권 검증)
@@ -116,13 +101,7 @@ public class AccountController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            deleteAccount.delete(id, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        deleteAccount.delete(id, userId);
     }
 
     // KIS API 자격증명 연결 테스트 — 토큰 발급 시도로 appKey/appSecret 유효성 확인

@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "주문 취소", description = "개별 주문 취소")
@@ -33,10 +32,6 @@ public class OrderCancelController {
             @AuthenticationPrincipal UUID userId) {
         try {
             cancelOrderUseCase.cancelOrder(orderId, userId);
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage()); // 409 PLACED 아닌 경우
         }
