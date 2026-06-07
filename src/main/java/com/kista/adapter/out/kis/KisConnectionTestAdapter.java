@@ -47,32 +47,30 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
     @Override
-    public boolean test(String appKey, String appSecret, UUID accountId) {
+    public void test(String appKey, String appSecret, UUID accountId) {
         // 유효 캐시 토큰이 있으면 재발급 없이 성공 — KIS 발급 알림 및 횟수 제한 방지
         if (accountId != null) {
             Optional<String> cached = kisTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
             if (cached.isPresent()) {
                 log.debug("KIS 연결 테스트: 캐시 토큰 유효 — KIS 호출 생략 (accountId={})", accountId);
-                return true;
+                return;
             }
         }
         try {
             // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 영구 캐시, null이면 단기 캐시 저장
             TokenCheckResponse response = issueToken(appKey, appSecret);
-            if (response != null) {
-                if (accountId != null) {
-                    // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
-                    OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-                    kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-                } else {
-                    // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
-                    tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
-                }
+            if (response == null) throw new Account.InvalidKisKeyException();
+            if (accountId != null) {
+                // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
+                OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
+                kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+            } else {
+                // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
+                tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
             }
-            return true;
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
-            return false;
+            throw new Account.InvalidKisKeyException();
         }
     }
 

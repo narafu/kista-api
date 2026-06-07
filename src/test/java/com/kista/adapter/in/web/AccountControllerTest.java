@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -62,15 +64,24 @@ class AccountControllerTest {
     }
 
     @Test
-    void testConnection_success_returns200() throws Exception {
-        when(connectionTest.test(anyString(), anyString(), any())).thenReturn(true);
-
+    void testConnection_success_returns204() throws Exception {
+        // void 메서드 — 기본 doNothing() stub, 성공 시 204 반환
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(mockAuth())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void testConnection_failure_returns422() throws Exception {
+        doThrow(new Account.InvalidKisKeyException()).when(connectionTest).test(anyString(), anyString(), any());
+
+        mockMvc.perform(post("/api/accounts/connection-tests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\"wrongkey\",\"appSecret\":\"wrongsecret\"}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

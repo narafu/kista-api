@@ -33,10 +33,8 @@ public class AccountController {
     private final GetAccountUseCase getAccount;
     private final KisConnectionTestUseCase connectionTest; // KIS 자격증명 연결 테스트
 
-    // 연결 테스트 요청/응답 DTO (컨트롤러 내부 전용)
-    // accountId: 등록된 계좌 수정 시 전달하면 발급 토큰을 캐시에 저장 — 등록 전 사전 검증 시 null 허용
+    // 연결 테스트 요청 DTO — accountId: 수정 시 전달하면 발급 토큰을 캐시에 저장, 등록 전 검증 시 null 허용
     record TestConnectionRequest(String appKey, String appSecret, UUID accountId) {}
-    record TestConnectionResponse(boolean success, String message) {}
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")
@@ -100,18 +98,18 @@ public class AccountController {
         deleteAccount.delete(id, userId);
     }
 
-    // KIS API 자격증명 연결 테스트 — 토큰 발급 시도로 appKey/appSecret 유효성 확인
+    // KIS API 자격증명 연결 테스트 — 실패 시 InvalidKisKeyException → GlobalExceptionHandler → 422
     @Operation(summary = "KIS API 연결 테스트", description = "appKey/appSecret으로 KIS OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "검증 완료 (success 필드로 결과 확인)"),
+            @ApiResponse(responseCode = "204", description = "연결 성공"),
+            @ApiResponse(responseCode = "422", description = "appKey 또는 appSecret이 유효하지 않음"),
     })
     @PostMapping("/connection-tests")
-    public TestConnectionResponse testConnection(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void testConnection(
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
-        boolean success = connectionTest.test(request.appKey(), request.appSecret(), request.accountId());
-        // 성공 시 message null, 실패 시 안내 메시지 반환
-        String message = success ? null : "KIS API 인증에 실패했습니다. appKey 또는 appSecret을 확인하세요.";
-        return new TestConnectionResponse(success, message);
+        // 실패 시 Account.InvalidKisKeyException → GlobalExceptionHandler → 422
+        connectionTest.test(request.appKey(), request.appSecret(), request.accountId());
     }
 }

@@ -14,8 +14,8 @@ class KisConnectionTestService implements KisConnectionTestUseCase {
     private final KisConnectionTestPort connectionTestPort; // 아웃바운드 포트 — adapter.out 구현체 주입
 
     @Override
-    public boolean test(String appKey, String appSecret, UUID accountId) {
-        return connectionTestPort.test(appKey, appSecret, accountId);
+    public void test(String appKey, String appSecret, UUID accountId) {
+        connectionTestPort.test(appKey, appSecret, accountId);
     }
 
     @Override
