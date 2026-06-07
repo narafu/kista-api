@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.ManualTradingException;
+import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -67,6 +68,13 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleManualTrading(ManualTradingException ex) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         detail.setTitle("Manual Trading Conflict");
+        return detail;
+    }
+
+    @ExceptionHandler(OrderCancelException.class)
+    public ProblemDetail handleOrderCancel(OrderCancelException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        detail.setTitle("Order Cancel Conflict");
         return detail;
     }
 

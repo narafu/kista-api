@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.*;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import org.junit.jupiter.api.Test;
@@ -87,7 +88,7 @@ class OrderControllerTest {
 
     @Test
     void next_returns_503_on_kis_error() throws Exception {
-        when(getNextOrders.preview(any(), any())).thenThrow(new RuntimeException("KIS API 오류"));
+        when(getNextOrders.preview(any(), any())).thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))

@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
@@ -69,7 +70,7 @@ class OrderCancelService implements CancelOrderUseCase {
 
         // PLACED 상태가 아니면 취소 불가
         if (order.status() != Order.OrderStatus.PLACED) {
-            throw new IllegalStateException("PLACED 상태 주문만 취소 가능합니다. 현재 상태: " + order.status());
+            throw new OrderCancelException("PLACED 상태 주문만 취소 가능합니다. 현재 상태: " + order.status());
         }
 
         cancelViaKis(order, account);

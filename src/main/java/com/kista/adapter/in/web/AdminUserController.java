@@ -11,10 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "Admin", description = "관리자 API")
@@ -45,14 +43,10 @@ public class AdminUserController {
     public void updateStatus(@PathVariable UUID userId,
                              @RequestBody StatusRequest body,
                              @AuthenticationPrincipal UUID adminId) {
-        try {
-            switch (body.status()) {
-                case "ACTIVE"   -> userAction.approveUser(adminId, userId);
-                case "REJECTED" -> userAction.rejectUser(adminId, userId);
-                default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
-            }
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        switch (body.status()) {
+            case "ACTIVE"   -> userAction.approveUser(adminId, userId);
+            case "REJECTED" -> userAction.rejectUser(adminId, userId);
+            default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
         }
     }
 
@@ -63,11 +57,7 @@ public class AdminUserController {
     public void changeRole(@PathVariable UUID userId,
                            @RequestBody RoleRequest body,
                            @AuthenticationPrincipal UUID adminId) {
-        try {
-            userAction.changeRole(adminId, userId, body.role());
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        userAction.changeRole(adminId, userId, body.role());
     }
 
     // 사용자 삭제
@@ -75,11 +65,7 @@ public class AdminUserController {
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable UUID userId, @AuthenticationPrincipal UUID adminId) {
-        try {
-            userAction.deleteUser(adminId, userId);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        userAction.deleteUser(adminId, userId);
     }
 
     record StatusRequest(String status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)

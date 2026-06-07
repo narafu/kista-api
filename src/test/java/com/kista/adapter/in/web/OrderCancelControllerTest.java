@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -77,7 +78,7 @@ class OrderCancelControllerTest {
 
     @Test
     void cancelOrder_notPlaced_returns409() throws Exception {
-        doThrow(new IllegalStateException("PLACED 상태 주문만 취소 가능합니다"))
+        doThrow(new OrderCancelException("PLACED 상태 주문만 취소 가능합니다"))
                 .when(cancelOrderUseCase).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)

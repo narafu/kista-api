@@ -2,6 +2,7 @@ package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.CancelOrderUseCase;
@@ -163,7 +164,7 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelOrder: PLACED가 아닌 상태 → IllegalStateException(409)")
+    @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
         Order filledOrder = new Order(orderId, accountId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
@@ -172,7 +173,7 @@ class OrderCancelServiceTest {
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(OrderCancelException.class);
     }
 
     // ---

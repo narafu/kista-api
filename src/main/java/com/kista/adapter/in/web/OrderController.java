@@ -8,10 +8,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -44,14 +42,7 @@ public class OrderController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            GetNextOrdersUseCase.Result result = getNextOrders.preview(accountId, userId);
-            return NextOrdersResponse.from(result);
-        } catch (SecurityException | java.util.NoSuchElementException e) {
-            throw e; // → GlobalExceptionHandler (403 / 404)
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "KIS API 호출 실패: " + e.getMessage());
-        }
+        // SecurityException→403, NoSuchElementException→404, KisApiException→503 모두 GlobalExceptionHandler 처리
+        return NextOrdersResponse.from(getNextOrders.preview(accountId, userId));
     }
 }
