@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -14,9 +13,11 @@ import java.util.UUID;
 @Tag(name = "Admin", description = "관리자 API")
 public class AdminPingController {
 
+    record PingResponse(String status, String adminId) {} // 관리자 ping 응답
+
     // Phase 2A 가드 검증용 최소 엔드포인트 — Phase 2B에서 실제 admin 엔드포인트로 대체
     @GetMapping("/_ping")
-    public Map<String, String> ping(@AuthenticationPrincipal UUID userId) {
-        return Map.of("status", "ok", "adminId", userId.toString());
+    public PingResponse ping(@AuthenticationPrincipal UUID userId) {
+        return new PingResponse("ok", userId.toString());
     }
 }

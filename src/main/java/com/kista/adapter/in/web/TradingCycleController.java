@@ -5,7 +5,6 @@ import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
@@ -22,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -116,11 +114,10 @@ public class TradingCycleController {
     // INFINITE 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
     @Operation(summary = "매매 수동 실행 (INFINITE 전용)")
     @PostMapping("/api/trading-cycles/{id}/execute")
-    public ResponseEntity<ExecuteOrdersResponse> executeManually(
+    public ExecuteOrdersResponse executeManually(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        List<Order> placed = manualExecute.execute(id, userId);
-        return ResponseEntity.ok(ExecuteOrdersResponse.from(placed));
+        return ExecuteOrdersResponse.from(manualExecute.execute(id, userId));
     }
 
     // 오늘 수동 실행으로 PLACED된 사이클 주문 전체 취소 (best-effort)

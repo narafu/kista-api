@@ -65,7 +65,9 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateNotificationChannel(@AuthenticationPrincipal UUID userId,
                                            @Valid @RequestBody NotificationChannelRequest body) {
-        NotificationChannel channel = NotificationChannel.valueOf(body.channel().toUpperCase());
+        NotificationChannel channel = NotificationChannel.tryParse(body.channel())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
         updateNotificationChannel.updateNotificationChannel(userId, channel);
     }
 }

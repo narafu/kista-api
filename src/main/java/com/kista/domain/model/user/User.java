@@ -1,6 +1,7 @@
 package com.kista.domain.model.user;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 public record User(
@@ -27,7 +28,17 @@ public record User(
         NONE,       // 알림 없음
         TELEGRAM,   // 텔레그램 봇 알림
         FCM,        // Firebase Cloud Messaging 푸시
-        ALL         // 텔레그램 + FCM 동시 발송
+        ALL;        // 텔레그램 + FCM 동시 발송
+
+        // 안전한 파싱 — 대소문자 무시, 불일치 시 empty 반환
+        public static Optional<NotificationChannel> tryParse(String value) {
+            if (value == null) return Optional.empty();
+            try {
+                return Optional.of(valueOf(value.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
+        }
     }
 
     // 상태만 교체 — 나머지 필드 보존
