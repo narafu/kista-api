@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
+import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -59,6 +60,13 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         detail.setTitle("Invalid Request");
+        return detail;
+    }
+
+    @ExceptionHandler(ManualTradingException.class)
+    public ProblemDetail handleManualTrading(ManualTradingException ex) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        detail.setTitle("Manual Trading Conflict");
         return detail;
     }
 

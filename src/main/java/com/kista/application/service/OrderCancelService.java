@@ -32,8 +32,7 @@ class OrderCancelService implements CancelOrderUseCase {
     public CancelResult cancelByCycle(UUID cycleId, UUID requesterId) {
         // 소유권 검증: 사이클 → 계좌 → 요청자 일치 확인
         var cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = requireOwnedAccount(cycle.accountId(), requesterId);
 
         // 오늘 PLACED된 주문 조회 (UTC 기준 — TradeDateConverter 없이 도메인 LocalDate 사용)
         List<Order> placedOrders = orderPort.findPlacedByAccountAndDate(account.id(), LocalDate.now());
@@ -66,8 +65,7 @@ class OrderCancelService implements CancelOrderUseCase {
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + orderId));
 
         // 소유권 검증: 주문의 계좌가 요청자 소유인지 확인
-        Account account = accountPort.findByIdOrThrow(order.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = requireOwnedAccount(order.accountId(), requesterId);
 
         // PLACED 상태가 아니면 취소 불가
         if (order.status() != Order.OrderStatus.PLACED) {
@@ -81,5 +79,11 @@ class OrderCancelService implements CancelOrderUseCase {
     // 일반 주문 취소 (TTTT1004U)
     private void cancelViaKis(Order order, Account account) {
         kisOrderPort.cancel(order, account);
+    }
+
+    private Account requireOwnedAccount(UUID accountId, UUID requesterId) {
+        Account account = accountPort.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        return account;
     }
 }

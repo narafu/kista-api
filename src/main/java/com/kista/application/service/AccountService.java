@@ -45,8 +45,7 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
 
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
+        Account account = requireOwnedAccount(accountId, requesterId);
         Account updated = new Account(
                 account.id(), account.userId(),
                 cmd.nickname() != null ? cmd.nickname() : account.nickname(),
@@ -59,8 +58,7 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
 
     @Override
     public void delete(UUID accountId, UUID requesterId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
+        requireOwnedAccount(accountId, requesterId);
         // 계좌에 속한 사이클 먼저 소프트 삭제 (FK CASCADE 대체)
         cyclePort.deleteByAccountId(accountId);
         accountPort.delete(accountId);
@@ -77,5 +75,11 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
     @Transactional(readOnly = true)
     public Account getById(UUID id) {
         return accountPort.findByIdOrThrow(id);
+    }
+
+    private Account requireOwnedAccount(UUID accountId, UUID requesterId) {
+        Account account = accountPort.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        return account;
     }
 }

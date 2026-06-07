@@ -25,7 +25,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -120,18 +119,8 @@ public class TradingCycleController {
     public ResponseEntity<ExecuteOrdersResponse> executeManually(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        try {
-            List<Order> placed = manualExecute.execute(id, userId);
-            return ResponseEntity.ok(ExecuteOrdersResponse.from(placed));
-        } catch (IllegalStateException e) {
-            // 주문 불가 시간대 or 오늘 이미 실행 → 409 Conflict
-            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
-        } catch (SecurityException | java.util.NoSuchElementException | IllegalArgumentException e) {
-            throw e; // → GlobalExceptionHandler (403 / 404 / 400)
-        } catch (Exception e) {
-            log.warn("수동 실행 KIS API 오류: id={}, {}", id, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
-        }
+        List<Order> placed = manualExecute.execute(id, userId);
+        return ResponseEntity.ok(ExecuteOrdersResponse.from(placed));
     }
 
     // 오늘 수동 실행으로 PLACED된 사이클 주문 전체 취소 (best-effort)

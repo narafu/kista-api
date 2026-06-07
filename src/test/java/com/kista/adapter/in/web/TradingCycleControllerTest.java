@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.kis.KisApiException;
+import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.port.in.*;
 import org.junit.jupiter.api.Test;
@@ -97,7 +99,7 @@ class TradingCycleControllerTest {
 
     @Test
     void executeManually_alreadyExecutedToday_returns409() throws Exception {
-        doThrow(new IllegalStateException("오늘 이미 실행된 사이클입니다"))
+        doThrow(new ManualTradingException("오늘 이미 실행된 사이클입니다"))
                 .when(manualExecute).execute(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
@@ -117,7 +119,7 @@ class TradingCycleControllerTest {
 
     @Test
     void executeManually_kisApiError_returns503() throws Exception {
-        doThrow(new RuntimeException("KIS API 연결 오류"))
+        doThrow(new KisApiException("KIS API 연결 오류", null))
                 .when(manualExecute).execute(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)

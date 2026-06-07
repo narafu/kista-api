@@ -1,6 +1,7 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.DstInfo;
@@ -52,7 +53,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
         DstInfo dst = DstInfo.immediate();
         if (dst.currentSession() == DstInfo.MarketSession.BLOCKED) {
             String range = dst.isDst() ? "05:00~17:00" : "06:00~18:00";
-            throw new IllegalStateException("주문 불가 시간대입니다 (KST " + range + ")");
+            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + range + ")");
         }
 
         // 스케줄러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
@@ -62,7 +63,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
         if (!orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today).isEmpty())
-            throw new IllegalStateException("오늘 이미 주문이 등록된 사이클입니다");
+            throw new ManualTradingException("오늘 이미 주문이 등록된 사이클입니다");
 
         User user = userPort.findById(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));

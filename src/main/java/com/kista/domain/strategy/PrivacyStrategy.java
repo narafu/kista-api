@@ -22,7 +22,7 @@ import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 
 @Slf4j
 @Component
-public class PrivacyStrategy implements PrivacyTradingStrategy {
+class PrivacyStrategy implements PrivacyTradingStrategy {
 
     @Override
     public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {

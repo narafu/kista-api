@@ -15,7 +15,7 @@ import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
-public class InfiniteStrategy implements InfiniteTradingStrategy {
+class InfiniteStrategy implements InfiniteTradingStrategy {
 
     @Override
     public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
