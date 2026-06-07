@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -60,11 +59,8 @@ public class AccountController {
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
-        // 계좌번호 실소유 검증 — 트랜잭션 외부에서 KIS API 호출 (제약: @Transactional 내 외부 호출 금지)
-        if (!connectionTest.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo())) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "계좌번호가 KIS 자격증명과 일치하지 않습니다");
-        }
+        // 계좌번호 실소유 검증 — 불일치 시 InvalidKisKeyException → GlobalExceptionHandler → 422
+        connectionTest.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
         return AccountResponse.from(
                 registerAccount.register(userId, request.toRegisterCommand())
         );

@@ -19,7 +19,7 @@ class KisConnectionTestService implements KisConnectionTestUseCase {
     }
 
     @Override
-    public boolean testAccountNo(String appKey, String appSecret, String accountNo) {
-        return connectionTestPort.testAccountNo(appKey, appSecret, accountNo);
+    public void testAccountNo(String appKey, String appSecret, String accountNo) {
+        connectionTestPort.testAccountNo(appKey, appSecret, accountNo);
     }
 }

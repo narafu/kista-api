@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.KisTokenCachePort;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +79,7 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
     }
 
     @Override
-    public boolean testAccountNo(String appKey, String appSecret, String accountNo) {
+    public void testAccountNo(String appKey, String appSecret, String accountNo) {
         // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
         String token;
         TempTokenEntry cached = tempTokenCache.get(appKey);
@@ -88,11 +89,11 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
         } else {
             try {
                 TokenCheckResponse tokenResponse = issueToken(appKey, appSecret);
-                if (tokenResponse == null) return false;
+                if (tokenResponse == null) throw new Account.InvalidKisKeyException();
                 token = tokenResponse.accessToken();
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-                return false;
+                throw new Account.InvalidKisKeyException();
             }
         }
 
@@ -117,12 +118,14 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
             AccountNoCheckResponse response = kisRestTemplate.exchange(
                     url, HttpMethod.GET, new HttpEntity<>(headers), AccountNoCheckResponse.class
             ).getBody();
-            boolean valid = response != null && "0".equals(response.rtCd());
-            if (!valid) log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
-            return valid;
+            if (response == null || !"0".equals(response.rtCd())) {
+                // rt_cd != "0" = 계좌번호 불일치 또는 KIS 오류 → 422
+                log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
+                throw new Account.InvalidKisKeyException();
+            }
         } catch (RestClientException e) {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
-            return false;
+            throw new Account.InvalidKisKeyException();
         }
     }
 

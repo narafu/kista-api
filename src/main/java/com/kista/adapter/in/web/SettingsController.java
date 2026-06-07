@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "설정", description = "텔레그램 봇 알림 설정 관리")
@@ -28,7 +27,8 @@ public class SettingsController {
     private final GetUserUseCase getUser;
     private final UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경
 
-    record NotificationChannelRequest(@NotBlank String channel) {} // 알림 채널 변경 요청 body
+    record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
+    record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
 
     // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
     @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
@@ -45,8 +45,8 @@ public class SettingsController {
     @PutMapping("/telegram")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
-                               @RequestBody Map<String, String> body) {
-        updateUserTelegram.updateTelegram(userId, body.get("botToken"), body.get("chatId"));
+                               @Valid @RequestBody TelegramUpdateRequest body) {
+        updateUserTelegram.updateTelegram(userId, body.botToken(), body.chatId());
     }
 
     // 텔레그램 봇 설정 해제

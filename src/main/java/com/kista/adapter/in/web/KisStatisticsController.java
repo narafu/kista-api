@@ -17,11 +17,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -198,7 +195,7 @@ public class KisStatisticsController {
             @RequestParam List<Ticker> tickers) {
         List<Ticker> distinct = tickers.stream().distinct().toList();
         if (distinct.isEmpty() || distinct.size() > 10) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "tickers는 1~10개여야 합니다");
+            throw new IllegalArgumentException("tickers는 1~10개여야 합니다"); // GlobalExceptionHandler → 400
         }
         Map<Ticker, BigDecimal> result = statisticsUseCase.getPrices(accountId, userId, distinct);
         return MultiPriceResponse.from(result);
