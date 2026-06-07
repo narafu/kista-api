@@ -67,9 +67,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         TradingCycle saved = cyclePort.save(cycle);
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음 (등록 시점엔 가격 미조회)
-        cycleHistoryPort.save(new TradingCycleHistory(
-                null, saved.id(), saved.initialUsdDeposit(), null, null, 0, null
-        ));
+        cycleHistoryPort.save(TradingCycleHistory.startSnapshot(saved.id(), saved.initialUsdDeposit(), null));
 
         log.info("거래 사이클 등록: accountId={}, cycleId={}, type={}", accountId, saved.id(), saved.type());
         return saved;

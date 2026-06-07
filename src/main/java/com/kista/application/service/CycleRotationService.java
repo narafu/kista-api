@@ -54,9 +54,7 @@ class CycleRotationService {
         cyclePort.save(rotated);
 
         // 4. 새 시작점 이력 (holdings=0, avgPrice=null)
-        cycleHistoryPort.save(new TradingCycleHistory(
-                null, cycle.id(), nextDeposit, price, null, 0, null
-        ));
+        cycleHistoryPort.save(TradingCycleHistory.startSnapshot(cycle.id(), nextDeposit, price));
         log.info("[cycleId={}] 사이클 재등록 완료: {} → initialUsdDeposit={}", cycle.id(), cycle.cycleSeedType(), nextDeposit);
         userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");
     }

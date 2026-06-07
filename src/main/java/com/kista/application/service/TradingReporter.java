@@ -71,11 +71,7 @@ class TradingReporter {
     // execute() 종료 시 1건 적재, 사이클 종료 시 연속 정책 처리
     private void saveCycleHistory(AccountBalance balance, TradingCycle cycle,
                                   Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
-        TradingCycleHistory history = new TradingCycleHistory(
-                null, cycle.id(),
-                balance.usdDeposit(), price,          // closingPrice (초기 등록 시 null)
-                balance.avgPrice(), balance.holdings(), null
-        );
+        TradingCycleHistory history = TradingCycleHistory.tradeSnapshot(cycle.id(), balance, price);
         cycleHistoryPort.save(history);
         log.info("[cycleId={}] 거래 사이클 이력 저장 완료", cycle.id());
 
