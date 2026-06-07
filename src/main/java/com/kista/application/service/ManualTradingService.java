@@ -40,8 +40,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
     public List<Order> execute(UUID cycleId, UUID requesterId) {
         // 동기 검증: 소유권·타입·상태
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId); // SecurityException → 403
+        Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
         if (cycle.type() != TradingCycle.Type.INFINITE)
             throw new IllegalArgumentException("INFINITE 사이클만 수동 실행 가능합니다");
         if (cycle.status() != TradingCycle.Status.ACTIVE)

@@ -67,7 +67,7 @@ class OrderCancelServiceTest {
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
 
@@ -86,7 +86,7 @@ class OrderCancelServiceTest {
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
@@ -105,7 +105,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelByCycle: PLACED 주문 없으면 CancelResult(0, 0)")
     void cancelByCycle_noPlacedOrders() {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
                 .thenReturn(List.of());
 
@@ -121,7 +121,8 @@ class OrderCancelServiceTest {
     void cancelByCycle_ownershipMismatch_throwsSecurityException() {
         UUID otherUser = UUID.randomUUID();
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, otherUser))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
         assertThatThrownBy(() -> service.cancelByCycle(cycleId, otherUser))
                 .isInstanceOf(SecurityException.class);
@@ -134,7 +135,7 @@ class OrderCancelServiceTest {
     void cancelOrder_success() {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
 
         service.cancelOrder(orderId, requesterId);
 
@@ -157,7 +158,8 @@ class OrderCancelServiceTest {
         Order order = placedOrder(orderId, "ORD_99");
         UUID otherUser = UUID.randomUUID();
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, otherUser))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, otherUser))
                 .isInstanceOf(SecurityException.class);
@@ -170,7 +172,7 @@ class OrderCancelServiceTest {
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.FILLED, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(ownedAccount);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(OrderCancelException.class);

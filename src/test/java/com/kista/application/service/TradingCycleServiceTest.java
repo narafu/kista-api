@@ -75,7 +75,7 @@ class TradingCycleServiceTest {
     void pause_publishes_TradingCyclePausedEvent() {
         // given
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(ACTIVE_CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(cyclePort.save(any(TradingCycle.class))).thenReturn(PAUSED_CYCLE);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
@@ -92,7 +92,7 @@ class TradingCycleServiceTest {
     void resume_publishes_TradingCycleResumedEvent() {
         // given
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(PAUSED_CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(cyclePort.save(any(TradingCycle.class))).thenReturn(RESUMED_CYCLE);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
@@ -109,9 +109,9 @@ class TradingCycleServiceTest {
     void pause_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(ACTIVE_CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
-        // ownerAccount()의 userId=USER_ID, 요청자=otherUserId → SecurityException
         assertThatThrownBy(() -> tradingCycleService.pause(CYCLE_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);
 
@@ -123,7 +123,8 @@ class TradingCycleServiceTest {
     void resume_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(PAUSED_CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
         assertThatThrownBy(() -> tradingCycleService.resume(CYCLE_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);

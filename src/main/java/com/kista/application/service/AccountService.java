@@ -45,13 +45,13 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
 
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return accountPort.save(account.withNickname(cmd.nickname()));
     }
 
     @Override
     public void delete(UUID accountId, UUID requesterId) {
-        requireOwnedAccount(accountId, requesterId);
+        accountPort.requireOwnedAccount(accountId, requesterId);
         // 계좌에 속한 사이클 먼저 소프트 삭제 (FK CASCADE 대체)
         cyclePort.deleteByAccountId(accountId);
         accountPort.delete(accountId);
@@ -70,9 +70,4 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
         return accountPort.findByIdOrThrow(id);
     }
 
-    private Account requireOwnedAccount(UUID accountId, UUID requesterId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
-        return account;
-    }
 }

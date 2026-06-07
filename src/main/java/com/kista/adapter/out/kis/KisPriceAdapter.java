@@ -48,16 +48,9 @@ public class KisPriceAdapter implements KisPricePort {
         // last(현재가) 우선, 비어있으면 base(전일종가) fallback
         String last = response.output().last();
         String base = response.output().base();
-        String price = (last != null && !last.isBlank()) ? last
-                     : (base != null && !base.isBlank()) ? base
-                     : null;
-        if (price == null) {
-            throw new KisApiException("가격 조회 응답 없음(last·base 모두 빈값): " + ticker, null);
-        }
-        if (last == null || last.isBlank()) {
-            log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
-        }
-        return new BigDecimal(price);
+        if (last == null || last.isBlank()) log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
+        return KisResponseParser.resolvePrice(last, base)
+                .orElseThrow(() -> new KisApiException("가격 조회 응답 없음(last·base 모두 빈값): " + ticker, null));
     }
 
     @Override
@@ -88,10 +81,8 @@ public class KisPriceAdapter implements KisPricePort {
         for (MultiPriceResponse.Output2 item : response.output2()) {
             if (item.symb() == null) continue;
             // last(현재가) 우선, 비어있으면 base(전일종가) fallback — 장 마감 시 last가 빈 ETF 대응
-            String price = (item.last() != null && !item.last().isBlank()) ? item.last()
-                         : (item.base() != null && !item.base().isBlank()) ? item.base()
-                         : null;
-            if (price == null) {
+            var resolved = KisResponseParser.resolvePrice(item.last(), item.base());
+            if (resolved.isEmpty()) {
                 log.warn("복수종목 현재가 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
                 continue;
             }
@@ -103,7 +94,7 @@ public class KisPriceAdapter implements KisPricePort {
                 log.warn("복수종목 현재가 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
                 continue;
             }
-            result.put(ticker, KisResponseParser.parseBd(price));
+            result.put(ticker, resolved.get());
         }
 
         // 복수종목 응답에 없는 종목 → 단건 API fallback

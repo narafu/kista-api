@@ -7,6 +7,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Optional;
 
 // KIS API 응답 문자열 파싱 공용 헬퍼 — 패키지 내부 전용
 final class KisResponseParser {
@@ -36,6 +37,13 @@ final class KisResponseParser {
             case MOC            -> "0";
             case LOC, LIMIT     -> price.setScale(2, RoundingMode.HALF_UP).toPlainString();
         };
+    }
+
+    // last(현재가) 우선, 비어있으면 base(전일종가) fallback — 장 마감 시 last가 빈 ETF 대응
+    static Optional<BigDecimal> resolvePrice(String last, String base) {
+        if (last != null && !last.isBlank()) return Optional.of(parseBd(last));
+        if (base != null && !base.isBlank()) return Optional.of(parseBd(base));
+        return Optional.empty();
     }
 
     // KIS YYYYMMDD 문자열 → LocalDate, 파싱 실패 시 fallback 반환

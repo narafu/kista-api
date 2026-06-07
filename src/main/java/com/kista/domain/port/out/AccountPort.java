@@ -16,6 +16,13 @@ public interface AccountPort {
         return findById(accountId).orElseThrow(
                 () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
     }
+
+    // 계좌 조회 + 소유권 검증 — 불일치 시 SecurityException (컨트롤러에서 403 변환)
+    default Account requireOwnedAccount(UUID accountId, UUID requesterId) {
+        Account account = findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        return account;
+    }
     int countByUserId(UUID userId);
     Account save(Account account);
     void delete(UUID id);

@@ -51,7 +51,7 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     @Override
     public PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId,
                                                LocalDate from, LocalDate to) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // KIS 예외는 그대로 전파 → 컨트롤러에서 503 처리
         return kisProfitPort.getPeriodProfit(account, from, to);
     }
@@ -59,7 +59,7 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     @Override
     public List<Execution> getTrades(UUID accountId, UUID requesterId,
                                       LocalDate from, LocalDate to) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         Optional<Ticker> ticker = tradingCyclePort.findActiveTicker(accountId);
         if (ticker.isEmpty()) return Collections.emptyList();
         return kisExecutionPort.getExecutions(from, to, ticker.get(), account);
@@ -67,26 +67,26 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
 
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return kisPortfolioPort.getPresentBalance(account);
     }
 
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return kisMarginPort.getMargin(account);
     }
 
     @Override
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return kisDailyTransactionPort.getDailyTransactions(from, to, account);
     }
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return kisPricePort.getPrices(tickers, account);
     }
 
@@ -94,7 +94,7 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     public CycleHistoryPage getCycleHistory(UUID accountId, UUID requesterId,
                                              LocalDate from, LocalDate to,
                                              Instant cursor, int size) {
-        Account account = requireOwnedAccount(accountId, requesterId);
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         Instant fromInstant = resolveFrom(from);
         // cursor 없으면 to(=내일)가 상한 — cursor는 그 이전 지점으로 좁혀감
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
@@ -108,7 +108,7 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
                                                       LocalDate from, LocalDate to,
                                                       Instant cursor, int size) {
         var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
-        Account account = requireOwnedAccount(cycle.accountId(), requesterId);
+        Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
         Instant fromInstant = resolveFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
         List<AccountCycleHistoryEntry> raw =
@@ -134,13 +134,6 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     private Instant resolveTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(ZoneOffset.UTC);
         return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-    }
-
-    // 계좌 조회 + 소유권 검증 — 불일치 시 SecurityException (컨트롤러에서 403 변환)
-    private Account requireOwnedAccount(UUID accountId, UUID requesterId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
-        return account;
     }
 
 }

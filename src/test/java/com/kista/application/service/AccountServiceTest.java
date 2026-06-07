@@ -76,8 +76,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
-        UUID otherId = UUID.randomUUID();
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
+        when(accountPort.requireOwnedAccount(accountId, userId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
 
@@ -88,7 +88,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("본인 계좌 수정 성공")
     void update_by_owner_success() {
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
@@ -100,8 +100,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("타 사용자 계좌 삭제 시 SecurityException 발생 (→ 403)")
     void delete_by_non_owner_throws_forbidden() {
-        UUID otherId = UUID.randomUUID();
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(otherId));
+        when(accountPort.requireOwnedAccount(accountId, userId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
 
         assertThatThrownBy(() -> accountService.delete(accountId, userId))
                 .isInstanceOf(SecurityException.class);
@@ -112,7 +112,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("본인 계좌 삭제 성공")
     void delete_by_owner_success() {
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(activeAccount(userId));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
 
         accountService.delete(accountId, userId);
 
@@ -122,7 +122,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("존재하지 않는 계좌 수정 시 NoSuchElementException 발생 (→ 404)")
     void update_not_found_throws() {
-        when(accountPort.findByIdOrThrow(accountId))
+        when(accountPort.requireOwnedAccount(accountId, userId))
                 .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
