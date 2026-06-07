@@ -5,12 +5,13 @@ import com.kista.domain.port.in.UnregisterFcmTokenUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "FCM", description = "FCM 디바이스 토큰 관리")
@@ -22,14 +23,16 @@ public class FcmController {
     private final RegisterFcmTokenUseCase registerFcmToken;
     private final UnregisterFcmTokenUseCase unregisterFcmToken;
 
+    record FcmTokenRequest(@NotBlank String token, @NotBlank String platform) {} // FCM 토큰 등록 요청 body
+
     // FCM 디바이스 토큰 등록 (WEB | ANDROID | IOS)
     @Operation(summary = "FCM 토큰 등록", description = "body: {\"token\": \"...\", \"platform\": \"WEB\"}")
     @ApiResponse(responseCode = "204", description = "등록 성공")
     @PostMapping("/tokens")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void registerToken(@AuthenticationPrincipal UUID userId,
-                              @RequestBody Map<String, String> body) {
-        registerFcmToken.register(userId, body.get("token"), body.get("platform"));
+                              @Valid @RequestBody FcmTokenRequest body) {
+        registerFcmToken.register(userId, body.token(), body.platform());
     }
 
     // FCM 디바이스 토큰 삭제
