@@ -22,16 +22,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SecurityException.class)
     public ProblemDetail handleForbidden(SecurityException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
-        detail.setTitle("Access Denied");
-        return detail;
+        return problem(HttpStatus.FORBIDDEN, "Access Denied", ex.getMessage());
     }
 
     @ExceptionHandler(Account.CooldownException.class)
     public ResponseEntity<ProblemDetail> handleCooldown(Account.CooldownException ex) {
         // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
-        detail.setTitle("Cooldown Active");
+        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Cooldown Active", ex.getMessage());
         detail.setProperty("retryAfter", ex.getRetryAfter().toString());
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().getEpochSecond()));
@@ -40,23 +37,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Account.InvalidKisKeyException.class)
     public ProblemDetail handleInvalidKisKey(Account.InvalidKisKeyException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
-        detail.setTitle("Invalid KIS Credentials");
-        return detail;
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid KIS Credentials", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-        detail.setTitle("Invalid State");
-        return detail;
+        return problem(HttpStatus.BAD_REQUEST, "Invalid State", ex.getMessage());
     }
 
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNotFound(NoSuchElementException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        detail.setTitle("Resource Not Found");
-        return detail;
+        return problem(HttpStatus.NOT_FOUND, "Resource Not Found", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -65,44 +56,39 @@ public class GlobalExceptionHandler {
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .toList()
                 .toString();
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, message);
-        detail.setTitle("Validation Failed");
-        return detail;
+        return problem(HttpStatus.BAD_REQUEST, "Validation Failed", message);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-        detail.setTitle("Invalid Request");
-        return detail;
+        return problem(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage());
     }
 
     @ExceptionHandler(ManualTradingException.class)
     public ProblemDetail handleManualTrading(ManualTradingException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        detail.setTitle("Manual Trading Conflict");
-        return detail;
+        return problem(HttpStatus.CONFLICT, "Manual Trading Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(OrderCancelException.class)
     public ProblemDetail handleOrderCancel(OrderCancelException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        detail.setTitle("Order Cancel Conflict");
-        return detail;
+        return problem(HttpStatus.CONFLICT, "Order Cancel Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(PrivacyTradeConflictException.class)
     public ProblemDetail handlePrivacyTradeConflict(PrivacyTradeConflictException ex) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        detail.setTitle("Privacy Trade Conflict");
-        return detail;
+        return problem(HttpStatus.CONFLICT, "Privacy Trade Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(KisApiException.class)
     public ProblemDetail handleKisApiException(KisApiException ex) {
         log.error("KIS API 오류: {}", ex.getMessage(), ex);
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
-        detail.setTitle("KIS API Error");
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
+    }
+
+    // ProblemDetail 생성 헬퍼 — 모든 핸들러에서 반복되는 3줄 보일러플레이트 제거
+    private static ProblemDetail problem(HttpStatus status, String title, String msg) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, msg);
+        detail.setTitle(title);
         return detail;
     }
 }

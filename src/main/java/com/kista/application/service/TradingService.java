@@ -20,6 +20,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -85,13 +87,9 @@ class TradingService implements ExecuteTradingUseCase {
         // planAndSaveOrders — 사이클별: 잔고 로드 + PLANNED 주문 생성·저장 (이미 존재하면 skip)
         List<CycleState> states = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            try {
-                CycleState state = planAndSaveOrders(ctx, startPrices, privacyBase, today);
-                if (state != null) states.add(state);
-            } catch (Exception e) {
-                log.error("[cycleId={}] planAndSaveOrders 오류: {}", ctx.cycle().id(), e.getMessage(), e);
-                notifyPort.notifyError(e);
-            }
+            runSafely("planAndSaveOrders", ctx.cycle().id(),
+                    () -> planAndSaveOrders(ctx, startPrices, privacyBase, today))
+                    .ifPresent(states::add);
         }
         if (states.isEmpty()) return;
 
@@ -101,15 +99,12 @@ class TradingService implements ExecuteTradingUseCase {
         // KIS 접수 — 사이클별: BUY 가격 보정 후 PLANNED → KIS 접수
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
-            try {
+            runSafely("KIS 접수", state.ctx().cycle().id(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().cycle(), state.ctx().account(),
                         state.startPrice(), state.position());
-                placedStates.add(new CyclePlacedState(state, mainOrders));
-            } catch (Exception e) {
-                log.error("[cycleId={}] KIS 접수 오류: {}", state.ctx().cycle().id(), e.getMessage(), e);
-                notifyPort.notifyError(e);
-            }
+                return new CyclePlacedState(state, mainOrders);
+            }).ifPresent(placedStates::add);
         }
 
         // 공통 대기 — PostClose까지 (모든 사이클이 공유하는 단 1회)
@@ -122,14 +117,12 @@ class TradingService implements ExecuteTradingUseCase {
         for (CyclePlacedState ps : placedStates) {
             CycleState st = ps.state();
             TradingCycle cycle = st.ctx().cycle();
-            try {
+            runSafely("recordAndNotify", cycle.id(), () -> {
                 reporter.recordAndNotify(today, cycle, st.ctx().account(), st.ctx().user(),
                         st.balance(), st.snapshot(), closingPrices.get(cycle.ticker()),
                         ps.mainOrders(), st.privacyBase());
-            } catch (Exception e) {
-                log.error("[cycleId={}] recordAndNotify 오류: {}", cycle.id(), e.getMessage(), e);
-                notifyPort.notifyError(e);
-            }
+                return null;
+            });
         }
     }
 
@@ -159,8 +152,9 @@ class TradingService implements ExecuteTradingUseCase {
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
                 balance, cycle, price, today, privacyBase, account.nickname()));
         if (planOpt.isEmpty()) return null;
+        var plan = planOpt.get(); // 한 번 풀어 재사용
 
-        List<Order> orders = planOpt.get().orders();
+        List<Order> orders = plan.orders();
         // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip + 알림
         if (!balance.isOrderValid(orders)) {
             log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
@@ -171,7 +165,7 @@ class TradingService implements ExecuteTradingUseCase {
         orderPlanner.savePlannedOrders(orders, account);
 
         // CycleState: INFINITE는 position/snapshot/startPrice, PRIVACY는 privacyBase 보존
-        InfinitePosition position = planOpt.get().position();
+        InfinitePosition position = plan.position();
         TradingSnapshot snapshot = position != null ? position.toSnapshot() : null;
         BigDecimal startPrice = cycle.type() == TradingCycle.Type.INFINITE ? price : null;
         PrivacyTradeBase privacyBaseForState = cycle.type() == TradingCycle.Type.PRIVACY ? privacyBase : null;
@@ -206,5 +200,23 @@ class TradingService implements ExecuteTradingUseCase {
         log.info("PostClose까지 대기: {}ms", ms);
         if (ms > 0) Thread.sleep(ms);
         log.info("PostClose 대기 완료");
+    }
+
+    // 사이클별 단계 실행 — 예외 발생 시 로그 + 관리자 알림 후 Optional.empty() 반환 (격리 실행)
+    @FunctionalInterface
+    private interface ThrowingSupplier<T> {
+        T get() throws Exception;
+    }
+
+    private <T> Optional<T> runSafely(String phase, UUID cycleId, ThrowingSupplier<T> supplier) throws InterruptedException {
+        try {
+            return Optional.ofNullable(supplier.get());
+        } catch (InterruptedException e) {
+            throw e; // InterruptedException은 삼키지 않음
+        } catch (Exception e) {
+            log.error("[cycleId={}] {} 오류: {}", cycleId, phase, e.getMessage(), e);
+            notifyPort.notifyError(e);
+            return Optional.empty();
+        }
     }
 }

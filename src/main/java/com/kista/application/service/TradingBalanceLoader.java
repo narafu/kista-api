@@ -26,12 +26,10 @@ class TradingBalanceLoader {
 
     // 잔고 로드 — preview용: 이력 없음은 skip, 있으면 그대로 반환
     BalanceLoad tryLoadBalance(TradingCycle cycle) {
-        var latestOpt = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream().findFirst();
-        if (latestOpt.isEmpty()) {
-            return new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY);
-        }
-        TradingCycleHistory latest = latestOpt.get();
-        return new BalanceLoad(new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit()), null);
+        return cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
+                .findFirst()
+                .map(h -> new BalanceLoad(new AccountBalance(h.holdings(), h.avgPrice(), h.usdDeposit()), null))
+                .orElse(new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
     }
 
     // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
