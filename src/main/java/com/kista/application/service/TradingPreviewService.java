@@ -8,6 +8,8 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +21,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import static com.kista.domain.model.order.Order.OrderDirection.BUY;
-import static com.kista.domain.model.order.Order.OrderDirection.SELL;
-
 @Service
 @RequiredArgsConstructor
 class TradingPreviewService implements GetNextOrdersUseCase {
@@ -31,7 +30,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
     private final KisPricePort kisPricePort;
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
-    private final TradingOrderPlanner orderPlanner;
+    private final CycleOrderStrategies cycleStrategies;
 
     // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -58,27 +57,30 @@ class TradingPreviewService implements GetNextOrdersUseCase {
         }
         AccountBalance balance = load.balance();
 
-        return switch (cycle.type()) {
-            case INFINITE -> {
-                BigDecimal price = kisPricePort.getPrice(cycle.ticker(), account);
-                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, "preview:" + accountId);
-                List<Order> orders = calc.orders();
-                // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
-                if (!balance.isOrderValid(orders)) {
-                    // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해
-                    yield new Result(today, calc.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
-                }
-                yield new Result(today, calc.position(), orders, null);
-            }
-            case PRIVACY -> {
-                // 스케줄러 planAndSaveOrders와 동일: 기준매매표 없으면 skip
-                PrivacyTradeBase base = privacyTradePort.findTodayTrade(today).orElse(null);
-                if (base == null) {
-                    yield new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
-                }
-                List<Order> orders = orderPlanner.calcPrivacy(balance, cycle.initialUsdDeposit(), base);
-                yield new Result(today, null, orders, null);
-            }
-        };
+        // INFINITE은 현재가 필요, PRIVACY는 기준매매표 필요 — 전략 입력 컨텍스트로 통합
+        BigDecimal price = cycle.type() == TradingCycle.Type.INFINITE
+                ? kisPricePort.getPrice(cycle.ticker(), account)
+                : null;
+        PrivacyTradeBase privacyBase = cycle.type() == TradingCycle.Type.PRIVACY
+                ? privacyTradePort.findTodayTrade(today).orElse(null)
+                : null;
+
+        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
+        var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
+                balance, cycle, price, today, privacyBase, "preview:" + accountId));
+
+        // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
+        if (planOpt.isEmpty()) {
+            return new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
+        }
+
+        CycleOrderStrategy.OrderPlan plan = planOpt.get();
+        List<Order> orders = plan.orders();
+        // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
+        // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해 (INFINITE만 non-null)
+        if (!balance.isOrderValid(orders)) {
+            return new Result(today, plan.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
+        }
+        return new Result(today, plan.position(), orders, null);
     }
 }

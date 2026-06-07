@@ -11,7 +11,10 @@ import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,8 +73,10 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
-        TradingOrderPlanner orderPlanner = new TradingOrderPlanner(infiniteStrategy, privacyStrategy, orderPort);
-        service = new TradingPreviewService(accountPort, cyclePort, kisPricePort, privacyTradePort, balanceLoader, orderPlanner);
+        CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
+                new InfiniteCycleOrderStrategy(infiniteStrategy),
+                new PrivacyCycleOrderStrategy(privacyStrategy)));
+        service = new TradingPreviewService(accountPort, cyclePort, kisPricePort, privacyTradePort, balanceLoader, cycleStrategies);
     }
 
     @Test

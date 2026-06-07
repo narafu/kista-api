@@ -11,7 +11,10 @@ import com.kista.domain.model.user.*;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,9 +91,12 @@ class TradingServiceTest {
     void setUp() {
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
-        TradingOrderPlanner orderPlanner = new TradingOrderPlanner(infiniteStrategy, privacyStrategy, orderPort);
+        TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
+        CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
+                new InfiniteCycleOrderStrategy(infiniteStrategy),
+                new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleRotationService rotationService = new CycleRotationService(
-                kisMarginPort, cyclePort, cycleHistoryPort, notifyPort, userNotificationPort);
+                kisMarginPort, cyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, kisOrderPort, priceCapper);
@@ -100,7 +106,7 @@ class TradingServiceTest {
         service = new TradingService(
                 marketCalendarPort, notifyPort,
                 orderPort, privacyTradePort,
-                balanceLoader, orderPlanner,
+                balanceLoader, cycleStrategies, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
     }
 

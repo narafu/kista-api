@@ -9,6 +9,8 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,9 +20,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static com.kista.domain.model.order.Order.OrderDirection.BUY;
-import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 
 @Slf4j
 @Service
@@ -32,7 +31,8 @@ class TradingService implements ExecuteTradingUseCase {
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
-    private final TradingOrderPlanner orderPlanner;            // 전략 계산 + 주문 저장 헬퍼
+    private final CycleOrderStrategies cycleStrategies;        // 사이클 타입별 주문 전략 라우터
+    private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + KIS 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
@@ -144,41 +144,38 @@ class TradingService implements ExecuteTradingUseCase {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(cycle).balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // 2. 전략별 PLANNED 주문 생성·저장
-        return switch (cycle.type()) {
-            case INFINITE -> {
-                BigDecimal price = startPrices.get(cycle.ticker());
-
-                // 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (수동 주문 우선 보존)
-                List<Order> todayOrders = orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today);
-                if (!todayOrders.isEmpty()) {
-                    log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip (수동 선행 또는 중복 호출)", account.nickname(), todayOrders.size());
-                    yield new CycleState(ctx, balance, null, null, price, null);
-                }
-
-                TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, account.nickname());
-                List<Order> orders = calc.orders();
-                // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
-                if (!balance.isOrderValid(orders)) {
-                    log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
-                    notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
-                    yield null;
-                }
-
-                orderPlanner.savePlannedOrders(orders, account);
-                yield new CycleState(ctx, balance, calc.position(), calc.position().toSnapshot(), price, null);
+        // 2. INFINITE 전용 가드: 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (수동 주문 보존)
+        BigDecimal price = startPrices.get(cycle.ticker());
+        if (cycle.type() == TradingCycle.Type.INFINITE) {
+            List<Order> todayOrders = orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today);
+            if (!todayOrders.isEmpty()) {
+                log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip (수동 선행 또는 중복 호출)", account.nickname(), todayOrders.size());
+                return new CycleState(ctx, balance, null, null, price, null);
             }
+        }
 
-            case PRIVACY -> {
-                if (privacyBase == null) {
-                    log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", account.nickname());
-                    yield null;
-                }
-                List<Order> privacyOrders = orderPlanner.calcPrivacy(balance, cycle.initialUsdDeposit(), privacyBase);
-                orderPlanner.savePlannedOrders(privacyOrders, account);
-                yield new CycleState(ctx, balance, null, null, null, privacyBase);
-            }
-        };
+        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 Optional.empty)
+        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
+        var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
+                balance, cycle, price, today, privacyBase, account.nickname()));
+        if (planOpt.isEmpty()) return null;
+
+        List<Order> orders = planOpt.get().orders();
+        // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip + 알림
+        if (!balance.isOrderValid(orders)) {
+            log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
+            notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
+            return null;
+        }
+
+        orderPlanner.savePlannedOrders(orders, account);
+
+        // CycleState: INFINITE는 position/snapshot/startPrice, PRIVACY는 privacyBase 보존
+        InfinitePosition position = planOpt.get().position();
+        TradingSnapshot snapshot = position != null ? position.toSnapshot() : null;
+        BigDecimal startPrice = cycle.type() == TradingCycle.Type.INFINITE ? price : null;
+        PrivacyTradeBase privacyBaseForState = cycle.type() == TradingCycle.Type.PRIVACY ? privacyBase : null;
+        return new CycleState(ctx, balance, position, snapshot, startPrice, privacyBaseForState);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)

@@ -9,14 +9,13 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-
-import static java.math.RoundingMode.HALF_UP;
 
 // 사이클 종료 시 cycleSeedType(MAINTAIN/MAX)에 따라 initialUsdDeposit 갱신 + 새 이력 생성
 // package-private — application/service 패키지 전용
@@ -30,6 +29,7 @@ class CycleRotationService {
     private final TradingCycleHistoryPort cycleHistoryPort;    // 새 시작점 이력
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
     private final UserNotificationPort userNotificationPort;   // 사용자 알림 (재등록 완료)
+    private final CycleOrderStrategies cycleStrategies;        // 사이클 타입별 최소금액 정책
 
     void rotate(TradingCycle cycle, Account account, User user,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
@@ -37,8 +37,8 @@ class CycleRotationService {
         BigDecimal nextDeposit = calcNextDeposit(cycle, account);
         if (nextDeposit == null) return; // 실패 — 내부에서 알림 발송 완료
 
-        // 2. 최소금액 가드
-        BigDecimal minRequired = resolveMinRequired(cycle, price, privacyTradeBase);
+        // 2. 최소금액 가드 — 사이클 타입별 정책은 전략 객체에 위임
+        BigDecimal minRequired = cycleStrategies.of(cycle).minRequiredDeposit(price, privacyTradeBase);
         if (minRequired != null && nextDeposit.compareTo(minRequired) < 0) {
             log.warn("[cycleId={}] 재등록 취소 — 잔고 부족: {} < 최소 {}", cycle.id(), nextDeposit, minRequired);
             notifyPort.notifyInsufficientBalance(account,
@@ -86,15 +86,4 @@ class CycleRotationService {
         return usdAmount;
     }
 
-    // 최소금액 기준: INFINITE = 현재가 × 44 (= 20round × 2 × 1.1 safety), PRIVACY = currentCycleStart / 2
-    private BigDecimal resolveMinRequired(TradingCycle cycle, BigDecimal price, PrivacyTradeBase privacyTradeBase) {
-        return switch (cycle.type()) {
-            case INFINITE -> price != null
-                    ? price.multiply(BigDecimal.valueOf(44)).setScale(2, HALF_UP)
-                    : null;
-            case PRIVACY -> privacyTradeBase != null
-                    ? privacyTradeBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP)
-                    : null;
-        };
-    }
 }
