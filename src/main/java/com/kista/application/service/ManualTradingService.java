@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -57,9 +56,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
         }
 
         // 스케줄러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
-        LocalDate today = LocalTime.now().isBefore(LocalTime.of(4, 0))
-                ? LocalDate.now()
-                : LocalDate.now().plusDays(1);
+        LocalDate today = DstInfo.nextTradeDate();
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
         if (!orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today).isEmpty())

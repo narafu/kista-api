@@ -3,7 +3,6 @@ package com.kista.adapter.out.notify;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -33,31 +32,19 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     // 사용자 알림 — notificationChannel에 따라 라우팅
     @Override
     public void notifyApproved(User user) {
-        if (usesTelegram(user)) telegram.notifyApproved(user);
-        if (usesFcm(user))      fcm.notifyApproved(user);
+        if (user.notificationChannel().includesTelegram()) telegram.notifyApproved(user);
+        if (user.notificationChannel().includesFcm())      fcm.notifyApproved(user);
     }
 
     @Override
     public void notifyRejected(User user) {
-        if (usesTelegram(user)) telegram.notifyRejected(user);
-        if (usesFcm(user))      fcm.notifyRejected(user);
+        if (user.notificationChannel().includesTelegram()) telegram.notifyRejected(user);
+        if (user.notificationChannel().includesFcm())      fcm.notifyRejected(user);
     }
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport report) {
-        if (usesTelegram(user)) telegram.notifyTradingReport(user, account, report);
-        if (usesFcm(user))      fcm.notifyTradingReport(user, account, report);
-    }
-
-    // TELEGRAM 또는 ALL 채널이면 Telegram 전송
-    private boolean usesTelegram(User u) {
-        return u.notificationChannel() == NotificationChannel.TELEGRAM
-                || u.notificationChannel() == NotificationChannel.ALL;
-    }
-
-    // FCM 또는 ALL 채널이면 FCM 전송
-    private boolean usesFcm(User u) {
-        return u.notificationChannel() == NotificationChannel.FCM
-                || u.notificationChannel() == NotificationChannel.ALL;
+        if (user.notificationChannel().includesTelegram()) telegram.notifyTradingReport(user, account, report);
+        if (user.notificationChannel().includesFcm())      fcm.notifyTradingReport(user, account, report);
     }
 }

@@ -14,9 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kista.domain.model.strategy.DstInfo;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -46,9 +47,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
                 .orElseThrow(() -> new NoSuchElementException("활성 거래 사이클이 없습니다: " + accountId));
 
         // 스케줄러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
-        LocalDate today = LocalTime.now().isBefore(LocalTime.of(4, 0))
-                ? LocalDate.now()
-                : LocalDate.now().plusDays(1);
+        LocalDate today = DstInfo.nextTradeDate();
 
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(cycle);

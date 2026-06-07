@@ -54,6 +54,16 @@ public record DstInfo(
         return new DstInfo(isDst, orderAt, postClose);
     }
 
+    // 스케줄러는 KST 04:00 실행 — 04:00 이후면 당일이 US 거래일이므로 오늘, 04:00 전이면 아직 전날
+    private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 0);
+
+    // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케줄러와 동일 로직 SSOT
+    public static LocalDate nextTradeDate() {
+        return LocalTime.now().isBefore(SCHEDULER_RUN_TIME)
+                ? LocalDate.now()
+                : LocalDate.now().plusDays(1);
+    }
+
     // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose는 정상 계산
     public static DstInfo immediate() {
         ZonedDateTime now = ZonedDateTime.now(KST);

@@ -24,7 +24,13 @@ public record Order(
         LIMIT  // 일반 지정가 주문
     }
 
-    public enum OrderDirection {BUY, SELL}
+    public enum OrderDirection {
+        BUY,
+        SELL;
+
+        // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열)
+        public String kisSllType() { return this == SELL ? "00" : ""; }
+    }
 
     public enum OrderStatus {
         PLANNED,    // DB 저장, KIS 접수 대기

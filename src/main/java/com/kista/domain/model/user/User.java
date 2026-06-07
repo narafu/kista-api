@@ -39,6 +39,9 @@ public record User(
                 return Optional.empty();
             }
         }
+
+        public boolean includesTelegram() { return this == TELEGRAM || this == ALL; }
+        public boolean includesFcm()      { return this == FCM      || this == ALL; }
     }
 
     // 상태만 교체 — 나머지 필드 보존

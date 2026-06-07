@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 
 @Component
 @RequiredArgsConstructor
@@ -29,7 +28,7 @@ public class KisOrderAdapter implements KisOrderPort {
         HttpHeaders headers = kisHttpClient.buildHeaders(trId, account);
 
         // autotrade 성공 패턴과 동일한 필드 순서 및 raw JSON String 포맷으로 전송
-        String body = String.format("""
+        String body = """
                 {
                     "ORD_SVR_DVSN_CD": "0",
                     "CANO": "%s",
@@ -42,15 +41,15 @@ public class KisOrderAdapter implements KisOrderPort {
                     "SLL_TYPE": "%s",
                     "CTAC_TLNO": "",
                     "MGCO_APTM_ODNO": ""
-                }""",
+                }""".formatted(
                 account.accountNo(),
                 account.kisAccountType(),
                 resolveOrderDvsn(order.orderType()),
                 exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
-                resolvePrice(order.orderType(), order.price()),
+                KisResponseParser.formatPrice(order.orderType(), order.price()),
                 order.quantity(),
-                order.direction() == Order.OrderDirection.SELL ? "00" : "");
+                order.direction().kisSllType());
 
         OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
 
@@ -75,7 +74,7 @@ public class KisOrderAdapter implements KisOrderPort {
         HttpHeaders headers = kisHttpClient.buildHeaders(CANCEL_TR_ID, account);
 
         // place()와 동일하게 raw JSON String으로 전송 — Map+Jackson 직렬화 시 EGW00202 발생
-        String body = String.format("""
+        String body = """
                 {
                     "CANO": "%s",
                     "ACNT_PRDT_CD": "%s",
@@ -87,7 +86,7 @@ public class KisOrderAdapter implements KisOrderPort {
                     "OVRS_ORD_UNPR": "0",
                     "MGCO_APTM_ODNO": "",
                     "ORD_SVR_DVSN_CD": "0"
-                }""",
+                }""".formatted(
                 account.accountNo(),
                 account.kisAccountType(),
                 exchangeRegistry.ovrsExcgCd(order.ticker()),
@@ -103,10 +102,6 @@ public class KisOrderAdapter implements KisOrderPort {
             case MOC   -> "33"; // 장마감시장가(MOC)
             case LIMIT -> "00"; // 지정가
         };
-    }
-
-    private String resolvePrice(Order.OrderType type, BigDecimal price) {
-        return KisResponseParser.formatPrice(type, price);
     }
 
     record OrderResponse(
