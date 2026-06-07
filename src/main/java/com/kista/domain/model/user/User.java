@@ -70,4 +70,11 @@ public record User(
                 telegramBotToken, telegramChatId, telegramBotUsername,
                 lastReappliedAt, channel);
     }
+
+    // 역할만 교체 — AdminService.changeRole 전용
+    public User withRole(UserRole newRole) {
+        return new User(id, kakaoId, nickname, status, newRole,
+                telegramBotToken, telegramChatId, telegramBotUsername,
+                lastReappliedAt, notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
+    }
 }

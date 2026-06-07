@@ -19,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Slf4j
@@ -62,8 +61,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
         if (!orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today).isEmpty())
             throw new ManualTradingException("오늘 이미 주문이 등록된 사이클입니다");
 
-        User user = userPort.findById(account.userId())
-                .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
+        User user = userPort.findByIdOrThrow(account.userId());
 
         // 현재가 조회 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
         Map<TradingCycle.Ticker, BigDecimal> prices = priceFetcher.fetchPrices(

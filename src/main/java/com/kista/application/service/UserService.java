@@ -63,7 +63,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
 
     @Override
     public void approve(UUID userId) {
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         User updated = user.withStatus(User.UserStatus.ACTIVE);
         userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
@@ -73,7 +73,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
 
     @Override
     public void reject(UUID userId) {
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
         User updated = user.withStatus(User.UserStatus.REJECTED, Instant.now());
         userPort.save(updated);
@@ -84,7 +84,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
 
     @Override
     public void reapply(UUID userId) {
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         Instant now = Instant.now();
 
         // 상태별 쿨다운 검증
@@ -112,8 +112,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
     @Override
     @Transactional(readOnly = true)
     public User getById(UUID id) {
-        return userPort.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + id));
+        return userPort.findByIdOrThrow(id);
     }
 
     @Override
@@ -123,30 +122,26 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoId));
     }
 
-    private User findOrThrow(UUID userId) {
-        return userPort.findById(userId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-    }
 
     @Override
     public void updateTelegram(UUID userId, String botToken, String chatId) {
         // botToken 유효성 검증 + username 취득 (실패 시 IllegalArgumentException)
         String botUsername = telegramBotInfoPort.getUsername(botToken);
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withTelegram(botToken, chatId, botUsername));
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
     }
 
     @Override
     public void removeTelegram(UUID userId) {
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withTelegram(null, null, null));
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
 
     @Override
     public void deleteMe(UUID userId) {
-        findOrThrow(userId); // 존재 확인 — 없으면 NoSuchElementException
+        userPort.findByIdOrThrow(userId); // 존재 확인
         // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
         cyclePort.deleteByUserId(userId);
         accountPort.deleteByUserId(userId);
@@ -156,7 +151,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
 
     @Override
     public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
-        User user = findOrThrow(userId);
+        User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withNotificationChannel(channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
     }

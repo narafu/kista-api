@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -78,7 +77,7 @@ class TradingCycleServiceTest {
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(ACTIVE_CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
         when(cyclePort.save(any(TradingCycle.class))).thenReturn(PAUSED_CYCLE);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(activeUser()));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
         // when
         tradingCycleService.pause(CYCLE_ID, USER_ID);
@@ -95,7 +94,7 @@ class TradingCycleServiceTest {
         when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(PAUSED_CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(ownerAccount());
         when(cyclePort.save(any(TradingCycle.class))).thenReturn(RESUMED_CYCLE);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(activeUser()));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
         // when
         tradingCycleService.resume(CYCLE_ID, USER_ID);

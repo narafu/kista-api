@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,7 +88,7 @@ class AdminServiceTest {
     void changeRole_updatesRoleAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
         User existing = user(targetId, User.UserStatus.ACTIVE);
-        when(userPort.findById(targetId)).thenReturn(Optional.of(existing));
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService.changeRole(adminId, targetId, User.UserRole.ADMIN);
@@ -103,7 +102,7 @@ class AdminServiceTest {
     @Test
     void deleteUser_softDeletesCascadeAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userPort.findById(targetId)).thenReturn(Optional.of(user(targetId, User.UserStatus.ACTIVE)));
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(user(targetId, User.UserStatus.ACTIVE));
 
         adminService.deleteUser(adminId, targetId);
 

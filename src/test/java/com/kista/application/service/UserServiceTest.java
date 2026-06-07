@@ -101,7 +101,7 @@ class UserServiceTest {
     @DisplayName("REJECTED 상태 사용자 재신청 시 PENDING 전환 + 관리자 재알림")
     void reapply_rejected_user_sets_pending_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(rejectedUser(userId)));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -116,8 +116,8 @@ class UserServiceTest {
     void reapply_pending_within_1h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
         // 30분 전에 마지막 재신청
-        when(userPort.findById(userId)).thenReturn(Optional.of(
-                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES))));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
                 .isInstanceOf(Account.CooldownException.class);
@@ -127,8 +127,8 @@ class UserServiceTest {
     @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 알림")
     void reapply_pending_after_1h_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(
-                pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS))));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS)));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -142,7 +142,7 @@ class UserServiceTest {
     @DisplayName("PENDING lastReappliedAt=null 이면 즉시 재신청 허용")
     void reapply_pending_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -154,8 +154,8 @@ class UserServiceTest {
     @DisplayName("REJECTED 24시간 이내 재신청 시 CooldownException")
     void reapply_rejected_within_24h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(
-                rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS))));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
                 .isInstanceOf(Account.CooldownException.class);
@@ -167,7 +167,7 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null, null, NotificationChannel.TELEGRAM);
-        when(userPort.findById(userId)).thenReturn(Optional.of(user));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -179,7 +179,7 @@ class UserServiceTest {
     @DisplayName("거절 시 lastReappliedAt 갱신 (24h 카운트다운 시작)")
     void reject_sets_lastReappliedAt() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reject(userId);
@@ -192,7 +192,7 @@ class UserServiceTest {
     @DisplayName("승인 시 ACTIVE 전환 + 승인 알림")
     void approve_sets_active_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.approve(userId);
@@ -205,7 +205,7 @@ class UserServiceTest {
     @DisplayName("거절 시 REJECTED 전환 + 거절 알림")
     void reject_sets_rejected_and_notifies() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findById(userId)).thenReturn(Optional.of(pendingUser(userId)));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reject(userId);
@@ -252,7 +252,7 @@ class UserServiceTest {
     @DisplayName("회원 탈퇴 시 userPort.delete 호출")
     void deleteMe_removesUser() {
         UUID id = UUID.randomUUID();
-        when(userPort.findById(id)).thenReturn(Optional.of(pendingUser(id)));
+        when(userPort.findByIdOrThrow(id)).thenReturn(pendingUser(id));
 
         userService.deleteMe(id);
 
@@ -263,7 +263,7 @@ class UserServiceTest {
     @DisplayName("존재하지 않는 사용자 탈퇴 시 NoSuchElementException")
     void deleteMe_userNotFound_throws() {
         UUID id = UUID.randomUUID();
-        when(userPort.findById(id)).thenReturn(Optional.empty());
+        when(userPort.findByIdOrThrow(id)).thenThrow(new NoSuchElementException("사용자를 찾을 수 없습니다: " + id));
 
         assertThatThrownBy(() -> userService.deleteMe(id))
                 .isInstanceOf(NoSuchElementException.class);

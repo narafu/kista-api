@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,7 +65,7 @@ class TradingSchedulerTest {
         User user = mockUser();
         when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
 
         scheduler.run();
 
@@ -95,7 +94,7 @@ class TradingSchedulerTest {
         User user = mockUser();
         when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
         doThrow(new InterruptedException("interrupted")).when(useCase).executeBatch(any());
 
         scheduler.run();
@@ -122,7 +121,7 @@ class TradingSchedulerTest {
         RuntimeException ex = new RuntimeException("계좌 없음");
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
         when(accountPort.findByIdOrThrow(accountId2)).thenReturn(account2);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
 
         scheduler.run();
 
@@ -141,7 +140,7 @@ class TradingSchedulerTest {
         User user = mockUser();
         when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
         doThrow(ex).when(useCase).executeBatch(any());
 

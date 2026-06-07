@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @Slf4j
 @Component
@@ -38,8 +37,7 @@ public class TradingScheduler {
         for (TradingCycle cycle : cycles) {
             try {
                 Account account = accountPort.findByIdOrThrow(cycle.accountId());
-                User user = userPort.findById(account.userId())
-                        .orElseThrow(() -> new NoSuchElementException("사용자 없음: " + account.userId()));
+                User user = userPort.findByIdOrThrow(account.userId());
                 contexts.add(new ExecuteTradingUseCase.BatchContext(cycle, account, user));
             } catch (Exception e) {
                 log.error("[cycleId={}] 컨텍스트 조회 오류: {}", cycle.id(), e.getMessage(), e);

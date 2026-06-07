@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Slf4j
@@ -89,7 +88,7 @@ class TradingCycleService implements RegisterTradingCycleUseCase,
         }
         Account account = requireOwnedAccount(cycle.accountId(), requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
-        User user = findUserOrThrow(requesterId);
+        User user = userPort.findByIdOrThrow(requesterId);
         TradingCycle paused = cycle.withStatus(TradingCycle.Status.PAUSED);
         cyclePort.save(paused);
         log.info("거래 사이클 중지: cycleId={}", cycleId);
@@ -106,7 +105,7 @@ class TradingCycleService implements RegisterTradingCycleUseCase,
         }
         Account account = requireOwnedAccount(cycle.accountId(), requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
-        User user = findUserOrThrow(requesterId);
+        User user = userPort.findByIdOrThrow(requesterId);
         TradingCycle active = cycle.withStatus(TradingCycle.Status.ACTIVE);
         cyclePort.save(active);
         log.info("거래 사이클 재개: cycleId={}", cycleId);
@@ -148,11 +147,6 @@ class TradingCycleService implements RegisterTradingCycleUseCase,
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
         return account;
-    }
-
-    private User findUserOrThrow(UUID userId) {
-        return userPort.findById(userId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
     }
 
 }

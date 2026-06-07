@@ -25,6 +25,12 @@ public record Account(
         private final String label; // 한국어 표시 이름
     }
 
+    // nickname만 교체 — AccountService.update 전용
+    public Account withNickname(String newNickname) {
+        return new Account(id, userId, newNickname != null ? newNickname : nickname,
+                accountNo, kisAppKey, kisSecretKey, kisAccountType, broker);
+    }
+
     // 소유권 불일치 시 SecurityException → 컨트롤러에서 403 매핑
     public void verifyOwnedBy(UUID requesterId) {
         if (!userId.equals(requesterId)) {

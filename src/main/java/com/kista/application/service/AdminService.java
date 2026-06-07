@@ -2,7 +2,6 @@ package com.kista.application.service;
 
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminDashboardUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
@@ -20,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Slf4j
@@ -66,23 +64,9 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
 
     @Override
     public void changeRole(UUID adminId, UUID targetUserId, User.UserRole role) {
-        // 사용자 존재 확인
-        User user = userPort.findById(targetUserId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
+        User user = userPort.findByIdOrThrow(targetUserId);
         // role만 교체, updatedAt=null (JPA @LastModifiedDate 자동 처리)
-        User updated = new User(
-                user.id(),
-                user.kakaoId(),
-                user.nickname(),
-                user.status(),
-                role,
-                user.telegramBotToken(),
-                user.telegramChatId(),
-                user.telegramBotUsername(),
-                user.lastReappliedAt(),
-                user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
-        );
-        userPort.save(updated);
+        userPort.save(user.withRole(role));
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,
                 Map.of("newRole", role.name()));
@@ -90,8 +74,7 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
 
     @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
-        userPort.findById(targetUserId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + targetUserId));
+        userPort.findByIdOrThrow(targetUserId); // 존재 확인
         // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
         cyclePort.deleteByUserId(targetUserId);
         accountPort.deleteByUserId(targetUserId);

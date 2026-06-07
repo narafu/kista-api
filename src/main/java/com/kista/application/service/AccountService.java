@@ -46,14 +46,7 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
         Account account = requireOwnedAccount(accountId, requesterId);
-        Account updated = new Account(
-                account.id(), account.userId(),
-                cmd.nickname() != null ? cmd.nickname() : account.nickname(),
-                account.accountNo(),
-                account.kisAppKey(), account.kisSecretKey(),
-                account.kisAccountType(), account.broker()
-        );
-        return accountPort.save(updated);
+        return accountPort.save(account.withNickname(cmd.nickname()));
     }
 
     @Override
