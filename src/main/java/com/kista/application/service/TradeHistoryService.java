@@ -12,7 +12,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class TradeHistoryService implements GetTradeHistoryUseCase {
+class TradeHistoryService implements GetTradeHistoryUseCase {
 
     private final OrderPort orderPort;
 

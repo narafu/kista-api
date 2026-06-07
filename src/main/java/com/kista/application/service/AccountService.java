@@ -19,7 +19,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
+class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
         DeleteAccountUseCase, GetAccountUseCase {
 
     private static final int MAX_ACCOUNTS_PER_USER = 10;

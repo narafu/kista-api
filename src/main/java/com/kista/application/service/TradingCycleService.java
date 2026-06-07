@@ -30,7 +30,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class TradingCycleService implements RegisterTradingCycleUseCase,
+class TradingCycleService implements RegisterTradingCycleUseCase,
         DeleteTradingCycleUseCase, GetTradingCycleUseCase, PauseTradingCycleUseCase,
         ResumeTradingCycleUseCase, UpdateTradingCycleUseCase {
 
@@ -44,8 +44,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
 
     @Override
     public TradingCycle register(UUID userId, UUID accountId, RegisterTradingCycleUseCase.Command cmd) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(userId);
+        Account account = requireOwnedAccount(accountId, userId);
 
         // 사이클 수 제한
         if (cyclePort.findByAccountId(accountId).size() >= MAX_CYCLES_PER_ACCOUNT) {
@@ -76,8 +75,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
     @Override
     public void delete(UUID cycleId, UUID requesterId) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        requireOwnedAccount(cycle.accountId(), requesterId);
         cyclePort.delete(cycleId);
         log.info("거래 사이클 삭제: cycleId={}, requesterId={}", cycleId, requesterId);
     }
@@ -89,8 +87,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         if (cycle.status() == TradingCycle.Status.PAUSED) {
             throw new IllegalStateException("이미 중지된 사이클입니다: " + cycleId);
         }
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = requireOwnedAccount(cycle.accountId(), requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
         User user = findUserOrThrow(requesterId);
         TradingCycle paused = cycle.withStatus(TradingCycle.Status.PAUSED);
@@ -107,8 +104,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         if (cycle.status() == TradingCycle.Status.ACTIVE) {
             throw new IllegalStateException("이미 활성화된 사이클입니다: " + cycleId);
         }
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = requireOwnedAccount(cycle.accountId(), requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
         User user = findUserOrThrow(requesterId);
         TradingCycle active = cycle.withStatus(TradingCycle.Status.ACTIVE);
@@ -121,8 +117,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
     @Override
     @Transactional(readOnly = true)
     public List<TradingCycle> listByAccountId(UUID accountId, UUID requesterId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        account.verifyOwnedBy(requesterId);
+        requireOwnedAccount(accountId, requesterId);
         return cyclePort.findByAccountId(accountId);
     }
 
@@ -130,16 +125,14 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
     @Transactional(readOnly = true)
     public TradingCycle getById(UUID cycleId, UUID requesterId) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        requireOwnedAccount(cycle.accountId(), requesterId);
         return cycle;
     }
 
     @Override
     public TradingCycle update(UUID cycleId, UUID requesterId, UpdateTradingCycleUseCase.Command cmd) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.findByIdOrThrow(cycle.accountId());
-        account.verifyOwnedBy(requesterId);
+        requireOwnedAccount(cycle.accountId(), requesterId);
 
         TradingCycle.CycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
@@ -150,6 +143,12 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         return saved;
     }
 
+
+    private Account requireOwnedAccount(UUID accountId, UUID requesterId) {
+        Account account = accountPort.findByIdOrThrow(accountId);
+        account.verifyOwnedBy(requesterId);
+        return account;
+    }
 
     private User findUserOrThrow(UUID userId) {
         return userPort.findById(userId)

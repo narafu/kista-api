@@ -11,7 +11,7 @@ import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
-public class PrivacyTradeService implements GetPrivacyCurrentBaseUseCase {
+class PrivacyTradeService implements GetPrivacyCurrentBaseUseCase {
 
     private final PrivacyTradePort privacyTradePort;
 

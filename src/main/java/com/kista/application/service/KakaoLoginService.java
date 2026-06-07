@@ -18,7 +18,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class KakaoLoginService implements KakaoLoginUseCase {
+class KakaoLoginService implements KakaoLoginUseCase {
 
     private final KakaoOAuthPort kakaoOAuthPort;
     private final RegisterUserUseCase registerUser;

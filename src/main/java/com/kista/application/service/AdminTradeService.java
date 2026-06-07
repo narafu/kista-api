@@ -13,7 +13,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AdminTradeService implements AdminListTradesUseCase {
+class AdminTradeService implements AdminListTradesUseCase {
 
     private final OrderPort orderPort; // 거래 내역 조회 포트
 

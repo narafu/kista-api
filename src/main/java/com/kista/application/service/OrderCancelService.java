@@ -21,7 +21,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class OrderCancelService implements CancelOrderUseCase {
+class OrderCancelService implements CancelOrderUseCase {
 
     private final OrderPort orderPort;
     private final KisOrderPort kisOrderPort;

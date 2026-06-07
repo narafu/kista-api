@@ -32,7 +32,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
+class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
 
     private final UserPort userPort;
     private final AccountPort accountPort;

@@ -12,7 +12,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class FcmTokenService implements RegisterFcmTokenUseCase, UnregisterFcmTokenUseCase {
+class FcmTokenService implements RegisterFcmTokenUseCase, UnregisterFcmTokenUseCase {
 
     private final FcmDeviceTokenPort fcmDeviceTokenPort;
 

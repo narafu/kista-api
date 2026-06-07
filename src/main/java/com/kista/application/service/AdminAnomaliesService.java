@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AdminAnomaliesService implements AdminAnomaliesUseCase {
+class AdminAnomaliesService implements AdminAnomaliesUseCase {
 
     private final OrderPort orderPort;
     private final AccountPort accountPort;

@@ -12,7 +12,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AdminAuditService implements AdminListAuditLogsUseCase {
+class AdminAuditService implements AdminListAuditLogsUseCase {
 
     private final AuditLogPort auditLogPort;
 

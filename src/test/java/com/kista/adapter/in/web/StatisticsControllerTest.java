@@ -114,9 +114,9 @@ class StatisticsControllerTest {
 
     @Test
     void profit_returns_503_on_kis_error() throws Exception {
-        // KIS API 실패는 RuntimeException으로 전파됨 → 컨트롤러에서 503으로 변환
+        // KIS API 실패는 KisApiException → GlobalExceptionHandler에서 503 변환
         when(statisticsUseCase.getPeriodProfit(any(), any(), any(), any()))
-                .thenThrow(new RuntimeException("KIS API 오류"));
+                .thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
                         .param("from", "2024-01-01").param("to", "2024-12-31")
@@ -163,7 +163,7 @@ class StatisticsControllerTest {
     @Test
     void prices_returns_503_on_kis_error() throws Exception {
         when(statisticsUseCase.getPrices(any(), any(), any()))
-                .thenThrow(new RuntimeException("KIS API 오류"));
+                .thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ")

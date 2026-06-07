@@ -10,7 +10,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MarketHolidayService implements GetMarketHolidaysUseCase {
+class MarketHolidayService implements GetMarketHolidaysUseCase {
 
     private final MarketHolidayQueryPort marketHolidayQueryPort;
 

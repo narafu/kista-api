@@ -12,7 +12,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AdminAccountService implements AdminListAccountsUseCase {
+class AdminAccountService implements AdminListAccountsUseCase {
 
     private final AccountPort accountPort; // 전체 계좌 조회용
 

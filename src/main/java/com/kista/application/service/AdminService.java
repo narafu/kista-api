@@ -27,7 +27,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, AdminDashboardUseCase {
+class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, AdminDashboardUseCase {
 
     private final UserPort userPort;
     private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model

@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Tag(name = "통계", description = "KIS API 기반 계좌별 손익·체결·잔고·증거금 조회")
@@ -55,13 +54,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        try {
-            return statisticsUseCase.getPeriodProfit(accountId, userId, from, to);
-        } catch (SecurityException | NoSuchElementException e) {
-            throw e; // → GlobalExceptionHandler (403 / 404)
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
-        }
+        return statisticsUseCase.getPeriodProfit(accountId, userId, from, to);
     }
 
     // 체결 내역 조회 (TTTS3035R)
@@ -207,13 +200,7 @@ public class KisStatisticsController {
         if (distinct.isEmpty() || distinct.size() > 10) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "tickers는 1~10개여야 합니다");
         }
-        try {
-            Map<Ticker, BigDecimal> result = statisticsUseCase.getPrices(accountId, userId, distinct);
-            return MultiPriceResponse.from(result);
-        } catch (SecurityException | NoSuchElementException e) {
-            throw e; // → GlobalExceptionHandler (403 / 404)
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
-        }
+        Map<Ticker, BigDecimal> result = statisticsUseCase.getPrices(accountId, userId, distinct);
+        return MultiPriceResponse.from(result);
     }
 }

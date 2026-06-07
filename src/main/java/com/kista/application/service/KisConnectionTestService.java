@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class KisConnectionTestService implements KisConnectionTestUseCase {
+class KisConnectionTestService implements KisConnectionTestUseCase {
 
     private final KisConnectionTestPort connectionTestPort; // 아웃바운드 포트 — adapter.out 구현체 주입
 

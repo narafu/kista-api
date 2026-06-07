@@ -12,7 +12,7 @@ import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
-public class PortfolioService implements GetPortfolioUseCase {
+class PortfolioService implements GetPortfolioUseCase {
 
     private final TradingCycleHistoryPort cycleHistoryPort;
 

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class FidaOrderService implements ExecuteFidaOrderUseCase {
+class FidaOrderService implements ExecuteFidaOrderUseCase {
 
     private final PrivacyTradePort privacyTradePort;
 

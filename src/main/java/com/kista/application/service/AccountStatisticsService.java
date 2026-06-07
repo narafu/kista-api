@@ -35,7 +35,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AccountStatisticsService implements GetAccountStatisticsUseCase {
+class AccountStatisticsService implements GetAccountStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final TradingCyclePort tradingCyclePort;
