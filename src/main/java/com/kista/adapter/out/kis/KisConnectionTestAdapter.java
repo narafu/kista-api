@@ -78,11 +78,14 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
     public void testAccountNo(String appKey, String appSecret, String accountNo) {
         // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
         String token;
+        Instant now = Instant.now();
         TempTokenEntry cached = tempTokenCache.get(appKey);
-        if (cached != null && Instant.now().isBefore(cached.expiresAt())) {
+        if (cached != null && now.isBefore(cached.expiresAt())) {
             log.debug("계좌번호 검증: 단기 캐시 토큰 재사용 (appKey={}...)", appKey.substring(0, Math.min(8, appKey.length())));
             token = cached.token();
         } else {
+            // 만료된 항목 즉시 제거 — ConcurrentHashMap 누적 방지
+            if (cached != null) tempTokenCache.remove(appKey, cached);
             try {
                 TokenCheckResponse tokenResponse = issueToken(appKey, appSecret);
                 if (tokenResponse == null) throw new Account.InvalidKisKeyException();

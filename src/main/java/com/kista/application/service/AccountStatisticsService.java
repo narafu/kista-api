@@ -30,6 +30,7 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -59,14 +60,9 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     public List<Execution> getTrades(UUID accountId, UUID requesterId,
                                       LocalDate from, LocalDate to) {
         Account account = requireOwnedAccount(accountId, requesterId);
-        Ticker ticker = tradingCyclePort.findByAccountId(accountId).stream()
-                .filter(c -> c.status() == com.kista.domain.model.tradingcycle.TradingCycle.Status.ACTIVE)
-                .findFirst()
-                .or(() -> tradingCyclePort.findByAccountId(accountId).stream().findFirst())
-                .map(com.kista.domain.model.tradingcycle.TradingCycle::ticker)
-                .orElse(null);
-        if (ticker == null) return Collections.emptyList();
-        return kisExecutionPort.getExecutions(from, to, ticker, account);
+        Optional<Ticker> ticker = tradingCyclePort.findActiveTicker(accountId);
+        if (ticker.isEmpty()) return Collections.emptyList();
+        return kisExecutionPort.getExecutions(from, to, ticker.get(), account);
     }
 
     @Override

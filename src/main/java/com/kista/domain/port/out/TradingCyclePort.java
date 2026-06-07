@@ -27,4 +27,14 @@ public interface TradingCyclePort {
 
     // 같은 계좌에 같은 type 중복 방지
     boolean existsByAccountIdAndType(UUID accountId, TradingCycle.Type type);
+
+    // ACTIVE 사이클 ticker 우선, 없으면 첫 번째 사이클 ticker 반환 — 없으면 empty
+    default Optional<TradingCycle.Ticker> findActiveTicker(UUID accountId) {
+        List<TradingCycle> cycles = findByAccountId(accountId);
+        return cycles.stream()
+                .filter(c -> c.status() == TradingCycle.Status.ACTIVE)
+                .findFirst()
+                .or(() -> cycles.stream().findFirst())
+                .map(TradingCycle::ticker);
+    }
 }
