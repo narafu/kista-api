@@ -183,14 +183,6 @@ class TradingService implements ExecuteTradingUseCase {
         executeBatch(List.of(new BatchContext(cycle, account, user)), dst);
     }
 
-    // 수동 실행 진입점: PLANNED 주문 저장까지만 수행 (KIS 접수는 스케줄러가 담당)
-    // 반환값: false = 휴장 또는 잔고 부족으로 skip
-    boolean planForManual(BatchContext ctx, LocalDate today) {
-        Map<Ticker, BigDecimal> startPrices = priceFetcher.fetchPrices(
-                List.of(ctx.cycle().ticker()), ctx.account());
-        return planAndSaveOrders(ctx, startPrices, null, today) != null;
-    }
-
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환
     private boolean isMarketOpen(LocalDate today) {
         boolean open = marketCalendarPort.isMarketOpen(today);
