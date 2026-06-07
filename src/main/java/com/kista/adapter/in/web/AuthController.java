@@ -4,7 +4,6 @@ import com.kista.adapter.in.web.dto.KakaoLoginResponse;
 import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.in.DeleteMeUseCase;
@@ -21,7 +20,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
@@ -73,7 +71,7 @@ public class AuthController {
         return sseEmitterRegistry.connect(userId);
     }
 
-    // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청
+    // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청 — CooldownException→429, IllegalStateException→400은 GlobalExceptionHandler 처리
     @Operation(summary = "승인 재신청", description = "거절(24시간) 또는 대기(1시간) 쿨다운 이후 재신청 가능.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "재신청 성공"),
@@ -83,14 +81,7 @@ public class AuthController {
     @PostMapping("/approval-requests")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void requestApproval(@AuthenticationPrincipal UUID userId) {
-        try {
-            approveUser.reapply(userId);
-        } catch (Account.CooldownException e) {
-            // 쿨다운 중 — 재신청 가능 시각을 body에 포함
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, e.getRetryAfter().toString());
-        } catch (IllegalStateException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        approveUser.reapply(userId);
     }
 
     // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (V16 FK CASCADE)

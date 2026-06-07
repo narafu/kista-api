@@ -2,6 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
@@ -23,6 +25,17 @@ public class GlobalExceptionHandler {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         detail.setTitle("Access Denied");
         return detail;
+    }
+
+    @ExceptionHandler(Account.CooldownException.class)
+    public ResponseEntity<ProblemDetail> handleCooldown(Account.CooldownException ex) {
+        // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        detail.setTitle("Cooldown Active");
+        detail.setProperty("retryAfter", ex.getRetryAfter().toString());
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().getEpochSecond()));
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).headers(headers).body(detail);
     }
 
     @ExceptionHandler(Account.InvalidKisKeyException.class)

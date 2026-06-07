@@ -8,11 +8,12 @@ import com.kista.domain.port.in.UpdateUserTelegramUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +28,8 @@ public class SettingsController {
     private final GetUserUseCase getUser;
     private final UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경
 
+    record NotificationChannelRequest(@NotBlank String channel) {} // 알림 채널 변경 요청 body
+
     // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
     @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -35,7 +38,7 @@ public class SettingsController {
         return TelegramSettingsResponse.from(getUser.getById(userId));
     }
 
-    // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증)
+    // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
     @ApiResponse(responseCode = "204", description = "저장 성공")
     @ApiResponse(responseCode = "400", description = "유효하지 않은 Bot Token")
@@ -43,13 +46,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
                                @RequestBody Map<String, String> body) {
-        String botToken = body.get("botToken");
-        String chatId = body.get("chatId");
-        try {
-            updateUserTelegram.updateTelegram(userId, botToken, chatId);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        updateUserTelegram.updateTelegram(userId, body.get("botToken"), body.get("chatId"));
     }
 
     // 텔레그램 봇 설정 해제
@@ -61,22 +58,14 @@ public class SettingsController {
         updateUserTelegram.removeTelegram(userId);
     }
 
-    // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택)
+    // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "알림 채널 변경", description = "TELEGRAM / FCM / ALL 중 선택. body: {\"channel\": \"FCM\"}")
     @ApiResponse(responseCode = "204", description = "변경 성공")
     @PatchMapping("/notification-channel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateNotificationChannel(@AuthenticationPrincipal UUID userId,
-                                           @RequestBody Map<String, String> body) {
-        String raw = body.get("channel");
-        if (raw == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "channel 필드가 필요합니다.");
-        }
-        try {
-            NotificationChannel channel = NotificationChannel.valueOf(raw.toUpperCase());
-            updateNotificationChannel.updateNotificationChannel(userId, channel);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유효하지 않은 채널: " + raw);
-        }
+                                           @Valid @RequestBody NotificationChannelRequest body) {
+        NotificationChannel channel = NotificationChannel.valueOf(body.channel().toUpperCase());
+        updateNotificationChannel.updateNotificationChannel(userId, channel);
     }
 }
