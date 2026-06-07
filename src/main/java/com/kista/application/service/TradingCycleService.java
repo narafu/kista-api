@@ -95,7 +95,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         account.verifyOwnedBy(requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
         User user = findUserOrThrow(requesterId);
-        TradingCycle paused = withStatus(cycle, TradingCycle.Status.PAUSED);
+        TradingCycle paused = cycle.withStatus(TradingCycle.Status.PAUSED);
         cyclePort.save(paused);
         log.info("거래 사이클 중지: cycleId={}", cycleId);
         // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
@@ -113,7 +113,7 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         account.verifyOwnedBy(requesterId);
         // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
         User user = findUserOrThrow(requesterId);
-        TradingCycle active = withStatus(cycle, TradingCycle.Status.ACTIVE);
+        TradingCycle active = cycle.withStatus(TradingCycle.Status.ACTIVE);
         cyclePort.save(active);
         log.info("거래 사이클 재개: cycleId={}", cycleId);
         // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
@@ -146,21 +146,12 @@ public class TradingCycleService implements RegisterTradingCycleUseCase,
         TradingCycle.CycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
                 : cycle.cycleSeedType();
-        TradingCycle updated = withCycleSeedType(cycle, seedType);
+        TradingCycle updated = cycle.withCycleSeedType(seedType);
         TradingCycle saved = cyclePort.save(updated);
         log.info("거래 사이클 수정: cycleId={}, cycleSeedType={}", cycleId, seedType);
         return saved;
     }
 
-    private TradingCycle withStatus(TradingCycle c, TradingCycle.Status status) {
-        return new TradingCycle(c.id(), c.accountId(), c.type(), status,
-                c.ticker(), c.initialUsdDeposit(), c.cycleSeedType());
-    }
-
-    private TradingCycle withCycleSeedType(TradingCycle c, TradingCycle.CycleSeedType cycleSeedType) {
-        return new TradingCycle(c.id(), c.accountId(), c.type(), c.status(),
-                c.ticker(), c.initialUsdDeposit(), cycleSeedType);
-    }
 
     private User findUserOrThrow(UUID userId) {
         return userPort.findById(userId)

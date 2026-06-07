@@ -64,7 +64,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public void approve(UUID userId) {
         User user = findOrThrow(userId);
-        User updated = withStatus(user, User.UserStatus.ACTIVE);
+        User updated = user.withStatus(User.UserStatus.ACTIVE);
         userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
         notificationPort.notifyApproved(updated);
@@ -75,9 +75,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     public void reject(UUID userId) {
         User user = findOrThrow(userId);
         // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.REJECTED, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), Instant.now(),
-                user.notificationChannel());
+        User updated = user.withStatus(User.UserStatus.REJECTED, Instant.now());
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
@@ -105,9 +103,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         }
 
         // PENDING 전환 + 재신청 시각 갱신
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), User.UserStatus.PENDING, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(), now,
-                user.notificationChannel());
+        User updated = user.withStatus(User.UserStatus.PENDING, now);
         userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
         notificationPort.notifyNewUser(updated);
@@ -137,20 +133,14 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
         // botToken 유효성 검증 + username 취득 (실패 시 IllegalArgumentException)
         String botUsername = telegramBotInfoPort.getUsername(botToken);
         User user = findOrThrow(userId);
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                botToken, chatId, botUsername, user.lastReappliedAt(),
-                user.notificationChannel());
-        userPort.save(updated);
+        userPort.save(user.withTelegram(botToken, chatId, botUsername));
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
     }
 
     @Override
     public void removeTelegram(UUID userId) {
         User user = findOrThrow(userId);
-        User updated = new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                null, null, null, user.lastReappliedAt(),
-                user.notificationChannel());
-        userPort.save(updated);
+        userPort.save(user.withTelegram(null, null, null));
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
 
@@ -167,15 +157,7 @@ public class UserService implements RegisterUserUseCase, ApproveUserUseCase, Get
     @Override
     public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
         User user = findOrThrow(userId);
-        userPort.save(new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                user.lastReappliedAt(), channel));
+        userPort.save(user.withNotificationChannel(channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
-    }
-
-    private User withStatus(User user, User.UserStatus newStatus) {
-        return new User(user.id(), user.kakaoId(), user.nickname(), newStatus, user.role(),
-                user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                user.lastReappliedAt(), user.notificationChannel());
     }
 }

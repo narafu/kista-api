@@ -19,6 +19,21 @@ public record TradingCycle(
         BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
         CycleSeedType cycleSeedType     // 사이클 종료 후 자동 재등록 정책
 ) {
+    // 상태만 교체 — 나머지 필드 보존
+    public TradingCycle withStatus(Status newStatus) {
+        return new TradingCycle(id, accountId, type, newStatus, ticker, initialUsdDeposit, cycleSeedType);
+    }
+
+    // 연속 정책만 교체
+    public TradingCycle withCycleSeedType(CycleSeedType newCycleSeedType) {
+        return new TradingCycle(id, accountId, type, status, ticker, initialUsdDeposit, newCycleSeedType);
+    }
+
+    // initialUsdDeposit만 교체 (연속 정책 재등록 시 시드 갱신)
+    public TradingCycle withInitialUsdDeposit(BigDecimal newDeposit) {
+        return new TradingCycle(id, accountId, type, status, ticker, newDeposit, cycleSeedType);
+    }
+
     @Getter
     @RequiredArgsConstructor
     public enum Type {

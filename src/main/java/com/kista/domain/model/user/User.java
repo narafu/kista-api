@@ -29,4 +29,31 @@ public record User(
         FCM,        // Firebase Cloud Messaging 푸시
         ALL         // 텔레그램 + FCM 동시 발송
     }
+
+    // 상태만 교체 — 나머지 필드 보존
+    public User withStatus(UserStatus newStatus) {
+        return new User(id, kakaoId, nickname, newStatus, role,
+                telegramBotToken, telegramChatId, telegramBotUsername,
+                lastReappliedAt, notificationChannel);
+    }
+
+    // 상태 + lastReappliedAt 동시 교체 (reject/reapply 용)
+    public User withStatus(UserStatus newStatus, Instant newLastReappliedAt) {
+        return new User(id, kakaoId, nickname, newStatus, role,
+                telegramBotToken, telegramChatId, telegramBotUsername,
+                newLastReappliedAt, notificationChannel);
+    }
+
+    // 텔레그램 설정 교체
+    public User withTelegram(String botToken, String chatId, String botUsername) {
+        return new User(id, kakaoId, nickname, status, role,
+                botToken, chatId, botUsername, lastReappliedAt, notificationChannel);
+    }
+
+    // 알림 채널 교체
+    public User withNotificationChannel(NotificationChannel channel) {
+        return new User(id, kakaoId, nickname, status, role,
+                telegramBotToken, telegramChatId, telegramBotUsername,
+                lastReappliedAt, channel);
+    }
 }

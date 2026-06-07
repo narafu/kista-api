@@ -64,14 +64,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
                 TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, "preview:" + accountId);
                 List<Order> orders = calc.orders();
                 // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
-                BigDecimal totalBuyAmount = orders.stream()
-                        .filter(o -> o.direction() == BUY)
-                        .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                int totalSellQuantity = orders.stream()
-                        .filter(o -> o.direction() == SELL)
-                        .mapToInt(Order::quantity).sum();
-                if (totalBuyAmount.compareTo(balance.usdDeposit()) > 0 || totalSellQuantity > balance.holdings()) {
+                if (!balance.isOrderValid(orders)) {
                     // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해
                     yield new Result(today, calc.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
                 }

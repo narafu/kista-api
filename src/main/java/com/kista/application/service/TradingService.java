@@ -159,16 +159,8 @@ class TradingService implements ExecuteTradingUseCase {
                 TradingOrderPlanner.InfiniteCalc calc = orderPlanner.calcInfinite(balance, cycle, price, today, account.nickname());
                 List<Order> orders = calc.orders();
                 // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
-                BigDecimal totalBuyAmount = orders.stream()
-                        .filter(o -> o.direction() == BUY)
-                        .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                int totalSellQuantity = orders.stream()
-                        .filter(o -> o.direction() == SELL)
-                        .mapToInt(Order::quantity).sum();
-                if (totalBuyAmount.compareTo(balance.usdDeposit()) > 0 || totalSellQuantity > balance.holdings()) {
-                    log.warn("[{}] 주문 유효성 실패 — 매수금액 ${} > 잔액 ${} 또는 매도수량 {} > 보유수량 {}",
-                            account.nickname(), totalBuyAmount, balance.usdDeposit(), totalSellQuantity, balance.holdings());
+                if (!balance.isOrderValid(orders)) {
+                    log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
                     notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
                     yield null;
                 }

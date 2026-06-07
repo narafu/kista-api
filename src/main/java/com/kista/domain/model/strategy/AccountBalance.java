@@ -13,6 +13,18 @@ public record AccountBalance(
         BigDecimal avgPrice,  // 평균 매입가 (holdings==0이면 null)
         BigDecimal usdDeposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
+    // 주문 유효성 검사: 총 매수금액 > 가용잔액 or 총 매도수량 > 보유수량이면 false
+    public boolean isOrderValid(List<Order> orders) {
+        BigDecimal totalBuyAmount = orders.stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        int totalSellQuantity = orders.stream()
+                .filter(o -> o.direction() == Order.OrderDirection.SELL)
+                .mapToInt(Order::quantity).sum();
+        return totalBuyAmount.compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
+    }
+
     // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (기존 매입금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
     public AccountBalance applyExecutions(List<Execution> executions) {
         if (executions.isEmpty()) return this;
