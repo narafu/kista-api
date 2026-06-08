@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.market;
 
 import com.kista.domain.port.in.GetMarketHolidaysUseCase;
 import com.kista.domain.port.out.MarketHolidayQueryPort;
