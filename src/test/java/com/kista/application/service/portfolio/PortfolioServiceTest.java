@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.portfolio;
 
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
