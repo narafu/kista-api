@@ -2,6 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.out.KisOrderPort;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +58,7 @@ public class KisOrderAdapter implements KisOrderPort {
         if (response == null || !"0".equals(response.rtCd())) {
             String code = response != null ? response.msgCd() : "N/A";
             String msg  = response != null ? response.msg1()  : "응답 없음";
-            throw new RuntimeException("KIS 주문 실패 [" + code + "]: " + msg);
+            throw new KisApiException("KIS 주문 실패 [" + code + "]: " + msg, null);
         }
 
         String odno = response.output() != null ? response.output().odno() : null;

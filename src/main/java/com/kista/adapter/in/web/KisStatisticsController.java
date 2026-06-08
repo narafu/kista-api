@@ -1,13 +1,12 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
+import com.kista.adapter.in.web.dto.DailyTransactionResponse;
+import com.kista.adapter.in.web.dto.ExecutionResponse;
+import com.kista.adapter.in.web.dto.MarginResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
+import com.kista.adapter.in.web.dto.PeriodProfitResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
-import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PeriodProfitResult;
-import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.in.GetAccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +42,7 @@ public class KisStatisticsController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/profit")
-    public PeriodProfitResult getPeriodProfit(
+    public PeriodProfitResponse getPeriodProfit(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
@@ -51,7 +50,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return statisticsUseCase.getPeriodProfit(accountId, userId, from, to);
+        return PeriodProfitResponse.from(statisticsUseCase.getPeriodProfit(accountId, userId, from, to));
     }
 
     // 체결 내역 조회 (TTTS3035R)
@@ -63,7 +62,7 @@ public class KisStatisticsController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/trades")
-    public List<Execution> getTrades(
+    public List<ExecutionResponse> getTrades(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
@@ -71,7 +70,8 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return statisticsUseCase.getTrades(accountId, userId, from, to);
+        return statisticsUseCase.getTrades(accountId, userId, from, to)
+                .stream().map(ExecutionResponse::from).toList();
     }
 
     // 체결기준현재잔고 조회 (CTRP6504R)
@@ -87,30 +87,7 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        PresentBalanceResult balance = statisticsUseCase.getPresentBalance(accountId, userId);
-        return normalizePortfolio(balance);
-    }
-
-    // PresentBalanceResult(KIS raw) → PortfolioSummaryResponse(kista-ui 호환 포맷) 변환
-    private PortfolioSummaryResponse normalizePortfolio(PresentBalanceResult balance) {
-        List<PortfolioSummaryResponse.PositionDto> positions = balance.items().stream()
-                .map(item -> new PortfolioSummaryResponse.PositionDto(
-                        item.ticker(),
-                        item.holdings(),
-                        item.avgPrice(),
-                        item.currentPrice(),
-                        item.evalAmountUsd(),
-                        item.profitLossUsd(),
-                        item.profitRate(),
-                        item.exchangeCode()
-                ))
-                .toList();
-        PortfolioSummaryResponse.SummaryDto summary = new PortfolioSummaryResponse.SummaryDto(
-                balance.totalAssetUsd(),
-                balance.totalEvalProfit(),
-                balance.totalReturnRate()
-        );
-        return new PortfolioSummaryResponse(positions, summary);
+        return PortfolioSummaryResponse.from(statisticsUseCase.getPresentBalance(accountId, userId));
     }
 
     // 해외증거금 통화별조회 (TTTC2101R) — USD·KRW만 반환
@@ -122,11 +99,12 @@ public class KisStatisticsController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/margin")
-    public List<MarginItem> getMargin(
+    public List<MarginResponse> getMargin(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return statisticsUseCase.getMargin(accountId, userId);
+        return statisticsUseCase.getMargin(accountId, userId)
+                .stream().map(MarginResponse::from).toList();
     }
 
     // 일별거래내역 조회 (CTOS4001R)
@@ -138,7 +116,7 @@ public class KisStatisticsController {
             @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
     })
     @GetMapping("/daily-trades")
-    public DailyTransactionResult getDailyTransactions(
+    public DailyTransactionResponse getDailyTransactions(
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
@@ -146,7 +124,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return statisticsUseCase.getDailyTransactions(accountId, userId, from, to);
+        return DailyTransactionResponse.from(statisticsUseCase.getDailyTransactions(accountId, userId, from, to));
     }
 
     // trading_cycle_history DB 조회 (KIS API 미사용) — 커서 기반 페이지네이션

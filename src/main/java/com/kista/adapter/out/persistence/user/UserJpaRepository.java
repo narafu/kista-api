@@ -14,6 +14,7 @@ import java.util.UUID;
 interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByKakaoId(String kakaoId);
     List<UserEntity> findAllByStatus(User.UserStatus status); // 상태별 조회 (관리자용)
+    long countByStatus(User.UserStatus status); // 상태별 사용자 수 (관리자 통계용)
 
     @Modifying
     @Query("UPDATE UserEntity u SET u.deletedAt = :now WHERE u.id = :id")

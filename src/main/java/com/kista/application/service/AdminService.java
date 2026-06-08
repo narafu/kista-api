@@ -82,11 +82,10 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
     @Override
     @Transactional(readOnly = true)
     public AdminStats getStats() {
-        List<User> all = userPort.findAll();
-        long totalUsers = all.size();
-        long pendingCount = all.stream().filter(u -> u.status() == User.UserStatus.PENDING).count();
-        long activeCount = all.stream().filter(u -> u.status() == User.UserStatus.ACTIVE).count();
-        long rejectedCount = all.stream().filter(u -> u.status() == User.UserStatus.REJECTED).count();
+        long totalUsers = userPort.countAll();
+        long pendingCount = userPort.countByStatus(User.UserStatus.PENDING);
+        long activeCount = userPort.countByStatus(User.UserStatus.ACTIVE);
+        long rejectedCount = userPort.countByStatus(User.UserStatus.REJECTED);
         long totalAccounts = accountPort.countAll();
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }

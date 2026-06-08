@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
@@ -30,4 +31,17 @@ public record PortfolioSummaryResponse(
             BigDecimal totalEvalProfit,  // tot_evlu_pfls_amt: 총평가손익 (USD)
             BigDecimal totalReturnRate   // evlu_erng_rt1: 총수익률 %
     ) {}
+
+    public static PortfolioSummaryResponse from(PresentBalanceResult balance) {
+        List<PositionDto> positions = balance.items().stream()
+                .map(item -> new PositionDto(
+                        item.ticker(), item.holdings(), item.avgPrice(), item.currentPrice(),
+                        item.evalAmountUsd(), item.profitLossUsd(), item.profitRate(), item.exchangeCode()
+                ))
+                .toList();
+        SummaryDto summary = new SummaryDto(
+                balance.totalAssetUsd(), balance.totalEvalProfit(), balance.totalReturnRate()
+        );
+        return new PortfolioSummaryResponse(positions, summary);
+    }
 }

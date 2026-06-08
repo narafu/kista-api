@@ -46,6 +46,16 @@ public class UserPersistenceAdapter implements UserPort {
     }
 
     @Override
+    public long countAll() {
+        return jpaRepository.count();
+    }
+
+    @Override
+    public long countByStatus(User.UserStatus status) {
+        return jpaRepository.countByStatus(status);
+    }
+
+    @Override
     public void delete(UUID id) {
         jpaRepository.softDeleteById(id, Instant.now());
     }

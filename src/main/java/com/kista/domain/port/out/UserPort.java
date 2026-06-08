@@ -18,5 +18,7 @@ public interface UserPort {
     User save(User user);
     List<User> findAll(); // 전체 사용자 목록 (관리자용)
     List<User> findAllByStatus(User.UserStatus status); // 상태별 사용자 목록 (관리자용)
+    long countAll(); // 전체 사용자 수 (관리자 통계용)
+    long countByStatus(User.UserStatus status); // 상태별 사용자 수 (관리자 통계용)
     void delete(UUID id); // 사용자 삭제 (관리자용)
 }
