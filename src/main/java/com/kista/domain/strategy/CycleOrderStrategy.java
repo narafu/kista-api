@@ -30,7 +30,6 @@ public interface CycleOrderStrategy {
     record PlanContext(
             AccountBalance balance,
             TradingCycle cycle,
-            BigDecimal price,             // 현재가
             BigDecimal prevClosePrice,    // 전일종가 (INFINITE 0회차 진입 방향 판단용, PRIVACY는 null)
             LocalDate tradeDate,
             PrivacyTradeBase privacyBase,  // INFINITE은 null 허용

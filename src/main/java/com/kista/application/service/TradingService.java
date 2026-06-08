@@ -153,7 +153,7 @@ class TradingService implements ExecuteTradingUseCase {
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 Optional.empty)
         CycleOrderStrategy strategy = cycleStrategies.of(cycle);
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, price, prevClosePrice, today, privacyBase, account.nickname()));
+                balance, cycle, prevClosePrice, today, privacyBase, account.nickname()));
         if (planOpt.isEmpty()) return null;
         var plan = planOpt.get(); // 한 번 풀어 재사용
 

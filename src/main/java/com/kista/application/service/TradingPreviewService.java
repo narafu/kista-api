@@ -56,21 +56,17 @@ class TradingPreviewService implements GetNextOrdersUseCase {
         }
         AccountBalance balance = load.balance();
 
-        // INFINITE은 현재가+전일종가 필요, PRIVACY는 기준매매표 필요 — 전략 입력 컨텍스트로 통합
-        BigDecimal price = null;
-        BigDecimal prevClosePrice = null;
-        if (cycle.type() == TradingCycle.Type.INFINITE) {
-            KisPricePort.PriceSnapshot snapshot = kisPricePort.getPriceSnapshot(cycle.ticker(), account);
-            price = snapshot.current();
-            prevClosePrice = snapshot.prevClose();
-        }
+        // INFINITE은 전일종가 필요(0회차 평단가 대용), PRIVACY는 기준매매표 필요 — 전략 입력 컨텍스트로 통합
+        BigDecimal prevClosePrice = cycle.type() == TradingCycle.Type.INFINITE
+                ? kisPricePort.getPriceSnapshot(cycle.ticker(), account).prevClose()
+                : null;
         PrivacyTradeBase privacyBase = cycle.type() == TradingCycle.Type.PRIVACY
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
         CycleOrderStrategy strategy = cycleStrategies.of(cycle);
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, price, prevClosePrice, today, privacyBase, "preview:" + accountId));
+                balance, cycle, prevClosePrice, today, privacyBase, "preview:" + accountId));
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (planOpt.isEmpty()) {

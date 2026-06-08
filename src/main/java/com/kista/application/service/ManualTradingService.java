@@ -64,11 +64,10 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
 
         User user = userPort.findByIdOrThrow(account.userId());
 
-        // 현재가 + 전일종가 조회 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
+        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
         Map<TradingCycle.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
                 List.of(cycle.ticker()), account);
         PriceSnapshot priceSnapshot = snapshots.get(cycle.ticker());
-        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
 
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(cycle).balance();
@@ -77,7 +76,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
 
         CycleOrderStrategy strategy = cycleStrategies.of(cycle);
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, price, prevClosePrice, today, null, account.nickname()));
+                balance, cycle, prevClosePrice, today, null, account.nickname()));
         if (planOpt.isEmpty()) return List.of(); // 전략 차원 skip (기준매매표 미수신 등)
 
         List<Order> orders = planOpt.get().orders();
