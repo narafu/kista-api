@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.account;
 
 import com.kista.domain.port.in.KisConnectionTestUseCase;
 import com.kista.domain.port.out.KisConnectionTestPort;

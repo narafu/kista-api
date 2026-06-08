@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.tradingcycle;
 
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
