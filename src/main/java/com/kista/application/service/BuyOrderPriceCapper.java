@@ -68,9 +68,9 @@ class BuyOrderPriceCapper {
             // 후반 단일 LOC 매수 케이스
             Order orig = buyOrders.getFirst();
             BigDecimal cappedPrice = orig.price().min(cap);
-            int qty = InfinitePosition.lateBuyQty(k, cappedPrice);
-            return qty > 0
-                    ? List.of(plannedBuy(today, cycle, orig.orderType(), qty, cappedPrice))
+            int quantity = InfinitePosition.lateBuyQty(k, cappedPrice);
+            return quantity > 0
+                    ? List.of(plannedBuy(today, cycle, orig.orderType(), quantity, cappedPrice))
                     : List.of();
         }
 
@@ -80,24 +80,24 @@ class BuyOrderPriceCapper {
         BigDecimal cappedAvg = buy1.price().min(cap);
         BigDecimal cappedRef = buy2.price().min(cap);
 
-        int qty1 = InfinitePosition.earlyBuyQty1(k, cappedAvg);
-        int qty2 = InfinitePosition.earlyBuyQty2(k, cappedAvg, qty1, cappedRef,
+        int quantity1 = InfinitePosition.earlyBuyQty1(k, cappedAvg);
+        int quantity2 = InfinitePosition.earlyBuyQty2(k, cappedAvg, quantity1, cappedRef,
                 cycle.ticker().getTargetProfitRate());
 
         List<Order> newBuys = new ArrayList<>();
-        if (qty1 > 0) {
+        if (quantity1 > 0) {
             // cappedAvg == cappedRef이면 병합
             if (cappedAvg.compareTo(cappedRef) == 0) {
-                int merged = qty1 + (qty2 > 0 ? qty2 : 0);
+                int merged = quantity1 + (quantity2 > 0 ? quantity2 : 0);
                 newBuys.add(plannedBuy(today, cycle, buy1.orderType(), merged, cappedAvg));
             } else {
-                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), qty1, cappedAvg));
-                if (qty2 > 0) {
-                    newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
+                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), quantity1, cappedAvg));
+                if (quantity2 > 0) {
+                    newBuys.add(plannedBuy(today, cycle, buy2.orderType(), quantity2, cappedRef));
                 }
             }
-        } else if (qty2 > 0) {
-            newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
+        } else if (quantity2 > 0) {
+            newBuys.add(plannedBuy(today, cycle, buy2.orderType(), quantity2, cappedRef));
         }
         return newBuys;
     }
