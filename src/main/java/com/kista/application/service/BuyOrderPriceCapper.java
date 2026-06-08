@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
-import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
 
 // BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — 전략 공식 기반으로 가격 캡 적용 후 재저장
@@ -62,7 +61,6 @@ class BuyOrderPriceCapper {
     private List<Order> recomputeBuys(LocalDate today, TradingCycle cycle, List<Order> buyOrders,
                                        BigDecimal cap, InfinitePosition position) {
         BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
-        BigDecimal targetProfitRate = cycle.ticker().getTargetProfitRate();
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
         // 주문이 1건이면 단순 캡 적용, 2건이면 각각 캡
@@ -70,7 +68,7 @@ class BuyOrderPriceCapper {
             // 후반 단일 LOC 매수 케이스
             Order orig = buyOrders.getFirst();
             BigDecimal cappedPrice = orig.price().min(cap);
-            int qty = k.divide(cappedPrice, 0, FLOOR).intValue();
+            int qty = InfinitePosition.lateBuyQty(k, cappedPrice);
             return qty > 0
                     ? List.of(plannedBuy(today, cycle, orig.orderType(), qty, cappedPrice))
                     : List.of();
@@ -82,11 +80,9 @@ class BuyOrderPriceCapper {
         BigDecimal cappedAvg = buy1.price().min(cap);
         BigDecimal cappedRef = buy2.price().min(cap);
 
-        int qty1 = k.divide(BigDecimal.valueOf(2), FLOOR)
-                .divide(cappedAvg, 0, FLOOR).intValue();
-        BigDecimal remaining = k.subtract(cappedAvg.multiply(BigDecimal.valueOf(qty1)))
-                .multiply(BigDecimal.ONE.add(targetProfitRate));
-        int qty2 = remaining.divide(cappedRef, 0, FLOOR).intValue();
+        int qty1 = InfinitePosition.earlyBuyQty1(k, cappedAvg);
+        int qty2 = InfinitePosition.earlyBuyQty2(k, cappedAvg, qty1, cappedRef,
+                cycle.ticker().getTargetProfitRate());
 
         List<Order> newBuys = new ArrayList<>();
         if (qty1 > 0) {

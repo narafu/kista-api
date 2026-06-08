@@ -83,20 +83,37 @@ public record InfinitePosition(
 
     // --- 수량 계산 로직 (주문 수량 계산 책임 위임) ---
 
+    // static 헬퍼: 실제 평단가·기준가 대신 임의 가격(예: 캡가격)으로도 재사용 가능
+    public static int earlyBuyQty1(BigDecimal unitAmount, BigDecimal price1) {
+        // 전반 매수①: (K/2) / price1
+        return unitAmount.divide(BigDecimal.valueOf(2), FLOOR)
+                .divide(price1, 0, FLOOR).intValue();
+    }
+
+    public static int earlyBuyQty2(BigDecimal unitAmount, BigDecimal price1, int qty1,
+                                   BigDecimal price2, BigDecimal rate) {
+        // 전반 매수②: (K - price1*qty1) * (1+r) / price2
+        return unitAmount.subtract(price1.multiply(BigDecimal.valueOf(qty1)))
+                .multiply(BigDecimal.ONE.add(rate))
+                .divide(price2, 0, FLOOR).intValue();
+    }
+
+    public static int lateBuyQty(BigDecimal unitAmount, BigDecimal price) {
+        // 후반 매수: K / price
+        return unitAmount.divide(price, 0, FLOOR).intValue();
+    }
+
     public int calcEarlyBuyQuantityByAvgPrice() {
-        BigDecimal halfUnitAmount = unitAmount().divide(BigDecimal.valueOf(2), FLOOR);
-        return halfUnitAmount.divide(averagePrice(), 0, FLOOR).intValue();
+        return earlyBuyQty1(unitAmount(), averagePrice());
     }
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
-        BigDecimal buyAmountByAvgPrice = averagePrice().multiply(BigDecimal.valueOf(buyQuantityByAvgPrice));
-        return unitAmount().subtract(buyAmountByAvgPrice)
-                .multiply(BigDecimal.ONE.add(ticker.getTargetProfitRate()))
-                .divide(referencePrice(), 0, FLOOR).intValue();
+        return earlyBuyQty2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
+                referencePrice(), ticker.getTargetProfitRate());
     }
 
     public int calcLateBuyQuantity() {
-        return unitAmount().divide(referencePrice(), 0, FLOOR).intValue();
+        return lateBuyQty(unitAmount(), referencePrice());
     }
 
     public int calcLocSellQuantity() {
