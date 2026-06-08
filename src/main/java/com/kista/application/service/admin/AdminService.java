@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.domain.model.admin.AdminStats;

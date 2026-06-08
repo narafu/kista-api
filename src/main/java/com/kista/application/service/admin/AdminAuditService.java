@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.admin;
 
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.in.AdminListAuditLogsUseCase;
