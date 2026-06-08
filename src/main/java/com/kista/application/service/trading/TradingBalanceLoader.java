@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.trading;
 
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
