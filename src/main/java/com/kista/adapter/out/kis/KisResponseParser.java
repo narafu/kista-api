@@ -59,7 +59,6 @@ final class KisResponseParser {
     }
 
     // 응답 행 목록 → null 가드 + Ticker 외 종목 필터링(silent drop) + 도메인 매핑 골격
-    // (KisPortfolioAdapter/KisDailyTransactionAdapter/KisProfitAdapter 공통)
     static <T, R> List<R> streamTickered(List<T> rows, Function<T, String> pdnoOf, BiFunction<Ticker, T, R> mapper) {
         if (rows == null) return Collections.emptyList();
         return rows.stream()

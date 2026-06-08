@@ -7,10 +7,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -18,11 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
-public class KisPriceAdapter implements KisPricePort {
+public class KisPriceApi implements KisPricePort {
 
     private static final String SINGLE_PATH  = "/uapi/overseas-price/v1/quotations/price";
     private static final String SINGLE_TR_ID = "HHDFS00000300";
@@ -48,15 +44,13 @@ public class KisPriceAdapter implements KisPricePort {
 
     @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(SINGLE_TR_ID, account);
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("AUTH", "");
         String excd = exchangeRegistry.excd(ticker);
-        params.add("EXCD", excd);
-        params.add("SYMB", ticker.name());
-
-        PriceResponse response = kisHttpClient.get(SINGLE_PATH, headers, params, PriceResponse.class);
-
+        PriceResponse response = kisHttpClient.pricingGet(
+                SINGLE_TR_ID, SINGLE_PATH, account, PriceResponse.class,
+                p -> {
+                    p.add("EXCD", excd);
+                    p.add("SYMB", ticker.name());
+                });
         if (response == null || response.output() == null) {
             throw new KisApiException("가격 조회 응답 없음: " + ticker, null);
         }
@@ -76,20 +70,17 @@ public class KisPriceAdapter implements KisPricePort {
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
         if (tickers.isEmpty()) return Map.of();
 
-        HttpHeaders headers = kisHttpClient.buildHeaders(MULTI_TR_ID, account);
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("AUTH", "");
-        params.add("NREC", String.valueOf(tickers.size()));
-
-        for (int i = 0; i < tickers.size(); i++) {
-            Ticker ticker = tickers.get(i);
-            String num = String.format("%02d", i + 1);
-            String excd = exchangeRegistry.excd(ticker);
-            params.add("EXCD_" + num, excd);
-            params.add("SYMB_" + num, ticker.name());
-        }
-
-        MultiPriceResponse response = kisHttpClient.get(MULTI_PATH, headers, params, MultiPriceResponse.class);
+        MultiPriceResponse response = kisHttpClient.pricingGet(
+                MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
+                p -> {
+                    p.add("NREC", String.valueOf(tickers.size()));
+                    for (int i = 0; i < tickers.size(); i++) {
+                        Ticker ticker = tickers.get(i);
+                        String num = String.format("%02d", i + 1);
+                        p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
+                        p.add("SYMB_" + num, ticker.name());
+                    }
+                });
 
         if (response == null || response.output2() == null) {
             log.warn("복수종목 스냅샷 응답 없음: output2 null");

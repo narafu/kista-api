@@ -2,8 +2,10 @@ package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.KisTokenCachePort;
+import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,8 +14,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -27,24 +27,74 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 
+// KisTokenPort + KisConnectionTestPort 통합 구현체
+// OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisConnectionTestAdapter implements KisConnectionTestPort {
+public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    // 계좌별 락 — 동시 요청 시 중복 발급 방지
+    private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+
+    // 연결 테스트 직후 계좌번호 검증 시 재발급 방지 — KIS EGW00133(1분당 1회 제한) 우회용 단기 캐시
+    private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
+    private record TempTokenEntry(String token, Instant expiresAt) {}
 
     private final RestTemplate kisRestTemplate;
     private final KisTokenCachePort kisTokenCachePort;
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
-    // 연결 테스트 직후 계좌번호 검증 시 재발급 방지 — KIS EGW00133(1분당 1회 제한) 우회용 단기 캐시
-    private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
-    private record TempTokenEntry(String token, Instant expiresAt) {}
+    // ── KisTokenPort ───────────────────────────────────────────────────────────
+
+    @Override
+    public String getToken(UUID accountId, String appKey, String appSecret) {
+        // 1차 조회 — 락 없이 빠른 경로
+        Optional<String> cached = kisTokenCachePort.findValidToken(accountId, threshold());
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+        // 캐시 miss 시 accountId별 락으로 경합 차단 — 같은 계좌 동시 호출이 N번 발급하는 것 방지
+        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // 2차 조회 (double-check) — 다른 스레드가 이미 발급했을 수 있음
+            return kisTokenCachePort.findValidToken(accountId, threshold())
+                    .orElseGet(() -> fetchAndCacheToken(accountId, appKey, appSecret));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
+        log.info("KIS 토큰 신규 발급: accountId={}", accountId);
+        try {
+            TokenResponse response = issueOAuthToken(appKey, appSecret);
+            OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
+            // 발급된 토큰을 account_id 기준으로 DB에 upsert
+            kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+            return response.accessToken();
+        } catch (Account.InvalidKisKeyException e) {
+            throw e; // KIS 키 검증 실패는 그대로 전파
+        } catch (Exception e) {
+            throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
+        }
+    }
+
+    // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
+    private OffsetDateTime threshold() {
+        return OffsetDateTime.now(KST).plusMinutes(1);
+    }
+
+    // ── KisConnectionTestPort ──────────────────────────────────────────────────
 
     @Override
     public void test(String appKey, String appSecret, UUID accountId) {
@@ -58,8 +108,7 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
         }
         try {
             // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 영구 캐시, null이면 단기 캐시 저장
-            TokenCheckResponse response = issueToken(appKey, appSecret);
-            if (response == null) throw new Account.InvalidKisKeyException();
+            TokenResponse response = issueOAuthToken(appKey, appSecret);
             if (accountId != null) {
                 // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
                 OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
@@ -87,9 +136,7 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
             // 만료된 항목 즉시 제거 — ConcurrentHashMap 누적 방지
             if (cached != null) tempTokenCache.remove(appKey, cached);
             try {
-                TokenCheckResponse tokenResponse = issueToken(appKey, appSecret);
-                if (tokenResponse == null) throw new Account.InvalidKisKeyException();
-                token = tokenResponse.accessToken();
+                token = issueOAuthToken(appKey, appSecret).accessToken();
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
                 throw new Account.InvalidKisKeyException();
@@ -104,13 +151,10 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
         headers.set("tr_id", "TTTC2101R"); // 해외증거금 통화별조회
         headers.set("custtype", "P");
 
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("CANO", accountNo);
-        params.add("ACNT_PRDT_CD", "01");
-
         String url = UriComponentsBuilder
                 .fromUriString(kisBaseUrl + "/uapi/overseas-stock/v1/trading/foreign-margin")
-                .queryParams(params)
+                .queryParam("CANO", accountNo)
+                .queryParam("ACNT_PRDT_CD", "01")
                 .toUriString();
 
         try {
@@ -128,8 +172,8 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
         }
     }
 
-    // KIS OAuth 토큰 발급 — test/testAccountNo 공용
-    private TokenCheckResponse issueToken(String appKey, String appSecret) {
+    // KIS OAuth 토큰 발급 — getToken/test/testAccountNo 공용
+    private TokenResponse issueOAuthToken(String appKey, String appSecret) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         Map<String, String> body = Map.of(
@@ -137,20 +181,23 @@ public class KisConnectionTestAdapter implements KisConnectionTestPort {
                 "appkey", appKey,
                 "appsecret", appSecret
         );
-        return kisRestTemplate.exchange(
+        TokenResponse response = kisRestTemplate.exchange(
                 kisBaseUrl + "/oauth2/tokenP",
                 HttpMethod.POST,
                 new HttpEntity<>(body, headers),
-                TokenCheckResponse.class
+                TokenResponse.class
         ).getBody();
+        if (response == null) throw new Account.InvalidKisKeyException();
+        return response;
     }
 
-    private OffsetDateTime parseExpiry(String raw) {
+    OffsetDateTime parseExpiry(String raw) {
+        // KST 문자열 "yyyy-MM-dd HH:mm:ss" → ZonedDateTime → OffsetDateTime(+09:00)
         LocalDateTime ldt = LocalDateTime.parse(raw, KIS_EXPIRY_FORMAT);
         return ldt.atZone(KST).toOffsetDateTime();
     }
 
-    record TokenCheckResponse(
+    record TokenResponse(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("access_token_token_expired") String accessTokenExpired
     ) {}

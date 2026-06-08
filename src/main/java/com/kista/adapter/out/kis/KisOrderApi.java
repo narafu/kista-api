@@ -6,13 +6,12 @@ import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.out.KisOrderPort;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
 
 @Component
 @RequiredArgsConstructor
-public class KisOrderAdapter implements KisOrderPort {
+public class KisOrderApi implements KisOrderPort {
 
     private static final String PATH        = "/uapi/overseas-stock/v1/trading/order";
     private static final String CANCEL_PATH = "/uapi/overseas-stock/v1/trading/order-rvsecncl";
@@ -26,7 +25,6 @@ public class KisOrderAdapter implements KisOrderPort {
     @Override
     public Order place(Order order, Account account) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
-        HttpHeaders headers = kisHttpClient.buildHeaders(trId, account);
 
         // autotrade 성공 패턴과 동일한 필드 순서 및 raw JSON String 포맷으로 전송
         String body = """
@@ -52,7 +50,7 @@ public class KisOrderAdapter implements KisOrderPort {
                 order.quantity(),
                 order.direction().kisSllType());
 
-        OrderResponse response = kisHttpClient.post(PATH, headers, body, OrderResponse.class);
+        OrderResponse response = kisHttpClient.post(PATH, kisHttpClient.buildHeaders(trId, account), body, OrderResponse.class);
 
         // rt_cd != "0" = KIS 비즈니스 오류 (HTTP 200이어도 실패) — msg_cd/msg1 포함해 예외 발생
         if (response == null || !"0".equals(response.rtCd())) {
@@ -72,8 +70,6 @@ public class KisOrderAdapter implements KisOrderPort {
 
     @Override
     public void cancel(Order order, Account account) {
-        HttpHeaders headers = kisHttpClient.buildHeaders(CANCEL_TR_ID, account);
-
         // place()와 동일하게 raw JSON String으로 전송 — Map+Jackson 직렬화 시 EGW00202 발생
         String body = """
                 {
@@ -94,7 +90,7 @@ public class KisOrderAdapter implements KisOrderPort {
                 order.ticker().name(),
                 order.kisOrderId());
 
-        kisHttpClient.post(CANCEL_PATH, headers, body, Void.class);
+        kisHttpClient.post(CANCEL_PATH, kisHttpClient.buildHeaders(CANCEL_TR_ID, account), body, Void.class);
     }
 
     private String resolveOrderDvsn(Order.OrderType type) {

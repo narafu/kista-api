@@ -9,9 +9,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.function.Consumer;
 
 @Component
 @RequiredArgsConstructor
@@ -47,5 +50,26 @@ public class KisHttpClient {
         return kisRestTemplate.exchange(
                 baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
         ).getBody();
+    }
+
+    // Trading API용: CANO/ACNT_PRDT_CD 자동 주입 + buildHeaders + get 일괄 처리
+    public <T> T tradingGet(String trId, String path, Account account,
+                            Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
+        HttpHeaders headers = buildHeaders(trId, account);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("CANO", account.accountNo());
+        params.add("ACNT_PRDT_CD", account.kisAccountType());
+        extraParams.accept(params);
+        return get(path, headers, params, responseType);
+    }
+
+    // 시세 API용: AUTH="" 기본 주입 + buildHeaders + get 일괄 처리 (계좌 파라미터 없음)
+    public <T> T pricingGet(String trId, String path, Account account,
+                            Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
+        HttpHeaders headers = buildHeaders(trId, account);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("AUTH", "");
+        extraParams.accept(params);
+        return get(path, headers, params, responseType);
     }
 }
