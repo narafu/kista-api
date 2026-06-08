@@ -46,12 +46,10 @@ class AdminServiceTest {
 
     @Test
     void getStats_returnsCorrectCounts() {
-        UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID(), id3 = UUID.randomUUID();
-        when(userPort.findAll()).thenReturn(List.of(
-                user(id1, User.UserStatus.PENDING),
-                user(id2, User.UserStatus.ACTIVE),
-                user(id3, User.UserStatus.REJECTED)
-        ));
+        when(userPort.countAll()).thenReturn(3L);
+        when(userPort.countByStatus(User.UserStatus.PENDING)).thenReturn(1L);
+        when(userPort.countByStatus(User.UserStatus.ACTIVE)).thenReturn(1L);
+        when(userPort.countByStatus(User.UserStatus.REJECTED)).thenReturn(1L);
         when(accountPort.countAll()).thenReturn(5L);
 
         AdminStats stats = adminService.getStats();
