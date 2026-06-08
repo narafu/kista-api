@@ -40,60 +40,14 @@ class BuyOrderPriceCapper {
         if (buyOrders.isEmpty()) return;
 
         BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
-        boolean needsCap = buyOrders.stream().anyMatch(o -> o.price().compareTo(cap) > 0);
-        if (!needsCap) return;
+        if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;
 
         log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap,
                 buyOrders.stream().map(o -> o.price() + "×" + o.quantity()).toList());
 
-        BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
-        BigDecimal targetProfitRate = cycle.ticker().getTargetProfitRate();
+        List<Order> newBuys = recomputeBuys(today, cycle, buyOrders, cap, position);
 
-        // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
-        // 주문이 1건이면 단순 캡 적용, 2건이면 각각 캡
-        List<Order> newBuys;
-        if (buyOrders.size() == 1) {
-            // 후반 단일 LOC 매수 케이스
-            Order orig = buyOrders.getFirst();
-            BigDecimal cappedPrice = orig.price().min(cap);
-            int qty = k.divide(cappedPrice, 0, FLOOR).intValue();
-            if (qty <= 0) {
-                log.warn("[{}] 보정 후 BUY 수량 0 — 매수 주문 제외", account.nickname());
-                orderPort.deletePlannedBuyByAccountAndDate(account.id(), today);
-                return;
-            }
-            newBuys = List.of(plannedBuy(today, cycle, orig.orderType(), qty, cappedPrice));
-        } else {
-            // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
-            Order buy1 = buyOrders.get(0);
-            Order buy2 = buyOrders.get(1);
-            BigDecimal cappedAvg = buy1.price().min(cap);
-            BigDecimal cappedRef = buy2.price().min(cap);
-
-            int qty1 = k.divide(BigDecimal.valueOf(2), FLOOR)
-                    .divide(cappedAvg, 0, FLOOR).intValue();
-            BigDecimal remaining = k.subtract(cappedAvg.multiply(BigDecimal.valueOf(qty1)))
-                    .multiply(BigDecimal.ONE.add(targetProfitRate));
-            int qty2 = remaining.divide(cappedRef, 0, FLOOR).intValue();
-
-            newBuys = new ArrayList<>();
-            if (qty1 > 0) {
-                // cappedAvg == cappedRef이면 병합
-                if (cappedAvg.compareTo(cappedRef) == 0) {
-                    int merged = qty1 + (qty2 > 0 ? qty2 : 0);
-                    newBuys.add(plannedBuy(today, cycle, buy1.orderType(), merged, cappedAvg));
-                } else {
-                    newBuys.add(plannedBuy(today, cycle, buy1.orderType(), qty1, cappedAvg));
-                    if (qty2 > 0) {
-                        newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
-                    }
-                }
-            } else if (qty2 > 0) {
-                newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
-            }
-        }
-
-        // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장
+        // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장 (수량 0 보정 포함 단일 경로)
         orderPort.deletePlannedBuyByAccountAndDate(account.id(), today);
         if (newBuys.isEmpty()) {
             log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
@@ -102,6 +56,54 @@ class BuyOrderPriceCapper {
         orderPlanner.savePlannedOrders(newBuys, account);
         log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(),
                 newBuys.stream().map(o -> o.price() + "×" + o.quantity()).toList());
+    }
+
+    // 캡가격 기준 매수 수량 재산정 — 순수 계산(I/O 없음), capIfNeeded가 결과를 영속화
+    private List<Order> recomputeBuys(LocalDate today, TradingCycle cycle, List<Order> buyOrders,
+                                       BigDecimal cap, InfinitePosition position) {
+        BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
+        BigDecimal targetProfitRate = cycle.ticker().getTargetProfitRate();
+
+        // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
+        // 주문이 1건이면 단순 캡 적용, 2건이면 각각 캡
+        if (buyOrders.size() == 1) {
+            // 후반 단일 LOC 매수 케이스
+            Order orig = buyOrders.getFirst();
+            BigDecimal cappedPrice = orig.price().min(cap);
+            int qty = k.divide(cappedPrice, 0, FLOOR).intValue();
+            return qty > 0
+                    ? List.of(plannedBuy(today, cycle, orig.orderType(), qty, cappedPrice))
+                    : List.of();
+        }
+
+        // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
+        Order buy1 = buyOrders.get(0);
+        Order buy2 = buyOrders.get(1);
+        BigDecimal cappedAvg = buy1.price().min(cap);
+        BigDecimal cappedRef = buy2.price().min(cap);
+
+        int qty1 = k.divide(BigDecimal.valueOf(2), FLOOR)
+                .divide(cappedAvg, 0, FLOOR).intValue();
+        BigDecimal remaining = k.subtract(cappedAvg.multiply(BigDecimal.valueOf(qty1)))
+                .multiply(BigDecimal.ONE.add(targetProfitRate));
+        int qty2 = remaining.divide(cappedRef, 0, FLOOR).intValue();
+
+        List<Order> newBuys = new ArrayList<>();
+        if (qty1 > 0) {
+            // cappedAvg == cappedRef이면 병합
+            if (cappedAvg.compareTo(cappedRef) == 0) {
+                int merged = qty1 + (qty2 > 0 ? qty2 : 0);
+                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), merged, cappedAvg));
+            } else {
+                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), qty1, cappedAvg));
+                if (qty2 > 0) {
+                    newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
+                }
+            }
+        } else if (qty2 > 0) {
+            newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
+        }
+        return newBuys;
     }
 
     private Order plannedBuy(LocalDate today, TradingCycle cycle, Order.OrderType orderType,
