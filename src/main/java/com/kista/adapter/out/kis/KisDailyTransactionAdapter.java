@@ -5,7 +5,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,26 +53,21 @@ public class KisDailyTransactionAdapter implements KisDailyTransactionPort {
             return new DailyTransactionResult(Collections.emptyList(), emptySummary());
         }
 
-        List<DailyTransaction> items = response.output1() == null
-                ? Collections.emptyList()
-                : response.output1().stream()
-                        .flatMap(o -> Ticker.tryParse(o.pdno())
-                                .map(ticker -> new DailyTransaction(
-                                        o.tradDt(),
-                                        o.sttlDt(),
-                                        KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
-                                        ticker,
-                                        o.ovrsItemName(),
-                                        KisResponseParser.parseIntSafe(o.filledQuantity()),
-                                        KisResponseParser.parseBd(o.ovrsStckCcldUnpr()),
-                                        KisResponseParser.parseBd(o.trFrcrAmt2()),
-                                        KisResponseParser.parseBd(o.wcrcExccAmt()),
-                                        KisResponseParser.parseBd(o.erlmExrt()),
-                                        o.crcyCd()
-                                ))
-                                .stream()
-                        )
-                        .toList();
+        List<DailyTransaction> items = KisResponseParser.streamTickered(response.output1(),
+                TransactionResponse.Output1::pdno,
+                (ticker, o) -> new DailyTransaction(
+                        o.tradDt(),
+                        o.sttlDt(),
+                        KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
+                        ticker,
+                        o.ovrsItemName(),
+                        KisResponseParser.parseIntSafe(o.filledQuantity()),
+                        KisResponseParser.parseBd(o.ovrsStckCcldUnpr()),
+                        KisResponseParser.parseBd(o.trFrcrAmt2()),
+                        KisResponseParser.parseBd(o.wcrcExccAmt()),
+                        KisResponseParser.parseBd(o.erlmExrt()),
+                        o.crcyCd()
+                ));
 
         DailyTransactionSummary summary = emptySummary();
         if (response.output2() != null) {

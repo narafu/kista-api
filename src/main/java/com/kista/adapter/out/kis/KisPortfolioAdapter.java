@@ -3,7 +3,6 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisPortfolioPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,23 +44,18 @@ public class KisPortfolioAdapter implements KisPortfolioPort {
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
-        List<PresentBalanceResult.Item> items = response.output1() == null
-                ? Collections.emptyList()
-                : response.output1().stream()
-                        .flatMap(o -> Ticker.tryParse(o.pdno())
-                                .map(ticker -> new PresentBalanceResult.Item(
-                                        ticker,
-                                        KisResponseParser.parseIntSafe(o.balanceQuantity13()),
-                                        KisResponseParser.parseBd(o.avgUnpr3()),
-                                        KisResponseParser.parseBd(o.ovrsNowPric1()),
-                                        KisResponseParser.parseBd(o.frcrEvluAmt2()),
-                                        KisResponseParser.parseBd(o.evluPflsAmt2()),
-                                        KisResponseParser.parseBd(o.evluPflsRt1()),
-                                        o.ovrsExcgCd()
-                                ))
-                                .stream()
-                        )
-                        .toList();
+        List<PresentBalanceResult.Item> items = KisResponseParser.streamTickered(response.output1(),
+                BalanceResponse.Output1::pdno,
+                (ticker, o) -> new PresentBalanceResult.Item(
+                        ticker,
+                        KisResponseParser.parseIntSafe(o.balanceQuantity13()),
+                        KisResponseParser.parseBd(o.avgUnpr3()),
+                        KisResponseParser.parseBd(o.ovrsNowPric1()),
+                        KisResponseParser.parseBd(o.frcrEvluAmt2()),
+                        KisResponseParser.parseBd(o.evluPflsAmt2()),
+                        KisResponseParser.parseBd(o.evluPflsRt1()),
+                        o.ovrsExcgCd()
+                ));
 
         BigDecimal totalAsset = BigDecimal.ZERO;
         BigDecimal totalProfit = BigDecimal.ZERO;

@@ -3,7 +3,6 @@ package com.kista.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.PeriodProfitResult;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisProfitPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,23 +52,18 @@ public class KisProfitAdapter implements KisProfitPort {
             return new PeriodProfitResult(Collections.emptyList(), BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
-        List<PeriodProfitResult.Item> items = response.output1() == null
-                ? Collections.emptyList()
-                : response.output1().stream()
-                        .flatMap(o -> Ticker.tryParse(o.ovrsPdno())
-                                .map(ticker -> new PeriodProfitResult.Item(
-                                        o.tradDay(),
-                                        ticker,
-                                        KisResponseParser.parseIntSafe(o.sellLiquidationQuantity()),
-                                        KisResponseParser.parseBd(o.pchsAvgPric()),
-                                        KisResponseParser.parseBd(o.avgSllUnpr()),
-                                        KisResponseParser.parseBd(o.ovrsRlztPflsAmt()),
-                                        KisResponseParser.parseBd(o.pftrt()),
-                                        o.ovrsExcgCd()
-                                ))
-                                .stream()
-                        )
-                        .toList();
+        List<PeriodProfitResult.Item> items = KisResponseParser.streamTickered(response.output1(),
+                ProfitResponse.Output1::ovrsPdno,
+                (ticker, o) -> new PeriodProfitResult.Item(
+                        o.tradDay(),
+                        ticker,
+                        KisResponseParser.parseIntSafe(o.sellLiquidationQuantity()),
+                        KisResponseParser.parseBd(o.pchsAvgPric()),
+                        KisResponseParser.parseBd(o.avgSllUnpr()),
+                        KisResponseParser.parseBd(o.ovrsRlztPflsAmt()),
+                        KisResponseParser.parseBd(o.pftrt()),
+                        o.ovrsExcgCd()
+                ));
 
         BigDecimal totalProfit = BigDecimal.ZERO;
         BigDecimal totalRate = BigDecimal.ZERO;

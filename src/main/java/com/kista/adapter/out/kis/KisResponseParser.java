@@ -1,13 +1,18 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 // KIS API 응답 문자열 파싱 공용 헬퍼 — 패키지 내부 전용
 final class KisResponseParser {
@@ -51,5 +56,16 @@ final class KisResponseParser {
         if (yyyymmdd == null || yyyymmdd.isBlank()) return fallback;
         try { return LocalDate.parse(yyyymmdd.trim(), DateTimeFormatter.BASIC_ISO_DATE); }
         catch (DateTimeParseException e) { return fallback; }
+    }
+
+    // 응답 행 목록 → null 가드 + Ticker 외 종목 필터링(silent drop) + 도메인 매핑 골격
+    // (KisPortfolioAdapter/KisDailyTransactionAdapter/KisProfitAdapter 공통)
+    static <T, R> List<R> streamTickered(List<T> rows, Function<T, String> pdnoOf, BiFunction<Ticker, T, R> mapper) {
+        if (rows == null) return Collections.emptyList();
+        return rows.stream()
+                .flatMap(row -> Ticker.tryParse(pdnoOf.apply(row))
+                        .map(ticker -> mapper.apply(ticker, row))
+                        .stream())
+                .toList();
     }
 }
