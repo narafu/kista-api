@@ -13,8 +13,10 @@
 
 
 ### GlobalExceptionHandler 자동 예외 처리
-- `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `PrivacyTradeConflictException` → 409 — Controller에서 별도 catch/rethrow 불필요 (단, `SecurityException`→403, KIS 오류→503은 컨트롤러에서 직접 처리)
-- **모든 엔드포인트에 SecurityException catch 필수**: 목록 조회(`GET /api/accounts/{id}/trading-cycles`) 포함 소유권 검증이 있는 모든 서비스 메서드를 호출하는 엔드포인트는 `SecurityException → 403` 처리 필수 — 누락 시 Spring 기본 핸들러가 500 반환 → 프론트엔드에서 해당 데이터가 빈 배열/null로 처리됨
+- Controller에서 별도 catch/rethrow 불필요 — 아래 예외는 모두 `GlobalExceptionHandler`에서 자동 처리됨
+- `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `IllegalStateException` → 400, `PrivacyTradeConflictException` → 409
+- `SecurityException` → 403, `KisApiException` → 503, `Account.InvalidKisKeyException` → 422
+- `ManualTradingException` / `OrderCancelException` → 409, `Account.CooldownException` → 429(Retry-After 포함)
 
 ### Account ↔ TradingCycle 분리
 - `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
@@ -161,12 +163,10 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### 소유권 검증 예외 패턴 (V2)
 - Service 내 반복 검증은 `private Account requireOwnedAccount(UUID accountId, UUID requesterId)` 헬퍼로 추출 — `AccountStatisticsService` 패턴 참고
-- Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw
-- Controller에서 catch → `ResponseStatusException(HttpStatus.FORBIDDEN)` 변환
-- application 레이어가 Spring HTTP에 의존하지 않아 ArchUnit 규칙 준수
-- KIS API 오류: Service에서 예외 그대로 전파 → Controller에서 `catch (Exception e) → ResponseStatusException(503)` 변환
-- `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 금지 (ArchUnit `application → adapter` 규칙)
-- `InvalidKisKeyException`(domain/model/) → Controller에서 422(UNPROCESSABLE_ENTITY) 변환 — register/update 공통 적용
+- Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw → `GlobalExceptionHandler`가 403 자동 처리
+- KIS API 오류: Service에서 `KisApiException` 그대로 전파 → `GlobalExceptionHandler`가 503 자동 처리
+- `InvalidKisKeyException`(domain/model/) → `GlobalExceptionHandler`가 422 자동 처리
+- Controller에 try/catch 추가 금지 — `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 사용 불가 (ArchUnit 규칙)
 
 ### @EnableJpaAuditing 위치
 - `@SpringBootApplication` 아닌 별도 `JpaAuditingConfig.java` (`adapter/out/persistence/`)에 선언 — 아니면 `@WebMvcTest` `BeanCreationException` 발생
