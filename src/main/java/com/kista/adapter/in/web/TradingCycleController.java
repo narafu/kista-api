@@ -7,7 +7,7 @@ import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
-import com.kista.domain.port.in.GetAccountStatisticsUseCase;
+import com.kista.domain.port.in.GetCycleHistoryUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.in.PauseTradingCycleUseCase;
@@ -41,7 +41,7 @@ public class TradingCycleController {
     private final GetTradingCycleUseCase getCycle;
     private final PauseTradingCycleUseCase pauseCycle;
     private final ResumeTradingCycleUseCase resumeCycle;
-    private final GetAccountStatisticsUseCase statisticsUseCase;
+    private final GetCycleHistoryUseCase getCycleHistory;
     private final ManualExecuteTradingUseCase manualExecute; // 수동 실행
     private final CancelOrderUseCase cancelOrder;            // 주문 취소
 
@@ -141,7 +141,7 @@ public class TradingCycleController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
-                statisticsUseCase.getStrategyCycleHistory(
+                getCycleHistory.getByStrategy(
                         strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 }

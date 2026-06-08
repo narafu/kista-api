@@ -9,7 +9,13 @@ import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetAccountStatisticsUseCase;
+import com.kista.domain.port.in.GetCycleHistoryUseCase;
+import com.kista.domain.port.in.GetDailyTransactionsUseCase;
+import com.kista.domain.port.in.GetExecutionsUseCase;
+import com.kista.domain.port.in.GetMarginUseCase;
+import com.kista.domain.port.in.GetMultiPriceUseCase;
+import com.kista.domain.port.in.GetPeriodProfitUseCase;
+import com.kista.domain.port.in.GetPresentBalanceUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
@@ -36,7 +42,14 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class AccountStatisticsService implements GetAccountStatisticsUseCase {
+class AccountStatisticsService implements
+        GetPeriodProfitUseCase,
+        GetExecutionsUseCase,
+        GetPresentBalanceUseCase,
+        GetMarginUseCase,
+        GetDailyTransactionsUseCase,
+        GetMultiPriceUseCase,
+        GetCycleHistoryUseCase {
 
     private final AccountPort accountPort;
     private final TradingCyclePort tradingCyclePort;
@@ -57,8 +70,8 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     }
 
     @Override
-    public List<Execution> getTrades(UUID accountId, UUID requesterId,
-                                      LocalDate from, LocalDate to) {
+    public List<Execution> getExecutions(UUID accountId, UUID requesterId,
+                                          LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         Optional<Ticker> ticker = tradingCyclePort.findActiveTicker(accountId);
         if (ticker.isEmpty()) return Collections.emptyList();
@@ -91,10 +104,10 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     }
 
     @Override
-    public CycleHistoryPage getCycleHistory(UUID accountId, UUID requesterId,
-                                             LocalDate from, LocalDate to,
-                                             Instant cursor, int size) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+    public CycleHistoryPage getByAccount(UUID accountId, UUID requesterId,
+                                          LocalDate from, LocalDate to,
+                                          Instant cursor, int size) {
+        accountPort.requireOwnedAccount(accountId, requesterId);
         Instant fromInstant = resolveFrom(from);
         // cursor 없으면 to(=내일)가 상한 — cursor는 그 이전 지점으로 좁혀감
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
@@ -104,11 +117,11 @@ class AccountStatisticsService implements GetAccountStatisticsUseCase {
     }
 
     @Override
-    public CycleHistoryPage getStrategyCycleHistory(UUID strategyId, UUID requesterId,
-                                                      LocalDate from, LocalDate to,
-                                                      Instant cursor, int size) {
+    public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
+                                           LocalDate from, LocalDate to,
+                                           Instant cursor, int size) {
         var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
+        accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
         Instant fromInstant = resolveFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
         List<AccountCycleHistoryEntry> raw =

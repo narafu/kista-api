@@ -48,7 +48,7 @@ class TradingCycleControllerTest {
     @MockitoBean GetTradingCycleUseCase getCycle;
     @MockitoBean PauseTradingCycleUseCase pauseCycle;
     @MockitoBean ResumeTradingCycleUseCase resumeCycle;
-    @MockitoBean GetAccountStatisticsUseCase statisticsUseCase;
+    @MockitoBean GetCycleHistoryUseCase getCycleHistory;
     @MockitoBean ManualExecuteTradingUseCase manualExecute;
     @MockitoBean CancelOrderUseCase cancelOrder;
 
@@ -162,7 +162,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_with_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(statisticsUseCase.getStrategyCycleHistory(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
+        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -176,7 +176,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_without_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(statisticsUseCase.getStrategyCycleHistory(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
+        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -189,7 +189,7 @@ class TradingCycleControllerTest {
     void strategyHistory_returns_nextCursor_when_hasMore() throws Exception {
         Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
         var page = new CycleHistoryPage(List.of(), cursor, true);
-        when(statisticsUseCase.getStrategyCycleHistory(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
+        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
