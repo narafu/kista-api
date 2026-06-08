@@ -1,15 +1,12 @@
 package com.kista.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +28,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
     private final KisPricePort kisPricePort;
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
-    private final CycleOrderStrategies cycleStrategies;
+    private final CycleOrderComputer orderComputer;
 
     // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -64,22 +61,19 @@ class TradingPreviewService implements GetNextOrdersUseCase {
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
-        var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, prevClosePrice, today, privacyBase, "preview:" + accountId));
+        CycleOrderComputer.ComputeResult result = orderComputer.compute(
+                balance, cycle, prevClosePrice, today, privacyBase, "preview:" + accountId);
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
-        if (planOpt.isEmpty()) {
+        if (result.isSkipped()) {
             return new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
         }
 
-        CycleOrderStrategy.OrderPlan plan = planOpt.get();
-        List<Order> orders = plan.orders();
         // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
         // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해 (INFINITE만 non-null)
-        if (!balance.isOrderValid(orders)) {
-            return new Result(today, plan.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
+        if (!result.valid()) {
+            return new Result(today, result.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
         }
-        return new Result(today, plan.position(), orders, null);
+        return new Result(today, result.position(), result.orders(), null);
     }
 }

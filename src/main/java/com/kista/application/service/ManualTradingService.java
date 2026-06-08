@@ -9,8 +9,6 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
-import com.kista.domain.strategy.CycleOrderStrategy;
-import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,7 +33,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
     private final NotifyPort notifyPort;
     private final TradingPriceFetcher priceFetcher;
     private final TradingBalanceLoader balanceLoader;
-    private final CycleOrderStrategies cycleStrategies;
+    private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
 
     @Override
@@ -74,19 +72,17 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
-        var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, prevClosePrice, today, null, account.nickname()));
-        if (planOpt.isEmpty()) return List.of(); // 전략 차원 skip (기준매매표 미수신 등)
+        CycleOrderComputer.ComputeResult result = orderComputer.compute(
+                balance, cycle, prevClosePrice, today, null, account.nickname());
+        if (result.isSkipped()) return List.of(); // 전략 차원 skip (기준매매표 미수신 등)
 
-        List<Order> orders = planOpt.get().orders();
-        if (!balance.isOrderValid(orders)) {
+        if (!result.valid()) {
             log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
             notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
             return List.of();
         }
 
-        orderPlanner.savePlannedOrders(orders, account);
+        orderPlanner.savePlannedOrders(result.orders(), account);
 
         // 저장된 PLANNED 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedByAccountAndDate(account.id(), today);

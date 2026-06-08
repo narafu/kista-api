@@ -10,8 +10,6 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,7 +32,7 @@ class TradingService implements ExecuteTradingUseCase {
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
-    private final CycleOrderStrategies cycleStrategies;        // 사이클 타입별 주문 전략 라우터
+    private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + KIS 접수
@@ -150,25 +148,22 @@ class TradingService implements ExecuteTradingUseCase {
             }
         }
 
-        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 Optional.empty)
-        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
-        var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, prevClosePrice, today, privacyBase, account.nickname()));
-        if (planOpt.isEmpty()) return null;
-        var plan = planOpt.get(); // 한 번 풀어 재사용
+        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip)
+        CycleOrderComputer.ComputeResult result = orderComputer.compute(
+                balance, cycle, prevClosePrice, today, privacyBase, account.nickname());
+        if (result.isSkipped()) return null;
 
-        List<Order> orders = plan.orders();
         // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip + 알림
-        if (!balance.isOrderValid(orders)) {
+        if (!result.valid()) {
             log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
             notifyPort.notifyInsufficientBalance(account, balance, cycle.ticker());
             return null;
         }
 
-        orderPlanner.savePlannedOrders(orders, account);
+        orderPlanner.savePlannedOrders(result.orders(), account);
 
         // CycleState: INFINITE는 position/snapshot/startPrice, PRIVACY는 privacyBase 보존
-        InfinitePosition position = plan.position();
+        InfinitePosition position = result.position();
         TradingSnapshot snapshot = position != null ? position.toSnapshot() : null;
         BigDecimal startPrice = cycle.type() == TradingCycle.Type.INFINITE ? price : null;
         PrivacyTradeBase privacyBaseForState = cycle.type() == TradingCycle.Type.PRIVACY ? privacyBase : null;

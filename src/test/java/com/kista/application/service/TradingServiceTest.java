@@ -96,6 +96,7 @@ class TradingServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies);
         CycleRotationService rotationService = new CycleRotationService(
                 kisMarginPort, cyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort);
@@ -107,7 +108,7 @@ class TradingServiceTest {
         service = new TradingService(
                 marketCalendarPort, notifyPort,
                 orderPort, privacyTradePort,
-                balanceLoader, cycleStrategies, orderPlanner,
+                balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
     }
 

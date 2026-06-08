@@ -76,7 +76,8 @@ class TradingPreviewServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        service = new TradingPreviewService(accountPort, cyclePort, kisPricePort, privacyTradePort, balanceLoader, cycleStrategies);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies);
+        service = new TradingPreviewService(accountPort, cyclePort, kisPricePort, privacyTradePort, balanceLoader, orderComputer);
     }
 
     @Test
