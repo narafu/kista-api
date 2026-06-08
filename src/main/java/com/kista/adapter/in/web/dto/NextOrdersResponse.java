@@ -18,9 +18,8 @@ public record NextOrdersResponse(
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
             int holdings,            // 보유 수량
-            BigDecimal averagePrice, // 평균 매입가
+            BigDecimal averagePrice, // 평균 매입가 (0회차: 전일종가)
             BigDecimal usdDeposit,   // 통합주문가능금액
-            BigDecimal currentPrice, // 현재가 (장마감 시 마지막 체결가)
             BigDecimal priceOffsetRate, // 가격 보정률 (전반: >0, 후반: ≤0)
             double currentRound,     // 현재 회차 (소수점 허용)
             BigDecimal unitAmount,   // 1회 매수 단위금액 (총자산 / 20)
@@ -34,7 +33,6 @@ public record NextOrdersResponse(
                     p.holdings(),
                     p.averagePrice(),
                     p.usdDeposit(),
-                    p.currentPrice(),
                     p.priceOffsetRate(),
                     p.currentRound(),
                     p.unitAmount(),

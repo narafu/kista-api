@@ -10,7 +10,7 @@ import static java.math.RoundingMode.HALF_UP;
 public record InfinitePosition(
         AccountBalance balance,
         TradingCycle.Ticker ticker,    // 거래 종목
-        BigDecimal currentPrice
+        BigDecimal prevClosePrice      // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
 ) {
     private static final int TOTAL_ROUNDS = 20;
 
@@ -27,7 +27,8 @@ public record InfinitePosition(
     // --- 무한매수법 핵심 수식 연산 (행위) ---
 
     public BigDecimal averagePrice() {
-        return holdings() == 0 ? currentPrice : balance.avgPrice();
+        // 0회차: 평단가가 없으므로 최근 종가를 평단가 대용으로 사용
+        return holdings() == 0 ? prevClosePrice : balance.avgPrice();
     }
 
     public BigDecimal purchaseAmount() {
@@ -64,10 +65,6 @@ public record InfinitePosition(
     public BigDecimal targetPrice() {
         return averagePrice().multiply(BigDecimal.ONE.add(ticker.getTargetProfitRate()))
                 .setScale(2, HALF_UP);
-    }
-
-    public BigDecimal evaluationAmount() {
-        return currentPrice.multiply(BigDecimal.valueOf(holdings()));
     }
 
     public TradingSnapshot toSnapshot() {

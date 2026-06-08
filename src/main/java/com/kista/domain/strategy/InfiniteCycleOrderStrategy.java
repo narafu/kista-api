@@ -33,11 +33,11 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
-        // 0회차(holdings==0)에서 현재가 없으면 InfinitePosition 생성 자체가 불가
-        if (ctx.balance().holdings() == 0 && ctx.price() == null) {
-            throw new IllegalStateException("현재가 조회 실패: " + ctx.cycle().ticker().name());
+        // 0회차(holdings==0)에서 전일종가 없으면 InfinitePosition 생성 자체가 불가
+        if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {
+            throw new IllegalStateException("전일종가 조회 실패: " + ctx.cycle().ticker().name());
         }
-        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.cycle().ticker(), ctx.price());
+        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.cycle().ticker(), ctx.prevClosePrice());
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),

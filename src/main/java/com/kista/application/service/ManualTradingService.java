@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -62,10 +64,12 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
 
         User user = userPort.findByIdOrThrow(account.userId());
 
-        // 현재가 조회 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
-        Map<TradingCycle.Ticker, BigDecimal> prices = priceFetcher.fetchPrices(
+        // 현재가 + 전일종가 조회 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
+        Map<TradingCycle.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
                 List.of(cycle.ticker()), account);
-        BigDecimal price = prices.get(cycle.ticker());
+        PriceSnapshot priceSnapshot = snapshots.get(cycle.ticker());
+        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
 
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(cycle).balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
@@ -73,7 +77,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
 
         CycleOrderStrategy strategy = cycleStrategies.of(cycle);
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, price, today, null, account.nickname()));
+                balance, cycle, price, prevClosePrice, today, null, account.nickname()));
         if (planOpt.isEmpty()) return List.of(); // 전략 차원 skip (기준매매표 미수신 등)
 
         List<Order> orders = planOpt.get().orders();

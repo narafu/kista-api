@@ -11,6 +11,7 @@ import com.kista.domain.model.user.*;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.ExecuteTradingUseCase.BatchContext;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
@@ -113,6 +114,7 @@ class TradingServiceTest {
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
         BigDecimal startPrice = new BigDecimal("20.00"); // 시작가 (Phase A, 04:00 KST)
+        BigDecimal prevClose = new BigDecimal("19.00");  // 전일종가
         // PRICE = "22.00" — 종가 (PostClose 이후)
 
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
@@ -124,9 +126,10 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001");
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
-                .thenReturn(Map.of(Ticker.SOXL, startPrice)) // 1st: 시작가
-                .thenReturn(Map.of(Ticker.SOXL, PRICE));     // 2nd: 종가
+                .thenReturn(Map.of(Ticker.SOXL, PRICE)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -142,8 +145,10 @@ class TradingServiceTest {
 
         verify(marketCalendarPort).isMarketOpen(any());
         verify(cycleHistoryPort).findRecentByCycleId(CYCLE.id(), 1);
-        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
-        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose) 각 1회
+        verify(kisPricePort, never()).getPriceSnapshot(any(), any()); // 단건 fallback 없음 — getPriceSnapshots 성공
+        verify(kisPricePort, never()).getPrice(any(), any());         // 단건 fallback 없음
+        verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
+        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort, atLeastOnce()).findPlannedByAccountAndDate(eq(ACCOUNT.id()), any());
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
@@ -163,6 +168,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
@@ -202,7 +208,8 @@ class TradingServiceTest {
         // 매수금액($20) > 잔액($10) → skip + notify
         Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null);
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        // 잔액 부족 시 조기 반환 → getPrices(종가 조회)까지 도달하지 않음
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(overBudgetBuy));
@@ -234,9 +241,10 @@ class TradingServiceTest {
         Execution buyExecution = new Execution(LocalDate.now(), Ticker.SOXL,
                 Order.OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00")))); // 시작가+전일종가
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
-                .thenReturn(Map.of(Ticker.SOXL, startPrice))  // 1st: 시작가
-                .thenReturn(Map.of(Ticker.SOXL, closingPrice)); // 2nd: 종가
+                .thenReturn(Map.of(Ticker.SOXL, closingPrice)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY)); // holdings=0
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -263,13 +271,14 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_fetchesPricesTwice_startAndClose_notPerCycle() throws InterruptedException {
-        // 두 사이클이 같은 ticker → getPrices() 2회(시작가+종가), getPrice() 0회
+        // 두 사이클이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(종가), 단건 fallback 없음
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
                 TradingCycle.CycleSeedType.NONE);
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
@@ -284,8 +293,10 @@ class TradingServiceTest {
                 new BatchContext(cycle2, ACCOUNT, USER)
         ), PAST_DST);
 
-        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT)); // 시작가(Phase A) + 종가(PostClose)
+        verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
+        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisPricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
@@ -297,8 +308,9 @@ class TradingServiceTest {
         TradingCycleHistory history2 = new TradingCycleHistory(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
-                .thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE), Ticker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
         // CYCLE: 휴장일 체크 전 잔고 조회에서 예외 (이미 isMarketOpen 다음이므로 isMarketOpen도 stub 필요)
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         RuntimeException ex = new RuntimeException("잔고 조회 오류");
@@ -321,15 +333,15 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_getPricesFails_cycleFailsAndNotifiesAdmin() throws InterruptedException {
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenThrow(new RuntimeException("API 오류"));
-        // getPrice 단건 fallback도 실패(null 반환) → price=null → holdings=0 → IllegalStateException
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenThrow(new RuntimeException("API 오류"));
+        // getPriceSnapshot 단건 fallback도 실패 → snapshot=null → price=null + prevClosePrice=null → holdings=0 → IllegalStateException
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
 
         service.executeBatch(List.of(new BatchContext(CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(kisPricePort).getPrice(Ticker.SOXL, ACCOUNT); // 단건 fallback 시도 확인
-        verify(notifyPort).notifyError(any(IllegalStateException.class)); // 현재가 null → 실패
+        verify(kisPricePort).getPriceSnapshot(Ticker.SOXL, ACCOUNT); // 단건 fallback 시도 확인
+        verify(notifyPort).notifyError(any(IllegalStateException.class)); // 현재가·전일종가 null → 실패
     }
 
     // ── 연속 정책(cycleSeedType) 재등록 테스트 ─────────────────────────────────
@@ -342,6 +354,7 @@ class TradingServiceTest {
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, initDeposit,
                 TradingCycle.CycleSeedType.MAINTAIN);
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maintainCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
@@ -366,6 +379,7 @@ class TradingServiceTest {
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
                 TradingCycle.CycleSeedType.MAX);
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
@@ -392,6 +406,7 @@ class TradingServiceTest {
                 TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("500.00"),
                 TradingCycle.CycleSeedType.MAX);
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));
@@ -416,6 +431,7 @@ class TradingServiceTest {
                 TradingCycle.CycleSeedType.MAX);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findRecentByCycleId(maxCycle.id(), 1)).thenReturn(List.of(FRESH_HISTORY));

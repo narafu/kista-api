@@ -47,7 +47,7 @@ class OrderControllerTest {
 
     private GetNextOrdersUseCase.Result buildNextResult() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22.00"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21.00"));
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
         return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order), null);
@@ -62,7 +62,6 @@ class OrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeDate").value(LocalDate.now().toString()))
                 .andExpect(jsonPath("$.position.ticker").value("SOXL"))
-                .andExpect(jsonPath("$.position.currentPrice").value(22.00))
                 .andExpect(jsonPath("$.orders[0].direction").value("BUY"))
                 .andExpect(jsonPath("$.orders[0].orderType").value("LOC"))
                 .andExpect(jsonPath("$.skipReason").doesNotExist());

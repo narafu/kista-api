@@ -51,6 +51,7 @@ class TradingReporter {
 
         if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
             // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
+            // 종가 기준 스냅샷: prevClosePrice=closingPrice (holdings>0이면 averagePrice는 avgPrice 사용, 0이어도 종가 기준 적절)
             TradingSnapshot postSnapshot = closingPrice != null
                     ? new InfinitePosition(postBalance, cycle.ticker(), closingPrice).toSnapshot()
                     : snapshot;

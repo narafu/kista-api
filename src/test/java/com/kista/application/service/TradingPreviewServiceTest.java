@@ -87,7 +87,8 @@ class TradingPreviewServiceTest {
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
+                .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
@@ -96,7 +97,6 @@ class TradingPreviewServiceTest {
         assertThat(result.skipReason()).isNull();
         assertThat(result.position()).isNotNull();
         assertThat(result.position().ticker()).isEqualTo(Ticker.SOXL);
-        assertThat(result.position().currentPrice()).isEqualByComparingTo(PRICE);
         assertThat(result.orders()).hasSize(1);
         // preview는 DB 저장 없음
         verify(orderPort, never()).saveAll(any());
@@ -113,7 +113,7 @@ class TradingPreviewServiceTest {
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
         assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
-        verify(kisPricePort, never()).getPrice(any(), any());
+        verify(kisPricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
@@ -125,7 +125,8 @@ class TradingPreviewServiceTest {
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
-        when(kisPricePort.getPrice(Ticker.SOXL, ACCOUNT)).thenReturn(PRICE);
+        when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
+                .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(overBudgetBuy));
 

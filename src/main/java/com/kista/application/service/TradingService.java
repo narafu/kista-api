@@ -9,6 +9,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -71,12 +72,12 @@ class TradingService implements ExecuteTradingUseCase {
         // 시장 개장 여부 확인 (1회) — 모든 사이클 공통, 가격 조회 전 조기 반환
         if (!isMarketOpen(today)) return;
 
-        // 시작 시점 현재가 일괄 조회
+        // 시작 시점 현재가 + 전일종가 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         List<Ticker> cycleTickers = contexts.stream()
                 .map(c -> c.cycle().ticker())
                 .distinct().toList();
         Account firstAccount = contexts.getFirst().account();
-        Map<Ticker, BigDecimal> startPrices = priceFetcher.fetchPrices(cycleTickers, firstAccount);
+        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
 
         // 기준 매매표 조회 (PRIVACY)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.cycle().type() == TradingCycle.Type.PRIVACY);
@@ -88,7 +89,7 @@ class TradingService implements ExecuteTradingUseCase {
         List<CycleState> states = new ArrayList<>();
         for (BatchContext ctx : contexts) {
             runSafely("planAndSaveOrders", ctx.cycle().id(),
-                    () -> planAndSaveOrders(ctx, startPrices, privacyBase, today))
+                    () -> planAndSaveOrders(ctx, startPriceSnapshots, privacyBase, today))
                     .ifPresent(states::add);
         }
         if (states.isEmpty()) return;
@@ -128,7 +129,7 @@ class TradingService implements ExecuteTradingUseCase {
 
     // planAndSaveOrders: 잔고 로드 + PLANNED 주문 생성·저장
     // 오늘 PLANNED 또는 PLACED가 이미 있으면 재계산 없이 그대로 반환 (수동 선행 주문 보존)
-    private CycleState planAndSaveOrders(BatchContext ctx, Map<Ticker, BigDecimal> startPrices,
+    private CycleState planAndSaveOrders(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
                                          PrivacyTradeBase privacyBase, LocalDate today) {
         TradingCycle cycle = ctx.cycle();
         Account account = ctx.account();
@@ -138,7 +139,9 @@ class TradingService implements ExecuteTradingUseCase {
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), cycle.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // 2. INFINITE 전용 가드: 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (수동 주문 보존)
-        BigDecimal price = startPrices.get(cycle.ticker());
+        PriceSnapshot priceSnapshot = startPriceSnapshots.get(cycle.ticker());
+        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
         if (cycle.type() == TradingCycle.Type.INFINITE) {
             List<Order> todayOrders = orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today);
             if (!todayOrders.isEmpty()) {
@@ -150,7 +153,7 @@ class TradingService implements ExecuteTradingUseCase {
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 Optional.empty)
         CycleOrderStrategy strategy = cycleStrategies.of(cycle);
         var planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, price, today, privacyBase, account.nickname()));
+                balance, cycle, price, prevClosePrice, today, privacyBase, account.nickname()));
         if (planOpt.isEmpty()) return null;
         var plan = planOpt.get(); // 한 번 풀어 재사용
 

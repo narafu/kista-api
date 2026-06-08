@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 
 @Component
@@ -33,6 +34,20 @@ public class KisPriceAdapter implements KisPricePort {
 
     @Override
     public BigDecimal getPrice(Ticker ticker, Account account) {
+        // 현재가만 필요한 경우 — snapshot 조회 후 current 반환 (KIS API 호출 횟수 동일)
+        return getPriceSnapshot(ticker, account).current();
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+        // 현재가만 필요한 경우 — snapshot 조회 후 current만 매핑 (multprice 1회 + fallback 동일)
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        getPriceSnapshots(tickers, account).forEach((t, s) -> result.put(t, s.current()));
+        return result;
+    }
+
+    @Override
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
         HttpHeaders headers = kisHttpClient.buildHeaders(SINGLE_TR_ID, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
@@ -45,16 +60,20 @@ public class KisPriceAdapter implements KisPricePort {
         if (response == null || response.output() == null) {
             throw new KisApiException("가격 조회 응답 없음: " + ticker, null);
         }
-        // last(현재가) 우선, 비어있으면 base(전일종가) fallback
         String last = response.output().last();
         String base = response.output().base();
         if (last == null || last.isBlank()) log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
-        return KisResponseParser.resolvePrice(last, base)
+        BigDecimal current = KisResponseParser.resolvePrice(last, base)
                 .orElseThrow(() -> new KisApiException("가격 조회 응답 없음(last·base 모두 빈값): " + ticker, null));
+        // prevClose: base 우선, 없으면 current로 fallback (장 개시 직전 등 base 빈값 방어)
+        BigDecimal prevClose = Optional.ofNullable(base).filter(s -> !s.isBlank())
+                .map(KisResponseParser::parseBd)
+                .orElse(current);
+        return new PriceSnapshot(current, prevClose);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
         if (tickers.isEmpty()) return Map.of();
 
         HttpHeaders headers = kisHttpClient.buildHeaders(MULTI_TR_ID, account);
@@ -64,7 +83,7 @@ public class KisPriceAdapter implements KisPricePort {
 
         for (int i = 0; i < tickers.size(); i++) {
             Ticker ticker = tickers.get(i);
-            String num = String.format("%02d", i + 1); // "01", "02", "03"
+            String num = String.format("%02d", i + 1);
             String excd = exchangeRegistry.excd(ticker);
             params.add("EXCD_" + num, excd);
             params.add("SYMB_" + num, ticker.name());
@@ -73,38 +92,41 @@ public class KisPriceAdapter implements KisPricePort {
         MultiPriceResponse response = kisHttpClient.get(MULTI_PATH, headers, params, MultiPriceResponse.class);
 
         if (response == null || response.output2() == null) {
-            log.warn("복수종목 현재가 응답 없음: output2 null");
+            log.warn("복수종목 스냅샷 응답 없음: output2 null");
             return Map.of();
         }
 
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        Map<Ticker, PriceSnapshot> result = new LinkedHashMap<>();
         for (MultiPriceResponse.Output2 item : response.output2()) {
             if (item.symb() == null) continue;
-            // last(현재가) 우선, 비어있으면 base(전일종가) fallback — 장 마감 시 last가 빈 ETF 대응
             var resolved = KisResponseParser.resolvePrice(item.last(), item.base());
             if (resolved.isEmpty()) {
-                log.warn("복수종목 현재가 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
+                log.warn("복수종목 스냅샷 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
                 continue;
             }
             if (item.last() == null || item.last().isBlank()) {
-                log.info("복수종목 현재가 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
+                log.info("복수종목 스냅샷 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
             }
             Ticker ticker = Ticker.tryParse(item.symb()).orElse(null);
             if (ticker == null) {
-                log.warn("복수종목 현재가 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
+                log.warn("복수종목 스냅샷 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
                 continue;
             }
-            result.put(ticker, resolved.get());
+            BigDecimal current = resolved.get();
+            BigDecimal prevClose = Optional.ofNullable(item.base()).filter(s -> !s.isBlank())
+                    .map(KisResponseParser::parseBd)
+                    .orElse(current);
+            result.put(ticker, new PriceSnapshot(current, prevClose));
         }
 
         // 복수종목 응답에 없는 종목 → 단건 API fallback
         for (Ticker ticker : tickers) {
             if (!result.containsKey(ticker)) {
-                log.warn("복수종목 현재가 응답 누락 — 단건 API fallback 시도: ticker={}", ticker);
+                log.warn("복수종목 스냅샷 응답 누락 — 단건 API fallback 시도: ticker={}", ticker);
                 try {
-                    BigDecimal price = getPrice(ticker, account);
-                    result.put(ticker, price);
-                    log.info("단건 API fallback 성공: ticker={}, price={}", ticker, price);
+                    PriceSnapshot snapshot = getPriceSnapshot(ticker, account);
+                    result.put(ticker, snapshot);
+                    log.info("단건 API fallback 성공: ticker={}, price={}", ticker, snapshot.current());
                 } catch (Exception e) {
                     log.warn("단건 API fallback도 실패: ticker={}", ticker);
                 }

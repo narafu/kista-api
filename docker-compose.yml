@@ -44,6 +44,19 @@ services:
     networks:
       - kista-api-net
 
+  # ── kis-coding-mcp ───────────────────────────────────────────────────────────
+  kis-coding-mcp:
+    container_name: kis-coding-mcp
+    build:
+      context: ../../kis-mcp
+      dockerfile: Dockerfile.kis-coding-mcp
+    restart: unless-stopped
+    # Claude Code에서 http://localhost:3001/mcp 로 연결
+    ports:
+      - "3001:8081"
+    networks:
+      - kista-api-net
+
 volumes:
   postgres_data:
   prometheus_data:
