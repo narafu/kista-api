@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.user;
 
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.TradingCyclePort;
@@ -11,13 +11,13 @@ import java.util.UUID;
 // UserService.deleteMe / AdminService.deleteUser 공통 cascade 삭제 — 사이클 → 계좌 → 사용자 순 (FK CASCADE 대체)
 @Component
 @RequiredArgsConstructor
-class UserCascadeDeleter {
+public class UserCascadeDeleter {
 
     private final TradingCyclePort cyclePort;
     private final AccountPort accountPort;
     private final UserPort userPort;
 
-    void deleteCascade(UUID userId) {
+    public void deleteCascade(UUID userId) {
         cyclePort.deleteByUserId(userId);
         accountPort.deleteByUserId(userId);
         userPort.delete(userId);

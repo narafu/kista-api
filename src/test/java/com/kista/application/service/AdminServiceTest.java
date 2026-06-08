@@ -1,5 +1,6 @@
 package com.kista.application.service;
 
+import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;

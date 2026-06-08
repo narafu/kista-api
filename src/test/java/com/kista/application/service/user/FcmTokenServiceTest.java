@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.user;
 
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import org.junit.jupiter.api.Test;

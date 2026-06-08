@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.user;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.domain.model.user.User.NotificationChannel;
