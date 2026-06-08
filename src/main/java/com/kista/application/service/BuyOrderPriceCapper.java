@@ -62,8 +62,7 @@ class BuyOrderPriceCapper {
                 orderPort.deletePlannedBuyByAccountAndDate(account.id(), today);
                 return;
             }
-            newBuys = List.of(new Order(null, null, today, cycle.ticker(),
-                    orig.orderType(), BUY, qty, cappedPrice, Order.OrderStatus.PLANNED, null));
+            newBuys = List.of(plannedBuy(today, cycle, orig.orderType(), qty, cappedPrice));
         } else {
             // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
             Order buy1 = buyOrders.get(0);
@@ -71,7 +70,7 @@ class BuyOrderPriceCapper {
             BigDecimal cappedAvg = buy1.price().min(cap);
             BigDecimal cappedRef = buy2.price().min(cap);
 
-            int qty1 = k.divide(BigDecimal.valueOf(2), 2, HALF_UP)
+            int qty1 = k.divide(BigDecimal.valueOf(2), FLOOR)
                     .divide(cappedAvg, 0, FLOOR).intValue();
             BigDecimal remaining = k.subtract(cappedAvg.multiply(BigDecimal.valueOf(qty1)))
                     .multiply(BigDecimal.ONE.add(targetProfitRate));
@@ -82,19 +81,15 @@ class BuyOrderPriceCapper {
                 // cappedAvg == cappedRef이면 병합
                 if (cappedAvg.compareTo(cappedRef) == 0) {
                     int merged = qty1 + (qty2 > 0 ? qty2 : 0);
-                    newBuys.add(new Order(null, null, today, cycle.ticker(),
-                            buy1.orderType(), BUY, merged, cappedAvg, Order.OrderStatus.PLANNED, null));
+                    newBuys.add(plannedBuy(today, cycle, buy1.orderType(), merged, cappedAvg));
                 } else {
-                    newBuys.add(new Order(null, null, today, cycle.ticker(),
-                            buy1.orderType(), BUY, qty1, cappedAvg, Order.OrderStatus.PLANNED, null));
+                    newBuys.add(plannedBuy(today, cycle, buy1.orderType(), qty1, cappedAvg));
                     if (qty2 > 0) {
-                        newBuys.add(new Order(null, null, today, cycle.ticker(),
-                                buy2.orderType(), BUY, qty2, cappedRef, Order.OrderStatus.PLANNED, null));
+                        newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
                     }
                 }
             } else if (qty2 > 0) {
-                newBuys.add(new Order(null, null, today, cycle.ticker(),
-                        buy2.orderType(), BUY, qty2, cappedRef, Order.OrderStatus.PLANNED, null));
+                newBuys.add(plannedBuy(today, cycle, buy2.orderType(), qty2, cappedRef));
             }
         }
 
@@ -107,5 +102,11 @@ class BuyOrderPriceCapper {
         orderPlanner.savePlannedOrders(newBuys, account);
         log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(),
                 newBuys.stream().map(o -> o.price() + "×" + o.quantity()).toList());
+    }
+
+    private Order plannedBuy(LocalDate today, TradingCycle cycle, Order.OrderType orderType,
+                             int quantity, BigDecimal price) {
+        return new Order(null, null, today, cycle.ticker(),
+                orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null);
     }
 }
