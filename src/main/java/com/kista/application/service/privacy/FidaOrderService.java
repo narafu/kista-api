@@ -1,4 +1,4 @@
-package com.kista.application.service;
+package com.kista.application.service.privacy;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
