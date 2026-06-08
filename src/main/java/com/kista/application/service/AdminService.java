@@ -10,7 +10,6 @@ import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +29,7 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
     private final UserPort userPort;
     private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
     private final AccountPort accountPort;
-    private final TradingCyclePort cyclePort;
+    private final UserCascadeDeleter userCascadeDeleter;
     private final ApproveUserUseCase approveUserUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
@@ -75,10 +74,7 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
     @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
         userPort.findByIdOrThrow(targetUserId); // 존재 확인
-        // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
-        cyclePort.deleteByUserId(targetUserId);
-        accountPort.deleteByUserId(targetUserId);
-        userPort.delete(targetUserId);
+        userCascadeDeleter.deleteCascade(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
     }

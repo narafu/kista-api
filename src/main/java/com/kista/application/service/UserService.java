@@ -11,10 +11,8 @@ import com.kista.domain.port.in.GetUserUseCase;
 import com.kista.domain.port.in.RegisterUserUseCase;
 import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
 import com.kista.domain.port.in.UpdateUserTelegramUseCase;
-import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
-import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +33,7 @@ import java.util.UUID;
 class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
 
     private final UserPort userPort;
-    private final AccountPort accountPort;
-    private final TradingCyclePort cyclePort;
+    private final UserCascadeDeleter userCascadeDeleter;
     private final UserNotificationPort notificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
@@ -142,10 +139,7 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
     @Override
     public void deleteMe(UUID userId) {
         userPort.findByIdOrThrow(userId); // 존재 확인
-        // 사이클 → 계좌 → 사용자 순으로 소프트 삭제 (FK CASCADE 대체)
-        cyclePort.deleteByUserId(userId);
-        accountPort.deleteByUserId(userId);
-        userPort.delete(userId);
+        userCascadeDeleter.deleteCascade(userId);
         log.info("사용자 탈퇴: userId={}", userId);
     }
 

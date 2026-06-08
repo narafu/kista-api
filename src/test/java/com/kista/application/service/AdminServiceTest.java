@@ -7,7 +7,6 @@ import com.kista.domain.port.in.ApproveUserUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +31,7 @@ class AdminServiceTest {
     @Mock UserPort userPort;
     @Mock AdminUserViewPort adminUserViewPort;
     @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock UserCascadeDeleter userCascadeDeleter;
     @Mock ApproveUserUseCase approveUserUseCase;
     @Mock AuditLogPort auditLogPort;
 
@@ -106,10 +105,8 @@ class AdminServiceTest {
 
         adminService.deleteUser(adminId, targetId);
 
-        // 사이클 → 계좌 → 사용자 순 소프트 삭제 cascade 검증
-        verify(cyclePort).deleteByUserId(targetId);
-        verify(accountPort).deleteByUserId(targetId);
-        verify(userPort).delete(targetId);
+        // cascade 삭제는 UserCascadeDeleter에 위임
+        verify(userCascadeDeleter).deleteCascade(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }
 }

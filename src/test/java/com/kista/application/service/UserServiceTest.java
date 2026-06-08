@@ -5,10 +5,8 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
-import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.DisplayName;
@@ -35,8 +33,7 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
 
     @Mock UserPort userPort;
-    @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock UserCascadeDeleter userCascadeDeleter;
     @Mock UserNotificationPort notificationPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
@@ -256,7 +253,7 @@ class UserServiceTest {
 
         userService.deleteMe(id);
 
-        verify(userPort).delete(id);
+        verify(userCascadeDeleter).deleteCascade(id);
     }
 
     @Test

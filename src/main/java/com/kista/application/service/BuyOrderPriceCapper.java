@@ -27,6 +27,9 @@ import static java.math.RoundingMode.HALF_UP;
 @Slf4j
 class BuyOrderPriceCapper {
 
+    // 가격 캡 배수: currentPrice × 1.10 초과 시 보정 대상
+    private static final BigDecimal PRICE_CAP_MULTIPLIER = new BigDecimal("1.10");
+
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
 
@@ -36,7 +39,7 @@ class BuyOrderPriceCapper {
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
 
-        BigDecimal cap = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
+        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
         boolean needsCap = buyOrders.stream().anyMatch(o -> o.price().compareTo(cap) > 0);
         if (!needsCap) return;
 
