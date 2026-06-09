@@ -7,7 +7,6 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class TradingService implements ExecuteTradingUseCase {
+class TradingService {
 
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
@@ -51,13 +50,11 @@ class TradingService implements ExecuteTradingUseCase {
     // KIS 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
 
-    @Override
-    public void execute(TradingCycle cycle, Account account, User user) throws InterruptedException {
+    void execute(TradingCycle cycle, Account account, User user) throws InterruptedException {
         executeBatch(List.of(new BatchContext(cycle, account, user)));
     }
 
-    @Override
-    public void executeBatch(List<BatchContext> contexts) throws InterruptedException {
+    void executeBatch(List<BatchContext> contexts) throws InterruptedException {
         executeBatch(contexts, DstInfo.calculate());
     }
 

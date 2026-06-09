@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.PrivacyCurrentBaseResponse;
-import com.kista.domain.port.in.GetPrivacyCurrentBaseUseCase;
+import com.kista.domain.port.in.PrivacyUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class PrivacyTradeController {
 
-    private final GetPrivacyCurrentBaseUseCase getPrivacyCurrentBaseUseCase;
+    private final PrivacyUseCase privacy;
 
     @Operation(summary = "현재 사이클 기준가 조회",
                description = "오늘 이후 거래일 중 가장 미래의 privacy_trades_master 행에서 current_cycle_start를 반환. 전략 등록 시 매수 배수 MAX 계산에 사용.")
@@ -28,6 +28,6 @@ public class PrivacyTradeController {
     @GetMapping("/base/latest")
     public PrivacyCurrentBaseResponse getLatestBase() {
         // GlobalExceptionHandler가 NoSuchElementException → 404 처리
-        return PrivacyCurrentBaseResponse.from(getPrivacyCurrentBaseUseCase.getPrivacyCurrentBase());
+        return PrivacyCurrentBaseResponse.from(privacy.getPrivacyCurrentBase());
     }
 }

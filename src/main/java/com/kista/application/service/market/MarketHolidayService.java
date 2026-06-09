@@ -1,6 +1,6 @@
 package com.kista.application.service.market;
 
-import com.kista.domain.port.in.GetMarketHolidaysUseCase;
+import com.kista.domain.port.in.MarketUseCase;
 import com.kista.domain.port.out.MarketHolidayQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -10,7 +10,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-class MarketHolidayService implements GetMarketHolidaysUseCase {
+class MarketHolidayService implements MarketUseCase {
 
     private final MarketHolidayQueryPort marketHolidayQueryPort;
 

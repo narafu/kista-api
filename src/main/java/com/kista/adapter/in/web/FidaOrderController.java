@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.FidaOrderResponse;
-import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
+import com.kista.domain.port.in.PrivacyUseCase;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class FidaOrderController {
 
-    private final ExecuteFidaOrderUseCase executeFidaOrderUseCase;
+    private final PrivacyUseCase privacy;
 
     @Operation(summary = "FIDA 주문 실행", description = "FIDA 계좌로 즉시 지정가 매매 주문 접수. X-Internal-Token 헤더 필수.")
     @ApiResponses({
@@ -32,7 +32,7 @@ public class FidaOrderController {
     })
     @PostMapping("/fida-orders")
     public ResponseEntity<FidaOrderResponse> placeFidaOrder(@RequestBody @Valid FidaOrderCommand command) {
-        PrivacyTradeSaveResult result = executeFidaOrderUseCase.execute(command);
+        PrivacyTradeSaveResult result = privacy.executeFidaOrder(command);
         FidaOrderResponse body = FidaOrderResponse.of(result.id(), command);
         return result.created()
                 ? ResponseEntity.status(HttpStatus.CREATED).body(body)

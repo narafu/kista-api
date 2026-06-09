@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.strategy.DstInfo;
-import com.kista.domain.port.in.GetMarketHolidaysUseCase;
+import com.kista.domain.port.in.MarketUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MarketHolidayController {
 
-    private final GetMarketHolidaysUseCase getMarketHolidaysUseCase;
+    private final MarketUseCase marketUseCase;
 
     @Operation(summary = "월별 미국 시장 휴장일 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -29,7 +29,7 @@ public class MarketHolidayController {
             @Parameter(description = "연도", example = "2026") @RequestParam int year,
             @Parameter(description = "월 (1-12)", example = "6") @RequestParam int month) {
         // LocalDate → ISO 문자열 변환으로 직렬화 방식 명시
-        return getMarketHolidaysUseCase.getMonthlyHolidays(year, month)
+        return marketUseCase.getMonthlyHolidays(year, month)
                 .stream().map(Object::toString).toList();
     }
 

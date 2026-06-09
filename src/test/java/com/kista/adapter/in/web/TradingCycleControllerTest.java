@@ -1,12 +1,12 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.kis.KisApiException;
+import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
-import com.kista.domain.port.in.CancelOrderUseCase;
-import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.ManualExecuteTradingUseCase;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.TradingCycleUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -21,9 +21,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-
-import com.kista.domain.model.order.CancelResult;
-import com.kista.domain.port.in.CancelOrderUseCase;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,9 +44,8 @@ class TradingCycleControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TradingCycleUseCase tradingCycle;
-    @MockitoBean GetCycleHistoryUseCase getCycleHistory;
-    @MockitoBean ManualExecuteTradingUseCase manualExecute;
-    @MockitoBean CancelOrderUseCase cancelOrder;
+    @MockitoBean AccountStatisticsUseCase accountStatistics;
+    @MockitoBean TradingExecutionUseCase tradingExecution;
 
     private static final UUID CYCLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -61,7 +57,7 @@ class TradingCycleControllerTest {
 
     @Test
     void executeManually_success_returns200WithOrders() throws Exception {
-        when(manualExecute.execute(any(), any())).thenReturn(List.of());
+        when(tradingExecution.executeManually(any(), any())).thenReturn(List.of());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -79,7 +75,7 @@ class TradingCycleControllerTest {
     @Test
     void executeManually_notOwner_returns403() throws Exception {
         doThrow(new SecurityException("소유권 불일치"))
-                .when(manualExecute).execute(any(), any());
+                .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -89,7 +85,7 @@ class TradingCycleControllerTest {
     @Test
     void executeManually_privacyCycle_returns400() throws Exception {
         doThrow(new IllegalArgumentException("INFINITE 사이클만 수동 실행 가능합니다"))
-                .when(manualExecute).execute(any(), any());
+                .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -99,7 +95,7 @@ class TradingCycleControllerTest {
     @Test
     void executeManually_alreadyExecutedToday_returns409() throws Exception {
         doThrow(new ManualTradingException("오늘 이미 실행된 사이클입니다"))
-                .when(manualExecute).execute(any(), any());
+                .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -109,7 +105,7 @@ class TradingCycleControllerTest {
     @Test
     void executeManually_cycleNotFound_returns404() throws Exception {
         doThrow(new NoSuchElementException("사이클 없음"))
-                .when(manualExecute).execute(any(), any());
+                .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -119,7 +115,7 @@ class TradingCycleControllerTest {
     @Test
     void executeManually_kisApiError_returns503() throws Exception {
         doThrow(new KisApiException("KIS API 연결 오류", null))
-                .when(manualExecute).execute(any(), any());
+                .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -128,7 +124,7 @@ class TradingCycleControllerTest {
 
     @Test
     void cancelExecute_success_returnsCancelResult() throws Exception {
-        when(cancelOrder.cancelByCycle(any(), any()))
+        when(tradingExecution.cancelByCycle(any(), any()))
                 .thenReturn(new CancelResult(2, 1));
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
@@ -141,7 +137,7 @@ class TradingCycleControllerTest {
     @Test
     void cancelExecute_notOwner_returns403() throws Exception {
         doThrow(new SecurityException("소유권 불일치"))
-                .when(cancelOrder).cancelByCycle(any(), any());
+                .when(tradingExecution).cancelByCycle(any(), any());
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -151,7 +147,7 @@ class TradingCycleControllerTest {
     @Test
     void cancelExecute_notFound_returns404() throws Exception {
         doThrow(new NoSuchElementException("사이클 없음"))
-                .when(cancelOrder).cancelByCycle(any(), any());
+                .when(tradingExecution).cancelByCycle(any(), any());
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -161,7 +157,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_with_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
+        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -175,7 +171,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_without_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
+        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -188,7 +184,7 @@ class TradingCycleControllerTest {
     void strategyHistory_returns_nextCursor_when_hasMore() throws Exception {
         Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
         var page = new CycleHistoryPage(List.of(), cursor, true);
-        when(getCycleHistory.getByStrategy(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
+        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)

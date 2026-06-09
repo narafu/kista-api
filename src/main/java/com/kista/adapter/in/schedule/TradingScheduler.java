@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ExecuteTradingUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.TradingCyclePort;
@@ -22,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TradingScheduler {
 
-    private final ExecuteTradingUseCase useCase;
+    private final TradingExecutionUseCase useCase;
     private final AccountPort accountPort;          // 계좌 조회
     private final TradingCyclePort cyclePort;       // ACTIVE 사이클 목록 조회
     private final UserPort userPort;                // 계좌 소유자 조회

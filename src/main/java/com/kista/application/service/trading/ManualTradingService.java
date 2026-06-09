@@ -7,7 +7,6 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ManualExecuteTradingUseCase;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +23,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class ManualTradingService implements ManualExecuteTradingUseCase {
+class ManualTradingService {
 
     private final TradingCyclePort cyclePort;
     private final AccountPort accountPort;
@@ -36,8 +35,7 @@ class ManualTradingService implements ManualExecuteTradingUseCase {
     private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
 
-    @Override
-    public List<Order> execute(UUID cycleId, UUID requesterId) {
+    List<Order> execute(UUID cycleId, UUID requesterId) {
         // 동기 검증: 소유권·타입·상태
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
         Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);

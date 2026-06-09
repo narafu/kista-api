@@ -5,7 +5,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.strategy.BatchContext;
-import com.kista.domain.port.in.ExecuteTradingUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.TradingCyclePort;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TradingSchedulerTest {
 
-    @Mock ExecuteTradingUseCase useCase;
+    @Mock TradingExecutionUseCase useCase;
     @Mock AccountPort accountPort;
     @Mock TradingCyclePort cyclePort;
     @Mock UserPort userPort;

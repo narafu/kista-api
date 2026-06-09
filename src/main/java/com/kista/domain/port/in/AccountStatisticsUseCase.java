@@ -1,0 +1,29 @@
+package com.kista.domain.port.in;
+
+import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.kis.PeriodProfitResult;
+import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
+import com.kista.domain.model.tradingcycle.CycleHistoryPage;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+// KIS 통계 + trading_cycle_history 조회 통합 인터페이스
+public interface AccountStatisticsUseCase {
+    PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+    List<Execution> getExecutions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+    PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId);
+    List<MarginItem> getMargin(UUID accountId, UUID requesterId);
+    DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+    Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
+    CycleHistoryPage getByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
+    CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
+}

@@ -6,7 +6,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.order.NextOrdersPreview;
-import com.kista.domain.port.in.GetNextOrdersUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -37,7 +37,7 @@ class OrderControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean GetNextOrdersUseCase getNextOrders;
+    @MockitoBean TradingExecutionUseCase tradingExecution;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
@@ -56,7 +56,7 @@ class OrderControllerTest {
 
     @Test
     void next_returns_200_with_orders_and_position() throws Exception {
-        when(getNextOrders.preview(eq(ACCOUNT_ID), any())).thenReturn(buildNextResult());
+        when(tradingExecution.preview(eq(ACCOUNT_ID), any())).thenReturn(buildNextResult());
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
@@ -70,7 +70,7 @@ class OrderControllerTest {
 
     @Test
     void next_returns_403_when_not_owner() throws Exception {
-        when(getNextOrders.preview(any(), any())).thenThrow(new SecurityException("접근 불가"));
+        when(tradingExecution.preview(any(), any())).thenThrow(new SecurityException("접근 불가"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
@@ -79,7 +79,7 @@ class OrderControllerTest {
 
     @Test
     void next_returns_404_when_account_not_found() throws Exception {
-        when(getNextOrders.preview(any(), any())).thenThrow(new NoSuchElementException("계좌 없음"));
+        when(tradingExecution.preview(any(), any())).thenThrow(new NoSuchElementException("계좌 없음"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))
@@ -88,7 +88,7 @@ class OrderControllerTest {
 
     @Test
     void next_returns_503_on_kis_error() throws Exception {
-        when(getNextOrders.preview(any(), any())).thenThrow(new KisApiException("KIS API 오류", null));
+        when(tradingExecution.preview(any(), any())).thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/orders/preview")
                         .with(authentication(mockAuth())))

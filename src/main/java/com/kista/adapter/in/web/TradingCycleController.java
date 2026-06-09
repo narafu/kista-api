@@ -5,10 +5,9 @@ import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
-import com.kista.domain.port.in.CancelOrderUseCase;
-import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.ManualExecuteTradingUseCase;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.TradingCycleUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,10 +29,9 @@ import java.util.UUID;
 @Slf4j
 public class TradingCycleController {
 
-    private final TradingCycleUseCase tradingCycle;          // CRUD + pause/resume
-    private final GetCycleHistoryUseCase getCycleHistory;
-    private final ManualExecuteTradingUseCase manualExecute; // 수동 실행
-    private final CancelOrderUseCase cancelOrder;            // 주문 취소
+    private final TradingCycleUseCase tradingCycle;              // CRUD + pause/resume
+    private final AccountStatisticsUseCase accountStatistics;   // 사이클 이력 조회
+    private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
 
     // 계좌의 거래 사이클 목록 조회
     @Operation(summary = "거래 사이클 목록 조회")
@@ -107,7 +105,7 @@ public class TradingCycleController {
     public ExecuteOrdersResponse executeManually(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return ExecuteOrdersResponse.from(manualExecute.execute(id, userId));
+        return ExecuteOrdersResponse.from(tradingExecution.executeManually(id, userId));
     }
 
     // 오늘 수동 실행으로 PLACED된 사이클 주문 전체 취소 (best-effort)
@@ -116,7 +114,7 @@ public class TradingCycleController {
     public CancelOrdersResponse cancelExecute(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return CancelOrdersResponse.from(cancelOrder.cancelByCycle(id, userId));
+        return CancelOrdersResponse.from(tradingExecution.cancelByCycle(id, userId));
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
@@ -131,7 +129,7 @@ public class TradingCycleController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
-                getCycleHistory.getByStrategy(
+                accountStatistics.getByStrategy(
                         strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 }

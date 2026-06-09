@@ -3,13 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.kis.*;
-import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.GetDailyTransactionsUseCase;
-import com.kista.domain.port.in.GetExecutionsUseCase;
-import com.kista.domain.port.in.GetMarginUseCase;
-import com.kista.domain.port.in.GetMultiPriceUseCase;
-import com.kista.domain.port.in.GetPeriodProfitUseCase;
-import com.kista.domain.port.in.GetPresentBalanceUseCase;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -42,13 +36,7 @@ class StatisticsControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean GetPeriodProfitUseCase getPeriodProfit;
-    @MockitoBean GetExecutionsUseCase getExecutions;
-    @MockitoBean GetPresentBalanceUseCase getPresentBalance;
-    @MockitoBean GetMarginUseCase getMargin;
-    @MockitoBean GetDailyTransactionsUseCase getDailyTransactions;
-    @MockitoBean GetMultiPriceUseCase getMultiPrice;
-    @MockitoBean GetCycleHistoryUseCase getCycleHistory;
+    @MockitoBean AccountStatisticsUseCase accountStatistics;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
@@ -65,7 +53,7 @@ class StatisticsControllerTest {
                         new BigDecimal("25.00"), new BigDecimal("25.0"), "NASD")),
                 new BigDecimal("125.00"), new BigDecimal("25.0")
         );
-        when(getPeriodProfit.getPeriodProfit(eq(ACCOUNT_ID), any(), any(), any()))
+        when(accountStatistics.getPeriodProfit(eq(ACCOUNT_ID), any(), any(), any()))
                 .thenReturn(result);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
@@ -78,7 +66,7 @@ class StatisticsControllerTest {
 
     @Test
     void trades_returns_200_with_list() throws Exception {
-        when(getExecutions.getExecutions(eq(ACCOUNT_ID), any(), any(), any()))
+        when(accountStatistics.getExecutions(eq(ACCOUNT_ID), any(), any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/trades")
@@ -93,7 +81,7 @@ class StatisticsControllerTest {
         PresentBalanceResult result = new PresentBalanceResult(
                 List.of(), new BigDecimal("1000.00"), new BigDecimal("50.00"), new BigDecimal("5.0")
         );
-        when(getPresentBalance.getPresentBalance(eq(ACCOUNT_ID), any()))
+        when(accountStatistics.getPresentBalance(eq(ACCOUNT_ID), any()))
                 .thenReturn(result);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/portfolio")
@@ -104,7 +92,7 @@ class StatisticsControllerTest {
 
     @Test
     void profit_returns_403_when_not_owner() throws Exception {
-        when(getPeriodProfit.getPeriodProfit(any(), any(), any(), any()))
+        when(accountStatistics.getPeriodProfit(any(), any(), any(), any()))
                 .thenThrow(new SecurityException("접근 불가"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
@@ -115,7 +103,7 @@ class StatisticsControllerTest {
 
     @Test
     void profit_returns_404_when_account_not_found() throws Exception {
-        when(getPeriodProfit.getPeriodProfit(any(), any(), any(), any()))
+        when(accountStatistics.getPeriodProfit(any(), any(), any(), any()))
                 .thenThrow(new NoSuchElementException("없음"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
@@ -127,7 +115,7 @@ class StatisticsControllerTest {
     @Test
     void profit_returns_503_on_kis_error() throws Exception {
         // KIS API 실패는 KisApiException → GlobalExceptionHandler에서 503 변환
-        when(getPeriodProfit.getPeriodProfit(any(), any(), any(), any()))
+        when(accountStatistics.getPeriodProfit(any(), any(), any(), any()))
                 .thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/profit")
@@ -141,7 +129,7 @@ class StatisticsControllerTest {
         Map<Ticker, BigDecimal> priceMap = new LinkedHashMap<>();
         priceMap.put(Ticker.TQQQ, new BigDecimal("120.50"));
         priceMap.put(Ticker.SOXL, new BigDecimal("35.20"));
-        when(getMultiPrice.getPrices(eq(ACCOUNT_ID), any(), any()))
+        when(accountStatistics.getPrices(eq(ACCOUNT_ID), any(), any()))
                 .thenReturn(priceMap);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
@@ -163,7 +151,7 @@ class StatisticsControllerTest {
 
     @Test
     void prices_returns_403_when_not_owner() throws Exception {
-        when(getMultiPrice.getPrices(any(), any(), any()))
+        when(accountStatistics.getPrices(any(), any(), any()))
                 .thenThrow(new SecurityException("접근 불가"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
@@ -174,7 +162,7 @@ class StatisticsControllerTest {
 
     @Test
     void prices_returns_503_on_kis_error() throws Exception {
-        when(getMultiPrice.getPrices(any(), any(), any()))
+        when(accountStatistics.getPrices(any(), any(), any()))
                 .thenThrow(new KisApiException("KIS API 오류", null));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
@@ -186,7 +174,7 @@ class StatisticsControllerTest {
     @Test
     void cycleHistory_returns_page_with_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(getCycleHistory.getByAccount(eq(ACCOUNT_ID), any(), any(), any(), isNull(), eq(50)))
+        when(accountStatistics.getByAccount(eq(ACCOUNT_ID), any(), any(), any(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
@@ -201,7 +189,7 @@ class StatisticsControllerTest {
     void cycleHistory_returns_page_without_date_params() throws Exception {
         // '전체' 선택 시 from/to 없어도 200 반환
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(getCycleHistory.getByAccount(eq(ACCOUNT_ID), any(), isNull(), isNull(), isNull(), eq(50)))
+        when(accountStatistics.getByAccount(eq(ACCOUNT_ID), any(), isNull(), isNull(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")
@@ -214,7 +202,7 @@ class StatisticsControllerTest {
     void cycleHistory_returns_nextCursor_when_hasMore() throws Exception {
         Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
         var page = new CycleHistoryPage(List.of(), cursor, true);
-        when(getCycleHistory.getByAccount(eq(ACCOUNT_ID), any(), any(), any(), any(), eq(50)))
+        when(accountStatistics.getByAccount(eq(ACCOUNT_ID), any(), any(), any(), any(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/cycle-history")

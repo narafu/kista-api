@@ -23,15 +23,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class FidaOrderServiceTest {
+class PrivacyServiceTest {
 
     @Mock PrivacyTradePort privacyTradePort;
 
     @InjectMocks
-    FidaOrderService sut;
+    PrivacyService sut;
 
     @Test
-    void execute_delegates_to_privacyTradePort() {
+    void executeFidaOrder_delegates_to_privacyTradePort() {
         UUID masterId = UUID.randomUUID();
         LocalDate utcDate = LocalDate.now(); // FIDA 송신값 (UTC=US 거래일)
         FidaOrderCommand req = new FidaOrderCommand(
@@ -40,7 +40,7 @@ class FidaOrderServiceTest {
 
         when(privacyTradePort.saveMasterWithDetails(any())).thenReturn(new PrivacyTradeSaveResult(masterId, true));
 
-        PrivacyTradeSaveResult result = sut.execute(req);
+        PrivacyTradeSaveResult result = sut.executeFidaOrder(req);
 
         assertThat(result.id()).isEqualTo(masterId);
         assertThat(result.created()).isTrue();
@@ -50,7 +50,7 @@ class FidaOrderServiceTest {
     }
 
     @Test
-    void execute_returns_existing_when_not_created() {
+    void executeFidaOrder_returns_existing_when_not_created() {
         UUID masterId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
@@ -58,7 +58,7 @@ class FidaOrderServiceTest {
 
         when(privacyTradePort.saveMasterWithDetails(any())).thenReturn(new PrivacyTradeSaveResult(masterId, false));
 
-        PrivacyTradeSaveResult result = sut.execute(req);
+        PrivacyTradeSaveResult result = sut.executeFidaOrder(req);
 
         assertThat(result.created()).isFalse();
     }

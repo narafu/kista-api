@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.order.OrderCancelException;
-import com.kista.domain.port.in.CancelOrderUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -31,7 +31,7 @@ class OrderCancelControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean CancelOrderUseCase cancelOrderUseCase;
+    @MockitoBean TradingExecutionUseCase tradingExecution;
 
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
     private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -42,7 +42,7 @@ class OrderCancelControllerTest {
 
     @Test
     void cancelOrder_success_returns204() throws Exception {
-        doNothing().when(cancelOrderUseCase).cancelOrder(any(), any());
+        doNothing().when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -59,7 +59,7 @@ class OrderCancelControllerTest {
     @Test
     void cancelOrder_notOwner_returns403() throws Exception {
         doThrow(new SecurityException("소유권 불일치"))
-                .when(cancelOrderUseCase).cancelOrder(any(), any());
+                .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -69,7 +69,7 @@ class OrderCancelControllerTest {
     @Test
     void cancelOrder_notFound_returns404() throws Exception {
         doThrow(new NoSuchElementException("주문 없음"))
-                .when(cancelOrderUseCase).cancelOrder(any(), any());
+                .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
                         .with(csrf()).with(authentication(mockAuth())))
@@ -79,7 +79,7 @@ class OrderCancelControllerTest {
     @Test
     void cancelOrder_notPlaced_returns409() throws Exception {
         doThrow(new OrderCancelException("PLACED 상태 주문만 취소 가능합니다"))
-                .when(cancelOrderUseCase).cancelOrder(any(), any());
+                .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
                         .with(csrf()).with(authentication(mockAuth())))

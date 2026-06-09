@@ -8,13 +8,7 @@ import com.kista.adapter.in.web.dto.MultiPriceResponse;
 import com.kista.adapter.in.web.dto.PeriodProfitResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.GetDailyTransactionsUseCase;
-import com.kista.domain.port.in.GetExecutionsUseCase;
-import com.kista.domain.port.in.GetMarginUseCase;
-import com.kista.domain.port.in.GetMultiPriceUseCase;
-import com.kista.domain.port.in.GetPeriodProfitUseCase;
-import com.kista.domain.port.in.GetPresentBalanceUseCase;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,14 +31,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class KisStatisticsController {
 
-    // CQRS: 쿼리별 UseCase 분리 — 단일 책임 + 의존성 명시화
-    private final GetPeriodProfitUseCase getPeriodProfit;
-    private final GetExecutionsUseCase getExecutions;
-    private final GetPresentBalanceUseCase getPresentBalance;
-    private final GetMarginUseCase getMargin;
-    private final GetDailyTransactionsUseCase getDailyTransactions;
-    private final GetMultiPriceUseCase getMultiPrice;
-    private final GetCycleHistoryUseCase getCycleHistory;
+    private final AccountStatisticsUseCase accountStatistics;
 
     // 기간손익 조회 (TTTS3039R)
     @Operation(summary = "기간손익 조회", description = "KIS API TTTS3039R — 지정 기간 동안의 종목별 실현손익 및 수익률 조회.")
@@ -63,7 +50,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return PeriodProfitResponse.from(getPeriodProfit.getPeriodProfit(accountId, userId, from, to));
+        return PeriodProfitResponse.from(accountStatistics.getPeriodProfit(accountId, userId, from, to));
     }
 
     // 체결 내역 조회 (TTTS3035R)
@@ -83,7 +70,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return getExecutions.getExecutions(accountId, userId, from, to)
+        return accountStatistics.getExecutions(accountId, userId, from, to)
                 .stream().map(ExecutionResponse::from).toList();
     }
 
@@ -100,7 +87,7 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return PortfolioSummaryResponse.from(getPresentBalance.getPresentBalance(accountId, userId));
+        return PortfolioSummaryResponse.from(accountStatistics.getPresentBalance(accountId, userId));
     }
 
     // 해외증거금 통화별조회 (TTTC2101R) — USD·KRW만 반환
@@ -116,7 +103,7 @@ public class KisStatisticsController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return getMargin.getMargin(accountId, userId)
+        return accountStatistics.getMargin(accountId, userId)
                 .stream().map(MarginResponse::from).toList();
     }
 
@@ -137,7 +124,7 @@ public class KisStatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return DailyTransactionResponse.from(getDailyTransactions.getDailyTransactions(accountId, userId, from, to));
+        return DailyTransactionResponse.from(accountStatistics.getDailyTransactions(accountId, userId, from, to));
     }
 
     // trading_cycle_history DB 조회 (KIS API 미사용) — 커서 기반 페이지네이션
@@ -162,7 +149,7 @@ public class KisStatisticsController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
-                getCycleHistory.getByAccount(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
+                accountStatistics.getByAccount(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 
     // 복수 종목 현재가 조회 (HHDFS76410000)
@@ -188,7 +175,7 @@ public class KisStatisticsController {
         if (distinct.isEmpty() || distinct.size() > 10) {
             throw new IllegalArgumentException("tickers는 1~10개여야 합니다"); // GlobalExceptionHandler → 400
         }
-        Map<Ticker, BigDecimal> result = getMultiPrice.getPrices(accountId, userId, distinct);
+        Map<Ticker, BigDecimal> result = accountStatistics.getPrices(accountId, userId, distinct);
         return MultiPriceResponse.from(result);
     }
 }

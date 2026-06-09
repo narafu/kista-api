@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
-import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
@@ -23,15 +22,14 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class OrderCancelService implements CancelOrderUseCase {
+class OrderCancelService {
 
     private final OrderPort orderPort;
     private final KisOrderPort kisOrderPort;
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
 
-    @Override
-    public CancelResult cancelByCycle(UUID cycleId, UUID requesterId) {
+    CancelResult cancelByCycle(UUID cycleId, UUID requesterId) {
         // 소유권 검증: 사이클 → 계좌 → 요청자 일치 확인
         var cycle = cyclePort.findByIdOrThrow(cycleId);
         Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
@@ -61,8 +59,7 @@ class OrderCancelService implements CancelOrderUseCase {
         return new CancelResult(cancelledCount, failedCount);
     }
 
-    @Override
-    public void cancelOrder(UUID orderId, UUID requesterId) {
+    void cancelOrder(UUID orderId, UUID requesterId) {
         Order order = orderPort.findById(orderId)
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + orderId));
 

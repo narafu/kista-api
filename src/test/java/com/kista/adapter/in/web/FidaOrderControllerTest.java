@@ -6,7 +6,7 @@ import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.ExecuteFidaOrderUseCase;
+import com.kista.domain.port.in.PrivacyUseCase;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class FidaOrderControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean ExecuteFidaOrderUseCase executeFidaOrderUseCase;
+    @MockitoBean PrivacyUseCase privacy;
 
     private static final String VALID_TOKEN = "test-internal-token";
 
@@ -53,7 +53,7 @@ class FidaOrderControllerTest {
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
-        given(executeFidaOrderUseCase.execute(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
+        given(privacy.executeFidaOrder(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
 
         mockMvc.perform(post("/api/internal/fida-orders")
                         .header("X-Internal-Token", VALID_TOKEN)

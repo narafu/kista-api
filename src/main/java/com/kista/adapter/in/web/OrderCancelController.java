@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.port.in.CancelOrderUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCancelController {
 
-    private final CancelOrderUseCase cancelOrderUseCase;
+    private final TradingExecutionUseCase tradingExecution;
 
     // 특정 주문 1건 취소 — PLACED 상태 주문만 가능, 그 외 상태면 OrderCancelException→409
     @Operation(summary = "개별 주문 취소")
@@ -27,6 +27,6 @@ public class OrderCancelController {
     public void cancelOrder(
             @PathVariable UUID orderId,
             @AuthenticationPrincipal UUID userId) {
-        cancelOrderUseCase.cancelOrder(orderId, userId);
+        tradingExecution.cancelOrder(orderId, userId);
     }
 }

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.NextOrdersResponse;
-import com.kista.domain.port.in.GetNextOrdersUseCase;
+import com.kista.domain.port.in.TradingExecutionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final GetNextOrdersUseCase getNextOrders;
+    private final TradingExecutionUseCase tradingExecution;
 
     // 다음 주문 미리보기 — DB 미저장, 휴장일·전략 무관하게 스케줄러 INSERT 대상을 강제 계산
     @Operation(
@@ -43,6 +43,6 @@ public class OrderController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
         // SecurityException→403, NoSuchElementException→404, KisApiException→503 모두 GlobalExceptionHandler 처리
-        return NextOrdersResponse.from(getNextOrders.preview(accountId, userId));
+        return NextOrdersResponse.from(tradingExecution.preview(accountId, userId));
     }
 }

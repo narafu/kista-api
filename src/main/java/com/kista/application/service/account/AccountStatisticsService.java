@@ -9,13 +9,7 @@ import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.GetDailyTransactionsUseCase;
-import com.kista.domain.port.in.GetExecutionsUseCase;
-import com.kista.domain.port.in.GetMarginUseCase;
-import com.kista.domain.port.in.GetMultiPriceUseCase;
-import com.kista.domain.port.in.GetPeriodProfitUseCase;
-import com.kista.domain.port.in.GetPresentBalanceUseCase;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
@@ -42,14 +36,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class AccountStatisticsService implements
-        GetPeriodProfitUseCase,
-        GetExecutionsUseCase,
-        GetPresentBalanceUseCase,
-        GetMarginUseCase,
-        GetDailyTransactionsUseCase,
-        GetMultiPriceUseCase,
-        GetCycleHistoryUseCase {
+class AccountStatisticsService implements AccountStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final TradingCyclePort tradingCyclePort;

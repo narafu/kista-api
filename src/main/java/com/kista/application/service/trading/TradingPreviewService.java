@@ -6,7 +6,6 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
-import com.kista.domain.port.in.GetNextOrdersUseCase;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +21,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-class TradingPreviewService implements GetNextOrdersUseCase {
+class TradingPreviewService {
 
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
@@ -33,9 +32,8 @@ class TradingPreviewService implements GetNextOrdersUseCase {
 
     // execute()와 동일한 잔고 출처(TradingCycleHistory) 및 전략 분기(switch)로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
-    @Override
     @Transactional(readOnly = true)
-    public NextOrdersPreview preview(UUID accountId, UUID requesterId) {
+    NextOrdersPreview preview(UUID accountId, UUID requesterId) {
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
 
