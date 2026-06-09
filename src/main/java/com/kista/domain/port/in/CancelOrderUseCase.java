@@ -1,5 +1,7 @@
 package com.kista.domain.port.in;
 
+import com.kista.domain.model.order.CancelResult;
+
 import java.util.UUID;
 
 public interface CancelOrderUseCase {
@@ -11,6 +13,4 @@ public interface CancelOrderUseCase {
     // 특정 주문 1건 취소
     // 예외: SecurityException(403), NoSuchElementException(404), IllegalStateException(PLACED 아닌 경우→409)
     void cancelOrder(UUID orderId, UUID requesterId);
-
-    record CancelResult(int cancelledCount, int failedCount) {}
 }

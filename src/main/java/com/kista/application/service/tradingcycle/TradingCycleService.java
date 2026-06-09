@@ -1,7 +1,9 @@
 package com.kista.application.service.tradingcycle;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.tradingcycle.RegisterCycleCommand;
 import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.tradingcycle.UpdateCycleCommand;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetTradingCycleUseCase;
@@ -42,7 +44,7 @@ class TradingCycleService implements RegisterTradingCycleUseCase,
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
-    public TradingCycle register(UUID userId, UUID accountId, RegisterTradingCycleUseCase.Command cmd) {
+    public TradingCycle register(UUID userId, UUID accountId, RegisterCycleCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
         // 사이클 수 제한
@@ -129,7 +131,7 @@ class TradingCycleService implements RegisterTradingCycleUseCase,
     }
 
     @Override
-    public TradingCycle update(UUID cycleId, UUID requesterId, UpdateTradingCycleUseCase.Command cmd) {
+    public TradingCycle update(UUID cycleId, UUID requesterId, UpdateCycleCommand cmd) {
         TradingCycle cycle = cyclePort.findByIdOrThrow(cycleId);
         accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
 

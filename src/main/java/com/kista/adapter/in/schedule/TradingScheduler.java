@@ -1,6 +1,7 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.ExecuteTradingUseCase;
@@ -33,12 +34,12 @@ public class TradingScheduler {
         log.info("매매 스케줄 시작 — ACTIVE 사이클 {}개", cycles.size());
 
         // 사이클별 계좌·사용자 조회 — 조회 실패한 사이클은 skip
-        List<ExecuteTradingUseCase.BatchContext> contexts = new ArrayList<>();
+        List<BatchContext> contexts = new ArrayList<>();
         for (TradingCycle cycle : cycles) {
             try {
                 Account account = accountPort.findByIdOrThrow(cycle.accountId());
                 User user = userPort.findByIdOrThrow(account.userId());
-                contexts.add(new ExecuteTradingUseCase.BatchContext(cycle, account, user));
+                contexts.add(new BatchContext(cycle, account, user));
             } catch (Exception e) {
                 log.error("[cycleId={}] 컨텍스트 조회 오류: {}", cycle.id(), e.getMessage(), e);
                 notifyPort.notifyError(e);

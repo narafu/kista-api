@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.port.in.CancelOrderUseCase;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -130,7 +131,7 @@ class TradingCycleControllerTest {
     @Test
     void cancelExecute_success_returnsCancelResult() throws Exception {
         when(cancelOrder.cancelByCycle(any(), any()))
-                .thenReturn(new CancelOrderUseCase.CancelResult(2, 1));
+                .thenReturn(new CancelResult(2, 1));
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(mockAuth())))

@@ -2,8 +2,8 @@ package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.RegisterTradingCycleUseCase;
-import com.kista.domain.port.in.UpdateTradingCycleUseCase;
+import com.kista.domain.model.tradingcycle.RegisterCycleCommand;
+import com.kista.domain.model.tradingcycle.UpdateCycleCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
@@ -19,11 +19,11 @@ public record TradingCycleRequest(
         @Schema(description = "연속 사이클 정책 (null이면 NONE)", example = "NONE")
         TradingCycle.CycleSeedType cycleSeedType
 ) {
-    public RegisterTradingCycleUseCase.Command toRegisterCommand() {
-        return new RegisterTradingCycleUseCase.Command(type, ticker, initialUsdDeposit, cycleSeedType);
+    public RegisterCycleCommand toRegisterCommand() {
+        return new RegisterCycleCommand(type, ticker, initialUsdDeposit, cycleSeedType);
     }
 
-    public UpdateTradingCycleUseCase.Command toUpdateCommand() {
-        return new UpdateTradingCycleUseCase.Command(cycleSeedType);
+    public UpdateCycleCommand toUpdateCommand() {
+        return new UpdateCycleCommand(cycleSeedType);
     }
 }

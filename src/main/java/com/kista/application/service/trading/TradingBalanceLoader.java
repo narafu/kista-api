@@ -3,7 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
-import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
+import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

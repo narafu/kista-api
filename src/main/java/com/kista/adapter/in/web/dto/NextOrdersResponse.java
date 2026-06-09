@@ -3,7 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetNextOrdersUseCase;
+import com.kista.domain.model.order.NextOrdersPreview;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,7 +13,7 @@ public record NextOrdersResponse(
         LocalDate tradeDate,
         PositionSnapshot position,                    // PRIVACY/skip 시 null
         List<OrderItem> orders,
-        GetNextOrdersUseCase.SkipReason skipReason    // 정상이면 null
+        NextOrdersPreview.SkipReason skipReason    // 정상이면 null
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
@@ -56,7 +56,7 @@ public record NextOrdersResponse(
         }
     }
 
-    public static NextOrdersResponse from(GetNextOrdersUseCase.Result result) {
+    public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
                 result.position() == null ? null : PositionSnapshot.from(result.position()),

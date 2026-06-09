@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.*;
+import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -45,12 +46,12 @@ class OrderControllerTest {
         return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
     }
 
-    private GetNextOrdersUseCase.Result buildNextResult() {
+    private NextOrdersPreview buildNextResult() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21.00"));
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
-        return new GetNextOrdersUseCase.Result(LocalDate.now(), position, List.of(order), null);
+        return new NextOrdersPreview(LocalDate.now(), position, List.of(order), null);
     }
 
     @Test

@@ -1,11 +1,11 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.CancelOrderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
@@ -71,7 +71,7 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
 
-        CancelOrderUseCase.CancelResult result = service.cancelByCycle(cycleId, requesterId);
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
         assertThat(result.cancelledCount()).isEqualTo(2);
         assertThat(result.failedCount()).isEqualTo(0);
@@ -93,7 +93,7 @@ class OrderCancelServiceTest {
         doNothing().when(kisOrderPort).cancel(eq(order1), any());
         doThrow(new RuntimeException("KIS 오류")).when(kisOrderPort).cancel(eq(order2), any());
 
-        CancelOrderUseCase.CancelResult result = service.cancelByCycle(cycleId, requesterId);
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
         assertThat(result.cancelledCount()).isEqualTo(1);
         assertThat(result.failedCount()).isEqualTo(1);
@@ -109,7 +109,7 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByAccountAndDate(eq(accountId), any(LocalDate.class)))
                 .thenReturn(List.of());
 
-        CancelOrderUseCase.CancelResult result = service.cancelByCycle(cycleId, requesterId);
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
         assertThat(result.cancelledCount()).isEqualTo(0);
         assertThat(result.failedCount()).isEqualTo(0);

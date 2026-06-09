@@ -8,8 +8,8 @@ import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
-import com.kista.domain.port.in.GetNextOrdersUseCase;
-import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
+import com.kista.domain.model.order.NextOrdersPreview;
+import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
@@ -93,7 +93,7 @@ class TradingPreviewServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
-        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
         assertThat(result.position()).isNotNull();
@@ -109,7 +109,7 @@ class TradingPreviewServiceTest {
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of());
 
-        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
         assertThat(result.position()).isNull();
@@ -131,7 +131,7 @@ class TradingPreviewServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(overBudgetBuy));
 
-        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
         assertThat(result.position()).isNotNull(); // position은 프론트 참고용으로 유지
@@ -150,7 +150,7 @@ class TradingPreviewServiceTest {
         when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
 
-        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
         assertThat(result.position()).isNull();
@@ -175,7 +175,7 @@ class TradingPreviewServiceTest {
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
         when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
 
-        GetNextOrdersUseCase.Result result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
         assertThat(result.position()).isNull(); // PRIVACY는 InfinitePosition 없음

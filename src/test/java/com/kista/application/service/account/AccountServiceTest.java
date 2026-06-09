@@ -1,8 +1,8 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.in.RegisterAccountUseCase;
-import com.kista.domain.port.in.UpdateAccountUseCase;
+import com.kista.domain.model.account.RegisterAccountCommand;
+import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import org.junit.jupiter.api.DisplayName;
@@ -39,8 +39,8 @@ class AccountServiceTest {
                 Account.Broker.KIS);
     }
 
-    private RegisterAccountUseCase.Command registerCmd() {
-        return new RegisterAccountUseCase.Command(
+    private RegisterAccountCommand registerCmd() {
+        return new RegisterAccountCommand(
                 "테스트계좌", "74420614", "appKey", "appSecret", "01"
         );
     }
@@ -79,7 +79,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId))
                 .thenThrow(new SecurityException("소유자가 아닙니다"));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
+        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임");
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, cmd))
                 .isInstanceOf(SecurityException.class);
@@ -91,7 +91,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountUseCase.Command cmd = new UpdateAccountUseCase.Command("변경닉네임");
+        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임");
         Account result = accountService.update(accountId, userId, cmd);
 
         assertThat(result.nickname()).isEqualTo("변경닉네임");
@@ -126,7 +126,7 @@ class AccountServiceTest {
                 .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
-                new UpdateAccountUseCase.Command("닉")))
+                new UpdateAccountCommand("닉")))
                 .isInstanceOf(NoSuchElementException.class);
     }
 

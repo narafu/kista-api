@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.in.CancelOrderUseCase;

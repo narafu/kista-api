@@ -4,8 +4,9 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.order.NextOrdersPreview;
+import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.in.GetNextOrdersUseCase;
-import com.kista.domain.port.in.GetNextOrdersUseCase.SkipReason;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
     @Override
     @Transactional(readOnly = true)
-    public Result preview(UUID accountId, UUID requesterId) {
+    public NextOrdersPreview preview(UUID accountId, UUID requesterId) {
         Account account = accountPort.findByIdOrThrow(accountId);
         account.verifyOwnedBy(requesterId);
 
@@ -49,7 +50,7 @@ class TradingPreviewService implements GetNextOrdersUseCase {
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(cycle);
         if (load.isSkip()) {
-            return new Result(today, null, List.of(), load.skipReason());
+            return new NextOrdersPreview(today, null, List.of(), load.skipReason());
         }
         AccountBalance balance = load.balance();
 
@@ -66,14 +67,14 @@ class TradingPreviewService implements GetNextOrdersUseCase {
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {
-            return new Result(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
+            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
         }
 
         // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
         // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해 (INFINITE만 non-null)
         if (!result.valid()) {
-            return new Result(today, result.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
+            return new NextOrdersPreview(today, result.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
         }
-        return new Result(today, result.position(), result.orders(), null);
+        return new NextOrdersPreview(today, result.position(), result.orders(), null);
     }
 }

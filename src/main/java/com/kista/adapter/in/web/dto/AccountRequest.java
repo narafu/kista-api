@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.port.in.RegisterAccountUseCase;
-import com.kista.domain.port.in.UpdateAccountUseCase;
+import com.kista.domain.model.account.RegisterAccountCommand;
+import com.kista.domain.model.account.UpdateAccountCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -17,13 +17,13 @@ public record AccountRequest(
         @Schema(description = "KIS API 앱 시크릿")
         String kisSecretKey
 ) {
-    public RegisterAccountUseCase.Command toRegisterCommand() {
-        return new RegisterAccountUseCase.Command(
+    public RegisterAccountCommand toRegisterCommand() {
+        return new RegisterAccountCommand(
                 nickname, accountNo, kisAppKey, kisSecretKey, null
         );
     }
 
-    public UpdateAccountUseCase.Command toUpdateCommand() {
-        return new UpdateAccountUseCase.Command(nickname);
+    public UpdateAccountCommand toUpdateCommand() {
+        return new UpdateAccountCommand(nickname);
     }
 }

@@ -1,6 +1,8 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.RegisterAccountCommand;
+import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.in.DeleteAccountUseCase;
 import com.kista.domain.port.in.GetAccountUseCase;
 import com.kista.domain.port.in.RegisterAccountUseCase;
@@ -28,7 +30,7 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
     private final TradingCyclePort cyclePort;
 
     @Override
-    public Account register(UUID userId, RegisterAccountUseCase.Command cmd) {
+    public Account register(UUID userId, RegisterAccountCommand cmd) {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
@@ -44,7 +46,7 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
     }
 
     @Override
-    public Account update(UUID accountId, UUID requesterId, UpdateAccountUseCase.Command cmd) {
+    public Account update(UUID accountId, UUID requesterId, UpdateAccountCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return accountPort.save(account.withNickname(cmd.nickname()));
     }
