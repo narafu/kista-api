@@ -65,9 +65,10 @@ class UserService implements UserUseCase {
             // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
             user = register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
         } catch (DataIntegrityViolationException e) {
-            // 동시 가입 경쟁 조건 → 기존 사용자 조회
+            // 동시 가입 경쟁 조건 → 기존 사용자 직접 조회 (self-invocation 방지)
             log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());
-            user = getByKakaoId(kakaoUser.kakaoId());
+            user = userPort.findByKakaoId(kakaoUser.kakaoId())
+                    .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoUser.kakaoId()));
         }
         // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
         if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != User.UserRole.ADMIN) {

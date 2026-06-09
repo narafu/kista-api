@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -284,5 +285,95 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         userService.unregisterFcmToken(userId, "token-abc");
         verify(fcmDeviceTokenPort).delete(userId, "token-abc");
+    }
+
+    // ─── login() 시나리오 ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("신규 사용자 login: findByKakaoId 결과 없으면 register 경로 → 새 User 반환")
+    void login_newUser_registersAndReturns() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-new-001";
+        String accessToken = "kakao-access-token";
+        UUID newUserId = UUID.randomUUID();
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "신규사용자"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → empty → save 경로
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            // UUID가 null이 아닌 User를 그대로 반환 (id는 register()에서 전달된 UUID)
+            return u;
+        });
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.kakaoId()).isEqualTo(kakaoId);
+        assertThat(result.status()).isEqualTo(User.UserStatus.PENDING);
+        assertThat(result.role()).isEqualTo(User.UserRole.USER);
+        verify(userPort).save(any()); // 신규 저장 1회
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: findByKakaoId 결과 있으면 기존 User 반환 (register 내 save 미호출)")
+    void login_existingUser_returnsExistingWithoutSave() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-001";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → 기존 사용자 반환 → orElseGet 미실행
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result).isEqualTo(existingUser);
+        verify(userPort, never()).save(any()); // 기존 사용자 → 저장 없음
+        verify(eventPublisher, never()).publishEvent(any()); // 이벤트 발행 없음
+    }
+
+    @Test
+    @DisplayName("중복 등록 경쟁 조건: save에서 DataIntegrityViolationException → findByKakaoId 재조회로 fallback")
+    void login_duplicateRegistration_fallbacksToExistingUser() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-race-001";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "경쟁사용자", User.UserStatus.PENDING, User.UserRole.USER,
+                null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → empty → save → DataIntegrityViolationException
+        when(userPort.findByKakaoId(kakaoId))
+                .thenReturn(Optional.empty())             // register() 내 첫 조회: empty
+                .thenReturn(Optional.of(existingUser));  // catch 블록의 fallback 재조회
+        when(userPort.save(any())).thenThrow(new DataIntegrityViolationException("UK constraint"));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result).isEqualTo(existingUser);
+        verify(userPort, times(2)).findByKakaoId(kakaoId); // 1차(register내) + 2차(catch fallback)
     }
 }
