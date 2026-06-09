@@ -2,11 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
-import com.kista.domain.port.in.DeleteAccountUseCase;
-import com.kista.domain.port.in.GetAccountUseCase;
-import com.kista.domain.port.in.KisConnectionTestUseCase;
-import com.kista.domain.port.in.RegisterAccountUseCase;
-import com.kista.domain.port.in.UpdateAccountUseCase;
+import com.kista.domain.port.in.AccountUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,11 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountController {
 
-    private final RegisterAccountUseCase registerAccount;
-    private final UpdateAccountUseCase updateAccount;
-    private final DeleteAccountUseCase deleteAccount;
-    private final GetAccountUseCase getAccount;
-    private final KisConnectionTestUseCase connectionTest; // KIS 자격증명 연결 테스트
+    private final AccountUseCase accountUseCase;
 
     // 연결 테스트 요청 DTO — accountId: 수정 시 전달하면 발급 토큰을 캐시에 저장, 등록 전 검증 시 null 허용
     record TestConnectionRequest(String appKey, String appSecret, UUID accountId) {}
@@ -41,7 +33,7 @@ public class AccountController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<AccountResponse> list(@AuthenticationPrincipal UUID userId) {
-        return getAccount.listByUser(userId).stream()
+        return accountUseCase.listByUser(userId).stream()
                 .map(AccountResponse::from)
                 .toList();
     }
@@ -58,9 +50,9 @@ public class AccountController {
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
         // 계좌번호 실소유 검증 — 불일치 시 InvalidKisKeyException → GlobalExceptionHandler → 422
-        connectionTest.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
+        accountUseCase.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
         return AccountResponse.from(
-                registerAccount.register(userId, request.toRegisterCommand())
+                accountUseCase.register(userId, request.toRegisterCommand())
         );
     }
 
@@ -78,7 +70,7 @@ public class AccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody AccountRequest request) {
         return AccountResponse.from(
-                updateAccount.update(id, userId, request.toUpdateCommand())
+                accountUseCase.update(id, userId, request.toUpdateCommand())
         );
     }
 
@@ -95,7 +87,7 @@ public class AccountController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        deleteAccount.delete(id, userId);
+        accountUseCase.delete(id, userId);
     }
 
     // KIS API 자격증명 연결 테스트 — 실패 시 InvalidKisKeyException → GlobalExceptionHandler → 422
@@ -110,6 +102,6 @@ public class AccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
         // 실패 시 Account.InvalidKisKeyException → GlobalExceptionHandler → 422
-        connectionTest.test(request.appKey(), request.appSecret(), request.accountId());
+        accountUseCase.test(request.appKey(), request.appSecret(), request.accountId());
     }
 }

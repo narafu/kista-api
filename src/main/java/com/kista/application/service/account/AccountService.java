@@ -3,15 +3,14 @@ package com.kista.application.service.account;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
-import com.kista.domain.port.in.DeleteAccountUseCase;
-import com.kista.domain.port.in.GetAccountUseCase;
-import com.kista.domain.port.in.RegisterAccountUseCase;
-import com.kista.domain.port.in.UpdateAccountUseCase;
+import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -21,13 +20,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
-        DeleteAccountUseCase, GetAccountUseCase {
+class AccountService implements AccountUseCase {
 
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
     private final AccountPort accountPort;
     private final TradingCyclePort cyclePort;
+    private final KisConnectionTestPort connectionTestPort; // KIS 자격증명 연결 테스트 포트
 
     @Override
     public Account register(UUID userId, RegisterAccountCommand cmd) {
@@ -72,4 +71,15 @@ class AccountService implements RegisterAccountUseCase, UpdateAccountUseCase,
         return accountPort.findByIdOrThrow(id);
     }
 
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // KIS 외부 API 호출 — 트랜잭션 불필요
+    public void test(String appKey, String appSecret, UUID accountId) {
+        connectionTestPort.test(appKey, appSecret, accountId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // KIS 외부 API 호출 — 트랜잭션 불필요
+    public void testAccountNo(String appKey, String appSecret, String accountNo) {
+        connectionTestPort.testAccountNo(appKey, appSecret, accountNo);
+    }
 }

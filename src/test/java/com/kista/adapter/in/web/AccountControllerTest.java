@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.in.*;
+import com.kista.domain.port.in.AccountUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.junit.jupiter.api.parallel.Execution;
@@ -34,11 +34,7 @@ class AccountControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean RegisterAccountUseCase registerAccount;
-    @MockitoBean UpdateAccountUseCase updateAccount;
-    @MockitoBean DeleteAccountUseCase deleteAccount;
-    @MockitoBean GetAccountUseCase getAccount;
-    @MockitoBean KisConnectionTestUseCase connectionTest;
+    @MockitoBean AccountUseCase accountUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -49,7 +45,7 @@ class AccountControllerTest {
 
     @Test
     void list_accounts_returns_200() throws Exception {
-        when(getAccount.listByUser(any())).thenReturn(List.of());
+        when(accountUseCase.listByUser(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/accounts")
                         .with(authentication(mockAuth())))
@@ -75,7 +71,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_failure_returns422() throws Exception {
-        doThrow(new Account.InvalidKisKeyException()).when(connectionTest).test(anyString(), anyString(), any());
+        doThrow(new Account.InvalidKisKeyException()).when(accountUseCase).test(anyString(), anyString(), any());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
