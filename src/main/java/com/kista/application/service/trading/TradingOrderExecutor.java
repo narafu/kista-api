@@ -37,7 +37,7 @@ class TradingOrderExecutor {
             // KIS 응답 Order는 id=null — DB PK(p.id())를 살려서 반환 (취소 API에서 사용)
             return new Order(p.id(), p.accountId(), p.tradeDate(), p.ticker(),
                     p.orderType(), p.direction(), p.quantity(), p.price(),
-                    Order.OrderStatus.PLACED, placedOrder.kisOrderId());
+                    Order.OrderStatus.PLACED, placedOrder.kisOrderId(), null, null);
         }).toList();
         log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());
         return placed;

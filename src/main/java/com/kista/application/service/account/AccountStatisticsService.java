@@ -17,7 +17,7 @@ import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
-import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final TradingCyclePort tradingCyclePort;
-    private final TradingCycleHistoryPort tradingCycleHistoryPort;
+    private final TradingCyclePositionPort tradingCycleHistoryPort;
     private final KisProfitPort kisProfitPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;

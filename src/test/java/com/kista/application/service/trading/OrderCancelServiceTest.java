@@ -170,7 +170,7 @@ class OrderCancelServiceTest {
     void cancelOrder_notPlaced_throwsIllegalStateException() {
         Order filledOrder = new Order(orderId, accountId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
-                Order.OrderStatus.FILLED, "ORD_99");
+                Order.OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
 
@@ -183,6 +183,6 @@ class OrderCancelServiceTest {
     private Order placedOrder(UUID id, String kisOrderId) {
         return new Order(id, accountId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
-                Order.OrderStatus.PLACED, kisOrderId);
+                Order.OrderStatus.PLACED, kisOrderId, null, null);
     }
 }

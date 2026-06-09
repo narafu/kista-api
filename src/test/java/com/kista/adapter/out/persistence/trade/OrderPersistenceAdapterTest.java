@@ -40,7 +40,7 @@ class OrderPersistenceAdapterTest {
     void saveAll_delegatesToRepository() {
         Order order = new Order(null, ACCOUNT_ID, TODAY, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, PRICE,
-                Order.OrderStatus.PLANNED, null);
+                Order.OrderStatus.PLANNED, null, null, null);
 
         adapter.saveAll(List.of(order));
 

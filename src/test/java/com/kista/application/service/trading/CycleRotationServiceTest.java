@@ -5,7 +5,7 @@ import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
@@ -36,7 +36,7 @@ class CycleRotationServiceTest {
 
     @Mock KisMarginPort kisMarginPort;
     @Mock TradingCyclePort cyclePort;
-    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock TradingCyclePositionPort cycleHistoryPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;

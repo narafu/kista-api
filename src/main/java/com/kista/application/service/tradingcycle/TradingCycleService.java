@@ -6,11 +6,11 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.UpdateCycleCommand;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.TradingCycleUseCase;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ class TradingCycleService implements TradingCycleUseCase {
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
 
     private final TradingCyclePort cyclePort;
-    private final TradingCycleHistoryPort cycleHistoryPort;
+    private final TradingCyclePositionPort cycleHistoryPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
@@ -60,7 +60,7 @@ class TradingCycleService implements TradingCycleUseCase {
         TradingCycle saved = cyclePort.save(cycle);
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음 (등록 시점엔 가격 미조회)
-        cycleHistoryPort.save(TradingCycleHistory.startSnapshot(saved.id(), saved.initialUsdDeposit(), null));
+        cycleHistoryPort.save(TradingCyclePosition.startSnapshot(saved.id(), saved.initialUsdDeposit(), null));
 
         log.info("거래 사이클 등록: accountId={}, cycleId={}, type={}", accountId, saved.id(), saved.type());
         return saved;

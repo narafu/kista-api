@@ -50,7 +50,7 @@ class OrderControllerTest {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21.00"));
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null);
+                Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLACED, null, null, null);
         return new NextOrdersPreview(LocalDate.now(), position, List.of(order), null);
     }
 

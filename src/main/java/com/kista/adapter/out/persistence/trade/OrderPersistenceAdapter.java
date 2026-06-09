@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -120,6 +121,17 @@ public class OrderPersistenceAdapter implements OrderPort {
         repository.save(e);
     }
 
+    @Override
+    public void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status) {
+        // 체결 완료: 상태 + 체결 수량/가중평균가 기록
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        e.setStatus(status);
+        e.setFilledQuantity(filledQuantity);
+        e.setFilledPrice(filledPrice);
+        repository.save(e);
+    }
+
     private OrderEntity toEntity(Order o) {
         OrderEntity e = new OrderEntity();
         e.setAccountId(o.accountId());
@@ -131,6 +143,8 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setPrice(o.price());
         e.setStatus(o.status());
         e.setKisOrderId(o.kisOrderId());
+        e.setFilledQuantity(o.filledQuantity());
+        e.setFilledPrice(o.filledPrice());
         return e;
     }
 
@@ -138,7 +152,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         return new Order(
                 e.getId(), e.getAccountId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
                 e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
-                e.getStatus(), e.getKisOrderId()
+                e.getStatus(), e.getKisOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );
     }
 }

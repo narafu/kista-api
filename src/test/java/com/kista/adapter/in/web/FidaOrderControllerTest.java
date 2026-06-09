@@ -79,7 +79,7 @@ class FidaOrderControllerTest {
         // BUY 주문에 quantity=null — "남은 전부"는 SELL 전용
         Order buyNullQty = new Order(null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderDirection.BUY, null,
-                new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null);
+                new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQty));

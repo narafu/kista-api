@@ -3,6 +3,7 @@ package com.kista.domain.port.out;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -41,4 +42,7 @@ public interface OrderPort {
 
     // 취소 완료 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
+
+    // 체결 완료 → FILLED 또는 PARTIALLY_FILLED 상태 + 체결 수량·가중평균가 기록
+    void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status);
 }

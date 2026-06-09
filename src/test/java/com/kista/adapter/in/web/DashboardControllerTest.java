@@ -47,7 +47,7 @@ class DashboardControllerTest {
     void getTrades_returns_200_with_list() throws Exception {
         Order o = new Order(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
-                new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001");
+                new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001", null, null);
         when(portfolioUseCase.getHistory(any(), any(), any())).thenReturn(List.of(o));
 
         mockMvc.perform(get("/api/trades")

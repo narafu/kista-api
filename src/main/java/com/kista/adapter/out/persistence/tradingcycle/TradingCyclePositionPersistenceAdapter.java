@@ -2,8 +2,8 @@ package com.kista.adapter.out.persistence.tradingcycle;
 
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
-import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -20,19 +20,19 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
+class TradingCyclePositionPersistenceAdapter implements TradingCyclePositionPort {
 
-    private final TradingCycleHistoryJpaRepository jpaRepository;
+    private final TradingCyclePositionJpaRepository jpaRepository;
     private final TradingCycleJpaRepository cycleJpaRepository; // ticker 조회용 (같은 패키지)
 
     @Override
-    public TradingCycleHistory save(TradingCycleHistory history) {
-        TradingCycleHistoryEntity entity = toEntity(history);
+    public TradingCyclePosition save(TradingCyclePosition position) {
+        TradingCyclePositionEntity entity = toEntity(position);
         return toDomain(jpaRepository.save(entity));
     }
 
     @Override
-    public List<TradingCycleHistory> findRecentByCycleId(UUID cycleId, int limit) {
+    public List<TradingCyclePosition> findRecentByCycleId(UUID cycleId, int limit) {
         // limit 무시하고 top10 조회 — 단순 구현, 필요 시 @Query로 동적 limit 추가
         return jpaRepository.findTop10ByTradingCycleIdOrderByCreatedAtDesc(cycleId).stream()
                 .limit(limit)
@@ -59,7 +59,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
 
     @Override
     public List<AccountCycleHistoryEntry> findRecentGlobal(int limit) {
-        List<TradingCycleHistoryEntity> entities =
+        List<TradingCyclePositionEntity> entities =
                 jpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
         Map<UUID, TradingCycle.Ticker> tickerMap = buildTickerMapFromEntities(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
@@ -70,7 +70,7 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
         ZoneId kst = ZoneId.of("Asia/Seoul");
         Instant fromInstant = from.atStartOfDay(kst).toInstant();
         Instant toInstant = to.plusDays(1).atStartOfDay(kst).toInstant(); // to 당일 포함
-        List<TradingCycleHistoryEntity> entities = jpaRepository.findBetweenDates(fromInstant, toInstant);
+        List<TradingCyclePositionEntity> entities = jpaRepository.findBetweenDates(fromInstant, toInstant);
         Map<UUID, TradingCycle.Ticker> tickerMap = buildTickerMapFromEntities(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }
@@ -100,16 +100,16 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
     }
 
     // 이력 엔티티 목록의 cycleId 집합으로 ticker 맵 구성 (전역 조회용)
-    private Map<UUID, TradingCycle.Ticker> buildTickerMapFromEntities(List<TradingCycleHistoryEntity> entities) {
+    private Map<UUID, TradingCycle.Ticker> buildTickerMapFromEntities(List<TradingCyclePositionEntity> entities) {
         Set<UUID> cycleIds = entities.stream()
-                .map(TradingCycleHistoryEntity::getTradingCycleId)
+                .map(TradingCyclePositionEntity::getTradingCycleId)
                 .collect(Collectors.toSet());
         if (cycleIds.isEmpty()) return Map.of();
         return cycleJpaRepository.findAllById(cycleIds).stream()
                 .collect(Collectors.toMap(TradingCycleEntity::getId, TradingCycleEntity::getTicker));
     }
 
-    private AccountCycleHistoryEntry toEntry(TradingCycleHistoryEntity e,
+    private AccountCycleHistoryEntry toEntry(TradingCyclePositionEntity e,
                                              Map<UUID, TradingCycle.Ticker> tickerMap) {
         return new AccountCycleHistoryEntry(
                 e.getId(),
@@ -122,22 +122,22 @@ class TradingCycleHistoryPersistenceAdapter implements TradingCycleHistoryPort {
         );
     }
 
-    private TradingCycleHistory toDomain(TradingCycleHistoryEntity e) {
-        return new TradingCycleHistory(
+    private TradingCyclePosition toDomain(TradingCyclePositionEntity e) {
+        return new TradingCyclePosition(
                 e.getId(), e.getTradingCycleId(),
                 e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt()
         );
     }
 
-    private TradingCycleHistoryEntity toEntity(TradingCycleHistory h) {
-        TradingCycleHistoryEntity e = new TradingCycleHistoryEntity();
-        e.setId(h.id()); // null이면 @GeneratedValue가 UUID 생성
-        e.setTradingCycleId(h.tradingCycleId());
-        e.setUsdDeposit(h.usdDeposit());
-        e.setClosingPrice(h.closingPrice());
-        e.setAvgPrice(h.avgPrice());
-        e.setHoldings(h.holdings());
+    private TradingCyclePositionEntity toEntity(TradingCyclePosition p) {
+        TradingCyclePositionEntity e = new TradingCyclePositionEntity();
+        e.setId(p.id()); // null이면 @GeneratedValue가 UUID 생성
+        e.setTradingCycleId(p.tradingCycleId());
+        e.setUsdDeposit(p.usdDeposit());
+        e.setClosingPrice(p.closingPrice());
+        e.setAvgPrice(p.avgPrice());
+        e.setHoldings(p.holdings());
         return e;
     }
 }

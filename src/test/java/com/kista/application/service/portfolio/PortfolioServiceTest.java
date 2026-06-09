@@ -3,7 +3,7 @@ package com.kista.application.service.portfolio;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PortfolioServiceTest {
 
-    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock TradingCyclePositionPort cycleHistoryPort;
     @Mock OrderPort orderPort;
 
     @InjectMocks PortfolioService sut;

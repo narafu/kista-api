@@ -117,6 +117,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (`uq_privacy_trades_master_date_ticker` 같은 named UNIQUE). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
+- **신규 컬럼은 항상 `created_at` 앞에 추가** — 마지막 두 컬럼은 반드시 `created_at`, `updated_at` 순서. `ADD COLUMN`이 맨 뒤에 붙으므로 위치 강제가 필요하면 테이블 재생성 패턴 사용 (V3 `orders` 테이블 `filled_quantity`/`filled_price` 추가 사례)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS`
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발
 - Flyway checksum mismatch (로컬 마이그레이션 파일 수정 시): `DELETE FROM flyway_schema_history WHERE version = 'N'` + 해당 테이블 DROP → 앱 재시작 (로컬 전용 — 운영 DB에 절대 적용 금지)

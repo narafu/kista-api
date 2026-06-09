@@ -11,6 +11,7 @@ import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.port.out.KisAccountPort;
@@ -174,8 +175,8 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                     p.add("NATN_CD", "");
                     p.add("CRCY_CD", "USD");
                     p.add("PDNO", "");              // 전종목
-                    p.add("INQR_STRT_DT", from.format(FMT));
-                    p.add("INQR_END_DT", to.format(FMT));
+                    p.add("INQR_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
+                    p.add("INQR_END_DT", formatTradeDate(to));
                     p.add("WCRC_FRCR_DVSN_CD", "01"); // 01=외화
                     p.add("CTX_AREA_FK200", "");
                     p.add("CTX_AREA_NK200", "");
@@ -212,8 +213,8 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                 EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
                 p -> {
                     p.add("PDNO", ticker.name());              // 전략 종목만 조회
-                    p.add("ORD_STRT_DT", from.format(FMT));
-                    p.add("ORD_END_DT", to.format(FMT));
+                    p.add("ORD_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
+                    p.add("ORD_END_DT", formatTradeDate(to));
                     p.add("SLL_BUY_DVSN", "00");              // 전체
                     p.add("CCLD_NCCS_DVSN", "00");            // 전체
                     p.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
@@ -227,10 +228,12 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
         if (response == null || response.output() == null) {
             return Collections.emptyList();
         }
+        LocalDate utcFrom = TradeDateConverter.toUtc(from); // KST fallback → UTC 기준으로 역변환 대응
         return response.output().stream()
                 .filter(item -> ticker.name().equals(item.pdno()))
                 .map(item -> new Execution(
-                        KisResponseParser.parseDate(item.ordDt(), from),
+                        // KIS ord_dt는 UTC(US거래일) → toKst()로 도메인 KST 일자로 복원
+                        TradeDateConverter.toKst(KisResponseParser.parseDate(item.ordDt(), utcFrom)),
                         ticker,
                         KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
                         KisResponseParser.parseIntSafe(item.filledQuantity()),
@@ -248,8 +251,8 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
         TransactionResponse response = kisHttpClient.tradingGet(
                 DAILY_TRANS_TR_ID, DAILY_TRANS_PATH, account, TransactionResponse.class,
                 p -> {
-                    p.add("ERLM_STRT_DT", from.format(FMT)); // 등록시작일자
-                    p.add("ERLM_END_DT", to.format(FMT));     // 등록종료일자
+                    p.add("ERLM_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
+                    p.add("ERLM_END_DT", formatTradeDate(to));
                     p.add("OVRS_EXCG_CD", exchangeRegistry.defaultUsExchange()); // 미국 전체
                     p.add("PDNO", "");                         // 전종목
                     p.add("SLL_BUY_DVSN_CD", "00");           // 00=전체, 01=매도, 02=매수
@@ -285,6 +288,11 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
             );
         }
         return new DailyTransactionResult(items, summary);
+    }
+
+    // KST 날짜 → KIS API 날짜 파라미터 (UTC=US거래일 YYYYMMDD)
+    private String formatTradeDate(LocalDate kst) {
+        return TradeDateConverter.toUtc(kst).format(FMT);
     }
 
     private static DailyTransactionSummary emptySummary() {

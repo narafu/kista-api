@@ -6,9 +6,10 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,7 @@ class CycleRotationService {
 
     private final KisMarginPort kisMarginPort;                 // MAX 재등록 시 USD 잔고 조회
     private final TradingCyclePort cyclePort;                  // 사이클 갱신
-    private final TradingCycleHistoryPort cycleHistoryPort;    // 새 시작점 이력
+    private final TradingCyclePositionPort cycleHistoryPort;   // 새 시작점 포지션
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
     private final UserNotificationPort userNotificationPort;   // 사용자 알림 (재등록 완료)
     private final CycleOrderStrategies cycleStrategies;        // 사이클 타입별 최소금액 정책
@@ -54,7 +55,7 @@ class CycleRotationService {
         cyclePort.save(rotated);
 
         // 4. 새 시작점 이력 (holdings=0, avgPrice=null)
-        cycleHistoryPort.save(TradingCycleHistory.startSnapshot(cycle.id(), nextDeposit, price));
+        cycleHistoryPort.save(TradingCyclePosition.startSnapshot(cycle.id(), nextDeposit, price));
         log.info("[cycleId={}] 사이클 재등록 완료: {} → initialUsdDeposit={}", cycle.id(), cycle.cycleSeedType(), nextDeposit);
         userNotificationPort.notifyStrategyChanged(user, account, rotated, "재등록");
     }

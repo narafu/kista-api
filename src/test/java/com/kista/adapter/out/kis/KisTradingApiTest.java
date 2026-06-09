@@ -121,7 +121,7 @@ class KisTradingApiTest {
         void getExecutions_selnByovCls01_returnsSell() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240615", "01", "5", "25.00", "125.00", "ORD001"
+                            "SOXL", "20240614", "01", "5", "25.00", "125.00", "ORD001"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
@@ -137,7 +137,7 @@ class KisTradingApiTest {
         void getExecutions_otherSelnByovCls_returnsBuyWithFields() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240615", "02", "10", "30.50", "305.00", "ORD002"
+                            "SOXL", "20240614", "02", "10", "30.50", "305.00", "ORD002"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
@@ -160,7 +160,7 @@ class KisTradingApiTest {
         void getExecutions_blankFields_parsedSafely() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240615", "02", "", "", "", "ORD003"
+                            "SOXL", "20240614", "02", "", "", "", "ORD003"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);

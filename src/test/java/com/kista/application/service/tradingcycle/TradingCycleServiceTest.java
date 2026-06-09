@@ -7,7 +7,7 @@ import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.TradingCycleHistoryPort;
+import com.kista.domain.port.out.TradingCyclePositionPort;
 import com.kista.domain.port.out.TradingCyclePort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 class TradingCycleServiceTest {
 
     @Mock TradingCyclePort cyclePort;
-    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock TradingCyclePositionPort cycleHistoryPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock ApplicationEventPublisher eventPublisher;

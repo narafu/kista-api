@@ -50,9 +50,15 @@ class OrderEntity extends BaseAuditEntity {
     private int quantity;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private Order.OrderStatus status; // PLANNED / PLACED / FILLED / FAILED
+    @Column(nullable = false, length = 20)
+    private Order.OrderStatus status; // PLANNED/PLACED/FILLED/PARTIALLY_FILLED/FAILED/CANCELLED
 
     @Column(name = "kis_order_id", length = 30)
     private String kisOrderId; // PLACED 이후 설정
+
+    @Column(name = "filled_quantity")
+    private Integer filledQuantity; // 체결 수량 (null=미확인, 0=미체결)
+
+    @Column(name = "filled_price", precision = 12, scale = 2)
+    private BigDecimal filledPrice; // 체결 가중평균가 (null=미체결)
 }

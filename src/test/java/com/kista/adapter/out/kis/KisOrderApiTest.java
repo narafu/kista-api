@@ -53,7 +53,7 @@ class KisOrderApiTest {
     void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
         BigDecimal locPrice = new BigDecimal("25.50");
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                10, locPrice, Order.OrderStatus.PLACED, null);
+                10, locPrice, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
@@ -71,7 +71,7 @@ class KisOrderApiTest {
     @DisplayName("BUY+MOC: ORD_DVSN=33, 가격=0")
     void place_buyMoc_usesOrdDvsn33() {
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.MOC, Order.OrderDirection.BUY,
-                5, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
+                5, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
@@ -89,7 +89,7 @@ class KisOrderApiTest {
     void place_buyLimit_usesActualPrice() {
         BigDecimal limitPrice = new BigDecimal("25.50");
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LIMIT, Order.OrderDirection.BUY,
-                3, limitPrice, Order.OrderStatus.PLACED, null);
+                3, limitPrice, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
@@ -106,7 +106,7 @@ class KisOrderApiTest {
     @DisplayName("SELL: TTTT1006U 사용")
     void place_sell_usesSellTrId() {
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.SELL,
-                8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
+                8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
@@ -120,7 +120,7 @@ class KisOrderApiTest {
     @DisplayName("응답 ODNO → orderId 반환, 상태=PLACED")
     void place_responseWithOdno_returnsKisOrderId() {
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
+                10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse response =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD123"));
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(response);
@@ -135,7 +135,7 @@ class KisOrderApiTest {
     @DisplayName("KIS 비즈니스 오류(rt_cd!=0): KisApiException 발생")
     void place_kisErrorResponse_throwsKisApiException() {
         Order order = new Order(null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
-                10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null);
+                10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse errorResponse =
                 new KisOrderApi.OrderResponse("1", "EGW00202", "GW라우팅 중 오류가 발생했습니다.", null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(errorResponse);
@@ -150,7 +150,7 @@ class KisOrderApiTest {
     void cancel_sendsCorrectParameters() {
         Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), TRADE_DATE, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
-                Order.OrderStatus.PLACED, "ORD_123");
+                Order.OrderStatus.PLACED, "ORD_123", null, null);
         when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
@@ -172,7 +172,7 @@ class KisOrderApiTest {
     void cancel_kisError_propagatesException() {
         Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), TRADE_DATE, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
-                Order.OrderStatus.PLACED, "ORD_456");
+                Order.OrderStatus.PLACED, "ORD_456", null, null);
         when(kisHttpClient.post(anyString(), any(), any(), any()))
                 .thenThrow(new RuntimeException("KIS 오류"));
 

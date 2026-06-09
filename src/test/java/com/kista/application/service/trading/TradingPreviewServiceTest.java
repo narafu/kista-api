@@ -7,7 +7,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.*;
@@ -41,7 +41,7 @@ class TradingPreviewServiceTest {
     @Mock TradingCyclePort cyclePort;
     @Mock KisPricePort kisPricePort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock TradingCyclePositionPort cycleHistoryPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock OrderPort orderPort;
@@ -62,12 +62,12 @@ class TradingPreviewServiceTest {
             TradingCycle.CycleSeedType.NONE
     );
 
-    static final TradingCycleHistory NORMAL_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition NORMAL_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null);
-    static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition FRESH_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
     // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
-    static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition LOW_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null);
 
     @BeforeEach
@@ -83,7 +83,7 @@ class TradingPreviewServiceTest {
     @Test
     void preview_returnsResult_whenHistoryExistsAndInfinite() {
         Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null);
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
@@ -122,7 +122,7 @@ class TradingPreviewServiceTest {
         // 매수금액($20) > 잔액($10) → INSUFFICIENT_BALANCE skip
         Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
-                Order.OrderStatus.PLANNED, null);
+                Order.OrderStatus.PLANNED, null, null, null);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
@@ -167,7 +167,7 @@ class TradingPreviewServiceTest {
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
         Order buyOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
-                Order.OrderStatus.PLANNED, null);
+                Order.OrderStatus.PLANNED, null, null, null);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));

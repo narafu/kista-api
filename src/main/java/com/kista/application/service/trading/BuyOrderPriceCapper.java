@@ -105,6 +105,6 @@ class BuyOrderPriceCapper {
     private Order plannedBuy(LocalDate today, TradingCycle cycle, Order.OrderType orderType,
                              int quantity, BigDecimal price) {
         return new Order(null, null, today, cycle.ticker(),
-                orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null);
+                orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null, null, null);
     }
 }

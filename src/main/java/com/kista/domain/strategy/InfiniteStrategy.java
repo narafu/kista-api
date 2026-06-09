@@ -32,13 +32,13 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         // LOC 매수 ① — 평단가 기준
         int buyQuantity1 = position.calcEarlyBuyQuantityByAvgPrice();
         if (buyQuantity1 >= 1) {
-            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice(), PLANNED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice(), PLANNED, null, null, null));
         }
 
         // LOC 매수 ② — 기준가 기준
         int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
         if (buyQuantity2 >= 1) {
-            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLANNED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice(), PLANNED, null, null, null));
         }
 
         addCommonSellOrders(orders, position, tradeDate);
@@ -48,13 +48,13 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         if (position.isDepositDeficient()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
-                orders.add(new Order(null, null, tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO, PLANNED, null));
+                orders.add(new Order(null, null, tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO, PLANNED, null, null, null));
             }
         } else {
             // LOC 매수 — 기준가 기준
             int buyQuantity = position.calcLateBuyQuantity();
             if (buyQuantity >= 1) {
-                orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity, position.referencePrice(), PLANNED, null));
+                orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, BUY, buyQuantity, position.referencePrice(), PLANNED, null, null, null));
             }
 
             addCommonSellOrders(orders, position, tradeDate);
@@ -66,13 +66,13 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
             BigDecimal locSellPrice = position.referencePrice().add(new BigDecimal("0.01"));
-            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, PLANNED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, PLANNED, null, null, null));
         }
 
         // 지정가 매도 (목표가)
         int limitSellQuantity = position.calcLimitSellQuantity();
         if (limitSellQuantity >= 1) {
-            orders.add(new Order(null, null, tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice(), PLANNED, null));
+            orders.add(new Order(null, null, tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice(), PLANNED, null, null, null));
         }
     }
 }

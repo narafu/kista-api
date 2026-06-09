@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.tradingcycle.TradingCycleHistory;
+import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
@@ -45,7 +45,7 @@ class TradingServiceTest {
     @Mock UserNotificationPort userNotificationPort;
     @Mock OrderPort orderPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
-    @Mock TradingCycleHistoryPort cycleHistoryPort;
+    @Mock TradingCyclePositionPort cycleHistoryPort;
     @Mock TradingCyclePort cyclePort;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
@@ -75,11 +75,11 @@ class TradingServiceTest {
     );
 
     // TradingCycleHistory 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
-    static final TradingCycleHistory NORMAL_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition NORMAL_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null);
-    static final TradingCycleHistory FRESH_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition FRESH_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
-    static final TradingCycleHistory LOW_HISTORY = new TradingCycleHistory(
+    static final TradingCyclePosition LOW_HISTORY = new TradingCyclePosition(
             null, CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null);
 
     static final User USER = new User(
@@ -102,7 +102,7 @@ class TradingServiceTest {
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, kisOrderPort, priceCapper);
         TradingReporter reporter = new TradingReporter(
-                kisExecutionPort, userNotificationPort, realtimeNotificationPort,
+                kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, rotationService);
         service = new TradingService(
                 marketCalendarPort, notifyPort,
@@ -118,13 +118,13 @@ class TradingServiceTest {
         // PRICE = "22.00" — 종가 (PostClose 이후)
 
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null);
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null, null, null);
         UUID plannedId = UUID.randomUUID();
         Order planned = new Order(plannedId, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, startPrice,
-                Order.OrderStatus.PLANNED, null);
+                Order.OrderStatus.PLANNED, null, null, null);
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001", null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
@@ -164,9 +164,9 @@ class TradingServiceTest {
     void executeBatch_todayOrdersExist_skipsPlanningAndProceedsToKis() throws InterruptedException {
         // 수동 실행으로 이미 PLANNED 주문이 존재 → 재계산 skip, KIS 접수만 수행
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null);
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLANNED, null, null, null);
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001", null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
@@ -207,7 +207,7 @@ class TradingServiceTest {
     void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
         // 매수금액($20) > 잔액($10) → skip + notify
         Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null);
+                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         // 잔액 부족 시 조기 반환 → getPrices(종가 조회)까지 도달하지 않음
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -231,13 +231,13 @@ class TradingServiceTest {
         BigDecimal executionAmount = new BigDecimal("20.50"); // 1주 × $20.50
 
         Order template = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null);
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLANNED, null, null, null);
         UUID plannedId = UUID.randomUUID();
         Order planned = new Order(plannedId, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, startPrice,
-                Order.OrderStatus.PLANNED, null);
+                Order.OrderStatus.PLANNED, null, null, null);
         Order placedOrder = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001");
+                Order.OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001", null, null);
         Execution buyExecution = new Execution(LocalDate.now(), Ticker.SOXL,
                 Order.OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
@@ -275,7 +275,7 @@ class TradingServiceTest {
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
                 TradingCycle.CycleSeedType.NONE);
-        TradingCycleHistory history2 = new TradingCycleHistory(
+        TradingCyclePosition history2 = new TradingCyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -305,7 +305,7 @@ class TradingServiceTest {
         TradingCycle cycle2 = new TradingCycle(UUID.randomUUID(), ACCOUNT.id(),
                 TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, Ticker.TQQQ, null,
                 TradingCycle.CycleSeedType.NONE);
-        TradingCycleHistory history2 = new TradingCycleHistory(
+        TradingCyclePosition history2 = new TradingCyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))

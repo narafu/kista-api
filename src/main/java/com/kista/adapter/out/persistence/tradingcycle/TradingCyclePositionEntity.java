@@ -11,11 +11,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "trading_cycle_history")
+@Table(name = "trading_cycle_position")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-class TradingCycleHistoryEntity extends BaseCreatedAtEntity {
+class TradingCyclePositionEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
