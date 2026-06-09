@@ -3,8 +3,7 @@ package com.kista.adapter.in.telegram;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetPortfolioUseCase;
-import com.kista.domain.port.in.GetTradeHistoryUseCase;
+import com.kista.domain.port.in.PortfolioUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,16 +26,14 @@ import static org.mockito.Mockito.*;
 class TelegramBotServiceTest {
 
     @Mock TelegramApiClient apiClient;
-    @Mock GetTradeHistoryUseCase getTradeHistoryUseCase;
-    @Mock GetPortfolioUseCase getPortfolioUseCase;
+    @Mock PortfolioUseCase portfolioUseCase;
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient,
-                getTradeHistoryUseCase, getPortfolioUseCase);
+        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase);
     }
 
     private TelegramUpdate update(String text) {
@@ -59,7 +56,7 @@ class TelegramBotServiceTest {
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());
-        when(getPortfolioUseCase.getCurrent()).thenReturn(snap);
+        when(portfolioUseCase.getCurrent()).thenReturn(snap);
 
         sut.handle(update("/status"));
 
@@ -70,7 +67,7 @@ class TelegramBotServiceTest {
 
     @Test
     void status_when_no_snapshot_returns_fallback_message() {
-        when(getPortfolioUseCase.getCurrent()).thenThrow(new NoSuchElementException());
+        when(portfolioUseCase.getCurrent()).thenThrow(new NoSuchElementException());
 
         sut.handle(update("/status"));
 
@@ -81,11 +78,11 @@ class TelegramBotServiceTest {
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(getTradeHistoryUseCase.getHistory(any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
+        when(portfolioUseCase.getHistory(any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
-        verify(getTradeHistoryUseCase).getHistory(
+        verify(portfolioUseCase).getHistory(
                 LocalDate.now().minusDays(14), LocalDate.now(), Ticker.SOXL);
     }
 

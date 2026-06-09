@@ -3,8 +3,7 @@ package com.kista.adapter.in.telegram;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.port.in.GetPortfolioUseCase;
-import com.kista.domain.port.in.GetTradeHistoryUseCase;
+import com.kista.domain.port.in.PortfolioUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,8 +22,7 @@ class TelegramBotService {
     @Value("${telegram.chat-id:}")
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
-    private final GetTradeHistoryUseCase getTradeHistoryUseCase;
-    private final GetPortfolioUseCase getPortfolioUseCase;
+    private final PortfolioUseCase portfolioUseCase;
     // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
 
@@ -84,7 +82,7 @@ class TelegramBotService {
 
     private String buildStatusMessage() {
         try {
-            AccountCycleHistoryEntry s = getPortfolioUseCase.getCurrent();
+            AccountCycleHistoryEntry s = portfolioUseCase.getCurrent();
             // closingPrice가 null이면 평가액 0으로 처리
             double marketValue = s.closingPrice() != null
                     ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
@@ -101,7 +99,7 @@ class TelegramBotService {
     private String buildHistoryMessage(int days) {
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(days);
-        List<Order> list = getTradeHistoryUseCase.getHistory(from, to, Ticker.SOXL);
+        List<Order> list = portfolioUseCase.getHistory(from, to, Ticker.SOXL);
         if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
         StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
         list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",

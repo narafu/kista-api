@@ -5,12 +5,7 @@ import com.kista.domain.model.tradingcycle.RegisterCycleCommand;
 import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.tradingcycle.UpdateCycleCommand;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.DeleteTradingCycleUseCase;
-import com.kista.domain.port.in.GetTradingCycleUseCase;
-import com.kista.domain.port.in.PauseTradingCycleUseCase;
-import com.kista.domain.port.in.RegisterTradingCycleUseCase;
-import com.kista.domain.port.in.ResumeTradingCycleUseCase;
-import com.kista.domain.port.in.UpdateTradingCycleUseCase;
+import com.kista.domain.port.in.TradingCycleUseCase;
 import com.kista.domain.model.tradingcycle.TradingCycleHistory;
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
@@ -31,9 +26,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class TradingCycleService implements RegisterTradingCycleUseCase,
-        DeleteTradingCycleUseCase, GetTradingCycleUseCase, PauseTradingCycleUseCase,
-        ResumeTradingCycleUseCase, UpdateTradingCycleUseCase {
+class TradingCycleService implements TradingCycleUseCase {
 
     private static final int MAX_CYCLES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1사이클
 

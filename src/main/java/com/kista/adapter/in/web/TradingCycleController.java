@@ -6,14 +6,9 @@ import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.CancelOrderUseCase;
-import com.kista.domain.port.in.DeleteTradingCycleUseCase;
 import com.kista.domain.port.in.GetCycleHistoryUseCase;
-import com.kista.domain.port.in.GetTradingCycleUseCase;
 import com.kista.domain.port.in.ManualExecuteTradingUseCase;
-import com.kista.domain.port.in.PauseTradingCycleUseCase;
-import com.kista.domain.port.in.RegisterTradingCycleUseCase;
-import com.kista.domain.port.in.ResumeTradingCycleUseCase;
-import com.kista.domain.port.in.UpdateTradingCycleUseCase;
+import com.kista.domain.port.in.TradingCycleUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,12 +30,7 @@ import java.util.UUID;
 @Slf4j
 public class TradingCycleController {
 
-    private final RegisterTradingCycleUseCase registerCycle;
-    private final UpdateTradingCycleUseCase updateCycle;
-    private final DeleteTradingCycleUseCase deleteCycle;
-    private final GetTradingCycleUseCase getCycle;
-    private final PauseTradingCycleUseCase pauseCycle;
-    private final ResumeTradingCycleUseCase resumeCycle;
+    private final TradingCycleUseCase tradingCycle;          // CRUD + pause/resume
     private final GetCycleHistoryUseCase getCycleHistory;
     private final ManualExecuteTradingUseCase manualExecute; // 수동 실행
     private final CancelOrderUseCase cancelOrder;            // 주문 취소
@@ -51,7 +41,7 @@ public class TradingCycleController {
     public List<TradingCycleResponse> list(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return getCycle.listByAccountId(accountId, userId).stream()
+        return tradingCycle.listByAccountId(accountId, userId).stream()
                 .map(TradingCycleResponse::from)
                 .toList();
     }
@@ -65,7 +55,7 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody TradingCycleRequest request) {
         return TradingCycleResponse.from(
-                registerCycle.register(userId, accountId, request.toRegisterCommand())
+                tradingCycle.register(userId, accountId, request.toRegisterCommand())
         );
     }
 
@@ -77,7 +67,7 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody TradingCycleRequest request) {
         return TradingCycleResponse.from(
-                updateCycle.update(id, userId, request.toUpdateCommand())
+                tradingCycle.update(id, userId, request.toUpdateCommand())
         );
     }
 
@@ -88,7 +78,7 @@ public class TradingCycleController {
     public void delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        deleteCycle.delete(id, userId);
+        tradingCycle.delete(id, userId);
     }
 
     // 거래 사이클 중지 (ACTIVE → PAUSED)
@@ -98,7 +88,7 @@ public class TradingCycleController {
     public void pause(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        pauseCycle.pause(id, userId);
+        tradingCycle.pause(id, userId);
     }
 
     // 거래 사이클 재개 (PAUSED → ACTIVE)
@@ -108,7 +98,7 @@ public class TradingCycleController {
     public void resume(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        resumeCycle.resume(id, userId);
+        tradingCycle.resume(id, userId);
     }
 
     // INFINITE 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)

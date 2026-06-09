@@ -3,8 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetPortfolioUseCase;
-import com.kista.domain.port.in.GetTradeHistoryUseCase;
+import com.kista.domain.port.in.PortfolioUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,8 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final GetTradeHistoryUseCase getTradeHistoryUseCase;
-    private final GetPortfolioUseCase getPortfolioUseCase;
+    private final PortfolioUseCase portfolioUseCase;
 
     @Operation(summary = "거래 내역 조회", description = "날짜 범위와 종목으로 필터링. 기본: 최근 30일, 종목 SOXL.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -40,7 +38,7 @@ public class DashboardController {
             @RequestParam(defaultValue = "SOXL") Ticker ticker) {
         LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
         LocalDate resolvedTo = to != null ? to : LocalDate.now();
-        return getTradeHistoryUseCase.getHistory(resolvedFrom, resolvedTo, ticker)
+        return portfolioUseCase.getHistory(resolvedFrom, resolvedTo, ticker)
                 .stream().map(TradeHistoryResponse::from).toList();
     }
 
@@ -48,7 +46,7 @@ public class DashboardController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/portfolio/current")
     public PortfolioSnapshotResponse getPortfolioCurrent() {
-        return PortfolioSnapshotResponse.from(getPortfolioUseCase.getCurrent());
+        return PortfolioSnapshotResponse.from(portfolioUseCase.getCurrent());
     }
 
     @Operation(summary = "포트폴리오 스냅샷 목록", description = "지정 기간의 포트폴리오 스냅샷 목록 반환. 기본: 최근 30일.")
@@ -63,7 +61,7 @@ public class DashboardController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
         LocalDate resolvedTo = to != null ? to : LocalDate.now();
-        return getPortfolioUseCase.getSnapshots(resolvedFrom, resolvedTo)
+        return portfolioUseCase.getSnapshots(resolvedFrom, resolvedTo)
                 .stream().map(PortfolioSnapshotResponse::from).toList();
     }
 

@@ -3,8 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.port.in.GetPortfolioUseCase;
-import com.kista.domain.port.in.GetTradeHistoryUseCase;
+import com.kista.domain.port.in.PortfolioUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -35,8 +34,7 @@ class DashboardControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean GetTradeHistoryUseCase getTradeHistoryUseCase;
-    @MockitoBean GetPortfolioUseCase getPortfolioUseCase;
+    @MockitoBean PortfolioUseCase portfolioUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -50,7 +48,7 @@ class DashboardControllerTest {
         Order o = new Order(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001");
-        when(getTradeHistoryUseCase.getHistory(any(), any(), any())).thenReturn(List.of(o));
+        when(portfolioUseCase.getHistory(any(), any(), any())).thenReturn(List.of(o));
 
         mockMvc.perform(get("/api/trades")
                         .with(authentication(mockAuth())))
@@ -65,7 +63,7 @@ class DashboardControllerTest {
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());
-        when(getPortfolioUseCase.getCurrent()).thenReturn(snap);
+        when(portfolioUseCase.getCurrent()).thenReturn(snap);
 
         mockMvc.perform(get("/api/portfolio/current")
                         .with(authentication(mockAuth())))
@@ -76,7 +74,7 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioSnapshots_returns_200() throws Exception {
-        when(getPortfolioUseCase.getSnapshots(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
+        when(portfolioUseCase.getSnapshots(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/portfolio/snapshots?from=2026-01-01&to=2026-01-31")
                         .with(authentication(mockAuth())))

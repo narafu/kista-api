@@ -1,7 +1,10 @@
 package com.kista.application.service.portfolio;
 
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.port.in.GetPortfolioUseCase;
+import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.port.in.PortfolioUseCase;
+import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.TradingCycleHistoryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,9 +15,10 @@ import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
-class PortfolioService implements GetPortfolioUseCase {
+class PortfolioService implements PortfolioUseCase {
 
     private final TradingCycleHistoryPort cycleHistoryPort;
+    private final OrderPort orderPort; // 거래 이력 조회
 
     @Override
     public AccountCycleHistoryEntry getCurrent() {
@@ -27,5 +31,10 @@ class PortfolioService implements GetPortfolioUseCase {
     @Override
     public List<AccountCycleHistoryEntry> getSnapshots(LocalDate from, LocalDate to) {
         return cycleHistoryPort.findBetween(from, to);
+    }
+
+    @Override
+    public List<Order> getHistory(LocalDate from, LocalDate to, Ticker ticker) {
+        return orderPort.findBy(from, to, ticker);
     }
 }
