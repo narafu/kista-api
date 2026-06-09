@@ -3,10 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.in.DeleteMeUseCase;
-import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.KakaoLoginUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -40,13 +37,10 @@ class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean ApproveUserUseCase approveUser;
-    @MockitoBean GetUserUseCase getUser;
+    @MockitoBean UserUseCase userUseCase;
     @MockitoBean SseEmitterRegistry sseEmitterRegistry;
     @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
-    @MockitoBean KakaoLoginUseCase kakaoLoginUseCase; // 카카오 로그인 유스케이스
     @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
-    @MockitoBean DeleteMeUseCase deleteMe;             // 회원 탈퇴 유스케이스
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -59,7 +53,7 @@ class AuthControllerTest {
     @DisplayName("쿨다운 중 재신청 시 429 Too Many Requests 반환")
     void reapply_cooldown_returns_429() throws Exception {
         Instant retryAfter = Instant.now().plus(1, ChronoUnit.HOURS);
-        doThrow(new Account.CooldownException(retryAfter)).when(approveUser).reapply(USER_ID);
+        doThrow(new Account.CooldownException(retryAfter)).when(userUseCase).reapply(USER_ID);
 
         mockMvc.perform(post("/api/auth/approval-requests")
                         .with(csrf())
@@ -75,13 +69,13 @@ class AuthControllerTest {
                         .with(authentication(auth())))
                 .andExpect(status().isNoContent());
 
-        verify(deleteMe).deleteMe(USER_ID); // UseCase 실제 호출 검증
+        verify(userUseCase).deleteMe(USER_ID); // UseCase 실제 호출 검증
     }
 
     @Test
     @DisplayName("존재하지 않는 사용자 탈퇴 시 404 반환")
     void deleteMe_userNotFound_returns404() throws Exception {
-        doThrow(new NoSuchElementException()).when(deleteMe).deleteMe(any());
+        doThrow(new NoSuchElementException()).when(userUseCase).deleteMe(any());
 
         mockMvc.perform(delete("/api/auth/me")
                         .with(csrf())

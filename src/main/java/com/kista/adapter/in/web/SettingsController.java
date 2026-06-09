@@ -2,9 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
-import com.kista.domain.port.in.UpdateUserTelegramUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,9 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SettingsController {
 
-    private final UpdateUserTelegramUseCase updateUserTelegram;
-    private final GetUserUseCase getUser;
-    private final UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경
+    private final UserUseCase userUseCase;
 
     record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
     record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
@@ -35,7 +31,7 @@ public class SettingsController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/telegram")
     public TelegramSettingsResponse getTelegram(@AuthenticationPrincipal UUID userId) {
-        return TelegramSettingsResponse.from(getUser.getById(userId));
+        return TelegramSettingsResponse.from(userUseCase.getById(userId));
     }
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
@@ -46,7 +42,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
                                @Valid @RequestBody TelegramUpdateRequest body) {
-        updateUserTelegram.updateTelegram(userId, body.botToken(), body.chatId());
+        userUseCase.updateTelegram(userId, body.botToken(), body.chatId());
     }
 
     // 텔레그램 봇 설정 해제
@@ -55,7 +51,7 @@ public class SettingsController {
     @DeleteMapping("/telegram")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeTelegram(@AuthenticationPrincipal UUID userId) {
-        updateUserTelegram.removeTelegram(userId);
+        userUseCase.removeTelegram(userId);
     }
 
     // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 GlobalExceptionHandler 처리
@@ -68,6 +64,6 @@ public class SettingsController {
         NotificationChannel channel = NotificationChannel.tryParse(body.channel())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
-        updateNotificationChannel.updateNotificationChannel(userId, channel);
+        userUseCase.updateNotificationChannel(userId, channel);
     }
 }

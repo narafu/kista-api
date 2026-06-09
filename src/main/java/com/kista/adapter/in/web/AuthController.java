@@ -5,10 +5,7 @@ import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.in.DeleteMeUseCase;
-import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.KakaoLoginUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,12 +27,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final KakaoLoginUseCase kakaoLoginUseCase;
+    private final UserUseCase userUseCase;
     private final JwtIssuerService jwtIssuerService;
-    private final GetUserUseCase getUser;
-    private final ApproveUserUseCase approveUser;
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
-    private final DeleteMeUseCase deleteMe;              // 회원 탈퇴
 
     record KakaoCallbackRequest(
             @Schema(description = "카카오 OAuth 인가 코드", example = "xxxxxxxxxxxxxxxxxxxxxxxx")
@@ -50,7 +44,7 @@ public class AuthController {
     @PostMapping("/kakao/callback")
     @SecurityRequirements
     public KakaoLoginResponse kakaoCallback(@RequestBody KakaoCallbackRequest request) {
-        User user = kakaoLoginUseCase.login(request.code(), request.redirectUri());
+        User user = userUseCase.login(request.code(), request.redirectUri());
         String token = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함
         return new KakaoLoginResponse(token, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user));
     }
@@ -60,7 +54,7 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
-        return UserResponse.from(getUser.getById(userId));
+        return UserResponse.from(userUseCase.getById(userId));
     }
 
     // PENDING 상태 사용자의 SSE 연결 — 승인/거절 시 브라우저 자동 리다이렉트
@@ -81,7 +75,7 @@ public class AuthController {
     @PostMapping("/approval-requests")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void requestApproval(@AuthenticationPrincipal UUID userId) {
-        approveUser.reapply(userId);
+        userUseCase.reapply(userId);
     }
 
     // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (V16 FK CASCADE)
@@ -90,6 +84,6 @@ public class AuthController {
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMe(@AuthenticationPrincipal UUID userId) {
-        deleteMe.deleteMe(userId);
+        userUseCase.deleteMe(userId);
     }
 }

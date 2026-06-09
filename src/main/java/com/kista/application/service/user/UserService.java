@@ -3,14 +3,11 @@ package com.kista.application.service.user;
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ApproveUserUseCase;
-import com.kista.domain.port.in.DeleteMeUseCase;
-import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.RegisterUserUseCase;
-import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
-import com.kista.domain.port.in.UpdateUserTelegramUseCase;
+import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.port.out.FcmDeviceTokenPort;
+import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -18,6 +15,7 @@ import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +28,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUseCase, UpdateUserTelegramUseCase, DeleteMeUseCase, UpdateNotificationChannelUseCase {
+class UserService implements UserUseCase {
 
     private final UserPort userPort;
     private final UserCascadeDeleter userCascadeDeleter;
@@ -39,6 +37,50 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
     private final AdminBootstrapProperties bootstrapProps; // ADMIN seed 목록
     private final TelegramBotInfoPort telegramBotInfoPort; // 봇 토큰 검증 + username 취득
+    private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
+    private final FcmDeviceTokenPort fcmDeviceTokenPort;   // FCM 토큰 저장/삭제
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getById(UUID id) {
+        return userPort.findByIdOrThrow(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getByKakaoId(String kakaoId) {
+        return userPort.findByKakaoId(kakaoId)
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoId));
+    }
+
+    @Override
+    public User login(String code, String redirectUri) {
+        // 인가 코드를 카카오 액세스 토큰으로 교환
+        String kakaoAccessToken = kakaoOAuthPort.exchangeCodeForToken(code, redirectUri);
+        // 카카오 액세스 토큰으로 사용자 정보 조회
+        KakaoOAuthPort.KakaoUserInfo kakaoUser = kakaoOAuthPort.getUserInfo(kakaoAccessToken);
+
+        User user;
+        try {
+            // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
+            user = register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
+        } catch (DataIntegrityViolationException e) {
+            // 동시 가입 경쟁 조건 → 기존 사용자 조회
+            log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());
+            user = getByKakaoId(kakaoUser.kakaoId());
+        }
+        // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
+        if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != User.UserRole.ADMIN) {
+            log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
+            user = userPort.save(new User(
+                    user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
+                    user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
+                    user.lastReappliedAt(),
+                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
+            ));
+        }
+        return user;
+    }
 
     @Override
     public User register(String kakaoId, String nickname, UUID userId) {
@@ -107,18 +149,11 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public User getById(UUID id) {
-        return userPort.findByIdOrThrow(id);
+    public void deleteMe(UUID userId) {
+        userPort.findByIdOrThrow(userId); // 존재 확인
+        userCascadeDeleter.deleteCascade(userId);
+        log.info("사용자 탈퇴: userId={}", userId);
     }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User getByKakaoId(String kakaoId) {
-        return userPort.findByKakaoId(kakaoId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoId));
-    }
-
 
     @Override
     public void updateTelegram(UUID userId, String botToken, String chatId) {
@@ -137,16 +172,19 @@ class UserService implements RegisterUserUseCase, ApproveUserUseCase, GetUserUse
     }
 
     @Override
-    public void deleteMe(UUID userId) {
-        userPort.findByIdOrThrow(userId); // 존재 확인
-        userCascadeDeleter.deleteCascade(userId);
-        log.info("사용자 탈퇴: userId={}", userId);
-    }
-
-    @Override
     public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
         User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withNotificationChannel(channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
+    }
+
+    @Override
+    public void registerFcmToken(UUID userId, String token, String platform) {
+        fcmDeviceTokenPort.save(userId, token, platform);
+    }
+
+    @Override
+    public void unregisterFcmToken(UUID userId, String token) {
+        fcmDeviceTokenPort.delete(userId, token);
     }
 }

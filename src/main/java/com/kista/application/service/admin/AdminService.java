@@ -7,7 +7,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminDashboardUseCase;
 import com.kista.domain.port.in.AdminListUsersUseCase;
 import com.kista.domain.port.in.AdminUserActionUseCase;
-import com.kista.domain.port.in.ApproveUserUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
@@ -31,7 +31,7 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
     private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
     private final AccountPort accountPort;
     private final UserCascadeDeleter userCascadeDeleter;
-    private final ApproveUserUseCase approveUserUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
+    private final UserUseCase userUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
     @Override
@@ -48,16 +48,16 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
 
     @Override
     public void approveUser(UUID adminId, UUID targetUserId) {
-        // 기존 ApproveUserUseCase 위임 (텔레그램 알림 + SSE 포함)
-        approveUserUseCase.approve(targetUserId);
+        // UserUseCase 위임 (텔레그램 알림 + SSE 포함)
+        userUseCase.approve(targetUserId);
         log.info("관리자 사용자 승인: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_APPROVE", "USER", targetUserId, null);
     }
 
     @Override
     public void rejectUser(UUID adminId, UUID targetUserId) {
-        // 기존 ApproveUserUseCase 위임 (텔레그램 알림 + SSE 포함)
-        approveUserUseCase.reject(targetUserId);
+        // UserUseCase 위임 (텔레그램 알림 + SSE 포함)
+        userUseCase.reject(targetUserId);
         log.info("관리자 사용자 거절: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, null);
     }

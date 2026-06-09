@@ -4,7 +4,7 @@ import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.ApproveUserUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
@@ -33,7 +33,7 @@ class AdminServiceTest {
     @Mock AdminUserViewPort adminUserViewPort;
     @Mock AccountPort accountPort;
     @Mock UserCascadeDeleter userCascadeDeleter;
-    @Mock ApproveUserUseCase approveUserUseCase;
+    @Mock UserUseCase userUseCase;
     @Mock AuditLogPort auditLogPort;
 
     @InjectMocks AdminService adminService;
@@ -68,7 +68,7 @@ class AdminServiceTest {
 
         adminService.approveUser(adminId, targetId);
 
-        verify(approveUserUseCase).approve(targetId);
+        verify(userUseCase).approve(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_APPROVE"), eq("USER"), eq(targetId), any());
     }
 
@@ -78,7 +78,7 @@ class AdminServiceTest {
 
         adminService.rejectUser(adminId, targetId);
 
-        verify(approveUserUseCase).reject(targetId);
+        verify(userUseCase).reject(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), any());
     }
 

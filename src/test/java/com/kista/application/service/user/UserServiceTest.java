@@ -3,8 +3,10 @@ package com.kista.application.service.user;
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.out.FcmDeviceTokenPort;
+import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -39,6 +41,8 @@ class UserServiceTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock AdminBootstrapProperties bootstrapProps;
     @Mock TelegramBotInfoPort telegramBotInfoPort;
+    @Mock KakaoOAuthPort kakaoOAuthPort;
+    @Mock FcmDeviceTokenPort fcmDeviceTokenPort;
 
     @InjectMocks UserService userService;
 
@@ -264,5 +268,21 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.deleteMe(id))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 등록 시 fcmDeviceTokenPort.save 호출")
+    void registerFcmToken_delegatesToPort() {
+        UUID userId = UUID.randomUUID();
+        userService.registerFcmToken(userId, "token-abc", "WEB");
+        verify(fcmDeviceTokenPort).save(userId, "token-abc", "WEB");
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 삭제 시 fcmDeviceTokenPort.delete 호출")
+    void unregisterFcmToken_delegatesToPort() {
+        UUID userId = UUID.randomUUID();
+        userService.unregisterFcmToken(userId, "token-abc");
+        verify(fcmDeviceTokenPort).delete(userId, "token-abc");
     }
 }

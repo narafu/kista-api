@@ -1,7 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.port.in.RegisterFcmTokenUseCase;
-import com.kista.domain.port.in.UnregisterFcmTokenUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -29,8 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FcmControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean RegisterFcmTokenUseCase registerFcmToken;
-    @MockitoBean UnregisterFcmTokenUseCase unregisterFcmToken;
+    @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
 
     static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -43,7 +41,7 @@ class FcmControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"fcm-token-abc\",\"platform\":\"WEB\"}"))
                 .andExpect(status().isNoContent());
-        verify(registerFcmToken).register(eq(USER_ID), eq("fcm-token-abc"), eq("WEB"));
+        verify(userUseCase).registerFcmToken(eq(USER_ID), eq("fcm-token-abc"), eq("WEB"));
     }
 
     @Test
@@ -52,6 +50,6 @@ class FcmControllerTest {
                         .with(csrf())
                         .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()))))
                 .andExpect(status().isNoContent());
-        verify(unregisterFcmToken).unregister(eq(USER_ID), eq("fcm-token-abc"));
+        verify(userUseCase).unregisterFcmToken(eq(USER_ID), eq("fcm-token-abc"));
     }
 }

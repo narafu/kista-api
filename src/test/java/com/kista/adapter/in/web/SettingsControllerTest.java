@@ -2,9 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.port.in.GetUserUseCase;
-import com.kista.domain.port.in.UpdateNotificationChannelUseCase;
-import com.kista.domain.port.in.UpdateUserTelegramUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -37,9 +35,7 @@ class SettingsControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean UpdateUserTelegramUseCase updateUserTelegram;
-    @MockitoBean GetUserUseCase getUser;
-    @MockitoBean UpdateNotificationChannelUseCase updateNotificationChannel; // 알림 채널 변경 UseCase
+    @MockitoBean UserUseCase userUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -57,7 +53,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNoContent());
 
-        verify(updateUserTelegram).updateTelegram(
+        verify(userUseCase).updateTelegram(
                 eq(UUID.fromString(USER_ID)), eq("test-token"), eq("chat-123"));
     }
 
@@ -67,7 +63,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNoContent());
 
-        verify(updateUserTelegram).removeTelegram(eq(UUID.fromString(USER_ID)));
+        verify(userUseCase).removeTelegram(eq(UUID.fromString(USER_ID)));
     }
 
     @Test
@@ -89,7 +85,7 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"channel\":\"FCM\"}"))
                 .andExpect(status().isNoContent());
-        verify(updateNotificationChannel).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
+        verify(userUseCase).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
     }
 
     @Test
