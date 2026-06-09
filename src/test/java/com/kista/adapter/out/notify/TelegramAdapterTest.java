@@ -2,7 +2,7 @@ package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +77,7 @@ class TelegramAdapterTest {
 
         Account acc = account(UUID.randomUUID(), "테스트");
         ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.notifyInsufficientBalance(acc, balance, TradingCycle.Ticker.SOXL);
+        adapter.notifyInsufficientBalance(acc, balance, Strategy.Ticker.SOXL);
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         String text = bodyCaptor.getValue().get("text");

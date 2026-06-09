@@ -4,7 +4,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase.PrivacyTrade;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

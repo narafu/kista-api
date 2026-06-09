@@ -1,7 +1,7 @@
 package com.kista.domain.model.privacy;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,7 +17,7 @@ public record PrivacyTradeBase(
 ) {
     public record PrivacyTrade(
             LocalDate tradeDate,       // 거래일
-            TradingCycle.Ticker ticker,             // 거래 종목
+            Strategy.Ticker ticker,             // 거래 종목
             Order.OrderType orderType,       // 주문 유형 (LOC/MOC/LIMIT)
             Order.OrderDirection direction,  // 매수/매도 방향
             Integer quantity,          // 주문 수량(nullable)

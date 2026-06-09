@@ -2,7 +2,7 @@ package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.NextOrdersPreview;
 
 import java.math.BigDecimal;

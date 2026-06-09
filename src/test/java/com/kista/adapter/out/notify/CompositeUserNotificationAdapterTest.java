@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,11 +113,11 @@ class CompositeUserNotificationAdapterTest {
         // 전략 변경 알림도 관리자 알림 — 채널 무관
         User user = userWith(NotificationChannel.FCM);
         Account account = mock(Account.class);
-        TradingCycle cycle = mock(TradingCycle.class);
+        Strategy strategy = mock(Strategy.class);
 
-        composite.notifyStrategyChanged(user, account, cycle, "등록");
+        composite.notifyStrategyChanged(user, account, strategy, "등록");
 
-        verify(telegram).notifyStrategyChanged(eq(user), eq(account), eq(cycle), eq("등록"));
+        verify(telegram).notifyStrategyChanged(eq(user), eq(account), eq(strategy), eq("등록"));
         verify(fcm, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 

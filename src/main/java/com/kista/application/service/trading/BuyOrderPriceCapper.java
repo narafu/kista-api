@@ -3,7 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.OrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ class BuyOrderPriceCapper {
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
 
-    void capIfNeeded(LocalDate today, TradingCycle cycle, Account account,
+    void capIfNeeded(LocalDate today, Strategy strategy, Account account,
                      BigDecimal currentPrice, InfinitePosition position) {
         List<Order> buyOrders = orderPort.findPlannedByAccountAndDate(account.id(), today)
                 .stream().filter(o -> o.direction() == BUY).toList();
@@ -44,7 +44,7 @@ class BuyOrderPriceCapper {
         log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap,
                 buyOrders.stream().map(o -> o.price() + "×" + o.quantity()).toList());
 
-        List<Order> newBuys = recomputeBuys(today, cycle, buyOrders, cap, position);
+        List<Order> newBuys = recomputeBuys(today, strategy, buyOrders, cap, position);
 
         // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장 (수량 0 보정 포함 단일 경로)
         orderPort.deletePlannedBuyByAccountAndDate(account.id(), today);
@@ -58,7 +58,7 @@ class BuyOrderPriceCapper {
     }
 
     // 캡가격 기준 매수 수량 재산정 — 순수 계산(I/O 없음), capIfNeeded가 결과를 영속화
-    private List<Order> recomputeBuys(LocalDate today, TradingCycle cycle, List<Order> buyOrders,
+    private List<Order> recomputeBuys(LocalDate today, Strategy strategy, List<Order> buyOrders,
                                        BigDecimal cap, InfinitePosition position) {
         BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
 
@@ -70,7 +70,7 @@ class BuyOrderPriceCapper {
             BigDecimal cappedPrice = orig.price().min(cap);
             int quantity = InfinitePosition.lateBuyQty(k, cappedPrice);
             return quantity > 0
-                    ? List.of(plannedBuy(today, cycle, orig.orderType(), quantity, cappedPrice))
+                    ? List.of(plannedBuy(today, strategy, orig.orderType(), quantity, cappedPrice))
                     : List.of();
         }
 
@@ -82,29 +82,29 @@ class BuyOrderPriceCapper {
 
         int quantity1 = InfinitePosition.earlyBuyQty1(k, cappedAvg);
         int quantity2 = InfinitePosition.earlyBuyQty2(k, cappedAvg, quantity1, cappedRef,
-                cycle.ticker().getTargetProfitRate());
+                strategy.ticker().getTargetProfitRate());
 
         List<Order> newBuys = new ArrayList<>();
         if (quantity1 > 0) {
             // cappedAvg == cappedRef이면 병합
             if (cappedAvg.compareTo(cappedRef) == 0) {
                 int merged = quantity1 + (quantity2 > 0 ? quantity2 : 0);
-                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), merged, cappedAvg));
+                newBuys.add(plannedBuy(today, strategy, buy1.orderType(), merged, cappedAvg));
             } else {
-                newBuys.add(plannedBuy(today, cycle, buy1.orderType(), quantity1, cappedAvg));
+                newBuys.add(plannedBuy(today, strategy, buy1.orderType(), quantity1, cappedAvg));
                 if (quantity2 > 0) {
-                    newBuys.add(plannedBuy(today, cycle, buy2.orderType(), quantity2, cappedRef));
+                    newBuys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
                 }
             }
         } else if (quantity2 > 0) {
-            newBuys.add(plannedBuy(today, cycle, buy2.orderType(), quantity2, cappedRef));
+            newBuys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
         }
         return newBuys;
     }
 
-    private Order plannedBuy(LocalDate today, TradingCycle cycle, Order.OrderType orderType,
+    private Order plannedBuy(LocalDate today, Strategy strategy, Order.OrderType orderType,
                              int quantity, BigDecimal price) {
-        return new Order(null, null, today, cycle.ticker(),
+        return new Order(null, null, today, strategy.ticker(),
                 orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null, null, null);
     }
 }

@@ -1,9 +1,9 @@
 package com.kista.application.service.portfolio;
 
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCyclePositionPort;
+import com.kista.domain.port.out.CyclePositionPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PortfolioServiceTest {
 
-    @Mock TradingCyclePositionPort cycleHistoryPort;
+    @Mock CyclePositionPort cycleHistoryPort;
     @Mock OrderPort orderPort;
 
     @InjectMocks PortfolioService sut;
@@ -34,7 +34,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("getCurrent: 가장 최근 이력 1건 반환")
     void getCurrent_returns_latest_entry() {
-        AccountCycleHistoryEntry entry = entry(new BigDecimal("26.00"));
+        CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
         when(cycleHistoryPort.findRecentGlobal(1)).thenReturn(List.of(entry));
 
         assertThat(sut.getCurrent()).isEqualTo(entry);
@@ -53,14 +53,14 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("getSnapshots: from/to 파라미터를 findBetween에 위임")
     void getSnapshots_delegates_date_range_to_port() {
-        AccountCycleHistoryEntry entry = entry(new BigDecimal("26.00"));
+        CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
         when(cycleHistoryPort.findBetween(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(entry));
 
         assertThat(sut.getSnapshots(LocalDate.now().minusDays(30), LocalDate.now())).hasSize(1);
     }
 
-    private AccountCycleHistoryEntry entry(BigDecimal currentPrice) {
-        return new AccountCycleHistoryEntry(
+    private CyclePositionHistoryEntry entry(BigDecimal currentPrice) {
+        return new CyclePositionHistoryEntry(
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), currentPrice,
                 new BigDecimal("25.00"), 30,

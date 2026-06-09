@@ -2,7 +2,7 @@ package com.kista.domain.strategy;
 
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,7 @@ import java.util.Optional;
 
 import static java.math.RoundingMode.HALF_UP;
 
-// PRIVACY 사이클의 주문 계획 + 최소금액 정책
+// PRIVACY 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcPrivacy + CycleRotationService.resolveMinRequired(PRIVACY) 이전
 @Slf4j
 @Component
@@ -26,8 +26,8 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     private final PrivacyTradingStrategy privacyStrategy;
 
     @Override
-    public TradingCycle.Type cycleType() {
-        return TradingCycle.Type.PRIVACY;
+    public Strategy.Type cycleType() {
+        return Strategy.Type.PRIVACY;
     }
 
     @Override
@@ -37,7 +37,8 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
             log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", ctx.label());
             return Optional.empty();
         }
-        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), ctx.cycle().initialUsdDeposit(), ctx.privacyBase());
+        // initialUsdDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
+        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), ctx.initialUsdDeposit(), ctx.privacyBase());
         return Optional.of(new OrderPlan(null, orders));
     }
 

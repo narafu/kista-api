@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 
 import java.math.BigDecimal;
 
@@ -12,7 +12,7 @@ public record CycleHistoryResponse(
         BigDecimal avgPrice,     // 평균 매입 단가 (보유수량 0이면 null)
         BigDecimal usdDeposit    // 통합주문가능금액
 ) {
-    public static CycleHistoryResponse from(AccountCycleHistoryEntry e) {
+    public static CycleHistoryResponse from(CyclePositionHistoryEntry e) {
         return new CycleHistoryResponse(
                 e.createdAt().toString(),
                 e.ticker() != null ? e.ticker().name() : null,

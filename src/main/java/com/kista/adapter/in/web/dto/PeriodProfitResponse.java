@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.kis.PeriodProfitResult;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.util.List;

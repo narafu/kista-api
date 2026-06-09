@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

@@ -5,13 +5,13 @@ import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ class AdminQueryService implements AdminQueryUseCase {
     private final AccountPort accountPort;
     private final OrderPort orderPort;
     private final AuditLogPort auditLogPort;
-    private final TradingCyclePort cyclePort;
+    private final StrategyPort strategyPort;
 
     @Override
     public AdminStats getStats() {
@@ -67,20 +67,20 @@ class AdminQueryService implements AdminQueryUseCase {
         LocalDate today = LocalDate.now();
         List<Account> allAccounts = accountPort.findAll();
 
-        // PAUSED 사이클이 있는 계좌
+        // PAUSED 전략이 있는 계좌
         List<Account> pausedAccounts = allAccounts.stream()
-                .filter(a -> cyclePort.findByAccountId(a.id()).stream()
-                        .anyMatch(c -> c.status() == TradingCycle.Status.PAUSED))
+                .filter(a -> strategyPort.findByAccountId(a.id()).stream()
+                        .anyMatch(s -> s.status() == Strategy.Status.PAUSED))
                 .toList();
 
         // 최근 7일 거래 있는 accountId 집합
         Set<UUID> activeAccountIds = orderPort.findAll(today.minusDays(7), today)
                 .stream().map(Order::accountId).collect(Collectors.toSet());
 
-        // ACTIVE 사이클이 있지만 7일 내 거래 없는 계좌
+        // ACTIVE 전략이 있지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
-                .filter(a -> cyclePort.findByAccountId(a.id()).stream()
-                        .anyMatch(c -> c.status() == TradingCycle.Status.ACTIVE))
+                .filter(a -> strategyPort.findByAccountId(a.id()).stream()
+                        .anyMatch(s -> s.status() == Strategy.Status.ACTIVE))
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();
 

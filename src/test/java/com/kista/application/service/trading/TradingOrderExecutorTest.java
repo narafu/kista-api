@@ -4,8 +4,8 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import org.junit.jupiter.api.DisplayName;
@@ -39,10 +39,9 @@ class TradingOrderExecutorTest {
             "74420614", "key", "secret", "01",
             Account.Broker.KIS);
 
-    static final TradingCycle CYCLE = new TradingCycle(
-            UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
-            TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-            TradingCycle.CycleSeedType.NONE);
+    static final Strategy CYCLE = new Strategy(
+            UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
 

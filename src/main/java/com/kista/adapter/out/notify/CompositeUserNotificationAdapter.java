@@ -1,8 +1,8 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +25,8 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
 
     // 관리자 알림 — 채널 무관, 항상 Telegram
     @Override
-    public void notifyStrategyChanged(User user, Account account, TradingCycle cycle, String action) {
-        telegram.notifyStrategyChanged(user, account, cycle, action);
+    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
+        telegram.notifyStrategyChanged(user, account, strategy, action);
     }
 
     // 사용자 알림 — notificationChannel에 따라 라우팅

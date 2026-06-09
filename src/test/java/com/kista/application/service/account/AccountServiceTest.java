@@ -5,7 +5,7 @@ import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisConnectionTestPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 class AccountServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock StrategyPort cyclePort;
     @Mock KisConnectionTestPort connectionTestPort; // AccountService 생성자 주입 필수
     @InjectMocks AccountService accountService;
 

@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kis;
 
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;

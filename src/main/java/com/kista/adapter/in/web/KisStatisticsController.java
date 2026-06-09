@@ -7,7 +7,7 @@ import com.kista.adapter.in.web.dto.MarginResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
 import com.kista.adapter.in.web.dto.PeriodProfitResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

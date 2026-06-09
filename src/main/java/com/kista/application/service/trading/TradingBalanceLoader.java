@@ -1,10 +1,10 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCyclePosition;
+import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
-import com.kista.domain.port.out.TradingCyclePositionPort;
+import com.kista.domain.port.out.CyclePositionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 class TradingBalanceLoader {
 
-    private final TradingCyclePositionPort cycleHistoryPort;
+    private final CyclePositionPort cycleHistoryPort;
 
     // 잔고 로드 결과 — 정상이면 balance non-null, skip이면 skipReason non-null
     record BalanceLoad(AccountBalance balance, SkipReason skipReason) {
@@ -25,18 +25,18 @@ class TradingBalanceLoader {
     }
 
     // 잔고 로드 — preview용: 이력 없음은 skip, 있으면 그대로 반환
-    BalanceLoad tryLoadBalance(TradingCycle cycle) {
-        return cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
+    BalanceLoad tryLoadBalance(Strategy strategy) {
+        return cycleHistoryPort.findLatestByStrategyId(strategy.id(), 1).stream()
                 .findFirst()
                 .map(h -> new BalanceLoad(new AccountBalance(h.holdings(), h.avgPrice(), h.usdDeposit()), null))
                 .orElse(new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
     }
 
     // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
-    BalanceLoad loadBalanceOrThrow(TradingCycle cycle) {
-        TradingCyclePosition latest = cycleHistoryPort.findRecentByCycleId(cycle.id(), 1).stream()
+    BalanceLoad loadBalanceOrThrow(Strategy strategy) {
+        CyclePosition latest = cycleHistoryPort.findLatestByStrategyId(strategy.id(), 1).stream()
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("사이클 이력 없음: cycleId=" + cycle.id()));
+                .orElseThrow(() -> new IllegalStateException("전략 이력 없음: strategyId=" + strategy.id()));
         return new BalanceLoad(new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit()), null);
     }
 }

@@ -1,7 +1,7 @@
 package com.kista.domain.port.out;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.util.List;

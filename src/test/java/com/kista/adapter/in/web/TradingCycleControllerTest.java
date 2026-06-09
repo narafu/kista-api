@@ -3,9 +3,9 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.ManualTradingException;
-import com.kista.domain.model.tradingcycle.CycleHistoryPage;
+import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
-import com.kista.domain.port.in.TradingCycleUseCase;
+import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -43,7 +43,7 @@ class TradingCycleControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean TradingCycleUseCase tradingCycle;
+    @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean AccountStatisticsUseCase accountStatistics;
     @MockitoBean TradingExecutionUseCase tradingExecution;
 

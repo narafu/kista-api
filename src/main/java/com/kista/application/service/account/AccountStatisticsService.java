@@ -6,19 +6,19 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.CycleHistoryPage;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
-import com.kista.domain.port.out.TradingCyclePositionPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,8 +39,8 @@ import java.util.UUID;
 class AccountStatisticsService implements AccountStatisticsUseCase {
 
     private final AccountPort accountPort;
-    private final TradingCyclePort tradingCyclePort;
-    private final TradingCyclePositionPort tradingCycleHistoryPort;
+    private final StrategyPort strategyPort;
+    private final CyclePositionPort cyclePositionPort;
     private final KisProfitPort kisProfitPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;
@@ -60,7 +60,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        Optional<Ticker> ticker = tradingCyclePort.findActiveTicker(accountId);
+        Optional<Ticker> ticker = strategyPort.findActiveTicker(accountId);
         if (ticker.isEmpty()) return Collections.emptyList();
         return kisExecutionPort.getExecutions(from, to, ticker.get(), account);
     }
@@ -98,8 +98,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         Instant fromInstant = resolveFrom(from);
         // cursor 없으면 to(=내일)가 상한 — cursor는 그 이전 지점으로 좁혀감
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
-        List<AccountCycleHistoryEntry> raw =
-                tradingCycleHistoryPort.findByAccountIdWithCursor(accountId, fromInstant, effectiveCursor, size + 1);
+        List<CyclePositionHistoryEntry> raw =
+                cyclePositionPort.findByAccountIdWithCursor(accountId, fromInstant, effectiveCursor, size + 1);
         return toPage(raw, size);
     }
 
@@ -107,19 +107,19 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                            LocalDate from, LocalDate to,
                                            Instant cursor, int size) {
-        var cycle = tradingCyclePort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
+        var strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         Instant fromInstant = resolveFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
-        List<AccountCycleHistoryEntry> raw =
-                tradingCycleHistoryPort.findByCycleIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
+        List<CyclePositionHistoryEntry> raw =
+                cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
         return toPage(raw, size);
     }
 
     // size+1 조회 결과로 hasMore 판단 후 CycleHistoryPage 생성
-    private CycleHistoryPage toPage(List<AccountCycleHistoryEntry> raw, int size) {
+    private CycleHistoryPage toPage(List<CyclePositionHistoryEntry> raw, int size) {
         boolean hasMore = raw.size() > size;
-        List<AccountCycleHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
+        List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
         // 다음 커서 = 현재 페이지 마지막 항목의 createdAt (DESC 정렬이므로 가장 오래된 것)
         Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
         return new CycleHistoryPage(items, nextCursor, hasMore);

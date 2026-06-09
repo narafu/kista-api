@@ -5,8 +5,8 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -42,7 +42,7 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyStrategyChanged(User user, Account account, TradingCycle cycle, String action) {
+    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
         // 전략 변경 알림은 관리자 전용 — no-op
     }
 

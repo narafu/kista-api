@@ -1,7 +1,7 @@
 package com.kista.adapter.in.telegram;
 
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.PortfolioUseCase;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +82,7 @@ class TelegramBotService {
 
     private String buildStatusMessage() {
         try {
-            AccountCycleHistoryEntry s = portfolioUseCase.getCurrent();
+            CyclePositionHistoryEntry s = portfolioUseCase.getCurrent();
             // closingPrice가 null이면 평가액 0으로 처리
             double marketValue = s.closingPrice() != null
                     ? s.closingPrice().doubleValue() * s.holdings() : 0.0;

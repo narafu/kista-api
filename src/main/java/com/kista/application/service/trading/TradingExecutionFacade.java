@@ -5,7 +5,7 @@ import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.BatchContext;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +26,8 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     private final TradingPreviewService tradingPreviewService;
 
     @Override
-    public void execute(TradingCycle cycle, Account account, User user) throws InterruptedException {
-        tradingService.execute(cycle, account, user);
+    public void execute(Strategy strategy, Account account, User user) throws InterruptedException {
+        tradingService.execute(strategy, account, user);
     }
 
     @Override
@@ -36,13 +36,13 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     }
 
     @Override
-    public List<Order> executeManually(UUID cycleId, UUID requesterId) {
-        return manualTradingService.execute(cycleId, requesterId);
+    public List<Order> executeManually(UUID strategyId, UUID requesterId) {
+        return manualTradingService.execute(strategyId, requesterId);
     }
 
     @Override
-    public CancelResult cancelByCycle(UUID cycleId, UUID requesterId) {
-        return orderCancelService.cancelByCycle(cycleId, requesterId);
+    public CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
+        return orderCancelService.cancelByCycle(strategyId, requesterId);
     }
 
     @Override

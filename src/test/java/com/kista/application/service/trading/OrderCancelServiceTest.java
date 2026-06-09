@@ -4,12 +4,12 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class OrderCancelServiceTest {
     @Mock OrderPort orderPort;
     @Mock KisOrderPort kisOrderPort;
     @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock StrategyPort cyclePort;
     @InjectMocks OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
@@ -47,15 +47,14 @@ class OrderCancelServiceTest {
     private final UUID orderId = UUID.randomUUID();
 
     private Account ownedAccount;
-    private TradingCycle cycle;
+    private Strategy cycle;
 
     @BeforeEach
     void setUp() {
         ownedAccount = new Account(accountId, requesterId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01", Account.Broker.KIS);
-        cycle = new TradingCycle(cycleId, accountId, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, BigDecimal.valueOf(1000),
-                TradingCycle.CycleSeedType.NONE);
+        cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
     }
 
     // --- cancelByCycle ---

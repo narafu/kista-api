@@ -5,9 +5,10 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.tradingcycle.TradingCyclePosition;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.*;
@@ -38,10 +39,11 @@ import static org.mockito.Mockito.*;
 class TradingPreviewServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock StrategyPort cyclePort;
+    @Mock StrategyCyclePort strategyCyclePort;
     @Mock KisPricePort kisPricePort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock TradingCyclePositionPort cycleHistoryPort;
+    @Mock CyclePositionPort cycleHistoryPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock OrderPort orderPort;
@@ -56,19 +58,23 @@ class TradingPreviewServiceTest {
             Account.Broker.KIS
     );
 
-    static final TradingCycle CYCLE = new TradingCycle(
-            UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
-            TradingCycle.Status.ACTIVE, Ticker.SOXL, null,
-            TradingCycle.CycleSeedType.NONE
+    static final Strategy CYCLE = new Strategy(
+            UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
 
-    static final TradingCyclePosition NORMAL_HISTORY = new TradingCyclePosition(
-            null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null);
-    static final TradingCyclePosition FRESH_HISTORY = new TradingCyclePosition(
-            null, CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null);
+    static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
+            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, null);
+
+    static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
+
+    static final CyclePosition NORMAL_HISTORY = new CyclePosition(
+            null, CYCLE_ID, new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null);
+    static final CyclePosition FRESH_HISTORY = new CyclePosition(
+            null, CYCLE_ID, new BigDecimal("1000.00"), null, null, 0, null, null);
     // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
-    static final TradingCyclePosition LOW_HISTORY = new TradingCyclePosition(
-            null, CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null);
+    static final CyclePosition LOW_HISTORY = new CyclePosition(
+            null, CYCLE_ID, new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null, null);
 
     @BeforeEach
     void setUp() {
@@ -77,7 +83,7 @@ class TradingPreviewServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies);
-        service = new TradingPreviewService(accountPort, cyclePort, kisPricePort, privacyTradePort, balanceLoader, orderComputer);
+        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, kisPricePort, privacyTradePort, balanceLoader, orderComputer);
     }
 
     @Test
@@ -87,7 +93,8 @@ class TradingPreviewServiceTest {
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
                 .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -107,7 +114,8 @@ class TradingPreviewServiceTest {
     void preview_returnsSkipNoCycleHistory_whenNoHistory() {
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of());
+        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of());
 
         NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -125,7 +133,8 @@ class TradingPreviewServiceTest {
                 Order.OrderStatus.PLANNED, null, null, null);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
-        when(cycleHistoryPort.findRecentByCycleId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
+        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
                 .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -140,14 +149,16 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSkipNoPrivacyBase_whenPrivacyAndNoBase() {
-        TradingCycle privacyCycle = new TradingCycle(
-                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("1000.00"),
-                TradingCycle.CycleSeedType.NONE);
+        Strategy privacyCycle = new Strategy(
+                UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+
+        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, null);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
-        when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
+        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
 
         NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
@@ -159,19 +170,21 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsOrders_whenPrivacyAndBaseExists() {
-        TradingCycle privacyCycle = new TradingCycle(
-                UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.PRIVACY,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, new BigDecimal("1000.00"),
-                TradingCycle.CycleSeedType.NONE);
+        Strategy privacyCycle = new Strategy(
+                UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         PrivacyTradeBase base = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
         Order buyOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
+        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, null);
+
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
-        when(cycleHistoryPort.findRecentByCycleId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
+        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
         when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
 
@@ -199,6 +212,6 @@ class TradingPreviewServiceTest {
 
         assertThatThrownBy(() -> service.preview(ACCOUNT.id(), ACCOUNT.userId()))
                 .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("활성 거래 사이클이 없습니다");
+                .hasMessageContaining("활성 전략이 없습니다");
     }
 }

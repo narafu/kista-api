@@ -1,14 +1,16 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.model.user.User;
 import com.kista.domain.model.strategy.BatchContext;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +34,8 @@ class TradingSchedulerTest {
 
     @Mock TradingExecutionUseCase useCase;
     @Mock AccountPort accountPort;
-    @Mock TradingCyclePort cyclePort;
+    @Mock StrategyPort cyclePort;
+    @Mock StrategyCyclePort strategyCyclePort;
     @Mock UserPort userPort;
     @Mock NotifyPort notifyPort;
     @InjectMocks TradingScheduler scheduler;
@@ -47,10 +51,14 @@ class TradingSchedulerTest {
                 Account.Broker.KIS);
     }
 
-    private TradingCycle mockCycle() {
-        return new TradingCycle(CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL, null,
-                TradingCycle.CycleSeedType.NONE);
+    private Strategy mockStrategy() {
+        return new Strategy(CYCLE_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+    }
+
+    private StrategyCycle mockStrategyCycle(UUID strategyId) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
+                Instant.now(), null);
     }
 
     private User mockUser() {
@@ -61,9 +69,11 @@ class TradingSchedulerTest {
     @Test
     void run_callsExecuteBatchWithAllContexts() throws InterruptedException {
         Account account = mockAccount();
-        TradingCycle cycle = mockCycle();
+        Strategy strategy = mockStrategy();
+        StrategyCycle currentCycle = mockStrategyCycle(strategy.id());
         User user = mockUser();
-        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(cyclePort.findAllActive()).thenReturn(List.of(strategy));
+        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(currentCycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
 
@@ -72,7 +82,7 @@ class TradingSchedulerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
         verify(useCase).executeBatch(captor.capture());
-        assertThat(captor.getValue()).containsExactly(new BatchContext(cycle, account, user));
+        assertThat(captor.getValue()).containsExactly(new BatchContext(strategy, currentCycle, account, user));
     }
 
     @Test
@@ -90,9 +100,11 @@ class TradingSchedulerTest {
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
         Account account = mockAccount();
-        TradingCycle cycle = mockCycle();
+        Strategy strategy = mockStrategy();
+        StrategyCycle currentCycle = mockStrategyCycle(strategy.id());
         User user = mockUser();
-        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(cyclePort.findAllActive()).thenReturn(List.of(strategy));
+        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(currentCycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
         doThrow(new InterruptedException("interrupted")).when(useCase).executeBatch(any());
@@ -105,21 +117,26 @@ class TradingSchedulerTest {
 
     @Test
     void run_contextBuildFails_skipsFailedCycleAndNotifiesAdmin() throws InterruptedException {
-        // cycle1 계좌 조회 실패 → skip + notifyError, cycle2는 contexts에 포함되어 executeBatch 호출
-        TradingCycle cycle1 = mockCycle();
+        // strategy1 계좌 조회 실패 → skip + notifyError, strategy2는 contexts에 포함되어 executeBatch 호출
+        Strategy strategy1 = mockStrategy();
         UUID cycleId2 = UUID.randomUUID();
         UUID accountId2 = UUID.randomUUID();
-        TradingCycle cycle2 = new TradingCycle(cycleId2, accountId2, TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, TradingCycle.Ticker.TQQQ, null,
-                TradingCycle.CycleSeedType.NONE);
+        Strategy strategy2 = new Strategy(cycleId2, accountId2, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle currentCycle2 = mockStrategyCycle(strategy2.id());
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
                 "99999999", "key2", "secret2", "01",
                 Account.Broker.KIS);
         User user = mockUser();
 
-        when(cyclePort.findAllActive()).thenReturn(List.of(cycle1, cycle2));
+        when(cyclePort.findAllActive()).thenReturn(List.of(strategy1, strategy2));
         RuntimeException ex = new RuntimeException("계좌 없음");
+        // strategy1: 사이클 조회 성공하지만 계좌 조회 실패
+        when(strategyCyclePort.findLatestByStrategyId(strategy1.id()))
+                .thenReturn(Optional.of(mockStrategyCycle(strategy1.id())));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
+        // strategy2: 정상
+        when(strategyCyclePort.findLatestByStrategyId(strategy2.id())).thenReturn(Optional.of(currentCycle2));
         when(accountPort.findByIdOrThrow(accountId2)).thenReturn(account2);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
 
@@ -130,15 +147,17 @@ class TradingSchedulerTest {
         ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
         verify(useCase).executeBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().getFirst().cycle()).isEqualTo(cycle2);
+        assertThat(captor.getValue().getFirst().strategy()).isEqualTo(strategy2);
     }
 
     @Test
     void run_executeBatchException_notifiesAdminViaNotifyPort() throws InterruptedException {
         Account account = mockAccount();
-        TradingCycle cycle = mockCycle();
+        Strategy strategy = mockStrategy();
+        StrategyCycle currentCycle = mockStrategyCycle(strategy.id());
         User user = mockUser();
-        when(cyclePort.findAllActive()).thenReturn(List.of(cycle));
+        when(cyclePort.findAllActive()).thenReturn(List.of(strategy));
+        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(currentCycle));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");

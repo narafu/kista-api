@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.PortfolioUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -59,7 +59,7 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioCurrent_returns_200() throws Exception {
-        AccountCycleHistoryEntry snap = new AccountCycleHistoryEntry(
+        CyclePositionHistoryEntry snap = new CyclePositionHistoryEntry(
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());

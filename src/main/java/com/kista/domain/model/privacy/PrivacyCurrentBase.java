@@ -1,6 +1,6 @@
 package com.kista.domain.model.privacy;
 
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -29,7 +29,7 @@ public record PortfolioSnapshotResponse(
         @Schema(description = "기록 일시 (UTC)", example = "2025-01-15T07:00:00Z")
         Instant createdAt
 ) {
-    public static PortfolioSnapshotResponse from(AccountCycleHistoryEntry e) {
+    public static PortfolioSnapshotResponse from(CyclePositionHistoryEntry e) {
         BigDecimal marketValueUsd = e.closingPrice() != null
                 ? e.closingPrice().multiply(BigDecimal.valueOf(e.holdings())).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;

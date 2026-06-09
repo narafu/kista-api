@@ -6,16 +6,17 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCyclePosition;
 import com.kista.domain.model.user.User;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
-import com.kista.domain.port.out.TradingCyclePositionPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,19 +42,20 @@ class TradingReporter {
     private final OrderPort orderPort;
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
-    private final TradingCyclePositionPort cycleHistoryPort;
+    private final CyclePositionPort cycleHistoryPort;
     private final CycleRotationService cycleRotationService;
 
-    void recordAndNotify(LocalDate today, TradingCycle cycle, Account account, User user,
+    void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
+                         Account account, User user,
                          AccountBalance balance, TradingSnapshot snapshot, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
         // today는 KST → KisTradingApi.getExecutions 내부에서 toUtc 변환됨
-        List<Execution> executions = kisExecutionPort.getExecutions(today, today, cycle.ticker(), account);
+        List<Execution> executions = kisExecutionPort.getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         AccountBalance postBalance = balance.applyExecutions(executions);
-        saveCyclePosition(postBalance, cycle, account, user, closingPrice, privacyBase);
+        saveCyclePosition(postBalance, strategy, currentCycle, account, user, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
@@ -61,7 +63,7 @@ class TradingReporter {
         if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
             // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
             TradingSnapshot postSnapshot = closingPrice != null
-                    ? new InfinitePosition(postBalance, cycle.ticker(), closingPrice).toSnapshot()
+                    ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice).toSnapshot()
                     : snapshot;
             TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
             userNotificationPort.notifyTradingReport(user, account, report);
@@ -77,18 +79,17 @@ class TradingReporter {
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
     }
 
-    // execute() 종료 시 1건 적재, 사이클 종료 시 연속 정책 처리
-    private void saveCyclePosition(AccountBalance balance, TradingCycle cycle,
+    // execute() 종료 시 1건 적재, holdings==0이면 사이클 rotation 정책 처리
+    private void saveCyclePosition(AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
-        TradingCyclePosition position = TradingCyclePosition.tradeSnapshot(cycle.id(), balance, price);
+        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         cycleHistoryPort.save(position);
-        log.info("[cycleId={}] 사이클 포지션 저장 완료", cycle.id());
+        log.info("[strategyId={}] 사이클 포지션 저장 완료", strategy.id());
 
-        if (position.holdings() == 0 && cycle.cycleSeedType().isConsecutive()) {
-            log.info("[cycleId={}] 사이클 종료 — 연속 정책 실행: {}", cycle.id(), cycle.cycleSeedType());
-            cycleRotationService.rotate(cycle, account, user, price, privacyBase);
-        } else if (position.holdings() == 0) {
-            log.info("[cycleId={}] 사이클 종료 (연속 없음)", cycle.id());
+        // holdings==0이면 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
+        if (position.holdings() == 0) {
+            log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
+            cycleRotationService.rotate(strategy, currentCycle, account, user, price, privacyBase);
         }
     }
 

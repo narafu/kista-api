@@ -3,9 +3,10 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
-import com.kista.domain.model.tradingcycle.TradingCyclePosition;
+import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
@@ -23,10 +24,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 // 사이클 종료 후 재등록(MAINTAIN/MAX) 정책 검증 — 최소금액 가드(InfiniteCycleOrderStrategy.MIN_DEPOSIT_MULTIPLIER=44) 포함
@@ -35,8 +40,9 @@ import static org.mockito.Mockito.*;
 class CycleRotationServiceTest {
 
     @Mock KisMarginPort kisMarginPort;
-    @Mock TradingCyclePort cyclePort;
-    @Mock TradingCyclePositionPort cycleHistoryPort;
+    @Mock StrategyPort strategyPort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock CyclePositionPort cyclePositionPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
@@ -60,13 +66,24 @@ class CycleRotationServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        service = new CycleRotationService(kisMarginPort, cyclePort, cycleHistoryPort,
-                notifyPort, userNotificationPort, cycleStrategies);
+        service = new CycleRotationService(kisMarginPort, strategyPort, strategyCyclePort,
+                cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies);
     }
 
-    private TradingCycle cycle(TradingCycle.CycleSeedType seedType, BigDecimal initialUsdDeposit) {
-        return new TradingCycle(UUID.randomUUID(), ACCOUNT.id(), TradingCycle.Type.INFINITE,
-                TradingCycle.Status.ACTIVE, Ticker.SOXL, initialUsdDeposit, seedType);
+    // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
+    private StrategyCycle currentCycle(UUID strategyId, BigDecimal initialUsdDeposit) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, initialUsdDeposit,
+                Instant.now(), null);
+    }
+
+    // 새 StrategyCycle stub 반환값 (save 후 id 포함)
+    private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, Instant.now(), null);
+    }
+
+    private Strategy strategy(Strategy.CycleSeedType seedType) {
+        return new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, seedType);
     }
 
     private MarginItem usdMargin(String purchasable) {
@@ -78,22 +95,27 @@ class CycleRotationServiceTest {
     @DisplayName("MAINTAIN — 기존 initialUsdDeposit 유지하여 재등록")
     void maintain_keepsExistingDeposit() {
         // minRequired = 22 × 44 = 968 — 기존 1000 통과
-        TradingCycle cycle = cycle(TradingCycle.CycleSeedType.MAINTAIN, new BigDecimal("1000.00"));
+        BigDecimal deposit = new BigDecimal("1000.00");
+        Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
+        StrategyCycle current = currentCycle(strategy.id(), deposit);
+        StrategyCycle newCycle = savedNewCycle(strategy.id(), deposit);
+        // MAINTAIN도 KIS 실잔고 확인 — actual >= maintainSeed 이면 재등록
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(usdMargin("1500.00")));
+        when(strategyCyclePort.save(any())).thenReturn(newCycle);
 
-        service.rotate(cycle, ACCOUNT, USER, PRICE, null);
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        ArgumentCaptor<TradingCycle> cycleCaptor = ArgumentCaptor.forClass(TradingCycle.class);
-        verify(cyclePort).save(cycleCaptor.capture());
-        TradingCycle saved = cycleCaptor.getValue();
-        assertThatCycleRotated(saved, cycle, new BigDecimal("1000.00"));
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+        assertThat(cycleCaptor.getValue().initialUsdDeposit()).isEqualByComparingTo(deposit);
+        assertThat(cycleCaptor.getValue().strategyId()).isEqualTo(strategy.id());
 
-        verify(cycleHistoryPort).save(argThat(h ->
-                h.tradingCycleId().equals(cycle.id())
-                        && h.usdDeposit().compareTo(new BigDecimal("1000.00")) == 0
-                        && h.holdings() == 0
-                        && h.avgPrice() == null));
-        verify(userNotificationPort).notifyStrategyChanged(USER, ACCOUNT, saved, "재등록");
-        verify(kisMarginPort, never()).getMargin(any());
+        verify(cyclePositionPort).save(argThat(p ->
+                p.strategyCycleId().equals(newCycle.id())
+                        && p.usdDeposit().compareTo(deposit) == 0
+                        && p.holdings() == 0
+                        && p.avgPrice() == null));
+        verify(userNotificationPort).notifyStrategyChanged(USER, ACCOUNT, strategy, "재등록");
         verify(notifyPort, never()).notifyInsufficientBalance(any(), any(), any());
     }
 
@@ -101,73 +123,80 @@ class CycleRotationServiceTest {
     @DisplayName("MAINTAIN — 최소금액 미달 시 재등록 취소 + 잔고부족 알림")
     void maintain_belowMinRequired_cancelsAndNotifies() {
         // minRequired = 22 × 44 = 968 — 기존 500은 미달
-        TradingCycle cycle = cycle(TradingCycle.CycleSeedType.MAINTAIN, new BigDecimal("500.00"));
+        // actual(600) >= maintainSeed(500) → targetSeed=500, 하지만 500 < minRequired(968) → 잔고부족 알림
+        BigDecimal deposit = new BigDecimal("500.00");
+        Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
+        StrategyCycle current = currentCycle(strategy.id(), deposit);
+        when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(usdMargin("600.00")));
 
-        service.rotate(cycle, ACCOUNT, USER, PRICE, null);
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT),
-                argThat(b -> b.usdDeposit().compareTo(new BigDecimal("500.00")) == 0), eq(Ticker.SOXL));
-        verify(cyclePort, never()).save(any());
-        verify(cycleHistoryPort, never()).save(any());
+                argThat(b -> b.usdDeposit().compareTo(deposit) == 0), eq(Ticker.SOXL));
+        verify(strategyCyclePort, never()).save(any());
+        verify(cyclePositionPort, never()).save(any());
         verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("MAX — KIS USD 잔고로 nextDeposit 갱신하여 재등록")
+    @DisplayName("MAX — 내부 원장 maxSeed 기준으로 재등록 (KIS 잔고는 검증용)")
     void max_resolvesDepositFromKisMargin() {
-        // KIS USD purchasableAmount=2000 — minRequired(968) 통과
-        TradingCycle cycle = cycle(TradingCycle.CycleSeedType.MAX, new BigDecimal("1000.00"));
+        // maxSeed = 마지막 CyclePosition.usdDeposit = 1500 (내부 원장)
+        // KIS actual(2000) >= maxSeed(1500) → targetSeed = 1500 (NOT 2000)
+        BigDecimal maintainDeposit = new BigDecimal("1000.00");
+        BigDecimal maxSeedDeposit = new BigDecimal("1500.00");
+        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), maintainDeposit);
+        StrategyCycle newCycle = savedNewCycle(strategy.id(), maxSeedDeposit);
+
+        // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
+        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
+
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(
                 new MarginItem(Currency.KRW, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
                 usdMargin("2000.00")));
+        when(cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)).thenReturn(List.of(lastPosition));
+        when(strategyCyclePort.save(any())).thenReturn(newCycle);
 
-        service.rotate(cycle, ACCOUNT, USER, PRICE, null);
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        ArgumentCaptor<TradingCycle> cycleCaptor = ArgumentCaptor.forClass(TradingCycle.class);
-        verify(cyclePort).save(cycleCaptor.capture());
-        assertThatCycleRotated(cycleCaptor.getValue(), cycle, new BigDecimal("2000.00"));
-        verify(cycleHistoryPort).save(argThat(h ->
-                h.usdDeposit().compareTo(new BigDecimal("2000.00")) == 0));
-        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), any(), eq("재등록"));
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+        assertThat(cycleCaptor.getValue().initialUsdDeposit()).isEqualByComparingTo(maxSeedDeposit);
+        verify(cyclePositionPort).save(argThat(p ->
+                p.usdDeposit().compareTo(maxSeedDeposit) == 0));
+        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), eq(strategy), eq("재등록"));
     }
 
     @Test
     @DisplayName("MAX — KIS 잔고 조회 실패 시 재등록 중단 + 관리자 오류 알림")
     void max_kisLookupFails_abortsAndNotifiesError() {
-        TradingCycle cycle = cycle(TradingCycle.CycleSeedType.MAX, new BigDecimal("1000.00"));
+        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         RuntimeException kisError = new RuntimeException("KIS 잔고 조회 실패");
         when(kisMarginPort.getMargin(ACCOUNT)).thenThrow(kisError);
 
-        service.rotate(cycle, ACCOUNT, USER, PRICE, null);
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(notifyPort).notifyError(kisError);
-        verify(cyclePort, never()).save(any());
-        verify(cycleHistoryPort, never()).save(any());
+        verify(strategyCyclePort, never()).save(any());
+        verify(cyclePositionPort, never()).save(any());
         verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("MAX — USD 잔고 행이 없으면 재등록 중단 + 오류 알림")
     void max_noUsdMarginRow_abortsAndNotifiesError() {
-        TradingCycle cycle = cycle(TradingCycle.CycleSeedType.MAX, new BigDecimal("1000.00"));
+        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(
                 new MarginItem(Currency.KRW, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)));
 
-        service.rotate(cycle, ACCOUNT, USER, PRICE, null);
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(notifyPort).notifyError(any(IllegalStateException.class));
-        verify(cyclePort, never()).save(any());
-        verify(cycleHistoryPort, never()).save(any());
-    }
-
-    private void assertThatCycleRotated(TradingCycle saved, TradingCycle original, BigDecimal expectedDeposit) {
-        org.assertj.core.api.Assertions.assertThat(saved.id()).isEqualTo(original.id());
-        org.assertj.core.api.Assertions.assertThat(saved.accountId()).isEqualTo(original.accountId());
-        org.assertj.core.api.Assertions.assertThat(saved.type()).isEqualTo(original.type());
-        org.assertj.core.api.Assertions.assertThat(saved.status()).isEqualTo(TradingCycle.Status.ACTIVE);
-        org.assertj.core.api.Assertions.assertThat(saved.ticker()).isEqualTo(original.ticker());
-        org.assertj.core.api.Assertions.assertThat(saved.cycleSeedType()).isEqualTo(original.cycleSeedType());
-        org.assertj.core.api.Assertions.assertThat(saved.initialUsdDeposit()).isEqualByComparingTo(expectedDeposit);
+        verify(strategyCyclePort, never()).save(any());
+        verify(cyclePositionPort, never()).save(any());
     }
 
 }

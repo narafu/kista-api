@@ -1,6 +1,6 @@
 package com.kista.domain.strategy;
 
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.function.Function;
 @Component
 public class CycleOrderStrategies {
 
-    private final Map<TradingCycle.Type, CycleOrderStrategy> byType;
+    private final Map<Strategy.Type, CycleOrderStrategy> byType;
 
     public CycleOrderStrategies(List<CycleOrderStrategy> strategies) {
         this.byType = strategies.stream()
@@ -19,13 +19,13 @@ public class CycleOrderStrategies {
                         CycleOrderStrategy::cycleType, Function.identity()));
     }
 
-    public CycleOrderStrategy of(TradingCycle.Type type) {
+    public CycleOrderStrategy of(Strategy.Type type) {
         CycleOrderStrategy s = byType.get(type);
         if (s == null) throw new IllegalStateException("등록되지 않은 cycleType: " + type);
         return s;
     }
 
-    public CycleOrderStrategy of(TradingCycle cycle) {
-        return of(cycle.type());
+    public CycleOrderStrategy of(Strategy strategy) {
+        return of(strategy.type());
     }
 }

@@ -1,7 +1,5 @@
 package com.kista.domain.model.strategy;
 
-import com.kista.domain.model.tradingcycle.TradingCycle;
-
 import java.math.BigDecimal;
 
 import static java.math.RoundingMode.FLOOR;
@@ -9,7 +7,7 @@ import static java.math.RoundingMode.HALF_UP;
 
 public record InfinitePosition(
         AccountBalance balance,
-        TradingCycle.Ticker ticker,    // 거래 종목
+        Strategy.Ticker ticker,        // 거래 종목
         BigDecimal prevClosePrice      // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
 ) {
     private static final int TOTAL_ROUNDS = 20;

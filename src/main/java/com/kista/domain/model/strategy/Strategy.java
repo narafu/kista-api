@@ -1,4 +1,4 @@
-package com.kista.domain.model.tradingcycle;
+package com.kista.domain.model.strategy;
 
 import com.kista.domain.model.account.Account;
 import lombok.Getter;
@@ -10,28 +10,30 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-public record TradingCycle(
-        UUID id,                        // PK
-        UUID accountId,                 // FK → accounts.id
-        Type type,                      // 매매 전략 종류
-        Status status,                  // 전략 실행 상태
-        Ticker ticker,                  // 거래 종목 (매매 도메인 메타: 익절률 + 설명)
-        BigDecimal initialUsdDeposit,   // 사이클 시작 시 초기 입금액 (PRIVACY: 배수 산출 기준)
-        CycleSeedType cycleSeedType     // 사이클 종료 후 자동 재등록 정책
+// 계좌별 영속 전략 설정 — 여러 StrategyCycle(매매 라운드)을 거느림
+public record Strategy(
+        UUID id,                    // PK
+        UUID accountId,             // FK → accounts.id
+        Type type,                  // 매매 전략 종류
+        Status status,              // 전략 실행 상태
+        Ticker ticker,              // 거래 종목 (매매 도메인 메타: 익절률 + 설명)
+        CycleSeedType cycleSeedType // 사이클 종료 후 자동 재등록 정책
 ) {
+    // 소유권 검증 — 불일치 시 SecurityException (GlobalExceptionHandler → 403)
+    public void verifyOwnedBy(UUID requesterId) {
+        if (!accountId.equals(requesterId)) {
+            throw new SecurityException("전략 소유자가 아닙니다.");
+        }
+    }
+
     // 상태만 교체 — 나머지 필드 보존
-    public TradingCycle withStatus(Status newStatus) {
-        return new TradingCycle(id, accountId, type, newStatus, ticker, initialUsdDeposit, cycleSeedType);
+    public Strategy withStatus(Status newStatus) {
+        return new Strategy(id, accountId, type, newStatus, ticker, cycleSeedType);
     }
 
     // 연속 정책만 교체
-    public TradingCycle withCycleSeedType(CycleSeedType newCycleSeedType) {
-        return new TradingCycle(id, accountId, type, status, ticker, initialUsdDeposit, newCycleSeedType);
-    }
-
-    // initialUsdDeposit만 교체 (연속 정책 재등록 시 시드 갱신)
-    public TradingCycle withInitialUsdDeposit(BigDecimal newDeposit) {
-        return new TradingCycle(id, accountId, type, status, ticker, newDeposit, cycleSeedType);
+    public Strategy withCycleSeedType(CycleSeedType newCycleSeedType) {
+        return new Strategy(id, accountId, type, status, ticker, newCycleSeedType);
     }
 
     @Getter
@@ -78,8 +80,8 @@ public record TradingCycle(
         FNGU(new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
         BULZ(new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
 
-        private final BigDecimal targetProfitRate;       // 익절 목표 수익률 (매매 도메인 정책)
-        private final String description;               // 종목 설명 (UI 메타)
+        private final BigDecimal targetProfitRate;  // 익절 목표 수익률 (매매 도메인 정책)
+        private final String description;           // 종목 설명 (UI 메타)
 
         // KIS 응답 String → Ticker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
         public static Optional<Ticker> tryParse(String name) {
@@ -95,9 +97,9 @@ public record TradingCycle(
     @Getter
     @RequiredArgsConstructor
     public enum CycleSeedType {
-        NONE("연속 안함"),    // 연속 사이클 없음
+        NONE("연속 안함"),    // holdings 0 → 전략 PAUSE
         MAINTAIN("시드 유지"), // 종료 후 동일 initialUsdDeposit으로 재등록
-        MAX("시드 MAX");      // 종료 후 현재 USD 잔고 전액을 initialUsdDeposit으로 재등록
+        MAX("시드 MAX");      // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
 
         private final String label; // 한국어 표시 이름
 

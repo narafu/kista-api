@@ -6,7 +6,7 @@ import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
-import com.kista.domain.port.in.TradingCycleUseCase;
+import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +29,7 @@ import java.util.UUID;
 @Slf4j
 public class TradingCycleController {
 
-    private final TradingCycleUseCase tradingCycle;              // CRUD + pause/resume
+    private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume
     private final AccountStatisticsUseCase accountStatistics;   // 사이클 이력 조회
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
 

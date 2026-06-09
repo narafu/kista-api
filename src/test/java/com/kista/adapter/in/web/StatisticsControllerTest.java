@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.tradingcycle.CycleHistoryPage;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import org.junit.jupiter.api.Test;

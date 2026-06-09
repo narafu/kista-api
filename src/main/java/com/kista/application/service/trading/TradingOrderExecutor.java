@@ -3,7 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +25,10 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
 
     // position이 있고 currentPrice가 있을 때만 보정 (수동 선행 주문은 그대로 접수)
-    List<Order> placeOrders(LocalDate today, TradingCycle cycle, Account account,
+    List<Order> placeOrders(LocalDate today, Strategy strategy, Account account,
                             BigDecimal currentPrice, InfinitePosition position) {
         if (currentPrice != null && position != null) {
-            buyOrderPriceCapper.capIfNeeded(today, cycle, account, currentPrice, position);
+            buyOrderPriceCapper.capIfNeeded(today, strategy, account, currentPrice, position);
         }
         List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
         List<Order> placed = planned.stream().map(p -> {

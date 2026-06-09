@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.trade;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

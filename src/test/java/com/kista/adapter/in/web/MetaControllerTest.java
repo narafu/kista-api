@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -40,8 +40,8 @@ class MetaControllerTest {
 
     @Test
     void getBundle_authenticated_returns200WithAllSections() throws Exception {
-        int strategyTypeCount = TradingCycle.Type.values().length;
-        int tickerCount = TradingCycle.Ticker.values().length;
+        int strategyTypeCount = Strategy.Type.values().length;
+        int tickerCount = Strategy.Ticker.values().length;
 
         mockMvc.perform(get("/api/meta")
                         .with(authentication(mockAuth())))
@@ -96,7 +96,7 @@ class MetaControllerTest {
         mockMvc.perform(get("/api/meta/cycle-seed-types")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(TradingCycle.CycleSeedType.values().length))
+                .andExpect(jsonPath("$.length()").value(Strategy.CycleSeedType.values().length))
                 .andExpect(jsonPath("$[0].code").value("NONE"))
                 .andExpect(jsonPath("$[0].label").value("연속 안함"));
     }
@@ -107,6 +107,6 @@ class MetaControllerTest {
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cycleSeedTypes").isArray())
-                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(TradingCycle.CycleSeedType.values().length));
+                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(Strategy.CycleSeedType.values().length));
     }
 }

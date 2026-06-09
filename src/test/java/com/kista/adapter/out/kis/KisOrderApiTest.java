@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.kis.KisApiException;
 import org.junit.jupiter.api.BeforeEach;

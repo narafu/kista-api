@@ -1,7 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import lombok.RequiredArgsConstructor;

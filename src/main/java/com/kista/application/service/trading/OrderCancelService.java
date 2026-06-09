@@ -7,7 +7,7 @@ import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,12 +27,12 @@ class OrderCancelService {
     private final OrderPort orderPort;
     private final KisOrderPort kisOrderPort;
     private final AccountPort accountPort;
-    private final TradingCyclePort cyclePort;
+    private final StrategyPort strategyPort;
 
-    CancelResult cancelByCycle(UUID cycleId, UUID requesterId) {
-        // 소유권 검증: 사이클 → 계좌 → 요청자 일치 확인
-        var cycle = cyclePort.findByIdOrThrow(cycleId);
-        Account account = accountPort.requireOwnedAccount(cycle.accountId(), requesterId);
+    CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
+        // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
+        var strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 오늘 PLACED된 주문 조회 (UTC 기준 — TradeDateConverter 없이 도메인 LocalDate 사용)
         List<Order> placedOrders = orderPort.findPlacedByAccountAndDate(account.id(), LocalDate.now());

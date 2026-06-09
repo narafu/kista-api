@@ -1,7 +1,7 @@
 package com.kista.application.service.privacy;
 
 import com.kista.common.TradeDateConverter;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;

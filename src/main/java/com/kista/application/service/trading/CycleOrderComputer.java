@@ -4,7 +4,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -21,19 +21,22 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class CycleOrderComputer {
 
-    private final CycleOrderStrategies cycleStrategies;   // 사이클 타입별 주문 전략 라우터
+    private final CycleOrderStrategies cycleStrategies;   // 전략 타입별 주문 전략 라우터
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
-    ComputeResult compute(AccountBalance balance, TradingCycle cycle, BigDecimal prevClosePrice,
-                          LocalDate tradeDate, PrivacyTradeBase privacyBase, String label) {
-        CycleOrderStrategy strategy = cycleStrategies.of(cycle);
-        Optional<CycleOrderStrategy.OrderPlan> planOpt = strategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, cycle, prevClosePrice, tradeDate, privacyBase, label));
+    // initialUsdDeposit: 현재 StrategyCycle.initialUsdDeposit (PRIVACY 전략에서 필요)
+    ComputeResult compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
+                          LocalDate tradeDate, BigDecimal initialUsdDeposit,
+                          PrivacyTradeBase privacyBase, String label) {
+        CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
+        Optional<CycleOrderStrategy.OrderPlan> planOpt = orderStrategy.plan(new CycleOrderStrategy.PlanContext(
+                balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label));
 
         // 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
         if (planOpt.isEmpty()) return ComputeResult.skipped();
 
         CycleOrderStrategy.OrderPlan plan = planOpt.get();
+
         // valid=false: 매수금액 > 잔액 or 매도수량 > 보유수량
         return new ComputeResult(plan, balance.isOrderValid(plan.orders()));
     }

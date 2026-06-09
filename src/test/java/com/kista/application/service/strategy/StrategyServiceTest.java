@@ -1,14 +1,15 @@
-package com.kista.application.service.tradingcycle;
+package com.kista.application.service.strategy;
 
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle;
-import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.TradingCyclePositionPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,37 +26,32 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TradingCycleService 단위 테스트")
-class TradingCycleServiceTest {
+@DisplayName("StrategyService 단위 테스트")
+class StrategyServiceTest {
 
-    @Mock TradingCyclePort cyclePort;
-    @Mock TradingCyclePositionPort cycleHistoryPort;
+    @Mock StrategyPort strategyPort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock CyclePositionPort cyclePositionPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks TradingCycleService tradingCycleService;
+    @InjectMocks StrategyService strategyService;
 
-    private static final UUID CYCLE_ID = UUID.randomUUID();
-    private static final UUID ACCOUNT_ID = UUID.randomUUID();
-    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID STRATEGY_ID = UUID.randomUUID();
+    private static final UUID ACCOUNT_ID  = UUID.randomUUID();
+    private static final UUID USER_ID     = UUID.randomUUID();
 
-    // ACTIVE 상태 사이클 픽스처
-    private static final TradingCycle ACTIVE_CYCLE = new TradingCycle(
-            CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE,
-            TradingCycle.Ticker.SOXL, new BigDecimal("1000"), TradingCycle.CycleSeedType.NONE
+    // ACTIVE 상태 전략 픽스처
+    private static final Strategy ACTIVE_STRATEGY = new Strategy(
+            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
+            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
 
-    // PAUSED 상태 사이클 픽스처 (pause() 후 저장되는 값)
-    private static final TradingCycle PAUSED_CYCLE = new TradingCycle(
-            CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE, TradingCycle.Status.PAUSED,
-            TradingCycle.Ticker.SOXL, new BigDecimal("1000"), TradingCycle.CycleSeedType.NONE
-    );
-
-    // ACTIVE 상태 사이클 픽스처 (resume() 후 저장되는 값)
-    private static final TradingCycle RESUMED_CYCLE = new TradingCycle(
-            CYCLE_ID, ACCOUNT_ID, TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE,
-            TradingCycle.Ticker.SOXL, new BigDecimal("1000"), TradingCycle.CycleSeedType.NONE
+    // PAUSED 상태 전략 픽스처
+    private static final Strategy PAUSED_STRATEGY = new Strategy(
+            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.PAUSED,
+            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
 
     private Account ownerAccount() {
@@ -74,45 +69,45 @@ class TradingCycleServiceTest {
     @DisplayName("pause() 호출 시 TradingCyclePausedEvent가 발행된다")
     void pause_publishes_TradingCyclePausedEvent() {
         // given
-        when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(ACTIVE_CYCLE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(cyclePort.save(any(TradingCycle.class))).thenReturn(PAUSED_CYCLE);
+        when(strategyPort.save(any(Strategy.class))).thenReturn(PAUSED_STRATEGY);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
         // when
-        tradingCycleService.pause(CYCLE_ID, USER_ID);
+        strategyService.pause(STRATEGY_ID, USER_ID);
 
         // then
         verify(eventPublisher).publishEvent(any(TradingCyclePausedEvent.class));
-        verify(cyclePort).save(any(TradingCycle.class));
+        verify(strategyPort).save(any(Strategy.class));
     }
 
     @Test
     @DisplayName("resume() 호출 시 TradingCycleResumedEvent가 발행된다")
     void resume_publishes_TradingCycleResumedEvent() {
         // given
-        when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(PAUSED_CYCLE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(cyclePort.save(any(TradingCycle.class))).thenReturn(RESUMED_CYCLE);
+        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
         // when
-        tradingCycleService.resume(CYCLE_ID, USER_ID);
+        strategyService.resume(STRATEGY_ID, USER_ID);
 
         // then
         verify(eventPublisher).publishEvent(any(TradingCycleResumedEvent.class));
-        verify(cyclePort).save(any(TradingCycle.class));
+        verify(strategyPort).save(any(Strategy.class));
     }
 
     @Test
     @DisplayName("pause() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void pause_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
-        when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(ACTIVE_CYCLE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
                 .thenThrow(new SecurityException("소유자가 아닙니다"));
 
-        assertThatThrownBy(() -> tradingCycleService.pause(CYCLE_ID, otherUserId))
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);
 
         verify(eventPublisher, never()).publishEvent(any());
@@ -122,11 +117,11 @@ class TradingCycleServiceTest {
     @DisplayName("resume() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void resume_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
-        when(cyclePort.findByIdOrThrow(CYCLE_ID)).thenReturn(PAUSED_CYCLE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
                 .thenThrow(new SecurityException("소유자가 아닙니다"));
 
-        assertThatThrownBy(() -> tradingCycleService.resume(CYCLE_ID, otherUserId))
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);
 
         verify(eventPublisher, never()).publishEvent(any());

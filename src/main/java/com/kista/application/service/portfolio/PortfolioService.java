@@ -1,11 +1,11 @@
 package com.kista.application.service.portfolio;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
-import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.PortfolioUseCase;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.TradingCyclePositionPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,11 +17,11 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 class PortfolioService implements PortfolioUseCase {
 
-    private final TradingCyclePositionPort cycleHistoryPort;
+    private final CyclePositionPort cycleHistoryPort;
     private final OrderPort orderPort; // 거래 이력 조회
 
     @Override
-    public AccountCycleHistoryEntry getCurrent() {
+    public CyclePositionHistoryEntry getCurrent() {
         // 전체 이력 중 가장 최근 1건 반환
         return cycleHistoryPort.findRecentGlobal(1).stream()
                 .findFirst()
@@ -29,7 +29,7 @@ class PortfolioService implements PortfolioUseCase {
     }
 
     @Override
-    public List<AccountCycleHistoryEntry> getSnapshots(LocalDate from, LocalDate to) {
+    public List<CyclePositionHistoryEntry> getSnapshots(LocalDate from, LocalDate to) {
         return cycleHistoryPort.findBetween(from, to);
     }
 

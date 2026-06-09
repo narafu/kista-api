@@ -6,7 +6,7 @@ import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisConnectionTestPort;
-import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ class AccountService implements AccountUseCase {
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
     private final AccountPort accountPort;
-    private final TradingCyclePort cyclePort;
+    private final StrategyPort strategyPort;
     private final KisConnectionTestPort connectionTestPort; // KIS 자격증명 연결 테스트 포트
 
     @Override
@@ -53,8 +53,8 @@ class AccountService implements AccountUseCase {
     @Override
     public void delete(UUID accountId, UUID requesterId) {
         accountPort.requireOwnedAccount(accountId, requesterId);
-        // 계좌에 속한 사이클 먼저 소프트 삭제 (FK CASCADE 대체)
-        cyclePort.deleteByAccountId(accountId);
+        // 계좌에 속한 전략 먼저 소프트 삭제 (FK CASCADE 대체)
+        strategyPort.deleteByAccountId(accountId);
         accountPort.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
     }

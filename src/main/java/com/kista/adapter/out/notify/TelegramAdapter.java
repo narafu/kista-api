@@ -3,7 +3,7 @@ package com.kista.adapter.out.notify;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +37,7 @@ public class TelegramAdapter implements NotifyPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(Account account, AccountBalance b, TradingCycle.Ticker ticker) {
+    public void notifyInsufficientBalance(Account account, AccountBalance b, Strategy.Ticker ticker) {
         send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
                 ticker.name(), b.holdings(), b.usdDeposit()));
     }

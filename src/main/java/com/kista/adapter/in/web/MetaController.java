@@ -5,7 +5,7 @@ import com.kista.adapter.in.web.dto.MetaBundle;
 import com.kista.adapter.in.web.dto.StrategyTypeMeta;
 import com.kista.adapter.in.web.dto.TickerMeta;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.CacheControl;
@@ -66,13 +66,13 @@ public class MetaController {
     }
 
     private List<StrategyTypeMeta> getStrategyTypeList() {
-        return Arrays.stream(TradingCycle.Type.values())
+        return Arrays.stream(Strategy.Type.values())
                 .map(StrategyTypeMeta::from)
                 .toList();
     }
 
     private List<TickerMeta> getTickerList() {
-        return Arrays.stream(TradingCycle.Ticker.values())
+        return Arrays.stream(Strategy.Ticker.values())
                 .map(TickerMeta::from)
                 .toList();
     }
@@ -84,13 +84,13 @@ public class MetaController {
     }
 
     private List<EnumMeta> getStrategyStatusList() {
-        return Arrays.stream(TradingCycle.Status.values())
+        return Arrays.stream(Strategy.Status.values())
                 .map(s -> new EnumMeta(s.name(), s.getLabel(), null))
                 .toList();
     }
 
     private List<EnumMeta> getCycleSeedTypeList() {
-        return Arrays.stream(TradingCycle.CycleSeedType.values())
+        return Arrays.stream(Strategy.CycleSeedType.values())
                 .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
                 .toList();
     }

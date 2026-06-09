@@ -3,7 +3,7 @@ package com.kista.adapter.out.notify;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.TradingSnapshot;
-import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,11 +43,11 @@ class TelegramUserNotificationAdapterTest {
                 null, null, null, null, NotificationChannel.TELEGRAM);
         Account account = mock(Account.class);
         when(account.nickname()).thenReturn("내계좌");
-        TradingCycle cycle = new TradingCycle(UUID.randomUUID(), UUID.randomUUID(),
-                TradingCycle.Type.INFINITE, TradingCycle.Status.ACTIVE, TradingCycle.Ticker.SOXL,
-                null, TradingCycle.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(UUID.randomUUID(), UUID.randomUUID(),
+                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL,
+                Strategy.CycleSeedType.NONE);
 
-        adapter.notifyStrategyChanged(user, account, cycle, "중지");
+        adapter.notifyStrategyChanged(user, account, strategy, "중지");
 
         verify(restTemplate).postForObject(contains("/botadmin-token/sendMessage"), any(), eq(String.class));
     }

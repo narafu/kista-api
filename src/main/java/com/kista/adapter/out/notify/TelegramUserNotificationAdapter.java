@@ -4,8 +4,8 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -25,16 +25,16 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
 
-    // TradingCycleService가 발행한 중지 이벤트를 커밋 성공 후에만 수신
+    // StrategyService가 발행한 중지 이벤트를 커밋 성공 후에만 수신
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCyclePaused(TradingCyclePausedEvent event) {
-        notifyStrategyChanged(event.user(), event.account(), event.cycle(), "중지");
+        notifyStrategyChanged(event.user(), event.account(), event.strategy(), "중지");
     }
 
-    // TradingCycleService가 발행한 재개 이벤트를 커밋 성공 후에만 수신
+    // StrategyService가 발행한 재개 이벤트를 커밋 성공 후에만 수신
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCycleResumed(TradingCycleResumedEvent event) {
-        notifyStrategyChanged(event.user(), event.account(), event.cycle(), "재개");
+        notifyStrategyChanged(event.user(), event.account(), event.strategy(), "재개");
     }
 
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
@@ -77,11 +77,11 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyStrategyChanged(User user, Account account, TradingCycle cycle, String action) {
+    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
         // 관리자 봇으로 전략 변경 내용 알림
         String text = String.format("사용자 %s이 계좌 %s의 %s(%s) 전략을 %s했습니다",
                 user.nickname(), account.nickname(),
-                cycle.type().name(), cycle.ticker().name(), action);
+                strategy.type().name(), strategy.ticker().name(), action);
         telegramHttpClient.sendMessage(props.chatId(), text, props.botToken());
     }
 
