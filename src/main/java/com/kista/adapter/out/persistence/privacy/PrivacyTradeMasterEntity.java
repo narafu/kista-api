@@ -16,8 +16,8 @@ import java.util.UUID;
 
 @Entity
 @Table(
-    name = "privacy_trades_master",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"trade_date", "ticker"})
+    name = "privacy_trade_bases",
+    uniqueConstraints = @UniqueConstraint(name = "uq_privacy_trade_bases_date_ticker", columnNames = {"trade_date", "ticker"})
 )
 @Getter
 @Setter(AccessLevel.PACKAGE)

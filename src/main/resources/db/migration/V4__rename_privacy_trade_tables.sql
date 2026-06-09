@@ -1,0 +1,7 @@
+-- privacy_trades_master → privacy_trade_bases
+ALTER TABLE privacy_trades_master RENAME TO privacy_trade_bases;
+ALTER TABLE privacy_trade_bases RENAME CONSTRAINT uq_privacy_trades_master_date_ticker TO uq_privacy_trade_bases_date_ticker;
+
+-- privacy_trades_detail → privacy_trade_base_orders
+ALTER TABLE privacy_trades_detail RENAME TO privacy_trade_base_orders;
+ALTER TABLE privacy_trade_base_orders RENAME CONSTRAINT privacy_trades_detail_privacy_trade_id_fkey TO privacy_trade_base_orders_privacy_trade_id_fkey;

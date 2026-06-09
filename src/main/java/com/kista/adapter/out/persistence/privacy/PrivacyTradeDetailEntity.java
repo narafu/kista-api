@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "privacy_trades_detail")
+@Table(name = "privacy_trade_base_orders")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
