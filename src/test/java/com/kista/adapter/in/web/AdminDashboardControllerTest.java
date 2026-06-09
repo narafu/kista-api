@@ -4,7 +4,7 @@ import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.admin.AdminStats;
-import com.kista.domain.port.in.AdminDashboardUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -33,13 +33,13 @@ class AdminDashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean AdminDashboardUseCase dashboardUseCase;
+    @MockitoBean AdminQueryUseCase adminQuery;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Test
     void getStats_withAdminToken_returns200() throws Exception {
-        when(dashboardUseCase.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
+        when(adminQuery.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
 
         var adminToken = new UsernamePasswordAuthenticationToken(ADMIN_UUID, null,
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));

@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.port.in.AdminListAuditLogsUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -31,7 +31,7 @@ class AdminAuditControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean AdminListAuditLogsUseCase listAuditLogs;
+    @MockitoBean AdminQueryUseCase adminQuery;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -51,7 +51,7 @@ class AdminAuditControllerTest {
 
     @Test
     void listAuditLogs_adminRole_returns200() throws Exception {
-        when(listAuditLogs.listAll()).thenReturn(List.of());
+        when(adminQuery.listAuditLogs()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/audit-logs")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))

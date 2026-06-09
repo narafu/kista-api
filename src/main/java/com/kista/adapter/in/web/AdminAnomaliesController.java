@@ -3,8 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.port.in.AdminAnomaliesUseCase;
-import com.kista.domain.port.in.AdminListUsersUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,14 +23,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminAnomaliesController {
 
-    private final AdminAnomaliesUseCase anomaliesUseCase;
-    private final AdminListUsersUseCase listUsers;
+    private final AdminQueryUseCase adminQuery;
+    private final AdminUserUseCase adminUser;
 
     @GetMapping
     public AdminAnomaliesResponse getAnomalies() {
-        AdminAnomalies anomalies = anomaliesUseCase.getAnomalies();
+        AdminAnomalies anomalies = adminQuery.getAnomalies();
 
-        Map<UUID, AdminUserView> userMap = listUsers.listAll().stream()
+        Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 
         List<AccountItem> pausedAccounts = anomalies.pausedAccounts().stream()

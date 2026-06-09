@@ -1,13 +1,18 @@
 package com.kista.application.service.admin;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.tradingcycle.TradingCycle;
 import com.kista.domain.model.admin.AdminAnomalies;
+import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.port.in.AdminAnomaliesUseCase;
+import com.kista.domain.model.tradingcycle.TradingCycle;
+import com.kista.domain.model.user.User;
+import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.TradingCyclePort;
+import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,16 +26,45 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-class AdminAnomaliesService implements AdminAnomaliesUseCase {
+class AdminQueryService implements AdminQueryUseCase {
 
-    private final OrderPort orderPort;
+    private final UserPort userPort;
     private final AccountPort accountPort;
+    private final OrderPort orderPort;
+    private final AuditLogPort auditLogPort;
     private final TradingCyclePort cyclePort;
+
+    @Override
+    public AdminStats getStats() {
+        long totalUsers = userPort.countAll();
+        long pendingCount = userPort.countByStatus(User.UserStatus.PENDING);
+        long activeCount = userPort.countByStatus(User.UserStatus.ACTIVE);
+        long rejectedCount = userPort.countByStatus(User.UserStatus.REJECTED);
+        long totalAccounts = accountPort.countAll();
+        return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
+    }
+
+    @Override
+    public List<Account> listAccounts() {
+        return accountPort.findAll();
+    }
+
+    @Override
+    public List<Order> listTrades() {
+        // 최근 30일 전체 계좌 거래 내역 조회
+        LocalDate to = LocalDate.now();
+        LocalDate from = to.minusDays(30);
+        return orderPort.findAll(from, to);
+    }
+
+    @Override
+    public List<AuditLog> listAuditLogs() {
+        return auditLogPort.findAll(); // 최신순 100건
+    }
 
     @Override
     public AdminAnomalies getAnomalies() {
         LocalDate today = LocalDate.now();
-
         List<Account> allAccounts = accountPort.findAll();
 
         // PAUSED 사이클이 있는 계좌

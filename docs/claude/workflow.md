@@ -17,5 +17,5 @@
 
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
-- `trading_cycle_history`: 사이클 단위 잔고 스냅샷 — 실행당 1건 append. `UNIQUE(trading_cycle_id, trade_date)` — 동일 trade_date 중복 시 무시(log.warn). 필드: usd_deposit/avg_price/holdings/current_price
+- `trading_cycle_history`: 사이클 단위 잔고 스냅샷 — 실행당 1건 append. `UNIQUE(trading_cycle_id, trade_date)` — 동일 trade_date 중복 시 무시(log.warn). 필드: usd_deposit/avg_price/holdings/closing_price (V2: current_price에서 리네임)
 - `trade_histories`·`portfolio_snapshots` 테이블은 V51·V50에서 DROP됨 — 참조 금지

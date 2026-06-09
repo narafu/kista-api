@@ -1,14 +1,10 @@
 package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
-import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.AdminDashboardUseCase;
-import com.kista.domain.port.in.AdminListUsersUseCase;
-import com.kista.domain.port.in.AdminUserActionUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.in.UserUseCase;
-import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.UserPort;
@@ -25,11 +21,10 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, AdminDashboardUseCase {
+class AdminService implements AdminUserUseCase {
 
     private final UserPort userPort;
     private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
-    private final AccountPort accountPort;
     private final UserCascadeDeleter userCascadeDeleter;
     private final UserUseCase userUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
@@ -78,16 +73,5 @@ class AdminService implements AdminListUsersUseCase, AdminUserActionUseCase, Adm
         userCascadeDeleter.deleteCascade(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public AdminStats getStats() {
-        long totalUsers = userPort.countAll();
-        long pendingCount = userPort.countByStatus(User.UserStatus.PENDING);
-        long activeCount = userPort.countByStatus(User.UserStatus.ACTIVE);
-        long rejectedCount = userPort.countByStatus(User.UserStatus.REJECTED);
-        long totalAccounts = accountPort.countAll();
-        return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }
 }

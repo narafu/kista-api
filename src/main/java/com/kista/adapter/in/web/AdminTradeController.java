@@ -3,9 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.port.in.AdminListAccountsUseCase;
-import com.kista.domain.port.in.AdminListTradesUseCase;
-import com.kista.domain.port.in.AdminListUsersUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,19 +23,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminTradeController {
 
-    private final AdminListTradesUseCase listTrades;      // 최근 30일 전체 거래 내역
-    private final AdminListAccountsUseCase listAccounts;  // accountId → userId 매핑용
-    private final AdminListUsersUseCase listUsers;        // userId → nickname 매핑용
+    private final AdminQueryUseCase adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
+    private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @GetMapping
     public List<AdminTradeResponse> listTrades() {
         // 계좌·사용자 맵 일괄 생성
-        Map<UUID, Account> accountMap = listAccounts.listAll().stream()
+        Map<UUID, Account> accountMap = adminQuery.listAccounts().stream()
                 .collect(Collectors.toMap(Account::id, Function.identity()));
-        Map<UUID, AdminUserView> userMap = listUsers.listAll().stream()
+        Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return listTrades.listAll().stream()
+        return adminQuery.listTrades().stream()
                 .map(t -> AdminTradeResponse.from(t, accountMap, userMap))
                 .toList();
     }

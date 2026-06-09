@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.admin.AuditLog;
-import com.kista.domain.port.in.AdminListAuditLogsUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,11 +17,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminAuditController {
 
-    private final AdminListAuditLogsUseCase listAuditLogs;
+    private final AdminQueryUseCase adminQuery;
 
     @GetMapping
     public List<AdminAuditLogResponse> listAuditLogs() {
-        return listAuditLogs.listAll().stream()
+        return adminQuery.listAuditLogs().stream()
                 .map(AdminAuditLogResponse::from)
                 .toList();
     }

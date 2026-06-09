@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminDashboardResponse;
-import com.kista.domain.port.in.AdminDashboardUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +18,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminDashboardController {
 
-    private final AdminDashboardUseCase dashboardUseCase;
+    private final AdminQueryUseCase adminQuery;
 
     // 사용자 현황 통계 조회 (상태별 카운트 + 총 계좌 수)
     @Operation(summary = "대시보드 통계 조회")
     @GetMapping("/stats")
     public AdminDashboardResponse getStats(@AuthenticationPrincipal UUID adminId) {
-        return AdminDashboardResponse.from(dashboardUseCase.getStats());
+        return AdminDashboardResponse.from(adminQuery.getStats());
     }
 }

@@ -3,8 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.AdminUserResponse;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.AdminListUsersUseCase;
-import com.kista.domain.port.in.AdminUserActionUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +20,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminUserController {
 
-    private final AdminListUsersUseCase listUsers;   // 사용자 목록 조회
-    private final AdminUserActionUseCase userAction; // 사용자 액션 (승인/거절/역할변경/삭제)
+    private final AdminUserUseCase adminUser; // 사용자 조회 + 액션 (승인/거절/역할변경/삭제)
 
     // 전체 또는 상태별 사용자 목록 조회
     @Operation(summary = "사용자 목록 조회")
@@ -31,8 +29,8 @@ public class AdminUserController {
             @RequestParam(required = false) User.UserStatus status,
             @AuthenticationPrincipal UUID adminId) {
         List<AdminUserView> views = status == null
-                ? listUsers.listAll()
-                : listUsers.listByStatus(status);
+                ? adminUser.listAll()
+                : adminUser.listByStatus(status);
         return AdminUserResponse.fromList(views);
     }
 
@@ -44,8 +42,8 @@ public class AdminUserController {
                              @RequestBody StatusRequest body,
                              @AuthenticationPrincipal UUID adminId) {
         switch (body.status()) {
-            case "ACTIVE"   -> userAction.approveUser(adminId, userId);
-            case "REJECTED" -> userAction.rejectUser(adminId, userId);
+            case "ACTIVE"   -> adminUser.approveUser(adminId, userId);
+            case "REJECTED" -> adminUser.rejectUser(adminId, userId);
             default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
         }
     }
@@ -57,7 +55,7 @@ public class AdminUserController {
     public void changeRole(@PathVariable UUID userId,
                            @RequestBody RoleRequest body,
                            @AuthenticationPrincipal UUID adminId) {
-        userAction.changeRole(adminId, userId, body.role());
+        adminUser.changeRole(adminId, userId, body.role());
     }
 
     // 사용자 삭제
@@ -65,7 +63,7 @@ public class AdminUserController {
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable UUID userId, @AuthenticationPrincipal UUID adminId) {
-        userAction.deleteUser(adminId, userId);
+        adminUser.deleteUser(adminId, userId);
     }
 
     record StatusRequest(String status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)

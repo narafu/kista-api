@@ -5,7 +5,6 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.tradingcycle.AccountCycleHistoryEntry;
 import com.kista.domain.model.tradingcycle.CycleHistoryPage;
 import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;
 

@@ -1,11 +1,9 @@
 package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
-import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.UserUseCase;
-import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.UserPort;
@@ -16,8 +14,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +27,6 @@ class AdminServiceTest {
 
     @Mock UserPort userPort;
     @Mock AdminUserViewPort adminUserViewPort;
-    @Mock AccountPort accountPort;
     @Mock UserCascadeDeleter userCascadeDeleter;
     @Mock UserUseCase userUseCase;
     @Mock AuditLogPort auditLogPort;
@@ -43,23 +38,6 @@ class AdminServiceTest {
     private User user(UUID id, User.UserStatus status) {
         return new User(id, "kakao-" + id, "테스트", status, User.UserRole.USER,
                 null, null, null, null, NotificationChannel.TELEGRAM);
-    }
-
-    @Test
-    void getStats_returnsCorrectCounts() {
-        when(userPort.countAll()).thenReturn(3L);
-        when(userPort.countByStatus(User.UserStatus.PENDING)).thenReturn(1L);
-        when(userPort.countByStatus(User.UserStatus.ACTIVE)).thenReturn(1L);
-        when(userPort.countByStatus(User.UserStatus.REJECTED)).thenReturn(1L);
-        when(accountPort.countAll()).thenReturn(5L);
-
-        AdminStats stats = adminService.getStats();
-
-        assertThat(stats.totalUsers()).isEqualTo(3);
-        assertThat(stats.pendingCount()).isEqualTo(1);
-        assertThat(stats.activeCount()).isEqualTo(1);
-        assertThat(stats.rejectedCount()).isEqualTo(1);
-        assertThat(stats.totalAccounts()).isEqualTo(5);
     }
 
     @Test

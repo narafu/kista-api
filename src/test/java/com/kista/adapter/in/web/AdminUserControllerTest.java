@@ -6,8 +6,7 @@ import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.AdminListUsersUseCase;
-import com.kista.domain.port.in.AdminUserActionUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -39,9 +38,8 @@ class AdminUserControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockitoBean JwtDecoder jwtDecoder;             // JwtDecoderConfig 실제 빈 생성 방지
-    @MockitoBean AdminListUsersUseCase listUsers;   // 컨트롤러 의존성 주입용
-    @MockitoBean AdminUserActionUseCase userAction; // 컨트롤러 의존성 주입용
+    @MockitoBean JwtDecoder jwtDecoder;         // JwtDecoderConfig 실제 빈 생성 방지
+    @MockitoBean AdminUserUseCase adminUser;    // 컨트롤러 의존성 주입용
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
@@ -59,7 +57,7 @@ class AdminUserControllerTest {
     @Test
     void listUsers_withAdminToken_returns200() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(listUsers.listAll()).thenReturn(List.of(sampleUser(userId)));
+        when(adminUser.listAll()).thenReturn(List.of(sampleUser(userId)));
 
         mockMvc.perform(get("/api/admin/users").with(authentication(adminToken())))
                 .andExpect(status().isOk())
@@ -77,7 +75,7 @@ class AdminUserControllerTest {
 
     @Test
     void approveUser_withAdminToken_returns204() throws Exception {
-        doNothing().when(userAction).approveUser(any(), any());
+        doNothing().when(adminUser).approveUser(any(), any());
 
         mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +86,7 @@ class AdminUserControllerTest {
 
     @Test
     void rejectUser_withAdminToken_returns204() throws Exception {
-        doNothing().when(userAction).rejectUser(any(), any());
+        doNothing().when(adminUser).rejectUser(any(), any());
 
         mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -99,7 +97,7 @@ class AdminUserControllerTest {
 
     @Test
     void changeRole_withAdminToken_returns204() throws Exception {
-        doNothing().when(userAction).changeRole(any(), any(), any());
+        doNothing().when(adminUser).changeRole(any(), any(), any());
 
         mockMvc.perform(patch("/api/admin/users/{id}/role", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +108,7 @@ class AdminUserControllerTest {
 
     @Test
     void deleteUser_withAdminToken_returns204() throws Exception {
-        doNothing().when(userAction).deleteUser(any(), any());
+        doNothing().when(adminUser).deleteUser(any(), any());
 
         mockMvc.perform(delete("/api/admin/users/{id}", UUID.randomUUID())
                         .with(authentication(adminToken())))

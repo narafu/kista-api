@@ -3,8 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.port.in.AdminListAccountsUseCase;
-import com.kista.domain.port.in.AdminListUsersUseCase;
+import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -32,8 +32,8 @@ class AdminAccountControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean AdminListAccountsUseCase listAccounts;
-    @MockitoBean AdminListUsersUseCase listUsers;
+    @MockitoBean AdminQueryUseCase adminQuery;
+    @MockitoBean AdminUserUseCase adminUser;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -53,8 +53,8 @@ class AdminAccountControllerTest {
 
     @Test
     void listAccounts_adminRole_returns200() throws Exception {
-        when(listAccounts.listAll()).thenReturn(List.of());
-        when(listUsers.listAll()).thenReturn(List.of());
+        when(adminQuery.listAccounts()).thenReturn(List.of());
+        when(adminUser.listAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/accounts")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
