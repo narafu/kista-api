@@ -23,6 +23,6 @@ public record TradingCycleRequest(
     }
 
     public UpdateStrategyCommand toUpdateCommand() {
-        return new UpdateStrategyCommand(cycleSeedType);
+        return new UpdateStrategyCommand(cycleSeedType, initialUsdDeposit);
     }
 }

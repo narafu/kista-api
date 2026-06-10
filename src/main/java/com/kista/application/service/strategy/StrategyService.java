@@ -148,8 +148,39 @@ class StrategyService implements StrategyUseCase {
                 : strategy.cycleSeedType();
         Strategy updated = strategy.withCycleSeedType(seedType);
         Strategy saved = strategyPort.save(updated);
+
+        if (cmd.newSeed() != null) {
+            updateSeed(strategyId, cmd.newSeed());
+        }
+
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
         return toDetail(saved);
+    }
+
+    // 시드 수정: 새 시드를 총자산 B로 교체 — usdDeposit = newSeed - M (M = avgPrice * holdings)
+    private void updateSeed(UUID strategyId, BigDecimal newSeed) {
+        if (newSeed.signum() <= 0) {
+            throw new IllegalArgumentException("시드는 0보다 커야 합니다");
+        }
+        StrategyCycle cycle = strategyCyclePort.findLatestByStrategyId(strategyId)
+                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: " + strategyId));
+        CyclePosition latest = cyclePositionPort.findLatestByStrategyId(strategyId, 1).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
+
+        BigDecimal purchaseAmount = latest.holdings() == 0
+                ? BigDecimal.ZERO
+                : latest.avgPrice().multiply(BigDecimal.valueOf(latest.holdings()));
+        // 새 시드는 이미 매수한 금액보다 작을 수 없음 (현금 음수 방지)
+        if (newSeed.compareTo(purchaseAmount) < 0) {
+            throw new IllegalArgumentException("시드는 이미 매수한 금액보다 적을 수 없습니다");
+        }
+        BigDecimal newDeposit = newSeed.subtract(purchaseAmount);
+
+        strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
+        cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
+                latest.closingPrice(), latest.avgPrice(), latest.holdings(), null, null));
+        log.info("시드 수정: strategyId={}, newSeed={}, newDeposit={}", strategyId, newSeed, newDeposit);
     }
 
     // 현재 StrategyCycle의 startAmount를 묶어 응답용 StrategyDetail 조립

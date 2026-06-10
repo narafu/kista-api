@@ -41,6 +41,15 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public void updateStartAmount(UUID cycleId, BigDecimal startAmount) {
+        // 시드 수정: load-set-save 패턴 (markEnded와 동일)
+        StrategyCycleEntity e = jpaRepository.findById(cycleId)
+                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
+        e.setStartAmount(startAmount);
+        jpaRepository.save(e);
+    }
+
+    @Override
     public void deleteByStrategyId(UUID strategyId) {
         jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }

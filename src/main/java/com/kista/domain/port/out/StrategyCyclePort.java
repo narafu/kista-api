@@ -16,6 +16,9 @@ public interface StrategyCyclePort {
     // 사이클 종료 기록 — holdings=0 청산 시 종료금액·종료일자 저장
     void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate);
 
+    // 시드 수정 — 사이클 시작금액(startAmount) 갱신
+    void updateStartAmount(UUID cycleId, BigDecimal startAmount);
+
     // 전략 삭제 시 사이클 일괄 소프트 삭제
     void deleteByStrategyId(UUID strategyId);
 

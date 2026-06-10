@@ -4,6 +4,8 @@ import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
@@ -12,11 +14,13 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -33,6 +37,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -178,6 +183,37 @@ class TradingCycleControllerTest {
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
+        Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"));
+        when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
+
+        mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":5000.00}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.initialUsdDeposit").value(5000.00));
+    }
+
+    @Test
+    void update_seedBelowPurchaseAmount_returns400() throws Exception {
+        doThrow(new IllegalArgumentException("시드는 이미 매수한 금액보다 적을 수 없습니다"))
+                .when(tradingCycle).update(eq(CYCLE_ID), any(), any());
+
+        mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
+                        .with(csrf()).with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":100.00}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
