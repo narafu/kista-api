@@ -43,6 +43,18 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyCycleCompleted(user, account, strategy);
+        if (user.notificationChannel().includesFcm())      fcm.notifyCycleCompleted(user, account, strategy);
+    }
+
+    @Override
+    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyNewCycleStarted(user, account, strategy, initialUsdDeposit);
+        if (user.notificationChannel().includesFcm())      fcm.notifyNewCycleStarted(user, account, strategy, initialUsdDeposit);
+    }
+
+    @Override
     public void notifyTradingReport(User user, Account account, TradingReport report) {
         if (user.notificationChannel().includesTelegram()) telegram.notifyTradingReport(user, account, report);
         if (user.notificationChannel().includesFcm())      fcm.notifyTradingReport(user, account, report);

@@ -47,6 +47,20 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
+        String body = String.format("[%s] %s %s 사이클 완료",
+                account.nickname(), strategy.type().name(), strategy.ticker().name());
+        send(user.id(), "사이클 종료", body);
+    }
+
+    @Override
+    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
+        String body = String.format("[%s] %s %s — 시드 $%.2f",
+                account.nickname(), strategy.type().name(), strategy.ticker().name(), initialUsdDeposit);
+        send(user.id(), "새 사이클 시작", body);
+    }
+
+    @Override
     public void notifyTradingReport(User user, Account account, TradingReport report) {
         String body = String.format("[%s] 매수 $%.2f / 매도 $%.2f", account.nickname(),
                 report.totalBoughtUsd(), report.totalSoldUsd());

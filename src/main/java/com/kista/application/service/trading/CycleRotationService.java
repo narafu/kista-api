@@ -90,7 +90,8 @@ class CycleRotationService {
         StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed));
         cyclePositionPort.save(CyclePosition.startSnapshot(newCycle.id(), targetSeed, price));
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
-        userNotificationPort.notifyStrategyChanged(user, account, strategy, "재등록");
+        userNotificationPort.notifyStrategyChanged(user, account, strategy, "재등록"); // 관리자 알림
+        userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
     }
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준

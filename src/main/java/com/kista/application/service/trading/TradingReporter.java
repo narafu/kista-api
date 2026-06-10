@@ -86,9 +86,10 @@ class TradingReporter {
         cycleHistoryPort.save(position);
         log.info("[strategyId={}] 사이클 포지션 저장 완료", strategy.id());
 
-        // holdings==0이면 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
+        // holdings==0이면 사이클 종료 알림 후 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
         if (position.holdings() == 0) {
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
+            userNotificationPort.notifyCycleCompleted(user, account, strategy);
             cycleRotationService.rotate(strategy, currentCycle, account, user, price, privacyBase);
         }
     }

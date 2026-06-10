@@ -86,6 +86,42 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
+        // 사용자 텔레그램 봇 미설정 시 생략
+        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
+                || user.telegramChatId() == null) {
+            log.warn("[{}] 텔레그램 미설정 — 사이클 종료 알림 생략", account.nickname());
+            return;
+        }
+        String text = String.format(
+                "🔄 <b>사이클 종료</b> — %s%n"
+                + "%s %s 전략의 매매 사이클이 완료되었습니다.%n"
+                + "다음 사이클 정책: %s",
+                account.nickname(),
+                strategy.type().name(), strategy.ticker().name(),
+                strategy.cycleSeedType().name());
+        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+    }
+
+    @Override
+    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
+        // 사용자 텔레그램 봇 미설정 시 생략
+        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
+                || user.telegramChatId() == null) {
+            log.warn("[{}] 텔레그램 미설정 — 사이클 시작 알림 생략", account.nickname());
+            return;
+        }
+        String text = String.format(
+                "🚀 <b>새 사이클 시작</b> — %s%n"
+                + "%s %s 전략의 새 매매 사이클이 시작되었습니다.%n"
+                + "시드: $%.2f",
+                account.nickname(),
+                strategy.type().name(), strategy.ticker().name(),
+                initialUsdDeposit);
+        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+    }
+
+    @Override
     public void notifyTradingReport(User user, Account account, TradingReport r) {
         // 사용자 텔레그램 봇 미설정 시 생략
         if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
