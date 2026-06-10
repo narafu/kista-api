@@ -107,7 +107,7 @@ public record InfinitePosition(
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
         return earlyBuyQty2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
-                referencePrice(), ticker.getTargetProfitRate());
+                referencePrice(), priceOffsetRate());
     }
 
     public int calcLateBuyQuantity() {

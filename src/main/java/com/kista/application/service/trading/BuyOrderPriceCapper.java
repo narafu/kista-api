@@ -28,6 +28,7 @@ class BuyOrderPriceCapper {
 
     // 가격 캡 배수: currentPrice × 1.10 초과 시 보정 대상
     private static final BigDecimal PRICE_CAP_MULTIPLIER = new BigDecimal("1.10");
+    private static final int CORRECTION_ORDER_COUNT = 3;
 
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
@@ -57,49 +58,72 @@ class BuyOrderPriceCapper {
                 newBuys.stream().map(o -> o.price() + "×" + o.quantity()).toList());
     }
 
-    // 캡가격 기준 매수 수량 재산정 — 순수 계산(I/O 없음), capIfNeeded가 결과를 영속화
+    // 캡가격 기준 매수 수량 재산정 — 순수 계산(I/O 없음), capIfNeeded가 결과를 영속화 + 보정 주문
     private List<Order> recomputeBuys(LocalDate today, Strategy strategy, List<Order> buyOrders,
                                        BigDecimal cap, InfinitePosition position) {
-        BigDecimal k = position.unitAmount();                            // 단위금액 (실값)
+        BigDecimal unitAmount = position.unitAmount(); // 단위금액 (실값)
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
-        // 주문이 1건이면 단순 캡 적용, 2건이면 각각 캡
-        if (buyOrders.size() == 1) {
-            // 후반 단일 LOC 매수 케이스
-            Order orig = buyOrders.getFirst();
-            BigDecimal cappedPrice = orig.price().min(cap);
-            int quantity = InfinitePosition.lateBuyQty(k, cappedPrice);
-            return quantity > 0
-                    ? List.of(plannedBuy(today, strategy, orig.orderType(), quantity, cappedPrice))
-                    : List.of();
+        // 주문이 1건이면 후반 단일 LOC, 2건이면 전반 ①②
+        List<Order> newBuys = buyOrders.size() == 1
+                ? computeLateBuys(today, strategy, buyOrders.getFirst(), cap, unitAmount)
+                : computeEarlyBuys(today, strategy, buyOrders, cap, unitAmount);
+
+        // 전후반 공통 보정 주문
+        for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
+            addCorrectionOrder(today, strategy, newBuys, unitAmount);
         }
 
-        // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
+        return newBuys;
+    }
+
+    // 후반 단일 LOC 매수: K/G
+    private List<Order> computeLateBuys(LocalDate today, Strategy strategy, Order orig,
+                                         BigDecimal cap, BigDecimal unitAmount) {
+        BigDecimal cappedPrice = orig.price().min(cap);
+        int quantity = InfinitePosition.lateBuyQty(unitAmount, cappedPrice);
+        List<Order> buys = new ArrayList<>();
+        if (quantity > 0) buys.add(plannedBuy(today, strategy, orig.orderType(), quantity, cappedPrice));
+        return buys;
+    }
+
+    // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
+    private List<Order> computeEarlyBuys(LocalDate today, Strategy strategy, List<Order> buyOrders,
+                                          BigDecimal cap, BigDecimal unitAmount) {
         Order buy1 = buyOrders.get(0);
         Order buy2 = buyOrders.get(1);
         BigDecimal cappedAvg = buy1.price().min(cap);
         BigDecimal cappedRef = buy2.price().min(cap);
 
-        int quantity1 = InfinitePosition.earlyBuyQty1(k, cappedAvg);
-        int quantity2 = InfinitePosition.earlyBuyQty2(k, cappedAvg, quantity1, cappedRef,
+        int quantity1 = InfinitePosition.earlyBuyQty1(unitAmount, cappedAvg);
+        int quantity2 = InfinitePosition.earlyBuyQty2(unitAmount, cappedAvg, quantity1, cappedRef,
                 strategy.ticker().getTargetProfitRate());
 
-        List<Order> newBuys = new ArrayList<>();
+        List<Order> buys = new ArrayList<>();
         if (quantity1 > 0) {
             // cappedAvg == cappedRef이면 병합
             if (cappedAvg.compareTo(cappedRef) == 0) {
                 int merged = quantity1 + (quantity2 > 0 ? quantity2 : 0);
-                newBuys.add(plannedBuy(today, strategy, buy1.orderType(), merged, cappedAvg));
+                buys.add(plannedBuy(today, strategy, buy1.orderType(), merged, cappedAvg));
             } else {
-                newBuys.add(plannedBuy(today, strategy, buy1.orderType(), quantity1, cappedAvg));
-                if (quantity2 > 0) {
-                    newBuys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
-                }
+                buys.add(plannedBuy(today, strategy, buy1.orderType(), quantity1, cappedAvg));
+                if (quantity2 > 0) buys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
             }
         } else if (quantity2 > 0) {
-            newBuys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
+            buys.add(plannedBuy(today, strategy, buy2.orderType(), quantity2, cappedRef));
         }
-        return newBuys;
+        return buys;
+    }
+
+    private void addCorrectionOrder(LocalDate today, Strategy strategy, List<Order> newBuys, BigDecimal unitAmount) {
+        int totalQuantity = newBuys.stream().mapToInt(Order::quantity).sum();
+        if (totalQuantity == 0) {
+            return;
+        }
+
+        BigDecimal adjustedOrderPrice = unitAmount.divide(BigDecimal.valueOf(totalQuantity + 1), 2, HALF_UP);
+
+        newBuys.add(plannedBuy(today, strategy, Order.OrderType.LOC, 1, adjustedOrderPrice));
     }
 
     private Order plannedBuy(LocalDate today, Strategy strategy, Order.OrderType orderType,
