@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 // KIS 접수: BUY 가격 보정 → PLANNED 일괄 접수 → PLACED 마킹
 @Component
@@ -25,17 +26,17 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
 
     // position이 있고 currentPrice가 있을 때만 보정 (수동 선행 주문은 그대로 접수)
-    List<Order> placeOrders(LocalDate today, Strategy strategy, Account account,
+    List<Order> placeOrders(LocalDate today, Strategy strategy, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position) {
         if (currentPrice != null && position != null) {
-            buyOrderPriceCapper.capIfNeeded(today, strategy, account, currentPrice, position);
+            buyOrderPriceCapper.capIfNeeded(today, strategy, account, strategyCycleId, currentPrice, position);
         }
-        List<Order> planned = orderPort.findPlannedByAccountAndDate(account.id(), today);
+        List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = planned.stream().map(p -> {
             Order placedOrder = kisOrderPort.place(p, account);
             orderPort.markPlaced(p.id(), placedOrder.kisOrderId()); // 접수 완료 즉시 기록
             // KIS 응답 Order는 id=null — DB PK(p.id())를 살려서 반환 (취소 API에서 사용)
-            return new Order(p.id(), p.accountId(), p.tradeDate(), p.ticker(),
+            return new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
                     p.orderType(), p.direction(), p.quantity(), p.price(),
                     Order.OrderStatus.PLACED, placedOrder.kisOrderId(), null, null);
         }).toList();

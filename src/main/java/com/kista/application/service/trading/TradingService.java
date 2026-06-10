@@ -100,7 +100,7 @@ class TradingService {
         for (CycleState state : states) {
             runSafely("KIS 접수", state.ctx().strategy().id(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
-                        state.ctx().strategy(), state.ctx().account(),
+                        state.ctx().strategy(), state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);
@@ -143,7 +143,7 @@ class TradingService {
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
         if (strategy.type() == Strategy.Type.INFINITE) {
-            List<Order> todayOrders = orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today);
+            List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
             if (!todayOrders.isEmpty()) {
                 log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip (수동 선행 또는 중복 호출)", account.nickname(), todayOrders.size());
                 return new CycleState(ctx, balance, null, null, price, null);
@@ -166,7 +166,7 @@ class TradingService {
             return null;
         }
 
-        orderPlanner.savePlannedOrders(result.orders(), account);
+        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
         // CycleState: INFINITE는 position/snapshot/startPrice, PRIVACY는 privacyBase 보존
         InfinitePosition position = result.position();

@@ -9,6 +9,7 @@ import java.util.UUID;
 public record Order(
         UUID id,                     // PK (null = 신규 PLANNED)
         UUID accountId,              // FK → accounts.id
+        UUID strategyCycleId,        // FK → strategy_cycle.id (멀티 전략 주문 격리)
         LocalDate tradeDate,         // 거래일
         Ticker ticker,               // 거래 종목
         OrderType orderType,         // 주문 유형 (LOC/MOC/LIMIT)
@@ -43,9 +44,9 @@ public record Order(
         CANCELLED          // 사용자 취소 요청으로 KIS 취소 접수 완료
     }
 
-    // 전략 계산 결과(template)를 특정 계좌의 PLANNED 주문으로 변환
-    public static Order plan(Order template, UUID accountId) {
-        return new Order(null, accountId, template.tradeDate(), template.ticker(),
+    // 전략 계산 결과(template)를 특정 계좌·사이클의 PLANNED 주문으로 변환
+    public static Order plan(Order template, UUID accountId, UUID strategyCycleId) {
+        return new Order(null, accountId, strategyCycleId, template.tradeDate(), template.ticker(),
                 template.orderType(), template.direction(), template.quantity(),
                 template.price(), OrderStatus.PLANNED, null, null, null);
     }

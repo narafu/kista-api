@@ -61,7 +61,7 @@ class ManualTradingService {
         LocalDate today = DstInfo.nextTradeDate();
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
-        if (!orderPort.findPlannedOrPlacedByAccountAndDate(account.id(), today).isEmpty())
+        if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
             throw new ManualTradingException("오늘 이미 주문이 등록된 전략입니다");
 
         User user = userPort.findByIdOrThrow(account.userId());
@@ -87,9 +87,9 @@ class ManualTradingService {
             return List.of();
         }
 
-        orderPlanner.savePlannedOrders(result.orders(), account);
+        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
         // 저장된 PLANNED 주문 반환 (UI에서 예약 확인용)
-        return orderPort.findPlannedByAccountAndDate(account.id(), today);
+        return orderPort.findPlannedByCycleAndDate(currentCycle.id(), today);
     }
 }

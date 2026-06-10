@@ -70,7 +70,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         // BUY (quantity>0) + SELL 합쳐 반환
         List<Order> buyOrders = buyEntries.stream()
                 .filter(e -> e.quantity > 0)
-                .map(e -> new Order(null, null, e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price, PLANNED, null, null, null))
+                .map(e -> new Order(null, null, null, e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price, PLANNED, null, null, null))
                 .toList();
         List<Order> sellOrders = buildSellOrders(explicitSells, nullSellTemplate, balance, multiple);
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
@@ -81,7 +81,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                                         AccountBalance balance, BigDecimal multiple) {
         // 명시 SELL multiple 적용
         List<Order> result = new ArrayList<>(explicit.stream()
-                .map(t -> new Order(null, null, t.tradeDate(), t.ticker(), t.orderType(), SELL,
+                .map(t -> new Order(null, null, null, t.tradeDate(), t.ticker(), t.orderType(), SELL,
                         applyMultiple(t.quantity(), multiple), t.price(), PLANNED, null, null, null))
                 .toList());
 
@@ -95,7 +95,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                     balance.holdings(), sumOtherSells);
             return result;
         }
-        result.add(new Order(null, null, nullTemplate.tradeDate(), nullTemplate.ticker(),
+        result.add(new Order(null, null, null, nullTemplate.tradeDate(), nullTemplate.ticker(),
                 nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), PLANNED, null, null, null));
         return result;
     }

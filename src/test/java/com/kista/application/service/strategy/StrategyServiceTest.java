@@ -3,7 +3,10 @@ package com.kista.application.service.strategy;
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
+import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyDetail;
@@ -12,6 +15,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -45,6 +49,7 @@ class StrategyServiceTest {
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock KisPricePort kisPricePort;
+    @Mock KisMarginPort kisMarginPort;
     @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks StrategyService strategyService;
@@ -260,5 +265,79 @@ class StrategyServiceTest {
                 .isInstanceOf(SecurityException.class);
 
         verify(strategyPort, never()).save(any());
+    }
+
+    // --- register() ---
+
+    @Test
+    @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
+    void register_duplicateTicker_throws() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(true);
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("register() 호출 시 시드가 자유 현금(KIS 가용금액 - 기존 전략 점유 시드)을 초과하면 IllegalArgumentException 발생")
+    void register_seedExceedsFreeCash_throws() {
+        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 600 > 500
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null);
+        Account account = ownerAccount();
+        CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("500"), null, null, 0, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(kisMarginPort.getMargin(account)).thenReturn(List.of(
+                new MarginItem(Currency.USD, new BigDecimal("1000"), new BigDecimal("1000"), new BigDecimal("1000"), null)));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
+        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("register() 호출 시 다른 종목 + 자유 현금 이내 시드면 등록 성공")
+    void register_uniqueTickerWithinFreeCash_succeeds() {
+        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 500 == 500 → 허용
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null);
+        Account account = ownerAccount();
+        CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("500"), null, null, 0, null, null);
+        UUID newStrategyId = UUID.randomUUID();
+        Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId,
+                new BigDecimal("500"), null, LocalDate.now(), null, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(kisMarginPort.getMargin(account)).thenReturn(List.of(
+                new MarginItem(Currency.USD, new BigDecimal("1000"), new BigDecimal("1000"), new BigDecimal("1000"), null)));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
+        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(kisPricePort.getPrice(Strategy.Ticker.TQQQ, account)).thenReturn(new BigDecimal("50.00"));
+
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(result.initialUsdDeposit()).isEqualByComparingTo("500");
+        verify(cyclePositionPort).save(argThat(p ->
+                p.strategyCycleId().equals(savedCycle.id())
+                        && p.usdDeposit().compareTo(new BigDecimal("500")) == 0));
     }
 }

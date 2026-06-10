@@ -28,6 +28,9 @@ class OrderEntity extends BaseAuditEntity {
     @Column(name = "account_id", nullable = false, columnDefinition = "UUID")
     private UUID accountId; // FK → accounts.id
 
+    @Column(name = "strategy_cycle_id", nullable = false, columnDefinition = "UUID")
+    private UUID strategyCycleId; // FK → strategy_cycle.id (멀티 전략 주문 격리)
+
     @Column(name = "trade_date", nullable = false)
     private LocalDate tradeDate; // DB는 UTC(=US 거래일) 저장, 코드는 KST로 다룸 — TradeDateConverter 경유
 

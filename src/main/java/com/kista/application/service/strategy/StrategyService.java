@@ -3,6 +3,8 @@ package com.kista.application.service.strategy;
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
+import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
@@ -13,6 +15,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -33,35 +36,39 @@ import java.util.UUID;
 @Transactional
 class StrategyService implements StrategyUseCase {
 
-    private static final int MAX_STRATEGIES_PER_ACCOUNT = 1; // 운영 정책: 계좌당 1전략
-
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final KisPricePort kisPricePort;                     // 등록 시점 현재가(종가) 조회
+    private final KisMarginPort kisMarginPort;                   // 등록 시점 가용 시드 검증
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
-        // 전략 수 제한
-        if (strategyPort.findByAccountId(accountId).size() >= MAX_STRATEGIES_PER_ACCOUNT) {
-            throw new IllegalStateException("계좌당 최대 " + MAX_STRATEGIES_PER_ACCOUNT + "개의 전략만 등록할 수 있습니다");
-        }
-
-        // 같은 type 중복 방지
-        if (strategyPort.existsByAccountIdAndType(accountId, cmd.type())) {
-            throw new IllegalStateException("이미 등록된 전략 종류입니다: " + cmd.type());
-        }
-
         // PRIVACY는 SOXL 강제, INFINITE는 요청값 우선 → fallback
         Strategy.CycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
                 : Strategy.CycleSeedType.NONE;
         Strategy.Ticker resolvedTicker = cmd.type().resolveTicker(cmd.ticker(), Strategy.Ticker.SOXL);
+
+        // 같은 계좌 내 종목 중복 방지 — 체결 귀속(KIS 종목별 합산 잔고 ↔ 전략) 일대일 보장
+        if (strategyPort.existsByAccountIdAndTicker(accountId, resolvedTicker)) {
+            throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + resolvedTicker);
+        }
+
+        // 새 시드는 KIS 가용금액에서 기존 전략들이 점유한 시드를 뺀 자유 현금 한도 내에서만 허용
+        if (cmd.initialUsdDeposit() != null) {
+            BigDecimal freeCash = calcFreeCash(account, accountId);
+            if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {
+                throw new IllegalArgumentException(
+                        "다른 전략이 사용 중인 시드를 제외한 자유 현금(" + freeCash + ")을 초과했습니다");
+            }
+        }
+
         Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType);
         Strategy saved = strategyPort.save(strategy);
 
@@ -155,6 +162,24 @@ class StrategyService implements StrategyUseCase {
 
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
         return toDetail(saved);
+    }
+
+    // 자유 현금 = KIS 통합주문가능금액(USD) - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
+    private BigDecimal calcFreeCash(Account account, UUID accountId) {
+        BigDecimal kisUsdAmount = kisMarginPort.getMargin(account).stream()
+                .filter(m -> Currency.USD == m.currency())
+                .findFirst()
+                .map(MarginItem::purchasableAmount)
+                .orElseThrow(() -> new IllegalStateException("KIS USD 잔고 조회 실패: accountId=" + accountId));
+
+        BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
+                .map(s -> cyclePositionPort.findLatestByStrategyId(s.id(), 1).stream()
+                        .findFirst()
+                        .map(CyclePosition::usdDeposit)
+                        .orElse(BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return kisUsdAmount.subtract(reserved);
     }
 
     // 시드 수정: 새 시드를 총자산 B로 교체 — usdDeposit = newSeed - M (M = avgPrice * holdings)

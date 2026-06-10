@@ -25,8 +25,8 @@ public interface StrategyPort {
     void deleteByAccountId(UUID accountId); // 계좌 삭제 시 전략 일괄 소프트 삭제
     void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 전략 일괄 소프트 삭제
 
-    // 같은 계좌에 같은 type 중복 방지
-    boolean existsByAccountIdAndType(UUID accountId, Strategy.Type type);
+    // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
+    boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker);
 
     // ACTIVE 전략 ticker 우선, 없으면 첫 번째 전략 ticker 반환 — 없으면 empty
     default Optional<Strategy.Ticker> findActiveTicker(UUID accountId) {

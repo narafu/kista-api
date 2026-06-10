@@ -46,6 +46,8 @@ class BuyOrderPriceCapperTest {
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
+    static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
+
     private BuyOrderPriceCapper capper() {
         return new BuyOrderPriceCapper(orderPort, orderPlanner);
     }
@@ -58,32 +60,32 @@ class BuyOrderPriceCapperTest {
     }
 
     private Order buy(String price, int quantity) {
-        return new Order(null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     @Test
     void noBuyOrders_doesNothing() {
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of());
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("20000"));
 
-        verify(orderPort, never()).deletePlannedBuyByAccountAndDate(any(), any());
-        verify(orderPlanner, never()).savePlannedOrders(any(), any());
+        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
     @Test
     void allBuysWithinCap_doesNothing() {
         // cap = 50 × 1.10 = 55.00 — 모든 BUY가 cap 이하라 보정 불필요
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("50.00", 18)));
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("20000"));
 
-        verify(orderPort, never()).deletePlannedBuyByAccountAndDate(any(), any());
-        verify(orderPlanner, never()).savePlannedOrders(any(), any());
+        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
     @Test
@@ -91,14 +93,14 @@ class BuyOrderPriceCapperTest {
         // cap=55, K=1000, r=0.20 / buy①=60(>cap→55), buy②=52(≤cap)
         // qty1 = floor((1000/2) / 55) = 9 / remaining = (1000-55×9)×1.20 = 606 / qty2 = floor(606/52) = 11
         // 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("60.00", 1), buy("52.00", 1)));
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("20000"));
 
-        verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
-        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
+        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = ordersCaptor.getValue();
         assertThat(saved).hasSize(5);
         assertThat(saved.get(0).quantity()).isEqualTo(9);
@@ -117,14 +119,14 @@ class BuyOrderPriceCapperTest {
     void twoBuys_convergeToSameCap_mergesIntoOne() {
         // cap=55, buy①=70·buy②=60 모두 55로 캡 → 동일 가격이면 병합
         // qty1 = floor(500/55) = 9 / remaining = 606 / qty2 = floor(606/55) = 11 / merged = 20
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("70.00", 1), buy("60.00", 1)));
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("20000"));
 
-        verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
-        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
+        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = ordersCaptor.getValue();
         // 병합 1건 + 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
         assertThat(saved).hasSize(4);
@@ -138,14 +140,14 @@ class BuyOrderPriceCapperTest {
     @Test
     void singleBuy_capped_recalculatesQuantity() {
         // 후반 단일 LOC 매수 — cap=55, K=1000 / qty = floor(1000/55) = 18
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("70.00", 1)));
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("20000"));
 
-        verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
-        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
+        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = ordersCaptor.getValue();
         // 재산정 1건 + 보정 3회: K/(18+1)=52.63, K/(19+1)=50.00, K/(20+1)=47.62 — 각 1주 LOC
         assertThat(saved).hasSize(4);
@@ -159,13 +161,13 @@ class BuyOrderPriceCapperTest {
     @Test
     void singleBuy_cappedQuantityZero_deletesWithoutSaving() {
         // cap=55, K=50(usdDeposit=1000) / qty = floor(50/55) = 0 → 매수 제외
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("200.00", 1)));
 
-        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, new BigDecimal("50.00"),
+        capper().capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"),
                 positionWithUnitAmount("1000"));
 
-        verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
-        verify(orderPlanner, never()).savePlannedOrders(any(), any());
+        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 }

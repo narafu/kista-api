@@ -35,9 +35,11 @@ class TradingOrderPlannerTest {
             "74420614", "key", "secret", "01",
             Account.Broker.KIS);
 
+    static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
+
     private Order template(Order.OrderDirection direction, String price, int quantity) {
-        // 전략이 만든 템플릿은 id/accountId/status/kisOrderId가 비어있음 (계좌 귀속 전)
-        return new Order(null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        // 전략이 만든 템플릿은 id/accountId/strategyCycleId/status/kisOrderId가 비어있음 (계좌 귀속 전)
+        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
                 direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
@@ -47,7 +49,7 @@ class TradingOrderPlannerTest {
         Order buyTemplate = template(Order.OrderDirection.BUY, "50.00", 10);
         Order sellTemplate = template(Order.OrderDirection.SELL, "60.00", 5);
 
-        new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(buyTemplate, sellTemplate), ACCOUNT);
+        new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(buyTemplate, sellTemplate), ACCOUNT, STRATEGY_CYCLE_ID);
 
         verify(orderPort).saveAll(ordersCaptor.capture());
         List<Order> saved = ordersCaptor.getValue();
@@ -56,6 +58,7 @@ class TradingOrderPlannerTest {
         Order savedBuy = saved.get(0);
         assertThat(savedBuy.id()).isNull();
         assertThat(savedBuy.accountId()).isEqualTo(ACCOUNT.id());
+        assertThat(savedBuy.strategyCycleId()).isEqualTo(STRATEGY_CYCLE_ID);
         assertThat(savedBuy.status()).isEqualTo(Order.OrderStatus.PLANNED);
         assertThat(savedBuy.kisOrderId()).isNull();
         assertThat(savedBuy.direction()).isEqualTo(Order.OrderDirection.BUY);
@@ -71,7 +74,7 @@ class TradingOrderPlannerTest {
     @Test
     @DisplayName("템플릿이 비어있으면 빈 목록으로 저장 호출")
     void savePlannedOrders_emptyTemplates_savesEmptyList() {
-        new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(), ACCOUNT);
+        new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(), ACCOUNT, STRATEGY_CYCLE_ID);
 
         verify(orderPort).saveAll(ordersCaptor.capture());
         assertThat(ordersCaptor.getValue()).isEmpty();

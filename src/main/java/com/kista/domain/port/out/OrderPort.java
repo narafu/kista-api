@@ -13,11 +13,11 @@ public interface OrderPort {
     // 계획 주문 일괄 저장 (신규 PLANNED 상태)
     void saveAll(List<Order> orders);
 
-    // 특정 계좌·날짜의 PLANNED 주문 조회 (waitForOrderTime 이후 실행 단계에서 호출)
-    List<Order> findPlannedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+    // 특정 사이클·날짜의 PLANNED 주문 조회 (waitForOrderTime 이후 실행 단계에서 호출)
+    List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 특정 계좌·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
-    List<Order> findPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+    // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
+    List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // kisOrderPort.place() 완료 후 PLACED 상태 + kisOrderId 기록
     void markPlaced(UUID orderId, String kisOrderId);
@@ -32,13 +32,13 @@ public interface OrderPort {
     Optional<Order> findById(UUID orderId);
 
     // KIS 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
-    void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+    void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // BUY PLANNED만 삭제 (KIS 접수 전 가격 보정 시 재저장 준비)
-    void deletePlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
+    void deletePlannedBuyByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 오늘 PLANNED 또는 PLACED 주문 조회 (스케줄러 재계산 skip 판정용)
-    List<Order> findPlannedOrPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate);
+    List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 취소 완료 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);

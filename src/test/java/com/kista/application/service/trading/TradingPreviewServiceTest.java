@@ -88,7 +88,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsResult_whenHistoryExistsAndInfinite() {
-        Order order = new Order(null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order order = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -128,7 +128,7 @@ class TradingPreviewServiceTest {
     @Test
     void preview_returnsSkipInsufficientBalance_whenBuyAmountExceedsBalance() {
         // 매수금액($20) > 잔액($10) → INSUFFICIENT_BALANCE skip
-        Order overBudgetBuy = new Order(null, null, LocalDate.now(), Ticker.SOXL,
+        Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -175,7 +175,7 @@ class TradingPreviewServiceTest {
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         PrivacyTradeBase base = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
-        Order buyOrder = new Order(null, ACCOUNT.id(), LocalDate.now(), Ticker.SOXL,
+        Order buyOrder = new Order(null, ACCOUNT.id(), null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 

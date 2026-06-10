@@ -28,6 +28,7 @@ class OrderPersistenceAdapterTest {
     OrderPersistenceAdapter adapter;
 
     static final UUID ACCOUNT_ID = UUID.randomUUID();
+    static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
     static final LocalDate TODAY = LocalDate.now();
     static final BigDecimal PRICE = new BigDecimal("22.0000");
 
@@ -38,7 +39,7 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void saveAll_delegatesToRepository() {
-        Order order = new Order(null, ACCOUNT_ID, TODAY, Ticker.SOXL,
+        Order order = new Order(null, ACCOUNT_ID, STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, PRICE,
                 Order.OrderStatus.PLANNED, null, null, null);
 
@@ -48,11 +49,12 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void findPlannedByAccountAndDate_returnsMappedDomainObjects() {
+    void findPlannedByCycleAndDate_returnsMappedDomainObjects() {
         // DB는 UTC 저장 — adapter가 KST TODAY를 UTC(TODAY-1)로 변환해서 조회
         LocalDate utcDate = TradeDateConverter.toUtc(TODAY);
         OrderEntity entity = new OrderEntity();
         entity.setAccountId(ACCOUNT_ID);
+        entity.setStrategyCycleId(STRATEGY_CYCLE_ID);
         entity.setTradeDate(utcDate); // DB에는 UTC 저장
         entity.setTicker(Ticker.SOXL);
         entity.setOrderType(Order.OrderType.LOC);
@@ -61,11 +63,11 @@ class OrderPersistenceAdapterTest {
         entity.setPrice(PRICE);
         entity.setStatus(Order.OrderStatus.PLANNED);
 
-        when(repository.findByAccountIdAndTradeDateAndStatus(
-                ACCOUNT_ID, utcDate, Order.OrderStatus.PLANNED)) // UTC 변환 후 조회
+        when(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                STRATEGY_CYCLE_ID, utcDate, Order.OrderStatus.PLANNED)) // UTC 변환 후 조회
                 .thenReturn(List.of(entity));
 
-        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY); // KST로 호출
+        List<Order> result = adapter.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY); // KST로 호출
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().ticker()).isEqualTo(Ticker.SOXL);
@@ -75,11 +77,11 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void findPlannedByAccountAndDate_returnsEmptyIfNone() {
-        when(repository.findByAccountIdAndTradeDateAndStatus(any(), any(), any()))
+    void findPlannedByCycleAndDate_returnsEmptyIfNone() {
+        when(repository.findByStrategyCycleIdAndTradeDateAndStatus(any(), any(), any()))
                 .thenReturn(List.of());
 
-        List<Order> result = adapter.findPlannedByAccountAndDate(ACCOUNT_ID, TODAY);
+        List<Order> result = adapter.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
 
         assertThat(result).isEmpty();
     }

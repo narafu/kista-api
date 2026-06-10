@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
@@ -33,9 +34,9 @@ class BuyOrderPriceCapper {
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
 
-    void capIfNeeded(LocalDate today, Strategy strategy, Account account,
+    void capIfNeeded(LocalDate today, Strategy strategy, Account account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position) {
-        List<Order> buyOrders = orderPort.findPlannedByAccountAndDate(account.id(), today)
+        List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
 
@@ -48,12 +49,12 @@ class BuyOrderPriceCapper {
         List<Order> newBuys = recomputeBuys(today, strategy, buyOrders, cap, position);
 
         // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장 (수량 0 보정 포함 단일 경로)
-        orderPort.deletePlannedBuyByAccountAndDate(account.id(), today);
+        orderPort.deletePlannedBuyByCycleAndDate(strategyCycleId, today);
         if (newBuys.isEmpty()) {
             log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
             return;
         }
-        orderPlanner.savePlannedOrders(newBuys, account);
+        orderPlanner.savePlannedOrders(newBuys, account, strategyCycleId);
         log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(),
                 newBuys.stream().map(o -> o.price() + "×" + o.quantity()).toList());
     }
@@ -128,7 +129,7 @@ class BuyOrderPriceCapper {
 
     private Order plannedBuy(LocalDate today, Strategy strategy, Order.OrderType orderType,
                              int quantity, BigDecimal price) {
-        return new Order(null, null, today, strategy.ticker(),
+        return new Order(null, null, null, today, strategy.ticker(),
                 orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null, null, null);
     }
 }

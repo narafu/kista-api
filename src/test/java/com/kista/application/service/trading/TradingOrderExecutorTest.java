@@ -43,6 +43,8 @@ class TradingOrderExecutorTest {
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
+    static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
+
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
 
     static final InfinitePosition POSITION = new InfinitePosition(
@@ -53,13 +55,13 @@ class TradingOrderExecutorTest {
     }
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
-        return new Order(id, ACCOUNT.id(), TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
                 direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order kisResponse(String kisOrderId) {
         // KIS 응답 Order는 id=null (DB PK는 호출측이 보존)
-        return new Order(null, ACCOUNT.id(), TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(null, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 10, new BigDecimal("50.00"), Order.OrderStatus.PLACED, kisOrderId, null, null);
     }
 
@@ -68,12 +70,12 @@ class TradingOrderExecutorTest {
     void placeOrders_withPriceAndPosition_capsBeforePlacing() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of(plannedOrder));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-001"));
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
-        verify(buyOrderPriceCapper).capIfNeeded(TODAY, CYCLE, ACCOUNT, CURRENT_PRICE, POSITION);
+        verify(buyOrderPriceCapper).capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
         assertThat(result.getFirst().status()).isEqualTo(Order.OrderStatus.PLACED);
@@ -86,12 +88,12 @@ class TradingOrderExecutorTest {
     void placeOrders_withoutCurrentPrice_skipsCapping() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of(plannedOrder));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-002"));
 
-        executor().placeOrders(TODAY, CYCLE, ACCOUNT, null, POSITION);
+        executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION);
 
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -99,20 +101,20 @@ class TradingOrderExecutorTest {
     void placeOrders_withoutPosition_skipsCapping() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of(plannedOrder));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-003"));
 
-        executor().placeOrders(TODAY, CYCLE, ACCOUNT, CURRENT_PRICE, null);
+        executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
 
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("계획 주문이 없으면 빈 목록 반환 + KIS 접수 호출 없음")
     void placeOrders_noPlannedOrders_returnsEmpty() {
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of());
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
         assertThat(result).isEmpty();
         verify(kisOrderPort, never()).place(any(), any());
@@ -125,11 +127,11 @@ class TradingOrderExecutorTest {
         UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID();
         Order order1 = planned(id1, Order.OrderDirection.BUY, "50.00", 10);
         Order order2 = planned(id2, Order.OrderDirection.SELL, "60.00", 5);
-        when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(List.of(order1, order2));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(order1, order2));
         when(kisOrderPort.place(order1, ACCOUNT)).thenReturn(kisResponse("KIS-101"));
         when(kisOrderPort.place(order2, ACCOUNT)).thenReturn(kisResponse("KIS-102"));
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(id1);

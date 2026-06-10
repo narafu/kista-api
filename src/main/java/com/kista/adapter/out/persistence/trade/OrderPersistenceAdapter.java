@@ -28,22 +28,22 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public List<Order> findPlannedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+    public List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // PLANNED 상태인 오늘 계획 주문만 조회
         return repository
-                .findByAccountIdAndTradeDateAndStatus(
-                        accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED)
+                .findByStrategyCycleIdAndTradeDateAndStatus(
+                        strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED)
                 .stream()
                 .map(this::toDomain)
                 .toList();
     }
 
     @Override
-    public List<Order> findPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+    public List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
         return repository
-                .findByAccountIdAndTradeDateAndStatus(
-                        accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED)
+                .findByStrategyCycleIdAndTradeDateAndStatus(
+                        strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED)
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -85,27 +85,27 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     @Transactional
-    public void deletePlannedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+    public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // KIS 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
-        repository.deleteAllByAccountIdAndTradeDateAndStatus(
-                accountId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED);
+        repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED);
     }
 
     @Override
     @Transactional
-    public void deletePlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+    public void deletePlannedBuyByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 가격 보정 시 BUY PLANNED만 삭제 — SELL PLANNED와 PLACED는 보존
-        repository.deleteAllByAccountIdAndTradeDateAndStatusAndDirection(
-                accountId, TradeDateConverter.toUtc(tradeDate),
+        repository.deleteAllByStrategyCycleIdAndTradeDateAndStatusAndDirection(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate),
                 Order.OrderStatus.PLANNED, Order.OrderDirection.BUY);
     }
 
     @Override
-    public List<Order> findPlannedOrPlacedByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+    public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 스케줄러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
         return repository
-                .findByAccountIdAndTradeDateAndStatusIn(
-                        accountId, TradeDateConverter.toUtc(tradeDate),
+                .findByStrategyCycleIdAndTradeDateAndStatusIn(
+                        strategyCycleId, TradeDateConverter.toUtc(tradeDate),
                         List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED))
                 .stream()
                 .map(this::toDomain)
@@ -135,6 +135,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     private OrderEntity toEntity(Order o) {
         OrderEntity e = new OrderEntity();
         e.setAccountId(o.accountId());
+        e.setStrategyCycleId(o.strategyCycleId());
         e.setTradeDate(TradeDateConverter.toUtc(o.tradeDate())); // KST 도메인 → UTC DB
         e.setTicker(o.ticker());
         e.setOrderType(o.orderType());
@@ -150,7 +151,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     private Order toDomain(OrderEntity e) {
         return new Order(
-                e.getId(), e.getAccountId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
+                e.getId(), e.getAccountId(), e.getStrategyCycleId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
                 e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getKisOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );

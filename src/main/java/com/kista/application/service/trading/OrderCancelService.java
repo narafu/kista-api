@@ -7,6 +7,7 @@ import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,14 +29,19 @@ class OrderCancelService {
     private final KisOrderPort kisOrderPort;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
+    private final StrategyCyclePort strategyCyclePort;
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
         var strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
+        // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리
+        var currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
+                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+
         // 오늘 PLACED된 주문 조회 (UTC 기준 — TradeDateConverter 없이 도메인 LocalDate 사용)
-        List<Order> placedOrders = orderPort.findPlacedByAccountAndDate(account.id(), LocalDate.now());
+        List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), LocalDate.now());
         if (placedOrders.isEmpty()) {
             return new CancelResult(0, 0);
         }
