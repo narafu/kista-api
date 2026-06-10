@@ -7,11 +7,13 @@ import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.UpdateStrategyCommand;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -21,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,10 +40,11 @@ class StrategyService implements StrategyUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
+    private final KisPricePort kisPricePort;                     // 등록 시점 현재가(종가) 조회
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
-    public Strategy register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
+    public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
         // 전략 수 제한
@@ -64,11 +68,12 @@ class StrategyService implements StrategyUseCase {
         // 첫 번째 StrategyCycle 생성
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), cmd.initialUsdDeposit()));
 
-        // 초기 스냅샷 저장: 입금액 기준, 보유 없음 (등록 시점엔 가격 미조회)
-        cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), null));
+        // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 종가는 등록 시점 현재가
+        BigDecimal currentPrice = kisPricePort.getPrice(resolvedTicker, account);
+        cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return saved;
+        return new StrategyDetail(saved, cycle.startAmount());
     }
 
     @Override
@@ -118,21 +123,23 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Strategy> listByAccountId(UUID accountId, UUID requesterId) {
+    public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         accountPort.requireOwnedAccount(accountId, requesterId);
-        return strategyPort.findByAccountId(accountId);
+        return strategyPort.findByAccountId(accountId).stream()
+                .map(this::toDetail)
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Strategy getById(UUID strategyId, UUID requesterId) {
+    public StrategyDetail getById(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return strategy;
+        return toDetail(strategy);
     }
 
     @Override
-    public Strategy update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
+    public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
@@ -142,6 +149,14 @@ class StrategyService implements StrategyUseCase {
         Strategy updated = strategy.withCycleSeedType(seedType);
         Strategy saved = strategyPort.save(updated);
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
-        return saved;
+        return toDetail(saved);
+    }
+
+    // 현재 StrategyCycle의 startAmount를 묶어 응답용 StrategyDetail 조립
+    private StrategyDetail toDetail(Strategy strategy) {
+        BigDecimal initialUsdDeposit = strategyCyclePort.findLatestByStrategyId(strategy.id())
+                .map(StrategyCycle::startAmount)
+                .orElse(null);
+        return new StrategyDetail(strategy, initialUsdDeposit);
     }
 }

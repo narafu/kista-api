@@ -6,7 +6,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +31,16 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate) {
+        // 사이클 종료 기록: load-set-save 패턴 (OrderPersistenceAdapter.markFilled와 동일)
+        StrategyCycleEntity e = jpaRepository.findById(cycleId)
+                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
+        e.setEndAmount(endAmount);
+        e.setEndDate(endDate);
+        jpaRepository.save(e);
+    }
+
+    @Override
     public void deleteByStrategyId(UUID strategyId) {
         jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }
@@ -45,7 +57,8 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     private StrategyCycle toDomain(StrategyCycleEntity e) {
         return new StrategyCycle(
-                e.getId(), e.getStrategyId(), e.getInitialUsdDeposit(),
+                e.getId(), e.getStrategyId(),
+                e.getStartAmount(), e.getEndAmount(), e.getStartDate(), e.getEndDate(),
                 e.getCreatedAt(), e.getDeletedAt()
         );
     }
@@ -54,7 +67,10 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         StrategyCycleEntity e = new StrategyCycleEntity();
         e.setId(c.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setStrategyId(c.strategyId());
-        e.setInitialUsdDeposit(c.initialUsdDeposit());
+        e.setStartAmount(c.startAmount());
+        e.setEndAmount(c.endAmount());
+        e.setStartDate(c.startDate());
+        e.setEndDate(c.endDate());
         return e;
     }
 }

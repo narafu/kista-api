@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,7 +59,7 @@ class TradingSchedulerTest {
 
     private StrategyCycle mockStrategyCycle(UUID strategyId) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
-                Instant.now(), null);
+                null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private User mockUser() {

@@ -17,6 +17,7 @@ import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ class TradingReporter {
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
     private final CyclePositionPort cycleHistoryPort;
+    private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
 
     void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
@@ -55,7 +57,7 @@ class TradingReporter {
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         AccountBalance postBalance = balance.applyExecutions(executions);
-        saveCyclePosition(postBalance, strategy, currentCycle, account, user, closingPrice, privacyBase);
+        saveCyclePosition(today, postBalance, strategy, currentCycle, account, user, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
@@ -80,7 +82,7 @@ class TradingReporter {
     }
 
     // execute() 종료 시 1건 적재, holdings==0이면 사이클 rotation 정책 처리
-    private void saveCyclePosition(AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
+    private void saveCyclePosition(LocalDate today, AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         cycleHistoryPort.save(position);
@@ -88,6 +90,8 @@ class TradingReporter {
 
         // holdings==0이면 사이클 종료 알림 후 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
         if (position.holdings() == 0) {
+            // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
+            strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
             userNotificationPort.notifyCycleCompleted(user, account, strategy);
             cycleRotationService.rotate(strategy, currentCycle, account, user, price, privacyBase);

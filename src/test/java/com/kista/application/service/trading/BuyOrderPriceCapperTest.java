@@ -90,6 +90,7 @@ class BuyOrderPriceCapperTest {
     void twoBuys_distinctCaps_recalculatesBoth() {
         // cap=55, K=1000, r=0.20 / buy①=60(>cap→55), buy②=52(≤cap)
         // qty1 = floor((1000/2) / 55) = 9 / remaining = (1000-55×9)×1.20 = 606 / qty2 = floor(606/52) = 11
+        // 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
         when(orderPort.findPlannedByAccountAndDate(ACCOUNT.id(), TODAY))
                 .thenReturn(List.of(buy("60.00", 1), buy("52.00", 1)));
 
@@ -99,11 +100,17 @@ class BuyOrderPriceCapperTest {
         verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
         List<Order> saved = ordersCaptor.getValue();
-        assertThat(saved).hasSize(2);
+        assertThat(saved).hasSize(5);
         assertThat(saved.get(0).quantity()).isEqualTo(9);
         assertThat(saved.get(0).price()).isEqualByComparingTo("55.00");
         assertThat(saved.get(1).quantity()).isEqualTo(11);
         assertThat(saved.get(1).price()).isEqualByComparingTo("52.00");
+        assertThat(saved.get(2).quantity()).isEqualTo(1);
+        assertThat(saved.get(2).price()).isEqualByComparingTo("47.62");
+        assertThat(saved.get(3).quantity()).isEqualTo(1);
+        assertThat(saved.get(3).price()).isEqualByComparingTo("45.45");
+        assertThat(saved.get(4).quantity()).isEqualTo(1);
+        assertThat(saved.get(4).price()).isEqualByComparingTo("43.48");
     }
 
     @Test
@@ -119,9 +126,13 @@ class BuyOrderPriceCapperTest {
         verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
         List<Order> saved = ordersCaptor.getValue();
-        assertThat(saved).hasSize(1);
+        // 병합 1건 + 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
+        assertThat(saved).hasSize(4);
         assertThat(saved.getFirst().quantity()).isEqualTo(20);
         assertThat(saved.getFirst().price()).isEqualByComparingTo("55.00");
+        assertThat(saved.get(1).price()).isEqualByComparingTo("47.62");
+        assertThat(saved.get(2).price()).isEqualByComparingTo("45.45");
+        assertThat(saved.get(3).price()).isEqualByComparingTo("43.48");
     }
 
     @Test
@@ -136,9 +147,13 @@ class BuyOrderPriceCapperTest {
         verify(orderPort).deletePlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT));
         List<Order> saved = ordersCaptor.getValue();
-        assertThat(saved).hasSize(1);
+        // 재산정 1건 + 보정 3회: K/(18+1)=52.63, K/(19+1)=50.00, K/(20+1)=47.62 — 각 1주 LOC
+        assertThat(saved).hasSize(4);
         assertThat(saved.getFirst().quantity()).isEqualTo(18);
         assertThat(saved.getFirst().price()).isEqualByComparingTo("55.00");
+        assertThat(saved.get(1).price()).isEqualByComparingTo("52.63");
+        assertThat(saved.get(2).price()).isEqualByComparingTo("50.00");
+        assertThat(saved.get(3).price()).isEqualByComparingTo("47.62");
     }
 
     @Test

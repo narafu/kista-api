@@ -1,7 +1,7 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.UpdateStrategyCommand;
 
 import java.util.List;
@@ -9,14 +9,14 @@ import java.util.UUID;
 
 public interface StrategyUseCase {
     // --- 조회 ---
-    List<Strategy> listByAccountId(UUID accountId, UUID requesterId);
-    Strategy getById(UUID strategyId, UUID requesterId);
+    List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId);
+    StrategyDetail getById(UUID strategyId, UUID requesterId);
 
     // --- 등록 ---
-    Strategy register(UUID userId, UUID accountId, RegisterStrategyCommand command);
+    StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand command);
 
     // --- 수정 ---
-    Strategy update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd);
+    StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd);
 
     // --- 삭제 ---
     void delete(UUID strategyId, UUID requesterId);

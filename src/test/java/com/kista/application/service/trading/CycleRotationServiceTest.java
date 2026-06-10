@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -71,14 +72,14 @@ class CycleRotationServiceTest {
     }
 
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
-    private StrategyCycle currentCycle(UUID strategyId, BigDecimal initialUsdDeposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, initialUsdDeposit,
-                Instant.now(), null);
+    private StrategyCycle currentCycle(UUID strategyId, BigDecimal startAmount) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, startAmount,
+                null, LocalDate.now(), null, Instant.now(), null);
     }
 
     // 새 StrategyCycle stub 반환값 (save 후 id 포함)
     private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, Instant.now(), null);
+        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {
@@ -107,7 +108,7 @@ class CycleRotationServiceTest {
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(cycleCaptor.capture());
-        assertThat(cycleCaptor.getValue().initialUsdDeposit()).isEqualByComparingTo(deposit);
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(deposit);
         assertThat(cycleCaptor.getValue().strategyId()).isEqualTo(strategy.id());
 
         verify(cyclePositionPort).save(argThat(p ->
@@ -162,7 +163,7 @@ class CycleRotationServiceTest {
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(cycleCaptor.capture());
-        assertThat(cycleCaptor.getValue().initialUsdDeposit()).isEqualByComparingTo(maxSeedDeposit);
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(maxSeedDeposit);
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(maxSeedDeposit) == 0));
         verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), eq(strategy), eq("재등록"));

@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyDetail;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -22,11 +23,12 @@ public record TradingCycleResponse(
         @Schema(description = "연속 사이클 정책", example = "NONE")
         String cycleSeedType
 ) {
-    public static TradingCycleResponse from(Strategy c) {
+    public static TradingCycleResponse from(StrategyDetail detail) {
+        Strategy c = detail.strategy();
         return new TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
-                c.ticker().name(), null,
+                c.ticker().name(), detail.initialUsdDeposit(),
                 c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name()
         );
     }

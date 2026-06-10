@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
-// NONE → 전략 PAUSED / MAINTAIN → 동일 initialUsdDeposit 유지 / MAX → 내부 원장 기준 최대 시드
+// NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
 // package-private — application/service 패키지 전용
 @Service
 @RequiredArgsConstructor
@@ -48,7 +48,7 @@ class CycleRotationService {
         BigDecimal actualBalance = fetchKisUsdBalance(strategy, account);
         if (actualBalance == null) return; // 실패 — 내부에서 notifyError 완료
 
-        BigDecimal maintainSeed = currentCycle.initialUsdDeposit(); // MAINTAIN 기준 시드
+        BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
         BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
 
         BigDecimal targetSeed;
@@ -99,7 +99,7 @@ class CycleRotationService {
         return cyclePositionPort.findLatestByStrategyId(strategy.id(), 1).stream()
                 .findFirst()
                 .map(CyclePosition::usdDeposit)
-                .orElse(currentCycle.initialUsdDeposit()); // fallback: 현재 사이클 시드
+                .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }
 
     // KIS margin 조회 → USD 행의 통합주문가능금액

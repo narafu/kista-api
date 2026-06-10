@@ -32,7 +32,7 @@ class CyclePositionEntity extends BaseCreatedAtEntity {
     private BigDecimal usdDeposit; // 통합주문가능금액 (매매 공식 B 기준)
 
     @Column(name = "closing_price", precision = 12, scale = 2)
-    private BigDecimal closingPrice; // 종가 (PRIVACY 또는 초기 등록 시 null)
+    private BigDecimal closingPrice; // 종가
 
     @Column(name = "avg_price", precision = 20, scale = 2)
     private BigDecimal avgPrice; // 평균 매입 단가 (holdings=0이면 null)

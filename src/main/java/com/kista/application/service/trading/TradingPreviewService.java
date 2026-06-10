@@ -65,9 +65,9 @@ class TradingPreviewService {
         PrivacyTradeBase privacyBase = strategy.type() == Strategy.Type.PRIVACY
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
-        // PRIVACY는 StrategyCycle.initialUsdDeposit 전달, INFINITE는 null
+        // PRIVACY는 StrategyCycle.startAmount 전달, INFINITE는 null
         BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
-                ? currentCycle.initialUsdDeposit()
+                ? currentCycle.startAmount()
                 : null;
 
         CycleOrderComputer.ComputeResult result = orderComputer.compute(

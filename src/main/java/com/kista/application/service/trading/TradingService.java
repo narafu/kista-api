@@ -151,9 +151,9 @@ class TradingService {
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip)
-        // PRIVACY는 StrategyCycle.initialUsdDeposit 전달, INFINITE는 null
+        // PRIVACY는 StrategyCycle.startAmount 전달, INFINITE는 null
         BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
-                ? currentCycle.initialUsdDeposit()
+                ? currentCycle.startAmount()
                 : null;
         CycleOrderComputer.ComputeResult result = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, initialUsdDeposit, privacyBase, account.nickname());

@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -34,6 +35,7 @@ class StrategyServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
+    @Mock KisPricePort kisPricePort;
     @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks StrategyService strategyService;
