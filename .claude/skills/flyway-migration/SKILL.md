@@ -32,15 +32,21 @@ FK 선언: 반드시 명시적 이름 사용
   ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text
 
 컬럼 순서: CREATE TABLE 컬럼 순서 = Entity 필드 선언 순서
+  모든 테이블 공통 순서: pk, fk, 비즈니스 컬럼…, created_at, updated_at, deleted_at
+  (감사·삭제 컬럼은 반드시 이 순서로 맨 뒤, 없는 컬럼은 생략)
 
 ## 4. 테이블 재생성 패턴 (컬럼 순서 변경 필요 시)
 
   -- named UNIQUE 제약 먼저 제거
   ALTER TABLE xxx_old DROP CONSTRAINT IF EXISTS uq_xxx;
   ALTER TABLE xxx RENAME TO xxx_old;
+  -- PK 인덱스명은 스키마 전역 — 새 테이블 생성 전 리네임 필수, named 인덱스는 DROP
+  ALTER INDEX xxx_pkey RENAME TO xxx_old_pkey;
+  DROP INDEX idx_xxx_...;
   CREATE TABLE xxx (...);
   INSERT INTO xxx SELECT ... FROM xxx_old;
   DROP TABLE xxx_old;
+  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (V6__strategy_cycle_lifecycle_columns.sql 참고)
 
 ## 5. 검증
 
