@@ -94,7 +94,7 @@
 - `MarginItem` 필드: `currency()` / `integratedOrderableAmount()` — KIS API 필드명(`crcy_cd` 등) 아님
 
 ### KIS 어댑터 상수 사용 규칙
-- `"NASD"`, `"AMEX"`, `"NYSE"` 리터럴 금지 → `ExchangeCode.NASD.name()` 등 enum 경유
+- `"NASD"`, `"AMEX"`, `"NYSE"` 리터럴 직접 작성 금지 → `KisExchangeRegistry`의 `ovrsExcgCd(ticker)`/`excd(ticker)`/`defaultUsExchange()` 경유
 - `"USD"`, `"미국"` 필터값은 현재 리터럴 유지 (대응 enum 없음)
 
 ### 복수종목 현재가 (KisPriceAdapter)
@@ -104,7 +104,7 @@
   - `Ticker.tryParse(symb)`로 enum 외 종목 silent drop
 - `getPrice(Ticker, Account)` — 단건 API(`HHDFS00000300`) 유지
 - KIS 거래소 코드 두 체계 혼용: `OVRS_EXCG_CD` (주문·체결·잔고 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
-- `TradingCycle.ExchangeCode` enum → `OVRS_EXCG_CD` 용, `TradingCycle.ExcdCode` enum → `EXCD` 용 — `Ticker`가 두 필드 모두 보유
+- `KisExchangeRegistry`(adapter/out/kis): `Ticker → (ovrsExcgCd, excd)` 매핑 전담. `ovrsExcgCd(ticker)`/`excd(ticker)`/`defaultUsExchange()`(="NASD", "미국 전체" 잔고·손익 조회용) 제공 — TQQQ=NASD/NAS, SOXL/USD/MAGX/FNGU/BULZ=AMEX/AMS
 - KIS 응답 모델(`PresentBalanceResult.Item`, `PeriodProfitResult.Item`)의 `exchangeCode: String`은 수신값이므로 enum 변환 대상 아님
 - **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API(`TTTT1002U`/`TTTT1006U`)가 프리마켓·정규장·애프터마켓 전 구간에서 LOC/MOC 모두 지원하므로 예약주문 API 불필요 — kista에서 완전 제거됨
 

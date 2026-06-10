@@ -1,7 +1,7 @@
 ## 핵심 제약 사항
 
 ### domain/port/out/ 네이밍 규칙
-- 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `TradingCyclePort`)
+- 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `StrategyPort`)
 - Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
 - `*Repository` 접미사 사용 금지 — JpaRepository와 혼동 유발
 
@@ -18,31 +18,34 @@
 - `SecurityException` → 403, `KisApiException` → 503, `Account.InvalidKisKeyException` → 422
 - `ManualTradingException` / `OrderCancelException` → 409, `Account.CooldownException` → 429(Retry-After 포함)
 
-### Account ↔ TradingCycle 분리
-- `Account` record 필드 10개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker, createdAt, updatedAt` — type/status/ticker/multiple 없음
-- `TradingCycle` record 필드 9개: `id, accountId, type(Type), status(Status), ticker(Ticker), initialUsdDeposit, cycleSeedType(CycleSeedType), createdAt, updatedAt`
-- `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `TradingCycle` record의 nested enum
-- `MAX_CYCLES_PER_ACCOUNT = 1` (`TradingCycleService` 상수) — 운영 정책, 확장 시 상수만 변경
-- `initialUsdDeposit`: 사이클 시작 시 초기 입금액 메타 기록용 — 매매 공식(B = usdDeposit + M) 변경 없음
+### Account ↔ Strategy 분리
+- `Account` record 필드 8개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
+- `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
+- `StrategyCycle` record 필드 8개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 사이클 단위 메타(시드/기간)
+- `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
+- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
+- `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
+- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
+- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 시드 수정 시 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
 - `/api/meta/strategy-types`, `/api/meta/tickers`, `/api/meta/brokers`, `/api/meta/strategy-statuses` — 개별 조회
-- `TradingCycle.Type`/`TradingCycle.Status`, `TradingCycle.Ticker`, `Account.Broker` enum에 label/description 필드 포함 (DTO `from()` 팩토리)
+- `Strategy.Type`/`Strategy.Status`, `Strategy.Ticker`, `Account.Broker` enum에 label/description 필드 포함 (DTO `from()` 팩토리)
 - UI는 이 엔드포인트로 라벨/available tickers/default값 수신 — enum 리터럴 UI 하드코딩 금지
-- `TickerMeta` 응답 필드: `code`/`label`/`description`/`targetProfitRate` — `exchangeCode`/`excdCode`는 KIS 내부 코드이므로 UI 미노출
+- `TickerMeta` 응답 필드: `code`/`label`/`description`/`targetProfitRate` — KIS 거래소 코드(OVRS_EXCG_CD/EXCD)는 어댑터 내부(`KisExchangeRegistry`) 전용, UI 미노출
 
 ### 파일 인코딩 주의 (BOM)
 - 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
 - 일괄 제거: `grep -rl $'\xef\xbb\xbf' src --include="*.java" | while read f; do sed -i '1s/^\xef\xbb\xbf//' "$f"; done`
 
 ### 수량 변수명 규칙
-- **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `TradingCycleHistory`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
+- **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `CyclePositionHistoryEntry`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
-- DB 컬럼: `trading_cycle_history.holdings`, `privacy_trades_master.holdings`(보유) / `orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
+- DB 컬럼: `cycle_position.holdings`, `privacy_trades_master.holdings`(보유) / `orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
 - KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
 - 복합 수량 필드: `orderedQty`/`filledQty` 패턴 금지 → `orderedQuantity`/`filledQuantity`
 - `InfinitePosition.calcXxxQuantity()` 메서드명은 "주문 수량 계산 결과"이므로 Quantity 유지 (보유수량 아님)
@@ -62,19 +65,19 @@
 - `*Request` suffix 사용 금지 — 외부 HTTP DTO 성격으로 오인됨
 - `domain/model/<도메인>/` 하위 위치 (ArchUnit domain 규칙 준수)
 
-### Ticker enum (TradingCycle.Ticker nested enum)
-- **import 경로**: `import com.kista.domain.model.tradingcycle.TradingCycle.Ticker;` — 구 `Strategy.Ticker` 완전 삭제됨
-- `TradingCycle.Ticker` enum: TQQQ/SOXL — exchangeCode(ExchangeCode)/excdCode(ExcdCode)/targetProfitRate/description 필드. 새 종목 추가 시 두 코드 체계 모두 지정 필수
-- PRIVACY 전략: 항상 `TradingCycle.Ticker.SOXL` 강제 (`TradingCycle.Type.resolveTicker()`)
-- `TradingCycle.Ticker.tryParse(String)` — KIS 응답 종목코드 안전 변환 (`Optional` 반환)
-- **Account에서 ticker 제거됨** — 매매 시 `tradingCycle.ticker()` 사용
+### Ticker enum (Strategy.Ticker nested enum)
+- **import 경로**: `import com.kista.domain.model.strategy.Strategy.Ticker;`
+- `Strategy.Ticker` enum: TQQQ/SOXL/USD/MAGX/FNGU/BULZ — `targetProfitRate`/`description` 필드만 보유. KIS 거래소 코드(OVRS_EXCG_CD/EXCD)는 `Ticker`가 아닌 `KisExchangeRegistry`(adapter/out/kis)가 매핑 관리 — 새 종목 추가 시 양쪽 모두 갱신 필요
+- PRIVACY 전략: 항상 `Strategy.Ticker.SOXL` 강제 (`Strategy.Type.resolveTicker()`)
+- `Strategy.Ticker.tryParse(String)` — KIS 응답 종목코드 안전 변환 (`Optional` 반환)
+- **Account에서 ticker 제거됨** — 매매 시 `strategy.ticker()` 사용
 
 
 ### Virtual Thread
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
-- 사이클 단위 순차 실행: `TradingCyclePort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
+- 사이클 단위 순차 실행: `StrategyPort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
 
 ### JPA 설정
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈
@@ -109,7 +112,7 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 
 ### Flyway
 - `V1__init.sql` **수정 금지** — 새 마이그레이션은 `V2__...` 이후로
-- 현재 최신: `V2__rename_current_price_to_closing_price.sql` — `trading_cycle_history.current_price` → `closing_price` 리네임
+- 현재 최신: `V7__fix_column_order_strategy_and_cycle_position.sql`
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (V34 `avg_price` 사례)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
@@ -256,6 +259,6 @@ P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 - `com.kista.common` 패키지: 유틸리티 헬퍼 위치 (도메인 무관, 어댑터·서비스 공용)
 
 ### 소프트 삭제(Soft Delete) 패턴
-- `users`, `accounts`, `trading_cycle` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언
+- `users`, `accounts`, `strategy`, `strategy_cycle`, `cycle_position` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언
 - **`nativeQuery = true` 쿼리는 `@SQLRestriction` 미적용** — `AND tc.deleted_at IS NULL` 수동 명시 필수 (`findAllActiveCycles` 등)
 - Cascade 순서: 서비스 레이어에서 사이클 → 계좌 → 사용자 순으로 명시 처리 (DB FK CASCADE 미작동)
