@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,8 @@ public class KisPriceApi implements KisPricePort {
     private static final String SINGLE_TR_ID = "HHDFS00000300";
     private static final String MULTI_PATH   = "/uapi/overseas-price/v1/quotations/multprice";
     private static final String MULTI_TR_ID  = "HHDFS76220000";
+    private static final String DAILY_PATH   = "/uapi/overseas-price/v1/quotations/dailyprice";
+    private static final String DAILY_TR_ID  = "HHDFS76240000";
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
@@ -59,10 +63,11 @@ public class KisPriceApi implements KisPricePort {
         if (last == null || last.isBlank()) log.info("단건 현재가 — last 빈값, base 사용: ticker={}, base={}", ticker, base);
         BigDecimal current = KisResponseParser.resolvePrice(last, base)
                 .orElseThrow(() -> new KisApiException("가격 조회 응답 없음(last·base 모두 빈값): " + ticker, null));
-        // prevClose: base 우선, 없으면 current로 fallback (장 개시 직전 등 base 빈값 방어)
-        BigDecimal prevClose = Optional.ofNullable(base).filter(s -> !s.isBlank())
-                .map(KisResponseParser::parseBd)
-                .orElse(current);
+        // prevClose: 가장 최근 확정 일봉 종가 우선 (base는 장 시작 전 하루 더 과거 종가일 수 있음), 실패 시 base→current fallback
+        BigDecimal prevClose = fetchLatestClose(ticker, excd, account)
+                .orElseGet(() -> Optional.ofNullable(base).filter(s -> !s.isBlank())
+                        .map(KisResponseParser::parseBd)
+                        .orElse(current));
         return new PriceSnapshot(current, prevClose);
     }
 
@@ -104,9 +109,11 @@ public class KisPriceApi implements KisPricePort {
                 continue;
             }
             BigDecimal current = resolved.get();
-            BigDecimal prevClose = Optional.ofNullable(item.base()).filter(s -> !s.isBlank())
-                    .map(KisResponseParser::parseBd)
-                    .orElse(current);
+            // prevClose: 가장 최근 확정 일봉 종가 우선, 실패 시 base→current fallback
+            BigDecimal prevClose = fetchLatestClose(ticker, exchangeRegistry.excd(ticker), account)
+                    .orElseGet(() -> Optional.ofNullable(item.base()).filter(s -> !s.isBlank())
+                            .map(KisResponseParser::parseBd)
+                            .orElse(current));
             result.put(ticker, new PriceSnapshot(current, prevClose));
         }
 
@@ -124,6 +131,34 @@ public class KisPriceApi implements KisPricePort {
             }
         }
         return result;
+    }
+
+    // 가장 최근 확정 거래일의 일봉 종가 조회 (KIS price API의 base는 미국장 개장 전 하루 더 과거 종가일 수 있음)
+    private Optional<BigDecimal> fetchLatestClose(Ticker ticker, String excd, Account account) {
+        try {
+            DailyPriceResponse response = kisHttpClient.pricingGet(
+                    DAILY_TR_ID, DAILY_PATH, account, DailyPriceResponse.class,
+                    p -> {
+                        p.add("EXCD", excd);
+                        p.add("SYMB", ticker.name());
+                        p.add("GUBN", "0");
+                        p.add("BYMD", LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE));
+                        p.add("MODP", "0");
+                    });
+            if (response == null || response.output2() == null || response.output2().isEmpty()) {
+                log.warn("일별시세(전일종가) 조회 응답 없음 — base 필드로 fallback: ticker={}", ticker);
+                return Optional.empty();
+            }
+            String clos = response.output2().get(0).clos();
+            if (clos == null || clos.isBlank()) {
+                log.warn("일별시세(전일종가) 응답 종가 빈값 — base 필드로 fallback: ticker={}", ticker);
+                return Optional.empty();
+            }
+            return Optional.of(KisResponseParser.parseBd(clos));
+        } catch (Exception e) {
+            log.warn("일별시세(전일종가) 조회 실패 — base 필드로 fallback: ticker={}", ticker, e);
+            return Optional.empty();
+        }
     }
 
     record PriceResponse(@JsonProperty("output") Output output) {
@@ -145,5 +180,10 @@ public class KisPriceApi implements KisPricePort {
             @JsonProperty("last") String last,
             @JsonProperty("base") String base
         ) {}
+    }
+
+    // 해외주식 기간별시세(일봉) 응답 — output2[0]이 가장 최근 거래일
+    record DailyPriceResponse(@JsonProperty("output2") List<Output2> output2) {
+        record Output2(@JsonProperty("clos") String clos) {}  // clos: 종가
     }
 }
