@@ -95,7 +95,7 @@ A = averagePrice (qty==0이면 currentPrice)   Q = quantity
 M = A × Q (purchaseAmount)   D = currentPrice × Q (evaluationAmount, 정보성)
 B = usdDeposit + M (totalAssets)   K = B ÷ 20 (unitAmount, scale=2, HALF_UP)
 T = Q==0 ? 0.0 : M ÷ K  (currentRound, double, 소수점 허용)
-S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=4, HALF_UP)
+S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=2, HALF_UP)
 G = A × (1 + S)  (referencePrice, scale=2, HALF_UP — LOC 주문 가격 기준)
 P = A × 1.20  (targetPrice, scale=2, HALF_UP)
 ```

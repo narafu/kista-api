@@ -35,7 +35,7 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("Q=10: currentRound=1.33, priceOffsetRate=0.1734 (SOXL)")
+    @DisplayName("Q=10: currentRound=1.33, priceOffsetRate=0.17 (SOXL)")
     void case_q10() {
         // A=20, M=200, D=210, B=3000, K=150.00, T=200/150=1.33
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("2800"));
@@ -47,9 +47,9 @@ class InfinitePositionTest {
         assertThat(pos.totalAssets()).isEqualByComparingTo("3000");
         assertThat(pos.currentRound()).isCloseTo(1.33, within(0.01));
         assertThat(pos.unitAmount()).isEqualByComparingTo("150.00");
-        assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.1734");
+        assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.17"); // 0.20 × (1 - 2×1.33/20) = 0.1734 → scale=2 반올림 0.17
         assertThat(pos.usdDeposit()).isEqualByComparingTo("2800");
-        assertThat(pos.referencePrice()).isEqualByComparingTo("23.47"); // 20 × (1+0.1734) = 23.468 → 23.47
+        assertThat(pos.referencePrice()).isEqualByComparingTo("23.40"); // 20 × (1+0.17) = 23.40
         assertThat(pos.targetPrice()).isEqualByComparingTo("24.00");
     }
 

@@ -68,7 +68,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`
-- `priceOffsetRate` 기대값: scale=2 반올림된 currentRound 기준으로 계산 (T=200/150=1.33 → 0.1734, not 0.1733)
+- `priceOffsetRate` 기대값: scale=2 반올림된 currentRound 기준으로 계산 후 scale=2 HALF_UP 반올림 (T=200/150=1.33 → 0.1734 → 0.17)
 - `TradingServiceTest`는 `when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음
 - TQQQ `targetProfitRate=0.15`, SOXL/USD `targetProfitRate=0.20` — `Ticker` enum이 관리

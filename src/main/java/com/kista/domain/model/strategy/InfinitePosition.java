@@ -12,7 +12,6 @@ public record InfinitePosition(
 ) {
     private static final int TOTAL_ROUNDS = 20;
     private static final int MONEY_SCALE = 2;   // 금액·가격·회차 반올림 자리수 (센트 단위)
-    private static final int RATE_SCALE = 4;    // priceOffsetRate 비율 반올림 자리수
 
     // --- 기본 도메인 속성 조회 ---
 
@@ -55,7 +54,7 @@ public record InfinitePosition(
         double roundFactor = 2.0 * currentRound() / TOTAL_ROUNDS;
         return ticker.getTargetProfitRate()
                 .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(roundFactor)))
-                .setScale(RATE_SCALE, HALF_UP);
+                .setScale(MONEY_SCALE, HALF_UP);
     }
 
     public BigDecimal referencePrice() {
