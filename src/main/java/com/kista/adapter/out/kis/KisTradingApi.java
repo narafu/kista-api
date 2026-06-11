@@ -39,8 +39,8 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
 
-    private static final String MARGIN_PATH = "/uapi/overseas-stock/v1/trading/foreign-margin";
-    private static final String MARGIN_TR_ID = "TTTC2101R"; // 해외증거금 통화별조회
+    static final String MARGIN_PATH = "/uapi/overseas-stock/v1/trading/foreign-margin"; // KisAuthApi.testAccountNo 공용
+    static final String MARGIN_TR_ID = "TTTC2101R"; // 해외증거금 통화별조회 — KisAuthApi.testAccountNo 공용
     private static final String TARGET_NATION = "미국";
 
     private static final String PORTFOLIO_PATH = "/uapi/overseas-stock/v1/trading/inquire-present-balance";

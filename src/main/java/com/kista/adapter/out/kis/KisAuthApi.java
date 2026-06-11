@@ -145,15 +145,10 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         }
 
         // 2단계: TTTC2101R 호출로 계좌번호 유효성 검증
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + token);
-        headers.set("appkey", appKey);
-        headers.set("appsecret", appSecret);
-        headers.set("tr_id", "TTTC2101R"); // 해외증거금 통화별조회
-        headers.set("custtype", "P");
+        HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, appSecret, KisTradingApi.MARGIN_TR_ID);
 
         String url = UriComponentsBuilder
-                .fromUriString(kisBaseUrl + "/uapi/overseas-stock/v1/trading/foreign-margin")
+                .fromUriString(kisBaseUrl + KisTradingApi.MARGIN_PATH)
                 .queryParam("CANO", accountNo)
                 .queryParam("ACNT_PRDT_CD", "01")
                 .toUriString();
