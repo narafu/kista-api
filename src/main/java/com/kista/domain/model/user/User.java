@@ -75,6 +75,6 @@ public record User(
     public User withRole(UserRole newRole) {
         return new User(id, kakaoId, nickname, status, newRole,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
+                lastReappliedAt, notificationChannel);
     }
 }

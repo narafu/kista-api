@@ -116,6 +116,7 @@ public record InfinitePosition(
         return lateBuyQty(unitAmount(), referencePrice());
     }
 
+    // 전후반 공통 LOC 매도 수량 — 후반 calcMocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
     public int calcLocSellQuantity() {
         return sellQuantityQuarter();
     }
@@ -124,6 +125,7 @@ public record InfinitePosition(
         return holdings() - sellQuantityQuarter();
     }
 
+    // 후반(K>D) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
     public int calcMocSellQuantity() {
         return sellQuantityQuarter();
     }
