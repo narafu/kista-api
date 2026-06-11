@@ -47,6 +47,7 @@ class TradingPreviewServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock OrderPort orderPort;
+    @Mock NotifyPort notifyPort;
 
     TradingPreviewService service;
 
@@ -82,7 +83,7 @@ class TradingPreviewServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, kisPricePort, privacyTradePort, balanceLoader, orderComputer);
     }
 

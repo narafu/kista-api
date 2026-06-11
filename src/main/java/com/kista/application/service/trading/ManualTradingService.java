@@ -32,7 +32,6 @@ class ManualTradingService {
     private final AccountPort accountPort;
     private final OrderPort orderPort;
     private final UserPort userPort;
-    private final NotifyPort notifyPort;
     private final TradingPriceFetcher priceFetcher;
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
@@ -53,8 +52,7 @@ class ManualTradingService {
         // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~17:00, 비DST 06:00~18:00)면 즉시 거부
         DstInfo dst = DstInfo.immediate();
         if (dst.currentSession() == DstInfo.MarketSession.BLOCKED) {
-            String range = dst.isDst() ? "05:00~17:00" : "06:00~18:00";
-            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + range + ")");
+            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + dst.blockedRangeDescription() + ")");
         }
 
         // 스케줄러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
@@ -76,16 +74,11 @@ class ManualTradingService {
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // INFINITE는 initialUsdDeposit null 전달 (PlanContext에서 무시됨)
-        CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, null, null, account.nickname());
-        if (result.isSkipped()) return List.of(); // 전략 차원 skip (기준매매표 미수신 등)
-
-        if (!result.valid()) {
-            log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, balance, strategy.ticker());
-            return List.of();
-        }
+        // INFINITE 전용 — privacyBase는 항상 null (PlanContext에서 무시됨)
+        CycleOrderComputer.ComputeResult result = orderComputer.computeIfValid(
+                balance, strategy, prevClosePrice, today, currentCycle, null, account.nickname(), account)
+                .orElse(null);
+        if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 

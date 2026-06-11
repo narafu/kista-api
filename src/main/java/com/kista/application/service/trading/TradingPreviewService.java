@@ -65,13 +65,9 @@ class TradingPreviewService {
         PrivacyTradeBase privacyBase = strategy.type() == Strategy.Type.PRIVACY
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
-        // PRIVACY는 StrategyCycle.startAmount 전달, INFINITE는 null
-        BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
-                ? currentCycle.startAmount()
-                : null;
 
         CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, initialUsdDeposit, privacyBase, "preview:" + accountId);
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + accountId);
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {

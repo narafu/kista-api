@@ -84,18 +84,39 @@ class TradingService {
                 : null;
 
         // planAndSaveOrders — 전략별: 잔고 로드 + PLANNED 주문 생성·저장 (이미 존재하면 skip)
-        List<CycleState> states = new ArrayList<>();
-        for (BatchContext ctx : contexts) {
-            runSafely("planAndSaveOrders", ctx.strategy().id(),
-                    () -> planAndSaveOrders(ctx, startPriceSnapshots, privacyBase, today))
-                    .ifPresent(states::add);
-        }
+        List<CycleState> states = planAll(contexts, startPriceSnapshots, privacyBase, today);
         if (states.isEmpty()) return;
 
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
         waitForOrderTime(dst);
 
         // KIS 접수 — 전략별: BUY 가격 보정 후 PLANNED → KIS 접수
+        List<CyclePlacedState> placedStates = placeAll(states, today);
+
+        // 공통 대기 — PostClose까지 (모든 전략이 공유하는 단 1회)
+        waitForPostClose(dst);
+
+        // 장 마감 후 종가 일괄 조회
+        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, firstAccount);
+
+        // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
+        reportAll(placedStates, closingPrices, today);
+    }
+
+    // 전략별: 잔고 로드 + PLANNED 주문 생성·저장 (실패 사이클은 격리)
+    private List<CycleState> planAll(List<BatchContext> contexts, Map<Ticker, PriceSnapshot> startPriceSnapshots,
+                                      PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
+        List<CycleState> states = new ArrayList<>();
+        for (BatchContext ctx : contexts) {
+            runSafely("planAndSaveOrders", ctx.strategy().id(),
+                    () -> planAndSaveOrders(ctx, startPriceSnapshots, privacyBase, today))
+                    .ifPresent(states::add);
+        }
+        return states;
+    }
+
+    // 전략별: BUY 가격 보정 후 PLANNED → KIS 접수 (실패 사이클은 격리)
+    private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             runSafely("KIS 접수", state.ctx().strategy().id(), () -> {
@@ -105,14 +126,11 @@ class TradingService {
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);
         }
+        return placedStates;
+    }
 
-        // 공통 대기 — PostClose까지 (모든 전략이 공유하는 단 1회)
-        waitForPostClose(dst);
-
-        // 장 마감 후 종가 일괄 조회
-        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, firstAccount);
-
-        // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
+    // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리)
+    private void reportAll(List<CyclePlacedState> placedStates, Map<Ticker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
         for (CyclePlacedState ps : placedStates) {
             CycleState st = ps.state();
             Strategy strategy = st.ctx().strategy();
@@ -150,21 +168,11 @@ class TradingService {
             }
         }
 
-        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip)
-        // PRIVACY는 StrategyCycle.startAmount 전달, INFINITE는 null
-        BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
-                ? currentCycle.startAmount()
-                : null;
-        CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, initialUsdDeposit, privacyBase, account.nickname());
-        if (result.isSkipped()) return null;
-
-        // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip + 알림
-        if (!result.valid()) {
-            log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, balance, strategy.ticker());
-            return null;
-        }
+        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
+        CycleOrderComputer.ComputeResult result = orderComputer.computeIfValid(
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), account)
+                .orElse(null);
+        if (result == null) return null;
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 

@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 // 복수종목 현재가 일괄 조회 + 누락분 단건 fallback
 @Component
@@ -23,43 +24,34 @@ class TradingPriceFetcher {
 
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<Ticker, BigDecimal> fetchPrices(List<Ticker> tickers, Account account) {
-        Map<Ticker, BigDecimal> prices;
-        try {
-            prices = new HashMap<>(kisPricePort.getPrices(tickers, account));
-        } catch (Exception e) {
-            log.warn("복수종목 현재가 일괄 조회 실패, 단건 fallback 사용: {}", e.getMessage());
-            prices = new HashMap<>();
-        }
-        for (Ticker ticker : tickers) {
-            if (!prices.containsKey(ticker)) {
-                try {
-                    prices.put(ticker, kisPricePort.getPrice(ticker, account));
-                } catch (Exception e) {
-                    log.warn("[{}] 단건 현재가 조회 실패: {}", ticker.name(), e.getMessage());
-                }
-            }
-        }
-        return prices;
+        return fetchWithFallback(tickers, account, "현재가", kisPricePort::getPrices, kisPricePort::getPrice);
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<Ticker, PriceSnapshot> fetchPriceSnapshots(List<Ticker> tickers, Account account) {
-        Map<Ticker, PriceSnapshot> snapshots;
+        return fetchWithFallback(tickers, account, "스냅샷", kisPricePort::getPriceSnapshots, kisPricePort::getPriceSnapshot);
+    }
+
+    // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
+    private <T> Map<Ticker, T> fetchWithFallback(List<Ticker> tickers, Account account, String label,
+                                                  BiFunction<List<Ticker>, Account, Map<Ticker, T>> bulkFetch,
+                                                  BiFunction<Ticker, Account, T> singleFetch) {
+        Map<Ticker, T> result;
         try {
-            snapshots = new HashMap<>(kisPricePort.getPriceSnapshots(tickers, account));
+            result = new HashMap<>(bulkFetch.apply(tickers, account));
         } catch (Exception e) {
-            log.warn("복수종목 스냅샷 일괄 조회 실패, 단건 fallback 사용: {}", e.getMessage());
-            snapshots = new HashMap<>();
+            log.warn("복수종목 {} 일괄 조회 실패, 단건 fallback 사용: {}", label, e.getMessage());
+            result = new HashMap<>();
         }
         for (Ticker ticker : tickers) {
-            if (!snapshots.containsKey(ticker)) {
+            if (!result.containsKey(ticker)) {
                 try {
-                    snapshots.put(ticker, kisPricePort.getPriceSnapshot(ticker, account));
+                    result.put(ticker, singleFetch.apply(ticker, account));
                 } catch (Exception e) {
-                    log.warn("[{}] 단건 스냅샷 조회 실패: {}", ticker.name(), e.getMessage());
+                    log.warn("[{}] 단건 {} 조회 실패: {}", ticker.name(), label, e.getMessage());
                 }
             }
         }
-        return snapshots;
+        return result;
     }
 }

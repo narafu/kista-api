@@ -98,7 +98,7 @@ class TradingServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
         // CycleRotationService: kisMarginPort, strategyPort, strategyCyclePort, cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies
         CycleRotationService rotationService = new CycleRotationService(
                 kisMarginPort, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);

@@ -32,6 +32,11 @@ public record DstInfo(
         return MarketSession.DIRECT;
     }
 
+    // BLOCKED 시간대 범위 설명 (KST) — 수동 실행 거부 메시지용
+    public String blockedRangeDescription() {
+        return isDst ? "05:00~17:00" : "06:00~18:00";
+    }
+
     private static final ZoneId NY  = ZoneId.of("America/New_York");
     private static final ZoneId KST = TimeZones.KST;
 
