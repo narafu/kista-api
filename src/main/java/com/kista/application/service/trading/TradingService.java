@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -52,8 +53,7 @@ class TradingService {
 
     void execute(Strategy strategy, Account account, User user) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
-        StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)));
     }
 
@@ -178,8 +178,7 @@ class TradingService {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
     void execute(Strategy strategy, Account account, User user, DstInfo dst) throws InterruptedException {
-        StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)), dst);
     }
 

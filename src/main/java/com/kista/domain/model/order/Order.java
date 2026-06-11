@@ -50,4 +50,11 @@ public record Order(
                 template.orderType(), template.direction(), template.quantity(),
                 template.price(), OrderStatus.PLANNED, null, null, null);
     }
+
+    // 전략 계산용 PLANNED 템플릿 주문 (계좌·사이클·체결정보는 이후 plan()에서 채움)
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price) {
+        return new Order(null, null, null, tradeDate, ticker, orderType, direction,
+                quantity, price, OrderStatus.PLANNED, null, null, null);
+    }
 }

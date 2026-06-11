@@ -1,5 +1,7 @@
 package com.kista.domain.model.strategy;
 
+import com.kista.common.TimeZones;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,7 +33,7 @@ public record DstInfo(
     }
 
     private static final ZoneId NY  = ZoneId.of("America/New_York");
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final ZoneId KST = TimeZones.KST;
 
     public Duration waitUntilOrderTime() {
         return Duration.between(Instant.now(), orderAt);

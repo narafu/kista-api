@@ -2,6 +2,7 @@ package com.kista.application.service.strategy;
 
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
+import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
@@ -187,8 +188,7 @@ class StrategyService implements StrategyUseCase {
         if (newSeed.signum() <= 0) {
             throw new IllegalArgumentException("시드는 0보다 커야 합니다");
         }
-        StrategyCycle cycle = strategyCyclePort.findLatestByStrategyId(strategyId)
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: " + strategyId));
+        StrategyCycle cycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategyId);
         CyclePosition latest = cyclePositionPort.findLatestByStrategyId(strategyId, 1).stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));

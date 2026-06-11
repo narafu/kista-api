@@ -18,7 +18,6 @@ import java.util.stream.Stream;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
-import static com.kista.domain.model.order.Order.OrderStatus.PLANNED;
 
 @Slf4j
 @Component
@@ -70,7 +69,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         // BUY (quantity>0) + SELL 합쳐 반환
         List<Order> buyOrders = buyEntries.stream()
                 .filter(e -> e.quantity > 0)
-                .map(e -> new Order(null, null, null, e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price, PLANNED, null, null, null))
+                .map(e -> Order.planned(e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price))
                 .toList();
         List<Order> sellOrders = buildSellOrders(explicitSells, nullSellTemplate, balance, multiple);
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
@@ -81,8 +80,8 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                                         AccountBalance balance, BigDecimal multiple) {
         // 명시 SELL multiple 적용
         List<Order> result = new ArrayList<>(explicit.stream()
-                .map(t -> new Order(null, null, null, t.tradeDate(), t.ticker(), t.orderType(), SELL,
-                        applyMultiple(t.quantity(), multiple), t.price(), PLANNED, null, null, null))
+                .map(t -> Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL,
+                        applyMultiple(t.quantity(), multiple), t.price()))
                 .toList());
 
         if (nullTemplate == null) return result;
@@ -95,8 +94,8 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                     balance.holdings(), sumOtherSells);
             return result;
         }
-        result.add(new Order(null, null, null, nullTemplate.tradeDate(), nullTemplate.ticker(),
-                nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), PLANNED, null, null, null));
+        result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
+                nullTemplate.orderType(), SELL, remaining, nullTemplate.price()));
         return result;
     }
 

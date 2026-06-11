@@ -43,7 +43,7 @@ class TradingReporter {
     private final OrderPort orderPort;
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
-    private final CyclePositionPort cycleHistoryPort;
+    private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
 
@@ -85,7 +85,7 @@ class TradingReporter {
     private void saveCyclePosition(LocalDate today, AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        cycleHistoryPort.save(position);
+        cyclePositionPort.save(position);
         log.info("[strategyId={}] 사이클 포지션 저장 완료", strategy.id());
 
         // holdings==0이면 사이클 종료 알림 후 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서

@@ -129,7 +129,6 @@ class BuyOrderPriceCapper {
 
     private Order plannedBuy(LocalDate today, Strategy strategy, Order.OrderType orderType,
                              int quantity, BigDecimal price) {
-        return new Order(null, null, null, today, strategy.ticker(),
-                orderType, BUY, quantity, price, Order.OrderStatus.PLANNED, null, null, null);
+        return Order.planned(today, strategy.ticker(), orderType, BUY, quantity, price);
     }
 }

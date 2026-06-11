@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.Order;
@@ -47,8 +48,7 @@ class ManualTradingService {
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
-        StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
 
         // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~17:00, 비DST 06:00~18:00)면 즉시 거부
         DstInfo dst = DstInfo.immediate();

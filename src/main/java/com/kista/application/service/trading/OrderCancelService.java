@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
@@ -37,8 +38,7 @@ class OrderCancelService {
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리
-        var currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+        var currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
 
         // 오늘 PLACED된 주문 조회 (UTC 기준 — TradeDateConverter 없이 도메인 LocalDate 사용)
         List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), LocalDate.now());

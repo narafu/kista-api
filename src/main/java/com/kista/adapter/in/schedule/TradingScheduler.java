@@ -1,5 +1,7 @@
 package com.kista.adapter.in.schedule;
 
+import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
@@ -31,7 +33,7 @@ public class TradingScheduler {
     private final UserPort userPort;                // 계좌 소유자 조회
     private final NotifyPort notifyPort;            // 관리자 오류 알림
 
-    @Scheduled(cron = "0 0 4 * * TUE-SAT", zone = "Asia/Seoul") // 화~토 04:00 KST
+    @Scheduled(cron = "0 0 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:00 KST
     public void run() {
         List<Strategy> strategies = strategyPort.findAllActive();
         log.info("매매 스케줄 시작 — ACTIVE 전략 {}개", strategies.size());
@@ -40,8 +42,7 @@ public class TradingScheduler {
         List<BatchContext> contexts = new ArrayList<>();
         for (Strategy strategy : strategies) {
             try {
-                StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                        .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id()));
+                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
                 Account account = accountPort.findByIdOrThrow(strategy.accountId());
                 User user = userPort.findByIdOrThrow(account.userId());
                 contexts.add(new BatchContext(strategy, currentCycle, account, user));

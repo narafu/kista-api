@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.strategy;
 
+import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -70,9 +70,8 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public List<CyclePositionHistoryEntry> findBetween(LocalDate from, LocalDate to) {
-        ZoneId kst = ZoneId.of("Asia/Seoul");
-        Instant fromInstant = from.atStartOfDay(kst).toInstant();
-        Instant toInstant = to.plusDays(1).atStartOfDay(kst).toInstant(); // to 당일 포함
+        Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
+        Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
         List<CyclePositionEntity> entities = positionRepo.findBetweenDates(fromInstant, toInstant);
         Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
