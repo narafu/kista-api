@@ -15,6 +15,12 @@ public record PrivacyTradeBase(
         BigDecimal currentCycleStart, // 현재 사이클 기준가 — PRIVACY multiple 동적 산출 기준
         List<PrivacyTrade> trades
 ) {
+    public PrivacyTradeBase {
+        if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
+            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + currentCycleStart);
+        }
+    }
+
     public record PrivacyTrade(
             LocalDate tradeDate,       // 거래일
             Strategy.Ticker ticker,             // 거래 종목

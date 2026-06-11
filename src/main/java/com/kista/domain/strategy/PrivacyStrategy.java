@@ -30,9 +30,6 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
             throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
         }
         BigDecimal start = privacyTradeBase.currentCycleStart();
-        if (start == null || start.signum() <= 0) {
-            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + start);
-        }
         BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
         log.info("[PRIVACY] 배수 산출: initialUsdDeposit={}, currentCycleStart={}, multiple={}", initialUsdDeposit, start, multiple);
 

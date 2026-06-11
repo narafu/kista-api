@@ -10,4 +10,10 @@ public record PrivacyCurrentBase(
         Ticker ticker,              // 대상 종목 (SOXL 고정)
         BigDecimal currentCycleStart, // 현재 사이클 시작 기준가
         LocalDate tradeDate         // 기준 매매표 적용 거래일
-) {}
+) {
+    public PrivacyCurrentBase {
+        if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
+            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + currentCycleStart);
+        }
+    }
+}
