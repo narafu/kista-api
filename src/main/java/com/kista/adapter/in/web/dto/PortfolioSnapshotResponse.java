@@ -5,7 +5,6 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -30,14 +29,10 @@ public record PortfolioSnapshotResponse(
         Instant createdAt
 ) {
     public static PortfolioSnapshotResponse from(CyclePositionHistoryEntry e) {
-        BigDecimal marketValueUsd = e.closingPrice() != null
-                ? e.closingPrice().multiply(BigDecimal.valueOf(e.holdings())).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalAssetUsd = marketValueUsd.add(e.usdDeposit()).setScale(2, RoundingMode.HALF_UP);
         return new PortfolioSnapshotResponse(
                 e.id(), e.ticker(), e.holdings(),
                 e.closingPrice(), e.avgPrice(),
-                marketValueUsd, e.usdDeposit(), totalAssetUsd,
+                e.marketValueUsd(), e.usdDeposit(), e.totalAssetUsd(),
                 e.createdAt());
     }
 }

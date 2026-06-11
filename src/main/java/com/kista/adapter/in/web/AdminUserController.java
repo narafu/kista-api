@@ -42,8 +42,8 @@ public class AdminUserController {
                              @RequestBody StatusRequest body,
                              @AuthenticationPrincipal UUID adminId) {
         switch (body.status()) {
-            case "ACTIVE"   -> adminUser.approveUser(adminId, userId);
-            case "REJECTED" -> adminUser.rejectUser(adminId, userId);
+            case ACTIVE   -> adminUser.approveUser(adminId, userId);
+            case REJECTED -> adminUser.rejectUser(adminId, userId);
             default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
         }
     }
@@ -66,6 +66,6 @@ public class AdminUserController {
         adminUser.deleteUser(adminId, userId);
     }
 
-    record StatusRequest(String status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)
+    record StatusRequest(User.UserStatus status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)
     record RoleRequest(User.UserRole role) {} // 역할 변경 요청 body
 }

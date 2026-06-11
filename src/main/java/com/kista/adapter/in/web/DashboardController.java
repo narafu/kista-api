@@ -36,9 +36,7 @@ public class DashboardController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "거래 종목", example = "SOXL")
             @RequestParam(defaultValue = "SOXL") Ticker ticker) {
-        LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate resolvedTo = to != null ? to : LocalDate.now();
-        return portfolioUseCase.getHistory(resolvedFrom, resolvedTo, ticker)
+        return portfolioUseCase.getHistory(resolveFrom(from), resolveTo(to), ticker)
                 .stream().map(TradeHistoryResponse::from).toList();
     }
 
@@ -59,10 +57,17 @@ public class DashboardController {
             @Parameter(description = "조회 종료일 (기본: 오늘)", example = "2025-01-31")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate resolvedTo = to != null ? to : LocalDate.now();
-        return portfolioUseCase.getSnapshots(resolvedFrom, resolvedTo)
+        return portfolioUseCase.getSnapshots(resolveFrom(from), resolveTo(to))
                 .stream().map(PortfolioSnapshotResponse::from).toList();
     }
 
+    // 조회 시작일 기본값: 오늘 - 30일
+    private static LocalDate resolveFrom(LocalDate from) {
+        return from != null ? from : LocalDate.now().minusDays(30);
+    }
+
+    // 조회 종료일 기본값: 오늘
+    private static LocalDate resolveTo(LocalDate to) {
+        return to != null ? to : LocalDate.now();
+    }
 }
