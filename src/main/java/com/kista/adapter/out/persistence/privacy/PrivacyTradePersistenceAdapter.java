@@ -5,6 +5,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyTradeBaseView;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -29,6 +30,13 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
             .thenComparing((a, b) -> a.direction() == Order.OrderDirection.BUY
                     ? b.price().compareTo(a.price())
                     : a.price().compareTo(b.price()));
+
+    // 주문 표시 정렬: BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순
+    private static final Comparator<PrivacyTradeDetailEntity> DETAIL_SORT = Comparator
+            .comparingInt((PrivacyTradeDetailEntity d) -> d.getDirection() == Order.OrderDirection.BUY ? 0 : 1)
+            .thenComparing((a, b) -> a.getDirection() == Order.OrderDirection.BUY
+                    ? b.getPrice().compareTo(a.getPrice())
+                    : a.getPrice().compareTo(b.getPrice()));
 
     private final PrivacyTradeMasterJpaRepository masterRepository;
 
@@ -138,5 +146,31 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
         return a.equals(b);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromUtc) {
+        return masterRepository.findBasesFromTradeDate(fromUtc).stream()
+                .map(this::toView)
+                .toList();
+    }
+
+    // 엔티티 → 조회 뷰 변환 (trade_date UTC → KST, 주문 정렬)
+    private PrivacyTradeBaseView toView(PrivacyTradeMasterEntity e) {
+        List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()
+                .sorted(DETAIL_SORT)
+                .map(d -> new PrivacyTradeBaseView.OrderLine(
+                        d.getId(), d.getDirection().name(), d.getOrderType().name(), d.getPrice(), d.getQuantity()))
+                .toList();
+        return new PrivacyTradeBaseView(
+                e.getId(),
+                TradeDateConverter.toKst(e.getTradeDate()),  // UTC DB → KST 도메인
+                e.getTicker().name(),
+                e.getCurrentCycleStart(),
+                e.getCurrentCycleRealizedPnl(),
+                e.getAvgPrice(),
+                e.getHoldings(),
+                orders);
     }
 }
