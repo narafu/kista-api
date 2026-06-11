@@ -103,7 +103,7 @@ class TradingServiceTest {
         CycleRotationService rotationService = new CycleRotationService(
                 kisMarginPort, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort);
-        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, kisOrderPort, priceCapper);
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,

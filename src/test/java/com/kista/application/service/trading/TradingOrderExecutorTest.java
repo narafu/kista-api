@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
@@ -39,10 +38,6 @@ class TradingOrderExecutorTest {
             "74420614", "key", "secret", "01",
             Account.Broker.KIS);
 
-    static final Strategy CYCLE = new Strategy(
-            UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
@@ -73,9 +68,9 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-001"));
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
-        verify(buyOrderPriceCapper).capIfNeeded(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        verify(buyOrderPriceCapper).capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
         assertThat(result.getFirst().status()).isEqualTo(Order.OrderStatus.PLACED);
@@ -91,9 +86,9 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-002"));
 
-        executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION);
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION);
 
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -104,9 +99,9 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(kisOrderPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-003"));
 
-        executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
 
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -114,7 +109,7 @@ class TradingOrderExecutorTest {
     void placeOrders_noPlannedOrders_returnsEmpty() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
         assertThat(result).isEmpty();
         verify(kisOrderPort, never()).place(any(), any());
@@ -131,7 +126,7 @@ class TradingOrderExecutorTest {
         when(kisOrderPort.place(order1, ACCOUNT)).thenReturn(kisResponse("KIS-101"));
         when(kisOrderPort.place(order2, ACCOUNT)).thenReturn(kisResponse("KIS-102"));
 
-        List<Order> result = executor().placeOrders(TODAY, CYCLE, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(id1);

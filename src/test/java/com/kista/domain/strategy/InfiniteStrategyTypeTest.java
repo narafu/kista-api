@@ -112,4 +112,90 @@ class InfiniteStrategyTypeTest {
         assertThat(orders).isNotEmpty();
         assertThat(orders).allMatch(o -> o.ticker() == Ticker.TQQQ);
     }
+
+    // ── buildCappedBuyOrders() 시나리오 ──────────────────────────────────────
+    // holdings=0 → unitAmount(K) = usdDeposit ÷ 20
+
+    private InfinitePosition positionWithUnitAmount(String usdDeposit) {
+        return new InfinitePosition(
+                new AccountBalance(0, null, new BigDecimal(usdDeposit)),
+                Ticker.SOXL, new BigDecimal("10.00"));
+    }
+
+    private Order buy(String price, int quantity) {
+        return Order.planned(TODAY, Ticker.SOXL, LOC, BUY, quantity, new BigDecimal(price));
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반 2건, 캡 후 가격 상이: ①②+보정 3건 = 5건")
+    void buildCappedBuyOrders_twoBuys_distinctCaps_recalculatesBoth() {
+        // cap=55, K=1000, r=0.20 / buy①=60(>cap→55), buy②=52(≤cap)
+        // qty1 = floor((1000/2) / 55) = 9 / remaining = (1000-55×9)×1.20 = 606 / qty2 = floor(606/52) = 11
+        // 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
+        InfinitePosition position = positionWithUnitAmount("20000");
+        List<Order> buyOrders = List.of(buy("60.00", 1), buy("52.00", 1));
+
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
+
+        assertThat(result).hasSize(5);
+        assertThat(result.get(0).quantity()).isEqualTo(9);
+        assertThat(result.get(0).price()).isEqualByComparingTo("55.00");
+        assertThat(result.get(1).quantity()).isEqualTo(11);
+        assertThat(result.get(1).price()).isEqualByComparingTo("52.00");
+        assertThat(result.get(2).quantity()).isEqualTo(1);
+        assertThat(result.get(2).price()).isEqualByComparingTo("47.62");
+        assertThat(result.get(3).quantity()).isEqualTo(1);
+        assertThat(result.get(3).price()).isEqualByComparingTo("45.45");
+        assertThat(result.get(4).quantity()).isEqualTo(1);
+        assertThat(result.get(4).price()).isEqualByComparingTo("43.48");
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반 2건, 동일 캡으로 수렴: 병합 1건+보정 3건 = 4건")
+    void buildCappedBuyOrders_twoBuys_convergeToSameCap_mergesIntoOne() {
+        // cap=55, buy①=70·buy②=60 모두 55로 캡 → 동일 가격이면 병합
+        // qty1 = floor(500/55) = 9 / remaining = 606 / qty2 = floor(606/55) = 11 / merged = 20
+        InfinitePosition position = positionWithUnitAmount("20000");
+        List<Order> buyOrders = List.of(buy("70.00", 1), buy("60.00", 1));
+
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
+
+        // 병합 1건 + 보정 3회: K/(20+1)=47.62, K/(21+1)=45.45, K/(22+1)=43.48 — 각 1주 LOC
+        assertThat(result).hasSize(4);
+        assertThat(result.getFirst().quantity()).isEqualTo(20);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
+        assertThat(result.get(1).price()).isEqualByComparingTo("47.62");
+        assertThat(result.get(2).price()).isEqualByComparingTo("45.45");
+        assertThat(result.get(3).price()).isEqualByComparingTo("43.48");
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 후반 1건: 재산정 1건+보정 3건 = 4건")
+    void buildCappedBuyOrders_singleBuy_capped_recalculatesQuantity() {
+        // 후반 단일 LOC 매수 — cap=55, K=1000 / qty = floor(1000/55) = 18
+        InfinitePosition position = positionWithUnitAmount("20000");
+        List<Order> buyOrders = List.of(buy("70.00", 1));
+
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
+
+        // 재산정 1건 + 보정 3회: K/(18+1)=52.63, K/(19+1)=50.00, K/(20+1)=47.62 — 각 1주 LOC
+        assertThat(result).hasSize(4);
+        assertThat(result.getFirst().quantity()).isEqualTo(18);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
+        assertThat(result.get(1).price()).isEqualByComparingTo("52.63");
+        assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
+        assertThat(result.get(3).price()).isEqualByComparingTo("47.62");
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0: 매수+보정 모두 제외 = 빈 리스트")
+    void buildCappedBuyOrders_singleBuy_cappedQuantityZero_returnsEmpty() {
+        // cap=55, K=50(usdDeposit=1000) / qty = floor(50/55) = 0 → 매수 제외, 누적수량 0이므로 보정도 제외
+        InfinitePosition position = positionWithUnitAmount("1000");
+        List<Order> buyOrders = List.of(buy("200.00", 1));
+
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
+
+        assertThat(result).isEmpty();
+    }
 }

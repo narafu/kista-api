@@ -121,7 +121,7 @@ class TradingService {
         for (CycleState state : states) {
             runSafely("KIS 접수", state.ctx().strategy().id(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
-                        state.ctx().strategy(), state.ctx().account(), state.ctx().currentCycle().id(),
+                        state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);
