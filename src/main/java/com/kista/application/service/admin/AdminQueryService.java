@@ -1,16 +1,19 @@
 package com.kista.application.service.admin;
 
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBaseView;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ class AdminQueryService implements AdminQueryUseCase {
     private final OrderPort orderPort;
     private final AuditLogPort auditLogPort;
     private final StrategyPort strategyPort;
+    private final PrivacyTradePort privacyTradePort;
 
     @Override
     public AdminStats getStats() {
@@ -85,5 +89,14 @@ class AdminQueryService implements AdminQueryUseCase {
                 .toList();
 
         return new AdminAnomalies(pausedAccounts, inactiveAccounts);
+    }
+
+    @Override
+    public List<PrivacyTradeBaseView> listPrivacyBases(Integer days) {
+        // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일을 UTC 거래일 경계로 변환
+        LocalDate fromUtc = days == null
+                ? LocalDate.EPOCH
+                : TradeDateConverter.toUtc(LocalDate.now().minusDays(days));
+        return privacyTradePort.findBasesFromTradeDate(fromUtc);
     }
 }
