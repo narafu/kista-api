@@ -19,7 +19,7 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // kisOrderPort.place() 완료 후 PLACED 상태 + externalOrderId 기록
+    // 브로커 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록
     void markPlaced(UUID orderId, String externalOrderId);
 
     // 기간+종목 필터 조회 (대시보드·텔레그램 이력 조회용)

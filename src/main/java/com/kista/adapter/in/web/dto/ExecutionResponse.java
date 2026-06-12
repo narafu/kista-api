@@ -14,7 +14,7 @@ public record ExecutionResponse(
         int quantity,
         BigDecimal price,
         BigDecimal amountUsd,
-        String externalOrderId
+        String orderId
 ) {
     public static ExecutionResponse from(Execution e) {
         return new ExecutionResponse(

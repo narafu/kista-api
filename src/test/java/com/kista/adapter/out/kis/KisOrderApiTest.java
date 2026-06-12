@@ -118,7 +118,7 @@ class KisOrderApiTest {
 
     @Test
     @DisplayName("응답 ODNO → orderId 반환, 상태=PLACED")
-    void place_responseWithOdno_returnsKisOrderId() {
+    void place_responseWithOdno_returnsExternalOrderId() {
         Order order = new Order(null, null, null, TRADE_DATE, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse response =
