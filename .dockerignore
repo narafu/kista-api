@@ -1,0 +1,77 @@
+# flyctl launch added from .gitignore
+# Gradle
+**/.gradle
+**/build
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+**/.idea
+**/*.iws
+**/*.iml
+**/*.ipr
+**/.vscode
+**/*.swp
+**/*.swo
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# 환경별 시크릿 파일
+**/**/application-local.yml
+**/**/application-test.yml
+**/*.env
+**/.env*
+!**/.env.example
+
+# Querydsl 생성 파일
+**/build/generated
+
+# Test reports
+**/build/reports
+**/build/test-results
+
+# Docker override
+**/docker-compose.override.yml
+
+# Fly.io
+**/.fly
+
+# memory
+.shrimp-data/memory
+
+# Claude Code 런타임 파일
+**/.claude/scheduled_tasks.lock
+**/.claude/scheduled_tasks.json
+**/.claude/settings.local.json
+
+# Serena MCP 런타임 디렉토리 (memories는 공유, 로컬 환경 설정만 제외)
+**/.serena/project.local.yml
+
+# Gradle 컴파일 바이너리 출력
+**/bin
+
+# Node.js 의존성 폴더
+**/node_modules
+
+#supabase 로컬 상태 및 데이터
+**/.supabase
+**/package-lock.json
+**/supabase/.temp
+
+# 로컬 서버 로그
+**/logs
+
+# flyctl launch added from .serena/.gitignore
+.serena/cache
+.serena/project.local.yml
+
+# flyctl launch added from .shrimp-data/.gitignore
+# Temporary files
+.shrimp-data/**/*.tmp
+.shrimp-data/**/*.log
+
+# OS files
+.shrimp-data/**/.DS_Store
+.shrimp-data/**/Thumbs.db
+fly.toml

@@ -1,0 +1,29 @@
+app = 'kista-api'
+primary_region = 'sin'
+
+[build]
+
+[env]
+  SPRING_PROFILES_ACTIVE = "prod"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  # 04:00 KST 스케줄러가 항상 실행될 수 있도록 최소 1대 유지
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period = "180s"
+    interval = "30s"
+    method = "GET"
+    path = "/actuator/health"
+    protocol = "http"
+    timeout = "10s"
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

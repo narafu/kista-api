@@ -24,11 +24,11 @@ USER appuser
 
 COPY --from=builder /workspace/build/libs/app.jar app.jar
 
-# JVM 옵션: Render 무료 512MB 기준 메모리 분배
-# Heap 220m + Metaspace 128m + CodeCache 64m + OS/스택 ~50m ≈ 462m (512m 이내)
+# JVM 옵션: Fly.io 1GB 기준 메모리 분배
+# Heap 512m + Metaspace 128m + CodeCache 64m + OS/스택 ~100m ≈ 804m (1GB 이내)
 # SerialGC: G1GC보다 메모리 오버헤드 낮음 — 저트래픽 스케줄러 앱에 적합
-ENV JAVA_OPTS="-Xmx220m \
-               -Xms32m \
+ENV JAVA_OPTS="-Xmx512m \
+               -Xms64m \
                -XX:MaxMetaspaceSize=128m \
                -XX:ReservedCodeCacheSize=64m \
                -XX:+UseSerialGC \
