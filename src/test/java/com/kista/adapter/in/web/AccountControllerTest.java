@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -19,6 +20,8 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -87,5 +90,54 @@ class AccountControllerTest {
                         .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void register_tossAccount_11digits_skipsAccountNoTest_returns201() throws Exception {
+        // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
+        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+                .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
+                        "토스계좌", "12345678901", "cid", "csecret", "42", Account.Broker.TOSS));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"12345678901\"," +
+                                "\"kisAppKey\":\"cid\",\"kisSecretKey\":\"csecret\",\"broker\":\"TOSS\"}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.broker").value("TOSS"));
+
+        // Toss 계좌는 testAccountNo() 미호출
+        verify(accountUseCase, never()).testAccountNo(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void register_kisAccount_callsAccountNoTest_returns201() throws Exception {
+        // KIS 계좌 등록: testAccountNo() 호출 후 register() 수행
+        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+                .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
+                        "KIS계좌", "74420614", "appKey", "appSecret", "01", Account.Broker.KIS));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614\"," +
+                                "\"kisAppKey\":\"appKey\",\"kisSecretKey\":\"appSecret\"}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.broker").value("KIS"));
+
+        // KIS 계좌는 testAccountNo() 반드시 호출
+        verify(accountUseCase).testAccountNo("appKey", "appSecret", "74420614");
+    }
+
+    @Test
+    void register_accountNo_not8or11digits_returns400() throws Exception {
+        // 9자리 계좌번호 → @Pattern 검증 실패 → 400
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"계좌\",\"accountNo\":\"123456789\"," +
+                                "\"kisAppKey\":\"key\",\"kisSecretKey\":\"secret\"}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isBadRequest());
     }
 }

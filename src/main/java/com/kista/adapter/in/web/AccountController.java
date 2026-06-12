@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.AccountUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,18 +40,20 @@ public class AccountController {
     }
 
     // 계좌 등록 (AES-256 암호화 저장)
-    @Operation(summary = "계좌 등록", description = "KIS 계좌 및 자격증명을 AES-256 암호화하여 저장.")
+    @Operation(summary = "계좌 등록", description = "KIS/Toss 계좌 및 자격증명을 AES-256 암호화하여 저장.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "등록 성공"),
             @ApiResponse(responseCode = "400", description = "이미 등록된 계좌이거나 잘못된 요청"),
-            @ApiResponse(responseCode = "422", description = "계좌번호가 KIS 자격증명과 일치하지 않음")
+            @ApiResponse(responseCode = "422", description = "계좌번호가 자격증명과 일치하지 않음")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
-        // 계좌번호 실소유 검증 — 불일치 시 InvalidKisKeyException → GlobalExceptionHandler → 422
-        accountUseCase.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
+        // KIS만 계좌번호 실소유 검증 — Toss는 AccountService.register() 내 testAndFetchAccountSeq()에서 통합 처리
+        if (request.broker() == null || request.broker() == Account.Broker.KIS) {
+            accountUseCase.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
+        }
         return AccountResponse.from(
                 accountUseCase.register(userId, request.toRegisterCommand())
         );

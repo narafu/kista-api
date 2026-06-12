@@ -7,6 +7,7 @@ import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.TossConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,21 +27,31 @@ class AccountService implements AccountUseCase {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
-    private final KisConnectionTestPort connectionTestPort; // KIS 자격증명 연결 테스트 포트
+    private final KisConnectionTestPort connectionTestPort;   // KIS 자격증명 연결 테스트 포트
+    private final TossConnectionTestPort tossConnectionTestPort; // Toss 자격증명 연결 테스트 + accountSeq 조회
 
     @Override
     public Account register(UUID userId, RegisterAccountCommand cmd) {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
+        // broker 미지정 시 KIS 기본값 적용
+        Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
+
+        // 증권사별 계좌 상품 코드 / 계좌 시퀀스 결정
+        String accountTypeOrSeq = switch (broker) {
+            case KIS -> cmd.kisAccountType() != null ? cmd.kisAccountType() : "01";
+            case TOSS -> tossConnectionTestPort.testAndFetchAccountSeq(cmd.kisAppKey(), cmd.kisSecretKey());
+        };
+
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
-                cmd.kisAccountType() != null ? cmd.kisAccountType() : "01",
-                Account.Broker.KIS
+                accountTypeOrSeq,
+                broker
         );
         Account saved = accountPort.save(account);
-        log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
+        log.info("계좌 등록: userId={}, accountId={}, broker={}", userId, saved.id(), broker);
         return saved;
     }
 
