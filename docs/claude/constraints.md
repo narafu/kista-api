@@ -91,14 +91,14 @@
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
-averagePrice (holdings==0이면 currentPrice)
+averagePrice (holdings==0이면 prevClosePrice 전일종가)
 purchaseAmount = averagePrice × holdings
 totalAssets = usdDeposit + purchaseAmount
 unitAmount = totalAssets ÷ 20  (scale=2, HALF_UP)
 currentRound = holdings==0 ? 0.0 : purchaseAmount ÷ unitAmount  (double, 소수점 허용)
-priceOffsetRate = 0.20 × (1 - 2×currentRound/20)  (scale=2, HALF_UP)
+priceOffsetRate = targetProfitRate × (1 - 2×currentRound/20)  (scale=2, HALF_UP)
 referencePrice = averagePrice × (1 + priceOffsetRate)  (scale=2, HALF_UP — LOC 주문 가격 기준)
-targetPrice = averagePrice × 1.20  (scale=2, HALF_UP)
+targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 ```
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
 - `currentRound`는 floor 없이 소수점 허용

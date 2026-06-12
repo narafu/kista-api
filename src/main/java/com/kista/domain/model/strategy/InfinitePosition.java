@@ -73,11 +73,13 @@ public record InfinitePosition(
 
     // --- TDA 지향: 비즈니스 조건 판단 메서드 (Tell, Don't Ask) ---
 
+    // 전반(priceOffsetRate>0) / 후반(priceOffsetRate≤0) — 수학적으로 currentRound < 10 / ≥ 10과 동치
     public boolean isEarlyStage() {
         return priceOffsetRate().compareTo(BigDecimal.ZERO) > 0;
     }
 
-    public boolean isDepositDeficient() {
+    // 마지막 회차(매도 소진 구간) — unitAmount > usdDeposit ⟺ A·Q > 19·usdDeposit ⟺ currentRound > 19
+    public boolean isFinalRound() {
         return unitAmount().compareTo(usdDeposit()) > 0;
     }
 

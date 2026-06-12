@@ -103,7 +103,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
     }
 
     private void buildLateStageOrders(List<Order> orders, InfinitePosition position, LocalDate tradeDate) {
-        if (position.isDepositDeficient()) {
+        if (position.isFinalRound()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
                 orders.add(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO));
