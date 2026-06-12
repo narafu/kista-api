@@ -91,19 +91,20 @@
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
-A = averagePrice (qty==0이면 currentPrice)   Q = quantity
-M = A × Q (purchaseAmount)   D = currentPrice × Q (evaluationAmount, 정보성)
-B = usdDeposit + M (totalAssets)   K = B ÷ 20 (unitAmount, scale=2, HALF_UP)
-T = Q==0 ? 0.0 : M ÷ K  (currentRound, double, 소수점 허용)
-S = 0.20 × (1 - 2T/20)  (priceOffsetRate, scale=2, HALF_UP)
-G = A × (1 + S)  (referencePrice, scale=2, HALF_UP — LOC 주문 가격 기준)
-P = A × 1.20  (targetPrice, scale=2, HALF_UP)
+averagePrice (holdings==0이면 currentPrice)
+purchaseAmount = averagePrice × holdings
+totalAssets = usdDeposit + purchaseAmount
+unitAmount = totalAssets ÷ 20  (scale=2, HALF_UP)
+currentRound = holdings==0 ? 0.0 : purchaseAmount ÷ unitAmount  (double, 소수점 허용)
+priceOffsetRate = 0.20 × (1 - 2×currentRound/20)  (scale=2, HALF_UP)
+referencePrice = averagePrice × (1 + priceOffsetRate)  (scale=2, HALF_UP — LOC 주문 가격 기준)
+targetPrice = averagePrice × 1.20  (scale=2, HALF_UP)
 ```
-- `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, B 계산에 사용
-- `currentRound`(T)는 floor 없이 소수점 허용
-- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 T < 10 / T ≥ 10과 동치)
-- **전반**: LOC 매수①(K/2/A, 평단가) + LOC 매수②((K − A×Q①)×(1+targetProfitRate)/G, 기준가) + LOC 매도(Q/4, G+0.01) + 지정가 매도(Q-Q/4, P)
-- **후반 K>D**: MOC 매도(Q/4)만 / **후반 K≤D**: LOC 매수(K/G, G) + LOC 매도 + 지정가 매도
+- `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
+- `currentRound`는 floor 없이 소수점 허용
+- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < 10 / currentRound ≥ 10과 동치)
+- **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+targetProfitRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
+- **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
 
 ### KIS 계좌번호 DB 저장 방식
 - 계좌번호는 `accounts.account_no` (8자리, AES-256 암호화) + `accounts.kis_account_type` (평문 `"01"`) 으로 분리 저장

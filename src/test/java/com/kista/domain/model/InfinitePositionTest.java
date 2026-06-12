@@ -16,9 +16,9 @@ import static org.assertj.core.api.Assertions.within;
 class InfinitePositionTest {
 
     @Test
-    @DisplayName("Q=0: 최근 종가(18)를 averagePrice 대용으로 사용(현재가 20 무관), currentRound=0, priceOffsetRate=0.2000 (SOXL)")
+    @DisplayName("holdings=0: 최근 종가(18)를 averagePrice 대용으로 사용(현재가 20 무관), currentRound=0, priceOffsetRate=0.2000 (SOXL)")
     void case_q0() {
-        // averagePrice=prevClose=18, M=0, D=0, B=2000, K=100.00, T=0.0
+        // averagePrice=prevClose=18, purchaseAmount=0, totalAssets=2000, unitAmount=100.00, currentRound=0.0
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("18"));
 
@@ -35,9 +35,9 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("Q=10: currentRound=1.33, priceOffsetRate=0.17 (SOXL)")
+    @DisplayName("holdings=10: currentRound=1.33, priceOffsetRate=0.17 (SOXL)")
     void case_q10() {
-        // A=20, M=200, D=210, B=3000, K=150.00, T=200/150=1.33
+        // averagePrice=20, purchaseAmount=200, totalAssets=3000, unitAmount=150.00, currentRound=200/150=1.33
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("2800"));
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("19"));
 
@@ -54,9 +54,9 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("Q=100: currentRound=5.0, priceOffsetRate=0.1000 (SOXL)")
+    @DisplayName("holdings=100: currentRound=5.0, priceOffsetRate=0.1000 (SOXL)")
     void case_q100() {
-        // A=5, M=500, D=600, B=2000, K=100.00, T=500/100=5.0
+        // averagePrice=5, purchaseAmount=500, totalAssets=2000, unitAmount=100.00, currentRound=500/100=5.0
         AccountBalance balance = new AccountBalance(100, new BigDecimal("5"), new BigDecimal("1500"));
         InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5.8"));
 
@@ -81,5 +81,17 @@ class InfinitePositionTest {
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.1500"); // TQQQ targetProfitRate=0.15
         assertThat(pos.referencePrice()).isEqualByComparingTo("57.50"); // 50×1.15
         assertThat(pos.targetPrice()).isEqualByComparingTo("57.50");
+    }
+
+    @Test
+    @DisplayName("earlyBuyQty1/earlyBuyQty2: FLOOR 결과가 0이어도 최소 1주 보장")
+    void earlyBuyQty_minimumOneShare() {
+        // unitAmount=10, price1=100 → (10/2)/100 = floor(0.05) = 0 → 최소 1
+        int qty1 = InfinitePosition.earlyBuyQty1(new BigDecimal("10"), new BigDecimal("100"));
+        assertThat(qty1).isEqualTo(1);
+
+        // unitAmount=10, price1=100, qty1=1 → (10 - 100*1)/price2 = 음수/200 → 최소 1
+        int qty2 = InfinitePosition.earlyBuyQty2(new BigDecimal("10"), new BigDecimal("100"), 1, new BigDecimal("200"));
+        assertThat(qty2).isEqualTo(1);
     }
 }

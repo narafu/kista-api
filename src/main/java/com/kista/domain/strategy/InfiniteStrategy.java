@@ -49,7 +49,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         return newBuys;
     }
 
-    // 후반 단일 LOC 매수: K/G
+    // 후반 단일 LOC 매수: unitAmount/referencePrice
     private List<Order> computeLateBuys(LocalDate tradeDate, InfinitePosition position, Order orig, BigDecimal cap, BigDecimal unitAmount) {
         BigDecimal cappedPrice = orig.price().min(cap);
         int quantity = InfinitePosition.lateBuyQty(unitAmount, cappedPrice);
@@ -66,20 +66,14 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         BigDecimal cappedRef = buy2.price().min(cap);
 
         int quantity1 = InfinitePosition.earlyBuyQty1(unitAmount, cappedAvg);
-        int quantity2 = InfinitePosition.earlyBuyQty2(unitAmount, cappedAvg, quantity1, cappedRef,
-                position.ticker().getTargetProfitRate());
+        int quantity2 = InfinitePosition.earlyBuyQty2(unitAmount, cappedAvg, quantity1, cappedRef);
 
         List<Order> buys = new ArrayList<>();
-        if (quantity1 > 0) {
+        if (cappedAvg.compareTo(cappedRef) == 0) {
             // cappedAvg == cappedRef이면 병합
-            if (cappedAvg.compareTo(cappedRef) == 0) {
-                int merged = quantity1 + (quantity2 > 0 ? quantity2 : 0);
-                buys.add(Order.planned(tradeDate, position.ticker(), buy1.orderType(), BUY, merged, cappedAvg));
-            } else {
-                buys.add(Order.planned(tradeDate, position.ticker(), buy1.orderType(), BUY, quantity1, cappedAvg));
-                if (quantity2 > 0) buys.add(Order.planned(tradeDate, position.ticker(), buy2.orderType(), BUY, quantity2, cappedRef));
-            }
-        } else if (quantity2 > 0) {
+            buys.add(Order.planned(tradeDate, position.ticker(), buy1.orderType(), BUY, quantity1 + quantity2, cappedAvg));
+        } else {
+            buys.add(Order.planned(tradeDate, position.ticker(), buy1.orderType(), BUY, quantity1, cappedAvg));
             buys.add(Order.planned(tradeDate, position.ticker(), buy2.orderType(), BUY, quantity2, cappedRef));
         }
         return buys;
@@ -97,17 +91,13 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
     }
 
     private void buildEarlyStageOrders(List<Order> orders, InfinitePosition position, LocalDate tradeDate) {
-        // LOC 매수 ① — 평단가 기준
+        // LOC 매수 ① — 평단가 기준 (최소 1주)
         int buyQuantity1 = position.calcEarlyBuyQuantityByAvgPrice();
-        if (buyQuantity1 >= 1) {
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice()));
-        }
+        orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, buyQuantity1, position.averagePrice()));
 
-        // LOC 매수 ② — 기준가 기준
+        // LOC 매수 ② — 기준가 기준 (최소 1주)
         int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
-        if (buyQuantity2 >= 1) {
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice()));
-        }
+        orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, buyQuantity2, position.referencePrice()));
 
         addCommonSellOrders(orders, position, tradeDate);
     }

@@ -39,7 +39,7 @@ public record InfinitePosition(
     }
 
     public BigDecimal unitAmount() {
-        // B ÷ 20
+        // totalAssets ÷ 20
         return totalAssets()
                 .divide(BigDecimal.valueOf(TOTAL_ROUNDS), MONEY_SCALE, HALF_UP);
     }
@@ -50,7 +50,7 @@ public record InfinitePosition(
     }
 
     public BigDecimal priceOffsetRate() {
-        // 2는 전체 20회차의 절반(T=10)에서 S=0이 되도록 하는 계수 — S = targetProfitRate × (1 - 2T/20)
+        // 2는 전체 20회차의 절반(currentRound=10)에서 priceOffsetRate=0이 되도록 하는 계수 — priceOffsetRate = targetProfitRate × (1 - 2×currentRound/20)
         double roundFactor = 2.0 * currentRound() / TOTAL_ROUNDS;
         return ticker.getTargetProfitRate()
                 .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(roundFactor)))
@@ -84,22 +84,21 @@ public record InfinitePosition(
     // --- 수량 계산 로직 (주문 수량 계산 책임 위임) ---
 
     // static 헬퍼: 실제 평단가·기준가 대신 임의 가격(예: 캡가격)으로도 재사용 가능
-    public static int earlyBuyQty1(BigDecimal unitAmount, BigDecimal price1) {
-        // 전반 매수①: (K/2) / price1
-        return unitAmount.divide(BigDecimal.valueOf(2), FLOOR)
-                .divide(price1, 0, FLOOR).intValue();
+    public static int earlyBuyQty1(BigDecimal unitAmount, BigDecimal price) {
+        // 전반 매수①: (unitAmount/2) / price — 최소 1주 보장
+        return Math.max(1, unitAmount.divide(BigDecimal.valueOf(2), FLOOR)
+                .divide(price, 0, FLOOR).intValue());
     }
 
-    public static int earlyBuyQty2(BigDecimal unitAmount, BigDecimal price1, int qty1,
-                                   BigDecimal price2, BigDecimal rate) {
-        // 전반 매수②: (K - price1*qty1) * (1+r) / price2
-        return unitAmount.subtract(price1.multiply(BigDecimal.valueOf(qty1)))
-                .multiply(BigDecimal.ONE.add(rate))
-                .divide(price2, 0, FLOOR).intValue();
+    public static int earlyBuyQty2(BigDecimal unitAmount, BigDecimal price1, int qty,
+                                   BigDecimal price2) {
+        // 전반 매수②: (unitAmount - price1×qty) / price2 — 최소 1주 보장
+        return Math.max(1, unitAmount.subtract(price1.multiply(BigDecimal.valueOf(qty)))
+                .divide(price2, 0, FLOOR).intValue());
     }
 
     public static int lateBuyQty(BigDecimal unitAmount, BigDecimal price) {
-        // 후반 매수: K / price
+        // 후반 매수: unitAmount / price
         return unitAmount.divide(price, 0, FLOOR).intValue();
     }
 
@@ -109,7 +108,7 @@ public record InfinitePosition(
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
         return earlyBuyQty2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
-                referencePrice(), priceOffsetRate());
+                referencePrice());
     }
 
     public int calcLateBuyQuantity() {
@@ -125,7 +124,7 @@ public record InfinitePosition(
         return holdings() - sellQuantityQuarter();
     }
 
-    // 후반(K>D) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
+    // 후반(unitAmount>usdDeposit) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
     public int calcMocSellQuantity() {
         return sellQuantityQuarter();
     }

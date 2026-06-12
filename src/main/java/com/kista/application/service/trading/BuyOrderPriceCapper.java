@@ -18,7 +18,7 @@ import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 
 // BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — InfiniteTradingStrategy에 위임해 가격 캡 적용 후 재저장
-// 가격 캡 재산정 공식(K/2/A, (K-A·q1)·(1+r)/G, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
+// 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
 @Component
 @RequiredArgsConstructor
 @Slf4j
