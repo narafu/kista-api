@@ -34,6 +34,15 @@ public class TradingCycleController {
     private final AccountStatisticsUseCase accountStatistics;   // 사이클 이력 조회
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
 
+    // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
+    @Operation(summary = "내 전체 거래 사이클 목록")
+    @GetMapping("/api/trading-cycles")
+    public List<TradingCycleResponse> listMine(@AuthenticationPrincipal UUID userId) {
+        return tradingCycle.listByUserId(userId).stream()
+                .map(TradingCycleResponse::from)
+                .toList();
+    }
+
     // 계좌의 거래 사이클 목록 조회
     @Operation(summary = "거래 사이클 목록 조회")
     @GetMapping("/api/accounts/{accountId}/trading-cycles")

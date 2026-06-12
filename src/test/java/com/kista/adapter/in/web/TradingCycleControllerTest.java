@@ -217,6 +217,30 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void listMine_returns200_with_strategy_list() throws Exception {
+        StrategyDetail detail = new StrategyDetail(
+                new com.kista.domain.model.strategy.Strategy(
+                        CYCLE_ID, UUID.randomUUID(),
+                        com.kista.domain.model.strategy.Strategy.Type.INFINITE,
+                        com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
+                        com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
+                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE),
+                new java.math.BigDecimal("1000"));
+        when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
+
+        mockMvc.perform(get("/api/trading-cycles").with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(CYCLE_ID.toString()))
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"));
+    }
+
+    @Test
+    void listMine_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/trading-cycles"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void strategyHistory_returns_nextCursor_when_hasMore() throws Exception {
         Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
         var page = new CycleHistoryPage(List.of(), cursor, true);

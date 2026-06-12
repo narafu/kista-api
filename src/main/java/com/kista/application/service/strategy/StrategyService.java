@@ -131,6 +131,15 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    public List<StrategyDetail> listByUserId(UUID userId) {
+        return accountPort.findByUserId(userId).stream()
+                .flatMap(acc -> strategyPort.findByAccountId(acc.id()).stream())
+                .map(this::toDetail)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         accountPort.requireOwnedAccount(accountId, requesterId);
         return strategyPort.findByAccountId(accountId).stream()

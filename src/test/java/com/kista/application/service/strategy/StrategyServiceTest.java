@@ -267,6 +267,33 @@ class StrategyServiceTest {
         verify(strategyPort, never()).save(any());
     }
 
+    // --- listByUserId() ---
+
+    @Test
+    @DisplayName("listByUserId() 호출 시 해당 사용자의 전 계좌 전략을 합쳐 반환한다")
+    void listByUserId_aggregatesStrategiesAcrossAccounts() {
+        UUID accountAId = UUID.randomUUID();
+        UUID accountBId = UUID.randomUUID();
+        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", "01", Account.Broker.KIS);
+        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", "01", Account.Broker.KIS);
+
+        UUID strategyAId = UUID.randomUUID();
+        UUID strategyBId = UUID.randomUUID();
+        Strategy strategyA = new Strategy(strategyAId, accountAId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategyB = new Strategy(strategyBId, accountBId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(accountA, accountB));
+        when(strategyPort.findByAccountId(accountAId)).thenReturn(List.of(strategyA));
+        when(strategyPort.findByAccountId(accountBId)).thenReturn(List.of(strategyB));
+        when(strategyCyclePort.findLatestByStrategyId(strategyAId)).thenReturn(Optional.of(CYCLE));
+        when(strategyCyclePort.findLatestByStrategyId(strategyBId)).thenReturn(Optional.of(CYCLE));
+
+        List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
+
+        assertThat(result).extracting(d -> d.strategy().id())
+                .containsExactlyInAnyOrder(strategyAId, strategyBId);
+    }
+
     // --- register() ---
 
     @Test
