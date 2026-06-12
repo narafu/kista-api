@@ -34,7 +34,7 @@ class TosHoldingsApiTest {
 
     @BeforeEach
     void setUp() {
-        when(tossHttpClient.buildHeadersNoAccount(any())).thenReturn(new HttpHeaders());
+        when(tossHttpClient.buildHeaders(any())).thenReturn(new HttpHeaders());
         tosHoldingsApi = new TosHoldingsApi(tossHttpClient);
     }
 

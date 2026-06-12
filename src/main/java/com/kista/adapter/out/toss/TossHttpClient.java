@@ -23,7 +23,18 @@ public class TossHttpClient {
     @Value("${toss.base-url}")
     private final String baseUrl;
 
-    // 계좌별 Bearer 토큰 헤더 구성 — 시세·주문 API 공용
+    // 계좌 컨텍스트 API용 — X-Tossinvest-Account 헤더 포함 (주문·잔고·매수가능금액)
+    // Account.kisAccountType에 accountSeq가 저장됨
+    public HttpHeaders buildHeaders(Account account) {
+        String token = tossTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        headers.set("X-Tossinvest-Account", account.kisAccountType());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    // 계좌 헤더 불필요 API용 — 시세 조회 등
     public HttpHeaders buildHeadersNoAccount(Account account) {
         // kisAppKey/kisSecretKey 필드를 Toss clientId/clientSecret으로 재사용
         String token = tossTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());

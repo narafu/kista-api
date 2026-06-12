@@ -28,7 +28,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     public AccountBalance getBalance(Account account, Ticker ticker) {
         // 보유 종목 조회
         HoldingsResponse holdingsResponse = tossHttpClient.get(
-                HOLDINGS_PATH, tossHttpClient.buildHeadersNoAccount(account),
+                HOLDINGS_PATH, tossHttpClient.buildHeaders(account),
                 new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
         // USD 매수가능금액 조회
@@ -53,7 +53,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     @Override
     public BigDecimal getBuyableAmount(Account account) {
         BuyableAmountResponse response = tossHttpClient.get(
-                BUYABLE_AMOUNT_PATH, tossHttpClient.buildHeadersNoAccount(account),
+                BUYABLE_AMOUNT_PATH, tossHttpClient.buildHeaders(account),
                 new LinkedMultiValueMap<>(), BuyableAmountResponse.class);
         return response != null ? new BigDecimal(response.amount()) : BigDecimal.ZERO;
     }

@@ -33,7 +33,7 @@ public class TosOrderApi implements TosOrderPort {
         body.put("price", resolvePrice(order.orderType(), order.price()));
 
         OrderResponse response = tossHttpClient.post(
-                ORDER_PATH, tossHttpClient.buildHeadersNoAccount(account), body, OrderResponse.class);
+                ORDER_PATH, tossHttpClient.buildHeaders(account), body, OrderResponse.class);
 
         // orderId 없으면 비즈니스 실패 처리
         if (response == null || response.orderId() == null) {
@@ -53,7 +53,7 @@ public class TosOrderApi implements TosOrderPort {
         // DELETE /api/v1/orders/{externalOrderId}
         tossHttpClient.delete(
                 ORDER_PATH + "/" + order.externalOrderId(),
-                tossHttpClient.buildHeadersNoAccount(account));
+                tossHttpClient.buildHeaders(account));
     }
 
     // LOC/MOC → 장마감 지정가(CLS), LIMIT → 정규장 지정가(DAY)

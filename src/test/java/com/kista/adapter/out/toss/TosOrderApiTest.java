@@ -40,8 +40,8 @@ class TosOrderApiTest {
 
     @BeforeEach
     void setUp() {
-        // buildHeadersNoAccount가 null 반환 시 NPE 방지 — 빈 헤더 반환
-        when(tossHttpClient.buildHeadersNoAccount(any())).thenReturn(new HttpHeaders());
+        // buildHeaders가 null 반환 시 NPE 방지 — 빈 헤더 반환
+        when(tossHttpClient.buildHeaders(any())).thenReturn(new HttpHeaders());
         tosOrderApi = new TosOrderApi(tossHttpClient);
     }
 
