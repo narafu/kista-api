@@ -2,9 +2,9 @@ package com.kista.application.service.strategy;
 
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
+import com.kista.application.service.trading.BrokerMarginRouter;
+import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
@@ -15,8 +15,6 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -48,8 +46,8 @@ class StrategyServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
-    @Mock KisPricePort kisPricePort;
-    @Mock KisMarginPort kisMarginPort;
+    @Mock BrokerPriceRouter brokerPriceRouter;
+    @Mock BrokerMarginRouter brokerMarginRouter;
     @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks StrategyService strategyService;
@@ -323,8 +321,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
-        when(kisMarginPort.getMargin(account)).thenReturn(List.of(
-                new MarginItem(Currency.USD, new BigDecimal("1000"), new BigDecimal("1000"), new BigDecimal("1000"), null)));
+        when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
 
@@ -351,13 +348,12 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
-        when(kisMarginPort.getMargin(account)).thenReturn(List.of(
-                new MarginItem(Currency.USD, new BigDecimal("1000"), new BigDecimal("1000"), new BigDecimal("1000"), null)));
+        when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
-        when(kisPricePort.getPrice(Strategy.Ticker.TQQQ, account)).thenReturn(new BigDecimal("50.00"));
+        when(brokerPriceRouter.getPrice(Strategy.Ticker.TQQQ, account)).thenReturn(new BigDecimal("50.00"));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 

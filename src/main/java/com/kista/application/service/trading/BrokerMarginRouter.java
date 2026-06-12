@@ -9,15 +9,15 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-// package-private — USD 매수가능금액을 브로커 무관하게 단일 인터페이스로 제공
+// USD 매수가능금액을 브로커 무관하게 단일 인터페이스로 제공
 @Component
 @RequiredArgsConstructor
-class BrokerMarginRouter {
+public class BrokerMarginRouter {
 
     private final KisMarginPort kisMarginPort;
     private final TosMarginPort tosMarginPort;
 
-    BigDecimal getUsdBuyableAmount(Account account) {
+    public BigDecimal getUsdBuyableAmount(Account account) {
         return switch (account.broker()) {
             case KIS -> kisMarginPort.getMargin(account).stream()
                     .filter(m -> Currency.USD == m.currency())

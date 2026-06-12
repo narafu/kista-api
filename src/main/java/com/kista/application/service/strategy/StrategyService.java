@@ -2,10 +2,10 @@ package com.kista.application.service.strategy;
 
 import com.kista.application.event.TradingCyclePausedEvent;
 import com.kista.application.event.TradingCycleResumedEvent;
+import com.kista.application.service.trading.BrokerMarginRouter;
+import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
@@ -16,8 +16,6 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -43,8 +41,8 @@ class StrategyService implements StrategyUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
-    private final KisPricePort kisPricePort;                     // 등록 시점 현재가(종가) 조회
-    private final KisMarginPort kisMarginPort;                   // 등록 시점 가용 시드 검증
+    private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 브로커 무관
+    private final BrokerMarginRouter brokerMarginRouter;         // 등록 시점 가용 시드 검증 — 브로커 무관
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
@@ -78,7 +76,7 @@ class StrategyService implements StrategyUseCase {
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), cmd.initialUsdDeposit()));
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 종가는 등록 시점 현재가
-        BigDecimal currentPrice = kisPricePort.getPrice(resolvedTicker, account);
+        BigDecimal currentPrice = brokerPriceRouter.getPrice(resolvedTicker, account);
         cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
@@ -175,13 +173,9 @@ class StrategyService implements StrategyUseCase {
         return toDetail(saved);
     }
 
-    // 자유 현금 = KIS 통합주문가능금액(USD) - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
+    // 자유 현금 = 브로커 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
-        BigDecimal kisUsdAmount = kisMarginPort.getMargin(account).stream()
-                .filter(m -> Currency.USD == m.currency())
-                .findFirst()
-                .map(MarginItem::purchasableAmount)
-                .orElseThrow(() -> new IllegalStateException("KIS USD 잔고 조회 실패: accountId=" + accountId));
+        BigDecimal kisUsdAmount = brokerMarginRouter.getUsdBuyableAmount(account);
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
                 .map(s -> cyclePositionPort.findLatestByStrategyId(s.id(), 1).stream()
