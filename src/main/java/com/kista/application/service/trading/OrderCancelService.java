@@ -6,7 +6,6 @@ import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -27,7 +26,7 @@ import java.util.UUID;
 class OrderCancelService {
 
     private final OrderPort orderPort;
-    private final KisOrderPort kisOrderPort;
+    private final BrokerOrderRouter brokerOrderRouter;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -52,7 +51,7 @@ class OrderCancelService {
         // best-effort: 개별 주문마다 취소 시도, 실패해도 계속 진행
         for (Order order : placedOrders) {
             try {
-                cancelViaKis(order, account);
+                cancelViaBroker(order, account);
                 orderPort.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
@@ -77,13 +76,13 @@ class OrderCancelService {
             throw new OrderCancelException("PLACED 상태 주문만 취소 가능합니다. 현재 상태: " + order.status());
         }
 
-        cancelViaKis(order, account);
+        cancelViaBroker(order, account);
         orderPort.markCancelled(orderId);
     }
 
-    // 일반 주문 취소 (TTTT1004U)
-    private void cancelViaKis(Order order, Account account) {
-        kisOrderPort.cancel(order, account);
+    // 브로커별 주문 취소
+    private void cancelViaBroker(Order order, Account account) {
+        brokerOrderRouter.cancel(order, account);
     }
 
 }

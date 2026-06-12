@@ -7,7 +7,10 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.PrivacyTradePort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +30,7 @@ class TradingPreviewService {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
-    private final KisPricePort kisPricePort;
+    private final BrokerPriceRouter brokerPriceRouter;
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
@@ -56,7 +59,7 @@ class TradingPreviewService {
 
         // INFINITE은 전일종가 필요(0회차 평단가 대용), PRIVACY는 기준매매표 필요 — 전략 입력 컨텍스트로 통합
         BigDecimal prevClosePrice = strategy.type() == Strategy.Type.INFINITE
-                ? kisPricePort.getPriceSnapshot(strategy.ticker(), account).prevClose()
+                ? brokerPriceRouter.getPriceSnapshot(strategy.ticker(), account).prevClose()
                 : null;
         PrivacyTradeBase privacyBase = strategy.type() == Strategy.Type.PRIVACY
                 ? privacyTradePort.findTodayTrade(today).orElse(null)

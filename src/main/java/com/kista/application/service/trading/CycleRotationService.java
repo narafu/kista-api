@@ -1,22 +1,23 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.NotifyPort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
 // NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
@@ -26,7 +27,7 @@ import java.util.List;
 @Slf4j
 class CycleRotationService {
 
-    private final KisMarginPort kisMarginPort;                 // USD 잔고 조회 (MAX 재등록)
+    private final BrokerMarginRouter brokerMarginRouter;        // USD 매수가능금액 조회 (MAX 재등록)
     private final StrategyPort strategyPort;                   // 전략 상태 갱신
     private final StrategyCyclePort strategyCyclePort;         // 새 StrategyCycle 생성
     private final CyclePositionPort cyclePositionPort;         // 새 시작 스냅샷 저장
@@ -44,8 +45,8 @@ class CycleRotationService {
             return;
         }
 
-        // MAINTAIN/MAX — KIS 실잔고 조회
-        BigDecimal actualBalance = fetchKisUsdBalance(strategy, account);
+        // MAINTAIN/MAX — 브로커별 USD 실잔고 조회
+        BigDecimal actualBalance = fetchUsdBalance(strategy, account);
         if (actualBalance == null) return; // 실패 — 내부에서 notifyError 완료
 
         BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
@@ -102,25 +103,20 @@ class CycleRotationService {
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }
 
-    // KIS margin 조회 → USD 행의 통합주문가능금액
-    private BigDecimal fetchKisUsdBalance(Strategy strategy, Account account) {
-        List<MarginItem> margins;
+    // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
+    private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
         try {
-            margins = kisMarginPort.getMargin(account);
+            BigDecimal usdAmount = brokerMarginRouter.getUsdBuyableAmount(account);
+            if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
+                log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
+                notifyPort.notifyError(new IllegalStateException("재등록 실패: USD 잔고 없음 strategyId=" + strategy.id()));
+                return null;
+            }
+            return usdAmount;
         } catch (Exception e) {
-            log.error("[strategyId={}] 재등록 — KIS 잔고 조회 실패: {}", strategy.id(), e.getMessage());
+            log.error("[strategyId={}] 재등록 — USD 잔고 조회 실패: {}", strategy.id(), e.getMessage());
             notifyPort.notifyError(e);
             return null;
         }
-        BigDecimal usdAmount = margins.stream()
-                .filter(m -> Currency.USD == m.currency())
-                .findFirst()
-                .map(MarginItem::purchasableAmount)
-                .orElse(null);
-        if (usdAmount == null) {
-            log.warn("[strategyId={}] 재등록 — USD 잔고 행 없음", strategy.id());
-            notifyPort.notifyError(new IllegalStateException("재등록 실패: USD 잔고 없음 strategyId=" + strategy.id()));
-        }
-        return usdAmount;
     }
 }

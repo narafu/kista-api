@@ -42,7 +42,7 @@ class TradingPreviewServiceTest {
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
-    @Mock KisPricePort kisPricePort;
+    @Mock KisPricePort kisPricePort; // BrokerPriceRouter(KIS) 내부에서 사용
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
@@ -85,7 +85,9 @@ class TradingPreviewServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
-        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, kisPricePort, privacyTradePort, balanceLoader, orderComputer);
+        // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
+        BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
+        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
     }
 
     @Test

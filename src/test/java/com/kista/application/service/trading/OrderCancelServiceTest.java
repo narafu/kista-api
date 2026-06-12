@@ -8,7 +8,6 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -38,7 +37,7 @@ import static org.mockito.Mockito.*;
 class OrderCancelServiceTest {
 
     @Mock OrderPort orderPort;
-    @Mock KisOrderPort kisOrderPort;
+    @Mock BrokerOrderRouter brokerOrderRouter;
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -82,7 +81,7 @@ class OrderCancelServiceTest {
 
         assertThat(result.cancelledCount()).isEqualTo(2);
         assertThat(result.failedCount()).isEqualTo(0);
-        verify(kisOrderPort, times(2)).cancel(any(), eq(ownedAccount));
+        verify(brokerOrderRouter, times(2)).cancel(any(), eq(ownedAccount));
         verify(orderPort, times(2)).markCancelled(any());
     }
 
@@ -98,8 +97,8 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
-        doNothing().when(kisOrderPort).cancel(eq(order1), any());
-        doThrow(new RuntimeException("KIS 오류")).when(kisOrderPort).cancel(eq(order2), any());
+        doNothing().when(brokerOrderRouter).cancel(eq(order1), any());
+        doThrow(new RuntimeException("KIS 오류")).when(brokerOrderRouter).cancel(eq(order2), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
@@ -122,7 +121,7 @@ class OrderCancelServiceTest {
 
         assertThat(result.cancelledCount()).isEqualTo(0);
         assertThat(result.failedCount()).isEqualTo(0);
-        verifyNoInteractions(kisOrderPort);
+        verifyNoInteractions(brokerOrderRouter);
     }
 
     @Test
@@ -148,7 +147,7 @@ class OrderCancelServiceTest {
 
         service.cancelOrder(orderId, requesterId);
 
-        verify(kisOrderPort).cancel(order, ownedAccount);
+        verify(brokerOrderRouter).cancel(order, ownedAccount);
         verify(orderPort).markCancelled(orderId);
     }
 

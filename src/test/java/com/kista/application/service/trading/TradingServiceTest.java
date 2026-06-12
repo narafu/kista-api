@@ -98,12 +98,15 @@ class TradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
-        // CycleRotationService: kisMarginPort, strategyPort, strategyCyclePort, cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies
+        // CycleRotationService: brokerMarginRouter wraps kisMarginPort for KIS 계좌 테스트
+        BrokerMarginRouter marginRouter = new BrokerMarginRouter(kisMarginPort, null);
         CycleRotationService rotationService = new CycleRotationService(
-                kisMarginPort, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort);
+                marginRouter, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
+        BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
+        BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, kisOrderPort, priceCapper);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, orderRouter, priceCapper);
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService);

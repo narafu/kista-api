@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.Account.Broker;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,8 +53,11 @@ class TradingReporter {
                          Account account, User user,
                          AccountBalance balance, TradingSnapshot snapshot, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
+        // Toss 계좌는 체결 조회 API 없음 (MVP) — 주문 PLACED 상태 유지
         // today는 KST → KisTradingApi.getExecutions 내부에서 toUtc 변환됨
-        List<Execution> executions = kisExecutionPort.getExecutions(today, today, strategy.ticker(), account);
+        List<Execution> executions = account.broker() == Broker.TOSS
+                ? Collections.emptyList()
+                : kisExecutionPort.getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
