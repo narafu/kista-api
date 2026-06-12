@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
+import com.kista.domain.model.toss.TossApiException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import com.kista.domain.model.order.ManualTradingException;
@@ -83,6 +84,12 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleKisApiException(KisApiException ex) {
         log.error("KIS API 오류: {}", ex.getMessage(), ex);
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
+    }
+
+    @ExceptionHandler(TossApiException.class)
+    public ProblemDetail handleTossApiException(TossApiException ex) {
+        log.error("Toss API 오류: {}", ex.getMessage(), ex);
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Toss API Error", ex.getMessage());
     }
 
     // ProblemDetail 생성 헬퍼 — 모든 핸들러에서 반복되는 3줄 보일러플레이트 제거
