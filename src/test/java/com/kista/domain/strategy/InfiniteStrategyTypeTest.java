@@ -29,9 +29,9 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 전반 holdings>0: LOC매수①② + LOC매도 + 지정가매도 = 4건")
     void buildOrders_frontHalf_withQuantity() {
-        // averagePrice=20, holdings=10, usdDeposit=1000 → totalAssets=1200, unitAmount=60, currentRound≈3.33, priceOffsetRate>0 (전반)
-        // referencePrice=20×(1+priceOffsetRate)≈22.67, targetPrice=24.00
-        // BUY①: floor(60/2/20)=1, BUY②: floor(60/2/22.67)=1
+        // averagePrice=20, holdings=10, usdDeposit=1000 → totalAssets=1200, unitAmount=60, currentRound=3.33, priceOffsetRate=0.13 (전반)
+        // referencePrice=20×1.13=22.60, targetPrice=20×1.20=24.00
+        // BUY①: floor(60/2/20)=1, BUY②: floor((60−20×1)/22.60)=floor(1.77)=1
         // LOC SELL: 10/4=2, LIMIT SELL: 10-2=8
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"),
                 new BigDecimal("1000"));
@@ -40,8 +40,10 @@ class InfiniteStrategyTypeTest {
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(4);
-        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.averagePrice()) == 0);
-        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.price().compareTo(position.referencePrice()) == 0);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY
+                && o.quantity() == 1 && o.price().compareTo(position.averagePrice()) == 0);
+        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY
+                && o.quantity() == 1 && o.price().compareTo(position.referencePrice()) == 0);
         assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
         assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8 && o.price().compareTo(position.targetPrice()) == 0);
         assertThat(orders).allMatch(o -> o.ticker() == Ticker.SOXL && o.tradeDate().equals(TODAY));
@@ -204,6 +206,36 @@ class InfiniteStrategyTypeTest {
         assertThat(result.get(1).price()).isEqualByComparingTo("52.63");
         assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
         assertThat(result.get(3).price()).isEqualByComparingTo("47.62");
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 비0회차 전반(currentRound=9): buy② 수량이 priceOffsetRate 기준 — targetProfitRate 사용 시 수량 달라짐")
+    void buildCappedBuyOrders_nonZeroRound_usesOffsetRateNotProfitRate() {
+        // holdings=180, avgPrice=5, usdDeposit=1100 → totalAssets=2000, unitAmount=100
+        // currentRound=9.00, priceOffsetRate=0.20×(1−0.9)=0.02, referencePrice=5.10, targetProfitRate=0.20, targetPrice=6.00
+        // priceOffsetRate(0.02) ≠ targetProfitRate(0.20) → 수량 공식 rate 선택이 결과에 영향
+        // BUY①: floor(50/5.00)=10, BUY②(priceOffsetRate): floor(50/5.10)=9 — targetProfitRate 사용 시: floor(50/6.00)=8
+        AccountBalance balance = new AccountBalance(180, new BigDecimal("5"), new BigDecimal("1100"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"));
+
+        // 정상 경로로 원본 주문 생성 후 BUY만 추출
+        List<Order> allOrders = strategy.buildOrders(position, TODAY);
+        List<Order> buyOrders = allOrders.stream().filter(o -> o.direction() == BUY).toList();
+
+        // cap=10.00 — referencePrice(5.10)보다 높아 실제 캡 없음: rate 선택만 검증
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("10.00"));
+
+        // buy①+buy②+보정3 = 5건
+        assertThat(result).hasSize(5);
+        assertThat(result.get(0).quantity()).isEqualTo(10);
+        assertThat(result.get(0).price()).isEqualByComparingTo("5.00");
+        // qty=9 (priceOffsetRate=0.02 기준), targetProfitRate(0.20) 사용 시 qty=8
+        assertThat(result.get(1).quantity()).isEqualTo(9);
+        assertThat(result.get(1).price()).isEqualByComparingTo("5.10");
+        // 보정: unitAmount/(19+1)=5.00, /(20+1)=4.76, /(21+1)=4.55 — 각 1주 LOC
+        assertThat(result.get(2).price()).isEqualByComparingTo("5.00");
+        assertThat(result.get(3).price()).isEqualByComparingTo("4.76");
+        assertThat(result.get(4).price()).isEqualByComparingTo("4.55");
     }
 
     @Test
