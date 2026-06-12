@@ -8,7 +8,7 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

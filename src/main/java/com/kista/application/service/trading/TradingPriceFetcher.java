@@ -2,8 +2,8 @@ package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.port.out.KisPricePort;
-import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

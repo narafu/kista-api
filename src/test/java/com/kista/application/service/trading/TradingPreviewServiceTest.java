@@ -9,6 +9,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.*;
@@ -97,7 +98,7 @@ class TradingPreviewServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
-                .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
+                .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
@@ -137,7 +138,7 @@ class TradingPreviewServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
-                .thenReturn(new KisPricePort.PriceSnapshot(PRICE, new BigDecimal("21.00")));
+                .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(overBudgetBuy));
 

@@ -2,7 +2,7 @@ package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

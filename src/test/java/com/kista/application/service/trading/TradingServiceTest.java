@@ -10,7 +10,6 @@ import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.KisPricePort.PriceSnapshot;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
