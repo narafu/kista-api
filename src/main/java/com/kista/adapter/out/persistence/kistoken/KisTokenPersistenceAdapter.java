@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.kistoken;
 
-import com.kista.domain.port.out.KisTokenCachePort;
+import com.kista.domain.port.out.BrokerTokenCachePort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // KisTokenJpaRepository가 package-private
-public class KisTokenPersistenceAdapter implements KisTokenCachePort {
+public class KisTokenPersistenceAdapter implements BrokerTokenCachePort {
 
     private final KisTokenJpaRepository repository;
 

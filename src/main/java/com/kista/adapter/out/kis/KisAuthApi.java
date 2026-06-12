@@ -5,7 +5,7 @@ import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.KisConnectionTestPort;
-import com.kista.domain.port.out.KisTokenCachePort;
+import com.kista.domain.port.out.BrokerTokenCachePort;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +50,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
     private final RestTemplate kisRestTemplate;
-    private final KisTokenCachePort kisTokenCachePort;
+    private final BrokerTokenCachePort brokerTokenCachePort;
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
@@ -59,7 +59,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
     @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
         // 1차 조회 — 락 없이 빠른 경로
-        Optional<String> cached = kisTokenCachePort.findValidToken(accountId, threshold());
+        Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, threshold());
         if (cached.isPresent()) {
             return cached.get();
         }
@@ -68,7 +68,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         lock.lock();
         try {
             // 2차 조회 (double-check) — 다른 스레드가 이미 발급했을 수 있음
-            return kisTokenCachePort.findValidToken(accountId, threshold())
+            return brokerTokenCachePort.findValidToken(accountId, threshold())
                     .orElseGet(() -> fetchAndCacheToken(accountId, appKey, appSecret));
         } finally {
             lock.unlock();
@@ -81,7 +81,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             TokenResponse response = issueOAuthToken(appKey, appSecret);
             OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
             // 발급된 토큰을 account_id 기준으로 DB에 upsert
-            kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+            brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
             return response.accessToken();
         } catch (Account.InvalidKisKeyException e) {
             throw e; // KIS 키 검증 실패는 그대로 전파
@@ -101,7 +101,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
     public void test(String appKey, String appSecret, UUID accountId) {
         // 유효 캐시 토큰이 있으면 재발급 없이 성공 — KIS 발급 알림 및 횟수 제한 방지
         if (accountId != null) {
-            Optional<String> cached = kisTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
+            Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
             if (cached.isPresent()) {
                 log.debug("KIS 연결 테스트: 캐시 토큰 유효 — KIS 호출 생략 (accountId={})", accountId);
                 return;
@@ -113,7 +113,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             if (accountId != null) {
                 // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
                 OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-                kisTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
+                brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
             } else {
                 // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
                 tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));

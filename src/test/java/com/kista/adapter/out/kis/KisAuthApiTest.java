@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.out.KisTokenCachePort;
+import com.kista.domain.port.out.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 class KisAuthApiTest {
 
     @Mock RestTemplate kisRestTemplate;
-    @Mock KisTokenCachePort kisTokenCachePort;
+    @Mock BrokerTokenCachePort brokerTokenCachePort;
 
     KisAuthApi api;
 
@@ -47,7 +47,7 @@ class KisAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        api = new KisAuthApi(kisRestTemplate, kisTokenCachePort, BASE_URL);
+        api = new KisAuthApi(kisRestTemplate, brokerTokenCachePort, BASE_URL);
     }
 
     @Nested
@@ -57,7 +57,7 @@ class KisAuthApiTest {
         @Test
         @DisplayName("캐시에 유효 토큰 있으면 KIS API 호출 없이 반환")
         void getToken_whenCacheHit_returnsCachedToken() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
 
             String result = api.getToken(ACCOUNT_ID, "key", "secret");
 
@@ -68,7 +68,7 @@ class KisAuthApiTest {
         @Test
         @DisplayName("캐시 미스 시 KIS API 호출하여 신규 토큰 반환")
         void getToken_whenCacheMiss_returnsNewToken() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
@@ -80,14 +80,14 @@ class KisAuthApiTest {
         @Test
         @DisplayName("캐시 미스 시 발급 토큰을 account_id와 함께 saveToken으로 캐시에 저장")
         void getToken_whenCacheMiss_savesTokenToCache() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
             api.getToken(ACCOUNT_ID, "key", "secret");
 
             ArgumentCaptor<OffsetDateTime> expiresCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-            verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
+            verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
             // KIS 응답은 KST(+09:00)이므로 offset이 +09:00이어야 함
             assertThat(expiresCaptor.getValue().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
         }
@@ -95,7 +95,7 @@ class KisAuthApiTest {
         @Test
         @DisplayName("캐시 만료 1분 전 임박 토큰은 재발급 — findValidToken에 now+1분 전달")
         void getToken_uses1MinBuffer_forCacheCheck() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
 
@@ -103,7 +103,7 @@ class KisAuthApiTest {
 
             // double-check 패턴으로 findValidToken이 2회 호출됨 (1차: 락 전, 2차: 락 후)
             ArgumentCaptor<OffsetDateTime> thresholdCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-            verify(kisTokenCachePort, times(2)).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
+            verify(brokerTokenCachePort, times(2)).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
             // 두 번 모두 threshold가 현재 시각보다 최소 59초 이상 미래여야 함 (1분 버퍼)
             thresholdCaptor.getAllValues().forEach(t ->
                     assertThat(t).isAfter(OffsetDateTime.now().plusSeconds(59)));
@@ -113,7 +113,7 @@ class KisAuthApiTest {
         @DisplayName("캐시 miss 후 lock 내 2차 조회(double-check)에서 hit 시 KIS API 미호출")
         void getToken_doubleCheck_preventsRedundantIssue() {
             // 1차 miss, 2차 hit (다른 스레드가 이미 발급한 상황 시뮬레이션)
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
                     .thenReturn(Optional.empty())
                     .thenReturn(Optional.of("concurrent-token"));
 
@@ -147,28 +147,28 @@ class KisAuthApiTest {
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
 
             assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", null));
-            verifyNoInteractions(kisTokenCachePort);
+            verifyNoInteractions(brokerTokenCachePort);
         }
 
         @Test
         @DisplayName("accountId 있고 캐시 미스 시 KIS 호출 후 토큰 캐시 저장")
         void test_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
 
             assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", ACCOUNT_ID));
-            verify(kisTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
+            verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
         }
 
         @Test
         @DisplayName("accountId 있고 캐시 히트 시 KIS 호출 없이 정상 완료")
         void test_whenAccountIdPresentAndCacheHit_completesWithoutKisCall() {
-            when(kisTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
+            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
 
             assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", ACCOUNT_ID));
             verifyNoInteractions(kisRestTemplate);
-            verify(kisTokenCachePort, never()).saveToken(any(), any(), any());
+            verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
         }
 
         @Test
