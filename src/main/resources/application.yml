@@ -63,6 +63,9 @@ server:
 kis:
   base-url: https://openapi.koreainvestment.com:9443
 
+toss:
+  base-url: https://openapi.tossinvest.com
+
 telegram:
   bot-token: ${TELEGRAM_BOT_TOKEN}
   chat-id: ${TELEGRAM_CHAT_ID}
