@@ -57,6 +57,9 @@ dependencies {
     // Firebase
     implementation(libs.firebase.admin)
 
+    // Apache HttpClient 5 — HttpComponentsClientHttpRequestFactory (에러 응답 바디 정상 읽기)
+    implementation("org.apache.httpcomponents.client5:httpclient5")
+
     // Lombok (컴파일 타임 코드 생성)
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
