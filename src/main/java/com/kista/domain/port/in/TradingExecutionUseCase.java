@@ -23,6 +23,6 @@ public interface TradingExecutionUseCase {
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId);
     // 특정 주문 1건 취소
     void cancelOrder(UUID orderId, UUID requesterId);
-    // 다음 주문 미리보기 (DB 저장 없음)
-    NextOrdersPreview preview(UUID accountId, UUID requesterId);
+    // 다음 주문 미리보기 (DB 저장 없음) — strategyId 기준
+    NextOrdersPreview preview(UUID strategyId, UUID requesterId);
 }

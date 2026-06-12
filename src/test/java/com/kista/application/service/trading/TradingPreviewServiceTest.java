@@ -92,8 +92,8 @@ class TradingPreviewServiceTest {
         Order order = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
+        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
@@ -101,7 +101,7 @@ class TradingPreviewServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
-        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
         assertThat(result.position()).isNotNull();
@@ -113,12 +113,12 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSkipNoCycleHistory_whenNoHistory() {
+        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of());
 
-        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
         assertThat(result.position()).isNull();
@@ -132,8 +132,8 @@ class TradingPreviewServiceTest {
         Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
+        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(CYCLE));
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
         when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
@@ -141,7 +141,7 @@ class TradingPreviewServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(overBudgetBuy));
 
-        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
         assertThat(result.position()).isNotNull(); // position은 프론트 참고용으로 유지
@@ -156,13 +156,13 @@ class TradingPreviewServiceTest {
 
         StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
+        when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
         when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
 
-        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
         assertThat(result.position()).isNull();
@@ -182,14 +182,14 @@ class TradingPreviewServiceTest {
 
         StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
+        when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(privacyCycle));
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
         when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
         when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
 
-        NextOrdersPreview result = service.preview(ACCOUNT.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
         assertThat(result.position()).isNull(); // PRIVACY는 InfinitePosition 없음
@@ -200,19 +200,20 @@ class TradingPreviewServiceTest {
     @Test
     void preview_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
+        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
 
-        assertThatThrownBy(() -> service.preview(ACCOUNT.id(), otherId))
+        assertThatThrownBy(() -> service.preview(CYCLE.id(), otherId))
                 .isInstanceOf(SecurityException.class);
     }
 
     @Test
-    void preview_throwsNoSuchElementException_whenNoActiveCycle() {
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(cyclePort.findByAccountId(ACCOUNT.id())).thenReturn(List.of());
+    void preview_throwsNoSuchElementException_whenStrategyNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(cyclePort.findByIdOrThrow(unknownId))
+                .thenThrow(new NoSuchElementException("전략 없음: " + unknownId));
 
-        assertThatThrownBy(() -> service.preview(ACCOUNT.id(), ACCOUNT.userId()))
-                .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("활성 전략이 없습니다");
+        assertThatThrownBy(() -> service.preview(unknownId, ACCOUNT.userId()))
+                .isInstanceOf(NoSuchElementException.class);
     }
 }

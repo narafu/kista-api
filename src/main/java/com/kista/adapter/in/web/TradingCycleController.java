@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.CancelOrdersResponse;
 import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.ExecuteOrdersResponse;
+import com.kista.adapter.in.web.dto.NextOrdersResponse;
 import com.kista.adapter.in.web.dto.TradingCycleRequest;
 import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
@@ -115,6 +116,15 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         return CancelOrdersResponse.from(tradingExecution.cancelByCycle(id, userId));
+    }
+
+    // 전략(사이클) 기준 다음 주문 미리보기 — DB 저장 없음, 휴장·상태 무관 강제 계산
+    @Operation(summary = "전략 다음 주문 미리보기")
+    @GetMapping("/api/trading-cycles/{id}/preview")
+    public NextOrdersResponse preview(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return NextOrdersResponse.from(tradingExecution.preview(id, userId));
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

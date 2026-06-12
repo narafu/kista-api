@@ -51,7 +51,7 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     }
 
     @Override
-    public NextOrdersPreview preview(UUID accountId, UUID requesterId) {
-        return tradingPreviewService.preview(accountId, requesterId);
+    public NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
+        return tradingPreviewService.preview(strategyId, requesterId);
     }
 }

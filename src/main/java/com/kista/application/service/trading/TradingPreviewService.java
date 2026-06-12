@@ -35,14 +35,10 @@ class TradingPreviewService {
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
     @Transactional(readOnly = true)
-    NextOrdersPreview preview(UUID accountId, UUID requesterId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
+    NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.findByIdOrThrow(strategy.accountId());
         account.verifyOwnedBy(requesterId);
-
-        Strategy strategy = strategyPort.findByAccountId(accountId).stream()
-                .filter(s -> s.status() == Strategy.Status.ACTIVE)
-                .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("활성 전략이 없습니다: " + accountId));
 
         // 현재 StrategyCycle — initialUsdDeposit 조회 (PRIVACY에서 필요)
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
@@ -67,7 +63,7 @@ class TradingPreviewService {
                 : null;
 
         CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + accountId);
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId);
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {
