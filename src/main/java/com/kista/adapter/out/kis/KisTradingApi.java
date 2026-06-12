@@ -239,7 +239,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                         KisResponseParser.parseIntSafe(item.filledQuantity()),
                         KisResponseParser.parseBd(item.ftCcldUnpr3()),
                         KisResponseParser.parseBd(item.ccldAmt()),
-                        item.odno()
+                        item.odno() // KIS ODNO → externalOrderId
                 ))
                 .toList();
     }

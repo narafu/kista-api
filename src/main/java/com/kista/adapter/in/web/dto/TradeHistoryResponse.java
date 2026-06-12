@@ -31,6 +31,6 @@ public record TradeHistoryResponse(
         return new TradeHistoryResponse(
                 o.id(), o.tradeDate(), o.ticker(),
                 o.orderType(), o.direction(), o.quantity(), o.price(),
-                o.status(), o.kisOrderId());
+                o.status(), o.externalOrderId());
     }
 }

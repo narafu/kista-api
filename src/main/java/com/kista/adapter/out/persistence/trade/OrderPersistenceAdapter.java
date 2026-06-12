@@ -50,12 +50,12 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public void markPlaced(UUID orderId, String kisOrderId) {
-        // 명시적 save로 dirty checking 의존 없이 PLACED + kisOrderId 기록
+    public void markPlaced(UUID orderId, String externalOrderId) {
+        // 명시적 save로 dirty checking 의존 없이 PLACED + externalOrderId 기록
         OrderEntity e = repository.findById(orderId)
                 .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
         e.setStatus(Order.OrderStatus.PLACED);
-        e.setKisOrderId(kisOrderId);
+        e.setExternalOrderId(externalOrderId);
         repository.save(e);
     }
 
@@ -143,7 +143,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setQuantity(o.quantity());
         e.setPrice(o.price());
         e.setStatus(o.status());
-        e.setKisOrderId(o.kisOrderId());
+        e.setExternalOrderId(o.externalOrderId());
         e.setFilledQuantity(o.filledQuantity());
         e.setFilledPrice(o.filledPrice());
         return e;
@@ -153,7 +153,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         return new Order(
                 e.getId(), e.getAccountId(), e.getStrategyCycleId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
                 e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
-                e.getStatus(), e.getKisOrderId(), e.getFilledQuantity(), e.getFilledPrice()
+                e.getStatus(), e.getExternalOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );
     }
 }

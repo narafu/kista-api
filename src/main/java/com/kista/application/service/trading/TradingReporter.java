@@ -98,18 +98,18 @@ class TradingReporter {
         }
     }
 
-    // 접수 주문과 실체결 내역을 kisOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
+    // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
     private void markFilledOrders(List<Order> mainOrders, List<Execution> executions) {
         if (executions.isEmpty()) return;
 
-        // kisOrderId → 체결 목록 그룹핑 (1:N 체결 허용)
+        // externalOrderId → 체결 목록 그룹핑 (1:N 체결 허용)
         Map<String, List<Execution>> byOrderId = executions.stream()
-                .filter(e -> e.kisOrderId() != null && !e.kisOrderId().isBlank())
-                .collect(Collectors.groupingBy(Execution::kisOrderId));
+                .filter(e -> e.externalOrderId() != null && !e.externalOrderId().isBlank())
+                .collect(Collectors.groupingBy(Execution::externalOrderId));
 
         for (Order order : mainOrders) {
-            if (order.kisOrderId() == null) continue;
-            List<Execution> matched = byOrderId.get(order.kisOrderId());
+            if (order.externalOrderId() == null) continue;
+            List<Execution> matched = byOrderId.get(order.externalOrderId());
             if (matched == null || matched.isEmpty()) continue; // 미체결 유지
 
             int filledQty = matched.stream().mapToInt(Execution::quantity).sum();

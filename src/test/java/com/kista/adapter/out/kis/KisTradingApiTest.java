@@ -150,7 +150,7 @@ class KisTradingApiTest {
             assertThat(e.quantity()).isEqualTo(10);
             assertThat(e.price()).isEqualByComparingTo("30.50");
             assertThat(e.amountUsd()).isEqualByComparingTo("305.00");
-            assertThat(e.kisOrderId()).isEqualTo("ORD002");
+            assertThat(e.externalOrderId()).isEqualTo("ORD002");
             assertThat(e.ticker()).isEqualTo(Ticker.SOXL);
             assertThat(e.tradeDate()).isEqualTo(DATE);
         }

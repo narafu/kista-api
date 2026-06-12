@@ -127,7 +127,7 @@ class KisOrderApiTest {
 
         Order result = api.place(order, ACCOUNT);
 
-        assertThat(result.kisOrderId()).isEqualTo("ORD123");
+        assertThat(result.externalOrderId()).isEqualTo("ORD123");
         assertThat(result.status()).isEqualTo(Order.OrderStatus.PLACED);
     }
 

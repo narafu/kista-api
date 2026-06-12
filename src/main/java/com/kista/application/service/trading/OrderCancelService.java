@@ -56,8 +56,8 @@ class OrderCancelService {
                 orderPort.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
-                log.warn("주문 취소 실패 — orderId={}, kisOrderId={}: {}",
-                        order.id(), order.kisOrderId(), e.getMessage());
+                log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
+                        order.id(), order.externalOrderId(), e.getMessage());
                 failedCount++;
             }
         }

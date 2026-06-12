@@ -17,7 +17,7 @@ public record Order(
         Integer quantity,            // 주문 수량(nullable)
         BigDecimal price,            // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,          // 주문 상태
-        String kisOrderId,           // KIS 시스템 부여 주문 번호 (ODNO), PLACED 이후 설정
+        String externalOrderId,      // 브로커 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
         Integer filledQuantity,      // 체결 수량 (null=미확인, 0=미체결)
         BigDecimal filledPrice       // 체결 가중평균가 (null=미체결)
 ) {

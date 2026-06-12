@@ -54,10 +54,10 @@ class TradingOrderExecutorTest {
                 direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
-    private Order kisResponse(String kisOrderId) {
+    private Order kisResponse(String externalOrderId) {
         // KIS 응답 Order는 id=null (DB PK는 호출측이 보존)
         return new Order(null, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 10, new BigDecimal("50.00"), Order.OrderStatus.PLACED, kisOrderId, null, null);
+                Order.OrderDirection.BUY, 10, new BigDecimal("50.00"), Order.OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     @Test
@@ -74,7 +74,7 @@ class TradingOrderExecutorTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
         assertThat(result.getFirst().status()).isEqualTo(Order.OrderStatus.PLACED);
-        assertThat(result.getFirst().kisOrderId()).isEqualTo("KIS-001");
+        assertThat(result.getFirst().externalOrderId()).isEqualTo("KIS-001");
         verify(orderPort).markPlaced(orderId, "KIS-001");
     }
 
@@ -130,9 +130,9 @@ class TradingOrderExecutorTest {
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(id1);
-        assertThat(result.get(0).kisOrderId()).isEqualTo("KIS-101");
+        assertThat(result.get(0).externalOrderId()).isEqualTo("KIS-101");
         assertThat(result.get(1).id()).isEqualTo(id2);
-        assertThat(result.get(1).kisOrderId()).isEqualTo("KIS-102");
+        assertThat(result.get(1).externalOrderId()).isEqualTo("KIS-102");
         verify(orderPort).markPlaced(id1, "KIS-101");
         verify(orderPort).markPlaced(id2, "KIS-102");
     }

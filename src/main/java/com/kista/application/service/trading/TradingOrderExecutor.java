@@ -33,11 +33,11 @@ class TradingOrderExecutor {
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = planned.stream().map(p -> {
             Order placedOrder = kisOrderPort.place(p, account);
-            orderPort.markPlaced(p.id(), placedOrder.kisOrderId()); // 접수 완료 즉시 기록
+            orderPort.markPlaced(p.id(), placedOrder.externalOrderId()); // 접수 완료 즉시 기록
             // KIS 응답 Order는 id=null — DB PK(p.id())를 살려서 반환 (취소 API에서 사용)
             return new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
                     p.orderType(), p.direction(), p.quantity(), p.price(),
-                    Order.OrderStatus.PLACED, placedOrder.kisOrderId(), null, null);
+                    Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null);
         }).toList();
         log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());
         return placed;

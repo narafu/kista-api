@@ -16,7 +16,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "orders")
 @Getter
-@Setter(AccessLevel.PACKAGE) // markPlaced 전용 (status, kisOrderId)
+@Setter(AccessLevel.PACKAGE) // markPlaced 전용 (status, externalOrderId)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
 class OrderEntity extends BaseAuditEntity {
 
@@ -56,8 +56,8 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private Order.OrderStatus status; // PLANNED/PLACED/FILLED/PARTIALLY_FILLED/FAILED/CANCELLED
 
-    @Column(name = "kis_order_id", length = 30)
-    private String kisOrderId; // PLACED 이후 설정
+    @Column(name = "external_order_id", length = 50)
+    private String externalOrderId; // PLACED 이후 설정
 
     @Column(name = "filled_quantity")
     private Integer filledQuantity; // 체결 수량 (null=미확인, 0=미체결)

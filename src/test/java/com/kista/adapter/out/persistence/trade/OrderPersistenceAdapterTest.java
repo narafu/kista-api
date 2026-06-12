@@ -87,7 +87,7 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void markPlaced_updatesStatusAndKisOrderId() {
+    void markPlaced_updatesStatusAndExternalOrderId() {
         UUID orderId = UUID.randomUUID();
         OrderEntity entity = new OrderEntity();
         entity.setStatus(Order.OrderStatus.PLANNED);
@@ -96,7 +96,7 @@ class OrderPersistenceAdapterTest {
         adapter.markPlaced(orderId, "ORD-001");
 
         assertThat(entity.getStatus()).isEqualTo(Order.OrderStatus.PLACED);
-        assertThat(entity.getKisOrderId()).isEqualTo("ORD-001");
+        assertThat(entity.getExternalOrderId()).isEqualTo("ORD-001");
         verify(repository).save(entity); // 명시적 save로 dirty checking 없이 처리
     }
 

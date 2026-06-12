@@ -189,9 +189,9 @@ class OrderCancelServiceTest {
 
     // ---
 
-    private Order placedOrder(UUID id, String kisOrderId) {
+    private Order placedOrder(UUID id, String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
-                Order.OrderStatus.PLACED, kisOrderId, null, null);
+                Order.OrderStatus.PLACED, externalOrderId, null, null);
     }
 }

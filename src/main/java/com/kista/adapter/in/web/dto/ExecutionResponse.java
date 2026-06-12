@@ -14,12 +14,12 @@ public record ExecutionResponse(
         int quantity,
         BigDecimal price,
         BigDecimal amountUsd,
-        String kisOrderId
+        String externalOrderId
 ) {
     public static ExecutionResponse from(Execution e) {
         return new ExecutionResponse(
                 e.tradeDate(), e.ticker(), e.direction(),
-                e.quantity(), e.price(), e.amountUsd(), e.kisOrderId()
+                e.quantity(), e.price(), e.amountUsd(), e.externalOrderId()
         );
     }
 }

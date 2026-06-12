@@ -88,7 +88,7 @@ public class KisOrderApi implements KisOrderPort {
                 account.kisAccountType(),
                 exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
-                order.kisOrderId());
+                order.externalOrderId());
 
         kisHttpClient.post(CANCEL_PATH, kisHttpClient.buildHeaders(CANCEL_TR_ID, account), body, Void.class);
     }
