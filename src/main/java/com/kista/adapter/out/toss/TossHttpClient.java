@@ -55,4 +55,11 @@ public class TossHttpClient {
                 baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
         ).getBody();
     }
+
+    // DELETE 요청 — 주문 취소 등 (응답 body 없음)
+    public void delete(String path, HttpHeaders headers) {
+        tossRestTemplate.exchange(
+                baseUrl + path, HttpMethod.DELETE, new HttpEntity<>(headers), Void.class
+        );
+    }
 }
