@@ -60,7 +60,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
 `application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
-- DB 연결 필요 통합 테스트: 현재 없음 (PortfolioSnapshotPersistenceAdapterTest·TradeHistoryPersistenceAdapterTest 삭제됨 — V50·V51)
+- DB 연결 필요 통합 테스트: 현재 없음 (PortfolioSnapshotPersistenceAdapterTest·TradeHistoryPersistenceAdapterTest 삭제됨 — `trade_histories`/`portfolio_snapshots` 테이블 자체가 스키마에 없음, `workflow.md` 참고)
 
 ### 전략 테스트 분리 원칙
 - `InfinitePositionTest` (`domain/model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)

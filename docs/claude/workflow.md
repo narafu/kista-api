@@ -27,4 +27,4 @@
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
 - `cycle_position`: 사이클 단위 포지션 스냅샷 — 실행당 1건 append (`CyclePositionPort.save()`, dedup/UNIQUE 제약 없음). 필드: usd_deposit/avg_price/holdings/closing_price
-- `trade_histories`·`portfolio_snapshots` 테이블은 V51·V50에서 DROP됨 — 참조 금지
+- `trade_histories`·`portfolio_snapshots` 테이블은 존재하지 않음 — 참조 금지
