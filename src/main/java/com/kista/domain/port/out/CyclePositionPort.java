@@ -32,6 +32,9 @@ public interface CyclePositionPort {
 
     List<CyclePositionHistoryEntry> findByStrategyIdWithCursor(UUID strategyId, Instant from, Instant cursor, int limit);
 
+    // 시드 수정 시 당일(KST) 기존 스냅샷 중복 제거
+    void softDeleteTodayByStrategyId(UUID strategyId, LocalDate kstDate);
+
     // 전략 삭제 시 포지션 일괄 소프트 삭제
     void deleteByStrategyId(UUID strategyId);
     void deleteByAccountId(UUID accountId);

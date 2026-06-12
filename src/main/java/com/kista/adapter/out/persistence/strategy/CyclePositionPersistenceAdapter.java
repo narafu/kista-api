@@ -96,6 +96,13 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public void softDeleteTodayByStrategyId(UUID strategyId, LocalDate kstDate) {
+        Instant dayStart = kstDate.atStartOfDay(TimeZones.KST).toInstant();
+        Instant dayEnd = kstDate.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
+        positionRepo.softDeleteByStrategyIdAndDate(strategyId, dayStart, dayEnd, Instant.now());
+    }
+
+    @Override
     public void deleteByStrategyId(UUID strategyId) {
         positionRepo.softDeleteByStrategyId(strategyId, Instant.now());
     }

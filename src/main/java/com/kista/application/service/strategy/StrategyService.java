@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -211,6 +212,8 @@ class StrategyService implements StrategyUseCase {
         }
         BigDecimal newDeposit = newSeed.subtract(purchaseAmount);
 
+        // 당일(KST) 기존 스냅샷 소프트 삭제 후 새 스냅샷 저장 — 같은 날 중복 방지
+        cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now());
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
                 latest.closingPrice(), latest.avgPrice(), latest.holdings(), null, null));

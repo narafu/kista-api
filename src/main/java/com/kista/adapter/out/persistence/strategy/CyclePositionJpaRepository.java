@@ -84,6 +84,21 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             @Param("cursor") Instant cursor,
             Pageable pageable);
 
+    // 시드 수정 시 당일(KST) 기존 스냅샷만 소프트 삭제
+    @Modifying
+    @Query(value = """
+            UPDATE cycle_position cp SET deleted_at = :now
+            FROM strategy_cycle sc WHERE cp.strategy_cycle_id = sc.id
+            AND sc.strategy_id = :strategyId
+            AND cp.created_at >= :dayStart AND cp.created_at < :dayEnd
+            AND cp.deleted_at IS NULL
+            """, nativeQuery = true)
+    void softDeleteByStrategyIdAndDate(
+            @Param("strategyId") UUID strategyId,
+            @Param("dayStart") Instant dayStart,
+            @Param("dayEnd") Instant dayEnd,
+            @Param("now") Instant now);
+
     @Modifying
     @Query(value = """
             UPDATE cycle_position cp SET deleted_at = :now
