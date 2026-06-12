@@ -10,8 +10,8 @@ import jakarta.validation.constraints.Pattern;
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
-        @Schema(description = "계좌번호 — KIS 8자리 또는 Toss 11자리", example = "74420614")
-        @NotBlank @Pattern(regexp = "\\d{8}|\\d{11}", message = "계좌번호는 8자리(KIS) 또는 11자리(Toss)여야 합니다")
+        @Schema(description = "계좌번호 — KIS 8자리 숫자 또는 Toss XXX-XX-XXXXXX 형식", example = "74420614")
+        @NotBlank @Pattern(regexp = "\\d{8}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 8자리(KIS) 또는 XXX-XX-XXXXXX 형식(Toss)이어야 합니다")
         String accountNo,
         @Schema(description = "API 앱 키 (KIS App Key / Toss Client ID)", example = "PSxxxxxxxxxx")
         String kisAppKey,
