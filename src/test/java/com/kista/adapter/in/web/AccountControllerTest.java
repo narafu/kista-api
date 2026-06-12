@@ -93,15 +93,15 @@ class AccountControllerTest {
     }
 
     @Test
-    void register_tossAccount_11digits_skipsAccountNoTest_returns201() throws Exception {
+    void register_tossAccount_skipsAccountNoTest_returns201() throws Exception {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "토스계좌", "12345678901", "cid", "csecret", "42", Account.Broker.TOSS));
+                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Account.Broker.TOSS));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"12345678901\"," +
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"131-01-001931\"," +
                                 "\"kisAppKey\":\"cid\",\"kisSecretKey\":\"csecret\",\"broker\":\"TOSS\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
@@ -113,26 +113,26 @@ class AccountControllerTest {
 
     @Test
     void register_kisAccount_callsAccountNoTest_returns201() throws Exception {
-        // KIS 계좌 등록: testAccountNo() 호출 후 register() 수행
+        // KIS 계좌 등록: testAccountNo()에 CANO 8자리만 전달, register() 수행
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "KIS계좌", "74420614", "appKey", "appSecret", "01", Account.Broker.KIS));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614\"," +
+                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
                                 "\"kisAppKey\":\"appKey\",\"kisSecretKey\":\"appSecret\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
 
-        // KIS 계좌는 testAccountNo() 반드시 호출
+        // 74420614-01 → CANO=74420614 으로 분리 후 testAccountNo 호출
         verify(accountUseCase).testAccountNo("appKey", "appSecret", "74420614");
     }
 
     @Test
-    void register_accountNo_not8or11digits_returns400() throws Exception {
-        // 9자리 계좌번호 → @Pattern 검증 실패 → 400
+    void register_accountNo_invalidFormat_returns400() throws Exception {
+        // 잘못된 형식(9자리 등) → @Pattern 검증 실패 → 400
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"계좌\",\"accountNo\":\"123456789\"," +

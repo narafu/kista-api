@@ -10,8 +10,8 @@ import jakarta.validation.constraints.Pattern;
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
-        @Schema(description = "계좌번호 — KIS 8자리 숫자 또는 Toss XXX-XX-XXXXXX 형식", example = "74420614")
-        @NotBlank @Pattern(regexp = "\\d{8}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 8자리(KIS) 또는 XXX-XX-XXXXXX 형식(Toss)이어야 합니다")
+        @Schema(description = "계좌번호 — KIS: XXXXXXXX-XX (예: 74420614-01), Toss: XXX-XX-XXXXXX (예: 131-01-001931)", example = "74420614-01")
+        @NotBlank @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 KIS XXXXXXXX-XX 또는 Toss XXX-XX-XXXXXX 형식이어야 합니다")
         String accountNo,
         @Schema(description = "API 앱 키 (KIS App Key / Toss Client ID)", example = "PSxxxxxxxxxx")
         String kisAppKey,
@@ -21,6 +21,15 @@ public record AccountRequest(
         Account.Broker broker
 ) {
     public RegisterAccountCommand toRegisterCommand() {
+        // KIS 74420614-01 → CANO=74420614, ACNT_PRDT_CD=01 분리
+        // Toss 131-01-001931 → accountNo 그대로 저장 (API 호출에는 accountSeq 사용)
+        boolean isKis = broker == null || broker == Account.Broker.KIS;
+        if (isKis && accountNo != null && accountNo.matches("\\d{8}-\\d{2}")) {
+            return new RegisterAccountCommand(
+                    nickname, accountNo.substring(0, 8), kisAppKey, kisSecretKey,
+                    accountNo.substring(9), broker
+            );
+        }
         return new RegisterAccountCommand(
                 nickname, accountNo, kisAppKey, kisSecretKey, null, broker
         );

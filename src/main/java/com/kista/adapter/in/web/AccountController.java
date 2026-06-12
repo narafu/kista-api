@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -51,12 +52,12 @@ public class AccountController {
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
         // KIS만 계좌번호 실소유 검증 — Toss는 AccountService.register() 내 testAndFetchAccountSeq()에서 통합 처리
+        // toRegisterCommand()에서 74420614-01 → accountNo=74420614 분리 완료 → CANO 8자리만 전달
+        RegisterAccountCommand cmd = request.toRegisterCommand();
         if (request.broker() == null || request.broker() == Account.Broker.KIS) {
-            accountUseCase.testAccountNo(request.kisAppKey(), request.kisSecretKey(), request.accountNo());
+            accountUseCase.testAccountNo(cmd.kisAppKey(), cmd.kisSecretKey(), cmd.accountNo());
         }
-        return AccountResponse.from(
-                accountUseCase.register(userId, request.toRegisterCommand())
-        );
+        return AccountResponse.from(accountUseCase.register(userId, cmd));
     }
 
     // 계좌 수정 (소유권 검증)
