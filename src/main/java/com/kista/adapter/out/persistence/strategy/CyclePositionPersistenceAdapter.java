@@ -44,6 +44,15 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit) {
+        // strategy_cycle_id 기준 최신 N건 직접 조회 (리버스모드 별지점 계산용)
+        return positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to) {
         List<CyclePositionEntity> entities = positionRepo.findByAccountIdAndDateRange(accountId, from, to);
         Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);

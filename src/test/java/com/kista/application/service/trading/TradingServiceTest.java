@@ -15,6 +15,7 @@ import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
+import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -73,7 +74,7 @@ class TradingServiceTest {
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
     );
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), STRATEGY.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null
+            UUID.randomUUID(), STRATEGY.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false
     );
 
     // CyclePosition 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
@@ -94,10 +95,11 @@ class TradingServiceTest {
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
+        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(infiniteStrategy),
+                new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort, cycleHistoryPort);
         // CycleRotationService: brokerMarginRouter wraps kisMarginPort for KIS 계좌 테스트
         BrokerMarginRouter marginRouter = new BrokerMarginRouter(kisMarginPort, null);
         CycleRotationService rotationService = new CycleRotationService(
@@ -284,7 +286,7 @@ class TradingServiceTest {
         // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
 
@@ -313,7 +315,7 @@ class TradingServiceTest {
         // STRATEGY → 예외 발생, strategy2 → 정상 실행
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
 
@@ -361,7 +363,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN, 20);
         StrategyCycle maintainCycle = new StrategyCycle(
-                UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null, false);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
@@ -374,7 +376,7 @@ class TradingServiceTest {
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(
                 new MarginItem(Currency.USD, initDeposit, initDeposit, initDeposit, null)));
         // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
-        StrategyCycle savedMaintainCycle = new StrategyCycle(UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null);
+        StrategyCycle savedMaintainCycle = new StrategyCycle(UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null, false);
         when(strategyCyclePort.save(any())).thenReturn(savedMaintainCycle);
 
         service.executeBatch(List.of(new BatchContext(maintainStrategy, maintainCycle, ACCOUNT, USER)), PAST_DST);
@@ -394,7 +396,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null, false);
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -406,7 +408,7 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(kisMarginPort.getMargin(ACCOUNT)).thenReturn(List.of(new MarginItem(Currency.USD, marginAmount, marginAmount, marginAmount, null)));
         // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
-        StrategyCycle savedMaxCycle = new StrategyCycle(UUID.randomUUID(), maxStrategy.id(), expectedSeed, null, LocalDate.now(), null, null, null);
+        StrategyCycle savedMaxCycle = new StrategyCycle(UUID.randomUUID(), maxStrategy.id(), expectedSeed, null, LocalDate.now(), null, null, null, false);
         when(strategyCyclePort.save(any())).thenReturn(savedMaxCycle);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
@@ -426,7 +428,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null, false);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
@@ -450,7 +452,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null, false);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));

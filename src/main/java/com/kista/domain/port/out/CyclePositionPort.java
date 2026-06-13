@@ -15,6 +15,9 @@ public interface CyclePositionPort {
     // 최신 cycle_position.createdAt 순 limit건 반환
     List<CyclePosition> findLatestByStrategyId(UUID strategyId, int limit);
 
+    // 사이클 ID 기준 최신 N개 포지션 (리버스모드 별지점 계산용 — 최근 closing_price 추출)
+    List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit);
+
     // 계좌 ID 기준 이력 조회 (ticker 포함, 날짜 범위 필터)
     List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to);
 

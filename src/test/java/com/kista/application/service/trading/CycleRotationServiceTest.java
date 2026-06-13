@@ -17,6 +17,7 @@ import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
+import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,8 +67,9 @@ class CycleRotationServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(infiniteStrategy),
+                new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         service = new CycleRotationService(brokerMarginRouter, strategyPort, strategyCyclePort,
                 cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies);
@@ -76,12 +78,12 @@ class CycleRotationServiceTest {
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
     private StrategyCycle currentCycle(UUID strategyId, BigDecimal startAmount) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, startAmount,
-                null, LocalDate.now(), null, Instant.now(), null);
+                null, LocalDate.now(), null, Instant.now(), null, false);
     }
 
     // 새 StrategyCycle stub 반환값 (save 후 id 포함)
     private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null);
+        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null, false);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {

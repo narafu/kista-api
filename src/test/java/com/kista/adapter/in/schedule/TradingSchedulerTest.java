@@ -59,7 +59,7 @@ class TradingSchedulerTest {
 
     private StrategyCycle mockStrategyCycle(UUID strategyId) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
-                null, LocalDate.now(), null, Instant.now(), null);
+                null, LocalDate.now(), null, Instant.now(), null, false);
     }
 
     private User mockUser() {

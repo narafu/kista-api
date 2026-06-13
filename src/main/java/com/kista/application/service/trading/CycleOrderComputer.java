@@ -4,9 +4,11 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
@@ -15,9 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 // TradingService/ManualTradingService/TradingPreviewService가 공유하던 주문 계획 공통부 추출
 // '전략 라우팅 → plan(PlanContext) → 잔고 유효성 검증'까지만 수행 — 저장·알림·반환 변환은 호출측 책임
@@ -26,20 +30,33 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class CycleOrderComputer {
 
+    // 리버스모드 별지점 계산에 사용할 최근 종가 개수
+    private static final int STAR_POINT_WINDOW = 5;
+
     private final CycleOrderStrategies cycleStrategies;   // 전략 타입별 주문 전략 라우터
     private final NotifyPort notifyPort;                  // 잔고 부족 알림 (computeIfValid 전용)
+    private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
-    // currentCycle: PRIVACY 전략의 initialUsdDeposit(=startAmount) 산출에 사용 — INFINITE는 무시
+    // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
     ComputeResult compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                           LocalDate tradeDate, StrategyCycle currentCycle,
                           PrivacyTradeBase privacyBase, String label) {
         BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
                 ? currentCycle.startAmount()
                 : null;
+
+        // 리버스모드인 경우 별지점 계산 (직전 5거래일 종가 평균)
+        // 첫날(소진 직후)은 포지션이 아직 없으므로 null — planReverseMode에서 첫날 로직 분기
+        BigDecimal starPointPrice = null;
+        if (strategy.type() == Strategy.Type.INFINITE && currentCycle != null && currentCycle.isReverseMode()) {
+            starPointPrice = computeStarPointPrice(currentCycle.id());
+        }
+
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label));
+                balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
+                currentCycle, starPointPrice));
 
         // 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
         if (planOpt.isEmpty()) return ComputeResult.skipped();
@@ -48,6 +65,19 @@ class CycleOrderComputer {
 
         // valid=false: 매수금액 > 잔액 or 매도수량 > 보유수량
         return new ComputeResult(plan, balance.isOrderValid(plan.orders()));
+    }
+
+    // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균
+    // 포지션이 없으면(첫날) null 반환 — 호출측에서 첫날 분기 처리
+    private BigDecimal computeStarPointPrice(UUID cycleId) {
+        List<CyclePosition> recentPositions = cyclePositionPort.findLatestByCycleId(cycleId, STAR_POINT_WINDOW);
+        List<BigDecimal> closingPrices = recentPositions.stream()
+                .map(CyclePosition::closingPrice)
+                .filter(p -> p != null && p.compareTo(BigDecimal.ZERO) > 0)
+                .toList();
+        if (closingPrices.isEmpty()) return null;
+        BigDecimal sum = closingPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
     }
 
     // compute + 잔고 유효성 실패 시 경고 로그·부족 알림까지 수행 — TradingService/ManualTradingService 공용

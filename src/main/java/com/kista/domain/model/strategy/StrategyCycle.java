@@ -15,10 +15,11 @@ public record StrategyCycle(
         LocalDate startDate,    // 사이클 시작일자 (KST)
         LocalDate endDate,      // 사이클 종료일자 (KST, 진행 중이면 null)
         Instant createdAt,      // 생성 시각 (null이면 DB DEFAULT)
-        Instant deletedAt       // soft-delete (null=활성)
+        Instant deletedAt,      // soft-delete (null=활성)
+        boolean isReverseMode   // 리버스모드 활성 여부 — 소진 발동 시 true, 복귀 시 false
 ) {
-    // 새 사이클 시작 — id/createdAt은 DB가 생성, 시작일자는 KST 오늘
+    // 새 사이클 시작 — id/createdAt은 DB가 생성, 시작일자는 KST 오늘, 리버스모드 비활성
     public static StrategyCycle start(UUID strategyId, BigDecimal startAmount) {
-        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(), null, null, null);
+        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(), null, null, null, false);
     }
 }

@@ -41,6 +41,9 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
     @Column(name = "end_date")
     private LocalDate endDate; // 사이클 종료일자 (KST, 진행 중이면 null)
 
+    @Column(name = "is_reverse_mode", nullable = false)
+    private boolean reverseMode; // 리버스모드 활성 여부 — 기본값 false
+
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 }

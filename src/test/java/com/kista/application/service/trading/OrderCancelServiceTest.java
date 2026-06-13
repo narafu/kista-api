@@ -60,7 +60,7 @@ class OrderCancelServiceTest {
         cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
-                null, LocalDate.now(), null, null, null);
+                null, LocalDate.now(), null, null, null, false);
     }
 
     // --- cancelByCycle ---

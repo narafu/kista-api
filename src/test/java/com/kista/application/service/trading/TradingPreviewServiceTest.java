@@ -18,6 +18,7 @@ import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyTradingStrategy;
+import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,7 +67,7 @@ class TradingPreviewServiceTest {
     );
 
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
 
     static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
 
@@ -81,10 +82,11 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
+        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(infiniteStrategy),
+                new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort, cycleHistoryPort);
         // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
@@ -157,7 +159,7 @@ class TradingPreviewServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
 
-        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -183,7 +185,7 @@ class TradingPreviewServiceTest {
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
-        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);

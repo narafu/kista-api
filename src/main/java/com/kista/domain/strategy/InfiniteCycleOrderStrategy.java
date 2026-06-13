@@ -3,7 +3,9 @@ package com.kista.domain.strategy;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.ReverseModePosition;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static java.math.RoundingMode.HALF_UP;
+
 
 // INFINITE 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcInfinite + CycleRotationService.resolveMinRequired(INFINITE) 이전
@@ -26,6 +29,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     private static final double MIN_DEPOSIT_FACTOR = 2.2;
 
     private final InfiniteTradingStrategy infiniteStrategy;
+    private final ReverseInfiniteTradingStrategy reverseStrategy; // 리버스모드 전략 (구현체: ReverseInfiniteStrategy)
 
     @Override
     public Strategy.Type cycleType() {
@@ -34,16 +38,52 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
+        StrategyCycle currentCycle = ctx.currentCycle();
+
+        // 리버스모드 분기 — StrategyCycle.isReverseMode() == true이면 리버스모드 전략 사용
+        if (currentCycle != null && currentCycle.isReverseMode()) {
+            return planReverseMode(ctx, currentCycle);
+        }
+
+        // 일반 모드 (기존 로직)
+        return planNormalMode(ctx);
+    }
+
+    // 일반 모드 — 기존 InfiniteTradingStrategy 사용
+    private Optional<OrderPlan> planNormalMode(PlanContext ctx) {
         // 0회차(holdings==0)에서 전일종가 없으면 InfinitePosition 생성 자체가 불가
         if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {
             throw new IllegalStateException("전일종가 조회 실패: " + ctx.strategy().ticker().name());
         }
         InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice(), ctx.strategy().divisionCount());
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
-        log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
+        log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
                 position.unitAmount(), orders.size());
         return Optional.of(new OrderPlan(position, orders));
+    }
+
+    // 리버스모드 — 별지점 기준 매도/쿼터매수
+    // currentCycle.isFirstReverseDay()는 없으므로 starPointPrice==null을 첫날 판단 기준으로 사용
+    private Optional<OrderPlan> planReverseMode(PlanContext ctx, StrategyCycle currentCycle) {
+        ReverseModePosition position = new ReverseModePosition(
+                ctx.balance().holdings(),
+                ctx.balance().avgPrice(),
+                ctx.balance().usdDeposit(),
+                ctx.strategy().ticker(),
+                ctx.strategy().divisionCount(),
+                ctx.starPointPrice(),      // null이면 첫날 (별지점 아직 없음)
+                ctx.starPointPrice() == null
+        );
+
+        List<Order> orders = position.isFirstDay()
+                ? reverseStrategy.buildFirstDayOrders(position, ctx.tradeDate())
+                : reverseStrategy.buildOrders(position, ctx.tradeDate());
+
+        log.info("[{}] 전략 계산(리버스모드): isFirstDay={}, holdings={}, starPointPrice={}, orders={}",
+                ctx.label(), position.isFirstDay(), position.holdings(), position.starPointPrice(), orders.size());
+        // 리버스모드에서 InfinitePosition은 null (OrderPlan.position()은 일반모드 전용)
+        return Optional.of(new OrderPlan(null, orders));
     }
 
     @Override
