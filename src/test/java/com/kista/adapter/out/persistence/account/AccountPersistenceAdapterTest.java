@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.account;
 
+import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.account.Account;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ class AccountPersistenceAdapterTest {
 
     @Mock AccountJpaRepository accountJpaRepository;
     @Mock AesCryptoService crypto;
+    @Mock AccountNoHasher hasher;
     @InjectMocks AccountPersistenceAdapter adapter;
 
     private final UUID accountId = UUID.randomUUID();
@@ -37,6 +39,8 @@ class AccountPersistenceAdapterTest {
         // 암호화/복호화 lenient stub
         lenient().when(crypto.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
         lenient().when(crypto.decrypt(anyString())).thenAnswer(inv -> ((String) inv.getArgument(0)).replace("enc:", ""));
+        // 해시 lenient stub
+        lenient().when(hasher.hash(anyString())).thenAnswer(inv -> "hash:" + inv.getArgument(0));
     }
 
     private AccountEntity accountEntityWithId(UUID id) {

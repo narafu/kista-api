@@ -47,6 +47,9 @@ class AccountEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private Account.Broker broker;       // 증권사
 
+    @Column(name = "account_no_hash", length = 64)
+    private String accountNoHash;          // HMAC-SHA256 해시 (전역 중복 체크용, 기존 레코드는 NULL)
+
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 

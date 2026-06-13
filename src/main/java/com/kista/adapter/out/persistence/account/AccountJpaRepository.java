@@ -15,6 +15,9 @@ interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
     int countByUserId(UUID userId);
 
+    // 전역 계좌번호 중복 체크 — deleted_at IS NULL인 활성 계좌만 대상
+    boolean existsByAccountNoHashAndDeletedAtIsNull(String accountNoHash);
+
     @Modifying
     @Query("UPDATE AccountEntity a SET a.deletedAt = :now WHERE a.id = :id")
     void softDeleteById(@Param("id") UUID id, @Param("now") Instant now);

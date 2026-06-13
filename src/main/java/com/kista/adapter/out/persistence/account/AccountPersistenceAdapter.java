@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.account;
 
+import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.AccountPort;
@@ -18,6 +19,7 @@ public class AccountPersistenceAdapter implements AccountPort {
 
     private final AccountJpaRepository jpaRepository;
     private final AesCryptoService crypto;
+    private final AccountNoHasher hasher;
 
     @Override
     public List<Account> findByUserId(UUID userId) {
@@ -65,6 +67,12 @@ public class AccountPersistenceAdapter implements AccountPort {
         return jpaRepository.count();
     }
 
+    @Override
+    public boolean existsByAccountNo(String accountNo) {
+        // 플레인텍스트 해시 후 DB 조회 — AES-GCM은 비결정론적이므로 해시 경유 필수
+        return jpaRepository.existsByAccountNoHashAndDeletedAtIsNull(hasher.hash(accountNo));
+    }
+
     // Account 도메인 모델 → 암호화 후 Entity 변환
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();
@@ -72,6 +80,7 @@ public class AccountPersistenceAdapter implements AccountPort {
         e.setUserId(a.userId());
         e.setNickname(a.nickname());
         e.setAccountNo(crypto.encrypt(a.accountNo()));
+        e.setAccountNoHash(hasher.hash(a.accountNo())); // 전역 중복 체크용 HMAC-SHA256 해시
         e.setKisAppKey(crypto.encrypt(a.kisAppKey()));
         e.setKisSecretKey(crypto.encrypt(a.kisSecretKey()));
         e.setKisAccountType(a.kisAccountType());

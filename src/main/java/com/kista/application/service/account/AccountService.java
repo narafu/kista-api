@@ -35,7 +35,11 @@ class AccountService implements AccountUseCase {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
-        // 동일 사용자의 계좌번호 중복 등록 방지 (복호화된 값으로 비교)
+        // 전역 계좌번호 중복 체크 (크로스-유저, 해시 기반 — V11 이후 신규 등록에만 적용)
+        if (accountPort.existsByAccountNo(cmd.accountNo())) {
+            throw new Account.DuplicateAccountException(cmd.accountNo());
+        }
+        // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback)
         accountPort.findByUserId(userId).stream()
                 .filter(a -> a.accountNo().equals(cmd.accountNo()))
                 .findAny()

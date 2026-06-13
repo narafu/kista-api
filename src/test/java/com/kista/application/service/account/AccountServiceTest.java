@@ -78,6 +78,17 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("다른 사용자가 이미 등록한 계좌번호 재등록 시 DuplicateAccountException 발생 (→ 409)")
+    void register_duplicateAccountNo_crossUser_throws() {
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.existsByAccountNo("74420614")).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
+                .isInstanceOf(Account.DuplicateAccountException.class)
+                .hasMessageContaining("74420614");
+    }
+
+    @Test
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
         when(accountPort.requireOwnedAccount(accountId, userId))
