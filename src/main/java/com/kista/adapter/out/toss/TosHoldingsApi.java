@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Component
@@ -22,8 +23,10 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
-    // Toss 매수 가능 금액 API 경로 (GET /api/v1/buying-power?currency=USD)
+    // Toss 매수 가능 금액 API 경로 (GET /api/v1/buying-power?currency=USD|KRW)
     private static final String BUYING_POWER_PATH = "/api/v1/buying-power";
+    // Toss 환율 API 경로 (GET /api/v1/exchange-rate?baseCurrency=USD&quoteCurrency=KRW)
+    private static final String EXCHANGE_RATE_PATH = "/api/v1/exchange-rate";
 
     private final TossHttpClient tossHttpClient;
 
@@ -60,16 +63,21 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
 
     @Override
     public List<MarginItem> getMarginItems(Account account) {
-        // USD + KRW 각각 조회 후 병합 — Toss는 통합예수금이므로 두 통화 모두 표시
-        List<MarginItem> items = new ArrayList<>();
-        for (Currency currency : List.of(Currency.USD, Currency.KRW)) {
-            BigDecimal amount = fetchBuyingPower(account, currency.name());
-            items.add(new MarginItem(currency, BigDecimal.ZERO, BigDecimal.ZERO, amount, BigDecimal.ZERO));
-        }
-        return items;
+        // USD·KRW 예수금 조회 후 환율 기반 USD 합산 — Toss 통합예수금
+        BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
+        BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");
+        BigDecimal usdToKrwRate = fetchUsdToKrwRate(account);
+
+        // KRW → USD 환산 후 합산 (환율 0이면 KRW 무시)
+        BigDecimal krwAsUsd = usdToKrwRate.compareTo(BigDecimal.ZERO) > 0
+                ? krwBuyable.divide(usdToKrwRate, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal totalUsd = usdBuyable.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
+
+        return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, totalUsd, usdToKrwRate));
     }
 
-    // currency 파라미터로 단건 조회
+    // currency 파라미터로 매수가능금액 단건 조회
     private BigDecimal fetchBuyingPower(Account account, String currencyCode) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("currency", currencyCode);
@@ -80,6 +88,20 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
             return BigDecimal.ZERO;
         }
         return new BigDecimal(wrapper.result().cashBuyingPower());
+    }
+
+    // USD/KRW 환율 조회 (1 USD = ? KRW) — 계좌 컨텍스트 불필요
+    private BigDecimal fetchUsdToKrwRate(Account account) {
+        var params = new LinkedMultiValueMap<String, String>();
+        params.add("baseCurrency", "USD");
+        params.add("quoteCurrency", "KRW");
+        ExchangeRateWrapper wrapper = tossHttpClient.get(
+                EXCHANGE_RATE_PATH, tossHttpClient.buildHeadersNoAccount(account),
+                params, ExchangeRateWrapper.class);
+        if (wrapper == null || wrapper.result() == null || wrapper.result().rate() == null) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(wrapper.result().rate()).round(new MathContext(6));
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
@@ -98,5 +120,13 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     record BuyableAmountResponse(
         @JsonProperty("cashBuyingPower") String cashBuyingPower, // 현금 기반 매수 가능 금액 (미수 미발생 기준)
         @JsonProperty("currency") String currency                // 통화 (예: USD)
+    ) {}
+
+    // GET /api/v1/exchange-rate 응답 래퍼 — {"result": {...}}
+    record ExchangeRateWrapper(@JsonProperty("result") ExchangeRateResult result) {}
+
+    record ExchangeRateResult(
+        @JsonProperty("rate") String rate,           // 매수 환율 (1 USD = ? KRW)
+        @JsonProperty("midRate") String midRate      // 매매기준율
     ) {}
 }

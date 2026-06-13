@@ -1,6 +1,8 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
+import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +38,11 @@ class TosHoldingsApiTest {
     void setUp() {
         when(tossHttpClient.buildHeaders(any())).thenReturn(new HttpHeaders());
         tosHoldingsApi = new TosHoldingsApi(tossHttpClient);
+    }
+
+    // getMarginItems는 exchange-rate API에 buildHeadersNoAccount를 사용
+    private void stubNoAccountHeader() {
+        when(tossHttpClient.buildHeadersNoAccount(any())).thenReturn(new HttpHeaders());
     }
 
     @Test
@@ -92,5 +99,46 @@ class TosHoldingsApiTest {
         BigDecimal amount = tosHoldingsApi.getBuyableAmount(ACCOUNT);
 
         assertThat(amount).isEqualByComparingTo("1234.56");
+    }
+
+    @Test
+    @DisplayName("getMarginItems: USD + KRW/환율 합산 후 단일 USD MarginItem 반환")
+    void getMarginItems_combinesUsdAndKrwByExchangeRate() {
+        stubNoAccountHeader();
+        // USD 100, KRW 140000, 환율 1400 → KRW→USD = 100, 합계 200
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+            .thenAnswer(inv -> {
+                @SuppressWarnings("unchecked")
+                org.springframework.util.MultiValueMap<String, String> params =
+                    (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
+                String currency = params.getFirst("currency");
+                String amount = "USD".equals(currency) ? "100.00" : "140000";
+                return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
+            });
+        when(tossHttpClient.get(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+            .thenReturn(new TosHoldingsApi.ExchangeRateWrapper(new TosHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+
+        List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
+
+        assertThat(items).hasSize(1);
+        MarginItem item = items.get(0);
+        assertThat(item.currency()).isEqualTo(Currency.USD);
+        assertThat(item.purchasableAmount()).isEqualByComparingTo("200.00"); // 100 + 140000/1400
+        assertThat(item.usdToKrwRate()).isEqualByComparingTo("1400.00");
+    }
+
+    @Test
+    @DisplayName("getMarginItems: 환율 조회 실패 시 USD만 반환")
+    void getMarginItems_exchangeRateZero_returnsUsdOnly() {
+        stubNoAccountHeader();
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("100.00", "USD")));
+        when(tossHttpClient.get(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+            .thenReturn(null);
+
+        List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).purchasableAmount()).isEqualByComparingTo("100.00");
     }
 }
