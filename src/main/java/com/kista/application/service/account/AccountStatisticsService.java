@@ -1,7 +1,6 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
@@ -79,10 +78,9 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 KIS API 미지원 — USD 매수가능금액만 반환
+        // Toss 계좌는 KIS API 미지원 — USD·KRW 통화별 매수가능금액 반환
         if (account.broker() == TOSS) {
-            BigDecimal buyable = tosMarginPort.getBuyableAmount(account);
-            return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, buyable, BigDecimal.ZERO));
+            return tosMarginPort.getMarginItems(account);
         }
         return kisMarginPort.getMargin(account);
     }

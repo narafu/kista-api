@@ -2,6 +2,8 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
+import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.TosAccountPort;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -52,10 +55,24 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
 
     @Override
     public BigDecimal getBuyableAmount(Account account) {
-        // currency=USD 쿼리 파라미터 필수 — 미전송 시 400 "유효하지 않은 주문 ID" 오류
-        // 응답 래퍼: {"result": {"cashBuyingPower": ..., "currency": ...}}
+        return fetchBuyingPower(account, "USD");
+    }
+
+    @Override
+    public List<MarginItem> getMarginItems(Account account) {
+        // USD + KRW 각각 조회 후 병합 — Toss는 통합예수금이므로 두 통화 모두 표시
+        List<MarginItem> items = new ArrayList<>();
+        for (Currency currency : List.of(Currency.USD, Currency.KRW)) {
+            BigDecimal amount = fetchBuyingPower(account, currency.name());
+            items.add(new MarginItem(currency, BigDecimal.ZERO, BigDecimal.ZERO, amount, BigDecimal.ZERO));
+        }
+        return items;
+    }
+
+    // currency 파라미터로 단건 조회
+    private BigDecimal fetchBuyingPower(Account account, String currencyCode) {
         var params = new LinkedMultiValueMap<String, String>();
-        params.add("currency", "USD");
+        params.add("currency", currencyCode);
         BuyingPowerWrapper wrapper = tossHttpClient.get(
                 BUYING_POWER_PATH, tossHttpClient.buildHeaders(account),
                 params, BuyingPowerWrapper.class);
