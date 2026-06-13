@@ -32,11 +32,12 @@ public class TosOrderApi implements TosOrderPort {
         body.put("quantity", order.quantity());
         body.put("price", resolvePrice(order.orderType(), order.price()));
 
-        OrderResponse response = tossHttpClient.post(
-                ORDER_PATH, tossHttpClient.buildHeaders(account), body, OrderResponse.class);
+        // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} 래퍼 구조
+        OrderResponseWrapper wrapper = tossHttpClient.post(
+                ORDER_PATH, tossHttpClient.buildHeaders(account), body, OrderResponseWrapper.class);
 
         // orderId 없으면 비즈니스 실패 처리
-        if (response == null || response.orderId() == null) {
+        if (wrapper == null || wrapper.result() == null || wrapper.result().orderId() == null) {
             throw new TossApiException("Toss 주문 실패: 응답에 orderId 없음", null);
         }
 
@@ -44,7 +45,7 @@ public class TosOrderApi implements TosOrderPort {
         return new Order(
                 null, null, null, order.tradeDate(), order.ticker(),
                 order.orderType(), order.direction(), order.quantity(), order.price(),
-                Order.OrderStatus.PLACED, response.orderId(), null, null
+                Order.OrderStatus.PLACED, wrapper.result().orderId(), null, null
         );
     }
 
@@ -70,6 +71,10 @@ public class TosOrderApi implements TosOrderPort {
     }
 
     // package-private — TosOrderApiTest에서 직접 생성하여 stub에 사용
+    record OrderResponseWrapper(
+        @JsonProperty("result") OrderResponse result  // Toss API 공통 {"result": {...}} 래퍼
+    ) {}
+
     record OrderResponse(
         @JsonProperty("orderId") String orderId,
         @JsonProperty("clientOrderId") String clientOrderId

@@ -45,12 +45,17 @@ class TosOrderApiTest {
         tosOrderApi = new TosOrderApi(tossHttpClient);
     }
 
+    // Toss API 응답 {"result": {...}} 래퍼 헬퍼
+    private static TosOrderApi.OrderResponseWrapper wrap(String orderId) {
+        return new TosOrderApi.OrderResponseWrapper(new TosOrderApi.OrderResponse(orderId, null));
+    }
+
     @Test
     @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, PLACED 상태 반환")
     void place_loc_mapsToLimitCls() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponse.class)))
-            .thenReturn(new TosOrderApi.OrderResponse("toss-order-id", null));
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+            .thenReturn(wrap("toss-order-id"));
 
         Order placed = tosOrderApi.place(order, ACCOUNT);
 
@@ -71,8 +76,8 @@ class TosOrderApiTest {
     @DisplayName("MOC 주문 → timeInForce=CLS, price=0.01 (장마감 LIMIT 대체)")
     void place_moc_usesLimitClsWithMinPrice() {
         Order order = mocSellOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponse.class)))
-            .thenReturn(new TosOrderApi.OrderResponse("toss-order-id-2", null));
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+            .thenReturn(wrap("toss-order-id-2"));
 
         tosOrderApi.place(order, ACCOUNT);
 
@@ -88,8 +93,8 @@ class TosOrderApiTest {
     @DisplayName("LIMIT 주문 → timeInForce=DAY")
     void place_limit_mapsToLimitDay() {
         Order order = limitBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponse.class)))
-            .thenReturn(new TosOrderApi.OrderResponse("toss-order-id-3", null));
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+            .thenReturn(wrap("toss-order-id-3"));
 
         tosOrderApi.place(order, ACCOUNT);
 
@@ -103,8 +108,8 @@ class TosOrderApiTest {
     @DisplayName("응답 orderId null → TossApiException")
     void place_nullOrderId_throwsTossApiException() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponse.class)))
-            .thenReturn(new TosOrderApi.OrderResponse(null, null));
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+            .thenReturn(new TosOrderApi.OrderResponseWrapper(new TosOrderApi.OrderResponse(null, null)));
 
         assertThatThrownBy(() -> tosOrderApi.place(order, ACCOUNT))
             .isInstanceOf(TossApiException.class);
