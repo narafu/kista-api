@@ -81,7 +81,7 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount());
+        return new StrategyDetail(saved, cycle.startAmount(), false);
     }
 
     @Override
@@ -215,11 +215,11 @@ class StrategyService implements StrategyUseCase {
         log.info("시드 수정: strategyId={}, newSeed={}, newDeposit={}", strategyId, newSeed, newDeposit);
     }
 
-    // 현재 StrategyCycle의 startAmount를 묶어 응답용 StrategyDetail 조립
+    // 현재 StrategyCycle의 startAmount + isReverseMode를 묶어 응답용 StrategyDetail 조립
     private StrategyDetail toDetail(Strategy strategy) {
-        BigDecimal initialUsdDeposit = strategyCyclePort.findLatestByStrategyId(strategy.id())
-                .map(StrategyCycle::startAmount)
-                .orElse(null);
-        return new StrategyDetail(strategy, initialUsdDeposit);
+        var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
+        BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
+        boolean isReverseMode = latestCycle.map(StrategyCycle::isReverseMode).orElse(false);
+        return new StrategyDetail(strategy, initialUsdDeposit, isReverseMode);
     }
 }

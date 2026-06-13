@@ -23,7 +23,9 @@ public record TradingCycleResponse(
         @Schema(description = "연속 사이클 정책", example = "NONE")
         String cycleSeedType,
         @Schema(description = "분할 수 (20/30/40)", example = "20")
-        int divisionCount
+        int divisionCount,
+        @Schema(description = "리버스모드 활성 여부 (소진 후 모드)", example = "false")
+        boolean isReverseMode
 ) {
     public static TradingCycleResponse from(StrategyDetail detail) {
         Strategy c = detail.strategy();
@@ -32,7 +34,8 @@ public record TradingCycleResponse(
                 c.type().name(), c.status().name(),
                 c.ticker().name(), detail.initialUsdDeposit(),
                 c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name(),
-                c.divisionCount()
+                c.divisionCount(),
+                detail.isReverseMode()
         );
     }
 }
