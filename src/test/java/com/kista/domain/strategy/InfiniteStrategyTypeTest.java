@@ -35,7 +35,7 @@ class InfiniteStrategyTypeTest {
         // LOC SELL: 10/4=2, LIMIT SELL: 10-2=8
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"),
                 new BigDecimal("1000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("21"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -57,7 +57,7 @@ class InfiniteStrategyTypeTest {
         // BUY①: floor(50/2/22)=1(비용=22), BUY②: floor((50-22)/26.40)=floor(1.06)=1
         // SELL: holdings/4=0 → 없음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -76,7 +76,7 @@ class InfiniteStrategyTypeTest {
         // averagePrice=5, holdings=200, usdDeposit=50 → totalAssets=1050, unitAmount=52.50, currentRound≈19.05 (후반), unitAmount(52.50)>usdDeposit(50)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("50"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("4.8"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("4.8"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -90,7 +90,7 @@ class InfiniteStrategyTypeTest {
         // averagePrice=5, holdings=200, usdDeposit=100 → totalAssets=1100, unitAmount=55, currentRound≈18.18 (후반), unitAmount(55)<=usdDeposit(100)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("100"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("4.9"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("4.9"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -108,7 +108,7 @@ class InfiniteStrategyTypeTest {
         // referencePrice=100×1.20=120.00, BUY②: floor((1.00-100×1)/120)=floor(-0.825)=-1 → 최소 1
         // SELL: holdings=0 → 없음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("20"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("100"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("100"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -126,7 +126,7 @@ class InfiniteStrategyTypeTest {
         // totalAssets=2000, unitAmount=100, referencePrice=10×1.15=11.50
         // BUY①: floor(100/2/10)=5, BUY②: floor(100/2/11.50)=4 → 주문 있음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("10"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("10"), 20);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -140,7 +140,7 @@ class InfiniteStrategyTypeTest {
     private InfinitePosition positionWithUnitAmount(String usdDeposit) {
         return new InfinitePosition(
                 new AccountBalance(0, null, new BigDecimal(usdDeposit)),
-                Ticker.SOXL, new BigDecimal("10.00"));
+                Ticker.SOXL, new BigDecimal("10.00"), 20);
     }
 
     private Order buy(String price, int quantity) {
@@ -216,7 +216,7 @@ class InfiniteStrategyTypeTest {
         // priceOffsetRate(0.02) ≠ targetProfitRate(0.20) → 수량 공식 rate 선택이 결과에 영향
         // BUY①: floor(50/5.00)=10, BUY②(priceOffsetRate): floor(50/5.10)=9 — targetProfitRate 사용 시: floor(50/6.00)=8
         AccountBalance balance = new AccountBalance(180, new BigDecimal("5"), new BigDecimal("1100"));
-        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5"), 20);
 
         // 정상 경로로 원본 주문 생성 후 BUY만 추출
         List<Order> allOrders = strategy.buildOrders(position, TODAY);

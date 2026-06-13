@@ -59,13 +59,13 @@ class StrategyServiceTest {
     // ACTIVE 상태 전략 픽스처
     private static final Strategy ACTIVE_STRATEGY = new Strategy(
             STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
     );
 
     // PAUSED 상태 전략 픽스처
     private static final Strategy PAUSED_STRATEGY = new Strategy(
             STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.PAUSED,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
     );
 
     private static final UUID CYCLE_ID = UUID.randomUUID();
@@ -277,8 +277,8 @@ class StrategyServiceTest {
 
         UUID strategyAId = UUID.randomUUID();
         UUID strategyBId = UUID.randomUUID();
-        Strategy strategyA = new Strategy(strategyAId, accountAId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy strategyB = new Strategy(strategyBId, accountBId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy strategyA = new Strategy(strategyAId, accountAId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
+        Strategy strategyB = new Strategy(strategyBId, accountBId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(accountA, accountB));
         when(strategyPort.findByAccountId(accountAId)).thenReturn(List.of(strategyA));
@@ -298,7 +298,7 @@ class StrategyServiceTest {
     @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
     void register_duplicateTicker_throws() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null);
+                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(true);
@@ -314,7 +314,7 @@ class StrategyServiceTest {
     void register_seedExceedsFreeCash_throws() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 600 > 500
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null);
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
@@ -336,13 +336,13 @@ class StrategyServiceTest {
     void register_uniqueTickerWithinFreeCash_succeeds() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 500 == 500 → 허용
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null);
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 20);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
         UUID newStrategyId = UUID.randomUUID();
         Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId,
                 new BigDecimal("500"), null, LocalDate.now(), null, null, null);
 

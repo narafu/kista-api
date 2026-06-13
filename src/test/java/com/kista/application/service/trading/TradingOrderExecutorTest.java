@@ -42,7 +42,7 @@ class TradingOrderExecutorTest {
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
 
     static final InfinitePosition POSITION = new InfinitePosition(
-            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"));
+            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
     private TradingOrderExecutor executor() {
         return new TradingOrderExecutor(orderPort, brokerOrderRouter, buyOrderPriceCapper);

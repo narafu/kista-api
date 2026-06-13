@@ -17,7 +17,8 @@ public record Strategy(
         Type type,                  // 매매 전략 종류
         Status status,              // 전략 실행 상태
         Ticker ticker,              // 거래 종목 (매매 도메인 메타: 익절률 + 설명)
-        CycleSeedType cycleSeedType // 사이클 종료 후 자동 재등록 정책
+        CycleSeedType cycleSeedType, // 사이클 종료 후 자동 재등록 정책
+        int divisionCount           // 분할 수 (20/30/40)
 ) {
     // 소유권 검증 — 불일치 시 SecurityException (GlobalExceptionHandler → 403)
     public void verifyOwnedBy(UUID requesterId) {
@@ -28,12 +29,17 @@ public record Strategy(
 
     // 상태만 교체 — 나머지 필드 보존
     public Strategy withStatus(Status newStatus) {
-        return new Strategy(id, accountId, type, newStatus, ticker, cycleSeedType);
+        return new Strategy(id, accountId, type, newStatus, ticker, cycleSeedType, divisionCount);
     }
 
     // 연속 정책만 교체
     public Strategy withCycleSeedType(CycleSeedType newCycleSeedType) {
-        return new Strategy(id, accountId, type, status, ticker, newCycleSeedType);
+        return new Strategy(id, accountId, type, status, ticker, newCycleSeedType, divisionCount);
+    }
+
+    // 분할 수만 교체
+    public Strategy withDivisionCount(int newDivisionCount) {
+        return new Strategy(id, accountId, type, status, ticker, cycleSeedType, newDivisionCount);
     }
 
     @Getter

@@ -8,9 +8,9 @@ import static java.math.RoundingMode.HALF_UP;
 public record InfinitePosition(
         AccountBalance balance,
         Strategy.Ticker ticker,        // 거래 종목
-        BigDecimal prevClosePrice      // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
+        BigDecimal prevClosePrice,     // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
+        int divisionCount              // 분할 수 (20/30/40) — totalAssets ÷ divisionCount = unitAmount
 ) {
-    private static final int TOTAL_ROUNDS = 20;
     private static final int MONEY_SCALE = 2;   // 금액·가격·회차 반올림 자리수 (센트 단위)
 
     // --- 기본 도메인 속성 조회 ---
@@ -39,9 +39,8 @@ public record InfinitePosition(
     }
 
     public BigDecimal unitAmount() {
-        // totalAssets ÷ 20
         return totalAssets()
-                .divide(BigDecimal.valueOf(TOTAL_ROUNDS), MONEY_SCALE, HALF_UP);
+                .divide(BigDecimal.valueOf(divisionCount), MONEY_SCALE, HALF_UP);
     }
 
     public double currentRound() {
@@ -50,8 +49,8 @@ public record InfinitePosition(
     }
 
     public BigDecimal priceOffsetRate() {
-        // 2는 전체 20회차의 절반(currentRound=10)에서 priceOffsetRate=0이 되도록 하는 계수 — priceOffsetRate = targetProfitRate × (1 - 2×currentRound/20)
-        double roundFactor = 2.0 * currentRound() / TOTAL_ROUNDS;
+        // 2는 전체 분할수의 절반(currentRound=divisionCount/2)에서 priceOffsetRate=0이 되도록 하는 계수
+        double roundFactor = 2.0 * currentRound() / divisionCount;
         return ticker.getTargetProfitRate()
                 .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(roundFactor)))
                 .setScale(MONEY_SCALE, HALF_UP);

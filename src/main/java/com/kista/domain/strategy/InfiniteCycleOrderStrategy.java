@@ -21,8 +21,9 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
-    // 사이클 재등록 최소금액 안전 계수 — 현재가 × 44 (= 20round × 2 × 1.1 safety)
-    private static final BigDecimal MIN_DEPOSIT_MULTIPLIER = BigDecimal.valueOf(44);
+    // 사이클 재등록 최소금액 안전 계수 — 현재가 × (divisionCount × 2.2)
+    // divisionCount=20: × 44, divisionCount=40: × 88
+    private static final double MIN_DEPOSIT_FACTOR = 2.2;
 
     private final InfiniteTradingStrategy infiniteStrategy;
 
@@ -37,7 +38,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {
             throw new IllegalStateException("전일종가 조회 실패: " + ctx.strategy().ticker().name());
         }
-        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice());
+        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice(), ctx.strategy().divisionCount());
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산: priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
@@ -46,8 +47,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     @Override
-    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase) {
+    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
         if (price == null) return null;
-        return price.multiply(MIN_DEPOSIT_MULTIPLIER).setScale(2, HALF_UP);
+        BigDecimal multiplier = BigDecimal.valueOf(divisionCount * MIN_DEPOSIT_FACTOR);
+        return price.multiply(multiplier).setScale(2, HALF_UP);
     }
 }

@@ -188,7 +188,7 @@ class TradingCycleControllerTest {
     @Test
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
         StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"));
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
@@ -224,7 +224,7 @@ class TradingCycleControllerTest {
                         com.kista.domain.model.strategy.Strategy.Type.INFINITE,
                         com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
                         com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
-                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE),
+                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE, 20),
                 new java.math.BigDecimal("1000"));
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 

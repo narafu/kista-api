@@ -69,7 +69,8 @@ class StrategyService implements StrategyUseCase {
             }
         }
 
-        Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType);
+        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : 20;
+        Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType, divisionCount);
         Strategy saved = strategyPort.save(strategy);
 
         // 첫 번째 StrategyCycle 생성

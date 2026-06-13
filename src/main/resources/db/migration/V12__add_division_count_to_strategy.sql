@@ -1,0 +1,1 @@
+ALTER TABLE strategy ADD COLUMN division_count INTEGER NOT NULL DEFAULT 20;

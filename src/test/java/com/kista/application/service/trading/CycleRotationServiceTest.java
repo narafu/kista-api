@@ -86,7 +86,7 @@ class CycleRotationServiceTest {
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {
         return new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, seedType);
+                Strategy.Status.ACTIVE, Ticker.SOXL, seedType, 20);
     }
 
 

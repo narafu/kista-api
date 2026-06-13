@@ -65,7 +65,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
     private Strategy toDomain(StrategyEntity e) {
         return new Strategy(
                 e.getId(), e.getAccountId(), e.getType(), e.getStatus(),
-                e.getTicker(), e.getCycleSeedType()
+                e.getTicker(), e.getCycleSeedType(), e.getDivisionCount()
         );
     }
 
@@ -77,6 +77,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
         e.setStatus(s.status());
         e.setTicker(s.ticker());
         e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : Strategy.CycleSeedType.NONE);
+        e.setDivisionCount(s.divisionCount() > 0 ? s.divisionCount() : 20);
         return e;
     }
 }

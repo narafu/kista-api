@@ -70,7 +70,7 @@ class TradingServiceTest {
     // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
     );
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
             UUID.randomUUID(), STRATEGY.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null
@@ -283,7 +283,7 @@ class TradingServiceTest {
     void executeBatch_fetchesPricesTwice_startAndClose_notPerCycle() throws InterruptedException {
         // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
-                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
@@ -312,7 +312,7 @@ class TradingServiceTest {
     void executeBatch_oneCycleFails_continuesWithNextAndNotifiesAdmin() throws InterruptedException {
         // STRATEGY → 예외 발생, strategy2 → 정상 실행
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
-                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
@@ -359,7 +359,7 @@ class TradingServiceTest {
         BigDecimal initDeposit = new BigDecimal("1000.00");
         Strategy maintainStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN, 20);
         StrategyCycle maintainCycle = new StrategyCycle(
                 UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null);
 
@@ -392,7 +392,7 @@ class TradingServiceTest {
         // actualBalance(2000) >= maxSeed(1000) → targetSeed = 1000
         Strategy maxStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
@@ -419,12 +419,12 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_MAX_belowMinRequired_skipsRotationAndNotifiesInsufficientBalance() throws InterruptedException {
-        // PRICE=22, minRequired = 22 × 40 = 880
-        // actualBalance=500, maintainSeed=500 → targetSeed=500 < 880 → notifyInsufficientBalance
+        // PRICE=22, minRequired = 22 × (20 × 2.2) = 968
+        // actualBalance=500, maintainSeed=500 → targetSeed=500 < 968 → notifyInsufficientBalance
         BigDecimal marginAmount = new BigDecimal("500.00");
         Strategy maxStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
@@ -448,7 +448,7 @@ class TradingServiceTest {
     void executeBatch_MAX_marginFails_skipsRotationAndNotifiesError() throws InterruptedException {
         Strategy maxStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX, 20);
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");

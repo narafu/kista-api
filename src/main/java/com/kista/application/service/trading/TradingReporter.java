@@ -70,7 +70,7 @@ class TradingReporter {
         if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
             // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
             TradingSnapshot postSnapshot = closingPrice != null
-                    ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice).toSnapshot()
+                    ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice, strategy.divisionCount()).toSnapshot()
                     : snapshot;
             TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
             userNotificationPort.notifyTradingReport(user, account, report);

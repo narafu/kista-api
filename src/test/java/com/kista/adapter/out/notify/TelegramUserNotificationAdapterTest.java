@@ -45,7 +45,7 @@ class TelegramUserNotificationAdapterTest {
         when(account.nickname()).thenReturn("내계좌");
         Strategy strategy = new Strategy(UUID.randomUUID(), UUID.randomUUID(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL,
-                Strategy.CycleSeedType.NONE);
+                Strategy.CycleSeedType.NONE, 20);
 
         adapter.notifyStrategyChanged(user, account, strategy, "중지");
 

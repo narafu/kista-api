@@ -79,7 +79,7 @@ class CycleRotationService {
         }
 
         // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임
-        BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase);
+        BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, strategy.divisionCount());
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 재등록 취소 — 최소금액 미달: {} < {}", strategy.id(), targetSeed, minRequired);
             notifyPort.notifyInsufficientBalance(account,

@@ -47,7 +47,7 @@ class BuyOrderPriceCapperTest {
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
     static final InfinitePosition POSITION = new InfinitePosition(
-            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"));
+            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
     private BuyOrderPriceCapper capper() {
         return new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);

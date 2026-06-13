@@ -23,7 +23,7 @@ public interface CycleOrderStrategy {
     Optional<OrderPlan> plan(PlanContext ctx);
 
     // 사이클 재등록 최소금액 — null이면 가드 미적용
-    BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase);
+    BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount);
 
     // 전략 계산 입력 — execute/preview 공통
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")

@@ -21,7 +21,9 @@ public record TradingCycleResponse(
         @Schema(description = "초기 입금액", example = "2000.00")
         BigDecimal initialUsdDeposit,
         @Schema(description = "연속 사이클 정책", example = "NONE")
-        String cycleSeedType
+        String cycleSeedType,
+        @Schema(description = "분할 수 (20/30/40)", example = "20")
+        int divisionCount
 ) {
     public static TradingCycleResponse from(StrategyDetail detail) {
         Strategy c = detail.strategy();
@@ -29,7 +31,8 @@ public record TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
                 c.ticker().name(), detail.initialUsdDeposit(),
-                c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name()
+                c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name(),
+                c.divisionCount()
         );
     }
 }

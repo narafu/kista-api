@@ -7,5 +7,6 @@ public record RegisterStrategyCommand(
         Strategy.Type type,
         Strategy.Ticker ticker,                      // null이면 전략 기본값
         BigDecimal initialUsdDeposit,                // null 허용 (선택 입력)
-        Strategy.CycleSeedType cycleSeedType         // null이면 NONE으로 처리
+        Strategy.CycleSeedType cycleSeedType,        // null이면 NONE으로 처리
+        int divisionCount                            // 분할 수 (20/30/40), 기본 20
 ) {}

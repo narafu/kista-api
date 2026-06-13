@@ -58,7 +58,7 @@ class OrderCancelServiceTest {
         ownedAccount = new Account(accountId, requesterId, "테스트계좌",
                 "74420614", "appKey", "appSecret", "01", Account.Broker.KIS);
         cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
                 null, LocalDate.now(), null, null, null);
     }
