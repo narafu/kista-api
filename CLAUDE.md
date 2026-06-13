@@ -46,5 +46,6 @@ docker compose up -d postgres                               # DB만 기동
 @docs/claude/constraints.md
 @docs/claude/testing.md
 @docs/claude/kis-api.md
+@docs/claude/toss-api.md
 @docs/claude/docker-infra.md
 @docs/claude/workflow.md
