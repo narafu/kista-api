@@ -65,6 +65,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage());
     }
 
+    @ExceptionHandler(Account.DuplicateAccountException.class)
+    public ProblemDetail handleDuplicateAccount(Account.DuplicateAccountException ex) {
+        return problem(HttpStatus.CONFLICT, "Duplicate Account", ex.getMessage());
+    }
+
     @ExceptionHandler(ManualTradingException.class)
     public ProblemDetail handleManualTrading(ManualTradingException ex) {
         return problem(HttpStatus.CONFLICT, "Manual Trading Conflict", ex.getMessage());

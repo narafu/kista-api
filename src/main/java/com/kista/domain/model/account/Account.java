@@ -52,4 +52,11 @@ public record Account(
     public static class InvalidKisKeyException extends RuntimeException {
         public InvalidKisKeyException() { super("KIS API 키가 유효하지 않습니다"); }
     }
+
+    // 동일 사용자가 같은 계좌번호를 중복 등록 시도한 경우
+    public static class DuplicateAccountException extends RuntimeException {
+        public DuplicateAccountException(String accountNo) {
+            super("이미 등록된 계좌번호입니다: " + accountNo);
+        }
+    }
 }

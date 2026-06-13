@@ -35,6 +35,11 @@ class AccountService implements AccountUseCase {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
+        // 동일 사용자의 계좌번호 중복 등록 방지 (복호화된 값으로 비교)
+        accountPort.findByUserId(userId).stream()
+                .filter(a -> a.accountNo().equals(cmd.accountNo()))
+                .findAny()
+                .ifPresent(a -> { throw new Account.DuplicateAccountException(cmd.accountNo()); });
         // broker 미지정 시 KIS 기본값 적용
         Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
 
