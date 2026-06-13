@@ -53,12 +53,16 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     @Override
     public BigDecimal getBuyableAmount(Account account) {
         // currency=USD 쿼리 파라미터 필수 — 미전송 시 400 "유효하지 않은 주문 ID" 오류
+        // 응답 래퍼: {"result": {"cashBuyingPower": ..., "currency": ...}}
         var params = new LinkedMultiValueMap<String, String>();
         params.add("currency", "USD");
-        BuyableAmountResponse response = tossHttpClient.get(
+        BuyingPowerWrapper wrapper = tossHttpClient.get(
                 BUYING_POWER_PATH, tossHttpClient.buildHeaders(account),
-                params, BuyableAmountResponse.class);
-        return response != null ? new BigDecimal(response.cashBuyingPower()) : BigDecimal.ZERO;
+                params, BuyingPowerWrapper.class);
+        if (wrapper == null || wrapper.result() == null || wrapper.result().cashBuyingPower() == null) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(wrapper.result().cashBuyingPower());
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
@@ -70,6 +74,9 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
         @JsonProperty("averagePurchasePrice") String averagePurchasePrice,  // 평균 매입가 (문자열)
         @JsonProperty("lastPrice") String lastPrice                         // 현재가 (문자열, 정보성)
     ) {}
+
+    // GET /api/v1/buying-power 응답 래퍼 — {"result": {...}}
+    record BuyingPowerWrapper(@JsonProperty("result") BuyableAmountResponse result) {}
 
     record BuyableAmountResponse(
         @JsonProperty("cashBuyingPower") String cashBuyingPower, // 현금 기반 매수 가능 금액 (미수 미발생 기준)

@@ -44,8 +44,8 @@ class TosHoldingsApiTest {
         var item = new TosHoldingsApi.HoldingItem("SOXL", "5", "20.00", "22.00");
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
             .thenReturn(new TosHoldingsApi.HoldingsResponse(List.of(item)));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyableAmountResponse.class)))
-            .thenReturn(new TosHoldingsApi.BuyableAmountResponse("1000.00", "USD"));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
 
         AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
 
@@ -59,8 +59,8 @@ class TosHoldingsApiTest {
     void getBalance_noHolding_returnsZeroBalance() {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
             .thenReturn(new TosHoldingsApi.HoldingsResponse(List.of()));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyableAmountResponse.class)))
-            .thenReturn(new TosHoldingsApi.BuyableAmountResponse("500.00", "USD"));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("500.00", "USD")));
 
         AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
 
@@ -74,7 +74,7 @@ class TosHoldingsApiTest {
     void getBalance_nullResponse_returnsZeroBalance() {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
             .thenReturn(null);
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyableAmountResponse.class)))
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(null);
 
         AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
@@ -86,8 +86,8 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("getBuyableAmount: 정상 금액 반환")
     void getBuyableAmount_returnsAmount() {
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyableAmountResponse.class)))
-            .thenReturn(new TosHoldingsApi.BuyableAmountResponse("1234.56", "USD"));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1234.56", "USD")));
 
         BigDecimal amount = tosHoldingsApi.getBuyableAmount(ACCOUNT);
 
