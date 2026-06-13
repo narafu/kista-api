@@ -2,6 +2,7 @@ package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
@@ -20,6 +21,7 @@ import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TosMarginPort;
+import com.kista.domain.port.out.TosPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,11 +53,14 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final TosMarginPort tosMarginPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
     private final KisPricePort kisPricePort;
+    private final TosPricePort tosPricePort;
 
     @Override
     public PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId,
                                                LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 기간별 손익 API 미지원 — 빈 결과 반환
+        if (account.broker() == TOSS) return new PeriodProfitResult(List.of(), BigDecimal.ZERO, BigDecimal.ZERO);
         // KIS 예외는 그대로 전파 → 컨트롤러에서 503 처리
         return kisProfitPort.getPeriodProfit(account, from, to);
     }
@@ -64,6 +69,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 체결 조회 API 미지원 — 빈 리스트 반환
+        if (account.broker() == TOSS) return Collections.emptyList();
         Optional<Ticker> ticker = strategyPort.findActiveTicker(accountId);
         if (ticker.isEmpty()) return Collections.emptyList();
         return kisExecutionPort.getExecutions(from, to, ticker.get(), account);
@@ -72,6 +79,9 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 체결기준현재잔고 API 미지원 — 빈 결과 반환
+        if (account.broker() == TOSS)
+            return new PresentBalanceResult(List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         return kisPortfolioPort.getPresentBalance(account);
     }
 
@@ -89,12 +99,18 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 일별거래내역 API 미지원 — 빈 결과 반환
+        if (account.broker() == TOSS)
+            return new DailyTransactionResult(List.of(),
+                    new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
         return kisDailyTransactionPort.getDailyTransactions(from, to, account);
     }
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 KIS 아닌 Toss 가격 API 사용
+        if (account.broker() == TOSS) return tosPricePort.getPrices(tickers, account);
         return kisPricePort.getPrices(tickers, account);
     }
 
