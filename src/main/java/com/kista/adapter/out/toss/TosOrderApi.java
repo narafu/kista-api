@@ -34,7 +34,7 @@ public class TosOrderApi implements TosOrderPort {
 
         // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} 래퍼 구조
         OrderResponseWrapper wrapper = tossHttpClient.post(
-                ORDER_PATH, tossHttpClient.buildHeaders(account), body, OrderResponseWrapper.class);
+                ORDER_PATH, account, body, OrderResponseWrapper.class);
 
         // orderId 없으면 비즈니스 실패 처리
         if (wrapper == null || wrapper.result() == null || wrapper.result().orderId() == null) {
@@ -52,9 +52,7 @@ public class TosOrderApi implements TosOrderPort {
     @Override
     public void cancel(Order order, Account account) {
         // DELETE /api/v1/orders/{externalOrderId}
-        tossHttpClient.delete(
-                ORDER_PATH + "/" + order.externalOrderId(),
-                tossHttpClient.buildHeaders(account));
+        tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
     }
 
     // LOC/MOC → 장마감 지정가(CLS), LIMIT → 정규장 지정가(DAY)

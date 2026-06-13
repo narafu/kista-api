@@ -46,7 +46,7 @@ class TosPriceApiTest {
     @DisplayName("복수 종목 현재가 정상 파싱")
     void getPrices_multipleSymbols_success() {
         var item = new TosPriceApi.PriceItem("SOXL", "25.50", "USD");
-        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(wrap(item));
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
@@ -58,7 +58,7 @@ class TosPriceApiTest {
     @DisplayName("미등록 종목 (AAPL)은 결과에서 제외")
     void getPrices_unknownSymbolExcluded() {
         var item = new TosPriceApi.PriceItem("AAPL", "180.00", "USD");
-        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(wrap(item));
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
@@ -70,7 +70,7 @@ class TosPriceApiTest {
     @DisplayName("PriceSnapshot: prevClose == current (Toss 전일종가 API 없음)")
     void getPriceSnapshot_prevCloseEqualsCurrent() {
         var item = new TosPriceApi.PriceItem("SOXL", "25.50", "USD");
-        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+        when(tossHttpClient.getNoAccountHeader(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(wrap(item));
 
         PriceSnapshot snapshot = tosPriceApi.getPriceSnapshot(Ticker.SOXL, ACCOUNT);
@@ -82,7 +82,7 @@ class TosPriceApiTest {
     @Test
     @DisplayName("null 응답 시 빈 Map 반환")
     void getPrices_nullResponse_returnsEmptyMap() {
-        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+        when(tossHttpClient.getNoAccountHeader(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(null);
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
@@ -93,7 +93,7 @@ class TosPriceApiTest {
     @Test
     @DisplayName("복수 스냅샷: prevClose == current (Toss 전일종가 근사)")
     void getPriceSnapshots_allPrevCloseEqualCurrent() {
-        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+        when(tossHttpClient.getNoAccountHeader(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(wrap(
                 new TosPriceApi.PriceItem("SOXL", "25.50", "USD"),
                 new TosPriceApi.PriceItem("TQQQ", "50.00", "USD")

@@ -35,8 +35,8 @@ public class TosPriceApi implements TosPricePort {
         params.add("symbols", tickers.stream().map(Ticker::name).collect(Collectors.joining(",")));
 
         // Toss API 응답: {"result": [{symbol, lastPrice, currency, timestamp}]} 래퍼 구조
-        PricesResponse response = tossHttpClient.get(
-                PRICES_PATH, tossHttpClient.buildHeadersNoAccount(account), params, PricesResponse.class);
+        PricesResponse response = tossHttpClient.getNoAccountHeader(
+                PRICES_PATH, account, params, PricesResponse.class);
 
         List<PriceItem> items = response != null ? response.result() : null;
 

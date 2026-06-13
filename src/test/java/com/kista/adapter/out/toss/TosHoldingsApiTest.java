@@ -11,8 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -36,13 +34,12 @@ class TosHoldingsApiTest {
 
     @BeforeEach
     void setUp() {
-        when(tossHttpClient.buildHeaders(any())).thenReturn(new HttpHeaders());
         tosHoldingsApi = new TosHoldingsApi(tossHttpClient);
     }
 
-    // getMarginItems는 exchange-rate API에 buildHeadersNoAccount를 사용
+    // getMarginItems는 exchange-rate API에 getNoAccountHeader를 사용 — 별도 stub 불필요
     private void stubNoAccountHeader() {
-        when(tossHttpClient.buildHeadersNoAccount(any())).thenReturn(new HttpHeaders());
+        // buildHeadersNoAccount 제거됨 — getNoAccountHeader stub은 개별 테스트에서 직접 설정
     }
 
     @Test
@@ -115,7 +112,7 @@ class TosHoldingsApiTest {
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
                 return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
             });
-        when(tossHttpClient.get(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(new TosHoldingsApi.ExchangeRateWrapper(new TosHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
 
         List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
@@ -133,7 +130,7 @@ class TosHoldingsApiTest {
         stubNoAccountHeader();
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("100.00", "USD")));
-        when(tossHttpClient.get(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(null);
 
         List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);

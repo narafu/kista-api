@@ -75,6 +75,12 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         return OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5);
     }
 
+    @Override
+    public void invalidateToken(UUID accountId) {
+        // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
+        brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+    }
+
     // ── TossConnectionTestPort ─────────────────────────────────────────────────
 
     @Override

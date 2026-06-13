@@ -34,8 +34,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     public AccountBalance getBalance(Account account, Ticker ticker) {
         // 보유 종목 조회
         HoldingsResponse holdingsResponse = tossHttpClient.get(
-                HOLDINGS_PATH, tossHttpClient.buildHeaders(account),
-                new LinkedMultiValueMap<>(), HoldingsResponse.class);
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
         // USD 매수가능금액 조회
         BigDecimal usdDeposit = getBuyableAmount(account);
@@ -82,8 +81,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("currency", currencyCode);
         BuyingPowerWrapper wrapper = tossHttpClient.get(
-                BUYING_POWER_PATH, tossHttpClient.buildHeaders(account),
-                params, BuyingPowerWrapper.class);
+                BUYING_POWER_PATH, account, params, BuyingPowerWrapper.class);
         if (wrapper == null || wrapper.result() == null || wrapper.result().cashBuyingPower() == null) {
             return BigDecimal.ZERO;
         }
@@ -95,9 +93,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
-        ExchangeRateWrapper wrapper = tossHttpClient.get(
-                EXCHANGE_RATE_PATH, tossHttpClient.buildHeadersNoAccount(account),
-                params, ExchangeRateWrapper.class);
+        ExchangeRateWrapper wrapper = tossHttpClient.getNoAccountHeader(
+                EXCHANGE_RATE_PATH, account, params, ExchangeRateWrapper.class);
         if (wrapper == null || wrapper.result() == null || wrapper.result().rate() == null) {
             return BigDecimal.ZERO;
         }

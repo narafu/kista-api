@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -40,8 +39,6 @@ class TosOrderApiTest {
 
     @BeforeEach
     void setUp() {
-        // buildHeaders가 null 반환 시 NPE 방지 — 빈 헤더 반환
-        when(tossHttpClient.buildHeaders(any())).thenReturn(new HttpHeaders());
         tosOrderApi = new TosOrderApi(tossHttpClient);
     }
 
