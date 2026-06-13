@@ -27,6 +27,27 @@ done
 # 삭제 후 검증: ./gradlew compileJava && ./gradlew test --tests 'com.kista.architecture.*'
 ```
 
+### Privacy 기준표 운영 → 로컬 마이그레이션 (supabase-cli)
+# "privacy 기준표 운영에서 로컬로 마이그레이션" 요청 시 이 절차 사용
+# 대상 테이블: privacy_trade_bases (기준 마스터), privacy_trade_base_orders (주문 세트)
+```bash
+# 1. 운영 DB에서 CSV 덤프
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" > /tmp/privacy_trade_bases.csv
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_base_orders ORDER BY created_at" > /tmp/privacy_trade_base_orders.csv
+
+# 2. CSV를 로컬 컨테이너에 복사
+docker cp /tmp/privacy_trade_bases.csv kista-api-postgres-1:/tmp/privacy_trade_bases.csv
+docker cp /tmp/privacy_trade_base_orders.csv kista-api-postgres-1:/tmp/privacy_trade_base_orders.csv
+
+# 3. 로컬 DB에 임포트 (NULL 'NULL' 옵션 필수 — supabase CSV에서 NULL이 문자열 "NULL"로 출력됨)
+docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
+  "COPY privacy_trade_bases (id, trade_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
+  "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, quantity, price, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+```
+# 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
+# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases;"
+
 ### 로컬 admin 토큰 발급 (DevAuthController, local 프로파일 전용)
 ```bash
 # 일반 사용자 토큰

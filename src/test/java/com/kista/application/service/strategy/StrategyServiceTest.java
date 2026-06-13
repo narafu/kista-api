@@ -310,9 +310,9 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("register() 호출 시 시드가 자유 현금(KIS 가용금액 - 기존 전략 점유 시드)을 초과하면 IllegalArgumentException 발생")
+    @DisplayName("register() 호출 시 시드가 예수금(KIS 가용금액 - 기존 전략 점유 시드)을 초과하면 IllegalArgumentException 발생")
     void register_seedExceedsFreeCash_throws() {
-        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 600 > 500
+        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 600 > 500
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20);
         Account account = ownerAccount();
@@ -332,9 +332,9 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("register() 호출 시 다른 종목 + 자유 현금 이내 시드면 등록 성공")
+    @DisplayName("register() 호출 시 다른 종목 + 예수금 이내 시드면 등록 성공")
     void register_uniqueTickerWithinFreeCash_succeeds() {
-        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 자유 현금 500 / 신규 시드 500 == 500 → 허용
+        // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 500 == 500 → 허용
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 20);
         Account account = ownerAccount();

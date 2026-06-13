@@ -60,12 +60,12 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + resolvedTicker);
         }
 
-        // 새 시드는 KIS 가용금액에서 기존 전략들이 점유한 시드를 뺀 자유 현금 한도 내에서만 허용
+        // 새 시드는 KIS 가용금액에서 기존 전략들이 점유한 시드를 뺀 예수금 한도 내에서만 허용
         if (cmd.initialUsdDeposit() != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {
                 throw new IllegalArgumentException(
-                        "다른 전략이 사용 중인 시드를 제외한 자유 현금(" + freeCash + ")을 초과했습니다");
+                        "다른 전략이 사용 중인 시드를 제외한 예수금(" + freeCash + ")을 초과했습니다");
             }
         }
 
@@ -174,7 +174,7 @@ class StrategyService implements StrategyUseCase {
         return toDetail(saved);
     }
 
-    // 자유 현금 = 브로커 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
+    // 예수금 = 브로커 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
         BigDecimal kisUsdAmount = brokerMarginRouter.getUsdBuyableAmount(account);
 
