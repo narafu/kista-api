@@ -8,8 +8,9 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     user/        ← User (nested enums: Role, Status, NotificationChannel), FcmDeviceToken
     account/     ← Account(+nested exceptions: CooldownException, InvalidKisKeyException), Broker
     strategy/    ← Strategy(+nested: Type, Status, Ticker, CycleSeedType), StrategyCycle, CyclePosition, StrategyDetail, CyclePositionHistoryEntry, CycleHistoryPage,
-                   RegisterStrategyCommand, UpdateStrategyCommand, BatchContext, InfinitePosition, AccountBalance, TradingSnapshot, TradingReport, DstInfo
-                   Strategy 필드: id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType
+                   RegisterStrategyCommand, UpdateStrategyCommand, BatchContext, InfinitePosition, ReverseModePosition, AccountBalance, TradingSnapshot, TradingReport, DstInfo
+                   Strategy 필드: id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType, divisionCount(int)
+                   StrategyDetail 필드: strategy, initialUsdDeposit, isReverseMode(boolean)
                    StrategyCycle 필드: id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt
                    CyclePosition 필드: id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt
     order/       ← Order, TradeEvent
@@ -58,7 +59,7 @@ adapter/out/
     user/        ← UserEntity + UserJpaRepository + UserPersistenceAdapter + AdminUserViewAdapter
     account/     ← AccountEntity + AccountJpaRepository + AccountPersistenceAdapter
     strategy/    ← StrategyEntity/StrategyCycleEntity/CyclePositionEntity + 각 JpaRepository + PersistenceAdapter (9파일)
-    kistoken/    ← KisTokenEntity + KisTokenJpaRepository + KisTokenPersistenceAdapter
+    kistoken/    ← KisTokenEntity(table=broker_tokens) + KisTokenJpaRepository + KisTokenPersistenceAdapter
     audit/       ← AuditLogEntity + AuditLogJpaRepository + AuditLogPersistenceAdapter
     trade/       ← Order (Entity + Repo + Adapter)
     privacy/     ← PrivacyTradeMasterEntity + PrivacyTradeDetailEntity + PrivacyTradePersistenceAdapter (PrivacyTradePort 구현)

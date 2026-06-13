@@ -20,10 +20,10 @@
 
 ### Account ↔ Strategy 분리
 - `Account` record 필드 8개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
-- `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
+- `Strategy` record 필드 7개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType), divisionCount(int)`
 - `StrategyCycle` record 필드 8개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 사이클 단위 메타(시드/기간)
 - `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
-- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
+- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, boolean isReverseMode` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
 - `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 시드 수정 시 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
@@ -113,7 +113,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 
 ### Flyway
 - `V1__init.sql` **수정 금지** — 새 마이그레이션은 `V2__...` 이후로
-- 현재 최신: `V8__add_strategy_cycle_id_to_orders.sql`
+- 현재 최신: `V13__add_is_reverse_mode_to_strategy_cycle.sql`
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (`avg_price` 사례, V1/V5/V7)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
