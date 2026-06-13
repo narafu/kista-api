@@ -1,7 +1,7 @@
 ## Docker / 인프라
 
 ### JVM 기본 TimeZone (KST 고정)
-- Render 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
+- Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
 - 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
 - DB `tradeDate`(LocalDate) 컬럼만 **UTC = US 거래일** 의미로 저장 — 도메인은 KST 일자, persistence 경계에서 `TradeDateConverter`로 ±1일 변환
@@ -9,15 +9,15 @@
 - JPA `@Converter(autoApply=true)` 자동 적용 금지 — 가시성 위해 명시 호출만 사용
 - `LocalDate.now(ZoneOffset.UTC)` 직접 사용 금지 — KST `LocalDate.now()` 사용 후 Adapter 경계에서 `TradeDateConverter.toUtc()` 경유
 
-### Render 무료 티어 런타임 OOM
-- 증상: `Out of memory (used over 512Mi)` — 앱 강제 종료
-- 원인: Heap + Metaspace + CodeCache + OS 합산이 512MB 초과
-- 해결: `ENV JAVA_OPTS="-Xmx220m -Xms32m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:+UseSerialGC -XX:+UseContainerSupport"`
+### Fly.io 런타임 메모리 설정
+- Fly.io: 1GB RAM (`fly.toml [[vm]] memory='1gb'`)
+- `ENV JAVA_OPTS="-Xmx512m -Xms64m ..."` — Dockerfile에 설정됨
+- 이전 Render 무료 티어(512MB): `Xmx220m` 사용, Fly.io 이전 후 `Xmx512m`으로 상향
 - SerialGC: 저트래픽 스케줄러 앱에 적합, G1GC 대비 메모리 오버헤드 낮음
 
-### Render 배포 방식
-- GHCR 불필요 — Render가 GitHub 레포에서 Dockerfile 직접 빌드·배포
-- `main` push 시 자동 배포, 환경변수 변경 시 자동 재배포 트리거됨
+### Fly.io 배포 방식
+- `.github/workflows/fly-deploy.yml` — `main` push 시 GitHub Actions가 compileJava + ArchUnit 검증 후 `fly deploy` 자동 실행
+- 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케줄러 04:00 KST 실행 보장
 
 ### Docker 빌드 OOM
 - `gradle.properties`는 Dockerfile에 복사되지 않음 — JVM이 컨테이너 메모리 ~25%를 힙으로 자동 할당해 BuildKit OOM 유발

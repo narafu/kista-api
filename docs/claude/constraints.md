@@ -199,7 +199,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 
 ### CORS (SecurityConfig)
 - SecurityConfig에 `.cors(cors -> cors.configurationSource(...))` 필수 — 미설정 시 Vercel 브라우저 fetch 전체 차단
-- 허용 origin: `CORS_ALLOWED_ORIGINS` 환경변수 (Render), 기본값 `http://localhost:3000`
+- 허용 origin: `CORS_ALLOWED_ORIGINS` 환경변수 (Fly.io secrets), 기본값 `http://localhost:3000`
 - `CORS_ALLOWED_ORIGINS` 쉼표 구분, 각 origin 앞뒤 공백 자동 trim — `http://localhost:3000, http://127.0.0.1:3000`처럼 공백 포함 작성 가능
 - `corsConfigurationSource()`: allowedMethods=GET/POST/PUT/**PATCH**/DELETE/OPTIONS (PATCH 미포함 시 전략중지/재개 등 PATCH 엔드포인트 403), allowedHeaders=Authorization/Content-Type, allowCredentials=true
 - **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 `Http403ForbiddenEntryPoint` 기본 적용 → 인증 실패가 401 대신 403 반환
@@ -207,8 +207,8 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 
 ### Telegram Webhook 등록
 - `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
-- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://kista-api.onrender.com/telegram/webhook"}'`
-- Render URL 변경 시 재등록 필요
+- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://kista-api.fly.dev/telegram/webhook"}'`
+- 배포 URL 변경 시 재등록 필요
 
 ### @Transactional 내부 외부 시스템 호출 금지
 - RestTemplate(텔레그램, KIS 등) 호출을 @Transactional 내부에서 하면 롤백 시에도 취소 불가 → 중복 알림 등 부작용

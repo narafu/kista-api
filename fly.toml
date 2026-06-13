@@ -1,5 +1,5 @@
 app = 'kista-api'
-primary_region = 'sin'
+primary_region = 'nrt'
 
 [build]
 
