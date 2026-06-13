@@ -115,19 +115,19 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         try {
-            ResponseEntity<List<AccountItem>> response = tossRestTemplate.exchange(
+            ResponseEntity<AccountsResponse> response = tossRestTemplate.exchange(
                     tossBaseUrl + "/api/v1/accounts",
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<List<AccountItem>>() {});
-            List<AccountItem> accounts = response.getBody();
+                    AccountsResponse.class);
+            List<AccountItem> accounts = response.getBody() == null ? null : response.getBody().result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
                 throw new Account.InvalidKisKeyException();
             }
             return String.valueOf(accounts.get(0).accountSeq());
         } catch (RestClientException e) {
-            log.warn("Toss 계좌 조회 실패: {}", e.getMessage());
+            log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
             throw new Account.InvalidKisKeyException();
         }
     }
@@ -138,6 +138,11 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
     record TokenResponse(
         @JsonProperty("access_token") String accessToken,
         @JsonProperty("expires_in") long expiresIn    // 토큰 유효 초 (기본 86400)
+    ) {}
+
+    // GET /api/v1/accounts 응답 래퍼 — {"result":[...]}
+    record AccountsResponse(
+        @JsonProperty("result") List<AccountItem> result
     ) {}
 
     // package-private — TossAuthApiTest에서 직접 생성하여 stub에 사용

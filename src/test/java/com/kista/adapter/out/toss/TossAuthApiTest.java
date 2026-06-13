@@ -131,9 +131,9 @@ class TossAuthApiTest {
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             // 계좌 목록 조회 stub
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    any(ParameterizedTypeReference.class)))
-                    .thenReturn(ResponseEntity.ok(List.of(
-                            new TossAuthApi.AccountItem(42, "1234567890")
+                    eq(TossAuthApi.AccountsResponse.class)))
+                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(
+                            List.of(new TossAuthApi.AccountItem(42, "1234567890"))
                     )));
 
             String result = api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET);
@@ -162,8 +162,8 @@ class TossAuthApiTest {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    any(ParameterizedTypeReference.class)))
-                    .thenReturn(ResponseEntity.ok(List.of()));
+                    eq(TossAuthApi.AccountsResponse.class)))
+                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(List.of())));
 
             assertThatThrownBy(() -> api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET))
                     .isInstanceOf(Account.InvalidKisKeyException.class);
@@ -176,7 +176,7 @@ class TossAuthApiTest {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    any(ParameterizedTypeReference.class)))
+                    eq(TossAuthApi.AccountsResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.FORBIDDEN, "Forbidden",
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
