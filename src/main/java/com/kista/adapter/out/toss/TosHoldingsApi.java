@@ -36,8 +36,11 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
         HoldingsResponse holdingsResponse = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
-        // USD 매수가능금액 조회
-        BigDecimal usdDeposit = getBuyableAmount(account);
+        // 통합증거금(USD+KRW→USD) 기준 — USD 현금만인 getBuyableAmount()와 달리 매매 수식 일관성 보장
+        BigDecimal usdDeposit = getMarginItems(account).stream()
+                .findFirst()
+                .map(MarginItem::purchasableAmount)
+                .orElse(BigDecimal.ZERO);
 
         if (holdingsResponse == null || holdingsResponse.items() == null) {
             return new AccountBalance(0, null, usdDeposit);
