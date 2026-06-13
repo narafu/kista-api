@@ -9,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.ParameterizedTypeReference;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -39,13 +37,17 @@ class TosPriceApiTest {
         tosPriceApi = new TosPriceApi(tossHttpClient);
     }
 
+    // Toss API 응답: {"result": [...]} 래퍼 헬퍼
+    private static TosPriceApi.PricesResponse wrap(TosPriceApi.PriceItem... items) {
+        return new TosPriceApi.PricesResponse(List.of(items));
+    }
+
     @Test
     @DisplayName("복수 종목 현재가 정상 파싱")
     void getPrices_multipleSymbols_success() {
         var item = new TosPriceApi.PriceItem("SOXL", "25.50", "USD");
-        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(),
-                any(ParameterizedTypeReference.class)))
-            .thenReturn(List.of(item));
+        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+            .thenReturn(wrap(item));
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
 
@@ -56,9 +58,8 @@ class TosPriceApiTest {
     @DisplayName("미등록 종목 (AAPL)은 결과에서 제외")
     void getPrices_unknownSymbolExcluded() {
         var item = new TosPriceApi.PriceItem("AAPL", "180.00", "USD");
-        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(),
-                any(ParameterizedTypeReference.class)))
-            .thenReturn(List.of(item));
+        when(tossHttpClient.get(eq("/api/v1/prices"), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+            .thenReturn(wrap(item));
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
 
@@ -67,11 +68,10 @@ class TosPriceApiTest {
 
     @Test
     @DisplayName("PriceSnapshot: prevClose == current (Toss 전일종가 API 없음)")
-    @SuppressWarnings("unchecked")
     void getPriceSnapshot_prevCloseEqualsCurrent() {
         var item = new TosPriceApi.PriceItem("SOXL", "25.50", "USD");
-        when(tossHttpClient.get(any(), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(List.of(item));
+        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+            .thenReturn(wrap(item));
 
         PriceSnapshot snapshot = tosPriceApi.getPriceSnapshot(Ticker.SOXL, ACCOUNT);
 
@@ -81,9 +81,8 @@ class TosPriceApiTest {
 
     @Test
     @DisplayName("null 응답 시 빈 Map 반환")
-    @SuppressWarnings("unchecked")
     void getPrices_nullResponse_returnsEmptyMap() {
-        when(tossHttpClient.get(any(), any(), any(), any(ParameterizedTypeReference.class)))
+        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
             .thenReturn(null);
 
         Map<Ticker, BigDecimal> result = tosPriceApi.getPrices(List.of(Ticker.SOXL), ACCOUNT);
@@ -93,14 +92,12 @@ class TosPriceApiTest {
 
     @Test
     @DisplayName("복수 스냅샷: prevClose == current (Toss 전일종가 근사)")
-    @SuppressWarnings("unchecked")
     void getPriceSnapshots_allPrevCloseEqualCurrent() {
-        var items = List.of(
-            new TosPriceApi.PriceItem("SOXL", "25.50", "USD"),
-            new TosPriceApi.PriceItem("TQQQ", "50.00", "USD")
-        );
-        when(tossHttpClient.get(any(), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(items);
+        when(tossHttpClient.get(any(), any(), any(), eq(TosPriceApi.PricesResponse.class)))
+            .thenReturn(wrap(
+                new TosPriceApi.PriceItem("SOXL", "25.50", "USD"),
+                new TosPriceApi.PriceItem("TQQQ", "50.00", "USD")
+            ));
 
         Map<Ticker, PriceSnapshot> snapshots = tosPriceApi.getPriceSnapshots(
             List.of(Ticker.SOXL, Ticker.TQQQ), ACCOUNT);

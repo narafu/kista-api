@@ -7,7 +7,6 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.TosPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -25,10 +24,6 @@ public class TosPriceApi implements TosPricePort {
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
 
-    // 배열 직접 반환 응답 타입 — Toss API는 [{symbol, lastPrice, currency, timestamp}] 형식
-    private static final ParameterizedTypeReference<List<PriceItem>> PRICE_LIST_TYPE =
-            new ParameterizedTypeReference<>() {};
-
     private final TossHttpClient tossHttpClient;
 
     @Override
@@ -39,8 +34,11 @@ public class TosPriceApi implements TosPricePort {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", tickers.stream().map(Ticker::name).collect(Collectors.joining(",")));
 
-        List<PriceItem> items = tossHttpClient.get(
-                PRICES_PATH, tossHttpClient.buildHeadersNoAccount(account), params, PRICE_LIST_TYPE);
+        // Toss API 응답: {"result": [{symbol, lastPrice, currency, timestamp}]} 래퍼 구조
+        PricesResponse response = tossHttpClient.get(
+                PRICES_PATH, tossHttpClient.buildHeadersNoAccount(account), params, PricesResponse.class);
+
+        List<PriceItem> items = response != null ? response.result() : null;
 
         if (items == null) return Map.of();
 
@@ -77,5 +75,10 @@ public class TosPriceApi implements TosPricePort {
         @JsonProperty("symbol") String symbol,        // 종목 코드 (예: SOXL)
         @JsonProperty("lastPrice") String lastPrice,  // 현재가 (문자열 소수 형식)
         @JsonProperty("currency") String currency     // 통화 (예: USD)
+    ) {}
+
+    // Toss API 공통 래퍼: {"result": [...]} — TossAuthApi.AccountsResponse 와 동일 패턴
+    record PricesResponse(
+        @JsonProperty("result") List<PriceItem> result
     ) {}
 }
