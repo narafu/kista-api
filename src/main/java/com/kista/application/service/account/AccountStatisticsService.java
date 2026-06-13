@@ -1,6 +1,7 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
@@ -19,6 +20,7 @@ import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.TosMarginPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.kista.domain.model.account.Account.Broker.TOSS;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,6 +49,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final KisExecutionPort kisExecutionPort;
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
+    private final TosMarginPort tosMarginPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
     private final KisPricePort kisPricePort;
 
@@ -74,6 +79,11 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // Toss 계좌는 KIS API 미지원 — USD 매수가능금액만 반환
+        if (account.broker() == TOSS) {
+            BigDecimal buyable = tosMarginPort.getBuyableAmount(account);
+            return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, buyable, BigDecimal.ZERO));
+        }
         return kisMarginPort.getMargin(account);
     }
 

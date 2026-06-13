@@ -19,8 +19,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
-    // Toss USD 매수가능금액 API 경로
-    private static final String BUYABLE_AMOUNT_PATH = "/api/v1/orders/buyable-amount";
+    // Toss 매수 가능 금액 API 경로 (GET /api/v1/buying-power?currency=USD)
+    private static final String BUYING_POWER_PATH = "/api/v1/buying-power";
 
     private final TossHttpClient tossHttpClient;
 
@@ -52,10 +52,13 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
 
     @Override
     public BigDecimal getBuyableAmount(Account account) {
+        // currency=USD 쿼리 파라미터 필수 — 미전송 시 400 "유효하지 않은 주문 ID" 오류
+        var params = new LinkedMultiValueMap<String, String>();
+        params.add("currency", "USD");
         BuyableAmountResponse response = tossHttpClient.get(
-                BUYABLE_AMOUNT_PATH, tossHttpClient.buildHeaders(account),
-                new LinkedMultiValueMap<>(), BuyableAmountResponse.class);
-        return response != null ? new BigDecimal(response.amount()) : BigDecimal.ZERO;
+                BUYING_POWER_PATH, tossHttpClient.buildHeaders(account),
+                params, BuyableAmountResponse.class);
+        return response != null ? new BigDecimal(response.cashBuyingPower()) : BigDecimal.ZERO;
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
@@ -69,7 +72,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
     ) {}
 
     record BuyableAmountResponse(
-        @JsonProperty("amount") String amount,      // USD 매수가능금액 (문자열 소수)
-        @JsonProperty("currency") String currency   // 통화 (예: USD)
+        @JsonProperty("cashBuyingPower") String cashBuyingPower, // 현금 기반 매수 가능 금액 (미수 미발생 기준)
+        @JsonProperty("currency") String currency                // 통화 (예: USD)
     ) {}
 }
