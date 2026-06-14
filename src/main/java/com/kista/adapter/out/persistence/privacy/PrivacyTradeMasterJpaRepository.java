@@ -10,6 +10,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface PrivacyTradeMasterJpaRepository extends JpaRepository<PrivacyTradeMasterEntity, UUID> {
+    // 중복 체크용 — 정확한 날짜 일치 (>= 쓰면 미래 레코드를 잡아 false 409 발생)
+    Optional<PrivacyTradeMasterEntity> findByTradeDateAndTicker(LocalDate tradeDate, Ticker ticker);
+
     Optional<PrivacyTradeMasterEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
 
     // trade_date >= today인 행 중 가장 미래 거래일의 SOXL 기준가 조회

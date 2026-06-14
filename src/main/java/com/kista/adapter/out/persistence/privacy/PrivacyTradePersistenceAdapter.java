@@ -80,7 +80,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     }
 
     private Optional<PrivacyTradeMasterEntity> getByTradeDateAndTicker(LocalDate kstDate, Ticker ticker) {
-        return masterRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB, trade_date >= 기준일 중 가장 가까운 것
+        return masterRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB, 정확한 날짜 일치
     }
 
     private boolean isIdentical(PrivacyTradeMasterEntity master, FidaOrderCommand command) {
