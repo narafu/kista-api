@@ -139,7 +139,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                 });
         if (response == null) {
             return new PresentBalanceResult(Collections.emptyList(),
-                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         }
         List<PresentBalanceResult.Item> items = KisResponseParser.streamTickered(response.output1(),
                 PortfolioResponse.Output1::pdno,
@@ -161,7 +161,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
             totalProfit = KisResponseParser.parseBd(response.output3().totEvluPflsAmt());
             totalRate = KisResponseParser.parseBd(response.output3().evluErngRt1());
         }
-        return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO);
+        return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     // ── KisProfitPort ──────────────────────────────────────────────────────────

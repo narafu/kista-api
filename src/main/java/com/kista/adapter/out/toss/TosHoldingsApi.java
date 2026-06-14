@@ -151,7 +151,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                   .multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, usdDeposit);
+        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, usdDeposit, rate);
     }
 
     // currency 파라미터로 매수가능금액 단건 조회

@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
@@ -83,7 +84,21 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // Toss 계좌는 KIS 체결기준잔고 미지원 — Toss 보유종목·예수금 기반으로 산출
         if (account.broker() == TOSS) return tossPortfolioPort.getPresentBalance(account);
-        return kisPortfolioPort.getPresentBalance(account);
+        // KIS: CTRP6504R은 예수금·환율 미제공 → TTTC2101R(margin) 조회로 보정
+        PresentBalanceResult portfolio = kisPortfolioPort.getPresentBalance(account);
+        List<MarginItem> margins = kisMarginPort.getMargin(account);
+        BigDecimal usdDeposit = margins.stream()
+                .filter(m -> m.currency() == Currency.USD)
+                .map(MarginItem::purchasableAmount)
+                .findFirst().orElse(BigDecimal.ZERO);
+        BigDecimal rate = margins.stream()
+                .filter(m -> m.currency() == Currency.USD)
+                .map(MarginItem::usdToKrwRate)
+                .findFirst().orElse(BigDecimal.ZERO);
+        return new PresentBalanceResult(
+                portfolio.items(), portfolio.totalAssetUsd(), portfolio.totalEvalProfit(),
+                portfolio.totalReturnRate(), usdDeposit, rate
+        );
     }
 
     @Override

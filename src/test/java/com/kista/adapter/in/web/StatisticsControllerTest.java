@@ -79,7 +79,8 @@ class StatisticsControllerTest {
     @Test
     void portfolio_returns_200_with_result() throws Exception {
         PresentBalanceResult result = new PresentBalanceResult(
-                List.of(), new BigDecimal("1000.00"), new BigDecimal("50.00"), new BigDecimal("5.0"), BigDecimal.ZERO
+                List.of(), new BigDecimal("1000.00"), new BigDecimal("50.00"), new BigDecimal("5.0"),
+                BigDecimal.ZERO, BigDecimal.ZERO
         );
         when(accountStatistics.getPresentBalance(eq(ACCOUNT_ID), any()))
                 .thenReturn(result);

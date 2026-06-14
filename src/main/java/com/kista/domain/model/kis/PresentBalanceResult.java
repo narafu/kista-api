@@ -9,7 +9,8 @@ public record PresentBalanceResult(
         BigDecimal totalAssetUsd,      // output3: tot_asst_amt (총자산 — KRW)
         BigDecimal totalEvalProfit,    // output3: tot_evlu_pfls_amt (총평가손익 — KRW)
         BigDecimal totalReturnRate,    // output3: evlu_erng_rt1 (총수익률 %)
-        BigDecimal usdDepositActual    // USD 예수금 (TOSS: 실 USD 예수금, KIS: ZERO)
+        BigDecimal usdDepositActual,   // USD 예수금 (TOSS: 실 USD 예수금, KIS: margin 조회값)
+        BigDecimal exchangeRateKrwPerUsd  // 환율 (1 USD = ? KRW, TOSS: 실값, KIS: margin 조회값)
 ) {
     public record Item(
             Ticker ticker,             // pdno: 종목코드
