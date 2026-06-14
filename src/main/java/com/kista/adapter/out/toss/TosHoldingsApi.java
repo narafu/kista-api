@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.TosAccountPort;
 import com.kista.domain.port.out.TosMarginPort;
+import com.kista.domain.port.out.TossPortfolioPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -16,10 +18,12 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
-public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
+public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -77,6 +81,77 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort {
         BigDecimal totalUsd = usdBuyable.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
 
         return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, totalUsd, usdToKrwRate));
+    }
+
+    @Override
+    public PresentBalanceResult getPresentBalance(Account account) {
+        // 1. 전체 보유 종목 조회
+        HoldingsResponse holdingsResponse = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
+        // 2~4. USD·KRW 예수금 및 환율 조회
+        BigDecimal usdDeposit = fetchBuyingPower(account, "USD");
+        BigDecimal krwDeposit = fetchBuyingPower(account, "KRW");
+        BigDecimal rate = fetchUsdToKrwRate(account);
+
+        // 5. Ticker 파싱 성공·수량 > 0 항목만 Item 변환
+        List<PresentBalanceResult.Item> items = List.of();
+        if (holdingsResponse != null && holdingsResponse.items() != null) {
+            items = holdingsResponse.items().stream()
+                    .filter(h -> h.lastPrice() != null && !h.lastPrice().isBlank())
+                    .flatMap(h -> {
+                        Optional<Ticker> tickerOpt = Ticker.tryParse(h.symbol());
+                        if (tickerOpt.isEmpty()) return Stream.empty();
+                        int qty = Integer.parseInt(h.quantity());
+                        if (qty <= 0) return Stream.empty();
+                        BigDecimal lastPrice = new BigDecimal(h.lastPrice());
+                        BigDecimal avgPrice = new BigDecimal(h.averagePurchasePrice());
+                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(qty))
+                                .setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal profitLossUsd = lastPrice.subtract(avgPrice)
+                                .multiply(BigDecimal.valueOf(qty))
+                                .setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal profitRate = avgPrice.compareTo(BigDecimal.ZERO) > 0
+                                ? lastPrice.subtract(avgPrice)
+                                  .divide(avgPrice, 4, RoundingMode.HALF_UP)
+                                  .multiply(new BigDecimal("100"))
+                                  .setScale(2, RoundingMode.HALF_UP)
+                                : BigDecimal.ZERO;
+                        return Stream.of(new PresentBalanceResult.Item(
+                                tickerOpt.get(), qty, avgPrice, lastPrice,
+                                evalAmountUsd, profitLossUsd, profitRate, "AMEX"
+                        ));
+                    })
+                    .toList();
+        }
+
+        // 6. KRW 기준 합산
+        BigDecimal totalEvalUsd = items.stream().map(PresentBalanceResult.Item::evalAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalProfitUsd = items.stream().map(PresentBalanceResult.Item::profitLossUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPurchaseUsd = items.stream()
+                .map(item -> item.avgPrice().multiply(BigDecimal.valueOf(item.holdings())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // totalAssetKrw = (포지션USD + USD예수금) × 환율 + KRW예수금
+        BigDecimal totalAssetKrw = rate.compareTo(BigDecimal.ZERO) > 0
+                ? totalEvalUsd.add(usdDeposit).multiply(rate).add(krwDeposit)
+                  .setScale(0, RoundingMode.HALF_UP)
+                : krwDeposit.setScale(0, RoundingMode.HALF_UP);
+        // totalEvalProfitKrw = 평가손익USD × 환율
+        BigDecimal totalEvalProfitKrw = rate.compareTo(BigDecimal.ZERO) > 0
+                ? totalProfitUsd.multiply(rate).setScale(0, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        // totalReturnRate = 평가손익KRW / 매입금액KRW × 100
+        BigDecimal totalPurchaseKrw = rate.compareTo(BigDecimal.ZERO) > 0
+                ? totalPurchaseUsd.multiply(rate).setScale(0, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal totalReturnRate = totalPurchaseKrw.compareTo(BigDecimal.ZERO) > 0
+                ? totalEvalProfitKrw.divide(totalPurchaseKrw, 4, RoundingMode.HALF_UP)
+                  .multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, usdDeposit);
     }
 
     // currency 파라미터로 매수가능금액 단건 조회

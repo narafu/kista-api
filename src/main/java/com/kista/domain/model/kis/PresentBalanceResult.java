@@ -6,9 +6,10 @@ import java.util.List;
 
 public record PresentBalanceResult(
         List<Item> items,              // output1: 종목별 잔고
-        BigDecimal totalAssetUsd,      // output3: tot_asst_amt (총자산)
-        BigDecimal totalEvalProfit,    // output3: tot_evlu_pfls_amt (총평가손익)
-        BigDecimal totalReturnRate     // output3: evlu_erng_rt1 (총수익률 %)
+        BigDecimal totalAssetUsd,      // output3: tot_asst_amt (총자산 — KRW)
+        BigDecimal totalEvalProfit,    // output3: tot_evlu_pfls_amt (총평가손익 — KRW)
+        BigDecimal totalReturnRate,    // output3: evlu_erng_rt1 (총수익률 %)
+        BigDecimal usdDepositActual    // USD 예수금 (TOSS: 실 USD 예수금, KIS: ZERO)
 ) {
     public record Item(
             Ticker ticker,             // pdno: 종목코드

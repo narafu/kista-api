@@ -1,10 +1,13 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.kis.PresentBalanceResult.Item;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.util.List;
+
+import static java.math.BigDecimal.ZERO;
 
 // KIS CTRP6504R 응답(PresentBalanceResult) → kista-ui 통합 포맷 DTO
 // PresentBalanceResult의 camelCase 필드를 kista-ui PortfolioSnapshot 타입과 일치하도록 정규화
@@ -27,9 +30,11 @@ public record PortfolioSummaryResponse(
 
     // 계좌 전체 요약 — PresentBalanceResult output3 필드
     public record SummaryDto(
-            BigDecimal totalAssetUsd,    // tot_asst_amt: 총자산 (USD)
-            BigDecimal totalEvalProfit,  // tot_evlu_pfls_amt: 총평가손익 (USD)
-            BigDecimal totalReturnRate   // evlu_erng_rt1: 총수익률 %
+            BigDecimal totalAssetUsd,       // tot_asst_amt: 총자산 (KRW — 필드명 quirk 유지)
+            BigDecimal totalEvalProfit,     // tot_evlu_pfls_amt: 총평가손익 (KRW)
+            BigDecimal totalReturnRate,     // evlu_erng_rt1: 총수익률 %
+            BigDecimal totalAssetUsdActual, // USD 총자산 (KIS: 포지션만, TOSS: 포지션+예수금)
+            BigDecimal evalProfitUsdSum     // USD 평가손익 합계
     ) {}
 
     public static PortfolioSummaryResponse from(PresentBalanceResult balance) {
@@ -39,8 +44,16 @@ public record PortfolioSummaryResponse(
                         item.evalAmountUsd(), item.profitLossUsd(), item.profitRate(), item.exchangeCode()
                 ))
                 .toList();
+        // USD 총자산 = 포지션 USD 합계 + USD 예수금 (TOSS: 포함, KIS: ZERO)
+        BigDecimal totalAssetUsdActual = balance.items().stream()
+                .map(Item::evalAmountUsd).reduce(ZERO, BigDecimal::add)
+                .add(balance.usdDepositActual());
+        // USD 평가손익 = 포지션 USD 손익 합계
+        BigDecimal evalProfitUsdSum = balance.items().stream()
+                .map(Item::profitLossUsd).reduce(ZERO, BigDecimal::add);
         SummaryDto summary = new SummaryDto(
-                balance.totalAssetUsd(), balance.totalEvalProfit(), balance.totalReturnRate()
+                balance.totalAssetUsd(), balance.totalEvalProfit(), balance.totalReturnRate(),
+                totalAssetUsdActual, evalProfitUsdSum
         );
         return new PortfolioSummaryResponse(positions, summary);
     }

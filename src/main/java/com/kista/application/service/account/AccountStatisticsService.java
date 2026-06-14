@@ -22,6 +22,7 @@ import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TosPricePort;
+import com.kista.domain.port.out.TossPortfolioPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final TosMarginPort tosMarginPort;
+    private final TossPortfolioPort tossPortfolioPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
     private final KisPricePort kisPricePort;
     private final TosPricePort tosPricePort;
@@ -79,9 +81,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 체결기준현재잔고 API 미지원 — 빈 결과 반환
-        if (account.broker() == TOSS)
-            return new PresentBalanceResult(List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        // Toss 계좌는 KIS 체결기준잔고 미지원 — Toss 보유종목·예수금 기반으로 산출
+        if (account.broker() == TOSS) return tossPortfolioPort.getPresentBalance(account);
         return kisPortfolioPort.getPresentBalance(account);
     }
 
