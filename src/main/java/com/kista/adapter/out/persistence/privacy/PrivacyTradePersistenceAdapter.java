@@ -129,8 +129,9 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
-        // today는 KST 일자 — getByTradeDateAndTicker 내부에서 UTC 변환
-        return this.getByTradeDateAndTicker(today, Ticker.SOXL)
+        // today는 KST 일자, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
+        return masterRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
+                        TradeDateConverter.toUtc(today), Ticker.SOXL)
                 .map(entity -> {
                     LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
                     List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()
