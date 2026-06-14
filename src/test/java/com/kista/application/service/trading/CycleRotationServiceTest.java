@@ -63,7 +63,7 @@ class CycleRotationServiceTest {
 
     static final User USER = new User(ACCOUNT.userId(), "kakao-1", "홍길동",
             User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM);
+            null, null, null, null, NotificationChannel.TELEGRAM, true);
 
     @BeforeEach
     void setUp() {

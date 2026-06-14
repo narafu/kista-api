@@ -50,24 +50,24 @@ class UserServiceTest {
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM, true);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
                 null, null, null,
-                Instant.now().minus(25, ChronoUnit.HOURS), NotificationChannel.TELEGRAM);
+                Instant.now().minus(25, ChronoUnit.HOURS), NotificationChannel.TELEGRAM, true);
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
+                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM, true);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
         return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
+                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM, true);
     }
 
     @Test
@@ -168,7 +168,7 @@ class UserServiceTest {
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM, true);
         when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -331,7 +331,7 @@ class UserServiceTest {
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
         User existingUser = new User(existingId, kakaoId, "기존사용자", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM, true);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
         when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자"));
@@ -358,7 +358,7 @@ class UserServiceTest {
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
         User existingUser = new User(existingId, kakaoId, "경쟁사용자", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM, true);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
         when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자"));

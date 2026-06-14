@@ -45,12 +45,18 @@ class CycleRotationService {
             return;
         }
 
-        // MAINTAIN/MAX — 브로커별 USD 실잔고 조회
-        BigDecimal actualBalance = fetchUsdBalance(strategy, account);
-        if (actualBalance == null) return; // 실패 — 내부에서 notifyError 완료
-
         BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
         BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
+
+        // 잔고 검증 비활성화 시 — 실잔고 조회 없이 목표 시드 직접 결정
+        BigDecimal actualBalance;
+        if (!user.balanceCheckEnabled()) {
+            actualBalance = strategy.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed;
+        } else {
+            // MAINTAIN/MAX — 브로커별 USD 실잔고 조회
+            actualBalance = fetchUsdBalance(strategy, account);
+            if (actualBalance == null) return; // 실패 — 내부에서 notifyError 완료
+        }
 
         BigDecimal targetSeed;
         if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX) {

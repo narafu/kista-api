@@ -83,7 +83,7 @@ class StrategyServiceTest {
     private User activeUser() {
         return new User(USER_ID, "kakao123", "테스터",
                 User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, NotificationChannel.TELEGRAM, true);
     }
 
     @Test
@@ -321,6 +321,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
         when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
@@ -348,6 +349,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
         when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));

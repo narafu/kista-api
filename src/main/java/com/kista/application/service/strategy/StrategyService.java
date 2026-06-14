@@ -60,8 +60,9 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + resolvedTicker);
         }
 
-        // 새 시드는 KIS 가용금액에서 기존 전략들이 점유한 시드를 뺀 예수금 한도 내에서만 허용
-        if (cmd.initialUsdDeposit() != null) {
+        // 잔고 검증 활성 시: 새 시드는 KIS 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
+        User user = userPort.findByIdOrThrow(userId);
+        if (user.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {
                 throw new IllegalArgumentException(

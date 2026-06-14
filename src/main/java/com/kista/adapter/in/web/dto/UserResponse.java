@@ -20,7 +20,9 @@ public record UserResponse(
         @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
         String telegramBotUsername,
         @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL)", example = "TELEGRAM")
-        NotificationChannel notificationChannel
+        NotificationChannel notificationChannel,
+        @Schema(description = "전략 등록·재등록 시 실잔고 검증 여부 (false=바이패스)", example = "true")
+        boolean balanceCheckEnabled
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
@@ -30,7 +32,8 @@ public record UserResponse(
                 user.telegramChatId() != null,
                 user.role(),
                 user.telegramBotUsername(),
-                user.notificationChannel()
+                user.notificationChannel(),
+                user.balanceCheckEnabled()
         );
     }
 }

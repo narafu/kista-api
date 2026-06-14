@@ -25,6 +25,7 @@ public class SettingsController {
 
     record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
     record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
+    record BalanceCheckRequest(boolean enabled) {}                                      // 잔고 검증 설정 요청 body
 
     // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
     @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
@@ -65,5 +66,15 @@ public class SettingsController {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
         userUseCase.updateNotificationChannel(userId, channel);
+    }
+
+    // 잔고 검증 설정 변경 (false=예수금 부족해도 전략 생성·재등록 허용)
+    @Operation(summary = "잔고 검증 설정", description = "false 시 실잔고 미확인 모드 — 예수금 부족해도 전략 등록·재등록 가능. body: {\"enabled\": false}")
+    @ApiResponse(responseCode = "204", description = "변경 성공")
+    @PatchMapping("/balance-check")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateBalanceCheck(@AuthenticationPrincipal UUID userId,
+                                   @RequestBody BalanceCheckRequest body) {
+        userUseCase.updateBalanceCheckEnabled(userId, body.enabled());
     }
 }

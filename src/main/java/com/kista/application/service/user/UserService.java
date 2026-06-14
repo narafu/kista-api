@@ -77,7 +77,8 @@ class UserService implements UserUseCase {
                     user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                     user.lastReappliedAt(),
-                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM
+                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM,
+                    user.balanceCheckEnabled()
             ));
         }
         return user;
@@ -92,7 +93,7 @@ class UserService implements UserUseCase {
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
-                    null, null, null, null, NotificationChannel.TELEGRAM);
+                    null, null, null, null, NotificationChannel.TELEGRAM, true);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
@@ -177,6 +178,13 @@ class UserService implements UserUseCase {
         User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withNotificationChannel(channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
+    }
+
+    @Override
+    public void updateBalanceCheckEnabled(UUID userId, boolean enabled) {
+        User user = userPort.findByIdOrThrow(userId);
+        userPort.save(user.withBalanceCheckEnabled(enabled));
+        log.info("잔고 검증 설정 변경: userId={}, enabled={}", userId, enabled);
     }
 
     @Override

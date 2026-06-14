@@ -31,6 +31,9 @@ public interface UserUseCase {
     // --- 알림채널 ---
     void updateNotificationChannel(UUID userId, NotificationChannel channel);
 
+    // --- 잔고 검증 설정 ---
+    void updateBalanceCheckEnabled(UUID userId, boolean enabled);
+
     // --- FCM ---
     void registerFcmToken(UUID userId, String token, String platform);
     void unregisterFcmToken(UUID userId, String token);

@@ -43,7 +43,7 @@ class CompositeUserNotificationAdapterTest {
                 User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null,
                 null,
-                channel);
+                channel, true);
     }
 
     // 테스트용 TradingReport 생성 헬퍼

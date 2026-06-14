@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN balance_check_enabled BOOLEAN NOT NULL DEFAULT TRUE;
