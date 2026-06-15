@@ -15,7 +15,6 @@ ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_admin_id_fkey;
 -- 2. 기존 테이블 리네임 + named 제약 정리
 -- ============================================================
 ALTER TABLE users RENAME TO users_old;
-ALTER INDEX users_pkey RENAME TO users_old_pkey;
 ALTER TABLE users_old RENAME CONSTRAINT users_kakao_id_key TO users_old_kakao_id_key;
 
 -- ============================================================
