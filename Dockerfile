@@ -12,7 +12,7 @@ RUN ./gradlew dependencies --no-daemon -q || true
 
 # 소스 복사 및 JAR 빌드
 COPY src/ src/
-RUN ./gradlew bootJar --no-daemon -x test
+RUN ./gradlew clean bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine AS runtime
