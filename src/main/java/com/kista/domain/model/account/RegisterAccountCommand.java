@@ -5,6 +5,6 @@ public record RegisterAccountCommand(
         String accountNo,       // 평문 (서비스에서 암호화)
         String appKey,       // 평문
         String secretKey,    // 평문
-        String kisAccountType,  // KIS: 계좌 상품 코드 기본값 "01", Toss: null
+        String brokerAccountCode,  // KIS: null(accountNo에 통합), TOSS: AccountService가 채움
         Account.Broker broker   // null이면 서비스에서 KIS 기본값 적용
 ) {}

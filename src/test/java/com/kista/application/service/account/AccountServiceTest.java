@@ -57,7 +57,7 @@ class AccountServiceTest {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.appKey(), a.secretKey(),
-                    a.kisAccountType(), a.broker());
+                    a.brokerAccountCode(), a.broker());
         });
 
         Account result = accountService.register(userId, registerCmd());
@@ -160,7 +160,7 @@ class AccountServiceTest {
         Account result = accountService.register(userId, cmd);
 
         verify(tossConnectionTestPort).testAndFetchAccountSeq("cid", "csecret");
-        assertThat(result.kisAccountType()).isEqualTo("42"); // accountSeq 저장
+        assertThat(result.brokerAccountCode()).isEqualTo("42"); // accountSeq 저장
         assertThat(result.broker()).isEqualTo(Account.Broker.TOSS);
         assertThat(result.accountNo()).isEqualTo("12345678901");
     }
@@ -172,13 +172,14 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", "74420614", "appKey", "appSecret", null, null
+                "테스트계좌", "74420614-01", "appKey", "appSecret", null, null
         );
 
         Account result = accountService.register(userId, cmd);
 
         assertThat(result.broker()).isEqualTo(Account.Broker.KIS);
-        assertThat(result.kisAccountType()).isEqualTo("01"); // KIS 기본값
+        assertThat(result.accountNo()).isEqualTo("74420614-01"); // 전체 형식 그대로 저장
+        assertThat(result.brokerAccountCode()).isNull(); // KIS는 null (accountNo에 통합)
         verify(tossConnectionTestPort, never()).testAndFetchAccountSeq(anyString(), anyString());
     }
 

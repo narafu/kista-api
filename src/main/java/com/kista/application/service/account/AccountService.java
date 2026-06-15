@@ -47,16 +47,16 @@ class AccountService implements AccountUseCase {
         // broker 미지정 시 KIS 기본값 적용
         Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
 
-        // 증권사별 계좌 상품 코드 / 계좌 시퀀스 결정
-        String accountTypeOrSeq = switch (broker) {
-            case KIS -> cmd.kisAccountType() != null ? cmd.kisAccountType() : "01";
+        // TOSS: accountSeq를 brokerAccountCode로 저장 / KIS: accountNo에 통합됐으므로 null
+        String brokerAccountCode = switch (broker) {
+            case KIS -> null;
             case TOSS -> tossConnectionTestPort.testAndFetchAccountSeq(cmd.appKey(), cmd.secretKey());
         };
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.appKey(), cmd.secretKey(),
-                accountTypeOrSeq,
+                brokerAccountCode,
                 broker
         );
         Account saved = accountPort.save(account);

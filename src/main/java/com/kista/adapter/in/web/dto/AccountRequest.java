@@ -21,18 +21,10 @@ public record AccountRequest(
         Account.Broker broker
 ) {
     public RegisterAccountCommand toRegisterCommand() {
-        // KIS 74420614-01 → CANO=74420614, ACNT_PRDT_CD=01 분리
-        // Toss 131-01-001931 → accountNo 그대로 저장 (API 호출에는 accountSeq 사용)
-        boolean isKis = broker == null || broker == Account.Broker.KIS;
-        if (isKis && accountNo != null && accountNo.matches("\\d{8}-\\d{2}")) {
-            return new RegisterAccountCommand(
-                    nickname, accountNo.substring(0, 8), appKey, secretKey,
-                    accountNo.substring(9), broker
-            );
-        }
-        return new RegisterAccountCommand(
-                nickname, accountNo, appKey, secretKey, null, broker
-        );
+        // accountNo를 그대로 저장 — KIS: "74420614-01", TOSS: "131-01-001931"
+        // KIS CANO/ACNT_PRDT_CD 파싱은 KIS 어댑터가 담당
+        // brokerAccountCode(TOSS accountSeq)는 AccountService에서 API 호출로 채움
+        return new RegisterAccountCommand(nickname, accountNo, appKey, secretKey, null, broker);
     }
 
     public UpdateAccountCommand toUpdateCommand() {

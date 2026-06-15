@@ -114,12 +114,12 @@ public class TossHttpClient {
         }
     }
 
-    // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.kisAccountType에 accountSeq가 저장됨
+    // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.brokerAccountCode에 accountSeq가 저장됨
     private HttpHeaders buildHeaders(Account account) {
         String token = tossTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        headers.set("X-Tossinvest-Account", account.kisAccountType());
+        headers.set("X-Tossinvest-Account", account.brokerAccountCode());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }

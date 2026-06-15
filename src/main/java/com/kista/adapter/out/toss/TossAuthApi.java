@@ -153,7 +153,7 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
 
     // package-private — TossAuthApiTest에서 직접 생성하여 stub에 사용
     record AccountItem(
-        @JsonProperty("accountSeq") int accountSeq,   // 계좌 일련번호 — kisAccountType에 저장
+        @JsonProperty("accountSeq") int accountSeq,   // 계좌 일련번호 — brokerAccountCode에 저장
         @JsonProperty("accountNo") String accountNo   // 계좌번호 (마스킹 가능)
     ) {}
 }

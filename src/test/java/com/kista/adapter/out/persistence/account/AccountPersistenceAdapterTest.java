@@ -51,7 +51,7 @@ class AccountPersistenceAdapterTest {
         e.setAccountNo("enc:74420614");
         e.setAppKey("enc:appKey");
         e.setSecretKey("enc:appSecret");
-        e.setKisAccountType("01");
+        e.setBrokerAccountCode("01");
         e.setBroker(Account.Broker.KIS);
         return e;
     }

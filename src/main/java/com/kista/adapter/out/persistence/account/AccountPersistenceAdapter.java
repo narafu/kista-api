@@ -83,7 +83,7 @@ public class AccountPersistenceAdapter implements AccountPort {
         e.setAccountNoHash(hasher.hash(a.accountNo())); // 전역 중복 체크용 HMAC-SHA256 해시
         e.setAppKey(crypto.encrypt(a.appKey()));
         e.setSecretKey(crypto.encrypt(a.secretKey()));
-        e.setKisAccountType(a.kisAccountType());
+        e.setBrokerAccountCode(a.brokerAccountCode());
         e.setBroker(a.broker() != null ? a.broker() : Account.Broker.KIS); // null 방어 — persistence 경계에서 보장
         return e;
     }
@@ -95,7 +95,7 @@ public class AccountPersistenceAdapter implements AccountPort {
                 crypto.decrypt(e.getAccountNo()),
                 crypto.decrypt(e.getAppKey()),
                 crypto.decrypt(e.getSecretKey()),
-                e.getKisAccountType(),
+                e.getBrokerAccountCode(),
                 e.getBroker()
         );
     }

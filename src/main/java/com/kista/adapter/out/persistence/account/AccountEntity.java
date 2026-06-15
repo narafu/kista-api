@@ -40,8 +40,8 @@ class AccountEntity extends BaseAuditEntity {
     @Column(name = "secret_key", nullable = false, length = 512)
     private String secretKey;         // AES-256 암호화 저장
 
-    @Column(name = "kis_account_type", nullable = false, length = 10)
-    private String kisAccountType;       // 계좌 상품 코드 (기본: 01)
+    @Column(name = "broker_account_code", length = 10)
+    private String brokerAccountCode;    // 브로커 API 보조 식별자 — KIS: null, TOSS: accountSeq
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

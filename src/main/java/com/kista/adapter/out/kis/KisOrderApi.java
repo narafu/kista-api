@@ -25,6 +25,10 @@ public class KisOrderApi implements KisOrderPort {
     @Override
     public Order place(Order order, Account account) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
+        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
+        String[] acctParts = account.accountNo().split("-", 2);
+        String cano = acctParts[0];
+        String acntPrdtCd = acctParts.length > 1 ? acctParts[1] : "01";
 
         // autotrade 성공 패턴과 동일한 필드 순서 및 raw JSON String 포맷으로 전송
         String body = """
@@ -41,8 +45,8 @@ public class KisOrderApi implements KisOrderPort {
                     "CTAC_TLNO": "",
                     "MGCO_APTM_ODNO": ""
                 }""".formatted(
-                account.accountNo(),
-                account.kisAccountType(),
+                cano,
+                acntPrdtCd,
                 resolveOrderDvsn(order.orderType()),
                 exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
@@ -70,6 +74,10 @@ public class KisOrderApi implements KisOrderPort {
 
     @Override
     public void cancel(Order order, Account account) {
+        String[] acctParts = account.accountNo().split("-", 2);
+        String cano = acctParts[0];
+        String acntPrdtCd = acctParts.length > 1 ? acctParts[1] : "01";
+
         // place()와 동일하게 raw JSON String으로 전송 — Map+Jackson 직렬화 시 EGW00202 발생
         String body = """
                 {
@@ -84,8 +92,8 @@ public class KisOrderApi implements KisOrderPort {
                     "MGCO_APTM_ODNO": "",
                     "ORD_SVR_DVSN_CD": "0"
                 }""".formatted(
-                account.accountNo(),
-                account.kisAccountType(),
+                cano,
+                acntPrdtCd,
                 exchangeRegistry.ovrsExcgCd(order.ticker()),
                 order.ticker().name(),
                 order.externalOrderId());

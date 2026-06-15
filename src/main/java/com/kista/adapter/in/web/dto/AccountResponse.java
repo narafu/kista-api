@@ -18,26 +18,23 @@ public record AccountResponse(
         String broker
 ) {
     public static AccountResponse from(Account a) {
-        String fullNo = fullAccountNo(a);
+        // accountNo가 이미 전체 표시 형식 — KIS: "74420614-01", TOSS: "131-01-001931"
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
-                maskAccountNo(a.accountNo()),  // 숫자 부분(8자리)만 마스킹
-                fullNo,
+                maskAccountNo(a.accountNo()),
+                a.accountNo(),
                 a.broker() != null ? a.broker().name() : null
         );
     }
 
-    // KIS: accountNo(8자리) + "-" + kisAccountType(01) 조합, 나머지 브로커는 accountNo 그대로
-    private static String fullAccountNo(Account a) {
-        if (a.broker() == Account.Broker.KIS && a.kisAccountType() != null) {
-            return a.accountNo() + "-" + a.kisAccountType();
-        }
-        return a.accountNo();
-    }
-
     private static String maskAccountNo(String accountNo) {
-        if (accountNo == null || accountNo.length() <= 4) return "****";
-        return "****" + accountNo.substring(accountNo.length() - 4);
+        if (accountNo == null) return "****";
+        // 하이픈 앞 숫자 부분만 마스킹 (예: "74420614-01" → "****4614-01", "131-01-001931" → "****1931")
+        int hyphenIdx = accountNo.indexOf('-');
+        String numPart = hyphenIdx > 0 ? accountNo.substring(0, hyphenIdx) : accountNo;
+        String suffix = hyphenIdx > 0 ? accountNo.substring(hyphenIdx) : "";
+        if (numPart.length() <= 4) return "****" + suffix;
+        return "****" + numPart.substring(numPart.length() - 4) + suffix;
     }
 }

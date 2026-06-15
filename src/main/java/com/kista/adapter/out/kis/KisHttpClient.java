@@ -62,8 +62,10 @@ public class KisHttpClient {
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
         HttpHeaders headers = buildHeaders(trId, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("CANO", account.accountNo());
-        params.add("ACNT_PRDT_CD", account.kisAccountType());
+        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
+        String[] parts = account.accountNo().split("-", 2);
+        params.add("CANO", parts[0]);
+        params.add("ACNT_PRDT_CD", parts.length > 1 ? parts[1] : "01");
         extraParams.accept(params);
         return get(path, headers, params, responseType);
     }
