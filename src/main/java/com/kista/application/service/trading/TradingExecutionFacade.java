@@ -36,6 +36,11 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     }
 
     @Override
+    public void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException {
+        tradingService.placeOpenOrders(contexts);
+    }
+
+    @Override
     public List<Order> executeManually(UUID strategyId, UUID requesterId) {
         return manualTradingService.execute(strategyId, requesterId);
     }

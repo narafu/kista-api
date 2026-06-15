@@ -43,7 +43,7 @@ class TradingServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
-    @Mock UserNotificationPort userNotificationPort;
+    @Mock UserNotificationPort userNotificationPort; // TradingService + TradingReporter 양쪽에서 사용
     @Mock OrderPort orderPort;
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock CyclePositionPort cycleHistoryPort;
@@ -55,7 +55,8 @@ class TradingServiceTest {
 
     static final DstInfo PAST_DST = new DstInfo(true,
             Instant.now().minusSeconds(3600),
-            Instant.now().minusSeconds(1800));
+            Instant.now().minusSeconds(1800),
+            Instant.now().minusSeconds(7200)); // marketOpen도 과거로 설정해 대기 skip
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
@@ -113,7 +114,7 @@ class TradingServiceTest {
                 kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService);
         service = new TradingService(
-                marketCalendarPort, notifyPort,
+                marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
@@ -184,6 +185,7 @@ class TradingServiceTest {
         // 오늘 이미 PLANNED 주문 존재 → planAndSaveOrders에서 재계산 skip
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
         when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
+        when(orderPort.findPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of()); // 개장 잡 선접수 없음
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
 
@@ -277,6 +279,134 @@ class TradingServiceTest {
         // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
         verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT),
                 argThat(r -> r.snapshot().holdings() == 1));
+    }
+
+    // ── placeOpenOrders 테스트 ────────────────────────────────────────────────
+
+    @Test
+    void placeOpenOrders_savesAllOrdersAndPlacesSellsOnly() throws InterruptedException {
+        // INFINITE: BUY + SELL 전량 저장, SELL만 즉시 접수
+        BigDecimal prevClose = new BigDecimal("19.00");
+        Order buyTemplate  = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY,  1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.SELL, 1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
+
+        UUID sellPlannedId = UUID.randomUUID();
+        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                Order.OrderStatus.PLACED, "ORD-SELL-001", null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate, sellTemplate));
+        // 저장 후 SELL PLANNED 조회
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(sellPlanned)); // SELL만 반환 (BUY도 있지만 SELL 필터 후)
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(sellPlacedKis);
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 전체 주문 저장 (BUY + SELL)
+        verify(orderPort).saveAll(anyList());
+        // SELL만 KIS 접수
+        verify(kisOrderPort).place(eq(sellPlanned), eq(ACCOUNT));
+        verify(orderPort).markPlaced(eq(sellPlannedId), eq("ORD-SELL-001"));
+        // 잔고 충분하므로 사용자 알람 없음
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any());
+    }
+
+    @Test
+    void placeOpenOrders_insufficientBalance_notifiesUserButStillSavesOrders() throws InterruptedException {
+        // 매수 금액 초과 → 사용자 알람, 저장은 진행
+        BigDecimal prevClose = new BigDecimal("19.00");
+        Order bigBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 100, new BigDecimal("500.00"), // 50,000 >> usdDeposit=10
+                Order.OrderStatus.PLANNED, null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(LOW_HISTORY)); // usdDeposit=10
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(bigBuy));
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of()); // SELL 없음
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 예수금 부족 — 사용자 알람 발송
+        verify(userNotificationPort).notifyInsufficientBalance(eq(USER), eq(ACCOUNT), eq(Ticker.SOXL));
+        // 저장은 진행
+        verify(orderPort).saveAll(anyList());
+        // SELL 없으므로 KIS 접수 없음
+        verify(kisOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void placeOpenOrders_noSellOrders_skipsKisPlace() throws InterruptedException {
+        // 후반 최종회차 등 SELL 없음 — KIS 접수 0건 (정상)
+        BigDecimal prevClose = new BigDecimal("19.00");
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate));
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of()); // SELL 없음
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort).saveAll(anyList());
+        verify(kisOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void executeBatch_skipBranch_recomputesPositionForBuyCapping() throws InterruptedException {
+        // 개장 잡이 먼저 실행 → 오늘 주문 존재 → skip 분기 → position 재계산 → BUY 접수
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+                Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                Order.OrderStatus.PLACED, "ORD-SELL-001", null, null);
+        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+                Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY, 1, PRICE,
+                Order.OrderStatus.PLANNED, null, null, null);
+        Order placedBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-BUY-001", null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        // 오늘 주문 이미 존재 (SELL은 PLACED, BUY는 PLANNED)
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingSell, existingBuy));
+        // BUY 잔고 유효 ($22 < $1000)
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingBuy)); // PLANNED BUY만
+        // PLACED SELL 조회 (placeAll에서 prePlacedSells)
+        when(orderPort.findPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingSell));
+        when(infiniteStrategy.buildOrders(any(), any())).thenReturn(List.of()); // 재계산용 mock
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedBuy);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 재계산은 했지만 saveAll은 없음
+        verify(orderPort, never()).saveAll(any());
+        // BUY 접수
+        verify(kisOrderPort).place(any(), eq(ACCOUNT));
+        // 잔고 충분 — 사용자 알람 없음
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any());
     }
 
     // ── executeBatch 테스트 ────────────────────────────────────────────────────

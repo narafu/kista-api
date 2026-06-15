@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -28,6 +29,7 @@ class TradingService {
 
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final NotifyPort notifyPort;                       // 관리자 텔레그램 알림 (오류·휴장·잔고부족)
+    private final UserNotificationPort userNotificationPort;   // 사용자 알림 (예수금 부족 등)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
@@ -123,6 +125,13 @@ class TradingService {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
+                // 개장 잡에서 선접수된 SELL 주문도 포함 — markFilledOrders 누락 방지
+                if (state.ctx().strategy().type() == Strategy.Type.INFINITE) {
+                    List<Order> prePlacedSells = orderPort
+                            .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
+                            .stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList();
+                    mainOrders = Stream.concat(prePlacedSells.stream(), mainOrders.stream()).toList();
+                }
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);
         }
@@ -156,16 +165,33 @@ class TradingService {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // 2. INFINITE 전용 가드: 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (수동 주문 보존)
+        // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (개장 잡 선행 또는 수동 주문 보존)
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
-        if (strategy.type() == Strategy.Type.INFINITE) {
-            List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
-            if (!todayOrders.isEmpty()) {
-                log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip (수동 선행 또는 중복 호출)", account.nickname(), todayOrders.size());
-                return new CycleState(ctx, balance, null, null, price, null);
+        List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
+        if (!todayOrders.isEmpty()) {
+            log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), todayOrders.size());
+
+            // 예수금 부족 확인 — PLANNED BUY 주문 합계 vs 현재 잔고
+            List<Order> plannedBuys = todayOrders.stream()
+                    .filter(o -> o.status() == Order.OrderStatus.PLANNED && o.direction() == Order.OrderDirection.BUY)
+                    .toList();
+            if (!plannedBuys.isEmpty() && !balance.isOrderValid(plannedBuys)) {
+                log.warn("[{}] 예수금 부족 — 매수 주문 건너뜀", account.nickname());
+                userNotificationPort.notifyInsufficientBalance(ctx.user(), account, strategy.ticker());
+                orderPort.deletePlannedBuyByCycleAndDate(currentCycle.id(), today);
             }
+
+            if (strategy.type() == Strategy.Type.INFINITE) {
+                // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
+                CycleOrderComputer.ComputeResult recalc = orderComputer.compute(
+                        balance, strategy, prevClosePrice, today, currentCycle, null, account.nickname());
+                InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
+                return new CycleState(ctx, balance, recalcPos, null, price, null);
+            }
+            // PRIVACY: privacyBase 보존 (reportAll에서 사이클 회전 등에 필요)
+            return new CycleState(ctx, balance, null, null, null, privacyBase);
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
@@ -188,6 +214,97 @@ class TradingService {
     void execute(Strategy strategy, Account account, User user, DstInfo dst) throws InterruptedException {
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)), dst);
+    }
+
+    void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException {
+        placeOpenOrders(contexts, DstInfo.calculate());
+    }
+
+    // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
+    void placeOpenOrders(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
+        if (contexts.isEmpty()) return;
+
+        LocalDate tradeDate = DstInfo.nextTradeDate(); // 개장 잡은 전날 저녁 실행 — 내일이 US 거래일
+        log.info("개장 order 생성 + INFINITE 매도 선접수 시작 — 거래일 {}", tradeDate);
+
+        if (!isMarketOpen(tradeDate)) return;
+
+        // 가격 스냅샷 일괄 조회 (개장 전 현시점)
+        List<Ticker> cycleTickers = contexts.stream().map(c -> c.strategy().ticker()).distinct().toList();
+        Account firstAccount = contexts.getFirst().account();
+        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
+
+        // PRIVACY 기준 매매표 조회 (내일 기준 — FIDA가 미리 송신했을 경우)
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().type() == Strategy.Type.PRIVACY);
+        PrivacyTradeBase privacyBase = hasPrivacy
+                ? privacyTradePort.findTodayTrade(tradeDate).orElse(null)
+                : null;
+
+        // 개장 시각까지 대기
+        waitUntilMarketOpen(dst);
+
+        // 전략별: order 생성·저장 + INFINITE 매도 선접수
+        for (BatchContext ctx : contexts) {
+            runSafely("개장 order+매도접수", ctx.strategy().id(), () -> {
+                planSaveAndPlaceSells(ctx, startPriceSnapshots, privacyBase, tradeDate);
+                return null;
+            });
+        }
+
+        log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
+    }
+
+    // 개장 잡 전용: order 전체 저장 + 예수금 부족 시 사용자 알람 + INFINITE SELL 즉시 접수
+    private void planSaveAndPlaceSells(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
+                                       PrivacyTradeBase privacyBase, LocalDate tradeDate) {
+        Strategy strategy = ctx.strategy();
+        StrategyCycle currentCycle = ctx.currentCycle();
+        Account account = ctx.account();
+        User user = ctx.user();
+
+        // 잔고 로드
+        AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
+        log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+
+        PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
+        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
+
+        // 전략 계산 (skip 결과는 건너뜀 — PRIVACY 기준 매매표 없을 시 정상 skip)
+        CycleOrderComputer.ComputeResult result = orderComputer.compute(
+                balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, account.nickname());
+        if (result.isSkipped()) {
+            log.info("[{}] 개장 order 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+            return;
+        }
+
+        // 예수금 부족 확인 — 부족해도 저장은 진행 (입금 후 마감 잡에서 실행 가능)
+        List<Order> buyOrders = result.orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY).toList();
+        if (!buyOrders.isEmpty() && !balance.isOrderValid(buyOrders)) {
+            log.warn("[{}] 예수금 부족 — 사용자 알람 후 주문 저장 진행", account.nickname());
+            userNotificationPort.notifyInsufficientBalance(user, account, strategy.ticker());
+        }
+
+        // 전체 PLANNED 저장
+        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
+
+        // INFINITE: 저장된 SELL PLANNED만 즉시 접수
+        if (strategy.type() == Strategy.Type.INFINITE) {
+            List<Order> plannedSells = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
+                    .stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList();
+            if (plannedSells.isEmpty()) {
+                log.info("[{}] 개장 접수할 SELL 주문 없음 (후반 최종회차 등)", account.nickname());
+                return;
+            }
+            orderExecutor.placeGiven(plannedSells, account);
+        }
+    }
+
+    private void waitUntilMarketOpen(DstInfo dst) throws InterruptedException {
+        long ms = dst.waitUntilMarketOpen().toMillis();
+        log.info("DST={}, 개장 시각까지 대기: {}ms", dst.isDst(), ms);
+        if (ms > 0) Thread.sleep(ms);
+        log.info("개장 시각 도달");
     }
 
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환

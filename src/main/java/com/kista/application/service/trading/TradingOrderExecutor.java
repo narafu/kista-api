@@ -23,6 +23,20 @@ class TradingOrderExecutor {
     private final BrokerOrderRouter brokerOrderRouter;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
 
+    // 지정된 주문 목록만 KIS 접수 (개장 잡 매도 선접수용 — BUY 보정 없음)
+    List<Order> placeGiven(List<Order> orders, Account account) {
+        if (orders.isEmpty()) return List.of();
+        List<Order> placed = orders.stream().map(p -> {
+            Order placedOrder = brokerOrderRouter.place(p, account);
+            orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
+            return new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
+                    p.orderType(), p.direction(), p.quantity(), p.price(),
+                    Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null);
+        }).toList();
+        log.info("[{}] 주문 {}건 선접수", account.nickname(), placed.size());
+        return placed;
+    }
+
     // position이 있고 currentPrice가 있을 때만 보정 (수동 선행 주문은 그대로 접수)
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position) {

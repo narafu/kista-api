@@ -16,4 +16,5 @@ public interface UserNotificationPort {
     void notifyCycleCompleted(User user, Account account, Strategy strategy);               // 사용자에게 사이클 종료(holdings=0) 알림
     void notifyNewCycleStarted(User user, Account account, Strategy strategy,
                                BigDecimal initialUsdDeposit);                              // 사용자에게 새 사이클 시작 알림
+    void notifyInsufficientBalance(User user, Account account, Strategy.Ticker ticker);    // 사용자에게 예수금 부족 알림
 }

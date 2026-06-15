@@ -10,9 +10,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 public record DstInfo(
-        boolean isDst,    // 미국 뉴욕 기준 일광절약시간(DST) 적용 여부
-        Instant orderAt,  // 주문 시각 (KST): DST=04:30, 비DST=05:30
-        Instant postClose // 시장 마감 후 체결 확인 시각 (KST): DST=05:10, 비DST=06:10
+        boolean isDst,      // 미국 뉴욕 기준 일광절약시간(DST) 적용 여부
+        Instant orderAt,    // 주문 시각 (KST): DST=04:30, 비DST=05:30
+        Instant postClose,  // 시장 마감 후 체결 확인 시각 (KST): DST=05:10, 비DST=06:10
+        Instant marketOpen  // 미 정규장 개장 시각 (KST): DST=22:30, 비DST=23:30
 ) {
 
     // 수동 실행 시 주문 가능 시간대
@@ -48,6 +49,10 @@ public record DstInfo(
         return Duration.between(Instant.now(), postClose);
     }
 
+    public Duration waitUntilMarketOpen() {
+        return Duration.between(Instant.now(), marketOpen);
+    }
+
     public static DstInfo calculate() {
         return calculate(ZonedDateTime.now(KST));
     }
@@ -56,9 +61,11 @@ public record DstInfo(
         boolean isDst = NY.getRules().isDaylightSavings(nowKst.toInstant());
         LocalTime locTime  = isDst ? LocalTime.of(4, 30) : LocalTime.of(5, 30);
         LocalTime postTime = isDst ? LocalTime.of(5, 10) : LocalTime.of(6, 10);
-        Instant orderAt   = nowKst.toLocalDate().atTime(locTime).atZone(KST).toInstant();
-        Instant postClose = nowKst.toLocalDate().atTime(postTime).atZone(KST).toInstant();
-        return new DstInfo(isDst, orderAt, postClose);
+        LocalTime openTime = isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); // NY 09:30 = KST DST 22:30 / 비DST 23:30
+        Instant orderAt    = nowKst.toLocalDate().atTime(locTime).atZone(KST).toInstant();
+        Instant postClose  = nowKst.toLocalDate().atTime(postTime).atZone(KST).toInstant();
+        Instant marketOpen = nowKst.toLocalDate().atTime(openTime).atZone(KST).toInstant();
+        return new DstInfo(isDst, orderAt, postClose, marketOpen);
     }
 
     // 스케줄러는 KST 04:00 실행 — 04:00 이후면 당일이 US 거래일이므로 오늘, 04:00 전이면 아직 전날
@@ -71,16 +78,18 @@ public record DstInfo(
                 : LocalDate.now().plusDays(1);
     }
 
-    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose는 정상 계산
+    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose/marketOpen은 정상 계산
     public static DstInfo immediate() {
         ZonedDateTime now = ZonedDateTime.now(KST);
         boolean isDst = NY.getRules().isDaylightSavings(now.toInstant());
         LocalTime postTime = isDst ? LocalTime.of(5, 10) : LocalTime.of(6, 10);
+        LocalTime openTime = isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30);
         // postTime이 이미 지났으면 내일 날짜 사용 (같은 날 05:10 KST 이후 호출 시 과거 Instant 방지)
         LocalDate targetDate = now.toLocalTime().isBefore(postTime)
                 ? now.toLocalDate()
                 : now.toLocalDate().plusDays(1);
-        Instant postClose = targetDate.atTime(postTime).atZone(KST).toInstant();
-        return new DstInfo(isDst, Instant.now().minusMillis(1), postClose);
+        Instant postClose  = targetDate.atTime(postTime).atZone(KST).toInstant();
+        Instant marketOpen = targetDate.atTime(openTime).atZone(KST).toInstant();
+        return new DstInfo(isDst, Instant.now().minusMillis(1), postClose, marketOpen);
     }
 }

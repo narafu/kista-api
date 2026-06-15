@@ -122,6 +122,22 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyInsufficientBalance(User user, Account account, com.kista.domain.model.strategy.Strategy.Ticker ticker) {
+        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
+                || user.telegramChatId() == null) {
+            log.warn("[{}] 텔레그램 미설정 — 예수금 부족 알림 생략", account.nickname());
+            return;
+        }
+        String text = String.format(
+                "⚠️ <b>예수금 부족</b> — %s%n"
+                + "%s %s 전략 매수 주문 금액이 현재 예수금을 초과합니다.%n"
+                + "예수금 입금 시 장 마감 전 자동으로 매수 주문이 실행됩니다.",
+                account.nickname(),
+                ticker.name(), ticker.getDescription());
+        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+    }
+
+    @Override
     public void notifyTradingReport(User user, Account account, TradingReport r) {
         // 사용자 텔레그램 봇 미설정 시 생략
         if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()

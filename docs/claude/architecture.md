@@ -38,7 +38,9 @@ application/
     admin/       ← AdminService, AdminQueryService
 
 adapter/in/
-  schedule/      ← TradingScheduler (월~금 04:00 KST, 멀티계좌) + MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
+  schedule/      ← TradingOpenScheduler (월~금 22:00 KST — 전략 전체 order 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람)
+                   TradingScheduler (월~금 04:00 KST — INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
+                   MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
   web/           ← REST Controller + DTO
                     AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행), DashboardController (DB기반 포트폴리오/거래내역), KisStatisticsController (KIS live 잔고/수익/가격), MetaController (enum SSOT /api/meta/**, Cache 1h), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), PrivacyTradeController, Admin*Controller×7 (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
@@ -135,6 +137,6 @@ domain      →  외부 의존 없음
   - 있고 내용 동일 → 200 (멱등)
   - 있고 내용 다름 → `PrivacyTradeConflictException` (`domain/model/privacy/`) → 409
 - `PrivacyTradeSaveResult` (`domain/port/out/`): `UUID id` + `boolean created` — 컨트롤러가 201/200 분기
-- 스케줄러 흐름: `StrategyType.PRIVACY` → `privacy_trade_bases/base_orders` 조회 → `orders` 복사 (미구현, INFINITE와 동일 출구)
+- 스케줄러 흐름: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.compute()`가 `privacy_trade_bases/base_orders` 조회 → `PrivacyStrategy.buildOrders()`로 `orders` 생성 (`CycleOrderComputer`가 전략별 분기, INFINITE와 동일 구조)
 - 테이블명 컨벤션: 기준-주문 분리 시 `xxx_bases` / `xxx_base_orders` 접미사 패턴 사용 (V4에서 `xxx_master`/`xxx_detail`에서 변경)
 

@@ -1,0 +1,68 @@
+package com.kista.adapter.in.schedule;
+
+import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.BatchContext;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.user.User;
+import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.NotifyPort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.UserPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+
+// 미 정규장 개장 시 order 전량 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TradingOpenScheduler {
+
+    private final TradingExecutionUseCase useCase;
+    private final AccountPort accountPort;
+    private final StrategyPort strategyPort;
+    private final StrategyCyclePort strategyCyclePort;
+    private final UserPort userPort;
+    private final NotifyPort notifyPort;
+
+    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST (개장 30분~90분 전)
+    public void run() {
+        List<Strategy> strategies = strategyPort.findAllActive();
+        log.info("개장 잡 시작 — ACTIVE 전략 {}개", strategies.size());
+
+        // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
+        List<BatchContext> contexts = new ArrayList<>();
+        for (Strategy strategy : strategies) {
+            try {
+                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+                Account account = accountPort.findByIdOrThrow(strategy.accountId());
+                User user = userPort.findByIdOrThrow(account.userId());
+                contexts.add(new BatchContext(strategy, currentCycle, account, user));
+            } catch (Exception e) {
+                log.error("[strategyId={}] 컨텍스트 조회 오류: {}", strategy.id(), e.getMessage(), e);
+                notifyPort.notifyError(e);
+            }
+        }
+
+        try {
+            useCase.placeOpenOrders(contexts);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("개장 잡 인터럽트: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("개장 잡 오류: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
+        }
+
+        log.info("개장 잡 완료");
+    }
+}

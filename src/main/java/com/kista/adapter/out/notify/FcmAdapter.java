@@ -67,6 +67,13 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.id(), "매매 결산", body);
     }
 
+    @Override
+    public void notifyInsufficientBalance(User user, Account account, com.kista.domain.model.strategy.Strategy.Ticker ticker) {
+        String body = String.format("[%s] %s 매수 주문 금액 > 예수금. 입금 시 장 마감 전 자동 실행됩니다.",
+                account.nickname(), ticker.name());
+        send(user.id(), "⚠️ 예수금 부족", body);
+    }
+
     private void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             log.warn("FCM 미설정 — 알림 생략");
