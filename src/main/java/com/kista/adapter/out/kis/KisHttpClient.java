@@ -27,8 +27,8 @@ public class KisHttpClient {
 
     // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
     public HttpHeaders buildHeaders(String trId, Account account) {
-        String token = kisTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());
-        return buildHeaders(token, account.kisAppKey(), account.kisSecretKey(), trId);
+        String token = kisTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
+        return buildHeaders(token, account.appKey(), account.secretKey(), trId);
     }
 
     // 토큰을 직접 보유한 호출부(KisAuthApi 등 KisTokenPort 미경유) 공용 헤더 빌더

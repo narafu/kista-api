@@ -102,7 +102,7 @@ class AccountControllerTest {
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"131-01-001931\"," +
-                                "\"kisAppKey\":\"cid\",\"kisSecretKey\":\"csecret\",\"broker\":\"TOSS\"}")
+                                "\"appKey\":\"cid\",\"secretKey\":\"csecret\",\"broker\":\"TOSS\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("TOSS"));
@@ -121,7 +121,7 @@ class AccountControllerTest {
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
-                                "\"kisAppKey\":\"appKey\",\"kisSecretKey\":\"appSecret\"}")
+                                "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
@@ -136,7 +136,7 @@ class AccountControllerTest {
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"계좌\",\"accountNo\":\"123456789\"," +
-                                "\"kisAppKey\":\"key\",\"kisSecretKey\":\"secret\"}")
+                                "\"appKey\":\"key\",\"secretKey\":\"secret\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isBadRequest());
     }

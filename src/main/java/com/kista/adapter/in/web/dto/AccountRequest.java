@@ -14,9 +14,9 @@ public record AccountRequest(
         @NotBlank @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 KIS XXXXXXXX-XX 또는 Toss XXX-XX-XXXXXX 형식이어야 합니다")
         String accountNo,
         @Schema(description = "API 앱 키 (KIS App Key / Toss Client ID)", example = "PSxxxxxxxxxx")
-        String kisAppKey,
+        String appKey,
         @Schema(description = "API 앱 시크릿 (KIS App Secret / Toss Client Secret)")
-        String kisSecretKey,
+        String secretKey,
         @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS"})
         Account.Broker broker
 ) {
@@ -26,12 +26,12 @@ public record AccountRequest(
         boolean isKis = broker == null || broker == Account.Broker.KIS;
         if (isKis && accountNo != null && accountNo.matches("\\d{8}-\\d{2}")) {
             return new RegisterAccountCommand(
-                    nickname, accountNo.substring(0, 8), kisAppKey, kisSecretKey,
+                    nickname, accountNo.substring(0, 8), appKey, secretKey,
                     accountNo.substring(9), broker
             );
         }
         return new RegisterAccountCommand(
-                nickname, accountNo, kisAppKey, kisSecretKey, null, broker
+                nickname, accountNo, appKey, secretKey, null, broker
         );
     }
 

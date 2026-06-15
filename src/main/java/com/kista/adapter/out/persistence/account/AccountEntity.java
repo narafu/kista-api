@@ -34,11 +34,11 @@ class AccountEntity extends BaseAuditEntity {
     @Column(name = "account_no", nullable = false, length = 512)
     private String accountNo;            // AES-256 암호화 저장
 
-    @Column(name = "kis_app_key", nullable = false, length = 512)
-    private String kisAppKey;            // AES-256 암호화 저장
+    @Column(name = "app_key", nullable = false, length = 512)
+    private String appKey;            // AES-256 암호화 저장
 
-    @Column(name = "kis_secret_key", nullable = false, length = 512)
-    private String kisSecretKey;         // AES-256 암호화 저장
+    @Column(name = "secret_key", nullable = false, length = 512)
+    private String secretKey;         // AES-256 암호화 저장
 
     @Column(name = "kis_account_type", nullable = false, length = 10)
     private String kisAccountType;       // 계좌 상품 코드 (기본: 01)

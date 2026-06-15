@@ -50,12 +50,12 @@ class AccountService implements AccountUseCase {
         // 증권사별 계좌 상품 코드 / 계좌 시퀀스 결정
         String accountTypeOrSeq = switch (broker) {
             case KIS -> cmd.kisAccountType() != null ? cmd.kisAccountType() : "01";
-            case TOSS -> tossConnectionTestPort.testAndFetchAccountSeq(cmd.kisAppKey(), cmd.kisSecretKey());
+            case TOSS -> tossConnectionTestPort.testAndFetchAccountSeq(cmd.appKey(), cmd.secretKey());
         };
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
-                cmd.accountNo(), cmd.kisAppKey(), cmd.kisSecretKey(),
+                cmd.accountNo(), cmd.appKey(), cmd.secretKey(),
                 accountTypeOrSeq,
                 broker
         );

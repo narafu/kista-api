@@ -47,7 +47,7 @@
 - FK 제약이 필요한 선행 행은 `@Autowired JdbcTemplate`으로 직접 SQL 삽입 후 `@Transactional` 롤백 활용:
   ```java
   jdbcTemplate.update("INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())", userId, "kakao_" + userId, "ACTIVE", "USER");
-  jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())", accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
+  jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())", accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
   ```
 - 타 패키지 FK 삽입 패턴: `OrderPersistenceAdapterTest` 참고 (TradeHistoryPersistenceAdapterTest 삭제됨)
 

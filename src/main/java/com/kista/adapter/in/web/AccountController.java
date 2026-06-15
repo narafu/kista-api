@@ -55,7 +55,7 @@ public class AccountController {
         // toRegisterCommand()에서 74420614-01 → accountNo=74420614 분리 완료 → CANO 8자리만 전달
         RegisterAccountCommand cmd = request.toRegisterCommand();
         if (request.broker() == null || request.broker() == Account.Broker.KIS) {
-            accountUseCase.testAccountNo(cmd.kisAppKey(), cmd.kisSecretKey(), cmd.accountNo());
+            accountUseCase.testAccountNo(cmd.appKey(), cmd.secretKey(), cmd.accountNo());
         }
         return AccountResponse.from(accountUseCase.register(userId, cmd));
     }

@@ -22,7 +22,7 @@ bash 명령으로 최신 버전 확인 후 +1:
 ENUM 컬럼: PostgreSQL 네이티브 ENUM(CREATE TYPE) 금지 → VARCHAR(20) 사용
 
 암호화 컬럼: AES-256 저장 컬럼은 VARCHAR(512) 이상
-  대상: account_no, kis_app_key, kis_secret_key, telegram_bot_token
+  대상: account_no, app_key, secret_key, telegram_bot_token
 
 FK 선언: 반드시 명시적 이름 사용
   CONSTRAINT <table>_<col>_fkey FOREIGN KEY (...) REFERENCES ... ON DELETE <CASCADE|RESTRICT>

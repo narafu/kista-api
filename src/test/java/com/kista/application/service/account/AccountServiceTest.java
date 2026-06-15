@@ -56,7 +56,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
-                    a.accountNo(), a.kisAppKey(), a.kisSecretKey(),
+                    a.accountNo(), a.appKey(), a.secretKey(),
                     a.kisAccountType(), a.broker());
         });
 

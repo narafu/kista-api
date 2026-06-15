@@ -49,8 +49,8 @@ class AccountPersistenceAdapterTest {
         e.setUserId(userId);
         e.setNickname("테스트계좌");
         e.setAccountNo("enc:74420614");
-        e.setKisAppKey("enc:appKey");
-        e.setKisSecretKey("enc:appSecret");
+        e.setAppKey("enc:appKey");
+        e.setSecretKey("enc:appSecret");
         e.setKisAccountType("01");
         e.setBroker(Account.Broker.KIS);
         return e;

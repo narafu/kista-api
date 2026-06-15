@@ -26,7 +26,7 @@ class TosPriceApiTest {
     @Mock TossHttpClient tossHttpClient;
     TosPriceApi tosPriceApi;
 
-    // Toss 계좌: kisAppKey=clientId, kisSecretKey=clientSecret 재사용
+    // Toss 계좌: appKey=clientId, secretKey=clientSecret 재사용
     static final Account ACCOUNT = new Account(
         UUID.randomUUID(), UUID.randomUUID(), "테스트",
         "12345678901", "cid", "csecret", "1", Account.Broker.TOSS

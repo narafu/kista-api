@@ -19,7 +19,7 @@
 - `ManualTradingException` / `OrderCancelException` → 409, `Account.CooldownException` → 429(Retry-After 포함)
 
 ### Account ↔ Strategy 분리
-- `Account` record 필드 8개: `id, userId, nickname, accountNo, kisAppKey, kisSecretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
+- `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
 - `Strategy` record 필드 7개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType), divisionCount(int)`
 - `StrategyCycle` record 필드 8개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 사이클 단위 메타(시드/기간)
 - `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
@@ -42,17 +42,17 @@
 - 일괄 제거: `grep -rl $'\xef\xbb\xbf' src --include="*.java" | while read f; do sed -i '1s/^\xef\xbb\xbf//' "$f"; done`
 
 ### 수량 변수명 규칙
-- **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `CyclePositionHistoryEntry`, `PresentBalanceResult.Item`, `PrivacyTradeEntity`, `PrivacyTradeOrderEntity`
+- **보유 잔고 수량** (avgPrice와 짝이 되는 것): `holdings` — `AccountBalance`, `TradingSnapshot`, `CyclePositionHistoryEntry`, `PresentBalanceResult.Item`, `PrivacyTradeBaseEntity`, `PrivacyTradeBaseOrderEntity`
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
-- DB 컬럼: `cycle_position.holdings`, `privacy_trades_master.holdings`(보유) / `orders.quantity`, `privacy_trades_detail.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
+- DB 컬럼: `cycle_position.holdings`, `privacy_trade_bases.holdings`(보유) / `orders.quantity`, `privacy_trade_base_orders.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
 - KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
 - 복합 수량 필드: `orderedQty`/`filledQty` 패턴 금지 → `orderedQuantity`/`filledQuantity`
 - `InfinitePosition.calcXxxQuantity()` 메서드명은 "주문 수량 계산 결과"이므로 Quantity 유지 (보유수량 아님)
 
 ### AES-256 암호화 컬럼 크기
 - AES-256 CBC 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
-- 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/kis_app_key/kis_secret_key/telegram_bot_token 모두 512
+- 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/app_key/secret_key/telegram_bot_token 모두 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴
@@ -113,12 +113,12 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 
 ### Flyway
 - `V1__init.sql` **수정 금지** — 새 마이그레이션은 `V2__...` 이후로
-- 현재 최신: `V13__add_is_reverse_mode_to_strategy_cycle.sql`
+- 현재 최신: `V19__reorder_users_balance_check_enabled.sql`
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (`avg_price` 사례, V1/V5/V7)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤에 추가 (`AFTER` 절 없음) — 컬럼을 특정 위치에 두려면 테이블 재생성 방식 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)
-- 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (`uq_privacy_trades_master_date_ticker` 같은 named UNIQUE). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
+- 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (`uq_privacy_trade_bases_date_ticker` 같은 named UNIQUE). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
 - **컬럼 순서 규칙 (모든 테이블 공통)**: `pk, fk, 비즈니스 컬럼…, created_at, updated_at, deleted_at` — 감사·삭제 컬럼은 반드시 이 순서로 맨 뒤에 위치 (없는 컬럼은 생략). 신규 컬럼은 항상 `created_at` 앞에 추가. `ADD COLUMN`이 맨 뒤에 붙으므로 위치 강제가 필요하면 테이블 재생성 패턴 사용 (V3 `orders`, V6 `strategy_cycle` 사례)

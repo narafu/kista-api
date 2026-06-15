@@ -50,7 +50,7 @@ jdbcTemplate.update(
     userId, "kakao_" + userId, "ACTIVE", "USER");
 // accounts 삽입
 jdbcTemplate.update(
-    "INSERT INTO accounts (id, user_id, nickname, account_no, kis_app_key, kis_secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+    "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
     accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
 ```
 

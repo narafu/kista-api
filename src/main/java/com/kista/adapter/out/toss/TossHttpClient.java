@@ -116,7 +116,7 @@ public class TossHttpClient {
 
     // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.kisAccountType에 accountSeq가 저장됨
     private HttpHeaders buildHeaders(Account account) {
-        String token = tossTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());
+        String token = tossTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.set("X-Tossinvest-Account", account.kisAccountType());
@@ -126,8 +126,8 @@ public class TossHttpClient {
 
     // 계좌 헤더 미포함 — 시세 조회·환율 등 계좌 컨텍스트 불필요 API용
     private HttpHeaders buildHeadersNoAccount(Account account) {
-        // kisAppKey/kisSecretKey 필드를 Toss clientId/clientSecret으로 재사용
-        String token = tossTokenPort.getToken(account.id(), account.kisAppKey(), account.kisSecretKey());
+        // appKey/secretKey 필드를 Toss clientId/clientSecret으로 재사용
+        String token = tossTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(MediaType.APPLICATION_JSON);
