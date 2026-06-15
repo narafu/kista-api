@@ -89,7 +89,8 @@ class TradingPreviewServiceTest {
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort, cycleHistoryPort);
         // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
-        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
+        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
+        when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
     }
 
     @Test

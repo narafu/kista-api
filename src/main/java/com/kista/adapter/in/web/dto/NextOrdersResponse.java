@@ -8,12 +8,14 @@ import com.kista.domain.model.order.NextOrdersPreview;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record NextOrdersResponse(
         LocalDate tradeDate,
-        PositionSnapshot position,                    // PRIVACY/skip 시 null
+        PositionSnapshot position,                 // PRIVACY/skip 시 null
         List<OrderItem> orders,
-        NextOrdersPreview.SkipReason skipReason    // 정상이면 null
+        NextOrdersPreview.SkipReason skipReason,   // 정상이면 null
+        List<TodayOrderItem> todayOrders           // 오늘 이미 등록된 PLANNED 주문
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
@@ -56,12 +58,34 @@ public record NextOrdersResponse(
         }
     }
 
+    // 취소 가능한 오늘 PLANNED 주문 항목 (id 포함)
+    public record TodayOrderItem(
+            UUID id,
+            String ticker,
+            String direction,
+            String orderType,
+            int quantity,
+            BigDecimal price
+    ) {
+        public static TodayOrderItem from(Order o) {
+            return new TodayOrderItem(
+                    o.id(),
+                    o.ticker().name(),
+                    o.direction().name(),
+                    o.orderType().name(),
+                    o.quantity(),
+                    o.price()
+            );
+        }
+    }
+
     public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
                 result.position() == null ? null : PositionSnapshot.from(result.position()),
                 result.orders().stream().map(OrderItem::from).toList(),
-                result.skipReason()
+                result.skipReason(),
+                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList()
         );
     }
 }

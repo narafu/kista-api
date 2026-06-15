@@ -7,9 +7,10 @@ import java.util.List;
 
 public record NextOrdersPreview(
         LocalDate tradeDate,
-        InfinitePosition position,   // PRIVACY/skip 시 null
-        List<Order> orders,          // skip 시 빈 리스트
-        SkipReason skipReason        // 정상이면 null
+        InfinitePosition position,        // PRIVACY/skip 시 null
+        List<Order> orders,               // skip 시 빈 리스트
+        SkipReason skipReason,            // 정상이면 null
+        List<Order> todayPlannedOrders    // 오늘 이미 등록된 PLANNED 주문 (없으면 빈 리스트)
 ) {
     public enum SkipReason {
         NO_CYCLE_HISTORY,       // 사이클 이력 없음 (신규)

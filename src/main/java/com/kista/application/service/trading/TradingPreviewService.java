@@ -8,6 +8,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -30,6 +31,7 @@ class TradingPreviewService {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
+    private final OrderPort orderPort;
     private final BrokerPriceRouter brokerPriceRouter;
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
@@ -50,10 +52,14 @@ class TradingPreviewService {
         // 스케줄러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
         LocalDate today = DstInfo.nextTradeDate();
 
+        // 오늘 이미 등록된 PLANNED 주문 조회 (새로고침 후에도 취소 버튼 복원용)
+        List<com.kista.domain.model.order.Order> todayPlannedOrders =
+                orderPort.findPlannedByCycleAndDate(currentCycle.id(), today);
+
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
         if (load.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), load.skipReason());
+            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders);
         }
         AccountBalance balance = load.balance();
 
@@ -70,14 +76,14 @@ class TradingPreviewService {
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {
-            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE);
+            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders);
         }
 
         // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량이면 skip
         // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해 (INFINITE만 non-null)
         if (!result.valid()) {
-            return new NextOrdersPreview(today, result.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE);
+            return new NextOrdersPreview(today, result.position(), List.of(), SkipReason.INSUFFICIENT_BALANCE, todayPlannedOrders);
         }
-        return new NextOrdersPreview(today, result.position(), result.orders(), null);
+        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders);
     }
 }
