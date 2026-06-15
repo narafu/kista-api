@@ -79,7 +79,7 @@ public class MetaController {
 
     private List<EnumMeta> getBrokerList() {
         return Arrays.stream(Account.Broker.values())
-                .map(b -> new EnumMeta(b.name(), b.getLabel(), null))
+                .map(b -> new EnumMeta(b.name(), b.getLabel(), b.getShortLabel()))
                 .toList();
     }
 

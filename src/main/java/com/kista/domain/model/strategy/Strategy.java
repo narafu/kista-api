@@ -70,8 +70,8 @@ public record Strategy(
     @Getter
     @RequiredArgsConstructor
     public enum Status {
-        ACTIVE("활성"),  // 매매 스케줄링 실행 중
-        PAUSED("중지");  // 매매 중지 (스케줄링 제외)
+        ACTIVE("운영중"),  // 매매 스케줄링 실행 중
+        PAUSED("일시중지"); // 매매 중지 (스케줄링 제외)
 
         private final String label; // 한국어 표시 이름
     }
@@ -103,9 +103,9 @@ public record Strategy(
     @Getter
     @RequiredArgsConstructor
     public enum CycleSeedType {
-        NONE("연속 안함"),    // holdings 0 → 전략 PAUSE
-        MAINTAIN("시드 유지"), // 종료 후 동일 initialUsdDeposit으로 재등록
-        MAX("시드 MAX");      // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
+        NONE("OFF"),        // holdings 0 → 전략 PAUSE
+        MAINTAIN("ON(유지)"), // 종료 후 동일 initialUsdDeposit으로 재등록
+        MAX("ON(MAX)");     // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
 
         private final String label; // 한국어 표시 이름
 

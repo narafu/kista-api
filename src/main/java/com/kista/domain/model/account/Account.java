@@ -19,10 +19,11 @@ public record Account(
     @Getter
     @RequiredArgsConstructor
     public enum Broker {
-        TOSS("토스증권"),    // 토스증권 Open API
-        KIS("한국투자증권");  // 한국투자증권 Open API
+        TOSS("토스증권",    "토스"),  // 토스증권 Open API
+        KIS("한국투자증권", "한투");  // 한국투자증권 Open API
 
-        private final String label; // 한국어 표시 이름
+        private final String label;      // 한국어 전체 이름
+        private final String shortLabel; // UI 모바일 약칭
     }
 
     // nickname만 교체 — AccountService.update 전용
