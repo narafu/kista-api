@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.domain.model.strategy.StrategyCycle;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -43,6 +44,10 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
 
     @Column(name = "is_reverse_mode", nullable = false)
     private boolean reverseMode; // 리버스모드 활성 여부 — 기본값 false
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "seed_resolved_by", nullable = false, length = 20)
+    private StrategyCycle.SeedResolvedBy seedResolvedBy; // 시드 결정 방식 — audit용
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨

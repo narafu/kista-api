@@ -72,7 +72,7 @@ class StrategyServiceTest {
 
     // 현재 사이클 픽스처 (시작금액 1000)
     private static final StrategyCycle CYCLE = new StrategyCycle(
-            CYCLE_ID, STRATEGY_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null, false
+            CYCLE_ID, STRATEGY_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED
     );
 
     private Account ownerAccount() {
@@ -345,7 +345,7 @@ class StrategyServiceTest {
         Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId,
-                new BigDecimal("500"), null, LocalDate.now(), null, null, null, false);
+                new BigDecimal("500"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);

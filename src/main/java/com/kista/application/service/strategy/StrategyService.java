@@ -74,8 +74,8 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType, divisionCount);
         Strategy saved = strategyPort.save(strategy);
 
-        // 첫 번째 StrategyCycle 생성
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), cmd.initialUsdDeposit()));
+        // 첫 번째 StrategyCycle 생성 — 사용자 직접 입력 시드
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.startFromUserInput(saved.id(), cmd.initialUsdDeposit()));
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 종가는 등록 시점 현재가
         BigDecimal currentPrice = brokerPriceRouter.getPrice(resolvedTicker, account);

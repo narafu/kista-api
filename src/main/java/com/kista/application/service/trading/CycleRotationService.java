@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
 // NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
@@ -48,15 +49,11 @@ class CycleRotationService {
         BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
         BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
 
-        // 잔고 검증 비활성화 시 — 실잔고 조회 없이 목표 시드 직접 결정
-        BigDecimal actualBalance;
-        if (!user.balanceCheckEnabled()) {
-            actualBalance = strategy.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed;
-        } else {
-            // MAINTAIN/MAX — 브로커별 USD 실잔고 조회
-            actualBalance = fetchUsdBalance(strategy, account);
-            if (actualBalance == null) return; // 실패 — 내부에서 notifyError 완료
-        }
+        // 잔고검증 정책 — ON: 브로커 실잔고 조회, OFF: 내부 원장만 사용
+        SeedResolutionPolicy policy = resolvePolicy(user, account, strategy);
+        Optional<BigDecimal> balanceOpt = policy.resolveAvailableBalance(strategy, maintainSeed, maxSeed);
+        if (balanceOpt.isEmpty()) return; // 브로커 조회 실패 — 내부에서 notifyError 완료
+        BigDecimal actualBalance = balanceOpt.get();
 
         BigDecimal targetSeed;
         if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX) {
@@ -93,12 +90,36 @@ class CycleRotationService {
             return;
         }
 
-        // 새 StrategyCycle + 시작 스냅샷 생성
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed));
+        // 새 StrategyCycle + 시작 스냅샷 생성 (시드 결정 방식 stamp)
+        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed, policy.seedResolvedBy()));
         cyclePositionPort.save(CyclePosition.startSnapshot(newCycle.id(), targetSeed, price));
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         userNotificationPort.notifyStrategyChanged(user, account, strategy, "재등록"); // 관리자 알림
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
+    }
+
+    // 잔고검증 설정에 따라 시드 결정 정책 선택
+    private SeedResolutionPolicy resolvePolicy(User user, Account account, Strategy strategy) {
+        if (!user.balanceCheckEnabled()) {
+            // OFF: 내부 원장만 사용 (브로커 조회 없음)
+            return new SeedResolutionPolicy() {
+                @Override
+                public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
+                    return Optional.of(s.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed);
+                }
+                @Override
+                public StrategyCycle.SeedResolvedBy seedResolvedBy() { return StrategyCycle.SeedResolvedBy.LEDGER_ONLY; }
+            };
+        }
+        // ON: 브로커 실잔고 조회
+        return new SeedResolutionPolicy() {
+            @Override
+            public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
+                return Optional.ofNullable(fetchUsdBalance(s, account));
+            }
+            @Override
+            public StrategyCycle.SeedResolvedBy seedResolvedBy() { return StrategyCycle.SeedResolvedBy.BROKER_VERIFIED; }
+        };
     }
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준

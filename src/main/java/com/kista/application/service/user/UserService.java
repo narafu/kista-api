@@ -183,8 +183,17 @@ class UserService implements UserUseCase {
     @Override
     public void updateBalanceCheckEnabled(UUID userId, boolean enabled) {
         User user = userPort.findByIdOrThrow(userId);
+        boolean previous = user.balanceCheckEnabled();
         userPort.save(user.withBalanceCheckEnabled(enabled));
-        log.info("잔고 검증 설정 변경: userId={}, enabled={}", userId, enabled);
+        log.info("잔고 검증 설정 변경: userId={}, {}→{}", userId, previous, enabled);
+        // OFF→ON 전환 시 경고: 실잔고보다 큰 시드를 가진 전략이 다음 회전에서 PAUSE될 수 있음
+        if (!previous && enabled) {
+            log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략의 시드가 실잔고를 초과하면 다음 사이클 회전 시 PAUSED될 수 있습니다.", userId);
+        }
+        // ON→OFF 전환 시 경고: 실잔고보다 큰 시드로 사이클이 시작되면 KIS에서 주문 거부될 수 있음
+        if (previous && !enabled) {
+            log.warn("[잔고검증 ON→OFF] userId={} — 실잔고보다 큰 시드로 사이클이 재등록되면 KIS에서 주문이 거부(APBK0988)될 수 있습니다.", userId);
+        }
     }
 
     @Override

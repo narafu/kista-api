@@ -78,12 +78,12 @@ class CycleRotationServiceTest {
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
     private StrategyCycle currentCycle(UUID strategyId, BigDecimal startAmount) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, startAmount,
-                null, LocalDate.now(), null, Instant.now(), null, false);
+                null, LocalDate.now(), null, Instant.now(), null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
     }
 
     // 새 StrategyCycle stub 반환값 (save 후 id 포함)
     private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null, false);
+        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {

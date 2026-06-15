@@ -67,7 +67,7 @@ class TradingPreviewServiceTest {
     );
 
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
+            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
 
     static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
 
@@ -159,7 +159,7 @@ class TradingPreviewServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
 
-        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
+        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -185,7 +185,7 @@ class TradingPreviewServiceTest {
                 Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
-        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false);
+        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
