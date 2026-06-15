@@ -15,7 +15,7 @@ ALTER TABLE orders DROP CONSTRAINT orders_account_id_fkey;
 -- 2. 기존 테이블 리네임 + named 제약/인덱스 정리 (스키마 전역 이름 충돌 방지)
 -- ============================================================
 ALTER TABLE accounts RENAME TO accounts_old;
-ALTER INDEX accounts_pkey RENAME TO accounts_old_pkey;
+-- accounts_pkey 인덱스는 테이블 리네임 시 Postgres가 자동으로 accounts_old_pkey로 변경함
 DROP INDEX idx_accounts_user_id;
 DROP INDEX uq_accounts_account_no_hash;
 
