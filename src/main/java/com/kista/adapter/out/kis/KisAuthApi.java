@@ -15,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -118,6 +119,14 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
                 // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
                 tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
             }
+        } catch (HttpStatusCodeException e) {
+            // EGW00133: KIS 1분당 1회 발급 제한 초과 — 잘못된 키와 구분해 429로 반환
+            if (e.getResponseBodyAsString().contains("EGW00133")) {
+                log.debug("KIS 연결 테스트 rate limit (EGW00133): accountId={}", accountId);
+                throw new Account.KisRateLimitException();
+            }
+            log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
+            throw new Account.InvalidKisKeyException();
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
             throw new Account.InvalidKisKeyException();
@@ -138,6 +147,13 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             if (cached != null) tempTokenCache.remove(appKey, cached);
             try {
                 token = issueOAuthToken(appKey, appSecret).accessToken();
+            } catch (HttpStatusCodeException e) {
+                if (e.getResponseBodyAsString().contains("EGW00133")) {
+                    log.debug("계좌번호 검증 중 rate limit (EGW00133)");
+                    throw new Account.KisRateLimitException();
+                }
+                log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
+                throw new Account.InvalidKisKeyException();
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
                 throw new Account.InvalidKisKeyException();
@@ -145,12 +161,14 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         }
 
         // 2단계: TTTC2101R 호출로 계좌번호 유효성 검증
+        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
+        String[] parts = accountNo.split("-", 2);
         HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, appSecret, KisTradingApi.MARGIN_TR_ID);
 
         String url = UriComponentsBuilder
                 .fromUriString(kisBaseUrl + KisTradingApi.MARGIN_PATH)
-                .queryParam("CANO", accountNo)
-                .queryParam("ACNT_PRDT_CD", "01")
+                .queryParam("CANO", parts[0])
+                .queryParam("ACNT_PRDT_CD", parts.length > 1 ? parts[1] : "01")
                 .toUriString();
 
         try {

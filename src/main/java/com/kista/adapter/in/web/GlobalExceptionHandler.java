@@ -41,6 +41,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid KIS Credentials", ex.getMessage());
     }
 
+    @ExceptionHandler(Account.KisRateLimitException.class)
+    public ProblemDetail handleKisRateLimit(Account.KisRateLimitException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "KIS Rate Limit", ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid State", ex.getMessage());

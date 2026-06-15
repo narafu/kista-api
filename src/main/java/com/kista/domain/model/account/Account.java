@@ -53,6 +53,11 @@ public record Account(
         public InvalidKisKeyException() { super("KIS API 키가 유효하지 않습니다"); }
     }
 
+    // KIS EGW00133 — 1분당 토큰 발급 1회 제한 초과
+    public static class KisRateLimitException extends RuntimeException {
+        public KisRateLimitException() { super("KIS API 호출 한도를 초과했습니다. 잠시 후 다시 시도하세요"); }
+    }
+
     // 동일 사용자가 같은 계좌번호를 중복 등록 시도한 경우
     public static class DuplicateAccountException extends RuntimeException {
         public DuplicateAccountException(String accountNo) {
