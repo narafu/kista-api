@@ -117,4 +117,37 @@ class HexagonalArchitectureTest {
                 .haveFullyQualifiedName("org.springframework.http.HttpStatus");
         rule.check(classes);
     }
+
+    @Test
+    @DisplayName("KIS 파서는 application 레이어를 의존하지 않는다 — 정규화는 outbound 책임")
+    void kis_parser_must_not_depend_on_application_layer() {
+        // adapter.out은 domain.model 사용이 정상 — application 서비스 직접 의존만 금지
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.adapter.out.kis..")
+                .and().haveSimpleNameEndingWith("Parser")
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.kista.application..");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("SSE EmitterRegistry는 adapter.in (controller)에서만 주입된다 — application 직접 의존 금지")
+    void sse_emitter_registry_must_not_be_used_in_application_layer() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.application..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.kista.adapter.out.sse..");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("RestController는 domain port 인터페이스(UseCase/Port)에만 의존하고 application 구현체에 직접 의존하지 않는다")
+    void rest_controllers_must_not_depend_on_application_implementations() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.adapter.in.web..")
+                .and().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.kista.application.service..");
+        rule.check(classes);
+    }
 }
