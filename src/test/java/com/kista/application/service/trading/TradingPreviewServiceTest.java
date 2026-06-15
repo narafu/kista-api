@@ -90,7 +90,8 @@ class TradingPreviewServiceTest {
         // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
-        when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
+        // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
+        lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
     }
 
     @Test

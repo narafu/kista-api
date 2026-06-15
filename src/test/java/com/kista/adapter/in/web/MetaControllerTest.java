@@ -78,8 +78,8 @@ class MetaControllerTest {
         mockMvc.perform(get("/api/meta/brokers")
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("KIS"))
-                .andExpect(jsonPath("$[0].label").value("한국투자증권"));
+                .andExpect(jsonPath("$[0].code").value("TOSS"))
+                .andExpect(jsonPath("$[0].label").value("토스증권"));
     }
 
     @Test
@@ -88,7 +88,7 @@ class MetaControllerTest {
                         .with(authentication(mockAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("ACTIVE"))
-                .andExpect(jsonPath("$[0].label").value("활성"));
+                .andExpect(jsonPath("$[0].label").value("운영중"));
     }
 
     @Test
@@ -98,7 +98,7 @@ class MetaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(Strategy.CycleSeedType.values().length))
                 .andExpect(jsonPath("$[0].code").value("NONE"))
-                .andExpect(jsonPath("$[0].label").value("연속 안함"));
+                .andExpect(jsonPath("$[0].label").value("OFF"));
     }
 
     @Test

@@ -113,7 +113,7 @@ class AccountControllerTest {
 
     @Test
     void register_kisAccount_callsAccountNoTest_returns201() throws Exception {
-        // KIS 계좌 등록: testAccountNo()에 CANO 8자리만 전달, register() 수행
+        // KIS 계좌 등록: testAccountNo()에 전체 accountNo 전달, 내부에서 CANO 분리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "KIS계좌", "74420614", "appKey", "appSecret", "01", Account.Broker.KIS));
@@ -126,8 +126,8 @@ class AccountControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
 
-        // 74420614-01 → CANO=74420614 으로 분리 후 testAccountNo 호출
-        verify(accountUseCase).testAccountNo("appKey", "appSecret", "74420614");
+        // testAccountNo에 전체 계좌번호 전달 — 내부에서 split('-')으로 CANO 분리
+        verify(accountUseCase).testAccountNo("appKey", "appSecret", "74420614-01");
     }
 
     @Test
