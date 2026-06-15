@@ -5,7 +5,6 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,8 +28,9 @@ public interface CycleOrderStrategy {
     // 전략 계산 입력 — execute/preview 공통
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
     // initialUsdDeposit: 현재 StrategyCycle의 시작 시드 (PRIVACY에서 buildOrders 호출 시 필요)
-    // currentCycle: 리버스모드 여부 판단용 (INFINITE에서 사용)
-    // starPointPrice: 리버스모드 별지점 (직전 5거래일 종가 평균, 리버스모드에서만 non-null)
+    // starPointPrice: 리버스모드 별지점 (직전 5거래일 종가 평균, 리버스모드 2일차+에서만 non-null)
+    // isReverseMode: 오늘의 리버스모드 여부 (cycle_position 최신 행에서 판단)
+    // isFirstReverseDay: 리버스모드 진입 첫날 여부 (직전 행이 일반모드였음)
     record PlanContext(
             AccountBalance balance,
             Strategy strategy,
@@ -39,13 +39,14 @@ public interface CycleOrderStrategy {
             LocalDate tradeDate,
             PrivacyTradeBase privacyBase,  // INFINITE은 null 허용
             String label,
-            StrategyCycle currentCycle,    // 리버스모드 여부 확인용 (INFINITE에서만 사용, null 허용)
-            BigDecimal starPointPrice      // 리버스모드 별지점 (직전 5거래일 종가 평균, null이면 미계산)
+            BigDecimal starPointPrice,     // 리버스모드 별지점 (null이면 첫날 또는 일반모드)
+            boolean isReverseMode,         // 오늘 리버스모드 여부
+            boolean isFirstReverseDay      // 리버스모드 진입 첫날 여부
     ) {
-        // 하위 호환 생성자 — currentCycle/starPointPrice 없는 기존 코드 호환
+        // 하위 호환 생성자 — isReverseMode/isFirstReverseDay 없는 기존 코드 호환
         PlanContext(AccountBalance balance, Strategy strategy, BigDecimal initialUsdDeposit,
                     BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase, String label) {
-            this(balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label, null, null);
+            this(balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label, null, false, false);
         }
     }
 

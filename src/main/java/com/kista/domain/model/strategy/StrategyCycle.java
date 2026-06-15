@@ -7,6 +7,7 @@ import java.util.UUID;
 
 // 전략 안의 매매 한 라운드 — 매수 시작에서 holdings=0 청산까지
 // 여러 StrategyCycle이 동일 Strategy에 누적됨 (사이클 이력 추적 가능)
+// 리버스모드 여부는 strategy_cycle이 아닌 cycle_position.is_reverse_mode가 SSOT
 public record StrategyCycle(
         UUID id,                          // PK (null이면 @GeneratedValue)
         UUID strategyId,                  // FK → strategy.id
@@ -16,7 +17,6 @@ public record StrategyCycle(
         LocalDate endDate,                // 사이클 종료일자 (KST, 진행 중이면 null)
         Instant createdAt,                // 생성 시각 (null이면 DB DEFAULT)
         Instant deletedAt,                // soft-delete (null=활성)
-        boolean isReverseMode,            // 리버스모드 활성 여부 — 소진 발동 시 true, 복귀 시 false
         SeedResolvedBy seedResolvedBy     // 시드 결정 방식 (audit용)
 ) {
     // 시드 결정 방식 — 운영 audit / 사일런트 PAUSE 원인 추적용
@@ -28,7 +28,7 @@ public record StrategyCycle(
 
     // 사이클 회전 시 사용 — seedResolvedBy 명시 필수
     public static StrategyCycle start(UUID strategyId, BigDecimal startAmount, SeedResolvedBy seedResolvedBy) {
-        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(), null, null, null, false, seedResolvedBy);
+        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(), null, null, null, seedResolvedBy);
     }
 
     // 최초 전략 등록 시 — 사용자 직접 입력

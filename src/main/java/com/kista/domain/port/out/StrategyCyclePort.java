@@ -19,10 +19,6 @@ public interface StrategyCyclePort {
     // 시드 수정 — 사이클 시작금액(startAmount) 갱신
     void updateStartAmount(UUID cycleId, BigDecimal startAmount);
 
-    // 리버스모드 전환 — 소진 발동 시 true, 일반모드 복귀 시 false
-    void markReverseMode(UUID cycleId);
-    void markNormalMode(UUID cycleId);
-
     // 전략 삭제 시 사이클 일괄 소프트 삭제
     void deleteByStrategyId(UUID strategyId);
 

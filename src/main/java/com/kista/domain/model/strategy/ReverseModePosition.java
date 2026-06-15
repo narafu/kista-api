@@ -42,12 +42,12 @@ public record ReverseModePosition(
         return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
     }
 
-    // 리버스모드 종료 조건: 종가 > 평단 × (1 - targetProfitRate)
+    // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
     // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
     public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
                 .setScale(2, HALF_UP);
-        return closingPrice.compareTo(threshold) > 0;
+        return closingPrice.compareTo(threshold) >= 0;
     }
 }

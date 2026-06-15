@@ -13,18 +13,19 @@ public record CyclePosition(
         BigDecimal closingPrice,  // 종가
         BigDecimal avgPrice,      // 평균 매입 단가 (holdings=0이면 null)
         int holdings,             // 보유 수량
+        boolean isReverseMode,    // 리버스모드 여부 — 체결 후 상태 머신으로 결정
         Instant createdAt,        // 생성 시각 (null이면 DB DEFAULT)
         Instant deletedAt         // soft-delete (null=활성)
 ) {
     // 사이클 등록·재등록 시 시작점 포지션 (holdings=0, avgPrice=null)
     // price: 등록 시점 현재가(종가)
     public static CyclePosition startSnapshot(UUID strategyCycleId, BigDecimal usdDeposit, BigDecimal price) {
-        return new CyclePosition(null, strategyCycleId, usdDeposit, price, null, 0, null, null);
+        return new CyclePosition(null, strategyCycleId, usdDeposit, price, null, 0, false, null, null);
     }
 
-    // 매매 완료 후 실포지션 스냅샷
-    public static CyclePosition tradeSnapshot(UUID strategyCycleId, AccountBalance balance, BigDecimal closingPrice) {
+    // 매매 완료 후 실포지션 스냅샷 — isReverseMode는 호출측 상태 머신이 계산
+    public static CyclePosition tradeSnapshot(UUID strategyCycleId, AccountBalance balance, BigDecimal closingPrice, boolean isReverseMode) {
         return new CyclePosition(null, strategyCycleId,
-                balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
+                balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), isReverseMode, null, null);
     }
 }

@@ -56,7 +56,7 @@ class TradingOpenSchedulerTest {
 
     private StrategyCycle mockCycle(UUID strategyId) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
-                null, LocalDate.now(), null, Instant.now(), null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+                null, LocalDate.now(), null, Instant.now(), null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
     }
 
     private User mockUser() {

@@ -40,6 +40,9 @@ class CyclePositionEntity extends BaseCreatedAtEntity {
     @Column(name = "holdings", nullable = false)
     private int holdings; // 보유 수량 (양의 정수, 단주 단위)
 
+    @Column(name = "is_reverse_mode", nullable = false)
+    private boolean reverseMode; // 리버스모드 여부 — 체결 후 상태 머신으로 결정, 기본값 false
+
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 }

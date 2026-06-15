@@ -72,7 +72,7 @@ class StrategyServiceTest {
 
     // 현재 사이클 픽스처 (시작금액 1000)
     private static final StrategyCycle CYCLE = new StrategyCycle(
-            CYCLE_ID, STRATEGY_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED
+            CYCLE_ID, STRATEGY_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED
     );
 
     private Account ownerAccount() {
@@ -171,7 +171,7 @@ class StrategyServiceTest {
     void update_seed_increase_with_holdings_replaces_total_assets() {
         // 보유 10주 @ avgPrice 100 → M = 1000
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, null, null);
+                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, false, null, null);
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -195,7 +195,7 @@ class StrategyServiceTest {
     @DisplayName("update() 시드 변경(미보유) — usdDeposit = 새시드, startAmount = 새시드")
     void update_seed_change_with_no_holdings() {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000"), new BigDecimal("110"), null, 0, null, null);
+                new BigDecimal("1000"), new BigDecimal("110"), null, 0, false, null, null);
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -219,7 +219,7 @@ class StrategyServiceTest {
     void update_seed_less_than_purchase_amount_throws() {
         // 보유 10주 @ avgPrice 100 → M = 1000, newSeed=500 < M
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, null, null);
+                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, false, null, null);
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -317,7 +317,7 @@ class StrategyServiceTest {
                 Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), null, null, 0, null, null);
+                new BigDecimal("500"), null, null, 0, false, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
@@ -340,12 +340,12 @@ class StrategyServiceTest {
                 Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 20);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), null, null, 0, null, null);
+                new BigDecimal("500"), null, null, 0, false, null, null);
         UUID newStrategyId = UUID.randomUUID();
         Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId,
-                new BigDecimal("500"), null, LocalDate.now(), null, null, null, false, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+                new BigDecimal("500"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);

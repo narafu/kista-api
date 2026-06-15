@@ -164,7 +164,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         return new CyclePosition(
                 e.getId(), e.getStrategyCycleId(),
                 e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
-                e.getHoldings(), e.getCreatedAt(), e.getDeletedAt()
+                e.getHoldings(), e.isReverseMode(), e.getCreatedAt(), e.getDeletedAt()
         );
     }
 
@@ -176,6 +176,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         e.setClosingPrice(p.closingPrice());
         e.setAvgPrice(p.avgPrice());
         e.setHoldings(p.holdings());
+        e.setReverseMode(p.isReverseMode());
         return e;
     }
 }

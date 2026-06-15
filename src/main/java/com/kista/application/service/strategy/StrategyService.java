@@ -212,15 +212,17 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now());
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
-                latest.closingPrice(), latest.avgPrice(), latest.holdings(), null, null));
+                latest.closingPrice(), latest.avgPrice(), latest.holdings(), latest.isReverseMode(), null, null));
         log.info("시드 수정: strategyId={}, newSeed={}, newDeposit={}", strategyId, newSeed, newDeposit);
     }
 
-    // 현재 StrategyCycle의 startAmount + isReverseMode를 묶어 응답용 StrategyDetail 조립
+    // 현재 StrategyCycle의 startAmount를 묶고, 리버스모드는 cycle_position 최신 행에서 판단
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
-        boolean isReverseMode = latestCycle.map(StrategyCycle::isReverseMode).orElse(false);
+        // 리버스모드 SSOT = cycle_position.is_reverse_mode (strategy_cycle 아님)
+        boolean isReverseMode = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
+                .stream().findFirst().map(CyclePosition::isReverseMode).orElse(false);
         return new StrategyDetail(strategy, initialUsdDeposit, isReverseMode);
     }
 }

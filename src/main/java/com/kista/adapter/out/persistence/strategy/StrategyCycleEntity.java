@@ -42,9 +42,6 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
     @Column(name = "end_date")
     private LocalDate endDate; // 사이클 종료일자 (KST, 진행 중이면 null)
 
-    @Column(name = "is_reverse_mode", nullable = false)
-    private boolean reverseMode; // 리버스모드 활성 여부 — 기본값 false
-
     @Enumerated(EnumType.STRING)
     @Column(name = "seed_resolved_by", nullable = false, length = 20)
     private StrategyCycle.SeedResolvedBy seedResolvedBy; // 시드 결정 방식 — audit용

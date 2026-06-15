@@ -88,17 +88,17 @@ class TradingReporter {
     }
 
     // execute() 종료 시 1건 적재, holdings==0이면 사이클 rotation 정책 처리
-    // 리버스모드 소진 감지 및 복귀 조건도 여기서 처리
     private void saveCyclePosition(LocalDate today, AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
-        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        cyclePositionPort.save(position);
-        log.info("[strategyId={}] 사이클 포지션 저장 완료", strategy.id());
-
-        // INFINITE 전략 전용 — 리버스모드 소진 감지 + 복귀 조건 처리
+        // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
+        boolean newReverseMode = false;
         if (strategy.type() == Strategy.Type.INFINITE) {
-            handleReverseModeTransition(strategy, currentCycle, balance, price);
+            newReverseMode = computeNewReverseMode(currentCycle.id(), strategy, balance, price);
         }
+
+        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price, newReverseMode);
+        cyclePositionPort.save(position);
+        log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
         // holdings==0이면 사이클 종료 알림 후 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
         if (position.holdings() == 0) {
@@ -110,34 +110,38 @@ class TradingReporter {
         }
     }
 
-    // 리버스모드 전환 처리:
-    // 1) 일반모드에서 소진 발동(isFinalRound) → markReverseMode
-    // 2) 리버스모드에서 복귀 조건 충족(closingPrice > avgPrice*(1-targetProfitRate)) → markNormalMode
-    private void handleReverseModeTransition(Strategy strategy, StrategyCycle currentCycle,
-                                              AccountBalance balance, BigDecimal closingPrice) {
-        if (currentCycle.isReverseMode()) {
-            // 리버스모드 종료 조건 — 종가 > 평단 × (1 - targetProfitRate)이면 일반모드 복귀
+    // 체결 후 포지션 기반 리버스모드 상태 머신
+    // 직전 행 is_reverse_mode → 진입/유지/종료 판정
+    private boolean computeNewReverseMode(java.util.UUID cycleId, Strategy strategy,
+                                           AccountBalance balance, BigDecimal closingPrice) {
+        List<CyclePosition> recent = cyclePositionPort.findLatestByCycleId(cycleId, 1);
+        boolean prevReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
+
+        if (prevReverseMode) {
+            // 리버스모드 종료 조건: avgPrice × (1 - targetProfitRate) ≤ closingPrice
             if (closingPrice != null && balance.avgPrice() != null && balance.holdings() > 0) {
                 ReverseModePosition rp = new ReverseModePosition(
                         balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
                         strategy.ticker(), strategy.divisionCount(), null, false);
                 if (rp.shouldExitReverseMode(closingPrice, strategy.ticker().getTargetProfitRate())) {
-                    strategyCyclePort.markNormalMode(currentCycle.id());
                     log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
                             strategy.id(), closingPrice, balance.avgPrice());
+                    return false;
                 }
             }
+            return true;
         } else {
-            // 일반모드에서 소진 감지(isFinalRound) — 보유수량 > 0인 경우만 체크
+            // 일반모드 → 소진 감지: usdDeposit < unitAmount (isFinalRound)
             if (balance.holdings() > 0 && closingPrice != null) {
                 // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
                 InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, strategy.divisionCount());
                 if (ip.isFinalRound()) {
-                    strategyCyclePort.markReverseMode(currentCycle.id());
                     log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
                             strategy.id(), ip.unitAmount(), balance.usdDeposit());
+                    return true;
                 }
             }
+            return false;
         }
     }
 

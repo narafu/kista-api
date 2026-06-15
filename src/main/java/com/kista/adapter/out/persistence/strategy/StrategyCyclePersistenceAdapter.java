@@ -50,24 +50,6 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
-    public void markReverseMode(UUID cycleId) {
-        // 리버스모드 진입: is_reverse_mode = true
-        StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
-        e.setReverseMode(true);
-        jpaRepository.save(e);
-    }
-
-    @Override
-    public void markNormalMode(UUID cycleId) {
-        // 일반모드 복귀: is_reverse_mode = false
-        StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
-        e.setReverseMode(false);
-        jpaRepository.save(e);
-    }
-
-    @Override
     public void deleteByStrategyId(UUID strategyId) {
         jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }
@@ -86,7 +68,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         return new StrategyCycle(
                 e.getId(), e.getStrategyId(),
                 e.getStartAmount(), e.getEndAmount(), e.getStartDate(), e.getEndDate(),
-                e.getCreatedAt(), e.getDeletedAt(), e.isReverseMode(), e.getSeedResolvedBy()
+                e.getCreatedAt(), e.getDeletedAt(), e.getSeedResolvedBy()
         );
     }
 
@@ -98,7 +80,6 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         e.setEndAmount(c.endAmount());
         e.setStartDate(c.startDate());
         e.setEndDate(c.endDate());
-        e.setReverseMode(c.isReverseMode());
         e.setSeedResolvedBy(c.seedResolvedBy());
         return e;
     }

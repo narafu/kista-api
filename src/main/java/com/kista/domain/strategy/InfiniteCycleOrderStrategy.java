@@ -5,7 +5,6 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.ReverseModePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,14 +37,10 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
-        StrategyCycle currentCycle = ctx.currentCycle();
-
-        // 리버스모드 분기 — StrategyCycle.isReverseMode() == true이면 리버스모드 전략 사용
-        if (currentCycle != null && currentCycle.isReverseMode()) {
-            return planReverseMode(ctx, currentCycle);
+        // 리버스모드 분기 — cycle_position 최신 행의 isReverseMode가 true이면 리버스모드 전략 사용
+        if (ctx.isReverseMode()) {
+            return planReverseMode(ctx);
         }
-
-        // 일반 모드 (기존 로직)
         return planNormalMode(ctx);
     }
 
@@ -64,16 +59,16 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     // 리버스모드 — 별지점 기준 매도/쿼터매수
-    // currentCycle.isFirstReverseDay()는 없으므로 starPointPrice==null을 첫날 판단 기준으로 사용
-    private Optional<OrderPlan> planReverseMode(PlanContext ctx, StrategyCycle currentCycle) {
+    // isFirstReverseDay=true이면 첫날 MOC 즉시 청산, false이면 LOC 분할 매도 + 쿼터매수
+    private Optional<OrderPlan> planReverseMode(PlanContext ctx) {
         ReverseModePosition position = new ReverseModePosition(
                 ctx.balance().holdings(),
                 ctx.balance().avgPrice(),
                 ctx.balance().usdDeposit(),
                 ctx.strategy().ticker(),
                 ctx.strategy().divisionCount(),
-                ctx.starPointPrice(),      // null이면 첫날 (별지점 아직 없음)
-                ctx.starPointPrice() == null
+                ctx.starPointPrice(),
+                ctx.isFirstReverseDay()
         );
 
         List<Order> orders = position.isFirstDay()

@@ -11,8 +11,8 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
                    RegisterStrategyCommand, UpdateStrategyCommand, BatchContext, InfinitePosition, ReverseModePosition, AccountBalance, TradingSnapshot, TradingReport, DstInfo
                    Strategy 필드: id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType, divisionCount(int)
                    StrategyDetail 필드: strategy, initialUsdDeposit, isReverseMode(boolean)
-                   StrategyCycle 필드: id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt
-                   CyclePosition 필드: id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt
+                   StrategyCycle 필드: id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt, seedResolvedBy (9필드, isReverseMode 제거됨)
+                   CyclePosition 필드: id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, isReverseMode(boolean), createdAt, deletedAt (9필드 — isReverseMode가 리버스모드 SSOT)
     order/       ← Order, TradeEvent
                    Order 필드: id, accountId, strategyCycleId, tradeDate, ticker, orderType, direction, quantity, price, status, kisOrderId, filledQuantity, filledPrice
                    OrderPort 조회/삭제는 strategyCycleId+tradeDate 기준 (1계좌 다중 전략 시 cycle 단위 격리): findPlannedByCycleAndDate, findPlacedByCycleAndDate, findPlannedOrPlacedByCycleAndDate, deletePlannedByCycleAndDate, deletePlannedBuyByCycleAndDate

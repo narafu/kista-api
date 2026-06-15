@@ -46,17 +46,24 @@ class CycleOrderComputer {
                 ? currentCycle.startAmount()
                 : null;
 
-        // 리버스모드인 경우 별지점 계산 (직전 5거래일 종가 평균)
-        // 첫날(소진 직후)은 포지션이 아직 없으므로 null — planReverseMode에서 첫날 로직 분기
+        // 오늘의 리버스모드 여부와 첫날 여부를 cycle_position 최근 2건으로 판단
+        boolean isReverseMode = false;
+        boolean isFirstReverseDay = false;
         BigDecimal starPointPrice = null;
-        if (strategy.type() == Strategy.Type.INFINITE && currentCycle != null && currentCycle.isReverseMode()) {
-            starPointPrice = computeStarPointPrice(currentCycle.id());
+        if (strategy.type() == Strategy.Type.INFINITE && currentCycle != null) {
+            List<CyclePosition> recent = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 2);
+            isReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
+            isFirstReverseDay = isReverseMode && (recent.size() < 2 || !recent.get(1).isReverseMode());
+            // 별지점: 리버스모드 2일차+에서만 계산 (첫날은 MOC 즉시 청산이라 별지점 불필요)
+            if (isReverseMode && !isFirstReverseDay) {
+                starPointPrice = computeStarPointPrice(currentCycle.id());
+            }
         }
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderStrategy.plan(new CycleOrderStrategy.PlanContext(
                 balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
-                currentCycle, starPointPrice));
+                starPointPrice, isReverseMode, isFirstReverseDay));
 
         // 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
         if (planOpt.isEmpty()) return ComputeResult.skipped();
