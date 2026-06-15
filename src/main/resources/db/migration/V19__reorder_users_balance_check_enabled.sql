@@ -21,8 +21,8 @@ ALTER TABLE users_old RENAME CONSTRAINT users_kakao_id_key1 TO users_old_kakao_i
 -- 3. 새 컬럼 순서로 재생성 (balance_check_enabled를 created_at 앞으로)
 -- ============================================================
 CREATE TABLE users (
-    id                    UUID         CONSTRAINT users_pkey PRIMARY KEY,
-    kakao_id              VARCHAR(50)  NOT NULL CONSTRAINT users_kakao_id_key UNIQUE,
+    id                    UUID         PRIMARY KEY,
+    kakao_id              VARCHAR(50)  NOT NULL UNIQUE,
     nickname              VARCHAR(100),
     status                VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     role                  VARCHAR(20)  NOT NULL DEFAULT 'USER',
