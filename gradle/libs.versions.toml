@@ -44,6 +44,10 @@ jjwt-jackson                   = { module = "io.jsonwebtoken:jjwt-jackson", vers
 
 # Testing
 archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+# Testcontainers — 버전은 Spring Boot BOM이 관리
+spring-boot-testcontainers     = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-junit-jupiter   = { module = "org.testcontainers:junit-jupiter" }
+testcontainers-postgresql      = { module = "org.testcontainers:postgresql" }
 
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }

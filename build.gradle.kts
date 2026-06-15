@@ -70,6 +70,10 @@ dependencies {
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.security.test)
     testImplementation(libs.archunit.junit5)
+    // Testcontainers — @DataJpaTest + PostgreSQL 통합 테스트 (*IT.java)
+    testImplementation(libs.spring.boot.testcontainers)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers.postgresql)
 }
 
 // Querydsl Q-class 생성 디렉토리 설정
@@ -92,10 +96,24 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 }
 
 tasks.named<Test>("test") {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // Docker/Testcontainers 필요 테스트는 기본 test 태스크에서 제외 — 별도 integration 태스크 사용
+        excludeTags("integration")
+    }
     jvmArgs("-XX:+EnableDynamicAgentLoading")
     systemProperty("user.timezone", "Asia/Seoul") // 테스트도 KST로 고정 — host TZ 무관하게 일관성 보장
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
+}
+
+// Docker + Testcontainers 통합 테스트 전용 태스크 — ./gradlew integration
+tasks.register<Test>("integration") {
+    group = "verification"
+    description = "Testcontainers PG 통합 테스트 (*IT.java)"
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    jvmArgs("-XX:+EnableDynamicAgentLoading")
+    systemProperty("user.timezone", "Asia/Seoul")
 }
