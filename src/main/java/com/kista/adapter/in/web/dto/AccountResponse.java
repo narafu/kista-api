@@ -22,7 +22,7 @@ public record AccountResponse(
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
-                maskAccountNo(fullNo),
+                maskAccountNo(a.accountNo()),  // 숫자 부분(8자리)만 마스킹
                 fullNo,
                 a.broker() != null ? a.broker().name() : null
         );
