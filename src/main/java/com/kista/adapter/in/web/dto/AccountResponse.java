@@ -12,6 +12,8 @@ public record AccountResponse(
         String nickname,
         @Schema(description = "마스킹된 계좌번호", example = "****4614")
         String accountNoMasked,
+        @Schema(description = "전체 계좌번호 (본인 계좌, 토글 표시용)", example = "74420614")
+        String accountNo,
         @Schema(description = "증권사", example = "KIS")
         String broker
 ) {
@@ -19,8 +21,14 @@ public record AccountResponse(
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
+                maskAccountNo(a.accountNo()),
                 a.accountNo(),
                 a.broker() != null ? a.broker().name() : null
         );
+    }
+
+    private static String maskAccountNo(String accountNo) {
+        if (accountNo == null || accountNo.length() <= 4) return "****";
+        return "****" + accountNo.substring(accountNo.length() - 4);
     }
 }
