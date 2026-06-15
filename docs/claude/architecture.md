@@ -62,7 +62,7 @@ adapter/out/
     kistoken/    ← KisTokenEntity(table=broker_tokens) + KisTokenJpaRepository + KisTokenPersistenceAdapter
     audit/       ← AuditLogEntity + AuditLogJpaRepository + AuditLogPersistenceAdapter
     trade/       ← Order (Entity + Repo + Adapter)
-    privacy/     ← PrivacyTradeMasterEntity + PrivacyTradeDetailEntity + PrivacyTradePersistenceAdapter (PrivacyTradePort 구현)
+    privacy/     ← PrivacyTradeBaseEntity + PrivacyTradeBaseOrderEntity + PrivacyTradePersistenceAdapter (PrivacyTradePort 구현)
     calendar/    ← UsMarketHolidayEntity + UsMarketHolidayJpaRepository + MarketCalendarPersistenceAdapter
     fcm/         ← FcmDeviceTokenEntity + FcmDeviceTokenJpaRepository + FcmDeviceTokenPersistenceAdapter
   notify/        ← TelegramAdapter (NotifyPort 구현 — 관리자봇 오류/리포트 알림)
@@ -125,16 +125,16 @@ domain      →  외부 의존 없음
 - **dev-token 소유권 제한**: `POST /api/auth/dev-token`은 고정 UUID(`...0001`) 소유 계좌만 접근 가능 — 403 시 DB에서 `cycle_position` 직접 조회로 대체
 
 ### PRIVACY 전략 패턴 (기준 매매표)
-- `privacy_trades_master` (`adapter/out/persistence/privacy/`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
-  - `(trade_date, ticker)` UNIQUE 제약 (`uq_privacy_trades_master_date_ticker`, V1, V4에서 제약명 rename) — 하루에 종목당 마스터 1건
+- `privacy_trade_bases` (`adapter/out/persistence/privacy/`, `PrivacyTradeBaseEntity`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
+  - `(trade_date, ticker)` UNIQUE 제약 (`uq_privacy_trade_bases_date_ticker`, V1, V4에서 `privacy_trades_master`로부터 rename) — 하루에 종목당 기준 매매표 1건
   - `updated_at` 없음 — `BaseCreatedAtEntity` 상속 (`createdAt`만)
-- `privacy_trades_detail`: 마스터 1행에 대한 계획 주문 세트 (direction/orderType/quantity/price)
+- `privacy_trade_base_orders` (`PrivacyTradeBaseOrderEntity`): 기준 매매표 1행에 대한 계획 주문 세트 (direction/orderType/quantity/price)
   - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리
 - FIDA 수신 흐름 (`PrivacyTradeSaveResult(id, created)` 반환):
   - `(tradeDate, ticker)` 없음 → INSERT → 201
   - 있고 내용 동일 → 200 (멱등)
   - 있고 내용 다름 → `PrivacyTradeConflictException` (`domain/model/privacy/`) → 409
 - `PrivacyTradeSaveResult` (`domain/port/out/`): `UUID id` + `boolean created` — 컨트롤러가 201/200 분기
-- 스케줄러 흐름: `StrategyType.PRIVACY` → `privacy_trades_master/detail` 조회 → `orders` 복사 (미구현, INFINITE와 동일 출구)
-- 테이블명 컨벤션: 마스터-디테일 분리 시 `xxx_master` / `xxx_detail` 접미사 패턴 사용
+- 스케줄러 흐름: `StrategyType.PRIVACY` → `privacy_trade_bases/base_orders` 조회 → `orders` 복사 (미구현, INFINITE와 동일 출구)
+- 테이블명 컨벤션: 기준-주문 분리 시 `xxx_bases` / `xxx_base_orders` 접미사 패턴 사용 (V4에서 `xxx_master`/`xxx_detail`에서 변경)
 

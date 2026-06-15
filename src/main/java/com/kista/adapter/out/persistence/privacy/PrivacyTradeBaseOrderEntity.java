@@ -16,7 +16,7 @@ import java.util.UUID;
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class PrivacyTradeDetailEntity extends BaseCreatedAtEntity {
+class PrivacyTradeBaseOrderEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -25,7 +25,7 @@ class PrivacyTradeDetailEntity extends BaseCreatedAtEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "privacy_trade_id", nullable = false)
-    private PrivacyTradeMasterEntity privacyTrade;
+    private PrivacyTradeBaseEntity privacyBase;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 5)

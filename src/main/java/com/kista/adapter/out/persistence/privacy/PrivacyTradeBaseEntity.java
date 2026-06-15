@@ -22,7 +22,7 @@ import java.util.UUID;
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
-class PrivacyTradeMasterEntity extends BaseCreatedAtEntity {
+class PrivacyTradeBaseEntity extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -48,6 +48,6 @@ class PrivacyTradeMasterEntity extends BaseCreatedAtEntity {
     @Column(nullable = false)
     private int holdings;                     // 보유 수량
 
-    @OneToMany(mappedBy = "privacyTrade", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PrivacyTradeDetailEntity> orders = new ArrayList<>();
+    @OneToMany(mappedBy = "privacyBase", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PrivacyTradeBaseOrderEntity> orders = new ArrayList<>();
 }

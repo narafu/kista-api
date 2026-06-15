@@ -11,9 +11,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PrivacyTradePort {
-    // FIDA 수신 데이터를 기준 매매표(master) + 주문 명세(details)로 저장
+    // FIDA 수신 데이터를 기준 매매표(base) + 주문 명세(orders)로 저장
     // 동일 (tradeDate, ticker)가 이미 존재하면 비교 후 일치 시 created=false, 불일치 시 PrivacyTradeConflictException
-    PrivacyTradeSaveResult saveMasterWithDetails(FidaOrderCommand command);
+    PrivacyTradeSaveResult saveBaseWithOrders(FidaOrderCommand command);
 
     // trade_date >= 오늘인 행 중 가장 미래 거래일의 기준가 반환 (없으면 empty)
     Optional<PrivacyCurrentBase> findCurrentBase();

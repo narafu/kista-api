@@ -32,31 +32,31 @@ class PrivacyServiceTest {
 
     @Test
     void executeFidaOrder_delegates_to_privacyTradePort() {
-        UUID masterId = UUID.randomUUID();
+        UUID baseId = UUID.randomUUID();
         LocalDate utcDate = LocalDate.now(); // FIDA 송신값 (UTC=US 거래일)
         FidaOrderCommand req = new FidaOrderCommand(
                 utcDate, Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
-        when(privacyTradePort.saveMasterWithDetails(any())).thenReturn(new PrivacyTradeSaveResult(masterId, true));
+        when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, true));
 
         PrivacyTradeSaveResult result = sut.executeFidaOrder(req);
 
-        assertThat(result.id()).isEqualTo(masterId);
+        assertThat(result.id()).isEqualTo(baseId);
         assertThat(result.created()).isTrue();
         // FIDA UTC → KST 변환된 새 request로 포트 호출됨
-        verify(privacyTradePort).saveMasterWithDetails(
+        verify(privacyTradePort).saveBaseWithOrders(
                 argThat(r -> r.tradeDate().equals(TradeDateConverter.toKst(utcDate))));
     }
 
     @Test
     void executeFidaOrder_returns_existing_when_not_created() {
-        UUID masterId = UUID.randomUUID();
+        UUID baseId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
-        when(privacyTradePort.saveMasterWithDetails(any())).thenReturn(new PrivacyTradeSaveResult(masterId, false));
+        when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, false));
 
         PrivacyTradeSaveResult result = sut.executeFidaOrder(req);
 

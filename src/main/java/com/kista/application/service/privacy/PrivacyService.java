@@ -39,6 +39,6 @@ class PrivacyService implements PrivacyUseCase {
                 command.holdings(),
                 command.orders()
         );
-        return privacyTradePort.saveMasterWithDetails(kstCommand);
+        return privacyTradePort.saveBaseWithOrders(kstCommand);
     }
 }

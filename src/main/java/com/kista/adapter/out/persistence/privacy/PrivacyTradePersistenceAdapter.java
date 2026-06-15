@@ -32,81 +32,77 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                     : a.price().compareTo(b.price()));
 
     // 주문 표시 정렬: BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순
-    private static final Comparator<PrivacyTradeDetailEntity> DETAIL_SORT = Comparator
-            .comparingInt((PrivacyTradeDetailEntity d) -> d.getDirection() == Order.OrderDirection.BUY ? 0 : 1)
+    private static final Comparator<PrivacyTradeBaseOrderEntity> BASE_ORDER_SORT = Comparator
+            .comparingInt((PrivacyTradeBaseOrderEntity o) -> o.getDirection() == Order.OrderDirection.BUY ? 0 : 1)
             .thenComparing((a, b) -> a.getDirection() == Order.OrderDirection.BUY
                     ? b.getPrice().compareTo(a.getPrice())
                     : a.getPrice().compareTo(b.getPrice()));
 
-    private final PrivacyTradeMasterJpaRepository masterRepository;
+    private final PrivacyTradeBaseJpaRepository baseRepository;
 
     @Override
     @Transactional
-    public PrivacyTradeSaveResult saveMasterWithDetails(FidaOrderCommand command) {
-        Optional<PrivacyTradeMasterEntity> existing = this.getByTradeDateAndTicker(command.tradeDate(), command.ticker());
+    public PrivacyTradeSaveResult saveBaseWithOrders(FidaOrderCommand command) {
+        Optional<PrivacyTradeBaseEntity> existing = this.getByTradeDateAndTicker(command.tradeDate(), command.ticker());
 
         if (existing.isPresent()) {
             // 동일 (tradeDate, ticker) 존재 — 내용 비교
-            PrivacyTradeMasterEntity master = existing.get();
-            if (isIdentical(master, command)) {
-                return new PrivacyTradeSaveResult(master.getId(), false); // 200
+            PrivacyTradeBaseEntity base = existing.get();
+            if (isIdentical(base, command)) {
+                return new PrivacyTradeSaveResult(base.getId(), false); // 200
             }
             throw new PrivacyTradeConflictException(
                     "기존 매매표와 내용이 다릅니다: tradeDate=" + command.tradeDate() + ", ticker=" + command.ticker());
         }
 
         // 신규 저장
-        PrivacyTradeMasterEntity master = new PrivacyTradeMasterEntity();
-        master.setTradeDate(TradeDateConverter.toUtc(command.tradeDate())); // KST 도메인 → UTC DB
-        master.setTicker(command.ticker());
-        master.setCurrentCycleStart(command.currentCycleStart());
-        master.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());
-        master.setAvgPrice(command.avgPrice());
-        master.setHoldings(command.holdings());
+        PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
+        base.setTradeDate(TradeDateConverter.toUtc(command.tradeDate())); // KST 도메인 → UTC DB
+        base.setTicker(command.ticker());
+        base.setCurrentCycleStart(command.currentCycleStart());
+        base.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());
+        base.setAvgPrice(command.avgPrice());
+        base.setHoldings(command.holdings());
 
-        // BUY → SELL 순 정렬 후 detail 생성 — cascade로 함께 저장
+        // BUY → SELL 순 정렬 후 주문 생성 — cascade로 함께 저장
         List<Order> sorted = command.orders().stream().sorted(ORDER_SORT).toList();
         for (Order order : sorted) {
-            PrivacyTradeDetailEntity detail = new PrivacyTradeDetailEntity();
-            detail.setPrivacyTrade(master);
-            detail.setDirection(order.direction());
-            detail.setOrderType(order.orderType());
-            detail.setQuantity(order.quantity());
-            detail.setPrice(order.price());
-            master.getOrders().add(detail);
+            PrivacyTradeBaseOrderEntity baseOrder = new PrivacyTradeBaseOrderEntity();
+            baseOrder.setPrivacyBase(base);
+            baseOrder.setDirection(order.direction());
+            baseOrder.setOrderType(order.orderType());
+            baseOrder.setQuantity(order.quantity());
+            baseOrder.setPrice(order.price());
+            base.getOrders().add(baseOrder);
         }
 
-        return new PrivacyTradeSaveResult(masterRepository.save(master).getId(), true); // 201
+        return new PrivacyTradeSaveResult(baseRepository.save(base).getId(), true); // 201
     }
 
-    private Optional<PrivacyTradeMasterEntity> getByTradeDateAndTicker(LocalDate kstDate, Ticker ticker) {
-        return masterRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB, 정확한 날짜 일치
+    private Optional<PrivacyTradeBaseEntity> getByTradeDateAndTicker(LocalDate kstDate, Ticker ticker) {
+        return baseRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB, 정확한 날짜 일치
     }
 
-    private boolean isIdentical(PrivacyTradeMasterEntity master, FidaOrderCommand command) {
-        if (master.getCurrentCycleStart().compareTo(command.currentCycleStart()) != 0) return false;
-        if (master.getCurrentCycleRealizedPnl().compareTo(command.currentCycleRealizedPnl()) != 0) return false;
-        if (!bigDecimalEquals(master.getAvgPrice(), command.avgPrice())) return false;
-        if (master.getHoldings() != command.holdings()) return false;
+    private boolean isIdentical(PrivacyTradeBaseEntity base, FidaOrderCommand command) {
+        if (base.getCurrentCycleStart().compareTo(command.currentCycleStart()) != 0) return false;
+        if (base.getCurrentCycleRealizedPnl().compareTo(command.currentCycleRealizedPnl()) != 0) return false;
+        if (!bigDecimalEquals(base.getAvgPrice(), command.avgPrice())) return false;
+        if (base.getHoldings() != command.holdings()) return false;
 
-        // detail 비교 — 동일한 정렬 기준으로 맞춘 후 순서대로 비교
-        List<PrivacyTradeDetailEntity> existingDetails = master.getOrders().stream()
-                .sorted(Comparator
-                        .comparingInt((PrivacyTradeDetailEntity d) -> d.getDirection() == Order.OrderDirection.BUY ? 0 : 1)
-                        .thenComparing((a, b) -> a.getDirection() == Order.OrderDirection.BUY
-                                ? b.getPrice().compareTo(a.getPrice())
-                                : a.getPrice().compareTo(b.getPrice())))
+        // 주문 비교 — 동일한 정렬 기준으로 맞춘 후 순서대로 비교
+        List<PrivacyTradeBaseOrderEntity> existingOrders = base.getOrders().stream()
+                .sorted(BASE_ORDER_SORT)
                 .toList();
         List<Order> incomingOrders = command.orders().stream().sorted(ORDER_SORT).toList();
 
-        if (existingDetails.size() != incomingOrders.size()) return false;
-        for (int i = 0; i < existingDetails.size(); i++) {
-            PrivacyTradeDetailEntity d = existingDetails.get(i);
+        if (existingOrders.size() != incomingOrders.size()) return false;
+        for (int i = 0; i < existingOrders.size(); i++) {
+            PrivacyTradeBaseOrderEntity e = existingOrders.get(i);
             Order o = incomingOrders.get(i);
-            if (d.getDirection() != o.direction()) return false;
-            if (d.getOrderType() != o.orderType()) return false;
-            if (!quantityEquals(d.getQuantity(), o.quantity())) return false;
-            if (d.getPrice().compareTo(o.price()) != 0) return false;
+            if (e.getDirection() != o.direction()) return false;
+            if (e.getOrderType() != o.orderType()) return false;
+            if (!quantityEquals(e.getQuantity(), o.quantity())) return false;
+            if (e.getPrice().compareTo(o.price()) != 0) return false;
         }
         return true;
     }
@@ -121,7 +117,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     public Optional<PrivacyCurrentBase> findCurrentBase() {
         // trade_date(UTC) >= 오늘(UTC)인 행 중 가장 미래 SOXL 기준가 조회
         LocalDate todayUtc = TradeDateConverter.toUtc(LocalDate.now()); // KST now → UTC
-        return masterRepository
+        return baseRepository
                 .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(todayUtc, Ticker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
                         TradeDateConverter.toKst(e.getTradeDate()))); // UTC DB → KST 도메인
@@ -130,7 +126,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
         // today는 KST 일자, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
-        return masterRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
+        return baseRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
                         TradeDateConverter.toUtc(today), Ticker.SOXL)
                 .map(entity -> {
                     LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
@@ -152,15 +148,15 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     @Transactional(readOnly = true)
     public List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromUtc) {
-        return masterRepository.findBasesFromTradeDate(fromUtc).stream()
+        return baseRepository.findBasesFromTradeDate(fromUtc).stream()
                 .map(this::toView)
                 .toList();
     }
 
     // 엔티티 → 조회 뷰 변환 (trade_date UTC → KST, 주문 정렬)
-    private PrivacyTradeBaseView toView(PrivacyTradeMasterEntity e) {
+    private PrivacyTradeBaseView toView(PrivacyTradeBaseEntity e) {
         List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()
-                .sorted(DETAIL_SORT)
+                .sorted(BASE_ORDER_SORT)
                 .map(d -> new PrivacyTradeBaseView.OrderLine(
                         d.getId(), d.getDirection().name(), d.getOrderType().name(), d.getPrice(), d.getQuantity()))
                 .toList();
