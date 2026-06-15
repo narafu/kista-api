@@ -29,6 +29,10 @@
 - `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 시드 수정 시 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
+### 잔고검증 토글 (User.balanceCheckEnabled)
+- `User.balanceCheckEnabled`: ON이면 `StrategyService` 시드 등록/수정 시 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
+- `UserService.updateBalanceCheckEnabled()`: OFF→ON 전환 시 활성 전략 존재하면 "시드>실잔고면 다음 사이클 회전 시 PAUSED" 경고 로그, ON→OFF 전환 시 "APBK0988 주문거부 가능" 경고 로그 (audit 목적, 차단 아님)
+
 
 ### MetaController (enum SSOT)
 - `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
@@ -46,7 +50,7 @@
 - **주문/체결 수량** (단건 거래 수량): `quantity` — `Order`, `PlannedOrder`, `Execution`, `DailyTransaction`
 - `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
 - DB 컬럼: `cycle_position.holdings`, `privacy_trade_bases.holdings`(보유) / `orders.quantity`, `privacy_trade_base_orders.quantity`(주문, nullable — FIDA 수신 시 수량 미확정 케이스 허용)
-- KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 — `cblcQty`→`balanceQuantity`, `slclQty`→`sellLiquidationQuantity`, `ftCcldQty`→`filledQuantity`, `ftOrdQty`→`orderedQuantity`, `cblcQty13`→`balanceQuantity13`
+- KIS 어댑터 내부 record: `@JsonProperty` 값(KIS API 키)은 유지, Java 필드명만 의미 명료화 완료 (예: `cblcQty`→`balanceQuantity`)
 - 복합 수량 필드: `orderedQty`/`filledQty` 패턴 금지 → `orderedQuantity`/`filledQuantity`
 - `InfinitePosition.calcXxxQuantity()` 메서드명은 "주문 수량 계산 결과"이므로 Quantity 유지 (보유수량 아님)
 
@@ -112,8 +116,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `74420614-01` 형태로 하나의 필드에 합치면 KIS API CANO 파라미터 오류 — 반드시 분리
 
 ### Flyway
-- `V1__init.sql` **수정 금지** — 새 마이그레이션은 `V2__...` 이후로
-- 현재 최신: `V19__reorder_users_balance_check_enabled.sql`
+- `V1__init.sql` **수정 금지** — 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인)
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (`avg_price` 사례, V1/V5/V7)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
@@ -236,6 +239,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - 인라인 `REFERENCES` 대신 `CONSTRAINT 명시_fkey FOREIGN KEY (...)` 형식 사용 권장 — 명시적 이름으로 충돌 없이 생성됨
 - 기존 접미사 제약 정리: `ALTER TABLE t RENAME CONSTRAINT old_fkey1 TO old_fkey;` 후 다음 마이그레이션에서 정상 이름으로 참조 가능
 - 실제 제약명 확인: `SELECT conname FROM pg_constraint WHERE conrelid = 'table'::regclass AND contype = 'f';`
+- **PK 인덱스도 Postgres가 자동 리네임**(`t_pkey` → `t_old_pkey`) — RENAME 후 수동 `ALTER INDEX t_pkey ...` 호출 시 "relation does not exist" 오류 (V16 운영 배포 실패 사례, 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 `t_pkey` 생성됨
 
 ### .env 파일 멀티라인 값 금지
 - JSON 환경변수(예: `FIREBASE_SERVICE_ACCOUNT_JSON`)는 반드시 한 줄로 직렬화 — `.env` 파서는 줄바꿈을 값 끝으로 인식, 첫 줄 이후 무시됨

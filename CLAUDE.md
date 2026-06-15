@@ -45,7 +45,9 @@ docker compose up -d postgres                               # DB만 기동
 @docs/claude/architecture.md
 @docs/claude/constraints.md
 @docs/claude/testing.md
-@docs/claude/kis-api.md
-@docs/claude/toss-api.md
-@docs/claude/docker-infra.md
 @docs/claude/workflow.md
+
+## 참고 문서 (필요시 Read)
+- KIS API 작업: `docs/claude/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
+- 토스증권 API 작업: `docs/claude/toss-api.md`
+- Docker/배포/인프라 작업: `docs/claude/docker-infra.md`

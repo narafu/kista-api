@@ -4,10 +4,7 @@
 - Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
 - 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
-- DB `tradeDate`(LocalDate) 컬럼만 **UTC = US 거래일** 의미로 저장 — 도메인은 KST 일자, persistence 경계에서 `TradeDateConverter`로 ±1일 변환
-- 변환 위치: `OrderPersistenceAdapter`, `PrivacyTradePersistenceAdapter` 의 toEntity/toDomain + LocalDate 파라미터 조회 메서드
-- JPA `@Converter(autoApply=true)` 자동 적용 금지 — 가시성 위해 명시 호출만 사용
-- `LocalDate.now(ZoneOffset.UTC)` 직접 사용 금지 — KST `LocalDate.now()` 사용 후 Adapter 경계에서 `TradeDateConverter.toUtc()` 경유
+- tradeDate(KST)↔trade_date(UTC=US 거래일) 변환 정책: `constraints.md`의 "tradeDate 변환 정책" 섹션 참고
 
 ### Fly.io 런타임 메모리 설정
 - Fly.io: 1GB RAM (`fly.toml [[vm]] memory='1gb'`)
@@ -55,3 +52,95 @@
 - 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop app postgres && docker compose rm -f postgres app` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ `docker compose up -d app` (Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
 - 복원 시 flyway_schema_history duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
 - `${DB_NAME:-}` 환경변수 미설정 시 `POSTGRES_DB=""` → kistadb 자동 생성 안 됨, postgres 기본 DB는 POSTGRES_USER값("kista") — 새 볼륨 후 반드시 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
+
+## 배포/인프라/외부 연동 런북
+
+### Fly.io 배포 모니터링
+```bash
+# 운영 로그 실시간 조회
+fly logs -a kista-api                                           # kista-api 운영 로그
+
+# 헬스 체크
+curl https://kista-api.fly.dev/actuator/health
+# 배포 상태 확인
+fly status -a kista-api
+# 수동 배포 (main 브랜치 push 시 GitHub Actions 자동 배포)
+fly deploy --app kista-api
+# 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
+# 로컬 Docker 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB) — kista-kista-api-1 아님
+# 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
+```
+
+### Fly.io 환경변수 설정
+```bash
+# 환경변수 일괄 설정
+fly secrets set KEY=VALUE KEY2=VALUE2 --app kista-api
+# 환경변수 목록 확인
+fly secrets list --app kista-api
+# 필수: KIS_APP_KEY/SECRET/HTS_ID, KIS_ACCOUNT_NO/TYPE, KIS_SYMBOL/EXCHANGE_CODE,
+#        TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD, GEMINI_API_KEY,
+#        JWT_SIGNING_KEY, AES_ENCRYPTION_KEY,
+#        ADMIN_KAKAO_IDS (쉼표 구분 카카오 ID 목록, 자동 ADMIN 승격)
+#        CORS_ALLOWED_ORIGINS (Vercel 프로덕션 URL)
+# SPRING_PROFILES_ACTIVE=prod 는 fly.toml [env]에 이미 고정
+```
+
+### kista-ui 운영 로그 조회
+```bash
+# 운영 로그 실시간 조회 (vercel-cli)
+vercel logs                                                     # kista-ui 운영 로그
+```
+
+### kista-ui URL 변경 연동 (멀티 레포)
+# kista-api URL 변경 후 kista-ui에 전달하는 방법:
+# 1) 이 대화의 변경 목록을 kista-ui 세션에 붙여넣기 (가장 빠름)
+# 2) kista-ui 세션에서: git -C <kista-api 절대경로> diff HEAD~1
+# kista-api 세션에서 절대경로로 kista-ui 파일 직접 편집 가능하나 git 커밋은 kista-ui 세션에서 따로 수행
+
+### kis-trade-mcp 재시작
+```bash
+# 소스: ~/workspace/open-trading-api/MCP/Kis Trading MCP
+# `KeyError: 'my_acct'` 오류 = ENV=live로 실행 시 재시작마다 yaml 재생성 → docker exec sed 수정은 무의미, 이미지 재빌드 필수
+docker stop kis-trade-mcp && docker rm kis-trade-mcp
+docker build -t kis-trade-mcp:latest ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP
+docker run -d -p 3001:3000 --name kis-trade-mcp \
+  --env-file ~/workspace/open-trading-api/MCP/Kis\ Trading\ MCP/.env.live \
+  -e KIS_APP_KEY=<kista .env의 KIS_APP_KEY> \
+  -e "KIS_APP_SECRET=<kista .env의 KIS_APP_SECRET>" \
+  -e KIS_HTS_ID=<kista .env의 KIS_HTS_ID> \
+  -e KIS_ACCT_STOCK=<kista .env의 KIS_ACCOUNT_NO> \
+  -e KIS_PROD_TYPE=01 \
+  kis-trade-mcp:latest
+# KIS_ACCOUNT_NO → KIS_ACCT_STOCK (변수명 다름 주의)
+# KIS_PROD_TYPE=01 필수 — .env.live에 빈값으로 있어서 누락 시 my_prod='' → changeTREnv 분기 미적용
+```
+
+### .mcp.json 경로 이식성
+- args에 절대경로 하드코딩 금지 — `"command": "sh", "args": ["-c", "node ${HOME}/workspace/..."]` 패턴으로 Mac/WSL 공용화
+- `env` 섹션 값은 쉘 확장 없이 리터럴 문자열로 전달됨 — `${HOME}` 써도 확장 안 됨
+- 환경변수 참조가 필요한 값은 `sh -c "VAR=${HOME}/... node ..."` 형태로 args에 포함
+- HTTP 타입 MCP `headers` 값도 리터럴 — 토큰 하드코딩 금지
+- 인증이 필요한 MCP는 `stdio` 타입 + `sh -c "npx mcp-remote <url> --header \"Authorization: Bearer ${TOKEN_VAR}\""` 패턴, 토큰은 `~/.zshrc`에 `export TOKEN_VAR=...`
+- `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
+- `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
+
+### Privacy 기준표 운영 → 로컬 마이그레이션 (supabase-cli)
+# "privacy 기준표 운영에서 로컬로 마이그레이션" 요청 시 이 절차 사용
+# 대상 테이블: privacy_trade_bases (기준 마스터), privacy_trade_base_orders (주문 세트)
+```bash
+# 1. 운영 DB에서 CSV 덤프
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" > /tmp/privacy_trade_bases.csv
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_base_orders ORDER BY created_at" > /tmp/privacy_trade_base_orders.csv
+
+# 2. CSV를 로컬 컨테이너에 복사
+docker cp /tmp/privacy_trade_bases.csv kista-api-postgres-1:/tmp/privacy_trade_bases.csv
+docker cp /tmp/privacy_trade_base_orders.csv kista-api-postgres-1:/tmp/privacy_trade_base_orders.csv
+
+# 3. 로컬 DB에 임포트 (NULL 'NULL' 옵션 필수 — supabase CSV에서 NULL이 문자열 "NULL"로 출력됨)
+docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
+  "COPY privacy_trade_bases (id, trade_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
+  "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, quantity, price, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+```
+# 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
+# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases;"

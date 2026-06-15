@@ -67,7 +67,7 @@
 ### kis-trade-mcp (localhost:3001)
 - `open-trading-api/MCP/Kis Trading MCP` 소스, SSE 모드 Docker 컨테이너
 - docker run 시 KIS 자격증명 환경변수 필수: `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값 — 변수명 다름 주의)
-- 재시작/문제 발생 시: `commands.md`의 `kis-trade-mcp 재시작` 섹션 참고
+- 재시작/문제 발생 시: `docker-infra.md`의 `kis-trade-mcp 재시작` 섹션 참고
 
 ### 기간손익 API (TTTS3039R, KisProfitAdapter)
 - TR ID: `TTTS3039R` (주의: `TTTS3027R` 아님 — 오기 주의)
