@@ -19,8 +19,8 @@ public record Account(
     @Getter
     @RequiredArgsConstructor
     public enum Broker {
-        KIS("한국투자증권"),  // 한국투자증권 Open API
-        TOSS("토스증권");     // 토스증권 Open API
+        TOSS("토스증권"),    // 토스증권 Open API
+        KIS("한국투자증권");  // 한국투자증권 Open API
 
         private final String label; // 한국어 표시 이름
     }
