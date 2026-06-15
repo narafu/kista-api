@@ -18,13 +18,22 @@ public record AccountResponse(
         String broker
 ) {
     public static AccountResponse from(Account a) {
+        String fullNo = fullAccountNo(a);
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
-                maskAccountNo(a.accountNo()),
-                a.accountNo(),
+                maskAccountNo(fullNo),
+                fullNo,
                 a.broker() != null ? a.broker().name() : null
         );
+    }
+
+    // KIS: accountNo(8자리) + "-" + kisAccountType(01) 조합, 나머지 브로커는 accountNo 그대로
+    private static String fullAccountNo(Account a) {
+        if (a.broker() == Account.Broker.KIS && a.kisAccountType() != null) {
+            return a.accountNo() + "-" + a.kisAccountType();
+        }
+        return a.accountNo();
     }
 
     private static String maskAccountNo(String accountNo) {
