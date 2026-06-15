@@ -19,13 +19,8 @@ public record AccountResponse(
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
-                maskAccountNo(a.accountNo()),
+                a.accountNo(),
                 a.broker() != null ? a.broker().name() : null
         );
-    }
-
-    private static String maskAccountNo(String accountNo) {
-        if (accountNo == null || accountNo.length() <= 4) return "****";
-        return "****" + accountNo.substring(accountNo.length() - 4);
     }
 }
