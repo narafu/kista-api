@@ -6,9 +6,12 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
+import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
@@ -31,6 +34,8 @@ import java.util.UUID;
 class UserService implements UserUseCase {
 
     private final UserPort userPort;
+    private final AccountPort accountPort;         // OFF→ON 전환 시 활성 전략 조회용
+    private final StrategyPort strategyPort;       // OFF→ON 전환 시 활성 전략 조회용
     private final UserCascadeDeleter userCascadeDeleter;
     private final UserNotificationPort notificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
@@ -186,14 +191,31 @@ class UserService implements UserUseCase {
         boolean previous = user.balanceCheckEnabled();
         userPort.save(user.withBalanceCheckEnabled(enabled));
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", userId, previous, enabled);
-        // OFF→ON 전환 시 경고: 실잔고보다 큰 시드를 가진 전략이 다음 회전에서 PAUSE될 수 있음
+
+        // OFF→ON: 활성 전략 시드 vs 실잔고 미검증 경고
         if (!previous && enabled) {
-            log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략의 시드가 실잔고를 초과하면 다음 사이클 회전 시 PAUSED될 수 있습니다.", userId);
+            long activeCount = countActiveStrategies(userId);
+            if (activeCount > 0) {
+                log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략 {}개가 있습니다. " +
+                        "시드가 실잔고를 초과하면 다음 사이클 회전 시 PAUSED됩니다.", userId, activeCount);
+            } else {
+                log.info("[잔고검증 OFF→ON] userId={} — 활성 전략 없음, 즉시 영향 없음.", userId);
+            }
         }
-        // ON→OFF 전환 시 경고: 실잔고보다 큰 시드로 사이클이 시작되면 KIS에서 주문 거부될 수 있음
+        // ON→OFF: 잔고 미검증으로 인한 KIS 주문 거부 가능성 경고
         if (previous && !enabled) {
-            log.warn("[잔고검증 ON→OFF] userId={} — 실잔고보다 큰 시드로 사이클이 재등록되면 KIS에서 주문이 거부(APBK0988)될 수 있습니다.", userId);
+            long activeCount = countActiveStrategies(userId);
+            log.warn("[잔고검증 ON→OFF] userId={} — 활성 전략 {}개. " +
+                    "실잔고보다 큰 시드로 재등록되면 KIS에서 주문이 거부(APBK0988)될 수 있습니다.", userId, activeCount);
         }
+    }
+
+    // 사용자의 활성 전략 수 — 계좌별 ACTIVE 전략 합산
+    private long countActiveStrategies(UUID userId) {
+        return accountPort.findByUserId(userId).stream()
+                .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
+                .filter(strategy -> strategy.status() == Strategy.Status.ACTIVE)
+                .count();
     }
 
     @Override
