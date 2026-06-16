@@ -34,6 +34,7 @@ class TradingService {
     private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼
+    private final BrokerMarginRouter brokerMarginRouter;       // 브로커별 live 매수가능금액 조회
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
@@ -163,6 +164,11 @@ class TradingService {
 
         // 1. 잔고 로드
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
+        // Toss는 체결 API 없어 cycle_position.usd_deposit이 stale — live 매수가능금액으로 보정
+        if (account.broker() == Account.Broker.TOSS) {
+            BigDecimal liveUsdDeposit = brokerMarginRouter.getUsdBuyableAmount(account);
+            balance = new AccountBalance(balance.holdings(), balance.avgPrice(), liveUsdDeposit);
+        }
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (개장 잡 선행 또는 수동 주문 보존)
@@ -264,6 +270,11 @@ class TradingService {
 
         // 잔고 로드
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
+        // Toss는 체결 API 없어 cycle_position.usd_deposit이 stale — live 매수가능금액으로 보정
+        if (account.broker() == Account.Broker.TOSS) {
+            BigDecimal liveUsdDeposit = brokerMarginRouter.getUsdBuyableAmount(account);
+            balance = new AccountBalance(balance.holdings(), balance.avgPrice(), liveUsdDeposit);
+        }
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
