@@ -124,6 +124,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
         // today는 KST 일자, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
         return baseRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
