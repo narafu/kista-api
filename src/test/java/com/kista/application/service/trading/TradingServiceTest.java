@@ -100,7 +100,7 @@ class TradingServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, notifyPort, cycleHistoryPort);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cycleHistoryPort);
         // CycleRotationService: brokerMarginRouter wraps kisMarginPort for KIS 계좌 테스트
         BrokerMarginRouter marginRouter = new BrokerMarginRouter(kisMarginPort, null);
         CycleRotationService rotationService = new CycleRotationService(
@@ -109,7 +109,7 @@ class TradingServiceTest {
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, orderRouter, priceCapper);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, orderRouter, priceCapper, notifyPort);
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService);
@@ -211,26 +211,6 @@ class TradingServiceTest {
         verify(kisPricePort, never()).getPrices(anyList(), any()); // 휴장 시 KIS 가격 조회 생략
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(cycleHistoryPort, never()).findLatestByStrategyId(any(), anyInt());
-        verify(orderPort, never()).saveAll(any());
-        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
-    }
-
-    @Test
-    void execute_insufficientBalance_notifiesAndSkipsTrading() throws InterruptedException {
-        // 매수금액($20) > 잔액($10) → skip + notify
-        Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null);
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        // 잔액 부족 시 조기 반환 → getPrices(종가 조회)까지 도달하지 않음
-        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(LOW_HISTORY));
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(overBudgetBuy));
-
-        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
-
-        verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), eq(LOW_BALANCE), eq(Ticker.SOXL));
-        verify(kisPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음 — getPrices 성공
         verify(orderPort, never()).saveAll(any());
         verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
     }

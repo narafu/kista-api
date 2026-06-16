@@ -179,16 +179,6 @@ class TradingService {
         if (!todayOrders.isEmpty()) {
             log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), todayOrders.size());
 
-            // 예수금 부족 확인 — PLANNED BUY 주문 합계 vs 현재 잔고
-            List<Order> plannedBuys = todayOrders.stream()
-                    .filter(o -> o.status() == Order.OrderStatus.PLANNED && o.direction() == Order.OrderDirection.BUY)
-                    .toList();
-            if (!plannedBuys.isEmpty() && !balance.isOrderValid(plannedBuys)) {
-                log.warn("[{}] 예수금 부족 — 매수 주문 건너뜀", account.nickname());
-                userNotificationPort.notifyInsufficientBalance(ctx.user(), account, strategy.ticker());
-                orderPort.deletePlannedBuyByCycleAndDate(currentCycle.id(), today);
-            }
-
             if (strategy.type() == Strategy.Type.INFINITE) {
                 // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
                 CycleOrderComputer.ComputeResult recalc = orderComputer.compute(

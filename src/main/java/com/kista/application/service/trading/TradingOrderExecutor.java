@@ -3,6 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,10 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-// 브로커 접수: BUY 가격 보정 → PLANNED 일괄 접수 → PLACED 마킹
+// 브로커 접수: BUY 가격 보정 → PLANNED 개별 접수 → PLACED 마킹 (접수 실패 주문은 로그 후 skip)
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -22,18 +24,13 @@ class TradingOrderExecutor {
     private final OrderPort orderPort;
     private final BrokerOrderRouter brokerOrderRouter;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
+    private final NotifyPort notifyPort;
 
-    // 지정된 주문 목록만 KIS 접수 (개장 잡 매도 선접수용 — BUY 보정 없음)
+    // 지정된 주문 목록만 브로커 접수 (개장 잡 매도 선접수용 — BUY 보정 없음)
     List<Order> placeGiven(List<Order> orders, Account account) {
         if (orders.isEmpty()) return List.of();
-        List<Order> placed = orders.stream().map(p -> {
-            Order placedOrder = brokerOrderRouter.place(p, account);
-            orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
-            return new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
-                    p.orderType(), p.direction(), p.quantity(), p.price(),
-                    Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null);
-        }).toList();
-        log.info("[{}] 주문 {}건 선접수", account.nickname(), placed.size());
+        List<Order> placed = placeEach(orders, account);
+        log.info("[{}] 주문 {}건 선접수 (성공)", account.nickname(), placed.size());
         return placed;
     }
 
@@ -44,15 +41,27 @@ class TradingOrderExecutor {
             buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
         }
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
-        List<Order> placed = planned.stream().map(p -> {
-            Order placedOrder = brokerOrderRouter.place(p, account);
-            orderPort.markPlaced(p.id(), placedOrder.externalOrderId()); // 접수 완료 즉시 기록
-            // KIS 응답 Order는 id=null — DB PK(p.id())를 살려서 반환 (취소 API에서 사용)
-            return new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
-                    p.orderType(), p.direction(), p.quantity(), p.price(),
-                    Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null);
-        }).toList();
-        log.info("[{}] 주문 {}건 접수", account.nickname(), placed.size());
+        List<Order> placed = placeEach(planned, account);
+        log.info("[{}] 주문 {}건 접수 (성공/{} 시도)", account.nickname(), placed.size(), planned.size());
+        return placed;
+    }
+
+    // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)
+    private List<Order> placeEach(List<Order> orders, Account account) {
+        List<Order> placed = new ArrayList<>();
+        for (Order p : orders) {
+            try {
+                Order placedOrder = brokerOrderRouter.place(p, account);
+                orderPort.markPlaced(p.id(), placedOrder.externalOrderId()); // 접수 완료 즉시 기록
+                placed.add(new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
+                        p.orderType(), p.direction(), p.quantity(), p.price(),
+                        Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null));
+            } catch (Exception e) {
+                // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
+                log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
+                notifyPort.notifyError(e);
+            }
+        }
         return placed;
     }
 }

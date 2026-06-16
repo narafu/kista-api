@@ -5,6 +5,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-// PLANNED → KIS 접수 → PLACED 마킹 흐름과 가격 보정 호출 조건(currentPrice/position 둘 다 있을 때만) 검증
+// PLANNED → 브로커 접수 → PLACED 마킹 흐름과 가격 보정 호출 조건(currentPrice/position 둘 다 있을 때만) 검증
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TradingOrderExecutor 단위 테스트")
 class TradingOrderExecutorTest {
@@ -29,6 +30,7 @@ class TradingOrderExecutorTest {
     @Mock OrderPort orderPort;
     @Mock BrokerOrderRouter brokerOrderRouter;
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
+    @Mock NotifyPort notifyPort;
 
     static final LocalDate TODAY = LocalDate.now();
 
@@ -45,7 +47,7 @@ class TradingOrderExecutorTest {
             new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, brokerOrderRouter, buyOrderPriceCapper);
+        return new TradingOrderExecutor(orderPort, brokerOrderRouter, buyOrderPriceCapper, notifyPort);
     }
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {

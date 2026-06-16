@@ -9,7 +9,6 @@ import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +33,6 @@ class CycleOrderComputer {
     private static final int STAR_POINT_WINDOW = 5;
 
     private final CycleOrderStrategies cycleStrategies;   // 전략 타입별 주문 전략 라우터
-    private final NotifyPort notifyPort;                  // 잔고 부족 알림 (computeIfValid 전용)
     private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
@@ -70,7 +68,7 @@ class CycleOrderComputer {
 
         CycleOrderStrategy.OrderPlan plan = planOpt.get();
 
-        // valid=false: 매수금액 > 잔액 or 매도수량 > 보유수량
+        // valid: UI 미리보기에서 잔고 부족 표시 용도 — 실제 주문 접수는 브로커 API가 최종 판단
         return new ComputeResult(plan, balance.isOrderValid(plan.orders()));
     }
 
@@ -87,22 +85,16 @@ class CycleOrderComputer {
         return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
     }
 
-    // compute + 잔고 유효성 실패 시 경고 로그·부족 알림까지 수행 — TradingService/ManualTradingService 공용
-    // skip 또는 invalid면 Optional.empty() 반환 (invalid인 경우만 알림 발송)
+    // 전략 계산 수행 — 전략 차원 skip이면 empty, 아니면 계산 결과 반환 (잔고 유효성 검사 제거됨)
     Optional<ComputeResult> computeIfValid(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                             LocalDate tradeDate, StrategyCycle currentCycle,
                                             PrivacyTradeBase privacyBase, String label, Account account) {
         ComputeResult result = compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, label);
         if (result.isSkipped()) return Optional.empty();
-        if (!result.valid()) {
-            log.warn("[{}] 주문 유효성 실패 — 잔액 부족 또는 보유수량 초과", account.nickname());
-            notifyPort.notifyInsufficientBalance(account, balance, strategy.ticker());
-            return Optional.empty();
-        }
         return Optional.of(result);
     }
 
-    // plan==null이면 전략 차원 skip / valid는 잔고 유효성 판정 (skip 시 무의미)
+    // plan==null이면 전략 차원 skip / valid는 UI 미리보기용 잔고 유효성 (주문 접수 블로킹 용도 아님)
     // position은 INFINITE만 non-null — INSUFFICIENT_BALANCE 미리보기에서도 단위금액 전달 위해 보존
     record ComputeResult(CycleOrderStrategy.OrderPlan plan, boolean valid) {
         static ComputeResult skipped() {
