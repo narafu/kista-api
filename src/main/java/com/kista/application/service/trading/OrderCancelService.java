@@ -5,6 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
+import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -39,16 +40,22 @@ class OrderCancelService {
         // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리
         var currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
 
-        // 오늘 PLACED된 주문 조회 (UTC 기준 — TradeDateConverter 없이 도메인 LocalDate 사용)
-        List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), LocalDate.now());
-        if (placedOrders.isEmpty()) {
-            return new CancelResult(0, 0);
+        // ManualTradingService와 동일 날짜 기준 사용 (KST 04:00 이후면 +1일 = 수동 실행 tradeDate)
+        LocalDate tradeDate = DstInfo.nextTradeDate();
+
+        // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
+        List<Order> plannedOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate);
+        int plannedDeleted = plannedOrders.size();
+        if (!plannedOrders.isEmpty()) {
+            orderPort.deletePlannedByCycleAndDate(currentCycle.id(), tradeDate);
+            log.info("PLANNED 주문 {}건 삭제 — cycleId={}", plannedDeleted, currentCycle.id());
         }
 
-        int cancelledCount = 0;
+        // PLACED 주문: 증권사 취소 + DB 상태 변경 (best-effort)
+        List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), tradeDate);
+        int cancelledCount = plannedDeleted;
         int failedCount = 0;
 
-        // best-effort: 개별 주문마다 취소 시도, 실패해도 계속 진행
         for (Order order : placedOrders) {
             try {
                 cancelViaBroker(order, account);
@@ -71,9 +78,15 @@ class OrderCancelService {
         // 소유권 검증: 주문의 계좌가 요청자 소유인지 확인
         Account account = accountPort.requireOwnedAccount(order.accountId(), requesterId);
 
-        // PLACED 상태가 아니면 취소 불가
+        if (order.status() == Order.OrderStatus.PLANNED) {
+            // 증권사 미접수 — DB에서만 취소 처리
+            orderPort.markCancelled(orderId);
+            return;
+        }
+
+        // PLACED 상태: 증권사 취소 후 DB 상태 변경
         if (order.status() != Order.OrderStatus.PLACED) {
-            throw new OrderCancelException("PLACED 상태 주문만 취소 가능합니다. 현재 상태: " + order.status());
+            throw new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: " + order.status());
         }
 
         cancelViaBroker(order, account);
