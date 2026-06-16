@@ -11,6 +11,7 @@ import com.kista.domain.port.out.TosAccountPort;
 import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossPortfolioPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort {
@@ -79,6 +81,9 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                 ? krwBuyable.divide(usdToKrwRate, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
         BigDecimal totalUsd = usdBuyable.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
+
+        // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
+        log.info("Toss 통합증거금 조회: USD=${}, KRW=₩{}, 환율={}, 합산USD=${}", usdBuyable, krwBuyable, usdToKrwRate, totalUsd);
 
         return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, totalUsd, usdToKrwRate));
     }
