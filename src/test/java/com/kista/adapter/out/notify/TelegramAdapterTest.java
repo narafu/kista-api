@@ -85,25 +85,6 @@ class TelegramAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void notifyReport_bodyContainsDateAndAmounts() {
-        TradingSnapshot snapshot = new TradingSnapshot(10,
-                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
-        TradingReport report = new TradingReport(
-                LocalDate.of(2024, 6, 15), snapshot, List.of(),
-                new BigDecimal("66.00"), new BigDecimal("35.00"));
-
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        adapter.notifyReport(report);
-
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
-        assertThat(text).contains("2024-06-15")
-                        .contains("66.00")
-                        .contains("35.00");
-    }
-
-    @Test
     void send_withEmptyToken_skipsRestTemplateCall() {
         TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restTemplate);
         TelegramAdapter noTokenAdapter = new TelegramAdapter(emptyHttpClient, EMPTY_PROPS);

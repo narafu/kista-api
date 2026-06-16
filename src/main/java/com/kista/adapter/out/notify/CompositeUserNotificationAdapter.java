@@ -65,4 +65,10 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
         if (user.notificationChannel().includesTelegram()) telegram.notifyInsufficientBalance(user, account, ticker);
         if (user.notificationChannel().includesFcm())      fcm.notifyInsufficientBalance(user, account, ticker);
     }
+
+    @Override
+    public void notifyError(User user, Exception e) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyError(user, e);
+        if (user.notificationChannel().includesFcm())      fcm.notifyError(user, e);
+    }
 }

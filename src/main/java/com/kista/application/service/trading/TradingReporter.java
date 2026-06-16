@@ -68,15 +68,13 @@ class TradingReporter {
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
-        if (snapshot != null) { // PRIVACY 전략은 스냅샷 없음 — 텔레그램 리포트 생략
-            // 매매 후 상태로 스냅샷 재계산 (종가 기준 편차율·목표가 포함)
-            TradingSnapshot postSnapshot = closingPrice != null
-                    ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice, strategy.divisionCount()).toSnapshot()
-                    : snapshot;
-            TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
-            userNotificationPort.notifyTradingReport(user, account, report);
-            log.info("[{}] 텔레그램 리포트 발송 완료", account.nickname());
-        }
+        // INFINITE: 종가 기준 스냅샷 재계산 / PRIVACY: snapshot=null 그대로
+        TradingSnapshot postSnapshot = snapshot != null && closingPrice != null
+                ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice, strategy.divisionCount()).toSnapshot()
+                : snapshot;
+        TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
+        userNotificationPort.notifyTradingReport(user, account, report);
+        log.info("[{}] 리포트 발송 완료", account.nickname());
         // 체결 건별 SSE 실시간 알림
         for (Execution e : executions) {
             TradeEvent event = e.direction() == SELL

@@ -116,7 +116,7 @@ class TradingServiceTest {
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
-                balanceLoader, orderComputer, orderPlanner,
+                balanceLoader, marginRouter, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
     }
 

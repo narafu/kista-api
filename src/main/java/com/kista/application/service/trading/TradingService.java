@@ -111,7 +111,7 @@ class TradingService {
                                       PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CycleState> states = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            runSafely("planAndSaveOrders", ctx.strategy().id(),
+            runSafely("planAndSaveOrders", ctx,
                     () -> planAndSaveOrders(ctx, startPriceSnapshots, privacyBase, today))
                     .ifPresent(states::add);
         }
@@ -122,7 +122,7 @@ class TradingService {
     private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
-            runSafely("KIS 접수", state.ctx().strategy().id(), () -> {
+            runSafely("KIS 접수", state.ctx(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
@@ -145,7 +145,7 @@ class TradingService {
             CycleState st = ps.state();
             Strategy strategy = st.ctx().strategy();
             StrategyCycle currentCycle = st.ctx().currentCycle();
-            runSafely("recordAndNotify", strategy.id(), () -> {
+            runSafely("recordAndNotify", ps.state().ctx(), () -> {
                 reporter.recordAndNotify(today, strategy, currentCycle, st.ctx().account(), st.ctx().user(),
                         st.balance(), st.snapshot(), closingPrices.get(strategy.ticker()),
                         ps.mainOrders(), st.privacyBase());
@@ -251,7 +251,7 @@ class TradingService {
 
         // 전략별: order 생성·저장 + INFINITE 매도 선접수
         for (BatchContext ctx : contexts) {
-            runSafely("개장 order+매도접수", ctx.strategy().id(), () -> {
+            runSafely("개장 order+매도접수", ctx, () -> {
                 planSaveAndPlaceSells(ctx, startPriceSnapshots, privacyBase, tradeDate);
                 return null;
             });
@@ -343,20 +343,21 @@ class TradingService {
         log.info("PostClose 대기 완료");
     }
 
-    // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 알림 후 Optional.empty() 반환 (격리 실행)
+    // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 + 사용자 알림 후 Optional.empty() 반환 (격리 실행)
     @FunctionalInterface
     private interface ThrowingSupplier<T> {
         T get() throws Exception;
     }
 
-    private <T> Optional<T> runSafely(String phase, UUID strategyId, ThrowingSupplier<T> supplier) throws InterruptedException {
+    private <T> Optional<T> runSafely(String phase, BatchContext ctx, ThrowingSupplier<T> supplier) throws InterruptedException {
         try {
             return Optional.ofNullable(supplier.get());
         } catch (InterruptedException e) {
             throw e; // InterruptedException은 삼키지 않음
         } catch (Exception e) {
-            log.error("[strategyId={}] {} 오류: {}", strategyId, phase, e.getMessage(), e);
+            log.error("[strategyId={}] {} 오류: {}", ctx.strategy().id(), phase, e.getMessage(), e);
             notifyPort.notifyError(e);
+            userNotificationPort.notifyError(ctx.user(), e);
             return Optional.empty();
         }
     }

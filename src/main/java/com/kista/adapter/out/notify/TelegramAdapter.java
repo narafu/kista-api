@@ -2,7 +2,6 @@ package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
@@ -16,20 +15,6 @@ public class TelegramAdapter implements NotifyPort {
 
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
-
-    @Override
-    public void notifyReport(TradingReport r) {
-        String text = String.format(
-                "<b>매매 결산 [%s]</b>%n"
-                + "매수: $%.2f | 매도: $%.2f%n"
-                + "보유: %d주 @ $%.4f%n"
-                + "편차율: %.4f | 목표가: $%.2f",
-                r.date(),
-                r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.snapshot().holdings(), r.snapshot().averagePrice(),
-                r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
-        send(text);
-    }
 
     @Override
     public void notifyMarketClosed() {

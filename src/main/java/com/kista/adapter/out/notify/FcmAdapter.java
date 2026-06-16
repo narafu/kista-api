@@ -74,6 +74,11 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.id(), "⚠️ 예수금 부족", body);
     }
 
+    @Override
+    public void notifyError(User user, Exception e) {
+        send(user.id(), "⚠️ 매매 오류 발생", e.getMessage());
+    }
+
     private void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             log.warn("FCM 미설정 — 알림 생략");

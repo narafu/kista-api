@@ -145,15 +145,37 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
             log.warn("[{}] 텔레그램 미설정 — 매매 리포트 생략", account.nickname());
             return;
         }
-        String text = String.format(
-                "<b>매매 결산 [%s] — %s</b>%n"
-                + "매수: $%.2f | 매도: $%.2f%n"
-                + "보유: %d주 @ $%.4f%n"
-                + "편차율: %.4f | 목표가: $%.2f",
-                r.date(), account.nickname(),
-                r.totalBoughtUsd(), r.totalSoldUsd(),
-                r.snapshot().holdings(), r.snapshot().averagePrice(),
-                r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
+        String text;
+        if (r.snapshot() != null) {
+            // INFINITE: 포지션 상세 포함
+            text = String.format(
+                    "<b>매매 결산 [%s] — %s</b>%n"
+                    + "매수: $%.2f | 매도: $%.2f%n"
+                    + "보유: %d주 @ $%.4f%n"
+                    + "편차율: %.4f | 목표가: $%.2f",
+                    r.date(), account.nickname(),
+                    r.totalBoughtUsd(), r.totalSoldUsd(),
+                    r.snapshot().holdings(), r.snapshot().averagePrice(),
+                    r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
+        } else {
+            // PRIVACY: 체결 금액만 표시 (스냅샷 없음)
+            text = String.format(
+                    "<b>매매 결산 [%s] — %s</b>%n"
+                    + "매수: $%.2f | 매도: $%.2f",
+                    r.date(), account.nickname(),
+                    r.totalBoughtUsd(), r.totalSoldUsd());
+        }
+        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+    }
+
+    @Override
+    public void notifyError(User user, Exception e) {
+        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
+                || user.telegramChatId() == null) {
+            log.warn("텔레그램 미설정 — 매매 오류 알림 생략");
+            return;
+        }
+        String text = String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage());
         telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
 }
