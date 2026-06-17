@@ -2,12 +2,15 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
+import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
+import org.springframework.http.ResponseCookie;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -42,10 +45,12 @@ class DevAuthControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean BlacklistUseCase blacklistUseCase;         // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean UserPort userPort;
+    @MockitoBean TokenUseCase tokenUseCase;                // RT 발급
+    @MockitoBean RefreshTokenCookieHelper cookieHelper;    // RT 쿠키 설정
 
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -77,6 +82,8 @@ class DevAuthControllerTest {
     void devToken_returns_token() throws Exception {
         when(userUseCase.register(any(), any(), any())).thenReturn(MOCK_USER);
         doNothing().when(userUseCase).approve(any());
+        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
+        when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
         when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
         when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
 
@@ -89,6 +96,8 @@ class DevAuthControllerTest {
     @Test
     void devAdminToken_returns_token() throws Exception {
         when(userPort.findById(any())).thenReturn(Optional.of(MOCK_ADMIN_USER));
+        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
+        when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
         when(jwtIssuerService.issue(any(), any())).thenReturn("admin-tok");
         when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
 
