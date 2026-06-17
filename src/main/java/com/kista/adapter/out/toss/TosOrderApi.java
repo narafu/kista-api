@@ -16,6 +16,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -111,8 +112,11 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
                         ? new BigDecimal(amtStr)
                         : price.multiply(BigDecimal.valueOf(filledQty)); // nullable 가드
 
-                // filledAt이 없으면 조회 from 날짜(KST)를 tradeDate로 사용
-                LocalDate tradeDate = from;
+                // filledAt은 KST(+09:00) — 직접 LocalDate 추출, 없으면 from 날짜 fallback
+                String filledAtStr = order.execution().filledAt();
+                LocalDate tradeDate = (filledAtStr != null && !filledAtStr.isBlank())
+                        ? OffsetDateTime.parse(filledAtStr).toLocalDate()
+                        : from;
 
                 Order.OrderDirection direction = "BUY".equals(order.side())
                         ? Order.OrderDirection.BUY
