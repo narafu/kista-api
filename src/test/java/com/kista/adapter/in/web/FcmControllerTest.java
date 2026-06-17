@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -30,6 +31,7 @@ class FcmControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
 
     static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

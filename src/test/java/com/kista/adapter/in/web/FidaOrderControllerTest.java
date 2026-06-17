@@ -6,6 +6,7 @@ import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.PrivacyUseCase;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
@@ -42,6 +43,7 @@ class FidaOrderControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean PrivacyUseCase privacy;
 
     private static final String VALID_TOKEN = "test-internal-token";

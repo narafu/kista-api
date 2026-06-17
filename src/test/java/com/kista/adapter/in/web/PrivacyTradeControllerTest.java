@@ -5,6 +5,7 @@ import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.PrivacyUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -36,6 +37,7 @@ class PrivacyTradeControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean PrivacyUseCase privacy;
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");

@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -36,6 +37,7 @@ class StatisticsControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountStatisticsUseCase accountStatistics;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";

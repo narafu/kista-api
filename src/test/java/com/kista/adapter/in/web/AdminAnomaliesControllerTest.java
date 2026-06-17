@@ -6,6 +6,7 @@ import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -33,6 +34,7 @@ class AdminAnomaliesControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
 

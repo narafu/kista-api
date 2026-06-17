@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class AuthControllerTest {
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean SseEmitterRegistry sseEmitterRegistry;
     @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

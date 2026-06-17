@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.junit.jupiter.api.parallel.Execution;
@@ -37,6 +38,7 @@ class AccountControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountUseCase accountUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";

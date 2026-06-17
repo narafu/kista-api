@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.PortfolioUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -34,6 +35,7 @@ class DashboardControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean PortfolioUseCase portfolioUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

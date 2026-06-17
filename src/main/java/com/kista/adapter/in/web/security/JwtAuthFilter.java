@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.security;
 
+import com.kista.domain.port.in.BlacklistUseCase;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtDecoder jwtDecoder;
+    private final BlacklistUseCase blacklistUseCase; // Redis 블랙리스트 체크 (adapter.in → domain.port.in)
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -34,6 +36,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Jwt jwt = jwtDecoder.decode(token);
                 UUID userId = UUID.fromString(jwt.getSubject()); // sub 클레임 = 사용자 UUID
+
+                // 블랙리스트 체크 — 탈퇴·로그아웃·거절된 userId 즉시 차단
+                if (blacklistUseCase.isBlacklisted(userId)) {
+                    log.debug("블랙리스트 차단: userId={}", userId);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    return;
+                }
+
                 // role claim → ROLE_* authority 변환 (claim 없으면 빈 authorities)
                 String roleClaim = jwt.getClaimAsString("role");
                 List<SimpleGrantedAuthority> authorities = roleClaim == null

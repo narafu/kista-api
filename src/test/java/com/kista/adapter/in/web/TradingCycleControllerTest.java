@@ -7,6 +7,7 @@ import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ class TradingCycleControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean AccountStatisticsUseCase accountStatistics;
     @MockitoBean TradingExecutionUseCase tradingExecution;

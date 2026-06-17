@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -25,6 +26,7 @@ class MetaControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

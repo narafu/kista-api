@@ -7,6 +7,7 @@ import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -39,6 +40,7 @@ class AdminUserControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean JwtDecoder jwtDecoder;         // JwtDecoderConfig 실제 빈 생성 방지
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AdminUserUseCase adminUser;    // 컨트롤러 의존성 주입용
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");

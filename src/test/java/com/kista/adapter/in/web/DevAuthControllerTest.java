@@ -5,6 +5,7 @@ import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.domain.model.user.User;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class DevAuthControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean UserPort userPort;
