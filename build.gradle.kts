@@ -41,6 +41,9 @@ dependencies {
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
 
+    // Redis (Upstash 블랙리스트 + 캐시)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
     // Security & JWT
     implementation(libs.spring.boot.starter.security)
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // NimbusJwtDecoder (ECC P-256 JWKS 검증)
