@@ -6,7 +6,5 @@ import java.math.BigDecimal;
 public record StrategyDetail(
         Strategy strategy,
         BigDecimal initialUsdDeposit,
-        boolean isReverseMode,
-        boolean canManualExecute,  // 수동 즉시 실행 가능 여부
-        boolean supportsPreview    // 미리보기 탭 표시 여부
+        boolean isReverseMode
 ) {}

@@ -40,6 +40,7 @@ class TradingServiceTest {
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
+    @Mock TosExecutionPort tosExecutionPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
@@ -110,8 +111,9 @@ class TradingServiceTest {
         BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, orderRouter, priceCapper, notifyPort);
+        BrokerExecutionRouter executionRouter = new BrokerExecutionRouter(kisExecutionPort, tosExecutionPort);
         TradingReporter reporter = new TradingReporter(
-                kisExecutionPort, orderPort, userNotificationPort, realtimeNotificationPort,
+                executionRouter, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService);
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,

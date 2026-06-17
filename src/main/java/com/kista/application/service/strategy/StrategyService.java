@@ -1,5 +1,6 @@
 package com.kista.application.service.strategy;
 
+import com.kista.common.TimeZones;
 import com.kista.application.service.trading.BrokerMarginRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.CycleLookups;
@@ -78,8 +79,7 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount(), false,
-                saved.supportsManualExecution(), saved.supportsPositionMetrics());
+        return new StrategyDetail(saved, cycle.startAmount(), false);
     }
 
     @Override
@@ -196,7 +196,7 @@ class StrategyService implements StrategyUseCase {
         BigDecimal newDeposit = newSeed.subtract(purchaseAmount);
 
         // 당일(KST) 기존 스냅샷 소프트 삭제 후 새 스냅샷 저장 — 같은 날 중복 방지
-        cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now());
+        cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now(TimeZones.KST));
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
                 latest.closingPrice(), latest.avgPrice(), latest.holdings(), latest.isReverseMode(), null, null));
@@ -210,7 +210,6 @@ class StrategyService implements StrategyUseCase {
         // 리버스모드 SSOT = cycle_position.is_reverse_mode (strategy_cycle 아님)
         boolean isReverseMode = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
                 .stream().findFirst().map(CyclePosition::isReverseMode).orElse(false);
-        return new StrategyDetail(strategy, initialUsdDeposit, isReverseMode,
-                strategy.supportsManualExecution(), strategy.supportsPositionMetrics());
+        return new StrategyDetail(strategy, initialUsdDeposit, isReverseMode);
     }
 }

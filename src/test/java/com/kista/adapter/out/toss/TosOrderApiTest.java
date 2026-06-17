@@ -1,7 +1,9 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.order.Order.OrderDirection;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -122,6 +125,92 @@ class TosOrderApiTest {
         tosOrderApi.cancel(order, ACCOUNT);
 
         verify(tossHttpClient).delete(eq("/api/v1/orders/toss-oid-123"), any());
+    }
+
+    @Test
+    @DisplayName("CLOSED 체결 → Execution 변환 (filledQuantity>0인 주문만)")
+    void getExecutions_closed_convertsFilledOrders() {
+        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("3", "25.50", "76.50", null);
+        TosOrderApi.OrderItem item = new TosOrderApi.OrderItem("oid-1", "SOXL", "BUY", "FILLED", exec);
+        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(item), null, false);
+        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+
+        // CLOSED 먼저, OPEN 두 번째로 반환
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
+            .thenReturn(closedResp)
+            .thenReturn(openResp);
+
+        List<Execution> executions = tosOrderApi.getExecutions(
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+
+        assertThat(executions).hasSize(1);
+        Execution e = executions.get(0);
+        assertThat(e.quantity()).isEqualTo(3);
+        assertThat(e.price()).isEqualByComparingTo("25.50");
+        assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
+        assertThat(e.direction()).isEqualTo(OrderDirection.BUY);
+        assertThat(e.externalOrderId()).isEqualTo("oid-1");
+        assertThat(e.ticker()).isEqualTo(Ticker.SOXL);
+    }
+
+    @Test
+    @DisplayName("filledQuantity=0 또는 null인 주문은 Execution에서 제외")
+    void getExecutions_skipsUnfilledOrders() {
+        TosOrderApi.OrderExecutionItem noFill   = new TosOrderApi.OrderExecutionItem("0",  null, null, null);
+        TosOrderApi.OrderExecutionItem nullFill = new TosOrderApi.OrderExecutionItem(null, null, null, null);
+        TosOrderApi.OrderItem unfilledItem  = new TosOrderApi.OrderItem("oid-2", "SOXL", "BUY", "PENDING", noFill);
+        TosOrderApi.OrderItem nullFillItem  = new TosOrderApi.OrderItem("oid-3", "SOXL", "BUY", "PENDING", nullFill);
+        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
+        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
+            .thenReturn(closedResp)
+            .thenReturn(openResp);
+
+        List<Execution> result = tosOrderApi.getExecutions(
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("OPEN 상태 부분 체결 → Execution 포함")
+    void getExecutions_open_partialFilled_included() {
+        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("2", "30.00", "60.00", null);
+        TosOrderApi.OrderItem partial = new TosOrderApi.OrderItem("oid-4", "SOXL", "SELL", "PARTIAL_FILLED", exec);
+        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(), null, false);
+        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(partial), null, false);
+
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
+            .thenReturn(closedResp)
+            .thenReturn(openResp);
+
+        List<Execution> result = tosOrderApi.getExecutions(
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).direction()).isEqualTo(OrderDirection.SELL);
+        assertThat(result.get(0).quantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("averageFilledPrice=null → price=ZERO, amountUsd는 명시값 우선")
+    void getExecutions_nullPrice_fallbackAmount() {
+        // amountUsd="50.00", price=null → price=BigDecimal.ZERO, amountUsd="50.00"(명시값 우선)
+        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("2", null, "50.00", null);
+        TosOrderApi.OrderItem item = new TosOrderApi.OrderItem("oid-5", "SOXL", "BUY", "FILLED", exec);
+        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(item), null, false);
+        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
+            .thenReturn(closedResp)
+            .thenReturn(openResp);
+
+        List<Execution> result = tosOrderApi.getExecutions(
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).amountUsd()).isEqualByComparingTo("50.00");
     }
 
     // --- helpers ---

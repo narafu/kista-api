@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 
 @Slf4j
 @Component
@@ -66,7 +67,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         // BUY (quantity>0) + SELL 합쳐 반환
         List<Order> buyOrders = buyEntries.stream()
                 .filter(e -> e.quantity > 0)
-                .map(e -> Order.planned(e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price))
+                .map(e -> Order.planned(e.tradeDate, e.ticker, e.orderType, BUY, e.quantity, e.price, AT_CLOSE))
                 .toList();
         List<Order> sellOrders = buildSellOrders(explicitSells, nullSellTemplate, balance, multiple);
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
@@ -78,7 +79,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         // 명시 SELL은 multiple만 적용 — balance cap 없음 (브로커가 실제 보유량으로 판단)
         List<Order> result = explicit.stream()
                 .map(t -> Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL,
-                        applyMultiple(t.quantity(), multiple), t.price()))
+                        applyMultiple(t.quantity(), multiple), t.price(), AT_CLOSE))
                 .toList();
 
         if (nullTemplate == null) return result;
@@ -93,7 +94,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         }
         List<Order> withNull = new ArrayList<>(result);
         withNull.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
-                nullTemplate.orderType(), SELL, remaining, nullTemplate.price()));
+                nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return withNull;
     }
 

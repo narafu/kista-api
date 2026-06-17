@@ -4,6 +4,7 @@ import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
@@ -32,17 +33,16 @@ class ManualTradingService {
     private final AccountPort accountPort;
     private final OrderPort orderPort;
     private final UserPort userPort;
+    private final PrivacyTradePort privacyTradePort;
     private final TradingPriceFetcher priceFetcher;
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
-        // 동기 검증: 소유권·타입·상태
+        // 동기 검증: 소유권·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        if (!strategy.supportsManualExecution())
-            throw new IllegalArgumentException("이 전략은 수동 실행을 지원하지 않습니다");
         if (!strategy.isActive())
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
@@ -74,9 +74,13 @@ class ManualTradingService {
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // INFINITE 전용 — privacyBase는 항상 null (PlanContext에서 무시됨)
+        // PRIVACY는 당일 기준매매표 조회, INFINITE는 null (PlanContext에서 무시됨)
+        PrivacyTradeBase privacyBase = strategy.isPrivacy()
+                ? privacyTradePort.findTodayTrade(today).orElse(null)
+                : null;
+
         CycleOrderComputer.ComputeResult result = orderComputer.computeIfValid(
-                balance, strategy, prevClosePrice, today, currentCycle, null, account.nickname(), account)
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), account)
                 .orElse(null);
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 

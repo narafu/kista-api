@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -67,7 +68,7 @@ class TradingService {
     void executeBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         if (contexts.isEmpty()) return;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TimeZones.KST);
 
         // 시장 개장 여부 확인 (1회) — 모든 전략 공통, 가격 조회 전 조기 반환
         if (!isMarketOpen(today)) return;

@@ -51,7 +51,6 @@ class TelegramUserNotificationAdapterTest {
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, null, NotificationChannel.TELEGRAM, true);
         Account account = mock(Account.class);
-        when(account.nickname()).thenReturn("노봇계좌");
 
         adapter.notifyTradingReport(user, account, buildTestReport());
 

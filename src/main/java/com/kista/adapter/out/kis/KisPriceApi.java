@@ -11,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import com.kista.common.TimeZones;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -143,7 +145,7 @@ public class KisPriceApi implements KisPricePort {
                         p.add("EXCD", excd);
                         p.add("SYMB", ticker.name());
                         p.add("GUBN", "0");
-                        p.add("BYMD", LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE));
+                        p.add("BYMD", LocalDate.now(TimeZones.KST).format(DateTimeFormatter.BASIC_ISO_DATE));
                         p.add("MODP", "0");
                     });
             if (response == null || response.output2() == null || response.output2().isEmpty()) {

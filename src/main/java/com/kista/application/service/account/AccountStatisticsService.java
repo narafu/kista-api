@@ -1,5 +1,6 @@
 package com.kista.application.service.account;
 
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
@@ -15,7 +16,7 @@ import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
-import com.kista.domain.port.out.KisExecutionPort;
+import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
@@ -48,7 +49,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
     private final KisProfitPort kisProfitPort;
-    private final KisExecutionPort kisExecutionPort;
+    private final BrokerExecutionRouter brokerExecutionRouter;
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final TosMarginPort tosMarginPort;
@@ -71,11 +72,9 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 체결 조회 API 미지원 — 빈 리스트 반환
-        if (account.isToss()) return Collections.emptyList();
         Optional<Ticker> ticker = strategyPort.findActiveTicker(accountId);
         if (ticker.isEmpty()) return Collections.emptyList();
-        return kisExecutionPort.getExecutions(from, to, ticker.get(), account);
+        return brokerExecutionRouter.getExecutions(from, to, ticker.get(), account);
     }
 
     @Override
@@ -171,7 +170,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
     // null이면 오늘 + 1일 (오늘 데이터 포함)
     private Instant resolveTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(); // KST 기준 오늘 (JVM TZ=KST 고정)
+        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
         return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 

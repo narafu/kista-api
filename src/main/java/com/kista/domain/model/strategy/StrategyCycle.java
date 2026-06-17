@@ -1,5 +1,7 @@
 package com.kista.domain.model.strategy;
 
+import com.kista.common.TimeZones;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,7 +30,7 @@ public record StrategyCycle(
 
     // 사이클 회전 시 사용 — seedResolvedBy 명시 필수
     public static StrategyCycle start(UUID strategyId, BigDecimal startAmount, SeedResolvedBy seedResolvedBy) {
-        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(), null, null, null, seedResolvedBy);
+        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(TimeZones.KST), null, null, null, seedResolvedBy);
     }
 
     // 최초 전략 등록 시 — 사용자 직접 입력

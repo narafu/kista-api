@@ -14,7 +14,6 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -26,7 +25,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,7 +38,7 @@ import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 @Slf4j
 class TradingReporter {
 
-    private final KisExecutionPort kisExecutionPort;
+    private final BrokerExecutionRouter brokerExecutionRouter;
     private final OrderPort orderPort;
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
@@ -52,11 +50,8 @@ class TradingReporter {
                          Account account, User user,
                          AccountBalance balance, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
-        // Toss 계좌는 체결 조회 API 없음 (MVP) — 주문 PLACED 상태 유지
-        // today는 KST → KisTradingApi.getExecutions 내부에서 toUtc 변환됨
-        List<Execution> executions = account.isToss()
-                ? Collections.emptyList()
-                : kisExecutionPort.getExecutions(today, today, strategy.ticker(), account);
+        // today는 KST — 브로커별 어댑터에서 toUtc 변환 처리
+        List<Execution> executions = brokerExecutionRouter.getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)

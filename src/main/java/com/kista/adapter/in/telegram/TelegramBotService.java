@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.kista.common.TimeZones;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -97,7 +99,7 @@ class TelegramBotService {
     }
 
     private String buildHistoryMessage(int days) {
-        LocalDate to = LocalDate.now();
+        LocalDate to = LocalDate.now(TimeZones.KST);
         LocalDate from = to.minusDays(days);
         List<Order> list = portfolioUseCase.getHistory(from, to, Ticker.SOXL);
         if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";

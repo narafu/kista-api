@@ -189,7 +189,7 @@ class TradingCycleControllerTest {
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), false, true, true);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), false);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
@@ -225,7 +225,7 @@ class TradingCycleControllerTest {
                         com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
                         com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
                         com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE, 20),
-                new java.math.BigDecimal("1000"), false, true, true);
+                new java.math.BigDecimal("1000"), false);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(mockAuth())))
