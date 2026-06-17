@@ -54,7 +54,7 @@ class TradingOrderExecutor {
                 Order placedOrder = brokerOrderRouter.place(p, account);
                 orderPort.markPlaced(p.id(), placedOrder.externalOrderId()); // 접수 완료 즉시 기록
                 placed.add(new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
-                        p.orderType(), p.direction(), p.quantity(), p.price(),
+                        p.orderType(), p.timing(), p.direction(), p.quantity(), p.price(),
                         Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null));
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단

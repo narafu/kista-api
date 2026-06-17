@@ -126,12 +126,12 @@ class TradingService {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
-                // 개장 잡에서 선접수된 SELL 주문도 포함 — markFilledOrders 누락 방지
-                if (state.ctx().strategy().type() == Strategy.Type.INFINITE) {
-                    List<Order> prePlacedSells = orderPort
-                            .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
-                            .stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList();
-                    mainOrders = Stream.concat(prePlacedSells.stream(), mainOrders.stream()).toList();
+                // 개장 잡에서 AT_OPEN 선접수된 주문도 포함 — markFilledOrders 누락 방지
+                List<Order> prePlacedAtOpen = orderPort
+                        .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
+                        .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+                if (!prePlacedAtOpen.isEmpty()) {
+                    mainOrders = Stream.concat(prePlacedAtOpen.stream(), mainOrders.stream()).toList();
                 }
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);
@@ -289,16 +289,14 @@ class TradingService {
         // 전체 PLANNED 저장
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
-        // INFINITE: 저장된 SELL PLANNED만 즉시 접수
-        if (strategy.type() == Strategy.Type.INFINITE) {
-            List<Order> plannedSells = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
-                    .stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList();
-            if (plannedSells.isEmpty()) {
-                log.info("[{}] 개장 접수할 SELL 주문 없음 (후반 최종회차 등)", account.nickname());
-                return;
-            }
-            orderExecutor.placeGiven(plannedSells, account);
+        // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관)
+        List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
+                .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+        if (atOpenOrders.isEmpty()) {
+            log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
+            return;
         }
+        orderExecutor.placeGiven(atOpenOrders, account);
     }
 
     private void waitUntilMarketOpen(DstInfo dst) throws InterruptedException {

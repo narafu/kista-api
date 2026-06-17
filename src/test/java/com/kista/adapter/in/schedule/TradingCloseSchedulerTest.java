@@ -31,7 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class TradingSchedulerTest {
+class TradingCloseSchedulerTest {
 
     @Mock TradingExecutionUseCase useCase;
     @Mock AccountPort accountPort;
@@ -39,7 +39,7 @@ class TradingSchedulerTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock UserPort userPort;
     @Mock NotifyPort notifyPort;
-    @InjectMocks TradingScheduler scheduler;
+    @InjectMocks TradingCloseScheduler scheduler;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();

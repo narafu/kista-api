@@ -116,7 +116,7 @@ class TosOrderApiTest {
     @DisplayName("취소: DELETE /api/v1/orders/{externalOrderId}")
     void cancel_callsDeleteWithOrderId() {
         Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
+            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLACED, "toss-oid-123", null, null);
 
         tosOrderApi.cancel(order, ACCOUNT);
@@ -128,19 +128,19 @@ class TosOrderApiTest {
 
     private Order locBuyOrder() {
         return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderDirection.BUY, 2, new BigDecimal("25.50"),
+            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("25.50"),
             Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order mocSellOrder() {
         return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.MOC, Order.OrderDirection.SELL, 1, BigDecimal.ZERO,
+            Order.OrderType.MOC, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, BigDecimal.ZERO,
             Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order limitBuyOrder() {
         return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LIMIT, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
+            Order.OrderType.LIMIT, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLANNED, null, null, null);
     }
 }

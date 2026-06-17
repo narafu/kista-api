@@ -40,7 +40,7 @@ class TradingOrderPlannerTest {
     private Order template(Order.OrderDirection direction, String price, int quantity) {
         // 전략이 만든 템플릿은 id/accountId/strategyCycleId/status/externalOrderId가 비어있음 (계좌 귀속 전)
         return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
-                direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+                Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     @Test

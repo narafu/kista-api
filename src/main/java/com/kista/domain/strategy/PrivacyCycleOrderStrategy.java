@@ -21,9 +21,10 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     private final PrivacyTradingStrategy privacyStrategy;
 
     @Override
-    public Strategy.Type cycleType() {
-        return Strategy.Type.PRIVACY;
-    }
+    public Strategy.Type cycleType() { return Strategy.Type.PRIVACY; }
+
+    @Override
+    public boolean requiresPrivacyBase() { return true; }
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {

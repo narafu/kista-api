@@ -43,6 +43,10 @@ class OrderEntity extends BaseAuditEntity {
     private Order.OrderType orderType; // VARCHAR, 네이티브 PostgreSQL ENUM 아님
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "timing", nullable = false, length = 20)
+    private Order.OrderTiming timing; // AT_CLOSE(마감 배치) / AT_OPEN(개장 선접수)
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 

@@ -89,7 +89,7 @@ class TradingPreviewServiceTest {
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cycleHistoryPort);
         // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
-        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer);
+        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
         // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
         lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
     }
@@ -97,7 +97,7 @@ class TradingPreviewServiceTest {
     @Test
     void preview_returnsResult_whenHistoryExistsAndInfinite() {
         Order order = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -137,7 +137,7 @@ class TradingPreviewServiceTest {
     void preview_returnsSkipInsufficientBalance_whenBuyAmountExceedsBalance() {
         // 매수금액($20) > 잔액($10) → INSUFFICIENT_BALANCE skip
         Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -184,7 +184,7 @@ class TradingPreviewServiceTest {
         PrivacyTradeBase base = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
         Order buyOrder = new Order(null, ACCOUNT.id(), null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
         StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);

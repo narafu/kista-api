@@ -12,6 +12,7 @@ import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ class TradingPreviewService {
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
+    private final CycleOrderStrategies cycleOrderStrategies;
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -63,11 +65,12 @@ class TradingPreviewService {
         }
         AccountBalance balance = load.balance();
 
-        // INFINITE은 전일종가 필요(0회차 평단가 대용), PRIVACY는 기준매매표 필요 — 전략 입력 컨텍스트로 통합
-        BigDecimal prevClosePrice = strategy.type() == Strategy.Type.INFINITE
+        // 전략별 필요 데이터 조회 — CycleOrderStrategy 다형 메서드로 전략 타입 분기 제거
+        var orderStrategy = cycleOrderStrategies.of(strategy);
+        BigDecimal prevClosePrice = orderStrategy.requiresPrevClose()
                 ? brokerPriceRouter.getPriceSnapshot(strategy.ticker(), account).prevClose()
                 : null;
-        PrivacyTradeBase privacyBase = strategy.type() == Strategy.Type.PRIVACY
+        PrivacyTradeBase privacyBase = orderStrategy.requiresPrivacyBase()
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 

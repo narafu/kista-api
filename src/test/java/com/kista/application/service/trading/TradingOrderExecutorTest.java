@@ -52,13 +52,13 @@ class TradingOrderExecutorTest {
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
         return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
-                direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+                Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order kisResponse(String externalOrderId) {
         // KIS 응답 Order는 id=null (DB PK는 호출측이 보존)
         return new Order(null, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 10, new BigDecimal("50.00"), Order.OrderStatus.PLACED, externalOrderId, null, null);
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 10, new BigDecimal("50.00"), Order.OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     @Test

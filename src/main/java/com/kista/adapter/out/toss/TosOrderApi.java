@@ -44,7 +44,7 @@ public class TosOrderApi implements TosOrderPort {
         // id=null — KIS와 동일하게 호출자가 DB 저장(plan/markPlaced) 처리
         return new Order(
                 null, null, null, order.tradeDate(), order.ticker(),
-                order.orderType(), order.direction(), order.quantity(), order.price(),
+                order.orderType(), order.timing(), order.direction(), order.quantity(), order.price(),
                 Order.OrderStatus.PLACED, wrapper.result().orderId(), null, null
         );
     }

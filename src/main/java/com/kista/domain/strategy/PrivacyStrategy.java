@@ -75,37 +75,26 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
     // 명시 SELL + null SELL("잔량 전부") 합산하여 Order 리스트 반환
     private List<Order> buildSellOrders(List<PrivacyTrade> explicit, PrivacyTrade nullTemplate,
                                         AccountBalance balance, BigDecimal multiple) {
-        // 명시 SELL multiple 적용 후 holdings 범위 내로 cap (낮은 가격 순서 포함, 초과분 제외)
-        List<Order> explicitOrders = explicit.stream()
+        // 명시 SELL은 multiple만 적용 — balance cap 없음 (브로커가 실제 보유량으로 판단)
+        List<Order> result = explicit.stream()
                 .map(t -> Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL,
                         applyMultiple(t.quantity(), multiple), t.price()))
                 .toList();
 
-        List<Order> result = new ArrayList<>();
-        int availableForSell = balance.holdings();
-        for (Order o : explicitOrders) {
-            if (availableForSell <= 0) break;
-            int qty = Math.min(o.quantity(), availableForSell);
-            if (qty > 0) result.add(Order.planned(o.tradeDate(), o.ticker(), o.orderType(), SELL, qty, o.price()));
-            availableForSell -= qty;
-        }
-        if (result.size() < explicitOrders.size()) {
-            log.warn("[PRIVACY] explicit SELL cap: holdings={}, {} 건 제외", balance.holdings(), explicitOrders.size() - result.size());
-        }
-
         if (nullTemplate == null) return result;
 
-        // null SELL = 잔량 - cap 이후 explicit SELL 합
-        int sumOtherSells = result.stream().mapToInt(Order::quantity).sum();
-        int remaining = balance.holdings() - sumOtherSells;
+        // null SELL = balance.holdings() - 명시 SELL 합 (음수면 제외)
+        int sumExplicit = result.stream().mapToInt(Order::quantity).sum();
+        int remaining = balance.holdings() - sumExplicit;
         if (remaining <= 0) {
-            log.warn("[PRIVACY] 잔량 매도 SELL 제외 — 다른 SELL 합이 잔량 이상: balance={}, sumOtherSells={}",
-                    balance.holdings(), sumOtherSells);
+            log.warn("[PRIVACY] 잔량 매도 SELL 제외 — 명시 SELL 합이 잔량 이상: balance={}, sumExplicit={}",
+                    balance.holdings(), sumExplicit);
             return result;
         }
-        result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
+        List<Order> withNull = new ArrayList<>(result);
+        withNull.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
                 nullTemplate.orderType(), SELL, remaining, nullTemplate.price()));
-        return result;
+        return withNull;
     }
 
     private void adjustBuyQuantities(List<BuyEntry> buyEntries, int diff) {

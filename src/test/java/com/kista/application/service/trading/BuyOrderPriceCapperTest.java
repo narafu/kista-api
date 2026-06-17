@@ -55,7 +55,7 @@ class BuyOrderPriceCapperTest {
 
     private Order buy(String price, int quantity) {
         return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     @Test

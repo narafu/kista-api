@@ -31,9 +31,10 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     private final ReverseInfiniteTradingStrategy reverseStrategy; // 리버스모드 전략 (구현체: ReverseInfiniteStrategy)
 
     @Override
-    public Strategy.Type cycleType() {
-        return Strategy.Type.INFINITE;
-    }
+    public Strategy.Type cycleType() { return Strategy.Type.INFINITE; }
+
+    @Override
+    public boolean requiresPrevClose() { return true; }
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {

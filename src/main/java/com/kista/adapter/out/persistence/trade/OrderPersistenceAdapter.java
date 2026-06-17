@@ -139,6 +139,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setTradeDate(TradeDateConverter.toUtc(o.tradeDate())); // KST 도메인 → UTC DB
         e.setTicker(o.ticker());
         e.setOrderType(o.orderType());
+        e.setTiming(o.timing());
         e.setDirection(o.direction());
         e.setQuantity(o.quantity());
         e.setPrice(o.price());
@@ -152,7 +153,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     private Order toDomain(OrderEntity e) {
         return new Order(
                 e.getId(), e.getAccountId(), e.getStrategyCycleId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
-                e.getOrderType(), e.getDirection(), e.getQuantity(), e.getPrice(),
+                e.getOrderType(), e.getTiming(), e.getDirection(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getExternalOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );
     }

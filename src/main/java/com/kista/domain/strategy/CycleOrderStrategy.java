@@ -18,6 +18,12 @@ public interface CycleOrderStrategy {
     // 이 전략이 담당하는 사이클 타입
     Strategy.Type cycleType();
 
+    // 미리보기 실행 전 전일종가 조회 필요 여부 (INFINITE만 true — 0회차 평단가 대용)
+    default boolean requiresPrevClose() { return false; }
+
+    // 미리보기 실행 전 기준매매표 조회 필요 여부 (PRIVACY만 true)
+    default boolean requiresPrivacyBase() { return false; }
+
     // 주문 계획 — Optional.empty()는 "전략 차원에서 skip" (예: PRIVACY 기준매매표 미수신)
     // INFINITE: position non-null / PRIVACY: position null
     Optional<OrderPlan> plan(PlanContext ctx);

@@ -85,7 +85,7 @@ class BrokerOrderRouterTest {
 
     private Order sampleOrder() {
         return new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderDirection.BUY, 1, BigDecimal.TEN,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, BigDecimal.TEN,
                 Order.OrderStatus.PLANNED, null, null, null);
     }
 }

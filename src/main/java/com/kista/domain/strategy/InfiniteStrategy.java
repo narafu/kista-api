@@ -13,6 +13,7 @@ import java.util.List;
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 import static com.kista.domain.model.order.Order.OrderType.*;
+import static com.kista.domain.model.order.Order.OrderTiming.*;
 
 @Component
 class InfiniteStrategy implements InfiniteTradingStrategy {
@@ -106,7 +107,8 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         if (position.isFinalRound()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
-                orders.add(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO));
+                // 최종회차 MOC 매도 — 개장 시 선접수
+                orders.add(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO, AT_OPEN));
             }
         } else {
             // LOC 매수 — 기준가 기준
@@ -120,17 +122,17 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
     }
 
     private void addCommonSellOrders(List<Order> orders, InfinitePosition position, LocalDate tradeDate) {
-        // LOC 매도 (기준가 + 0.01)
+        // LOC 매도 (기준가 + 0.01) — 개장 시 선접수
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
             BigDecimal locSellPrice = position.referencePrice().add(new BigDecimal("0.01"));
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice));
+            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, AT_OPEN));
         }
 
-        // 지정가 매도 (목표가)
+        // 지정가 매도 (목표가) — 개장 시 선접수
         int limitSellQuantity = position.calcLimitSellQuantity();
         if (limitSellQuantity >= 1) {
-            orders.add(Order.planned(tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice()));
+            orders.add(Order.planned(tradeDate, position.ticker(), LIMIT, SELL, limitSellQuantity, position.targetPrice(), AT_OPEN));
         }
     }
 }

@@ -41,8 +41,8 @@ class ManualTradingService {
         // 동기 검증: 소유권·타입·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        if (strategy.type() != Strategy.Type.INFINITE)
-            throw new IllegalArgumentException("INFINITE 전략만 수동 실행 가능합니다");
+        if (!strategy.supportsManualExecution())
+            throw new IllegalArgumentException("이 전략은 수동 실행을 지원하지 않습니다");
         if (strategy.status() != Strategy.Status.ACTIVE)
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
