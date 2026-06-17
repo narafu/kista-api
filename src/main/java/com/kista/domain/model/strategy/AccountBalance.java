@@ -25,6 +25,16 @@ public record AccountBalance(
         return totalBuyAmount.compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
     }
 
+    // 매수 부족 금액: max(0, 총매수금액 - 가용잔액). 부족분 없으면 ZERO
+    public BigDecimal calcBuyDeficit(List<Order> orders) {
+        BigDecimal totalBuyAmount = orders.stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal deficit = totalBuyAmount.subtract(usdDeposit);
+        return deficit.compareTo(BigDecimal.ZERO) > 0 ? deficit.setScale(2, HALF_UP) : BigDecimal.ZERO;
+    }
+
     // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (기존 매입금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
     public AccountBalance applyExecutions(List<Execution> executions) {
         if (executions.isEmpty()) return this;

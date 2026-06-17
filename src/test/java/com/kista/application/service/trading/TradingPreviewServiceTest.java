@@ -135,7 +135,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSkipInsufficientBalance_whenBuyAmountExceedsBalance() {
-        // 매수금액($20) > 잔액($10) → INSUFFICIENT_BALANCE skip
+        // 잔액 $10, 매수금액 $20 → INSUFFICIENT_BALANCE, 부족분 $10
         Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
@@ -152,7 +152,8 @@ class TradingPreviewServiceTest {
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
         assertThat(result.position()).isNotNull(); // position은 프론트 참고용으로 유지
-        assertThat(result.orders()).isEmpty();
+        assertThat(result.orders()).hasSize(1); // 계산 결과는 포함 — 프론트에서 경고와 함께 표시
+        assertThat(result.balanceDeficit()).isEqualByComparingTo(new BigDecimal("10.00")); // $20 - $10
     }
 
     @Test
