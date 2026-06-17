@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import com.kista.common.TimeZones;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -63,11 +65,11 @@ public class DashboardController {
 
     // 조회 시작일 기본값: 오늘 - 30일
     private static LocalDate resolveFrom(LocalDate from) {
-        return from != null ? from : LocalDate.now().minusDays(30);
+        return from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
     }
 
     // 조회 종료일 기본값: 오늘
     private static LocalDate resolveTo(LocalDate to) {
-        return to != null ? to : LocalDate.now();
+        return to != null ? to : LocalDate.now(TimeZones.KST);
     }
 }

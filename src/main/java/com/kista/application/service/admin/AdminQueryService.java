@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kista.common.TimeZones;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -56,7 +58,7 @@ class AdminQueryService implements AdminQueryUseCase {
     @Override
     public List<Order> listTrades() {
         // 최근 30일 전체 계좌 거래 내역 조회
-        LocalDate to = LocalDate.now();
+        LocalDate to = LocalDate.now(TimeZones.KST);
         LocalDate from = to.minusDays(30);
         return orderPort.findAll(from, to);
     }
@@ -68,7 +70,7 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public AdminAnomalies getAnomalies() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TimeZones.KST);
         List<Account> allAccounts = accountPort.findAll();
 
         // PAUSED 전략이 있는 계좌
@@ -96,7 +98,7 @@ class AdminQueryService implements AdminQueryUseCase {
         // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일을 UTC 거래일 경계로 변환
         LocalDate fromUtc = days == null
                 ? LocalDate.EPOCH
-                : TradeDateConverter.toUtc(LocalDate.now().minusDays(days));
+                : TradeDateConverter.toUtc(LocalDate.now(TimeZones.KST).minusDays(days));
         return privacyTradePort.findBasesFromTradeDate(fromUtc);
     }
 }

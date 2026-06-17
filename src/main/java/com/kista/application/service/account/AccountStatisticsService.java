@@ -1,5 +1,6 @@
 package com.kista.application.service.account;
 
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
@@ -169,7 +170,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
     // null이면 오늘 + 1일 (오늘 데이터 포함)
     private Instant resolveTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(); // KST 기준 오늘 (JVM TZ=KST 고정)
+        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
         return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 

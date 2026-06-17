@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.common.TradeDateConverter;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
@@ -116,7 +117,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     public Optional<PrivacyCurrentBase> findCurrentBase() {
         // trade_date(UTC) >= 오늘(UTC)인 행 중 가장 미래 SOXL 기준가 조회
-        LocalDate todayUtc = TradeDateConverter.toUtc(LocalDate.now()); // KST now → UTC
+        LocalDate todayUtc = TradeDateConverter.toUtc(LocalDate.now(TimeZones.KST)); // KST now → UTC
         return baseRepository
                 .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(todayUtc, Ticker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),

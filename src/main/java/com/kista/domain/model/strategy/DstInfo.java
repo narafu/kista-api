@@ -73,9 +73,9 @@ public record DstInfo(
 
     // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케줄러와 동일 로직 SSOT
     public static LocalDate nextTradeDate() {
-        return LocalTime.now().isBefore(SCHEDULER_RUN_TIME)
-                ? LocalDate.now()
-                : LocalDate.now().plusDays(1);
+        return LocalTime.now(KST).isBefore(SCHEDULER_RUN_TIME)
+                ? LocalDate.now(KST)
+                : LocalDate.now(KST).plusDays(1);
     }
 
     // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose/marketOpen은 정상 계산

@@ -21,7 +21,7 @@ public class MarketCalendarRefreshScheduler {
     // 앱 기동 시 당해 연도 캘린더 데이터 없으면 3년치 자동 적재
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        int year = LocalDate.now().getYear();
+        int year = LocalDate.now(TimeZones.KST).getYear();
         try {
             refreshYears(year, 3);
         } catch (Exception e) {
@@ -33,7 +33,7 @@ public class MarketCalendarRefreshScheduler {
     // 매년 1월 1일 00:00 KST — 당해 연도 포함 향후 3년치 적재
     @Scheduled(cron = "0 0 0 1 1 *", zone = TimeZones.KST_ID)
     public void refreshForNewYear() {
-        int year = LocalDate.now().getYear();
+        int year = LocalDate.now(TimeZones.KST).getYear();
         log.info("연간 시장 캘린더 갱신 스케줄 실행: {}~{}년", year, year + 2);
         try {
             refreshYears(year, 3);
@@ -45,7 +45,7 @@ public class MarketCalendarRefreshScheduler {
     // 매월 1일 01:00 KST — 해당 월 데이터만 최신화
     @Scheduled(cron = "0 0 1 1 * *", zone = TimeZones.KST_ID)
     public void refreshCurrentMonth() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TimeZones.KST);
         log.info("월간 시장 캘린더 갱신 스케줄 실행: {}년 {}월", today.getYear(), today.getMonthValue());
         try {
             marketCalendarRefreshPort.refreshMonth(today.getYear(), today.getMonthValue());
