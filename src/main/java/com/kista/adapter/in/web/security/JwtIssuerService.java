@@ -15,7 +15,7 @@ import java.util.UUID;
 @Component
 public class JwtIssuerService {
 
-    public static final long TOKEN_TTL_MS = 604_800_000L; // 7일 (밀리초)
+    public static final long TOKEN_TTL_MS = 900_000L; // 15분 (밀리초)
 
     @Value("${jwt.signing-key}")
     private String signingJwk; // EC JWK JSON 문자열

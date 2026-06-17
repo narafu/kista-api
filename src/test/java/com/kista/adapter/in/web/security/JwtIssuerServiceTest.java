@@ -80,9 +80,9 @@ class JwtIssuerServiceTest {
     }
 
     @Test
-    @DisplayName("expiresInSeconds() — 7일(604800초) 반환")
-    void expiresInSeconds_returns_604800() {
-        assertThat(jwtIssuerService.expiresInSeconds()).isEqualTo(604800L);
+    @DisplayName("expiresInSeconds() — 15분(900초) 반환")
+    void expiresInSeconds_returns_900() {
+        assertThat(jwtIssuerService.expiresInSeconds()).isEqualTo(900L);
     }
 
     // 공개키로 ES256 서명 검증 후 클레임 반환

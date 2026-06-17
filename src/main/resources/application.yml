@@ -37,6 +37,10 @@ spring:
     scheduling:
       thread-name-prefix: kista-api-scheduler-
 
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
 management:
   endpoints:
     web:
@@ -72,11 +76,6 @@ telegram:
 
 crypto:
   aes-key: ${AES_ENCRYPTION_KEY}
-
-spring:
-  data:
-    redis:
-      url: ${REDIS_URL:redis://localhost:6379}
 
 app:
   cookie:
