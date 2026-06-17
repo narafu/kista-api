@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.port.in.PortfolioUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import com.kista.common.TimeZones;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -25,10 +27,16 @@ class TelegramBotService {
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
     private final PortfolioUseCase portfolioUseCase;
+    private final UserUseCase userUseCase;
     // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
     private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
 
     void handle(TelegramUpdate update) {
+        // 인라인 버튼 클릭(callback_query) 처리 — message가 null이므로 별도 분기 필수
+        if (update.callbackQuery() != null) {
+            handleCallbackQuery(update.callbackQuery());
+            return;
+        }
         if (update.message() == null || update.message().text() == null) return;
         long chatId = update.message().chat().id();
         String text = update.message().text().trim();
@@ -43,6 +51,54 @@ class TelegramBotService {
             case IDLE -> handleIdle(chatId, text);
             case AWAITING_RUN_CONFIRM -> handleRunConfirm(chatId, text);
         };
+        if (reply != null) {
+            apiClient.sendMessage(String.valueOf(chatId), reply);
+        }
+    }
+
+    private void handleCallbackQuery(TelegramUpdate.CallbackQuery callbackQuery) {
+        // 버튼 로딩 스피너 즉시 해제
+        apiClient.answerCallbackQuery(callbackQuery.id());
+
+        long chatId = callbackQuery.message().chat().id();
+        if (!String.valueOf(chatId).equals(adminChatId)) {
+            log.warn("Unauthorized callback_query from chatId={}", chatId);
+            return;
+        }
+
+        String data = callbackQuery.data();
+        String[] parts = data != null ? data.split(":") : new String[0];
+        if (parts.length != 2) {
+            log.warn("알 수 없는 callback_data: {}", data);
+            return;
+        }
+
+        String action = parts[0];
+        UUID targetUserId;
+        try {
+            targetUserId = UUID.fromString(parts[1]);
+        } catch (IllegalArgumentException e) {
+            log.warn("callback_data UUID 파싱 실패: {}", data);
+            return;
+        }
+
+        String reply = switch (action) {
+            case "approve" -> {
+                userUseCase.approve(targetUserId);
+                log.info("텔레그램 관리자 승인: targetUserId={}", targetUserId);
+                yield "✅ 승인 완료: " + targetUserId;
+            }
+            case "reject" -> {
+                userUseCase.reject(targetUserId);
+                log.info("텔레그램 관리자 거절: targetUserId={}", targetUserId);
+                yield "❌ 거절 완료: " + targetUserId;
+            }
+            default -> {
+                log.warn("알 수 없는 callback action: {}", action);
+                yield null;
+            }
+        };
+
         if (reply != null) {
             apiClient.sendMessage(String.valueOf(chatId), reply);
         }
