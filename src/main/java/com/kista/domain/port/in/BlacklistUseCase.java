@@ -1,0 +1,7 @@
+package com.kista.domain.port.in;
+
+import java.util.UUID;
+
+public interface BlacklistUseCase {
+    boolean isBlacklisted(UUID userId);
+}
