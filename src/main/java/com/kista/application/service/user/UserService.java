@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
@@ -22,6 +23,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
@@ -44,6 +46,7 @@ class UserService implements UserUseCase {
     private final TelegramBotInfoPort telegramBotInfoPort; // 봇 토큰 검증 + username 취득
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
     private final FcmDeviceTokenPort fcmDeviceTokenPort;   // FCM 토큰 저장/삭제
+    private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
 
     @Override
     @Transactional(readOnly = true)
@@ -126,6 +129,7 @@ class UserService implements UserUseCase {
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
         realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
+        blacklistPort.add(userId, Duration.ofMinutes(15)); // 거절 즉시 AT 차단
     }
 
     @Override
@@ -216,6 +220,13 @@ class UserService implements UserUseCase {
                 .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
                 .filter(strategy -> strategy.isActive())
                 .count();
+    }
+
+    @Override
+    public void updateNickname(UUID userId, String nickname) {
+        User user = userPort.findByIdOrThrow(userId);
+        userPort.save(user.withNickname(nickname.strip()));
+        log.info("닉네임 변경: userId={}", userId);
     }
 
     @Override

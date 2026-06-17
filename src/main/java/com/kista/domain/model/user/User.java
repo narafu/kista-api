@@ -90,4 +90,11 @@ public record User(
                 telegramBotToken, telegramChatId, telegramBotUsername,
                 lastReappliedAt, notificationChannel, value);
     }
+
+    // 닉네임 교체
+    public User withNickname(String nickname) {
+        return new User(id, kakaoId, nickname, status, role,
+                telegramBotToken, telegramChatId, telegramBotUsername,
+                lastReappliedAt, notificationChannel, balanceCheckEnabled);
+    }
 }

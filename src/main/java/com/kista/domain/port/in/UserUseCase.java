@@ -34,6 +34,9 @@ public interface UserUseCase {
     // --- 잔고 검증 설정 ---
     void updateBalanceCheckEnabled(UUID userId, boolean enabled);
 
+    // --- 닉네임 ---
+    void updateNickname(UUID userId, String nickname);
+
     // --- FCM ---
     void registerFcmToken(UUID userId, String token, String platform);
     void unregisterFcmToken(UUID userId, String token);

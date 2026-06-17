@@ -99,4 +99,23 @@ class SettingsControllerTest {
                         .content("{\"channel\":\"INVALID\"}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void patchNickname_valid_returns204() throws Exception {
+        mockMvc.perform(patch("/api/settings/nickname")
+                        .with(csrf()).with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isNoContent());
+        verify(userUseCase).updateNickname(eq(UUID.fromString(USER_ID)), eq("새닉네임"));
+    }
+
+    @Test
+    void patchNickname_blank_returns400() throws Exception {
+        mockMvc.perform(patch("/api/settings/nickname")
+                        .with(csrf()).with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +28,12 @@ public class SettingsController {
     record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
     record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
     record BalanceCheckRequest(boolean enabled) {}                                      // 잔고 검증 설정 요청 body
+    record NicknameRequest(                                                             // 닉네임 변경 요청 body
+        @NotBlank
+        @Size(max = 10, message = "닉네임은 10자 이내여야 합니다")
+        @Pattern(regexp = "^[\\p{L}\\d ]{1,10}$", message = "한글·영문·숫자·공백 1~10자")
+        String nickname
+    ) {}
 
     // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
     @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
@@ -76,5 +84,16 @@ public class SettingsController {
     public void updateBalanceCheck(@AuthenticationPrincipal UUID userId,
                                    @RequestBody BalanceCheckRequest body) {
         userUseCase.updateBalanceCheckEnabled(userId, body.enabled());
+    }
+
+    // 닉네임 변경 (1~10자, 한글·영문·숫자·공백)
+    @Operation(summary = "닉네임 변경", description = "KISTA 닉네임을 변경합니다. 한글·영문·숫자·공백 1~10자. body: {\"nickname\": \"새닉네임\"}")
+    @ApiResponse(responseCode = "204", description = "변경 성공")
+    @ApiResponse(responseCode = "400", description = "유효하지 않은 닉네임")
+    @PatchMapping("/nickname")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateNickname(@AuthenticationPrincipal UUID userId,
+                               @Valid @RequestBody NicknameRequest body) {
+        userUseCase.updateNickname(userId, body.nickname());
     }
 }
