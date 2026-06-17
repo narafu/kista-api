@@ -5,6 +5,7 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +47,7 @@ class UserServiceTest {
     @Mock TelegramBotInfoPort telegramBotInfoPort;
     @Mock KakaoOAuthPort kakaoOAuthPort;
     @Mock FcmDeviceTokenPort fcmDeviceTokenPort;
+    @Mock BlacklistPort blacklistPort;
 
     @InjectMocks UserService userService;
 
@@ -214,6 +218,18 @@ class UserServiceTest {
 
         verify(userPort).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
         verify(notificationPort).notifyRejected(any());
+    }
+
+    @Test
+    @DisplayName("거절 시 블랙리스트 즉시 등재 (AT 만료까지 15분 차단)")
+    void reject_blacklistsUser() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId);
+
+        verify(blacklistPort).add(eq(userId), eq(Duration.ofMinutes(15)));
     }
 
     @Test
