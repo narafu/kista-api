@@ -1,20 +1,29 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
+import com.kista.domain.port.out.TosExecutionPort;
 import com.kista.domain.port.out.TosOrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class TosOrderApi implements TosOrderPort {
+public class TosOrderApi implements TosOrderPort, TosExecutionPort {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";
@@ -55,6 +64,69 @@ public class TosOrderApi implements TosOrderPort {
         tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
     }
 
+    @Override
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
+        // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
+        List<Execution> result = new ArrayList<>();
+        result.addAll(fetchExecutions("CLOSED", from, to, ticker, account));
+        result.addAll(fetchExecutions("OPEN",   from, to, ticker, account));
+        return result;
+    }
+
+    // status별 GET /api/v1/orders — 페이지네이션 루프 처리 (CLOSED), OPEN은 단일 응답
+    private List<Execution> fetchExecutions(String status, LocalDate from, LocalDate to,
+                                             Ticker ticker, Account account) {
+        List<Execution> result = new ArrayList<>();
+        String cursor = null;
+        boolean hasNext = true;
+
+        while (hasNext) {
+            // 토스 from/to → TradeDateConverter.toUtc: KST 매매일을 US 거래일(UTC)로 변환
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("status", status);
+            params.add("symbol", ticker.name());
+            params.add("from",   TradeDateConverter.toUtc(from).toString());
+            params.add("to",     TradeDateConverter.toUtc(to).toString());
+            params.add("limit",  "100");
+            if (cursor != null) params.add("cursor", cursor);
+
+            OrdersResponse response = tossHttpClient.get(ORDER_PATH, account, params, OrdersResponse.class);
+            if (response == null || response.orders() == null) break;
+
+            // filledQuantity > 0인 주문만 Execution으로 변환
+            for (OrderItem order : response.orders()) {
+                if (order.execution() == null) continue;
+                String filledQtyStr = order.execution().filledQuantity();
+                if (filledQtyStr == null || filledQtyStr.isBlank()) continue;
+                int filledQty = Integer.parseInt(filledQtyStr);
+                if (filledQty <= 0) continue;
+
+                String priceStr = order.execution().averageFilledPrice();
+                BigDecimal price = (priceStr != null && !priceStr.isBlank())
+                        ? new BigDecimal(priceStr)
+                        : BigDecimal.ZERO;
+
+                String amtStr = order.execution().filledAmount();
+                BigDecimal amountUsd = (amtStr != null && !amtStr.isBlank())
+                        ? new BigDecimal(amtStr)
+                        : price.multiply(BigDecimal.valueOf(filledQty)); // nullable 가드
+
+                // filledAt이 없으면 조회 from 날짜(KST)를 tradeDate로 사용
+                LocalDate tradeDate = from;
+
+                Order.OrderDirection direction = "BUY".equals(order.side())
+                        ? Order.OrderDirection.BUY
+                        : Order.OrderDirection.SELL;
+
+                result.add(new Execution(tradeDate, ticker, direction, filledQty, price, amountUsd, order.orderId()));
+            }
+
+            hasNext = Boolean.TRUE.equals(response.hasNext()) && "CLOSED".equals(status);
+            cursor  = response.nextCursor();
+        }
+        return result;
+    }
+
     // LOC/MOC → 장마감 지정가(CLS), LIMIT → 정규장 지정가(DAY)
     private String resolveTimeInForce(Order.OrderType type) {
         return switch (type) {
@@ -76,5 +148,27 @@ public class TosOrderApi implements TosOrderPort {
     record OrderResponse(
         @JsonProperty("orderId") String orderId,
         @JsonProperty("clientOrderId") String clientOrderId
+    ) {}
+
+    // GET /api/v1/orders 응답 — package-private으로 테스트에서 직접 생성 가능
+    record OrdersResponse(
+        @JsonProperty("orders")    List<OrderItem> orders,
+        @JsonProperty("nextCursor") String nextCursor,
+        @JsonProperty("hasNext")    Boolean hasNext
+    ) {}
+
+    record OrderItem(
+        @JsonProperty("orderId")   String orderId,
+        @JsonProperty("symbol")    String symbol,
+        @JsonProperty("side")      String side,       // BUY / SELL
+        @JsonProperty("status")    String status,
+        @JsonProperty("execution") OrderExecutionItem execution
+    ) {}
+
+    record OrderExecutionItem(
+        @JsonProperty("filledQuantity")      String filledQuantity,      // nullable
+        @JsonProperty("averageFilledPrice")  String averageFilledPrice,  // nullable
+        @JsonProperty("filledAmount")        String filledAmount,         // nullable
+        @JsonProperty("filledAt")            String filledAt              // nullable
     ) {}
 }
