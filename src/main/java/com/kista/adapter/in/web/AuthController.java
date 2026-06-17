@@ -3,8 +3,10 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.KakaoLoginResponse;
 import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
+import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.user.User;
+import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,7 +14,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,14 +26,16 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
-@Tag(name = "인증", description = "카카오 OAuth 로그인, 사용자 정보 조회, 승인 신청")
+@Tag(name = "인증", description = "카카오 OAuth 로그인, 토큰 갱신, 사용자 정보 조회, 승인 신청")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final UserUseCase userUseCase;
+    private final TokenUseCase tokenUseCase;
     private final JwtIssuerService jwtIssuerService;
+    private final RefreshTokenCookieHelper cookieHelper;
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
 
     record KakaoCallbackRequest(
@@ -38,15 +45,54 @@ public class AuthController {
             String redirectUri
     ) {} // 카카오 인가 코드 + 리다이렉트 URI
 
-    // 카카오 OAuth 인가 코드로 로그인 처리 — 신규 가입 or 기존 유저 조회 후 JWT 발급
+    // 카카오 OAuth 인가 코드로 로그인 — AT(body) + RT(HttpOnly 쿠키) 발급
     @Operation(summary = "카카오 로그인", description = "카카오 OAuth 인가 코드로 로그인. 신규 사용자는 PENDING 상태로 가입 후 관리자 승인 대기.")
     @ApiResponse(responseCode = "200", description = "로그인 성공 (JWT 반환)")
     @PostMapping("/kakao/callback")
     @SecurityRequirements
-    public KakaoLoginResponse kakaoCallback(@RequestBody KakaoCallbackRequest request) {
+    public KakaoLoginResponse kakaoCallback(@RequestBody KakaoCallbackRequest request,
+                                             HttpServletRequest httpRequest,
+                                             HttpServletResponse httpResponse) {
         User user = userUseCase.login(request.code(), request.redirectUri());
-        String token = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함
-        return new KakaoLoginResponse(token, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user));
+        String rawRt = tokenUseCase.issueRefreshToken(user.id(), httpRequest.getHeader("User-Agent"));
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
+        String at = jwtIssuerService.issue(user.id(), user.role());
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user));
+    }
+
+    // RT 쿠키로 새 AT + RT 발급 (RTR)
+    @Operation(summary = "토큰 갱신", description = "HttpOnly 쿠키의 refresh_token으로 새 AT + RT를 발급합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "갱신 성공"),
+            @ApiResponse(responseCode = "401", description = "유효하지 않은 refresh token")
+    })
+    @PostMapping("/refresh")
+    @SecurityRequirements
+    public KakaoLoginResponse refresh(HttpServletRequest request, HttpServletResponse response) {
+        String rawRt = cookieHelper.extract(request);
+        if (rawRt == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return null;
+        }
+        var result = tokenUseCase.refresh(rawRt, request.getHeader("User-Agent"));
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(result.newRawRefreshToken()).toString());
+        String newAt = jwtIssuerService.issue(result.userId(), result.userRole());
+        return new KakaoLoginResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds(),
+                UserResponse.from(userUseCase.getById(result.userId())));
+    }
+
+    // 로그아웃 — RT 삭제 + userId 블랙리스트 + 쿠키 삭제
+    @Operation(summary = "로그아웃", description = "refresh_token 쿠키를 무효화하고 AT를 즉시 차단합니다.")
+    @ApiResponse(responseCode = "204", description = "로그아웃 성공")
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @SecurityRequirements
+    public void logout(HttpServletRequest request, HttpServletResponse response) {
+        String rawRt = cookieHelper.extract(request);
+        if (rawRt != null) {
+            tokenUseCase.logout(rawRt);
+        }
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }
 
     // 현재 사용자 정보 및 상태 조회
@@ -78,12 +124,13 @@ public class AuthController {
         userUseCase.reapply(userId);
     }
 
-    // 회원 탈퇴 — accounts FK CASCADE, audit_logs SET NULL (관리자 삭제 후 감사 로그 보존)
+    // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (FK CASCADE + 블랙리스트 등재)
     @Operation(summary = "회원 탈퇴", description = "본인 계정 및 모든 연관 데이터(계좌, 거래내역 등)를 즉시 삭제합니다.")
     @ApiResponse(responseCode = "204", description = "탈퇴 성공")
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteMe(@AuthenticationPrincipal UUID userId) {
+    public void deleteMe(@AuthenticationPrincipal UUID userId, HttpServletResponse response) {
         userUseCase.deleteMe(userId);
+        response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }
 }
