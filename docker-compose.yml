@@ -44,6 +44,14 @@ services:
     networks:
       - kista-api-net
 
+  # ── Redis (로컬 블랙리스트 + 캐시) ───────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - kista-api-net
+
   # ── kis-coding-mcp ───────────────────────────────────────────────────────────
   kis-coding-mcp:
     container_name: kis-coding-mcp
