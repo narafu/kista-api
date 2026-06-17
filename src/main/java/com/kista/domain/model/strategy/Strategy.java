@@ -37,12 +37,6 @@ public record Strategy(
         return new Strategy(id, accountId, type, status, ticker, newCycleSeedType, divisionCount);
     }
 
-    // 수동 실행 지원 여부 — INFINITE 전략만 가능
-    public boolean supportsManualExecution() { return type == Type.INFINITE; }
-
-    // KPI 포지션 메트릭(회차/단위금액/기준가/목표가) 표시 여부 — INFINITE 전략만 해당
-    public boolean supportsPositionMetrics() { return type == Type.INFINITE; }
-
     public boolean isInfinite() { return type == Type.INFINITE; }
     public boolean isPrivacy()  { return type == Type.PRIVACY; }
     public boolean isActive()   { return status == Status.ACTIVE; }

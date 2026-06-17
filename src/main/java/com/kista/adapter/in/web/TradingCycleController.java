@@ -109,8 +109,8 @@ public class TradingCycleController {
         tradingCycle.resume(id, userId);
     }
 
-    // INFINITE 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
-    @Operation(summary = "매매 수동 실행 (INFINITE 전용)")
+    // 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
+    @Operation(summary = "매매 수동 실행")
     @PostMapping("/api/trading-cycles/{id}/execute")
     public ExecuteOrdersResponse executeManually(
             @PathVariable UUID id,
