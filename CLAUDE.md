@@ -38,7 +38,7 @@ docker compose up -d postgres                               # DB만 기동
 - 요청이 모호하거나 구체적 지침이 필요한 경우 가정하고 진행하지 말고 먼저 질문
 
 ## Git 규칙
-- `git push`는 사용자가 명시적으로 요청한 경우에만 실행 — 커밋 후 자동 푸시 금지
+- `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
 - 커밋 전 `git config user.name` / `git config user.email` 확인 — 올바른 author: `narafu <narafu@kakao.com>`
 
 @docs/claude/commands.md
