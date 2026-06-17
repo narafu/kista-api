@@ -78,7 +78,7 @@ public class AuthController {
         userUseCase.reapply(userId);
     }
 
-    // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (V16 FK CASCADE)
+    // 회원 탈퇴 — accounts FK CASCADE, audit_logs SET NULL (관리자 삭제 후 감사 로그 보존)
     @Operation(summary = "회원 탈퇴", description = "본인 계정 및 모든 연관 데이터(계좌, 거래내역 등)를 즉시 삭제합니다.")
     @ApiResponse(responseCode = "204", description = "탈퇴 성공")
     @DeleteMapping("/me")

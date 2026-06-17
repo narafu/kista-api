@@ -20,7 +20,7 @@ public class AuditLogEntity extends BaseCreatedAtEntity {
     @Column(updatable = false)
     private UUID id;
 
-    @Column(name = "admin_id", nullable = false)
+    @Column(name = "admin_id", nullable = true)
     private UUID adminId;
 
     @Column(nullable = false, length = 64)
