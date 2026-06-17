@@ -68,8 +68,7 @@ class CycleOrderComputer {
 
         CycleOrderStrategy.OrderPlan plan = planOpt.get();
 
-        // valid: UI 미리보기에서 잔고 부족 표시 용도 — 실제 주문 접수는 브로커 API가 최종 판단
-        return new ComputeResult(plan, balance.isOrderValid(plan.orders()));
+        return new ComputeResult(plan);
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균
@@ -94,11 +93,10 @@ class CycleOrderComputer {
         return Optional.of(result);
     }
 
-    // plan==null이면 전략 차원 skip / valid는 UI 미리보기용 잔고 유효성 (주문 접수 블로킹 용도 아님)
-    // position은 INFINITE만 non-null — INSUFFICIENT_BALANCE 미리보기에서도 단위금액 전달 위해 보존
-    record ComputeResult(CycleOrderStrategy.OrderPlan plan, boolean valid) {
+    // plan==null이면 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
+    record ComputeResult(CycleOrderStrategy.OrderPlan plan) {
         static ComputeResult skipped() {
-            return new ComputeResult(null, false);
+            return new ComputeResult(null);
         }
 
         boolean isSkipped() {

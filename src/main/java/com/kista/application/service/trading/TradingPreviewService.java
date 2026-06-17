@@ -61,7 +61,7 @@ class TradingPreviewService {
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
         if (load.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders, null);
+            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders);
         }
         AccountBalance balance = load.balance();
 
@@ -79,15 +79,9 @@ class TradingPreviewService {
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {
-            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, null);
+            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders);
         }
 
-        // 주문 유효성: 매수금액 > 잔액 or 매도수량 > 보유수량 — 주문은 계산 결과 그대로 포함하되 balanceDeficit 전달
-        // position 포함 — 단위금액·현재가 정보를 프론트에 전달하기 위해 (INFINITE만 non-null)
-        if (!result.valid()) {
-            BigDecimal deficit = balance.calcBuyDeficit(result.orders());
-            return new NextOrdersPreview(today, result.position(), result.orders(), SkipReason.INSUFFICIENT_BALANCE, todayPlannedOrders, deficit);
-        }
-        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders, null);
+        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders);
     }
 }

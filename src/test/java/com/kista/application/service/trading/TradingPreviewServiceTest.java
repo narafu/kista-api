@@ -3,7 +3,6 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -75,9 +74,6 @@ class TradingPreviewServiceTest {
             null, CYCLE_ID, new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, false, null, null);
     static final CyclePosition FRESH_HISTORY = new CyclePosition(
             null, CYCLE_ID, new BigDecimal("1000.00"), null, null, 0, false, null, null);
-    // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
-    static final CyclePosition LOW_HISTORY = new CyclePosition(
-            null, CYCLE_ID, new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, false, null, null);
 
     @BeforeEach
     void setUp() {
@@ -131,29 +127,6 @@ class TradingPreviewServiceTest {
         assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
         verify(kisPricePort, never()).getPriceSnapshot(any(), any());
-    }
-
-    @Test
-    void preview_returnsSkipInsufficientBalance_whenBuyAmountExceedsBalance() {
-        // 잔액 $10, 매수금액 $20 → INSUFFICIENT_BALANCE, 부족분 $10
-        Order overBudgetBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
-                Order.OrderStatus.PLANNED, null, null, null);
-        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
-        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(LOW_HISTORY));
-        when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
-                .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(overBudgetBuy));
-
-        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
-
-        assertThat(result.skipReason()).isEqualTo(SkipReason.INSUFFICIENT_BALANCE);
-        assertThat(result.position()).isNotNull(); // position은 프론트 참고용으로 유지
-        assertThat(result.orders()).hasSize(1); // 계산 결과는 포함 — 프론트에서 경고와 함께 표시
-        assertThat(result.balanceDeficit()).isEqualByComparingTo(new BigDecimal("10.00")); // $20 - $10
     }
 
     @Test

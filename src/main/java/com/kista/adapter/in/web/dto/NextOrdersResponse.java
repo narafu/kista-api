@@ -15,8 +15,7 @@ public record NextOrdersResponse(
         PositionSnapshot position,                 // PRIVACY/skip 시 null
         List<OrderItem> orders,
         NextOrdersPreview.SkipReason skipReason,   // 정상이면 null
-        List<TodayOrderItem> todayOrders,          // 오늘 이미 등록된 PLANNED 주문
-        BigDecimal balanceDeficit                  // null: 정상 or 기타 skip, ZERO+: 매수 부족 금액 (USD)
+        List<TodayOrderItem> todayOrders           // 오늘 이미 등록된 PLANNED 주문
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
@@ -86,8 +85,7 @@ public record NextOrdersResponse(
                 result.position() == null ? null : PositionSnapshot.from(result.position()),
                 result.orders().stream().map(OrderItem::from).toList(),
                 result.skipReason(),
-                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList(),
-                result.balanceDeficit()
+                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList()
         );
     }
 }
