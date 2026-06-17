@@ -121,7 +121,10 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
                 result.add(new Execution(tradeDate, ticker, direction, filledQty, price, amountUsd, order.orderId()));
             }
 
-            hasNext = Boolean.TRUE.equals(response.hasNext()) && "CLOSED".equals(status);
+            // cursor 없이 hasNext=true면 다음 페이지 조회 불가 — 무한루프 방지
+            hasNext = Boolean.TRUE.equals(response.hasNext())
+                    && "CLOSED".equals(status)
+                    && response.nextCursor() != null;
             cursor  = response.nextCursor();
         }
         return result;
