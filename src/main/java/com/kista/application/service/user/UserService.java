@@ -11,6 +11,7 @@ import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
+import com.kista.domain.port.out.RefreshTokenPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
@@ -47,6 +48,7 @@ class UserService implements UserUseCase {
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
     private final FcmDeviceTokenPort fcmDeviceTokenPort;   // FCM 토큰 저장/삭제
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
+    private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
 
     @Override
     @Transactional(readOnly = true)
@@ -130,6 +132,7 @@ class UserService implements UserUseCase {
         notificationPort.notifyRejected(updated);
         realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
         blacklistPort.add(userId, Duration.ofMinutes(15)); // 거절 즉시 AT 차단
+        refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
 
     @Override

@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
+import com.kista.domain.port.out.RefreshTokenPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
@@ -48,6 +49,7 @@ class UserServiceTest {
     @Mock KakaoOAuthPort kakaoOAuthPort;
     @Mock FcmDeviceTokenPort fcmDeviceTokenPort;
     @Mock BlacklistPort blacklistPort;
+    @Mock RefreshTokenPort refreshTokenPort;
 
     @InjectMocks UserService userService;
 
@@ -230,6 +232,7 @@ class UserServiceTest {
         userService.reject(userId);
 
         verify(blacklistPort).add(eq(userId), eq(Duration.ofMinutes(15)));
+        verify(refreshTokenPort).deleteAllByUserId(userId);
     }
 
     @Test
