@@ -42,11 +42,6 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
-        // 전략 변경 알림은 관리자 전용 — no-op
-    }
-
-    @Override
     public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
         String body = String.format("[%s] %s %s 사이클 완료",
                 account.nickname(), strategy.type().name(), strategy.ticker().name());
@@ -81,12 +76,10 @@ public class FcmAdapter implements UserNotificationPort {
 
     private void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
-            log.warn("FCM 미설정 — 알림 생략");
             return;
         }
         List<String> tokens = fcmDeviceTokenPort.findTokensByUserId(userId);
         if (tokens.isEmpty()) {
-            log.warn("[{}] FCM 토큰 없음 — 알림 생략", userId);
             return;
         }
         MulticastMessage message = MulticastMessage.builder()

@@ -45,6 +45,11 @@ public record User(
         public boolean includesFcm()      { return this == FCM      || this == ALL; }
     }
 
+    // 텔레그램 봇 토큰 + Chat ID가 모두 설정된 경우에만 true
+    public boolean hasTelegramBot() {
+        return telegramBotToken != null && !telegramBotToken.isBlank() && telegramChatId != null;
+    }
+
     // 상태만 교체 — 나머지 필드 보존
     public User withStatus(UserStatus newStatus) {
         return new User(id, kakaoId, nickname, newStatus, role,

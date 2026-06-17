@@ -46,7 +46,6 @@ class TradingService {
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
-            TradingSnapshot snapshot,       // INFINITE만 non-null (신규 계산 시)
             BigDecimal startPrice,          // INFINITE만 non-null
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
@@ -81,7 +80,7 @@ class TradingService {
         Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
 
         // 기준 매매표 조회 (PRIVACY)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().type() == Strategy.Type.PRIVACY);
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
         PrivacyTradeBase privacyBase = hasPrivacy
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
@@ -147,7 +146,7 @@ class TradingService {
             StrategyCycle currentCycle = st.ctx().currentCycle();
             runSafely("recordAndNotify", ps.state().ctx(), () -> {
                 reporter.recordAndNotify(today, strategy, currentCycle, st.ctx().account(), st.ctx().user(),
-                        st.balance(), st.snapshot(), closingPrices.get(strategy.ticker()),
+                        st.balance(), closingPrices.get(strategy.ticker()),
                         ps.mainOrders(), st.privacyBase());
                 return null;
             });
@@ -165,7 +164,7 @@ class TradingService {
         // 1. 잔고 로드
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         // Toss는 체결 API 없어 cycle_position.usd_deposit이 stale — live 매수가능금액으로 보정
-        if (account.broker() == Account.Broker.TOSS) {
+        if (account.isToss()) {
             BigDecimal liveUsdDeposit = brokerMarginRouter.getUsdBuyableAmount(account);
             balance = new AccountBalance(balance.holdings(), balance.avgPrice(), liveUsdDeposit);
         }
@@ -179,15 +178,15 @@ class TradingService {
         if (!todayOrders.isEmpty()) {
             log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), todayOrders.size());
 
-            if (strategy.type() == Strategy.Type.INFINITE) {
+            if (strategy.isInfinite()) {
                 // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
                 CycleOrderComputer.ComputeResult recalc = orderComputer.compute(
                         balance, strategy, prevClosePrice, today, currentCycle, null, account.nickname());
                 InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
-                return new CycleState(ctx, balance, recalcPos, null, price, null);
+                return new CycleState(ctx, balance, recalcPos, price, null);
             }
             // PRIVACY: privacyBase 보존 (reportAll에서 사이클 회전 등에 필요)
-            return new CycleState(ctx, balance, null, null, null, privacyBase);
+            return new CycleState(ctx, balance, null, null, privacyBase);
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
@@ -198,12 +197,11 @@ class TradingService {
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
-        // CycleState: INFINITE는 position/snapshot/startPrice, PRIVACY는 privacyBase 보존
+        // CycleState: INFINITE는 position/startPrice, PRIVACY는 privacyBase 보존
         InfinitePosition position = result.position();
-        TradingSnapshot snapshot = position != null ? position.toSnapshot() : null;
-        BigDecimal startPrice = strategy.type() == Strategy.Type.INFINITE ? price : null;
-        PrivacyTradeBase privacyBaseForState = strategy.type() == Strategy.Type.PRIVACY ? privacyBase : null;
-        return new CycleState(ctx, balance, position, snapshot, startPrice, privacyBaseForState);
+        BigDecimal startPrice = strategy.isInfinite() ? price : null;
+        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
+        return new CycleState(ctx, balance, position, startPrice, privacyBaseForState);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
@@ -231,7 +229,7 @@ class TradingService {
         Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
 
         // PRIVACY 기준 매매표 조회 (내일 기준 — FIDA가 미리 송신했을 경우)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().type() == Strategy.Type.PRIVACY);
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
         PrivacyTradeBase privacyBase = hasPrivacy
                 ? privacyTradePort.findTodayTrade(tradeDate).orElse(null)
                 : null;
@@ -261,7 +259,7 @@ class TradingService {
         // 잔고 로드
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         // Toss는 체결 API 없어 cycle_position.usd_deposit이 stale — live 매수가능금액으로 보정
-        if (account.broker() == Account.Broker.TOSS) {
+        if (account.isToss()) {
             BigDecimal liveUsdDeposit = brokerMarginRouter.getUsdBuyableAmount(account);
             balance = new AccountBalance(balance.holdings(), balance.avgPrice(), liveUsdDeposit);
         }

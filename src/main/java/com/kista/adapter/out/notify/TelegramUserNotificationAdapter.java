@@ -1,8 +1,6 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.application.event.NewUserRegisteredEvent;
-import com.kista.application.event.TradingCyclePausedEvent;
-import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
@@ -24,18 +22,6 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
-
-    // StrategyService가 발행한 중지 이벤트를 커밋 성공 후에만 수신
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCyclePaused(TradingCyclePausedEvent event) {
-        notifyStrategyChanged(event.user(), event.account(), event.strategy(), "중지");
-    }
-
-    // StrategyService가 발행한 재개 이벤트를 커밋 성공 후에만 수신
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCycleResumed(TradingCycleResumedEvent event) {
-        notifyStrategyChanged(event.user(), event.account(), event.strategy(), "재개");
-    }
 
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -60,37 +46,19 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyApproved(User user) {
-        // 사용자 개인 봇으로 승인 알림 전송
-        if (user.telegramChatId() != null && user.telegramBotToken() != null) {
-            telegramHttpClient.sendMessage(user.telegramChatId(), "✅ 가입이 승인되었습니다.",
-                    user.telegramBotToken());
-        }
+        if (!user.hasTelegramBot()) return;
+        telegramHttpClient.sendMessage(user.telegramChatId(), "✅ 가입이 승인되었습니다.", user.telegramBotToken());
     }
 
     @Override
     public void notifyRejected(User user) {
-        // 사용자 개인 봇으로 거절 알림 전송
-        if (user.telegramChatId() != null && user.telegramBotToken() != null) {
-            telegramHttpClient.sendMessage(user.telegramChatId(), "❌ 가입 신청이 거절되었습니다.",
-                    user.telegramBotToken());
-        }
-    }
-
-    @Override
-    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
-        // 관리자 봇으로 전략 변경 내용 알림
-        String text = String.format("사용자 %s이 계좌 %s의 %s(%s) 전략을 %s했습니다",
-                user.nickname(), account.nickname(),
-                strategy.type().name(), strategy.ticker().name(), action);
-        telegramHttpClient.sendMessage(props.chatId(), text, props.botToken());
+        if (!user.hasTelegramBot()) return;
+        telegramHttpClient.sendMessage(user.telegramChatId(), "❌ 가입 신청이 거절되었습니다.", user.telegramBotToken());
     }
 
     @Override
     public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
-        // 사용자 텔레그램 봇 미설정 시 생략
-        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
-                || user.telegramChatId() == null) {
-            log.warn("[{}] 텔레그램 미설정 — 사이클 종료 알림 생략", account.nickname());
+        if (!user.hasTelegramBot()) {
             return;
         }
         String text = String.format(
@@ -105,10 +73,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
-        // 사용자 텔레그램 봇 미설정 시 생략
-        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
-                || user.telegramChatId() == null) {
-            log.warn("[{}] 텔레그램 미설정 — 사이클 시작 알림 생략", account.nickname());
+        if (!user.hasTelegramBot()) {
             return;
         }
         String text = String.format(
@@ -123,9 +88,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyInsufficientBalance(User user, Account account, com.kista.domain.model.strategy.Strategy.Ticker ticker) {
-        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
-                || user.telegramChatId() == null) {
-            log.warn("[{}] 텔레그램 미설정 — 예수금 부족 알림 생략", account.nickname());
+        if (!user.hasTelegramBot()) {
             return;
         }
         String text = String.format(
@@ -139,40 +102,20 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport r) {
-        // 사용자 텔레그램 봇 미설정 시 생략
-        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
-                || user.telegramChatId() == null) {
-            log.warn("[{}] 텔레그램 미설정 — 매매 리포트 생략", account.nickname());
+        if (!user.hasTelegramBot()) {
             return;
         }
-        String text;
-        if (r.snapshot() != null) {
-            // INFINITE: 포지션 상세 포함
-            text = String.format(
-                    "<b>매매 결산 [%s] — %s</b>%n"
-                    + "매수: $%.2f | 매도: $%.2f%n"
-                    + "보유: %d주 @ $%.4f%n"
-                    + "편차율: %.4f | 목표가: $%.2f",
-                    r.date(), account.nickname(),
-                    r.totalBoughtUsd(), r.totalSoldUsd(),
-                    r.snapshot().holdings(), r.snapshot().averagePrice(),
-                    r.snapshot().priceOffsetRate(), r.snapshot().targetPrice());
-        } else {
-            // PRIVACY: 체결 금액만 표시 (스냅샷 없음)
-            text = String.format(
-                    "<b>매매 결산 [%s] — %s</b>%n"
-                    + "매수: $%.2f | 매도: $%.2f",
-                    r.date(), account.nickname(),
-                    r.totalBoughtUsd(), r.totalSoldUsd());
-        }
+        String text = String.format(
+                "<b>매매 결산 [%s] — %s</b>%n"
+                + "매수: $%.2f | 매도: $%.2f",
+                r.date(), account.nickname(),
+                r.totalBoughtUsd(), r.totalSoldUsd());
         telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
 
     @Override
     public void notifyError(User user, Exception e) {
-        if (user.telegramBotToken() == null || user.telegramBotToken().isBlank()
-                || user.telegramChatId() == null) {
-            log.warn("텔레그램 미설정 — 매매 오류 알림 생략");
+        if (!user.hasTelegramBot()) {
             return;
         }
         String text = String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage());

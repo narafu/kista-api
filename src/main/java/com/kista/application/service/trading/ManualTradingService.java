@@ -43,7 +43,7 @@ class ManualTradingService {
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.supportsManualExecution())
             throw new IllegalArgumentException("이 전략은 수동 실행을 지원하지 않습니다");
-        if (strategy.status() != Strategy.Status.ACTIVE)
+        if (!strategy.isActive())
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요

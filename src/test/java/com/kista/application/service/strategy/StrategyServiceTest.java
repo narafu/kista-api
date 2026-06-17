@@ -1,7 +1,5 @@
 package com.kista.application.service.strategy;
 
-import com.kista.application.event.TradingCyclePausedEvent;
-import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.application.service.trading.BrokerMarginRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.domain.model.account.Account;
@@ -24,7 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,7 +46,6 @@ class StrategyServiceTest {
     @Mock UserPort userPort;
     @Mock BrokerPriceRouter brokerPriceRouter;
     @Mock BrokerMarginRouter brokerMarginRouter;
-    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks StrategyService strategyService;
 
@@ -87,37 +84,25 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("pause() 호출 시 TradingCyclePausedEvent가 발행된다")
-    void pause_publishes_TradingCyclePausedEvent() {
-        // given
+    @DisplayName("pause() 호출 시 전략 상태가 PAUSED로 저장된다")
+    void pause_saves_strategy_as_paused() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(PAUSED_STRATEGY);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
-        // when
         strategyService.pause(STRATEGY_ID, USER_ID);
 
-        // then
-        verify(eventPublisher).publishEvent(any(TradingCyclePausedEvent.class));
-        verify(strategyPort).save(any(Strategy.class));
+        verify(strategyPort).save(argThat(s -> s.status() == Strategy.Status.PAUSED));
     }
 
     @Test
-    @DisplayName("resume() 호출 시 TradingCycleResumedEvent가 발행된다")
-    void resume_publishes_TradingCycleResumedEvent() {
-        // given
+    @DisplayName("resume() 호출 시 전략 상태가 ACTIVE로 저장된다")
+    void resume_saves_strategy_as_active() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
 
-        // when
         strategyService.resume(STRATEGY_ID, USER_ID);
 
-        // then
-        verify(eventPublisher).publishEvent(any(TradingCycleResumedEvent.class));
-        verify(strategyPort).save(any(Strategy.class));
+        verify(strategyPort).save(argThat(s -> s.status() == Strategy.Status.ACTIVE));
     }
 
     @Test
@@ -131,7 +116,7 @@ class StrategyServiceTest {
         assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);
 
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(strategyPort, never()).save(any());
     }
 
     @Test
@@ -145,7 +130,7 @@ class StrategyServiceTest {
         assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, otherUserId))
                 .isInstanceOf(SecurityException.class);
 
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(strategyPort, never()).save(any());
     }
 
     @Test

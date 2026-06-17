@@ -214,7 +214,7 @@ class UserService implements UserUseCase {
     private long countActiveStrategies(UUID userId) {
         return accountPort.findByUserId(userId).stream()
                 .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
-                .filter(strategy -> strategy.status() == Strategy.Status.ACTIVE)
+                .filter(strategy -> strategy.isActive())
                 .count();
     }
 

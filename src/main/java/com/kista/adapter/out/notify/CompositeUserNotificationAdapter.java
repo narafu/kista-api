@@ -23,12 +23,6 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
         telegram.notifyNewUser(user);
     }
 
-    // 관리자 알림 — 채널 무관, 항상 Telegram
-    @Override
-    public void notifyStrategyChanged(User user, Account account, Strategy strategy, String action) {
-        telegram.notifyStrategyChanged(user, account, strategy, action);
-    }
-
     // 사용자 알림 — notificationChannel에 따라 라우팅
     @Override
     public void notifyApproved(User user) {

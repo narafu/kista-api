@@ -40,7 +40,7 @@ class CycleOrderComputer {
     ComputeResult compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                           LocalDate tradeDate, StrategyCycle currentCycle,
                           PrivacyTradeBase privacyBase, String label) {
-        BigDecimal initialUsdDeposit = strategy.type() == Strategy.Type.PRIVACY
+        BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
 
@@ -48,7 +48,7 @@ class CycleOrderComputer {
         boolean isReverseMode = false;
         boolean isFirstReverseDay = false;
         BigDecimal starPointPrice = null;
-        if (strategy.type() == Strategy.Type.INFINITE && currentCycle != null) {
+        if (strategy.isInfinite() && currentCycle != null) {
             List<CyclePosition> recent = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 2);
             isReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
             isFirstReverseDay = isReverseMode && (recent.size() < 2 || !recent.get(1).isReverseMode());

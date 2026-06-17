@@ -74,7 +74,7 @@ class AdminQueryService implements AdminQueryUseCase {
         // PAUSED 전략이 있는 계좌
         List<Account> pausedAccounts = allAccounts.stream()
                 .filter(a -> strategyPort.findByAccountId(a.id()).stream()
-                        .anyMatch(s -> s.status() == Strategy.Status.PAUSED))
+                        .anyMatch(Strategy::isPaused))
                 .toList();
 
         // 최근 7일 거래 있는 accountId 집합
@@ -84,7 +84,7 @@ class AdminQueryService implements AdminQueryUseCase {
         // ACTIVE 전략이 있지만 7일 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
                 .filter(a -> strategyPort.findByAccountId(a.id()).stream()
-                        .anyMatch(s -> s.status() == Strategy.Status.ACTIVE))
+                        .anyMatch(Strategy::isActive))
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();
 

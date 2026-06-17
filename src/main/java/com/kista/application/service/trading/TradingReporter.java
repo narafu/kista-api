@@ -1,7 +1,6 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.Account.Broker;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
@@ -13,7 +12,6 @@ import com.kista.domain.model.strategy.ReverseModePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.strategy.TradingSnapshot;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.KisExecutionPort;
@@ -52,11 +50,11 @@ class TradingReporter {
 
     void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
                          Account account, User user,
-                         AccountBalance balance, TradingSnapshot snapshot, BigDecimal closingPrice,
+                         AccountBalance balance, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
         // Toss 계좌는 체결 조회 API 없음 (MVP) — 주문 PLACED 상태 유지
         // today는 KST → KisTradingApi.getExecutions 내부에서 toUtc 변환됨
-        List<Execution> executions = account.broker() == Broker.TOSS
+        List<Execution> executions = account.isToss()
                 ? Collections.emptyList()
                 : kisExecutionPort.getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
@@ -68,11 +66,7 @@ class TradingReporter {
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
-        // INFINITE: 종가 기준 스냅샷 재계산 / PRIVACY: snapshot=null 그대로
-        TradingSnapshot postSnapshot = snapshot != null && closingPrice != null
-                ? new InfinitePosition(postBalance, strategy.ticker(), closingPrice, strategy.divisionCount()).toSnapshot()
-                : snapshot;
-        TradingReport report = buildReport(today, postSnapshot, mainOrders, executions);
+        TradingReport report = buildReport(today, executions);
         userNotificationPort.notifyTradingReport(user, account, report);
         log.info("[{}] 리포트 발송 완료", account.nickname());
         // 체결 건별 SSE 실시간 알림
@@ -90,7 +84,7 @@ class TradingReporter {
                                    Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
         boolean newReverseMode = false;
-        if (strategy.type() == Strategy.Type.INFINITE) {
+        if (strategy.isInfinite()) {
             newReverseMode = computeNewReverseMode(currentCycle.id(), strategy, balance, price);
         }
 
@@ -174,8 +168,7 @@ class TradingReporter {
         }
     }
 
-    private TradingReport buildReport(LocalDate today, TradingSnapshot snapshot,
-                                      List<Order> mainOrders, List<Execution> executions) {
+    private TradingReport buildReport(LocalDate today, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
                 .filter(e -> e.direction() == BUY)
                 .map(Execution::amountUsd)
@@ -184,6 +177,6 @@ class TradingReporter {
                 .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TradingReport(today, snapshot, mainOrders, totalBought, totalSold);
+        return new TradingReport(today, totalBought, totalSold);
     }
 }

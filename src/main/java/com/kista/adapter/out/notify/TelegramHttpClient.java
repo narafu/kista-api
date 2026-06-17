@@ -32,7 +32,6 @@ class TelegramHttpClient {
     void sendWithInlineKeyboard(String chatId, String text, String botToken,
                                 List<Map<String, String>> buttons) {
         if (botToken == null || botToken.isBlank()) {
-            log.warn("botToken 미설정 — 인라인 버튼 메시지 생략");
             return;
         }
         try {

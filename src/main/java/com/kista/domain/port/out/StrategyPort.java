@@ -32,7 +32,7 @@ public interface StrategyPort {
     default Optional<Strategy.Ticker> findActiveTicker(UUID accountId) {
         List<Strategy> strategies = findByAccountId(accountId);
         return strategies.stream()
-                .filter(s -> s.status() == Strategy.Status.ACTIVE)
+                .filter(s -> s.isActive())
                 .findFirst()
                 .or(() -> strategies.stream().findFirst())
                 .map(Strategy::ticker);

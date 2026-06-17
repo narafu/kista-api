@@ -19,8 +19,7 @@ class TelegramApiClient {
     private final TelegramProperties props;
 
     void sendMessage(String chatId, String text) {
-        if (props.botToken() == null || props.botToken().isBlank()) {
-            log.warn("Telegram botToken 미설정 — 메시지 전송 생략");
+        if (!props.hasBot()) {
             return;
         }
         try {
@@ -36,7 +35,7 @@ class TelegramApiClient {
 
     // 인라인 버튼 클릭 후 버튼의 로딩 스피너 제거
     void answerCallbackQuery(String callbackQueryId) {
-        if (props.botToken() == null || props.botToken().isBlank()) return;
+        if (!props.hasBot()) return;
         try {
             String url = API_BASE + "/bot" + props.botToken() + "/answerCallbackQuery";
             telegramRestTemplate.postForObject(url,

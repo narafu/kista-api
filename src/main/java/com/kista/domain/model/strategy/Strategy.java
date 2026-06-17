@@ -43,6 +43,11 @@ public record Strategy(
     // KPI 포지션 메트릭(회차/단위금액/기준가/목표가) 표시 여부 — INFINITE 전략만 해당
     public boolean supportsPositionMetrics() { return type == Type.INFINITE; }
 
+    public boolean isInfinite() { return type == Type.INFINITE; }
+    public boolean isPrivacy()  { return type == Type.PRIVACY; }
+    public boolean isActive()   { return status == Status.ACTIVE; }
+    public boolean isPaused()   { return status == Status.PAUSED; }
+
     // 분할 수만 교체
     public Strategy withDivisionCount(int newDivisionCount) {
         return new Strategy(id, accountId, type, status, ticker, cycleSeedType, newDivisionCount);
@@ -51,8 +56,8 @@ public record Strategy(
     @Getter
     @RequiredArgsConstructor
     public enum Type {
-        INFINITE("20분할 LOC 매매 전략"), // 모든 Ticker 지원
-        PRIVACY("Fanding 매매표 기반 전략"); // SOXL 전용
+        INFINITE("무한매수법"), // 모든 Ticker 지원
+        PRIVACY("Fanding P전략"); // SOXL 전용
 
         private final String description; // 전략 설명
 

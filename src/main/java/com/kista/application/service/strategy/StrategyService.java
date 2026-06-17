@@ -1,7 +1,5 @@
 package com.kista.application.service.strategy;
 
-import com.kista.application.event.TradingCyclePausedEvent;
-import com.kista.application.event.TradingCycleResumedEvent;
 import com.kista.application.service.trading.BrokerMarginRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.CycleLookups;
@@ -21,7 +19,6 @@ import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +40,6 @@ class StrategyService implements StrategyUseCase {
     private final UserPort userPort;
     private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 브로커 무관
     private final BrokerMarginRouter brokerMarginRouter;         // 등록 시점 가용 시드 검증 — 브로커 무관
-    private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 알림 발행용
 
     @Override
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
@@ -101,34 +97,24 @@ class StrategyService implements StrategyUseCase {
     public void pause(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         // 중복 상태 guard — 이미 중지된 전략은 재중지 불가
-        if (strategy.status() == Strategy.Status.PAUSED) {
+        if (strategy.isPaused()) {
             throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
         }
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
-        User user = userPort.findByIdOrThrow(requesterId);
-        Strategy paused = strategy.withStatus(Strategy.Status.PAUSED);
-        strategyPort.save(paused);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
         log.info("전략 중지: strategyId={}", strategyId);
-        // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
-        eventPublisher.publishEvent(new TradingCyclePausedEvent(user, account, paused));
     }
 
     @Override
     public void resume(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가
-        if (strategy.status() == Strategy.Status.ACTIVE) {
+        if (strategy.isActive()) {
             throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
         }
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // save() 전 사용자 조회 — 사용자 없으면 저장 불필요
-        User user = userPort.findByIdOrThrow(requesterId);
-        Strategy active = strategy.withStatus(Strategy.Status.ACTIVE);
-        strategyPort.save(active);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        strategyPort.save(strategy.withStatus(Strategy.Status.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
-        // 커밋 성공 후에만 텔레그램 알림 — 롤백 시 중복 발송 방지
-        eventPublisher.publishEvent(new TradingCycleResumedEvent(user, account, active));
     }
 
     @Override

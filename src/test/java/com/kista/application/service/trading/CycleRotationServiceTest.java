@@ -116,7 +116,6 @@ class CycleRotationServiceTest {
                         && p.usdDeposit().compareTo(deposit) == 0
                         && p.holdings() == 0
                         && p.avgPrice() == null));
-        verify(userNotificationPort).notifyStrategyChanged(USER, ACCOUNT, strategy, "재등록");
         verify(notifyPort, never()).notifyInsufficientBalance(any(), any(), any());
     }
 
@@ -136,7 +135,6 @@ class CycleRotationServiceTest {
                 argThat(b -> b.usdDeposit().compareTo(deposit) == 0), eq(Ticker.SOXL));
         verify(strategyCyclePort, never()).save(any());
         verify(cyclePositionPort, never()).save(any());
-        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 
     @Test
@@ -164,7 +162,6 @@ class CycleRotationServiceTest {
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(maxSeedDeposit);
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(maxSeedDeposit) == 0));
-        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), eq(strategy), eq("재등록"));
     }
 
     @Test
@@ -180,7 +177,6 @@ class CycleRotationServiceTest {
         verify(notifyPort).notifyError(kisError);
         verify(strategyCyclePort, never()).save(any());
         verify(cyclePositionPort, never()).save(any());
-        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 
     @Test

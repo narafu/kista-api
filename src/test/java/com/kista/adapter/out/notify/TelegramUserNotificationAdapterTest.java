@@ -2,8 +2,6 @@ package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.strategy.TradingSnapshot;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +14,6 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -35,21 +32,6 @@ class TelegramUserNotificationAdapterTest {
     void setUp() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restTemplate);
         adapter = new TelegramUserNotificationAdapter(httpClient, PROPS);
-    }
-
-    @Test
-    void notifyStrategyChanged_sendsToAdminChat() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM, true);
-        Account account = mock(Account.class);
-        when(account.nickname()).thenReturn("내계좌");
-        Strategy strategy = new Strategy(UUID.randomUUID(), UUID.randomUUID(),
-                Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL,
-                Strategy.CycleSeedType.NONE, 20);
-
-        adapter.notifyStrategyChanged(user, account, strategy, "중지");
-
-        verify(restTemplate).postForObject(contains("/botadmin-token/sendMessage"), any(), eq(String.class));
     }
 
     @Test
@@ -78,10 +60,6 @@ class TelegramUserNotificationAdapterTest {
 
     // TradingReport 생성 헬퍼
     private TradingReport buildTestReport() {
-        TradingSnapshot snapshot = new TradingSnapshot(10,
-                new BigDecimal("20.00"), new BigDecimal("0.1733"), new BigDecimal("24.00"));
-        return new TradingReport(
-                LocalDate.of(2024, 6, 15), snapshot, List.of(),
-                new BigDecimal("66.00"), new BigDecimal("35.00"));
+        return new TradingReport(LocalDate.of(2024, 6, 15), new BigDecimal("66.00"), new BigDecimal("35.00"));
     }
 }

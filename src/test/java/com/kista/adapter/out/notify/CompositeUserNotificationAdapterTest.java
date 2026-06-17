@@ -1,9 +1,7 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.strategy.TradingSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
@@ -16,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -48,17 +45,7 @@ class CompositeUserNotificationAdapterTest {
 
     // 테스트용 TradingReport 생성 헬퍼
     static TradingReport report() {
-        TradingSnapshot snapshot = new TradingSnapshot(
-                10,                                  // holdings
-                new BigDecimal("100.00"),            // averagePrice
-                new BigDecimal("0.1500"),            // priceOffsetRate
-                new BigDecimal("115.00"));           // targetPrice
-        return new TradingReport(
-                LocalDate.now(),
-                snapshot,
-                List.<Order>of(),                    // mainOrders
-                new BigDecimal("500.00"),            // totalBoughtUsd
-                new BigDecimal("200.00"));           // totalSoldUsd
+        return new TradingReport(LocalDate.now(), new BigDecimal("500.00"), new BigDecimal("200.00"));
     }
 
     @Test
@@ -108,18 +95,7 @@ class CompositeUserNotificationAdapterTest {
         verify(fcm, never()).notifyNewUser(any());
     }
 
-    @Test
-    void notifyStrategyChanged_alwaysGoesToTelegram() {
-        // 전략 변경 알림도 관리자 알림 — 채널 무관
-        User user = userWith(NotificationChannel.FCM);
-        Account account = mock(Account.class);
-        Strategy strategy = mock(Strategy.class);
 
-        composite.notifyStrategyChanged(user, account, strategy, "등록");
-
-        verify(telegram).notifyStrategyChanged(eq(user), eq(account), eq(strategy), eq("등록"));
-        verify(fcm, never()).notifyStrategyChanged(any(), any(), any(), any());
-    }
 
     @Test
     void notifyApproved_telegramChannel_routesToTelegramOnly() {

@@ -257,8 +257,7 @@ class TradingServiceTest {
                 && h.avgPrice() != null && h.avgPrice().compareTo(executionPrice) == 0
                 && h.closingPrice() != null && h.closingPrice().compareTo(closingPrice) == 0));
         // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
-        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT),
-                argThat(r -> r.snapshot().holdings() == 1));
+        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
     }
 
     // ── placeOpenOrders 테스트 ────────────────────────────────────────────────
@@ -494,7 +493,6 @@ class TradingServiceTest {
         // 재등록: startAmount 동일 유지 (StrategyCycle로 저장)
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(initDeposit) == 0));
         // 성공 알림 발송
-        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), any(Strategy.class), eq("재등록"));
     }
 
     @Test
@@ -526,7 +524,6 @@ class TradingServiceTest {
         // 재등록: 내부 원장(maxSeed=1000)으로 새 StrategyCycle 생성
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(expectedSeed) == 0));
         // 성공 알림 발송
-        verify(userNotificationPort).notifyStrategyChanged(eq(USER), eq(ACCOUNT), any(Strategy.class), eq("재등록"));
     }
 
     @Test
@@ -553,7 +550,6 @@ class TradingServiceTest {
 
         verify(strategyCyclePort, never()).save(any());
         verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT), any(AccountBalance.class), eq(Ticker.SOXL));
-        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 
     @Test
@@ -579,6 +575,5 @@ class TradingServiceTest {
         verify(strategyCyclePort, never()).save(any());
         // rotateCycleIfConsecutive 내부 catch → notifyError (executeBatch 바깥 catch와 별개)
         verify(notifyPort, atLeastOnce()).notifyError(any());
-        verify(userNotificationPort, never()).notifyStrategyChanged(any(), any(), any(), any());
     }
 }
