@@ -60,7 +60,7 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private Order.OrderStatus status; // PLANNED/PLACED/FILLED/PARTIALLY_FILLED/FAILED/CANCELLED
 
-    @Column(name = "external_order_id", length = 50)
+    @Column(name = "external_order_id", length = 255)
     private String externalOrderId; // PLACED 이후 설정
 
     @Column(name = "filled_quantity")
