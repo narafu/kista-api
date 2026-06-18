@@ -1,9 +1,7 @@
 package com.kista.adapter.in.aop;
 
 import com.kista.domain.port.out.AppErrorLogPort;
-import com.kista.domain.port.out.NotifyPort;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.Signature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -20,7 +19,6 @@ class ErrorLogAspectTest {
 
     @Mock AppErrorLogPort appErrorLogPort;
     @Mock ProceedingJoinPoint pjp;
-    @Mock Signature signature;
     ErrorLogAspect aspect;
 
     RuntimeException testException = new RuntimeException("테스트 오류");
@@ -29,8 +27,7 @@ class ErrorLogAspectTest {
     void setUp() {
         aspect = new ErrorLogAspect(appErrorLogPort);
         when(pjp.getArgs()).thenReturn(new Object[]{testException});
-        when(pjp.getSignature()).thenReturn(signature);
-        when(signature.getDeclaringTypeName()).thenReturn("com.kista.adapter.out.notify.TelegramAdapter");
+        when(pjp.getTarget()).thenReturn(new Object());
     }
 
     @Test
@@ -38,7 +35,7 @@ class ErrorLogAspectTest {
         // Aspect가 DB 저장 후 원래 호출(텔레그램 발송)도 실행하는지 확인
         aspect.intercept(pjp);
 
-        verify(appErrorLogPort).save(testException, "com.kista.adapter.out.notify.TelegramAdapter");
+        verify(appErrorLogPort).save(eq(testException), eq("java.lang.Object"));
         verify(pjp).proceed();
     }
 

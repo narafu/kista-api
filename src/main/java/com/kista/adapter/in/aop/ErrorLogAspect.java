@@ -22,7 +22,7 @@ public class ErrorLogAspect {
         Exception e = (Exception) pjp.getArgs()[0];
         // DB 저장 실패가 텔레그램 알림을 막지 않도록 격리
         try {
-            appErrorLogPort.save(e, pjp.getSignature().getDeclaringTypeName());
+            appErrorLogPort.save(e, pjp.getTarget().getClass().getName());
         } catch (Exception saveEx) {
             log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
         }
