@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 public class RefreshTokenCookieHelper {
 
     private static final String COOKIE_NAME = "refresh_token";
-    private static final String COOKIE_PATH = "/api/auth"; // refresh/logout 엔드포인트에만 전송
+    private static final String COOKIE_PATH = "/"; // proxy가 모든 경로에서 RT를 읽어 자동 갱신할 수 있도록
     private static final long RT_MAX_AGE = 432_000L; // 120시간 = 5일
 
     @Value("${app.cookie.secure:true}")
