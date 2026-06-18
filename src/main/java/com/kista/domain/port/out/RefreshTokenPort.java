@@ -10,5 +10,6 @@ public interface RefreshTokenPort {
     Optional<RefreshToken> findByTokenHash(String tokenHash);
     void deleteByTokenHash(String tokenHash);
     void deleteAllByUserId(UUID userId); // 탈퇴/거절 시 전체 세션 종료
+    void deleteByUserIdAndUserAgent(UUID userId, String userAgent); // 동일 기기 재로그인 시 구 RT 교체
     int deleteAllExpired(); // 스케줄러 — 만료 토큰 일괄 정리
 }

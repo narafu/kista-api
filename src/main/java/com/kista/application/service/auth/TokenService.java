@@ -36,8 +36,8 @@ class TokenService implements TokenUseCase {
 
     @Override
     public String issueRefreshToken(UUID userId, String userAgent) {
-        // 기존 RT 전부 삭제 — 따닥 로그인으로 고아 토큰이 남지 않도록
-        refreshTokenPort.deleteAllByUserId(userId);
+        // 동일 기기(User-Agent) 기존 RT 교체 — 따닥 로그인 고아 토큰 방지, 다른 기기 세션은 유지
+        refreshTokenPort.deleteByUserIdAndUserAgent(userId, userAgent);
         String rawToken = generateRawToken();
         refreshTokenPort.save(new RefreshToken(
                 null, userId, sha256Hex(rawToken), userAgent,

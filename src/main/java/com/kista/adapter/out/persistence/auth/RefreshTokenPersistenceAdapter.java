@@ -42,6 +42,12 @@ class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
 
     @Override
     @Transactional
+    public void deleteByUserIdAndUserAgent(UUID userId, String userAgent) {
+        repository.deleteAllByUserIdAndUserAgent(userId, userAgent);
+    }
+
+    @Override
+    @Transactional
     public int deleteAllExpired() {
         return repository.deleteAllByExpiresAtBefore(Instant.now());
     }
