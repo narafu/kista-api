@@ -4,6 +4,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.PortfolioUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,13 +28,14 @@ class TelegramBotServiceTest {
 
     @Mock TelegramApiClient apiClient;
     @Mock PortfolioUseCase portfolioUseCase;
+    @Mock UserUseCase userUseCase;
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase);
+        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase, userUseCase);
     }
 
     private TelegramUpdate update(String text) {
