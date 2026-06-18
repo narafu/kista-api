@@ -50,7 +50,7 @@ class DashboardControllerTest {
         Order o = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 10,
                 new BigDecimal("25.00"), Order.OrderStatus.PLACED, "KIS001", null, null);
-        when(portfolioUseCase.getHistory(any(), any(), any())).thenReturn(List.of(o));
+        when(portfolioUseCase.getHistory(any(), any(), any(), any())).thenReturn(List.of(o));
 
         mockMvc.perform(get("/api/trades")
                         .with(authentication(mockAuth())))
@@ -65,7 +65,7 @@ class DashboardControllerTest {
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());
-        when(portfolioUseCase.getCurrent()).thenReturn(snap);
+        when(portfolioUseCase.getCurrent(any())).thenReturn(snap);
 
         mockMvc.perform(get("/api/portfolio/current")
                         .with(authentication(mockAuth())))
@@ -76,7 +76,7 @@ class DashboardControllerTest {
 
     @Test
     void getPortfolioSnapshots_returns_200() throws Exception {
-        when(portfolioUseCase.getSnapshots(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
+        when(portfolioUseCase.getSnapshots(any(), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/portfolio/snapshots?from=2026-01-01&to=2026-01-31")
                         .with(authentication(mockAuth())))

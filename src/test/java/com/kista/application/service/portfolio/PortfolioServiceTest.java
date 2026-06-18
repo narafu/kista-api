@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,21 +32,23 @@ class PortfolioServiceTest {
 
     @InjectMocks PortfolioService sut;
 
+    static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     @Test
     @DisplayName("getCurrent: 가장 최근 이력 1건 반환")
     void getCurrent_returns_latest_entry() {
         CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
-        when(cycleHistoryPort.findRecentGlobal(1)).thenReturn(List.of(entry));
+        when(cycleHistoryPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of(entry));
 
-        assertThat(sut.getCurrent()).isEqualTo(entry);
+        assertThat(sut.getCurrent(USER_ID)).isEqualTo(entry);
     }
 
     @Test
     @DisplayName("getCurrent: 이력 없으면 NoSuchElementException")
     void getCurrent_throws_when_no_history() {
-        when(cycleHistoryPort.findRecentGlobal(1)).thenReturn(List.of());
+        when(cycleHistoryPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> sut.getCurrent())
+        assertThatThrownBy(() -> sut.getCurrent(USER_ID))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("포트폴리오");
     }
@@ -54,9 +57,9 @@ class PortfolioServiceTest {
     @DisplayName("getSnapshots: from/to 파라미터를 findBetween에 위임")
     void getSnapshots_delegates_date_range_to_port() {
         CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
-        when(cycleHistoryPort.findBetween(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(entry));
+        when(cycleHistoryPort.findBetweenByUser(eq(USER_ID), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(entry));
 
-        assertThat(sut.getSnapshots(LocalDate.now().minusDays(30), LocalDate.now())).hasSize(1);
+        assertThat(sut.getSnapshots(USER_ID, LocalDate.now().minusDays(30), LocalDate.now())).hasSize(1);
     }
 
     private CyclePositionHistoryEntry entry(BigDecimal currentPrice) {

@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,10 +33,13 @@ class TelegramBotServiceTest {
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
+    static final UUID USER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase, userUseCase);
+        // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
+        lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }
 
     private TelegramUpdate update(String text) {
@@ -58,7 +62,7 @@ class TelegramBotServiceTest {
                 UUID.randomUUID(), Ticker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());
-        when(portfolioUseCase.getCurrent()).thenReturn(snap);
+        when(portfolioUseCase.getCurrent(any())).thenReturn(snap);
 
         sut.handle(update("/status"));
 
@@ -69,7 +73,7 @@ class TelegramBotServiceTest {
 
     @Test
     void status_when_no_snapshot_returns_fallback_message() {
-        when(portfolioUseCase.getCurrent()).thenThrow(new NoSuchElementException());
+        when(portfolioUseCase.getCurrent(any())).thenThrow(new NoSuchElementException());
 
         sut.handle(update("/status"));
 
@@ -80,12 +84,12 @@ class TelegramBotServiceTest {
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(portfolioUseCase.getHistory(any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
+        when(portfolioUseCase.getHistory(any(), any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
         verify(portfolioUseCase).getHistory(
-                LocalDate.now().minusDays(14), LocalDate.now(), Ticker.SOXL);
+                eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(Ticker.SOXL));
     }
 
     @Test
