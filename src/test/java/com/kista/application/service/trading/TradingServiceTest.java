@@ -52,6 +52,7 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
+    @Mock TosAccountPort tosAccountPort;
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -118,7 +119,7 @@ class TradingServiceTest {
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
-                balanceLoader, marginRouter, orderComputer, orderPlanner,
+                balanceLoader, tosAccountPort, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
     }
 
