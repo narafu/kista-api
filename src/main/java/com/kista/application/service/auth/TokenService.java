@@ -36,7 +36,8 @@ class TokenService implements TokenUseCase {
 
     @Override
     public String issueRefreshToken(UUID userId, String userAgent) {
-        // 로그인 시 새 RT 발급 — rawToken 반환, 컨트롤러가 HttpOnly 쿠키로 전달
+        // 기존 RT 전부 삭제 — 따닥 로그인으로 고아 토큰이 남지 않도록
+        refreshTokenPort.deleteAllByUserId(userId);
         String rawToken = generateRawToken();
         refreshTokenPort.save(new RefreshToken(
                 null, userId, sha256Hex(rawToken), userAgent,
