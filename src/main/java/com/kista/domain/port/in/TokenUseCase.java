@@ -11,4 +11,6 @@ public interface TokenUseCase {
     TokenRefreshResult refresh(String rawRefreshToken, String userAgent);
     // 로그아웃: RT 삭제 + userId 블랙리스트 등재
     void logout(String rawRefreshToken);
+    // 만료 RT 일괄 정리 — 스케줄러 전용
+    int cleanupExpiredTokens();
 }

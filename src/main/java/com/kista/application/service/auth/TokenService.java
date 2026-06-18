@@ -88,6 +88,11 @@ class TokenService implements TokenUseCase {
         }
     }
 
+    @Override
+    public int cleanupExpiredTokens() {
+        return refreshTokenPort.deleteAllExpired();
+    }
+
     private static String generateRawToken() {
         byte[] bytes = new byte[32]; // 256비트 엔트로피
         new SecureRandom().nextBytes(bytes);

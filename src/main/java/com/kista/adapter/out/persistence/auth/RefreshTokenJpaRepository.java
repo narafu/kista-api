@@ -16,4 +16,7 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, UU
 
     // 사용자 전체 토큰 삭제 (회원 탈퇴 / 전체 로그아웃)
     void deleteAllByUserId(UUID userId);
+
+    // 만료된 토큰 일괄 삭제 (스케줄러)
+    int deleteAllByExpiresAtBefore(java.time.Instant threshold);
 }
