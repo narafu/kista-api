@@ -38,7 +38,7 @@ public class FcmAdapter implements UserNotificationPort {
 
     @Override
     public void notifyRejected(User user) {
-        send(user.id(), "KISTA 알림", "❌ 가입 신청이 거절되었습니다.");
+        send(user.id(), "KISTA 알림", "❌ 가입이 거절되었습니다.");
     }
 
     @Override
@@ -57,16 +57,16 @@ public class FcmAdapter implements UserNotificationPort {
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport report) {
-        String body = String.format("[%s] 매수 $%.2f / 매도 $%.2f", account.nickname(),
+        String body = String.format("[%s %s] 매수 $%.2f / 매도 $%.2f",
+                report.strategyType().name(), report.ticker().name(),
                 report.totalBoughtUsd(), report.totalSoldUsd());
-        send(user.id(), "매매 결산", body);
+        send(user.id(), "매매 결산 — " + account.nickname(), body);
     }
 
     @Override
-    public void notifyInsufficientBalance(User user, Account account, com.kista.domain.model.strategy.Strategy.Ticker ticker) {
-        String body = String.format("[%s] %s 매수 주문 금액 > 예수금. 입금 시 장 마감 전 자동 실행됩니다.",
-                account.nickname(), ticker.name());
-        send(user.id(), "⚠️ 예수금 부족", body);
+    public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
+        String body = String.format("[%s %s] 장 마감 전 예수금 확인 바랍니다.", strategyType.name(), ticker.name());
+        send(user.id(), "⚠️ 예수금 부족 — " + account.nickname(), body);
     }
 
     @Override

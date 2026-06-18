@@ -60,3 +60,6 @@ supabase/.temp
 
 # 로컬 서버 로그
 logs/
+
+# superpowers
+docs/superpowers/plans/**

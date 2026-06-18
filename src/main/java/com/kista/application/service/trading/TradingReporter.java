@@ -61,7 +61,7 @@ class TradingReporter {
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
-        TradingReport report = buildReport(today, executions);
+        TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
         userNotificationPort.notifyTradingReport(user, account, report);
         log.info("[{}] 리포트 발송 완료", account.nickname());
         // 체결 건별 SSE 실시간 알림
@@ -163,7 +163,7 @@ class TradingReporter {
         }
     }
 
-    private TradingReport buildReport(LocalDate today, List<Execution> executions) {
+    private TradingReport buildReport(LocalDate today, Strategy.Type strategyType, Strategy.Ticker ticker, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
                 .filter(e -> e.direction() == BUY)
                 .map(Execution::amountUsd)
@@ -172,6 +172,6 @@ class TradingReporter {
                 .filter(e -> e.direction() == SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TradingReport(today, totalBought, totalSold);
+        return new TradingReport(today, strategyType, ticker, totalBought, totalSold);
     }
 }

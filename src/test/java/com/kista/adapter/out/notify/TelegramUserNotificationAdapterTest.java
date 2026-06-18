@@ -1,6 +1,7 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
@@ -59,6 +60,6 @@ class TelegramUserNotificationAdapterTest {
 
     // TradingReport 생성 헬퍼
     private TradingReport buildTestReport() {
-        return new TradingReport(LocalDate.of(2024, 6, 15), new BigDecimal("66.00"), new BigDecimal("35.00"));
+        return new TradingReport(LocalDate.of(2024, 6, 15), Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("66.00"), new BigDecimal("35.00"));
     }
 }

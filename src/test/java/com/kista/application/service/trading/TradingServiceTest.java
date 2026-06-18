@@ -300,7 +300,7 @@ class TradingServiceTest {
         verify(kisOrderPort).place(eq(sellPlanned), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(sellPlannedId), eq("ORD-SELL-001"));
         // 잔고 충분하므로 사용자 알람 없음
-        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any());
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any());
     }
 
     @Test
@@ -322,7 +322,7 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         // 예수금 부족 — 사용자 알람 발송
-        verify(userNotificationPort).notifyInsufficientBalance(eq(USER), eq(ACCOUNT), eq(Ticker.SOXL));
+        verify(userNotificationPort).notifyInsufficientBalance(eq(USER), eq(ACCOUNT), eq(Strategy.Type.INFINITE), eq(Ticker.SOXL));
         // 저장은 진행
         verify(orderPort).saveAll(anyList());
         // SELL 없으므로 KIS 접수 없음
@@ -387,7 +387,7 @@ class TradingServiceTest {
         // BUY 접수
         verify(kisOrderPort).place(any(), eq(ACCOUNT));
         // 잔고 충분 — 사용자 알람 없음
-        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any());
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any());
     }
 
     // ── executeBatch 테스트 ────────────────────────────────────────────────────

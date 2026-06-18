@@ -45,7 +45,7 @@ class CompositeUserNotificationAdapterTest {
 
     // 테스트용 TradingReport 생성 헬퍼
     static TradingReport report() {
-        return new TradingReport(LocalDate.now(), new BigDecimal("500.00"), new BigDecimal("200.00"));
+        return new TradingReport(LocalDate.now(), Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("500.00"), new BigDecimal("200.00"));
     }
 
     @Test

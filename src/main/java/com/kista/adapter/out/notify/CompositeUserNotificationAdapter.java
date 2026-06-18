@@ -55,9 +55,9 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(User user, Account account, Strategy.Ticker ticker) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyInsufficientBalance(user, account, ticker);
-        if (user.notificationChannel().includesFcm())      fcm.notifyInsufficientBalance(user, account, ticker);
+    public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyInsufficientBalance(user, account, strategyType, ticker);
+        if (user.notificationChannel().includesFcm())      fcm.notifyInsufficientBalance(user, account, strategyType, ticker);
     }
 
     @Override

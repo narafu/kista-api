@@ -282,7 +282,7 @@ class TradingService {
                 .filter(o -> o.direction() == Order.OrderDirection.BUY).toList();
         if (!buyOrders.isEmpty() && !balance.isOrderValid(buyOrders)) {
             log.warn("[{}] 예수금 부족 — 사용자 알람 후 주문 저장 진행", account.nickname());
-            userNotificationPort.notifyInsufficientBalance(user, account, strategy.ticker());
+            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
         }
 
         // 전체 PLANNED 저장
