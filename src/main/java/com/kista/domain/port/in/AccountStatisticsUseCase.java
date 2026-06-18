@@ -6,6 +6,7 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
@@ -25,4 +26,6 @@ public interface AccountStatisticsUseCase {
     Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
     CycleHistoryPage getByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
+    // 계좌 기준 스냅샷 조회 (차트용 — DB 기반, KIS API 미사용)
+    List<CyclePositionHistoryEntry> getSnapshotsByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
 }

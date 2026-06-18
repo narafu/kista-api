@@ -3,6 +3,8 @@ package com.kista.adapter.out.persistence.trade;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,4 +32,19 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 기간 전체 (관리자용)
     List<OrderEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
+
+    // 사용자 기준 기간+종목 조회 (account 경유 JOIN — native)
+    @Query(value = """
+            SELECT o.* FROM orders o
+            JOIN accounts a ON o.account_id = a.id
+            WHERE a.user_id = :userId
+              AND o.trade_date BETWEEN :from AND :to
+              AND o.ticker = :ticker
+            ORDER BY o.trade_date DESC
+            """, nativeQuery = true)
+    List<OrderEntity> findByUserIdAndTradeDateBetweenAndTicker(
+            @Param("userId") UUID userId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("ticker") String ticker);
 }

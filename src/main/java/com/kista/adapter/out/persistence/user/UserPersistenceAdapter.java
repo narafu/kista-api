@@ -31,6 +31,11 @@ public class UserPersistenceAdapter implements UserPort {
     }
 
     @Override
+    public Optional<User> findByTelegramChatId(String chatId) {
+        return jpaRepository.findByTelegramChatId(chatId).map(this::toDomain);
+    }
+
+    @Override
     public User save(User user) {
         return toDomain(jpaRepository.save(UserEntity.fromModel(encrypt(user))));
     }

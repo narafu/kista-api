@@ -139,30 +139,41 @@ class TelegramBotService {
     }
 
     private String buildStatusMessage() {
-        try {
-            CyclePositionHistoryEntry s = portfolioUseCase.getCurrent();
-            // closingPrice가 null이면 평가액 0으로 처리
-            double marketValue = s.closingPrice() != null
-                    ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
-            double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
-            double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
-            return String.format(
-                    "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
-                    s.holdings(), avgPrice, marketValue, s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
-        } catch (NoSuchElementException e) {
-            return "포트폴리오 데이터가 없습니다.";
-        }
+        // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
+        return userUseCase.findUserIdByTelegramChatId(adminChatId)
+                .map(userId -> {
+                    try {
+                        CyclePositionHistoryEntry s = portfolioUseCase.getCurrent(userId);
+                        // closingPrice가 null이면 평가액 0으로 처리
+                        double marketValue = s.closingPrice() != null
+                                ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
+                        double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
+                        double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
+                        return String.format(
+                                "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
+                                s.holdings(), avgPrice, marketValue,
+                                s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
+                    } catch (NoSuchElementException e) {
+                        return "포트폴리오 데이터가 없습니다.";
+                    }
+                })
+                .orElse("텔레그램 Chat ID가 계정과 연결되지 않았습니다.");
     }
 
     private String buildHistoryMessage(int days) {
         LocalDate to = LocalDate.now(TimeZones.KST);
         LocalDate from = to.minusDays(days);
-        List<Order> list = portfolioUseCase.getHistory(from, to, Ticker.SOXL);
-        if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
-        StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
-        list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",
-                h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
-        return sb.toString().trim();
+        // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
+        return userUseCase.findUserIdByTelegramChatId(adminChatId)
+                .map(userId -> {
+                    List<Order> list = portfolioUseCase.getHistory(userId, from, to, Ticker.SOXL);
+                    if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
+                    StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
+                    list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",
+                            h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
+                    return sb.toString().trim();
+                })
+                .orElse("텔레그램 Chat ID가 계정과 연결되지 않았습니다.");
     }
 
     private int parseHistoryDays(String text) {

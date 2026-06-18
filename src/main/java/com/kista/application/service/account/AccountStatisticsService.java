@@ -129,6 +129,16 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     @Override
+    public List<CyclePositionHistoryEntry> getSnapshotsByAccount(UUID accountId, UUID requesterId,
+                                                                  LocalDate from, LocalDate to) {
+        accountPort.requireOwnedAccount(accountId, requesterId);
+        Instant fromInstant = from != null ? from.atStartOfDay(TimeZones.KST).toInstant() : Instant.EPOCH;
+        Instant toInstant = (to != null ? to.plusDays(1) : LocalDate.now(TimeZones.KST).plusDays(1))
+                .atStartOfDay(TimeZones.KST).toInstant();
+        return cyclePositionPort.findByAccountId(accountId, fromInstant, toInstant);
+    }
+
+    @Override
     public CycleHistoryPage getByAccount(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to,
                                           Instant cursor, int size) {

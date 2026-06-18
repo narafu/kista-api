@@ -78,10 +78,27 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
+        List<CyclePositionEntity> entities =
+                positionRepo.findRecentByUserId(userId, PageRequest.of(0, limit));
+        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
+        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+    }
+
+    @Override
     public List<CyclePositionHistoryEntry> findBetween(LocalDate from, LocalDate to) {
         Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
         Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
         List<CyclePositionEntity> entities = positionRepo.findBetweenDates(fromInstant, toInstant);
+        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
+        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+    }
+
+    @Override
+    public List<CyclePositionHistoryEntry> findBetweenByUser(UUID userId, LocalDate from, LocalDate to) {
+        Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
+        Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
+        List<CyclePositionEntity> entities = positionRepo.findBetweenDatesByUserId(userId, fromInstant, toInstant);
         Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }

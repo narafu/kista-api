@@ -25,6 +25,9 @@ public interface OrderPort {
     // 기간+종목 필터 조회 (대시보드·텔레그램 이력 조회용)
     List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker);
 
+    // 사용자 스코프 기간+종목 조회 (대시보드 — 본인 데이터만)
+    List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker);
+
     // 기간 내 전체 계좌 조회 ticker 필터 없음 (관리자·이상징후 감지용)
     List<Order> findAll(LocalDate from, LocalDate to);
 

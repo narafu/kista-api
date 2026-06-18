@@ -27,8 +27,14 @@ public interface CyclePositionPort {
     // 전체 이력 중 가장 최근 N건 (대시보드·텔레그램 현황 조회)
     List<CyclePositionHistoryEntry> findRecentGlobal(int limit);
 
+    // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만)
+    List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit);
+
     // 날짜 범위 이력 전체 (차트용 시계열) — from 당일 00:00 KST ~ to 익일 00:00 KST
     List<CyclePositionHistoryEntry> findBetween(LocalDate from, LocalDate to);
+
+    // 사용자 스코프 날짜 범위 (차트용 시계열)
+    List<CyclePositionHistoryEntry> findBetweenByUser(UUID userId, LocalDate from, LocalDate to);
 
     // 커서 기반 페이지 조회 — limit건 반환 (hasMore 판단용으로 limit+1 전달 권장)
     List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from, Instant cursor, int limit);

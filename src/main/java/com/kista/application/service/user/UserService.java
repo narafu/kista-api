@@ -64,6 +64,12 @@ class UserService implements UserUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public java.util.Optional<UUID> findUserIdByTelegramChatId(String chatId) {
+        return userPort.findByTelegramChatId(chatId).map(User::id);
+    }
+
+    @Override
     public User login(String code, String redirectUri) {
         // 인가 코드를 카카오 액세스 토큰으로 교환
         String kakaoAccessToken = kakaoOAuthPort.exchangeCodeForToken(code, redirectUri);

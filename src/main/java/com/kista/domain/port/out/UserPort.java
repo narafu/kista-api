@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface UserPort {
     Optional<User> findById(UUID id);
     Optional<User> findByKakaoId(String kakaoId);
+    Optional<User> findByTelegramChatId(String chatId); // 텔레그램 봇 명령 발신자 식별용
 
     // AccountPort.findByIdOrThrow 패턴과 동일
     default User findByIdOrThrow(UUID id) {

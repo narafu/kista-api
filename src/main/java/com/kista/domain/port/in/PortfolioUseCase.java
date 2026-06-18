@@ -6,9 +6,10 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public interface PortfolioUseCase {
-    CyclePositionHistoryEntry getCurrent();
-    List<CyclePositionHistoryEntry> getSnapshots(LocalDate from, LocalDate to);
-    List<Order> getHistory(LocalDate from, LocalDate to, Ticker ticker);
+    CyclePositionHistoryEntry getCurrent(UUID userId);
+    List<CyclePositionHistoryEntry> getSnapshots(UUID userId, LocalDate from, LocalDate to);
+    List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, Ticker ticker);
 }

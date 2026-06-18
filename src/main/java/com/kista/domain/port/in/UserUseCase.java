@@ -9,6 +9,7 @@ public interface UserUseCase {
     // --- 조회 ---
     User getById(UUID id);
     User getByKakaoId(String kakaoId);
+    java.util.Optional<UUID> findUserIdByTelegramChatId(String chatId); // 텔레그램 봇 명령 발신자 userId 조회
 
     // --- 카카오 로그인 ---
     User login(String code, String redirectUri);
