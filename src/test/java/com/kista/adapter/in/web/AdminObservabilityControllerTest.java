@@ -3,7 +3,11 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AppErrorLog;
+import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.out.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -27,27 +31,55 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AdminErrorLogController.class)
+@WebMvcTest(AdminObservabilityController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
-class AdminErrorLogControllerTest {
+class AdminObservabilityControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean AdminQueryUseCase adminQuery;
+    @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AppErrorLogPort appErrorLogPort;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
+    // ── 감사 로그 ──────────────────────────────────────────────────────────
+    @Test
+    void listAuditLogs_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/logs/audit"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listAuditLogs_userRole_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/logs/audit")
+                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listAuditLogs_adminRole_returns200() throws Exception {
+        when(adminQuery.listAuditLogs()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/logs/audit")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    // ── 오류 로그 ──────────────────────────────────────────────────────────
     @Test
     void listErrorLogs_anonymous_returns401() throws Exception {
-        mockMvc.perform(get("/api/admin/error-logs"))
+        mockMvc.perform(get("/api/admin/logs/errors"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void listErrorLogs_userRole_returns403() throws Exception {
-        mockMvc.perform(get("/api/admin/error-logs")
+        mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(token(USER_UUID, "ROLE_USER"))))
                 .andExpect(status().isForbidden());
     }
@@ -60,10 +92,9 @@ class AdminErrorLogControllerTest {
         );
         when(appErrorLogPort.findRecent(100)).thenReturn(List.of(log));
 
-        mockMvc.perform(get("/api/admin/error-logs")
+        mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[0].errorType").value("KisApiException"));
     }
 
@@ -71,9 +102,36 @@ class AdminErrorLogControllerTest {
     void listErrorLogs_customLimit_passedToPort() throws Exception {
         when(appErrorLogPort.findRecent(50)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/admin/error-logs?limit=50")
+        mockMvc.perform(get("/api/admin/logs/errors?limit=50")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk());
+    }
+
+    // ── 이상 징후 ──────────────────────────────────────────────────────────
+    @Test
+    void getAnomalies_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/logs/anomalies"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getAnomalies_userRole_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/logs/anomalies")
+                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getAnomalies_adminRole_returns200() throws Exception {
+        when(adminQuery.getAnomalies())
+                .thenReturn(new AdminAnomalies(List.of(), List.of()));
+        when(adminUser.listAll()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/logs/anomalies")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pausedAccounts").isArray())
+                .andExpect(jsonPath("$.inactiveAccounts").isArray());
     }
 
     private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
