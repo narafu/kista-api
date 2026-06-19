@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,13 +92,13 @@ class TradingService {
         if (states.isEmpty()) return;
 
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
-        waitForOrderTime(dst);
+        waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
 
         // KIS 접수 — 전략별: BUY 가격 보정 후 PLANNED → KIS 접수
         List<CyclePlacedState> placedStates = placeAll(states, today);
 
         // 공통 대기 — PostClose까지 (모든 전략이 공유하는 단 1회)
-        waitForPostClose(dst);
+        waitFor("PostClose", dst.waitUntilPostClose(), dst);
 
         // 장 마감 후 종가 일괄 조회
         Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, firstAccount);
@@ -240,7 +241,7 @@ class TradingService {
                 : null;
 
         // 개장 시각까지 대기
-        waitUntilMarketOpen(dst);
+        waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
 
         // 전략별: order 생성·저장 + INFINITE 매도 선접수
         for (BatchContext ctx : contexts) {
@@ -296,11 +297,12 @@ class TradingService {
         orderExecutor.placeGiven(atOpenOrders, account);
     }
 
-    private void waitUntilMarketOpen(DstInfo dst) throws InterruptedException {
-        long ms = dst.waitUntilMarketOpen().toMillis();
-        log.info("DST={}, 개장 시각까지 대기: {}ms", dst.isDst(), ms);
+    // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그
+    private void waitFor(String label, Duration duration, DstInfo dst) throws InterruptedException {
+        long ms = duration.toMillis();
+        log.info("DST={}, {}까지 대기: {}ms", dst.isDst(), label, ms);
         if (ms > 0) Thread.sleep(ms);
-        log.info("개장 시각 도달");
+        log.info("{} 도달", label);
     }
 
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환
@@ -312,20 +314,6 @@ class TradingService {
             notifyPort.notifyMarketClosed();
         }
         return open;
-    }
-
-    private void waitForOrderTime(DstInfo dst) throws InterruptedException {
-        long ms = dst.waitUntilOrderTime().toMillis();
-        log.info("DST={}, 주문 시각까지 대기: {}ms", dst.isDst(), ms);
-        if (ms > 0) Thread.sleep(ms);
-        log.info("주문 시각 도달");
-    }
-
-    private void waitForPostClose(DstInfo dst) throws InterruptedException {
-        long ms = dst.waitUntilPostClose().toMillis();
-        log.info("PostClose까지 대기: {}ms", ms);
-        if (ms > 0) Thread.sleep(ms);
-        log.info("PostClose 대기 완료");
     }
 
     // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 + 사용자 알림 후 Optional.empty() 반환 (격리 실행)
