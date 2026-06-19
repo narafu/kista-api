@@ -31,7 +31,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
 
     @Override
     public List<Strategy> findAllActive() {
-        // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케줄러용)
+        // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케쥴러용)
         return jpaRepository.findAllActiveStrategies().stream()
                 .map(this::toDomain)
                 .toList();

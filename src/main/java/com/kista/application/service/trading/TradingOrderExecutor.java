@@ -26,7 +26,7 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final NotifyPort notifyPort;
 
-    // 지정된 주문 목록만 브로커 접수 (개장 잡 매도 선접수용 — BUY 보정 없음)
+    // 지정된 주문 목록만 브로커 접수 (장 개시 스케쥴러 매도 선접수용 — BUY 보정 없음)
     List<Order> placeGiven(List<Order> orders, Account account) {
         if (orders.isEmpty()) return List.of();
         List<Order> placed = placeEach(orders, account);

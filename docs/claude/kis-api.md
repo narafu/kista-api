@@ -24,7 +24,7 @@
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능
-- 스케줄: 1월 1일 00:00 KST 3년치(`year`~`year+2`) 적재 / 매월 1일 01:00 KST 당월 최신화 (`MarketCalendarRefreshScheduler`)
+- 스케쥴러: 1월 1일 00:00 KST 3년치(`year`~`year+2`) 적재 / 매월 1일 01:00 KST 당월 최신화 (`MarketCalendarRefreshScheduler`)
 - `refreshCalendar(year)`: 연간 전체 교체(`replaceByYear`) / `refreshMonth(year, month)`: 월별 교체(`replaceByMonth`)
 
 ### KIS 휴장 조회 API (`CTOS5011R`, KisHolidayAdapter)

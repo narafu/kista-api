@@ -127,8 +127,8 @@ class TelegramBotService {
         return switch (text.toLowerCase()) {
             case "yes" -> {
                 stateMap.put(chatId, BotState.IDLE);
-                // V2: 수동 실행은 스케줄러가 자동 처리 — 계좌별 전략 API 사용 권장
-                yield "V2에서는 스케줄러(화~토 07:00)가 자동 실행합니다. 계좌 전략은 앱에서 설정하세요.";
+                // V2: 수동 실행은 스케쥴러가 자동 처리 — 계좌별 전략 API 사용 권장
+                yield "V2에서는 스케쥴러(화~토 07:00)가 자동 실행합니다. 계좌 전략은 앱에서 설정하세요.";
             }
             case "no", "/cancel" -> {
                 stateMap.put(chatId, BotState.IDLE);

@@ -68,10 +68,10 @@ public record DstInfo(
         return new DstInfo(isDst, orderAt, postClose, marketOpen);
     }
 
-    // 스케줄러는 KST 04:00 실행 — 04:00 이후면 당일이 US 거래일이므로 오늘, 04:00 전이면 아직 전날
+    // 스케쥴러는 KST 04:00 실행 — 04:00 이후면 당일이 US 거래일이므로 오늘, 04:00 전이면 아직 전날
     private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 0);
 
-    // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케줄러와 동일 로직 SSOT
+    // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케쥴러와 동일 로직 SSOT
     public static LocalDate nextTradeDate() {
         return LocalTime.now(KST).isBefore(SCHEDULER_RUN_TIME)
                 ? LocalDate.now(KST)

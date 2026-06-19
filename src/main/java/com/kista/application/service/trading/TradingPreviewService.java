@@ -51,7 +51,7 @@ class TradingPreviewService {
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
                 .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id()));
 
-        // 스케줄러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
+        // 스케쥴러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
         LocalDate today = DstInfo.nextTradeDate();
 
         // 오늘 이미 등록된 PLANNED 주문 조회 (새로고침 후에도 취소 버튼 복원용)

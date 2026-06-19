@@ -55,7 +55,7 @@ class ManualTradingService {
             throw new ManualTradingException("주문 불가 시간대입니다 (KST " + dst.blockedRangeDescription() + ")");
         }
 
-        // 스케줄러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
+        // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
         LocalDate today = DstInfo.nextTradeDate();
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
@@ -64,7 +64,7 @@ class ManualTradingService {
 
         User user = userPort.findByIdOrThrow(account.userId());
 
-        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케줄러가 담당
+        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케쥴러가 담당
         Map<Strategy.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
                 List.of(strategy.ticker()), account);
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());

@@ -24,7 +24,7 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, UU
     // 동일 기기 재로그인 시 구 RT 교체
     void deleteAllByUserIdAndUserAgent(UUID userId, String userAgent);
 
-    // 만료된 토큰 일괄 삭제 (스케줄러)
+    // 만료된 토큰 일괄 삭제 (스케쥴러)
     int deleteAllByExpiresAtBefore(Instant threshold);
 
     // 조건부 rotated_at 마킹 — rotated_at IS NULL인 행만 갱신, affected rows로 회전 승자 판정
@@ -33,6 +33,6 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, UU
     @Query("update RefreshTokenEntity e set e.rotatedAt = :now where e.tokenHash = :hash and e.rotatedAt is null")
     int markRotated(@Param("hash") String hash, @Param("now") Instant now);
 
-    // grace 기간이 지난 회전 토큰 일괄 삭제 (스케줄러)
+    // grace 기간이 지난 회전 토큰 일괄 삭제 (스케쥴러)
     int deleteAllByRotatedAtBefore(Instant threshold);
 }

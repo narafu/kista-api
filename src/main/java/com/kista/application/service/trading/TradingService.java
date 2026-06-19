@@ -126,7 +126,7 @@ class TradingService {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
-                // 개장 잡에서 AT_OPEN 선접수된 주문도 포함 — markFilledOrders 누락 방지
+                // 장 개시 스케쥴러에서 AT_OPEN 선접수된 주문도 포함 — markFilledOrders 누락 방지
                 List<Order> prePlacedAtOpen = orderPort
                         .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
                         .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
@@ -168,7 +168,7 @@ class TradingService {
                 : balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
-        // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (개장 잡 선행 또는 수동 주문 보존)
+        // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (장 개시 스케쥴러 선행 또는 수동 주문 보존)
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
@@ -216,7 +216,7 @@ class TradingService {
     void placeOpenOrders(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         if (contexts.isEmpty()) return;
 
-        LocalDate tradeDate = DstInfo.nextTradeDate(); // 개장 잡은 전날 저녁 실행 — 내일이 US 거래일
+        LocalDate tradeDate = DstInfo.nextTradeDate(); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 US 거래일
         log.info("개장 order 생성 + INFINITE 매도 선접수 시작 — 거래일 {}", tradeDate);
 
         if (!isMarketOpen(tradeDate)) return;
@@ -246,7 +246,7 @@ class TradingService {
         log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
     }
 
-    // 개장 잡 전용: order 전체 저장 + 예수금 부족 시 사용자 알람 + INFINITE SELL 즉시 접수
+    // 장 개시 스케쥴러 전용: order 전체 저장 + 예수금 부족 시 사용자 알람 + INFINITE SELL 즉시 접수
     private void planSaveAndPlaceSells(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
                                        PrivacyTradeBase privacyBase, LocalDate tradeDate) {
         Strategy strategy = ctx.strategy();

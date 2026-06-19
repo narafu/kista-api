@@ -21,7 +21,7 @@
 ### Account ↔ Strategy 분리
 - `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
 - `Strategy` record 필드 7개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType), divisionCount(int)`
-- `StrategyCycle` record 필드 8개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 사이클 단위 메타(시드/기간)
+- `StrategyCycle` record 필드 9개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt, seedResolvedBy` — 사이클 단위 메타(시드/기간)
 - `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
 - `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, boolean isReverseMode` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
@@ -81,7 +81,7 @@
 - `spring.threads.virtual.enabled=true` (application.yml에 설정됨)
 - `TradingService` 내부 대기: `Thread.sleep()` 사용
 - `@Async`, `CompletableFuture` **사용 금지**
-- 사이클 단위 순차 실행: `StrategyPort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케줄러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
+- 사이클 단위 순차 실행: `StrategyPort.findAllActive()` → `executeBatch(contexts)` 1회 호출 — context 빌드 실패 사이클은 스케쥴러에서 skip, 실행 중 실패 격리는 `TradingService.executeBatch()` 내부에서 처리
 
 ### JPA 설정
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈

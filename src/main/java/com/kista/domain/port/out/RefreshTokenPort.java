@@ -12,9 +12,9 @@ public interface RefreshTokenPort {
     void deleteByTokenHash(String tokenHash);
     void deleteAllByUserId(UUID userId); // 탈퇴/거절/재사용 공격 탐지 시 전체 세션 폐기
     void deleteByUserIdAndUserAgent(UUID userId, String userAgent); // 동일 기기 재로그인 시 구 RT 교체
-    int deleteAllExpired(); // 스케줄러 — 만료 토큰 일괄 정리
+    int deleteAllExpired(); // 스케쥴러 — 만료 토큰 일괄 정리
     // RTR grace 지원 — rotated_at IS NULL인 행만 갱신, 1 반환 시 회전 승자
     int markRotated(String tokenHash, Instant now);
-    // 스케줄러 — grace 기간이 지난 회전 토큰 일괄 삭제
+    // 스케쥴러 — grace 기간이 지난 회전 토큰 일괄 삭제
     int deleteAllRotatedBefore(Instant threshold);
 }

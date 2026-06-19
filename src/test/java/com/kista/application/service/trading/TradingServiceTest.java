@@ -188,7 +188,7 @@ class TradingServiceTest {
         // 오늘 이미 PLANNED 주문 존재 → planAndSaveOrders에서 재계산 skip
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
         when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
-        when(orderPort.findPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of()); // 개장 잡 선접수 없음
+        when(orderPort.findPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of()); // 장 개시 스케쥴러 선접수 없음
         when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
 
@@ -353,7 +353,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_skipBranch_recomputesPositionForBuyCapping() throws InterruptedException {
-        // 개장 잡이 먼저 실행 → 오늘 주문 존재 → skip 분기 → position 재계산 → BUY 접수
+        // 장 개시 스케쥴러 먼저 실행 → 오늘 주문 존재 → skip 분기 → position 재계산 → BUY 접수
         Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
                 Ticker.SOXL, Order.OrderType.LOC, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
                 Order.OrderStatus.PLACED, "ORD-SELL-001", null, null);

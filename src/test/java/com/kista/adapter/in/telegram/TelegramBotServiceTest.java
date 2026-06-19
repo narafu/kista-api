@@ -110,8 +110,8 @@ class TelegramBotServiceTest {
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(apiClient).sendMessage(any(), captor.capture());
-        // V2에서는 스케줄러가 자동 처리 안내 메시지 확인
-        assertThat(captor.getValue()).contains("스케줄러");
+        // V2에서는 스케쥴러가 자동 처리 안내 메시지 확인
+        assertThat(captor.getValue()).contains("스케쥴러");
     }
 
     @Test

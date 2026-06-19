@@ -75,8 +75,8 @@ public record Strategy(
     @Getter
     @RequiredArgsConstructor
     public enum Status {
-        ACTIVE("운영중"),  // 매매 스케줄링 실행 중
-        PAUSED("일시중지"); // 매매 중지 (스케줄링 제외)
+        ACTIVE("운영중"),  // 매매 스케쥴링 실행 중
+        PAUSED("일시중지"); // 매매 중지 (스케쥴링 제외)
 
         private final String label; // 한국어 표시 이름
     }
