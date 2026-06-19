@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.KakaoLoginResponse;
+import com.kista.adapter.in.web.dto.RefreshResponse;
 import com.kista.adapter.in.web.dto.UserResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
@@ -68,7 +69,7 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     @SecurityRequirements
-    public KakaoLoginResponse refresh(HttpServletRequest request, HttpServletResponse response) {
+    public RefreshResponse refresh(HttpServletRequest request, HttpServletResponse response) {
         String rawRt = cookieHelper.extract(request);
         if (rawRt == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -77,8 +78,8 @@ public class AuthController {
         var result = tokenUseCase.refresh(rawRt, request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(result.newRawRefreshToken()).toString());
         String newAt = jwtIssuerService.issue(result.userId(), result.userRole());
-        return new KakaoLoginResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds(),
-                UserResponse.from(userUseCase.getById(result.userId())));
+        // rawRefreshToken을 body에 포함 — proxy.ts가 Edge Runtime에서 Set-Cookie 헤더 필터링을 우회하는 데 사용
+        return new RefreshResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds(), result.newRawRefreshToken());
     }
 
     // 로그아웃 — RT 삭제 + userId 블랙리스트 + 쿠키 삭제

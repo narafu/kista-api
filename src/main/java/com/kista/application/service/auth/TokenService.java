@@ -75,7 +75,17 @@ class TokenService implements TokenUseCase {
         }
 
         // 미회전 RT — markRotated로 회전 마킹 (조건부 update, 경쟁 시 1건만 1 반환)
-        refreshTokenPort.markRotated(hash, now);
+        int rotated = refreshTokenPort.markRotated(hash, now);
+        if (rotated == 0) {
+            // 다른 스레드가 먼저 회전 — 최신 상태 재조회 후 grace 판정
+            rt = refreshTokenPort.findByTokenHash(hash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
+            if (rt.rotatedAt() == null || Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) > 0) {
+                refreshTokenPort.deleteAllByUserId(rt.userId());
+                throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+            }
+            // grace 이내 경쟁 패자 → 아래 winner 경로와 동일하게 처리
+        }
         User user = userPort.findByIdOrThrow(rt.userId());
         return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
     }
