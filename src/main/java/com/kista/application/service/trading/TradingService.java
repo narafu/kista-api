@@ -188,8 +188,8 @@ class TradingService {
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
-        CycleOrderComputer.ComputeResult result = orderComputer.computeIfValid(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), account)
+        CycleOrderComputer.ComputeResult result = orderComputer.computeUnlessSkipped(
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
                 .orElse(null);
         if (result == null) return null;
 

@@ -49,11 +49,6 @@ public interface CycleOrderStrategy {
             boolean isReverseMode,         // 오늘 리버스모드 여부
             boolean isFirstReverseDay      // 리버스모드 진입 첫날 여부
     ) {
-        // 하위 호환 생성자 — isReverseMode/isFirstReverseDay 없는 기존 코드 호환
-        PlanContext(AccountBalance balance, Strategy strategy, BigDecimal initialUsdDeposit,
-                    BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase, String label) {
-            this(balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label, null, false, false);
-        }
     }
 
     // 전략 계산 결과 — position은 INFINITE만 non-null (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존)

@@ -79,8 +79,8 @@ class ManualTradingService {
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        CycleOrderComputer.ComputeResult result = orderComputer.computeIfValid(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), account)
+        CycleOrderComputer.ComputeResult result = orderComputer.computeUnlessSkipped(
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
                 .orElse(null);
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 
