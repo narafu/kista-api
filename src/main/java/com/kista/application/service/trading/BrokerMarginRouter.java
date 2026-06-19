@@ -24,11 +24,8 @@ public class BrokerMarginRouter {
                     .findFirst()
                     .map(m -> m.purchasableAmount())
                     .orElse(BigDecimal.ZERO);
-            // Toss: USD 현금만이 아닌 통합증거금(USD+KRW→USD 환산) 기준
-            case TOSS -> tosMarginPort.getMarginItems(account).stream()
-                    .findFirst()
-                    .map(m -> m.purchasableAmount())
-                    .orElse(BigDecimal.ZERO);
+            // Toss: USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
+            case TOSS -> tosMarginPort.getBuyableAmount(account);
         };
     }
 }

@@ -42,11 +42,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         HoldingsResponse holdingsResponse = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
-        // 통합증거금(USD+KRW→USD) 기준 — USD 현금만인 getBuyableAmount()와 달리 매매 수식 일관성 보장
-        BigDecimal usdDeposit = getMarginItems(account).stream()
-                .findFirst()
-                .map(MarginItem::purchasableAmount)
-                .orElse(BigDecimal.ZERO);
+        // 토스 API는 USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
+        BigDecimal usdDeposit = getBuyableAmount(account);
 
         if (holdingsResponse == null || holdingsResponse.items() == null) {
             return new AccountBalance(0, null, usdDeposit);
@@ -71,21 +68,18 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
 
     @Override
     public List<MarginItem> getMarginItems(Account account) {
-        // USD·KRW 예수금 조회 후 환율 기반 USD 합산 — Toss 통합예수금
+        // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
         BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");
         BigDecimal usdToKrwRate = fetchUsdToKrwRate(account);
 
-        // KRW → USD 환산 후 합산 (환율 0이면 KRW 무시)
-        BigDecimal krwAsUsd = usdToKrwRate.compareTo(BigDecimal.ZERO) > 0
-                ? krwBuyable.divide(usdToKrwRate, 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalUsd = usdBuyable.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
-
         // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
-        log.info("Toss 통합증거금 조회: USD=${}, KRW=₩{}, 환율={}, 합산USD=${}", usdBuyable, krwBuyable, usdToKrwRate, totalUsd);
+        log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
 
-        return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, totalUsd, usdToKrwRate));
+        return List.of(
+                new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, usdBuyable, usdToKrwRate),
+                new MarginItem(Currency.KRW, BigDecimal.ZERO, BigDecimal.ZERO, krwBuyable, usdToKrwRate)
+        );
     }
 
     @Override
