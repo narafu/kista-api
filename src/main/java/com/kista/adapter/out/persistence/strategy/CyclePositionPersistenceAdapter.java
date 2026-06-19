@@ -54,9 +54,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to) {
-        List<CyclePositionEntity> entities = positionRepo.findByAccountIdAndDateRange(accountId, from, to);
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findByAccountIdAndDateRange(accountId, from, to));
     }
 
     @Override
@@ -71,45 +69,32 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public List<CyclePositionHistoryEntry> findRecentGlobal(int limit) {
-        List<CyclePositionEntity> entities =
-                positionRepo.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)));
     }
 
     @Override
     public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
-        List<CyclePositionEntity> entities =
-                positionRepo.findRecentByUserId(userId, PageRequest.of(0, limit));
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findRecentByUserId(userId, PageRequest.of(0, limit)));
     }
 
     @Override
     public List<CyclePositionHistoryEntry> findBetween(LocalDate from, LocalDate to) {
         Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
         Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
-        List<CyclePositionEntity> entities = positionRepo.findBetweenDates(fromInstant, toInstant);
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findBetweenDates(fromInstant, toInstant));
     }
 
     @Override
     public List<CyclePositionHistoryEntry> findBetweenByUser(UUID userId, LocalDate from, LocalDate to) {
         Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
         Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
-        List<CyclePositionEntity> entities = positionRepo.findBetweenDatesByUserId(userId, fromInstant, toInstant);
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findBetweenDatesByUserId(userId, fromInstant, toInstant));
     }
 
     @Override
     public List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
                                                                       Instant cursor, int limit) {
-        List<CyclePositionEntity> entities = positionRepo.findByAccountIdWithCursor(
-                accountId, from, cursor, PageRequest.of(0, limit));
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        return toEntries(positionRepo.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit)));
     }
 
     @Override
@@ -149,18 +134,26 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
                 .map(CyclePositionEntity::getStrategyCycleId)
                 .collect(Collectors.toSet());
         if (cycleIds.isEmpty()) return Map.of();
-        // strategy_cycle → strategy_id → ticker
-        Set<UUID> strategyIds = cycleRepo.findAllById(cycleIds).stream()
+        // strategy_cycle 1회 조회 후 재사용 (이전: findAllById 3회 호출)
+        List<StrategyCycleEntity> cycles = cycleRepo.findAllById(cycleIds);
+        // strategy_id → ticker
+        Set<UUID> strategyIds = cycles.stream()
                 .map(StrategyCycleEntity::getStrategyId)
                 .collect(Collectors.toSet());
         Map<UUID, Strategy.Ticker> strategyTickerMap = strategyRepo.findAllById(strategyIds).stream()
                 .collect(Collectors.toMap(StrategyEntity::getId, StrategyEntity::getTicker));
         // cycleId → ticker 역매핑
-        return cycleRepo.findAllById(cycleIds).stream()
+        return cycles.stream()
                 .collect(Collectors.toMap(
                         StrategyCycleEntity::getId,
                         sc -> strategyTickerMap.getOrDefault(sc.getStrategyId(), null)
                 ));
+    }
+
+    // 포지션 목록 → 히스토리 entry 목록 (ticker 맵 1회 구성 후 일괄 변환)
+    private List<CyclePositionHistoryEntry> toEntries(List<CyclePositionEntity> entities) {
+        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
+        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }
 
     // ticker 맵을 이용한 entry 변환
