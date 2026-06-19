@@ -83,12 +83,17 @@ class TradingReporter {
             newReverseMode = computeNewReverseMode(currentCycle.id(), strategy, balance, price);
         }
 
+        // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
+        List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
+        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.get(0).holdings() > 0;
+
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price, newReverseMode);
         cyclePositionPort.save(position);
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
-        // holdings==0이면 사이클 종료 알림 후 CycleSeedType 무관하게 항상 rotate 호출 — NONE 처리는 rotate 내부에서
-        if (position.holdings() == 0) {
+        // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
+        // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
+        if (position.holdings() == 0 && prevHadHoldings) {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
