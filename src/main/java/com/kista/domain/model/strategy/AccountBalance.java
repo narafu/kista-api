@@ -29,12 +29,12 @@ public record AccountBalance(
     public AccountBalance applyExecutions(List<Execution> executions) {
         if (executions.isEmpty()) return this;
 
-        int buyQty = sumQuantity(executions, Order.OrderDirection.BUY);
-        int sellQty = sumQuantity(executions, Order.OrderDirection.SELL);
+        int buyQuantity = sumQuantity(executions, Order.OrderDirection.BUY);
+        int sellQuantity = sumQuantity(executions, Order.OrderDirection.SELL);
         BigDecimal buyAmount = sumAmount(executions, Order.OrderDirection.BUY);
         BigDecimal sellAmount = sumAmount(executions, Order.OrderDirection.SELL);
 
-        int newHoldings = holdings + buyQty - sellQty;
+        int newHoldings = holdings + buyQuantity - sellQuantity;
         BigDecimal preAmount = (holdings == 0 || avgPrice == null)
                 ? BigDecimal.ZERO
                 : avgPrice.multiply(BigDecimal.valueOf(holdings));

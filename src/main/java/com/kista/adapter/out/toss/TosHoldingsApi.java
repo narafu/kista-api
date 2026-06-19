@@ -54,9 +54,9 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                 .filter(i -> ticker.name().equals(i.symbol()))
                 .findFirst()
                 .map(i -> {
-                    int qty = Integer.parseInt(i.quantity());
-                    BigDecimal avg = qty > 0 ? new BigDecimal(i.averagePurchasePrice()) : null;
-                    return new AccountBalance(qty, avg, usdDeposit);
+                    int quantity = Integer.parseInt(i.quantity());
+                    BigDecimal avg = quantity > 0 ? new BigDecimal(i.averagePurchasePrice()) : null;
+                    return new AccountBalance(quantity, avg, usdDeposit);
                 })
                 .orElse(new AccountBalance(0, null, usdDeposit));
     }
@@ -100,14 +100,14 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                     .flatMap(h -> {
                         Optional<Ticker> tickerOpt = Ticker.tryParse(h.symbol());
                         if (tickerOpt.isEmpty()) return Stream.empty();
-                        int qty = Integer.parseInt(h.quantity());
-                        if (qty <= 0) return Stream.empty();
+                        int quantity = Integer.parseInt(h.quantity());
+                        if (quantity <= 0) return Stream.empty();
                         BigDecimal lastPrice = new BigDecimal(h.lastPrice());
                         BigDecimal avgPrice = new BigDecimal(h.averagePurchasePrice());
-                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(qty))
+                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(quantity))
                                 .setScale(2, RoundingMode.HALF_UP);
                         BigDecimal profitLossUsd = lastPrice.subtract(avgPrice)
-                                .multiply(BigDecimal.valueOf(qty))
+                                .multiply(BigDecimal.valueOf(quantity))
                                 .setScale(2, RoundingMode.HALF_UP);
                         BigDecimal profitRate = avgPrice.compareTo(BigDecimal.ZERO) > 0
                                 ? lastPrice.subtract(avgPrice)
@@ -116,7 +116,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                                   .setScale(2, RoundingMode.HALF_UP)
                                 : BigDecimal.ZERO;
                         return Stream.of(new PresentBalanceResult.Item(
-                                tickerOpt.get(), qty, avgPrice, lastPrice,
+                                tickerOpt.get(), quantity, avgPrice, lastPrice,
                                 evalAmountUsd, profitLossUsd, profitRate, "AMEX"
                         ));
                     })

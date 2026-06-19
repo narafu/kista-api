@@ -84,14 +84,14 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("earlyBuyQty1/earlyBuyQty2: FLOOR 결과가 0이어도 최소 1주 보장")
-    void earlyBuyQty_minimumOneShare() {
+    @DisplayName("earlyBuyQuantity1/earlyBuyQuantity2: FLOOR 결과가 0이어도 최소 1주 보장")
+    void earlyBuyQuantity_minimumOneShare() {
         // unitAmount=10, price1=100 → (10/2)/100 = floor(0.05) = 0 → 최소 1
-        int qty1 = InfinitePosition.earlyBuyQty1(new BigDecimal("10"), new BigDecimal("100"));
-        assertThat(qty1).isEqualTo(1);
+        int quantity1 = InfinitePosition.earlyBuyQuantity1(new BigDecimal("10"), new BigDecimal("100"));
+        assertThat(quantity1).isEqualTo(1);
 
-        // unitAmount=10, price1=100, qty1=1 → (10 - 100*1)/price2 = 음수/200 → 최소 1
-        int qty2 = InfinitePosition.earlyBuyQty2(new BigDecimal("10"), new BigDecimal("100"), 1, new BigDecimal("200"));
-        assertThat(qty2).isEqualTo(1);
+        // unitAmount=10, price1=100, quantity1=1 → (10 - 100*1)/price2 = 음수/200 → 최소 1
+        int quantity2 = InfinitePosition.earlyBuyQuantity2(new BigDecimal("10"), new BigDecimal("100"), 1, new BigDecimal("200"));
+        assertThat(quantity2).isEqualTo(1);
     }
 }

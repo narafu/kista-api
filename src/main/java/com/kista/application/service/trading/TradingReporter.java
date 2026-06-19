@@ -151,20 +151,20 @@ class TradingReporter {
             List<Execution> matched = byOrderId.get(order.externalOrderId());
             if (matched == null || matched.isEmpty()) continue; // 미체결 유지
 
-            int filledQty = matched.stream().mapToInt(Execution::quantity).sum();
+            int filledQuantity = matched.stream().mapToInt(Execution::quantity).sum();
             // 가중평균 체결가: Σ(체결금액) ÷ Σ(체결수량)
             BigDecimal totalAmt = matched.stream().map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal avgFilledPrice = filledQty > 0
-                    ? totalAmt.divide(BigDecimal.valueOf(filledQty), 2, RoundingMode.HALF_UP)
+            BigDecimal avgFilledPrice = filledQuantity > 0
+                    ? totalAmt.divide(BigDecimal.valueOf(filledQuantity), 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            int orderedQty = order.quantity() != null ? order.quantity() : 0;
-            Order.OrderStatus newStatus = filledQty >= orderedQty
+            int orderedQuantity = order.quantity() != null ? order.quantity() : 0;
+            Order.OrderStatus newStatus = filledQuantity >= orderedQuantity
                     ? Order.OrderStatus.FILLED
                     : Order.OrderStatus.PARTIALLY_FILLED;
 
-            orderPort.markFilled(order.id(), filledQty, avgFilledPrice, newStatus);
-            log.info("[orderId={}] {} → {}, 체결수량={}/{}", order.id(), order.status(), newStatus, filledQty, orderedQty);
+            orderPort.markFilled(order.id(), filledQuantity, avgFilledPrice, newStatus);
+            log.info("[orderId={}] {} → {}, 체결수량={}/{}", order.id(), order.status(), newStatus, filledQuantity, orderedQuantity);
         }
     }
 

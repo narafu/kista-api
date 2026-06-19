@@ -23,13 +23,13 @@ class ReverseInfiniteStrategy implements ReverseInfiniteTradingStrategy {
     // 첫날: MOC 매도만 (별지점 계산 없이 즉시 청산 시작)
     @Override
     public List<Order> buildFirstDayOrders(ReverseModePosition position, LocalDate tradeDate) {
-        int mocSellQty = position.calcMocSellQuantity();
-        if (mocSellQty < 1) {
+        int mocSellQuantity = position.calcMocSellQuantity();
+        if (mocSellQuantity < 1) {
             log.warn("[리버스모드 첫날] MOC 매도 수량 0 — holdings={}, divisionCount={}", position.holdings(), position.divisionCount());
             return List.of();
         }
-        log.info("[리버스모드 첫날] MOC 매도 {}주", mocSellQty);
-        return List.of(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQty, BigDecimal.ZERO));
+        log.info("[리버스모드 첫날] MOC 매도 {}주", mocSellQuantity);
+        return List.of(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO));
     }
 
     // 두번째 날 이후: LOC 매도(별지점 위) + LOC 쿼터매수(별지점 아래)
@@ -38,18 +38,18 @@ class ReverseInfiniteStrategy implements ReverseInfiniteTradingStrategy {
         List<Order> orders = new ArrayList<>();
 
         // LOC 매도 — 별지점 위에서 (starPointPrice 가격으로 LOC)
-        int locSellQty = position.calcLocSellQuantity();
-        if (locSellQty >= 1 && position.starPointPrice() != null) {
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQty, position.starPointPrice()));
-            log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQty, position.starPointPrice());
+        int locSellQuantity = position.calcLocSellQuantity();
+        if (locSellQuantity >= 1 && position.starPointPrice() != null) {
+            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, position.starPointPrice()));
+            log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQuantity, position.starPointPrice());
         }
 
         // LOC 쿼터매수 — 별지점 아래에서 (starPointPrice - $0.01)
-        int locBuyQty = position.calcLocBuyQuantity();
-        if (locBuyQty >= 1 && position.starPointPrice() != null) {
+        int locBuyQuantity = position.calcLocBuyQuantity();
+        if (locBuyQuantity >= 1 && position.starPointPrice() != null) {
             BigDecimal buyPrice = position.starPointPrice().subtract(new BigDecimal("0.01"));
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, locBuyQty, buyPrice));
-            log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQty, buyPrice);
+            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity, buyPrice));
+            log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQuantity, buyPrice);
         }
 
         return orders;
