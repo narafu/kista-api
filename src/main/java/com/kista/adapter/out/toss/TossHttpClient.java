@@ -35,75 +35,45 @@ public class TossHttpClient {
     }
 
     public <T> T post(String path, Account account, Object body, Class<T> responseType) {
-        HttpHeaders headers = buildHeaders(account);
-        try {
-            return tossRestTemplate.exchange(
-                    baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
-            ).getBody();
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 401) {
-                // 401 — 토큰 무효화 후 1회 재시도
-                log.warn("Toss POST 401 — 토큰 무효화 후 재시도: path={}", path);
-                tossTokenPort.invalidateToken(account.id());
-                try {
-                    return tossRestTemplate.exchange(
-                            baseUrl + path, HttpMethod.POST,
-                            new HttpEntity<>(body, buildHeaders(account)), responseType
-                    ).getBody();
-                } catch (RestClientException retryEx) {
-                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
-                }
-            }
-            throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
-        } catch (RestClientException e) {
-            throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
-        }
+        return executeWithRetry(account, path, () -> tossRestTemplate.exchange(
+                baseUrl + path, HttpMethod.POST,
+                new HttpEntity<>(body, buildHeaders(account)), responseType
+        ).getBody());
     }
 
     // DELETE 요청 — 주문 취소 등 (응답 body 없음)
     public void delete(String path, Account account) {
-        HttpHeaders headers = buildHeaders(account);
-        try {
+        executeWithRetry(account, path, () -> {
             tossRestTemplate.exchange(
-                    baseUrl + path, HttpMethod.DELETE, new HttpEntity<>(headers), Void.class
+                    baseUrl + path, HttpMethod.DELETE,
+                    new HttpEntity<>(buildHeaders(account)), Void.class
             );
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 401) {
-                // 401 — 토큰 무효화 후 1회 재시도
-                log.warn("Toss DELETE 401 — 토큰 무효화 후 재시도: path={}", path);
-                tossTokenPort.invalidateToken(account.id());
-                try {
-                    tossRestTemplate.exchange(
-                            baseUrl + path, HttpMethod.DELETE,
-                            new HttpEntity<>(buildHeaders(account)), Void.class
-                    );
-                    return;
-                } catch (RestClientException retryEx) {
-                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
-                }
-            }
-            throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
-        } catch (RestClientException e) {
-            throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
-        }
+            return null;
+        });
     }
 
     // ── private helpers ────────────────────────────────────────────────────────
 
     private <T> T executeGet(String path, Account account, MultiValueMap<String, String> params,
                               Class<T> responseType, boolean withAccountHeader) {
-        HttpHeaders headers = withAccountHeader ? buildHeaders(account) : buildHeadersNoAccount(account);
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        try {
+        return executeWithRetry(account, path, () -> {
+            HttpHeaders headers = withAccountHeader ? buildHeaders(account) : buildHeadersNoAccount(account);
             return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
+        });
+    }
+
+    // 401 → 토큰 무효화 후 1회 재시도. 매 시도마다 call이 buildHeaders로 최신 토큰을 다시 읽는다.
+    private <T> T executeWithRetry(Account account, String path, java.util.function.Supplier<T> call) {
+        try {
+            return call.get();
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() == 401) {
                 // 401 — 토큰 무효화 후 1회 재시도
-                log.warn("Toss GET 401 — 토큰 무효화 후 재시도: path={}", path);
+                log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
                 tossTokenPort.invalidateToken(account.id());
-                HttpHeaders freshHeaders = withAccountHeader ? buildHeaders(account) : buildHeadersNoAccount(account);
                 try {
-                    return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(freshHeaders), responseType).getBody();
+                    return call.get();
                 } catch (RestClientException retryEx) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
                 }
