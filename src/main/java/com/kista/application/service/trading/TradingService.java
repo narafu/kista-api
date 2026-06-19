@@ -154,6 +154,16 @@ class TradingService {
         }
     }
 
+    // 잔고 로드 — Toss는 /api/v1/holdings live 조회, KIS는 cycle_position DB 이력 사용
+    private AccountBalance loadBalance(Strategy strategy, Account account) {
+        AccountBalance balance = account.isToss()
+                ? tosAccountPort.getBalance(account, strategy.ticker())
+                : balanceLoader.loadBalanceOrThrow(strategy).balance();
+        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
+                account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+        return balance;
+    }
+
     // planAndSaveOrders: 잔고 로드 + PLANNED 주문 생성·저장
     // 오늘 PLANNED 또는 PLACED가 이미 있으면 재계산 없이 그대로 반환 (수동 선행 주문 보존)
     private CycleState planAndSaveOrders(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
@@ -162,11 +172,8 @@ class TradingService {
         StrategyCycle currentCycle = ctx.currentCycle();
         Account account = ctx.account();
 
-        // 1. 잔고 로드 — Toss는 /api/v1/holdings live 조회, KIS는 cycle_position DB 이력 사용
-        AccountBalance balance = account.isToss()
-                ? tosAccountPort.getBalance(account, strategy.ticker())
-                : balanceLoader.loadBalanceOrThrow(strategy).balance();
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+        // 1. 잔고 로드
+        AccountBalance balance = loadBalance(strategy, account);
 
         // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (장 개시 스케쥴러 선행 또는 수동 주문 보존)
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
@@ -254,11 +261,8 @@ class TradingService {
         Account account = ctx.account();
         User user = ctx.user();
 
-        // 잔고 로드 — Toss는 /api/v1/holdings live 조회, KIS는 cycle_position DB 이력 사용
-        AccountBalance balance = account.isToss()
-                ? tosAccountPort.getBalance(account, strategy.ticker())
-                : balanceLoader.loadBalanceOrThrow(strategy).balance();
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}", account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+        // 잔고 로드
+        AccountBalance balance = loadBalance(strategy, account);
 
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
