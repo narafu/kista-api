@@ -58,7 +58,7 @@ class OrderCancelService {
 
         for (Order order : placedOrders) {
             try {
-                cancelViaBroker(order, account);
+                brokerOrderRouter.cancel(order, account);
                 orderPort.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
@@ -89,13 +89,8 @@ class OrderCancelService {
             throw new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: " + order.status());
         }
 
-        cancelViaBroker(order, account);
-        orderPort.markCancelled(orderId);
-    }
-
-    // 브로커별 주문 취소
-    private void cancelViaBroker(Order order, Account account) {
         brokerOrderRouter.cancel(order, account);
+        orderPort.markCancelled(orderId);
     }
 
 }
