@@ -13,4 +13,6 @@ public interface TokenUseCase {
     void logout(String rawRefreshToken);
     // 만료 RT 일괄 정리 — 스케줄러 전용
     int cleanupExpiredTokens();
+    // grace 기간이 지난 회전 RT 정리 — 스케줄러 전용
+    int cleanupRotatedTokens();
 }
