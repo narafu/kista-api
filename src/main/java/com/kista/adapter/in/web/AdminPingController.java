@@ -15,7 +15,7 @@ public class AdminPingController {
 
     record PingResponse(String status, String adminId) {} // 관리자 ping 응답
 
-    // Phase 2A 가드 검증용 최소 엔드포인트 — Phase 2B에서 실제 admin 엔드포인트로 대체
+    // hasRole("ADMIN") 가드 동작 확인용 최소 엔드포인트 — AdminPingControllerTest 패턴 참고
     @GetMapping("/_ping")
     public PingResponse ping(@AuthenticationPrincipal UUID userId) {
         return new PingResponse("ok", userId.toString());
