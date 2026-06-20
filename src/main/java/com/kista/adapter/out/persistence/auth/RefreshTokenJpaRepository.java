@@ -27,12 +27,8 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, UU
     // 만료된 토큰 일괄 삭제 (스케쥴러)
     int deleteAllByExpiresAtBefore(Instant threshold);
 
-    // 조건부 rotated_at 마킹 — rotated_at IS NULL인 행만 갱신, affected rows로 회전 승자 판정
-    // 동시 요청이 같은 hash로 호출해도 1개만 1을 반환해 경쟁 조건을 안전하게 처리
+    // 슬라이딩 만료 연장 — refresh 성공 시 expires_at만 갱신 (RT 회전 없음, 드리프트 원천 차단)
     @Modifying
-    @Query("update RefreshTokenEntity e set e.rotatedAt = :now where e.tokenHash = :hash and e.rotatedAt is null")
-    int markRotated(@Param("hash") String hash, @Param("now") Instant now);
-
-    // grace 기간이 지난 회전 토큰 일괄 삭제 (스케쥴러)
-    int deleteAllByRotatedAtBefore(Instant threshold);
+    @Query("update RefreshTokenEntity e set e.expiresAt = :exp where e.tokenHash = :hash")
+    void touchExpiry(@Param("hash") String hash, @Param("exp") Instant newExpiresAt);
 }

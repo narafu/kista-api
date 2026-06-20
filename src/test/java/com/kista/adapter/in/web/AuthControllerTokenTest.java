@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.*;
+import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
@@ -18,7 +19,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -68,13 +68,13 @@ class AuthControllerTokenTest {
     }
 
     @Test
-    void refresh_invalidToken_returns404() throws Exception {
+    void refresh_invalidToken_returns401() throws Exception {
         given(tokenUseCase.refresh(anyString(), any()))
-                .willThrow(new NoSuchElementException("유효하지 않은 refresh token"));
+                .willThrow(new InvalidRefreshTokenException("유효하지 않은 refresh token"));
 
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", "badToken")))
-                .andExpect(status().isNotFound()); // GlobalExceptionHandler: NoSuchElementException → 404
+                .andExpect(status().isUnauthorized()); // GlobalExceptionHandler: InvalidRefreshTokenException → 401
     }
 
     @Test

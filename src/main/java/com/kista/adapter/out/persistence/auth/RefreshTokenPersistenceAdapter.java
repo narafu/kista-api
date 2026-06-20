@@ -54,13 +54,7 @@ class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
 
     @Override
     @Transactional
-    public int markRotated(String tokenHash, Instant now) {
-        return repository.markRotated(tokenHash, now);
-    }
-
-    @Override
-    @Transactional
-    public int deleteAllRotatedBefore(Instant threshold) {
-        return repository.deleteAllByRotatedAtBefore(threshold);
+    public void touchExpiry(String tokenHash, Instant newExpiresAt) {
+        repository.touchExpiry(tokenHash, newExpiresAt);
     }
 }

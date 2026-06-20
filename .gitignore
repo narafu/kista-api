@@ -62,4 +62,4 @@ supabase/.temp
 logs/
 
 # superpowers
-docs/superpowers/plans/**
+.superpowers/**

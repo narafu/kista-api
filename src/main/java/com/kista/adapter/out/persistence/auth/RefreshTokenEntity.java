@@ -29,10 +29,7 @@ class RefreshTokenEntity {
     private String userAgent; // nullable: 디바이스 식별용
 
     @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt; // 토큰 만료 시각
-
-    @Column(name = "rotated_at")
-    private Instant rotatedAt; // 회전 시각 — null이면 미회전
+    private Instant expiresAt; // 토큰 만료 시각 (슬라이딩 갱신 — refresh 마다 연장)
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt; // DB DEFAULT now()
@@ -49,6 +46,6 @@ class RefreshTokenEntity {
 
     // 엔티티 → 도메인 변환
     RefreshToken toDomain() {
-        return new RefreshToken(id, userId, tokenHash, userAgent, expiresAt, rotatedAt, createdAt);
+        return new RefreshToken(id, userId, tokenHash, userAgent, expiresAt, createdAt);
     }
 }

@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,67 +49,54 @@ class TokenServiceTest {
         assertThat(saved.userId()).isEqualTo(USER_ID);
         assertThat(saved.tokenHash()).isEqualTo(TokenService.sha256Hex(rawToken));
         assertThat(saved.id()).isNull(); // JPA가 생성
-        assertThat(saved.rotatedAt()).isNull(); // 신규 발급 시 미회전
         assertThat(saved.expiresAt()).isAfter(Instant.now().plus(Duration.ofHours(119)));
     }
 
-    // 정상 회전: 미회전 RT → markRotated 호출 + 새 RT 발급
+    // 정상 갱신: 유효한 RT → touchExpiry 호출 + 동일 RT 반환 (드리프트 불가 — 회귀 방지 핵심)
     @Test
-    void refresh_unrotatedToken_marksRotatedAndIssuesNewToken() {
-        String rawOld = "oldRawToken12345";
-        String oldHash = TokenService.sha256Hex(rawOld);
-        RefreshToken existing = makeRt(oldHash, Instant.now().plus(Duration.ofHours(120)), null);
+    void refresh_validToken_touchesExpiryAndReturnsSameToken() {
+        String rawToken = "validRawToken12345";
+        String hash = TokenService.sha256Hex(rawToken);
+        RefreshToken existing = makeRt(hash, Instant.now().plus(Duration.ofHours(120)));
         User user = mockUser(USER_ID, User.UserRole.USER);
 
-        given(refreshTokenPort.findByTokenHash(oldHash)).willReturn(Optional.of(existing));
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(existing));
         given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
-        given(refreshTokenPort.markRotated(any(), any())).willReturn(1);
 
-        TokenRefreshResult result = tokenService.refresh(rawOld, "ua");
+        TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
 
-        // 구 RT 삭제 없이 markRotated만 호출
-        verify(refreshTokenPort, never()).deleteByTokenHash(oldHash);
-        verify(refreshTokenPort).markRotated(eq(oldHash), any(Instant.class));
-        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 저장
+        // 회전 없음 — 새 RT 저장·구 RT 삭제 없이 touchExpiry만 호출
+        verify(refreshTokenPort, never()).save(any(RefreshToken.class));
+        verify(refreshTokenPort, never()).deleteByTokenHash(any());
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+        verify(refreshTokenPort).touchExpiry(eq(hash), any(Instant.class));
+        // 동일 RT 반환 — 브라우저 쿠키 드리프트 원천 불가
+        assertThat(result.newRawRefreshToken()).isEqualTo(rawToken);
         assertThat(result.userId()).isEqualTo(USER_ID);
         assertThat(result.userRole()).isEqualTo(User.UserRole.USER);
-        assertThat(result.newRawRefreshToken()).isNotEqualTo(rawOld);
     }
 
-    // grace 내 재사용: 회전된 RT를 grace 이내 재제시 → 새 RT 발급, 예외 없음
+    // 회귀 방지: 동일 RT를 Set-Cookie 유실 시뮬레이션으로 여러 번 refresh → 세션 폐기 없이 정상 처리
     @Test
-    void refresh_rotatedTokenWithinGrace_issuesNewTokenWithoutException() {
-        String raw = "rotatedToken";
-        String hash = TokenService.sha256Hex(raw);
-        Instant rotatedAt = Instant.now().minus(Duration.ofSeconds(10)); // grace(60s) 이내
-        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
+    void refresh_sameToken_repeatedly_neverRevokesSession() {
+        String rawToken = "stableRawToken";
+        String hash = TokenService.sha256Hex(rawToken);
+        RefreshToken rt = makeRt(hash, Instant.now().plus(Duration.ofHours(120)));
         User user = mockUser(USER_ID, User.UserRole.USER);
 
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
         given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
 
-        TokenRefreshResult result = tokenService.refresh(raw, "ua");
+        // 같은 RT로 5번 연속 refresh (드리프트 시 구 RT를 반복 제시하는 상황)
+        for (int i = 0; i < 5; i++) {
+            TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
+            assertThat(result.newRawRefreshToken()).isEqualTo(rawToken);
+        }
 
-        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 발급
-        verify(refreshTokenPort, never()).deleteAllByUserId(any()); // 전체 폐기 없음
-        assertThat(result.userId()).isEqualTo(USER_ID);
-    }
-
-    // grace 초과 재사용: 회전된 RT를 grace 이후 제시 → 전체 폐기 + 401
-    @Test
-    void refresh_rotatedTokenAfterGrace_revokesAllSessionsAndThrows() {
-        String raw = "staleRotatedToken";
-        String hash = TokenService.sha256Hex(raw);
-        Instant rotatedAt = Instant.now().minus(TokenService.RT_GRACE).minus(Duration.ofSeconds(1));
-        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
-
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
-
-        assertThatThrownBy(() -> tokenService.refresh(raw, "ua"))
-                .isInstanceOf(InvalidRefreshTokenException.class)
-                .hasMessageContaining("유효하지 않은");
-        verify(refreshTokenPort).deleteAllByUserId(USER_ID); // 전체 폐기
-        verify(refreshTokenPort, never()).save(any()); // 새 RT 발급 없음
+        // 세션 폐기(deleteAllByUserId) 절대 미호출
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+        // touchExpiry 5번 호출
+        verify(refreshTokenPort, times(5)).touchExpiry(eq(hash), any(Instant.class));
     }
 
     @Test
@@ -117,13 +105,15 @@ class TokenServiceTest {
         assertThatThrownBy(() -> tokenService.refresh("unknown", "ua"))
                 .isInstanceOf(InvalidRefreshTokenException.class)
                 .hasMessageContaining("유효하지 않은");
+        // 단건 401 — 전체 세션 폐기 없음
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
     }
 
     @Test
     void refresh_expiredToken_throwsAndCleansUp() {
         String raw = "expiredToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken expired = makeRt(hash, Instant.now().minusSeconds(1), null);
+        RefreshToken expired = makeRt(hash, Instant.now().minusSeconds(1));
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(expired));
 
@@ -131,13 +121,14 @@ class TokenServiceTest {
                 .isInstanceOf(InvalidRefreshTokenException.class)
                 .hasMessageContaining("만료된");
         verify(refreshTokenPort).deleteByTokenHash(hash); // 만료 토큰 정리
+        verify(refreshTokenPort, never()).deleteAllByUserId(any()); // 전체 세션 폐기 없음
     }
 
     @Test
     void logout_validToken_deletesAndBlacklists() {
         String raw = "logoutToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000));
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
@@ -161,8 +152,8 @@ class TokenServiceTest {
         assertThat(TokenService.sha256Hex("test")).isEqualTo(hash); // 결정론적
     }
 
-    private RefreshToken makeRt(String hash, Instant expiresAt, Instant rotatedAt) {
-        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, rotatedAt, Instant.now());
+    private RefreshToken makeRt(String hash, Instant expiresAt) {
+        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, Instant.now());
     }
 
     private User mockUser(UUID id, User.UserRole role) {
