@@ -1,6 +1,5 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
@@ -42,14 +41,6 @@ public class SettingsController {
         @Pattern(regexp = "^[\\p{L}\\d ]{1,10}$", message = "한글·영문·숫자·공백 1~10자")
         String nickname
     ) {}
-
-    // 텔레그램 봇 설정 조회 (chatId 반환, botToken은 보안상 미노출)
-    @Operation(summary = "텔레그램 설정 조회", description = "현재 설정된 텔레그램 채팅 ID 반환. botToken은 보안상 응답에서 제외.")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
-    @GetMapping("/telegram")
-    public TelegramSettingsResponse getTelegram(@AuthenticationPrincipal UUID userId) {
-        return TelegramSettingsResponse.from(userUseCase.getById(userId));
-    }
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")

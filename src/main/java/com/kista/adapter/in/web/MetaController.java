@@ -35,36 +35,6 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
 
-    @Operation(summary = "전략 타입 목록")
-    @GetMapping("/strategy-types")
-    public ResponseEntity<List<StrategyTypeMeta>> getStrategyTypes() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(getStrategyTypeList());
-    }
-
-    @Operation(summary = "티커 목록")
-    @GetMapping("/tickers")
-    public ResponseEntity<List<TickerMeta>> getTickers() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(getTickerList());
-    }
-
-    @Operation(summary = "브로커 목록")
-    @GetMapping("/brokers")
-    public ResponseEntity<List<EnumMeta>> getBrokers() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(getBrokerList());
-    }
-
-    @Operation(summary = "전략 상태 목록")
-    @GetMapping("/strategy-statuses")
-    public ResponseEntity<List<EnumMeta>> getStrategyStatuses() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(getStrategyStatusList());
-    }
-
-    @Operation(summary = "연속 사이클 정책 목록")
-    @GetMapping("/cycle-seed-types")
-    public ResponseEntity<List<EnumMeta>> getCycleSeedTypes() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(getCycleSeedTypeList());
-    }
-
     private List<StrategyTypeMeta> getStrategyTypeList() {
         return Arrays.stream(Strategy.Type.values())
                 .map(StrategyTypeMeta::from)

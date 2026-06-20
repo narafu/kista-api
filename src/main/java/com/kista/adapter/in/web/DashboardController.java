@@ -2,8 +2,6 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
-import com.kista.adapter.in.web.dto.TradeHistoryResponse;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.PortfolioUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +21,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "대시보드", description = "거래 내역, 포트폴리오 스냅샷 조회")
+@Tag(name = "대시보드", description = "포트폴리오 스냅샷·사이클 이력 조회")
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -31,30 +29,6 @@ public class DashboardController {
 
     private final PortfolioUseCase portfolioUseCase;
     private final AccountStatisticsUseCase accountStatistics;
-
-    @Operation(summary = "거래 내역 조회", description = "날짜 범위와 종목으로 필터링. 기본: 최근 30일, 종목 SOXL.")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
-    @GetMapping("/trades")
-    public List<TradeHistoryResponse> getTrades(
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "조회 시작일 (기본: 오늘 - 30일)", example = "2025-01-01")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "조회 종료일 (기본: 오늘)", example = "2025-01-31")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @Parameter(description = "거래 종목", example = "SOXL")
-            @RequestParam(defaultValue = "SOXL") Ticker ticker) {
-        return portfolioUseCase.getHistory(userId, resolveFrom(from), resolveTo(to), ticker)
-                .stream().map(TradeHistoryResponse::from).toList();
-    }
-
-    @Operation(summary = "현재 포트폴리오 조회", description = "가장 최근 포트폴리오 스냅샷 1건 반환.")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
-    @GetMapping("/portfolio/current")
-    public PortfolioSnapshotResponse getPortfolioCurrent(@AuthenticationPrincipal UUID userId) {
-        return PortfolioSnapshotResponse.from(portfolioUseCase.getCurrent(userId));
-    }
 
     @Operation(summary = "포트폴리오 스냅샷 목록", description = "지정 기간의 포트폴리오 스냅샷 목록 반환. 기본: 최근 30일.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
