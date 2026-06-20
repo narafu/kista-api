@@ -78,8 +78,8 @@ class TradingService {
         List<Ticker> cycleTickers = contexts.stream()
                 .map(c -> c.strategy().ticker())
                 .distinct().toList();
-        Account firstAccount = contexts.getFirst().account();
-        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
+        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
+        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
 
         // 기준 매매표 조회 (PRIVACY)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
@@ -101,7 +101,7 @@ class TradingService {
         waitFor("PostClose", dst.waitUntilPostClose(), dst);
 
         // 장 마감 후 종가 일괄 조회
-        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, firstAccount);
+        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, priceAccount);
 
         // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
         reportAll(placedStates, closingPrices, today);
@@ -231,8 +231,8 @@ class TradingService {
 
         // 가격 스냅샷 일괄 조회 (개장 전 현시점)
         List<Ticker> cycleTickers = contexts.stream().map(c -> c.strategy().ticker()).distinct().toList();
-        Account firstAccount = contexts.getFirst().account();
-        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, firstAccount);
+        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
+        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
 
         // PRIVACY 기준 매매표 조회 (내일 기준 — FIDA가 미리 송신했을 경우)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
@@ -303,6 +303,15 @@ class TradingService {
         log.info("DST={}, {}까지 대기: {}ms", dst.isDst(), label, ms);
         if (ms > 0) Thread.sleep(ms);
         log.info("{} 도달", label);
+    }
+
+    // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)
+    private Account selectPriceAccount(List<BatchContext> contexts) {
+        return contexts.stream()
+                .map(BatchContext::account)
+                .filter(Account::isToss)
+                .findFirst()
+                .orElseGet(() -> contexts.getFirst().account());
     }
 
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환

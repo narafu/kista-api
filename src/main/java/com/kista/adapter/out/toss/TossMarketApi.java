@@ -4,29 +4,36 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossMarketSession;
+import com.kista.domain.model.toss.TossMarketSession.SessionHours;
 import com.kista.domain.port.out.TossAccountListPort;
 import com.kista.domain.port.out.TossMarketCalendarPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.stereotype.Component;
+
+// Toss market-calendar API 스펙 (openapi.json 검증):
+// - GET /api/v1/market-calendar/US?date={YYYY-MM-DD} — 단건 조회 (date 미지정 시 오늘)
+// - response: { today: { date, dayMarket, preMarket, regularMarket, afterMarket } }
+//   각 세션: { startTime(ISO8601), endTime(ISO8601) }
+// - isOpen boolean 없음 — regularMarket != null 이면 개장일로 판단
+// 범위 조회(from~to)는 날짜별 루프로 처리, 최대 30일 제한
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPort {
 
-    // Toss 해외 장 운영 정보 API 경로 (미국)
     private static final String MARKET_CALENDAR_PATH = "/api/v1/market-calendar/US";
-    // Toss 계좌 목록 API 경로
     private static final String ACCOUNTS_PATH = "/api/v1/accounts";
-    // Toss API 날짜 파라미터 포맷
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    // 범위 조회 최대 일수 — 초과 시 IllegalArgumentException(→ 400)
+    private static final int MAX_RANGE_DAYS = 30;
 
     private final TossHttpClient tossHttpClient;
 
@@ -34,31 +41,51 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     @Override
     public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to, Account account) {
+        long days = from.until(to).getDays() + 1;
+        if (days > MAX_RANGE_DAYS) {
+            throw new IllegalArgumentException("market-calendar 조회는 최대 " + MAX_RANGE_DAYS + "일 범위만 지원합니다");
+        }
+        List<TossMarketSession> sessions = new ArrayList<>();
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            sessions.add(fetchSession(date, account));
+        }
+        return sessions;
+    }
+
+    private TossMarketSession fetchSession(LocalDate date, Account account) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("from", from.format(DATE_FMT));
-        params.add("to",   to.format(DATE_FMT));
+        params.add("date", date.toString()); // YYYY-MM-DD
 
         // 장 운영 정보는 계좌 컨텍스트 불필요
         MarketCalendarResponse response = tossHttpClient.getNoAccountHeader(
                 MARKET_CALENDAR_PATH, account, params, MarketCalendarResponse.class);
 
-        if (response == null || response.result() == null) {
-            log.warn("Toss 장 운영 정보 응답 없음: from={}, to={}", from, to);
-            return List.of();
+        if (response == null || response.today() == null) {
+            log.warn("Toss market-calendar 응답 없음: date={}", date);
+            // 응답 없으면 해당 날짜 휴장으로 처리
+            return new TossMarketSession(date, null, null, null);
         }
-        return response.result().stream()
-                .map(s -> new TossMarketSession(
-                        LocalDate.parse(s.date(), DATE_FMT),
-                        Boolean.TRUE.equals(s.isOpen())
-                ))
-                .toList();
+        MarketDay today = response.today();
+        return new TossMarketSession(
+                date,
+                toSessionHours(today.preMarket()),
+                toSessionHours(today.regularMarket()),
+                toSessionHours(today.afterMarket())
+        );
+    }
+
+    private SessionHours toSessionHours(SessionWindow w) {
+        if (w == null || w.startTime() == null) return null;
+        return new SessionHours(
+                OffsetDateTime.parse(w.startTime()),
+                OffsetDateTime.parse(w.endTime())
+        );
     }
 
     // ── TossAccountListPort ────────────────────────────────────────────────────
 
     @Override
     public List<TossAccountInfo> getAccountList(Account account) {
-        // 계좌 헤더 없이 Bearer 토큰만으로 조회 (계좌 선택 전 단계)
         AccountsResponse response = tossHttpClient.getNoAccountHeader(
                 ACCOUNTS_PATH, account, new LinkedMultiValueMap<>(), AccountsResponse.class);
 
@@ -73,21 +100,30 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
+    // GET /api/v1/market-calendar/US 응답 래퍼 — { today: {...} }
     record MarketCalendarResponse(
-        @JsonProperty("result") List<SessionItem> result
+        @JsonProperty("today") MarketDay today
     ) {}
 
-    record SessionItem(
-        @JsonProperty("date")   String  date,   // YYYYMMDD
-        @JsonProperty("isOpen") Boolean isOpen  // 개장 여부
+    record MarketDay(
+        @JsonProperty("date")          String        date,
+        @JsonProperty("preMarket")     SessionWindow preMarket,
+        @JsonProperty("regularMarket") SessionWindow regularMarket,
+        @JsonProperty("afterMarket")   SessionWindow afterMarket
     ) {}
 
+    record SessionWindow(
+        @JsonProperty("startTime") String startTime,  // ISO 8601
+        @JsonProperty("endTime")   String endTime     // ISO 8601
+    ) {}
+
+    // GET /api/v1/accounts 응답 래퍼
     record AccountsResponse(
         @JsonProperty("result") List<AccountItem> result
     ) {}
 
     record AccountItem(
-        @JsonProperty("accountSeq") int    accountSeq, // 계좌 일련번호
-        @JsonProperty("accountNo")  String accountNo   // 계좌번호
+        @JsonProperty("accountSeq") int    accountSeq,
+        @JsonProperty("accountNo")  String accountNo
     ) {}
 }

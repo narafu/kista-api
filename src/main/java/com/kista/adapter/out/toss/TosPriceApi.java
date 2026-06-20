@@ -25,7 +25,8 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
-    // Toss 종목 기본 정보 API: GET /api/v1/stocks?symbol=SOXL
+    // Toss 종목 기본 정보 API: GET /api/v1/stocks?symbols=SOXL (복수형, 콤마 구분)
+    // 주의: stocks API는 가격 정보 미제공 — 현재가는 /prices 별도 조회
     private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
@@ -78,20 +79,27 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
 
     @Override
     public TossStockInfo getStockInfo(Ticker ticker, Account account) {
+        // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("symbol", ticker.name());
+        params.add("symbols", ticker.name());
 
-        StockInfoResponse response = tossHttpClient.getNoAccountHeader(
-                STOCKS_PATH, account, params, StockInfoResponse.class);
+        StocksResponse response = tossHttpClient.getNoAccountHeader(
+                STOCKS_PATH, account, params, StocksResponse.class);
 
-        if (response == null || response.result() == null) {
+        List<StockItem> items = response != null ? response.result() : null;
+        if (items == null || items.isEmpty()) {
             log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
-            return new TossStockInfo(ticker.name(), ticker.name(), "", "USD", BigDecimal.ZERO, BigDecimal.ZERO);
+            return new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", "");
         }
-        StockItem s = response.result();
-        BigDecimal lastPrice = s.lastPrice() != null ? new BigDecimal(s.lastPrice()) : BigDecimal.ZERO;
-        BigDecimal prevClose = s.prevClosePrice() != null ? new BigDecimal(s.prevClosePrice()) : lastPrice;
-        return new TossStockInfo(s.symbol(), s.name(), s.exchange(), s.currency(), lastPrice, prevClose);
+        StockItem s = items.get(0);
+        return new TossStockInfo(
+                s.symbol(),
+                s.name()         != null ? s.name()         : ticker.name(),
+                s.englishName()  != null ? s.englishName()  : ticker.name(),
+                s.market()       != null ? s.market()       : "",
+                s.currency()     != null ? s.currency()     : "USD",
+                s.status()       != null ? s.status()       : ""
+        );
     }
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────
@@ -108,17 +116,19 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
         @JsonProperty("result") List<PriceItem> result
     ) {}
 
-    // GET /api/v1/stocks 응답 래퍼: {"result": {...}}
-    record StockInfoResponse(
-        @JsonProperty("result") StockItem result
+    // GET /api/v1/stocks 응답 래퍼: {"result": [...]} (복수 반환)
+    record StocksResponse(
+        @JsonProperty("result") List<StockItem> result
     ) {}
 
+    // stocks API 응답 — 가격 정보 없음 (name/market/currency 등 기본 정보만)
     record StockItem(
-        @JsonProperty("symbol")         String symbol,         // 종목 코드
-        @JsonProperty("name")           String name,           // 종목명
-        @JsonProperty("exchange")       String exchange,       // 거래소
-        @JsonProperty("currency")       String currency,       // 통화
-        @JsonProperty("lastPrice")      String lastPrice,      // 현재가
-        @JsonProperty("prevClosePrice") String prevClosePrice  // 전일종가
+        @JsonProperty("symbol")           String symbol,          // 종목 코드
+        @JsonProperty("name")             String name,            // 한글 종목명
+        @JsonProperty("englishName")      String englishName,     // 영문 종목명
+        @JsonProperty("market")           String market,          // 거래소/시장
+        @JsonProperty("currency")         String currency,        // 통화
+        @JsonProperty("status")           String status,          // 종목 상태
+        @JsonProperty("sharesOutstanding") String sharesOutstanding // 발행주식수
     ) {}
 }
