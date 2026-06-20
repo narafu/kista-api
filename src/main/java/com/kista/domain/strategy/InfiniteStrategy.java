@@ -53,7 +53,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
     // 후반 단일 LOC 매수: unitAmount/referencePrice
     private List<Order> computeLateBuys(LocalDate tradeDate, InfinitePosition position, Order orig, BigDecimal cap, BigDecimal unitAmount) {
         BigDecimal cappedPrice = orig.price().min(cap);
-        int quantity = InfinitePosition.lateBuyQty(unitAmount, cappedPrice);
+        int quantity = InfinitePosition.lateBuyQuantity(unitAmount, cappedPrice);
         List<Order> buys = new ArrayList<>();
         if (quantity > 0) buys.add(Order.planned(tradeDate, position.ticker(), orig.orderType(), BUY, quantity, cappedPrice));
         return buys;
@@ -66,8 +66,8 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         BigDecimal cappedAvg = buy1.price().min(cap);
         BigDecimal cappedRef = buy2.price().min(cap);
 
-        int quantity1 = InfinitePosition.earlyBuyQty1(unitAmount, cappedAvg);
-        int quantity2 = InfinitePosition.earlyBuyQty2(unitAmount, cappedAvg, quantity1, cappedRef);
+        int quantity1 = InfinitePosition.earlyBuyQuantity1(unitAmount, cappedAvg);
+        int quantity2 = InfinitePosition.earlyBuyQuantity2(unitAmount, cappedAvg, quantity1, cappedRef);
 
         List<Order> buys = new ArrayList<>();
         if (cappedAvg.compareTo(cappedRef) == 0) {

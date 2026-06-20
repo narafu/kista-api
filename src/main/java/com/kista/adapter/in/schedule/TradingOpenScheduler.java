@@ -37,7 +37,7 @@ public class TradingOpenScheduler {
     @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST (개장 30분~90분 전)
     public void run() {
         List<Strategy> strategies = strategyPort.findAllActive();
-        log.info("개장 잡 시작 — ACTIVE 전략 {}개", strategies.size());
+        log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());
 
         // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
         List<BatchContext> contexts = new ArrayList<>();
@@ -57,12 +57,12 @@ public class TradingOpenScheduler {
             useCase.placeOpenOrders(contexts);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("개장 잡 인터럽트: {}", e.getMessage());
+            log.warn("장 개시 스케쥴러 인터럽트: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("개장 잡 오류: {}", e.getMessage(), e);
+            log.error("장 개시 스케쥴러 오류: {}", e.getMessage(), e);
             notifyPort.notifyError(e);
         }
 
-        log.info("개장 잡 완료");
+        log.info("장 개시 스케쥴러 완료");
     }
 }

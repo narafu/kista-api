@@ -97,10 +97,10 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
             // filledQuantity > 0인 주문만 Execution으로 변환
             for (OrderItem order : response.orders()) {
                 if (order.execution() == null) continue;
-                String filledQtyStr = order.execution().filledQuantity();
-                if (filledQtyStr == null || filledQtyStr.isBlank()) continue;
-                int filledQty = Integer.parseInt(filledQtyStr);
-                if (filledQty <= 0) continue;
+                String filledQuantityStr = order.execution().filledQuantity();
+                if (filledQuantityStr == null || filledQuantityStr.isBlank()) continue;
+                int filledQuantity = Integer.parseInt(filledQuantityStr);
+                if (filledQuantity <= 0) continue;
 
                 String priceStr = order.execution().averageFilledPrice();
                 BigDecimal price = (priceStr != null && !priceStr.isBlank())
@@ -110,7 +110,7 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
                 String amtStr = order.execution().filledAmount();
                 BigDecimal amountUsd = (amtStr != null && !amtStr.isBlank())
                         ? new BigDecimal(amtStr)
-                        : price.multiply(BigDecimal.valueOf(filledQty)); // nullable 가드
+                        : price.multiply(BigDecimal.valueOf(filledQuantity)); // nullable 가드
 
                 // filledAt은 KST(+09:00) — 직접 LocalDate 추출, 없으면 from 날짜 fallback
                 String filledAtStr = order.execution().filledAt();
@@ -122,7 +122,7 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
                         ? Order.OrderDirection.BUY
                         : Order.OrderDirection.SELL;
 
-                result.add(new Execution(tradeDate, ticker, direction, filledQty, price, amountUsd, order.orderId()));
+                result.add(new Execution(tradeDate, ticker, direction, filledQuantity, price, amountUsd, order.orderId()));
             }
 
             // cursor 없이 hasNext=true면 다음 페이지 조회 불가 — 무한루프 방지

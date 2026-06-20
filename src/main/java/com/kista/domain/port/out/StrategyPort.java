@@ -17,7 +17,7 @@ public interface StrategyPort {
                 () -> new NoSuchElementException("전략을 찾을 수 없습니다: " + strategyId));
     }
 
-    // 사용자 ACTIVE + 전략 ACTIVE 전체 조회 (스케줄러용)
+    // 사용자 ACTIVE + 전략 ACTIVE 전체 조회 (스케쥴러용)
     List<Strategy> findAllActive();
 
     Strategy save(Strategy strategy);

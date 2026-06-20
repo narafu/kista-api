@@ -63,7 +63,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         }
         String text = String.format(
                 "🔄 <b>사이클 종료</b> — %s%n"
-                + "%s[%s] 사이클이 완료되었습니다.%n"
+                + "[%s] %s 사이클이 완료되었습니다.%n"
                 + "다음 사이클 정책: %s",
                 account.nickname(),
                 strategy.type().name(), strategy.ticker().name(),
@@ -78,7 +78,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         }
         String text = String.format(
                 "🚀 <b>새 사이클 시작</b> — %s%n"
-                + "%s[%s] 사이클이 시작되었습니다.%n"
+                + "[%s] %s 사이클이 시작되었습니다.%n"
                 + "시드: $%.2f",
                 account.nickname(),
                 strategy.type().name(), strategy.ticker().name(),
@@ -92,8 +92,8 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
             return;
         }
         String text = String.format(
-                "⚠️ <b>예수금 부족</b> — %s[%s %s]%n"
-                + "장 마감 전 예수금 확인 바랍니다.",
+                "⚠️ <b>예수금 부족</b> — %s%n"
+                + "[%s] %s 장 마감 전 예수금 확인 바랍니다.",
                 account.nickname(), strategyType.name(), ticker.name());
         telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
@@ -105,7 +105,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         }
         String text = String.format(
                 "<b>매매 결산[%s]</b> — %s%n"
-                + "[%s %s] 매수: $%.2f | 매도: $%.2f",
+                + "[%s] %s 매수: $%.2f | 매도: $%.2f",
                 r.date(), account.nickname(),
                 r.strategyType().name(), r.ticker().name(),
                 r.totalBoughtUsd(), r.totalSoldUsd());

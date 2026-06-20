@@ -120,7 +120,7 @@ domain      →  외부 의존 없음
 - `TelegramAdapter`/`TelegramUserNotificationAdapter` 접근 경로: `r.snapshot().X()` (포맷 문자열 변경 금지)
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
 - PRIVACY execute() null guard: `snapshot=null` → `saveAndNotify`에서 `snapshot != null` 조건 가드 유지 필수
-- **`preview()` today 오프셋**: 스케줄러는 KST 04:00 실행 → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴. 미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남
+- **`preview()` today 오프셋**: 스케쥴러는 KST 04:00 실행 → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴. 미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남
 - **`INSUFFICIENT_BALANCE` skip 시 position 포함**: `shouldSkip(price)` true여도 `InfinitePosition`을 Result에 포함 — 프론트에서 단위금액·현재가·부족 금액 표시 목적 (`position=null` 관행의 의도된 예외)
 - **`AccountBalance.shouldSkip(price)` 오버로드**: 0회차(holdings==0)에서 `unitAmount(=usdDeposit/20) < currentPrice`면 매수 수량 0 케이스. `tryLoadBalance()`의 `shouldSkip()` 통과 후 INFINITE 블록에서 추가 검증
 - **0회차 미리보기**: holdings=0에서 LOC매수②만 기준가에 생성, 매도 수량=0 생략 — 정상 동작. 0회차에서 priceOffsetRate=targetProfitRate이므로 referencePrice=targetPrice (두 KPI 카드 동일값)
@@ -137,6 +137,6 @@ domain      →  외부 의존 없음
   - 있고 내용 동일 → 200 (멱등)
   - 있고 내용 다름 → `PrivacyTradeConflictException` (`domain/model/privacy/`) → 409
 - `PrivacyTradeSaveResult` (`domain/port/out/`): `UUID id` + `boolean created` — 컨트롤러가 201/200 분기
-- 스케줄러 흐름: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.compute()`가 `privacy_trade_bases/base_orders` 조회 → `PrivacyStrategy.buildOrders()`로 `orders` 생성 (`CycleOrderComputer`가 전략별 분기, INFINITE와 동일 구조)
+- 스케쥴러 흐름: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.compute()`가 `privacy_trade_bases/base_orders` 조회 → `PrivacyStrategy.buildOrders()`로 `orders` 생성 (`CycleOrderComputer`가 전략별 분기, INFINITE와 동일 구조)
 - 테이블명 컨벤션: 기준-주문 분리 시 `xxx_bases` / `xxx_base_orders` 접미사 패턴 사용 (V4에서 `xxx_master`/`xxx_detail`에서 변경)
 

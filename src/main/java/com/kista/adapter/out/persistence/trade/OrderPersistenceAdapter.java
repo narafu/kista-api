@@ -113,7 +113,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // 스케줄러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
+        // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
         return repository
                 .findByStrategyCycleIdAndTradeDateAndStatusIn(
                         strategyCycleId, TradeDateConverter.toUtc(tradeDate),

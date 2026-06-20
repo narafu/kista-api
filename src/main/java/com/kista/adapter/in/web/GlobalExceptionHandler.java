@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.toss.TossApiException;
 import org.springframework.http.HttpHeaders;
@@ -20,6 +21,12 @@ import java.util.NoSuchElementException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+        // refresh 인증 실패 — AuthController Swagger 401 명세와 실제 동작 일치
+        return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+    }
 
     @ExceptionHandler(SecurityException.class)
     public ProblemDetail handleForbidden(SecurityException ex) {

@@ -36,7 +36,7 @@ public class TradingCloseScheduler {
     @Scheduled(cron = "0 0 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:00 KST (미국 장 마감 30분 전)
     public void run() {
         List<Strategy> strategies = strategyPort.findAllActive();
-        log.info("마감 매매 스케줄 시작 — ACTIVE 전략 {}개", strategies.size());
+        log.info("마감 매매 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());
 
         // 전략별 현재 StrategyCycle·계좌·사용자 조회 — 조회 실패한 전략은 skip
         List<BatchContext> contexts = new ArrayList<>();
@@ -57,12 +57,12 @@ public class TradingCloseScheduler {
             useCase.executeBatch(contexts);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("마감 매매 스케줄 인터럽트: {}", e.getMessage());
+            log.warn("마감 매매 스케쥴러 인터럽트: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("마감 매매 스케줄 오류: {}", e.getMessage(), e);
+            log.error("마감 매매 스케쥴러 오류: {}", e.getMessage(), e);
             notifyPort.notifyError(e);
         }
 
-        log.info("마감 매매 스케줄 완료");
+        log.info("마감 매매 스케쥴러 완료");
     }
 }

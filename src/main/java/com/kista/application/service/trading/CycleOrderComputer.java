@@ -1,6 +1,5 @@
 package com.kista.application.service.trading;
 
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -84,10 +83,10 @@ class CycleOrderComputer {
         return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
     }
 
-    // 전략 계산 수행 — 전략 차원 skip이면 empty, 아니면 계산 결과 반환 (잔고 유효성 검사 제거됨)
-    Optional<ComputeResult> computeIfValid(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
-                                            LocalDate tradeDate, StrategyCycle currentCycle,
-                                            PrivacyTradeBase privacyBase, String label, Account account) {
+    // 전략 계산 수행 — 전략 차원 skip이면 empty, 아니면 계산 결과 반환
+    Optional<ComputeResult> computeUnlessSkipped(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
+                                                 LocalDate tradeDate, StrategyCycle currentCycle,
+                                                 PrivacyTradeBase privacyBase, String label) {
         ComputeResult result = compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, label);
         if (result.isSkipped()) return Optional.empty();
         return Optional.of(result);

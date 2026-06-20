@@ -66,7 +66,7 @@ class TradingOpenSchedulerTest {
 
     @Test
     void run_includesBothInfiniteAndPrivacyStrategies() throws InterruptedException {
-        // INFINITE + PRIVACY 모두 포함 — 개장 잡은 전략 타입 불문 모두 처리
+        // INFINITE + PRIVACY 모두 포함 — 장 개시 스케쥴러 전략 타입 불문 모두 처리
         Strategy infinite = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
         Strategy privacy  = mockStrategy(ACCOUNT_ID, Strategy.Type.PRIVACY);
         Account account   = mockAccount(ACCOUNT_ID);

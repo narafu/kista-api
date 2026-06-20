@@ -1,5 +1,6 @@
 package com.kista.application.service.auth;
 
+import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.RefreshToken;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.port.in.TokenUseCase;
@@ -19,7 +20,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Service
@@ -29,6 +29,8 @@ class TokenService implements TokenUseCase {
 
     private static final Duration RT_TTL = Duration.ofHours(120); // 5일
     private static final Duration AT_TTL = Duration.ofMinutes(15); // AT 수명 — 블랙리스트 등재 기간
+    // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 정상 처리
+    static final Duration RT_GRACE = Duration.ofSeconds(60);
 
     private final RefreshTokenPort refreshTokenPort;
     private final BlacklistPort blacklistPort;
@@ -41,7 +43,7 @@ class TokenService implements TokenUseCase {
         String rawToken = generateRawToken();
         refreshTokenPort.save(new RefreshToken(
                 null, userId, sha256Hex(rawToken), userAgent,
-                Instant.now().plus(RT_TTL), null
+                Instant.now().plus(RT_TTL), null, null
         ));
         return rawToken;
     }
@@ -49,24 +51,53 @@ class TokenService implements TokenUseCase {
     @Override
     public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
         String hash = sha256Hex(rawRefreshToken);
-        RefreshToken rt = refreshTokenPort.findByTokenHash(hash)
-                .orElseThrow(() -> new NoSuchElementException("유효하지 않은 refresh token"));
+        Instant now = Instant.now();
 
-        if (rt.expiresAt().isBefore(Instant.now())) {
-            refreshTokenPort.deleteByTokenHash(hash); // 만료 토큰 즉시 정리
-            throw new NoSuchElementException("만료된 refresh token");
+        RefreshToken rt = refreshTokenPort.findByTokenHash(hash)
+                .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
+
+        if (rt.expiresAt().isBefore(now)) {
+            // 만료 — 즉시 정리 후 401
+            refreshTokenPort.deleteByTokenHash(hash);
+            throw new InvalidRefreshTokenException("만료된 refresh token");
         }
 
-        // RTR: 구 RT 삭제 후 새 RT 발급
-        refreshTokenPort.deleteByTokenHash(hash);
+        if (rt.rotatedAt() != null) {
+            // 이미 회전된 RT 재제시
+            if (Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) <= 0) {
+                // grace 이내 → 동시 경쟁의 패자, 정상 처리
+                User user = userPort.findByIdOrThrow(rt.userId());
+                return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
+            }
+            // grace 초과 → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
+            refreshTokenPort.deleteAllByUserId(rt.userId());
+            throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+        }
+
+        // 미회전 RT — markRotated로 회전 마킹 (조건부 update, 경쟁 시 1건만 1 반환)
+        int rotated = refreshTokenPort.markRotated(hash, now);
+        if (rotated == 0) {
+            // 다른 스레드가 먼저 회전 — 최신 상태 재조회 후 grace 판정
+            rt = refreshTokenPort.findByTokenHash(hash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
+            if (rt.rotatedAt() == null || Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) > 0) {
+                refreshTokenPort.deleteAllByUserId(rt.userId());
+                throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+            }
+            // grace 이내 경쟁 패자 → 아래 winner 경로와 동일하게 처리
+        }
         User user = userPort.findByIdOrThrow(rt.userId());
+        return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
+    }
+
+    // 새 RT 행 발급 — rawToken 반환
+    private String issueNewRt(UUID userId, String userAgent) {
         String newRaw = generateRawToken();
         refreshTokenPort.save(new RefreshToken(
-                null, rt.userId(), sha256Hex(newRaw), userAgent,
-                Instant.now().plus(RT_TTL), null
+                null, userId, sha256Hex(newRaw), userAgent,
+                Instant.now().plus(RT_TTL), null, null
         ));
-
-        return new TokenRefreshResult(user.id(), user.role(), newRaw);
+        return newRaw;
     }
 
     @Override
@@ -92,6 +123,12 @@ class TokenService implements TokenUseCase {
     @Override
     public int cleanupExpiredTokens() {
         return refreshTokenPort.deleteAllExpired();
+    }
+
+    @Override
+    public int cleanupRotatedTokens() {
+        // grace 2배 여유를 두어 극단적 지연 요청도 처리 후 삭제
+        return refreshTokenPort.deleteAllRotatedBefore(Instant.now().minus(RT_GRACE.multipliedBy(2)));
     }
 
     private static String generateRawToken() {

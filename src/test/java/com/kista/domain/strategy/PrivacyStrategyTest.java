@@ -136,8 +136,8 @@ class PrivacyStrategyTest {
     @Test
     @DisplayName("quantity null trade — 필터링되어 결과에 미포함")
     void nullQuantityFiltered() {
-        PrivacyTrade nullQty = new PrivacyTrade(DATE, TICKER, LOC, BUY, null, new BigDecimal("10"));
-        PrivacyTradeBase base = base(100, List.of(nullQty, buy(80, "9"), sell(50, "12")));
+        PrivacyTrade nullQuantity = new PrivacyTrade(DATE, TICKER, LOC, BUY, null, new BigDecimal("10"));
+        PrivacyTradeBase base = base(100, List.of(nullQuantity, buy(80, "9"), sell(50, "12")));
         List<Order> orders = strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base);
 
         // null quantity BUY는 제외, 유효한 BUY(9$)와 SELL(12$)만 포함

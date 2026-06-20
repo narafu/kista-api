@@ -79,12 +79,12 @@ class FidaOrderControllerTest {
     @Test
     void placeFidaOrder_buy_with_null_quantity_returns_400() throws Exception {
         // BUY 주문에 quantity=null — "남은 전부"는 SELL 전용
-        Order buyNullQty = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+        Order buyNullQuantity = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, null,
                 new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
-                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQty));
+                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQuantity));
 
         mockMvc.perform(post("/api/internal/fida-orders")
                         .header("X-Internal-Token", VALID_TOKEN)

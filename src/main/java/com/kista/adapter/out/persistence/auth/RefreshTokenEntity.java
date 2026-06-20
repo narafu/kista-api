@@ -31,6 +31,9 @@ class RefreshTokenEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt; // 토큰 만료 시각
 
+    @Column(name = "rotated_at")
+    private Instant rotatedAt; // 회전 시각 — null이면 미회전
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt; // DB DEFAULT now()
 
@@ -46,6 +49,6 @@ class RefreshTokenEntity {
 
     // 엔티티 → 도메인 변환
     RefreshToken toDomain() {
-        return new RefreshToken(id, userId, tokenHash, userAgent, expiresAt, createdAt);
+        return new RefreshToken(id, userId, tokenHash, userAgent, expiresAt, rotatedAt, createdAt);
     }
 }

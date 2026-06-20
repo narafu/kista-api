@@ -7,9 +7,13 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossExchangeRate;
+import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.port.out.TosAccountPort;
 import com.kista.domain.port.out.TosMarginPort;
+import com.kista.domain.port.out.TossExchangeRatePort;
 import com.kista.domain.port.out.TossPortfolioPort;
+import com.kista.domain.port.out.TossSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,7 +29,8 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort {
+public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort,
+        TossExchangeRatePort, TossSellableQuantityPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -33,6 +38,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
     private static final String BUYING_POWER_PATH = "/api/v1/buying-power";
     // Toss 환율 API 경로 (GET /api/v1/exchange-rate?baseCurrency=USD&quoteCurrency=KRW)
     private static final String EXCHANGE_RATE_PATH = "/api/v1/exchange-rate";
+    // Toss 판매 가능 수량 API 경로
+    private static final String SELLABLE_QUANTITY_PATH = "/api/v1/sellable-quantity";
 
     private final TossHttpClient tossHttpClient;
 
@@ -42,11 +49,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         HoldingsResponse holdingsResponse = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
-        // 통합증거금(USD+KRW→USD) 기준 — USD 현금만인 getBuyableAmount()와 달리 매매 수식 일관성 보장
-        BigDecimal usdDeposit = getMarginItems(account).stream()
-                .findFirst()
-                .map(MarginItem::purchasableAmount)
-                .orElse(BigDecimal.ZERO);
+        // 토스 API는 USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
+        BigDecimal usdDeposit = getBuyableAmount(account);
 
         if (holdingsResponse == null || holdingsResponse.items() == null) {
             return new AccountBalance(0, null, usdDeposit);
@@ -57,9 +61,9 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                 .filter(i -> ticker.name().equals(i.symbol()))
                 .findFirst()
                 .map(i -> {
-                    int qty = Integer.parseInt(i.quantity());
-                    BigDecimal avg = qty > 0 ? new BigDecimal(i.averagePurchasePrice()) : null;
-                    return new AccountBalance(qty, avg, usdDeposit);
+                    int quantity = Integer.parseInt(i.quantity());
+                    BigDecimal avg = quantity > 0 ? new BigDecimal(i.averagePurchasePrice()) : null;
+                    return new AccountBalance(quantity, avg, usdDeposit);
                 })
                 .orElse(new AccountBalance(0, null, usdDeposit));
     }
@@ -71,21 +75,18 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
 
     @Override
     public List<MarginItem> getMarginItems(Account account) {
-        // USD·KRW 예수금 조회 후 환율 기반 USD 합산 — Toss 통합예수금
+        // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
         BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");
         BigDecimal usdToKrwRate = fetchUsdToKrwRate(account);
 
-        // KRW → USD 환산 후 합산 (환율 0이면 KRW 무시)
-        BigDecimal krwAsUsd = usdToKrwRate.compareTo(BigDecimal.ZERO) > 0
-                ? krwBuyable.divide(usdToKrwRate, 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalUsd = usdBuyable.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
-
         // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
-        log.info("Toss 통합증거금 조회: USD=${}, KRW=₩{}, 환율={}, 합산USD=${}", usdBuyable, krwBuyable, usdToKrwRate, totalUsd);
+        log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
 
-        return List.of(new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, totalUsd, usdToKrwRate));
+        return List.of(
+                new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, usdBuyable, usdToKrwRate),
+                new MarginItem(Currency.KRW, BigDecimal.ZERO, BigDecimal.ZERO, krwBuyable, usdToKrwRate)
+        );
     }
 
     @Override
@@ -106,14 +107,14 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                     .flatMap(h -> {
                         Optional<Ticker> tickerOpt = Ticker.tryParse(h.symbol());
                         if (tickerOpt.isEmpty()) return Stream.empty();
-                        int qty = Integer.parseInt(h.quantity());
-                        if (qty <= 0) return Stream.empty();
+                        int quantity = Integer.parseInt(h.quantity());
+                        if (quantity <= 0) return Stream.empty();
                         BigDecimal lastPrice = new BigDecimal(h.lastPrice());
                         BigDecimal avgPrice = new BigDecimal(h.averagePurchasePrice());
-                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(qty))
+                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(quantity))
                                 .setScale(2, RoundingMode.HALF_UP);
                         BigDecimal profitLossUsd = lastPrice.subtract(avgPrice)
-                                .multiply(BigDecimal.valueOf(qty))
+                                .multiply(BigDecimal.valueOf(quantity))
                                 .setScale(2, RoundingMode.HALF_UP);
                         BigDecimal profitRate = avgPrice.compareTo(BigDecimal.ZERO) > 0
                                 ? lastPrice.subtract(avgPrice)
@@ -122,7 +123,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                                   .setScale(2, RoundingMode.HALF_UP)
                                 : BigDecimal.ZERO;
                         return Stream.of(new PresentBalanceResult.Item(
-                                tickerOpt.get(), qty, avgPrice, lastPrice,
+                                tickerOpt.get(), quantity, avgPrice, lastPrice,
                                 evalAmountUsd, profitLossUsd, profitRate, "AMEX"
                         ));
                     })
@@ -177,15 +178,42 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
 
     // USD/KRW 환율 조회 (1 USD = ? KRW) — 계좌 컨텍스트 불필요
     private BigDecimal fetchUsdToKrwRate(Account account) {
+        return getExchangeRate(account).rate();
+    }
+
+    // ── TossExchangeRatePort ───────────────────────────────────────────────────
+
+    @Override
+    public TossExchangeRate getExchangeRate(Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
         ExchangeRateWrapper wrapper = tossHttpClient.getNoAccountHeader(
                 EXCHANGE_RATE_PATH, account, params, ExchangeRateWrapper.class);
-        if (wrapper == null || wrapper.result() == null || wrapper.result().rate() == null) {
-            return BigDecimal.ZERO;
+        if (wrapper == null || wrapper.result() == null) {
+            return new TossExchangeRate(BigDecimal.ZERO, BigDecimal.ZERO);
         }
-        return new BigDecimal(wrapper.result().rate()).round(new MathContext(6));
+        ExchangeRateResult r = wrapper.result();
+        BigDecimal rate    = r.rate()    != null ? new BigDecimal(r.rate()).round(new MathContext(6))    : BigDecimal.ZERO;
+        BigDecimal midRate = r.midRate() != null ? new BigDecimal(r.midRate()).round(new MathContext(6)) : BigDecimal.ZERO;
+        return new TossExchangeRate(rate, midRate);
+    }
+
+    // ── TossSellableQuantityPort ───────────────────────────────────────────────
+
+    @Override
+    public TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+        var params = new LinkedMultiValueMap<String, String>();
+        params.add("symbol", ticker.name());
+        SellableQuantityWrapper wrapper = tossHttpClient.get(
+                SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
+        if (wrapper == null || wrapper.result() == null) {
+            log.warn("Toss 판매 가능 수량 응답 없음: ticker={}", ticker);
+            return new TossSellableQuantity(ticker.name(), 0);
+        }
+        SellableQuantityResult result = wrapper.result();
+        int quantity = result.quantity() != null ? Integer.parseInt(result.quantity()) : 0;
+        return new TossSellableQuantity(ticker.name(), quantity);
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
@@ -210,7 +238,15 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
     record ExchangeRateWrapper(@JsonProperty("result") ExchangeRateResult result) {}
 
     record ExchangeRateResult(
-        @JsonProperty("rate") String rate,           // 매수 환율 (1 USD = ? KRW)
-        @JsonProperty("midRate") String midRate      // 매매기준율
+        @JsonProperty("rate")    String rate,    // 매수 환율 (1 USD = ? KRW)
+        @JsonProperty("midRate") String midRate  // 매매기준율
+    ) {}
+
+    // GET /api/v1/sellable-quantity 응답 래퍼 — {"result": {...}}
+    record SellableQuantityWrapper(@JsonProperty("result") SellableQuantityResult result) {}
+
+    record SellableQuantityResult(
+        @JsonProperty("symbol")   String symbol,   // 종목 코드
+        @JsonProperty("quantity") String quantity  // 판매 가능 수량
     ) {}
 }

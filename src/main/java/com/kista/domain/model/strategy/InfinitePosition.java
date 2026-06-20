@@ -85,35 +85,35 @@ public record InfinitePosition(
     // --- 수량 계산 로직 (주문 수량 계산 책임 위임) ---
 
     // static 헬퍼: 실제 평단가·기준가 대신 임의 가격(예: 캡가격)으로도 재사용 가능
-    public static int earlyBuyQty1(BigDecimal unitAmount, BigDecimal price) {
+    public static int earlyBuyQuantity1(BigDecimal unitAmount, BigDecimal price) {
         // 전반 매수①: (unitAmount/2) / price — 최소 1주 보장
         return Math.max(1, unitAmount.divide(BigDecimal.valueOf(2), FLOOR)
                 .divide(price, 0, FLOOR).intValue());
     }
 
-    public static int earlyBuyQty2(BigDecimal unitAmount, BigDecimal price1, int qty,
-                                   BigDecimal price2) {
-        // 전반 매수②: (unitAmount - price1×qty) / price2 — 최소 1주 보장
-        return Math.max(1, unitAmount.subtract(price1.multiply(BigDecimal.valueOf(qty)))
+    public static int earlyBuyQuantity2(BigDecimal unitAmount, BigDecimal price1, int quantity,
+                                        BigDecimal price2) {
+        // 전반 매수②: (unitAmount - price1×quantity) / price2 — 최소 1주 보장
+        return Math.max(1, unitAmount.subtract(price1.multiply(BigDecimal.valueOf(quantity)))
                 .divide(price2, 0, FLOOR).intValue());
     }
 
-    public static int lateBuyQty(BigDecimal unitAmount, BigDecimal price) {
+    public static int lateBuyQuantity(BigDecimal unitAmount, BigDecimal price) {
         // 후반 매수: unitAmount / price
         return unitAmount.divide(price, 0, FLOOR).intValue();
     }
 
     public int calcEarlyBuyQuantityByAvgPrice() {
-        return earlyBuyQty1(unitAmount(), averagePrice());
+        return earlyBuyQuantity1(unitAmount(), averagePrice());
     }
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
-        return earlyBuyQty2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
+        return earlyBuyQuantity2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
                 referencePrice());
     }
 
     public int calcLateBuyQuantity() {
-        return lateBuyQty(unitAmount(), referencePrice());
+        return lateBuyQuantity(unitAmount(), referencePrice());
     }
 
     // 전후반 공통 LOC 매도 수량 — 후반 calcMocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)

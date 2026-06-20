@@ -11,7 +11,7 @@ primary_region = 'nrt'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  # 04:00 KST 스케줄러가 항상 실행될 수 있도록 최소 1대 유지
+  # 04:00 KST 스케쥴러가 항상 실행될 수 있도록 최소 1대 유지
   min_machines_running = 1
   processes = ['app']
 

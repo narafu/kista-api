@@ -34,7 +34,7 @@ public class MarketCalendarRefreshScheduler {
     @Scheduled(cron = "0 0 0 1 1 *", zone = TimeZones.KST_ID)
     public void refreshForNewYear() {
         int year = LocalDate.now(TimeZones.KST).getYear();
-        log.info("연간 시장 캘린더 갱신 스케줄 실행: {}~{}년", year, year + 2);
+        log.info("연간 시장 캘린더 갱신 스케쥴러 실행: {}~{}년", year, year + 2);
         try {
             refreshYears(year, 3);
         } catch (Exception e) {
@@ -46,7 +46,7 @@ public class MarketCalendarRefreshScheduler {
     @Scheduled(cron = "0 0 1 1 * *", zone = TimeZones.KST_ID)
     public void refreshCurrentMonth() {
         LocalDate today = LocalDate.now(TimeZones.KST);
-        log.info("월간 시장 캘린더 갱신 스케줄 실행: {}년 {}월", today.getYear(), today.getMonthValue());
+        log.info("월간 시장 캘린더 갱신 스케쥴러 실행: {}년 {}월", today.getYear(), today.getMonthValue());
         try {
             marketCalendarRefreshPort.refreshMonth(today.getYear(), today.getMonthValue());
         } catch (Exception e) {

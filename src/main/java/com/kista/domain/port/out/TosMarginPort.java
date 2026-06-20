@@ -7,8 +7,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface TosMarginPort {
-    // GET /api/v1/buying-power?currency=USD — USD 매수가능금액 (거래 계산용)
+    // GET /api/v1/buying-power?currency=USD — USD 매수가능금액 (거래 계산·시드 검증용)
     BigDecimal getBuyableAmount(Account account);
-    // GET /api/v1/buying-power?currency=USD + KRW — USD·KRW 통화별 매수가능금액 (UI 표시용)
+    // GET /api/v1/buying-power?currency=USD + KRW — USD·KRW 통화별 매수가능금액 (통합 아님, UI 표시용)
     List<MarginItem> getMarginItems(Account account);
 }

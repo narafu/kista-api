@@ -57,7 +57,7 @@ public class FcmAdapter implements UserNotificationPort {
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport report) {
-        String body = String.format("[%s %s] 매수 $%.2f / 매도 $%.2f",
+        String body = String.format("[%s] %s 매수 $%.2f / 매도 $%.2f",
                 report.strategyType().name(), report.ticker().name(),
                 report.totalBoughtUsd(), report.totalSoldUsd());
         send(user.id(), "매매 결산 — " + account.nickname(), body);
@@ -65,7 +65,7 @@ public class FcmAdapter implements UserNotificationPort {
 
     @Override
     public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
-        String body = String.format("[%s %s] 장 마감 전 예수금 확인 바랍니다.", strategyType.name(), ticker.name());
+        String body = String.format("[%s] %s 장 마감 전 예수금 확인 바랍니다.", strategyType.name(), ticker.name());
         send(user.id(), "⚠️ 예수금 부족 — " + account.nickname(), body);
     }
 

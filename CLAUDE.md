@@ -24,13 +24,15 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 ## 빠른 시작
 
 ```bash
-./gradlew bootRun --args='--spring.profiles.active=local'  # 로컬 실행
-./gradlew test                                              # 전체 테스트
-./gradlew compileJava                                       # 컴파일 검증
-docker compose up -d postgres                               # DB만 기동
+bash gradlew bootRun --args='--spring.profiles.active=local'  # 로컬 실행
+bash gradlew test                                              # 전체 테스트
+bash gradlew compileJava                                       # 컴파일 검증
+docker compose up -d postgres                                  # DB만 기동
 ```
 
 필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격)
+
+로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 
 ## 작업 방식
 

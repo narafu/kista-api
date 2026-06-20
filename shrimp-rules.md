@@ -280,7 +280,7 @@ SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
 |------|------|
 | 매매 로직 수정 요청 | `SoxlDivisionStrategy`만 수정, `TradingService`에 로직 추가 금지 |
 | 새 KIS API 연동 | 새 Adapter 클래스 생성, `KisHttpClient` 재사용 |
-| 스케줄링 방식 변경 요청 | Virtual Thread + Thread.sleep 유지, @Async 도입 거부 |
+| 스케쥴링 방식 변경 요청 | Virtual Thread + Thread.sleep 유지, @Async 도입 거부 |
 | 스키마 변경 | 기존 V*.sql 수정 금지, 새 버전 파일 추가 |
 | 도메인 모델에 Spring 어노테이션 필요 시 | 어댑터 계층으로 이동 후 변환 |
 
