@@ -4,7 +4,6 @@ import com.kista.adapter.in.web.dto.TokenResponse;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
@@ -76,13 +75,10 @@ public class DevAuthController {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userPort.findById(DEV_ADMIN_UUID).orElseGet(() ->
                 userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
-                        null, null, null, null, NotificationChannel.NONE)));
+                        null, null, null, null, User.DEFAULT_CHANNEL)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != User.UserRole.ADMIN) {
-            admin = userPort.save(new User(admin.id(), admin.kakaoId(), admin.nickname(),
-                    User.UserStatus.ACTIVE, User.UserRole.ADMIN, admin.telegramBotToken(), admin.telegramChatId(),
-                    admin.telegramBotUsername(), admin.lastReappliedAt(),
-                    admin.notificationChannel() != null ? admin.notificationChannel() : NotificationChannel.NONE));
+            admin = userPort.save(admin.withStatus(User.UserStatus.ACTIVE).withRole(User.UserRole.ADMIN));
         }
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(admin.id(), request.getHeader("User-Agent"));

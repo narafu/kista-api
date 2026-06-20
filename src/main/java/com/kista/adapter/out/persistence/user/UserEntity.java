@@ -69,14 +69,13 @@ class UserEntity extends BaseAuditEntity {
         e.telegramChatId = user.telegramChatId();
         e.telegramBotUsername = user.telegramBotUsername();
         e.lastReappliedAt = user.lastReappliedAt();
-        e.notificationChannel = user.notificationChannel() != null
-                ? user.notificationChannel() : NotificationChannel.NONE;
+        e.notificationChannel = user.notificationChannel();
         return e;
     }
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, lastReappliedAt,
-                notificationChannel != null ? notificationChannel : NotificationChannel.NONE);
+                notificationChannel);
     }
 }

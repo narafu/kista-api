@@ -84,12 +84,7 @@ class UserService implements UserUseCase {
         // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
         if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != User.UserRole.ADMIN) {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
-            user = userPort.save(new User(
-                    user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
-                    user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
-                    user.lastReappliedAt(),
-                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.FCM
-            ));
+            user = userPort.save(user.withStatus(User.UserStatus.ACTIVE).withRole(User.UserRole.ADMIN));
         }
         return user;
     }
@@ -103,7 +98,7 @@ class UserService implements UserUseCase {
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
-                    null, null, null, null, NotificationChannel.FCM);
+                    null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
