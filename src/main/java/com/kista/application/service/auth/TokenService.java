@@ -31,6 +31,8 @@ class TokenService implements TokenUseCase {
 
     private static final Duration RT_TTL = Duration.ofHours(120); // 5일
     private static final Duration AT_TTL = Duration.ofMinutes(15); // AT 수명 — 블랙리스트 등재 기간
+    // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 동시 요청 패자로 허용
+    static final Duration RT_GRACE = Duration.ofSeconds(60);
 
     private final RefreshTokenPort refreshTokenPort;
     private final BlacklistPort blacklistPort;
@@ -43,16 +45,18 @@ class TokenService implements TokenUseCase {
         String rawToken = generateRawToken();
         refreshTokenPort.save(new RefreshToken(
                 null, userId, sha256Hex(rawToken), userAgent,
-                Instant.now().plus(RT_TTL), null
+                Instant.now().plus(RT_TTL), null, null
         ));
         return rawToken;
     }
 
     /**
-     * 안정 RT + 슬라이딩 갱신.
-     * RT를 회전(교체)하지 않고 동일 토큰을 유지하면서 expires_at만 연장한다.
-     * 회전 없음 → 브라우저 Set-Cookie relay 실패 시에도 구 RT가 여전히 유효 → 드리프트 불가.
-     * 도난 대응: 알 수 없는/만료된 RT → 단건 401 (전체 세션 폐기 없음).
+     * RTR + 60초 grace window.
+     * <p>
+     * 미회전 RT → markRotated(원자적 UPDATE) → 새 RT 발급 (회전 승자).
+     * 이미 회전된 RT 재제시:
+     *   - grace 이내  → 동시 요청의 패자로 허용, 새 RT 발급
+     *   - grace 초과  → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
      */
     @Override
     public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
@@ -66,16 +70,39 @@ class TokenService implements TokenUseCase {
                 });
 
         if (rt.expiresAt().isBefore(now)) {
-            // 만료 — 즉시 정리 후 401 (단건, 전체 세션 폐기 없음)
             refreshTokenPort.deleteByTokenHash(hash);
             log.warn("[RT] refresh 거부: 만료된 토큰 (userId={})", rt.userId());
             throw new InvalidRefreshTokenException("만료된 refresh token");
         }
 
-        // 유효 — expires_at 슬라이딩 연장 후 동일 rawToken 반환
-        refreshTokenPort.touchExpiry(hash, now.plus(RT_TTL));
+        if (rt.rotatedAt() != null) {
+            // 이미 회전된 RT 재제시
+            if (Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) <= 0) {
+                // grace 이내 → 동시 경쟁의 패자, 정상 처리
+                User user = userPort.findByIdOrThrow(rt.userId());
+                return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
+            }
+            // grace 초과 → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
+            log.warn("[RT] 재사용 공격 의심: grace 초과 회전 토큰 재제시 (userId={})", rt.userId());
+            refreshTokenPort.deleteAllByUserId(rt.userId());
+            throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+        }
+
+        // 미회전 RT — markRotated로 원자적 회전 마킹 (동시 요청 시 1건만 1 반환)
+        int rotated = refreshTokenPort.markRotated(hash, now);
+        if (rotated == 0) {
+            // 다른 스레드/인스턴스가 먼저 회전 — 최신 상태 재조회 후 grace 판정
+            rt = refreshTokenPort.findByTokenHash(hash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
+            if (rt.rotatedAt() == null || Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) > 0) {
+                log.warn("[RT] refresh 거부: markRotated 경쟁 후 grace 초과 (userId={})", rt.userId());
+                refreshTokenPort.deleteAllByUserId(rt.userId());
+                throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+            }
+            // grace 이내 경쟁 패자 → 정상 처리
+        }
         User user = userPort.findByIdOrThrow(rt.userId());
-        return new TokenRefreshResult(user.id(), user.role(), rawRefreshToken);
+        return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
     }
 
     @Override
@@ -83,8 +110,19 @@ class TokenService implements TokenUseCase {
         String hash = sha256Hex(rawRefreshToken);
         refreshTokenPort.findByTokenHash(hash).ifPresent(rt -> {
             refreshTokenPort.deleteByTokenHash(hash);
-            blacklistPort.add(rt.userId(), AT_TTL); // 남은 AT 수명 동안 즉시 차단
+            blacklistPort.add(rt.userId(), AT_TTL);
         });
+    }
+
+    @Override
+    public int cleanupExpiredTokens() {
+        return refreshTokenPort.deleteAllExpired();
+    }
+
+    @Override
+    public int cleanupRotatedTokens() {
+        // grace 2배 여유를 두어 극단적 지연 요청도 처리 후 삭제
+        return refreshTokenPort.deleteAllRotatedBefore(Instant.now().minus(RT_GRACE.multipliedBy(2)));
     }
 
     // package-private — TokenServiceTest에서 직접 테스트
@@ -98,9 +136,13 @@ class TokenService implements TokenUseCase {
         }
     }
 
-    @Override
-    public int cleanupExpiredTokens() {
-        return refreshTokenPort.deleteAllExpired();
+    private String issueNewRt(UUID userId, String userAgent) {
+        String newRaw = generateRawToken();
+        refreshTokenPort.save(new RefreshToken(
+                null, userId, sha256Hex(newRaw), userAgent,
+                Instant.now().plus(RT_TTL), null, null
+        ));
+        return newRaw;
     }
 
     private static String generateRawToken() {

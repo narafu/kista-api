@@ -25,7 +25,7 @@ class RefreshTokenPersistenceAdapterTest {
     @Test
     void save_persistsEntity() {
         RefreshToken token = new RefreshToken(null, UUID.randomUUID(), "hash64chars",
-                "Mozilla/5.0", Instant.now().plusSeconds(432000), Instant.now());
+                "Mozilla/5.0", Instant.now().plusSeconds(432000), null, Instant.now());
         adapter.save(token);
         verify(repository).save(any(RefreshTokenEntity.class));
     }
@@ -34,7 +34,7 @@ class RefreshTokenPersistenceAdapterTest {
     void findByTokenHash_found_returnsDomain() {
         UUID userId = UUID.randomUUID();
         RefreshTokenEntity entity = RefreshTokenEntity.from(
-                new RefreshToken(null, userId, "abc123", null, Instant.now().plusSeconds(1000), Instant.now()));
+                new RefreshToken(null, userId, "abc123", null, Instant.now().plusSeconds(1000), null, Instant.now()));
         given(repository.findByTokenHash("abc123")).willReturn(Optional.of(entity));
 
         Optional<RefreshToken> result = adapter.findByTokenHash("abc123");
@@ -62,14 +62,26 @@ class RefreshTokenPersistenceAdapterTest {
         verify(repository).deleteAllByUserId(userId);
     }
 
-    // touchExpiry — 슬라이딩 만료 연장 위임 검증
     @Test
-    void touchExpiry_delegatesToRepository() {
+    void markRotated_delegatesToRepository() {
         String hash = "somehash";
-        Instant newExpiry = Instant.now().plusSeconds(432000);
+        Instant now = Instant.now();
+        given(repository.markRotated(hash, now)).willReturn(1);
 
-        adapter.touchExpiry(hash, newExpiry);
+        int result = adapter.markRotated(hash, now);
 
-        verify(repository).touchExpiry(hash, newExpiry);
+        assertThat(result).isEqualTo(1);
+        verify(repository).markRotated(hash, now);
+    }
+
+    @Test
+    void deleteAllRotatedBefore_delegatesToRepository() {
+        Instant threshold = Instant.now();
+        given(repository.deleteAllByRotatedAtBefore(threshold)).willReturn(3);
+
+        int result = adapter.deleteAllRotatedBefore(threshold);
+
+        assertThat(result).isEqualTo(3);
+        verify(repository).deleteAllByRotatedAtBefore(threshold);
     }
 }

@@ -25,7 +25,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,55 +47,63 @@ class TokenServiceTest {
         RefreshToken saved = captor.getValue();
         assertThat(saved.userId()).isEqualTo(USER_ID);
         assertThat(saved.tokenHash()).isEqualTo(TokenService.sha256Hex(rawToken));
-        assertThat(saved.id()).isNull(); // JPA가 생성
+        assertThat(saved.id()).isNull();
+        assertThat(saved.rotatedAt()).isNull(); // 신규 발급 — 미회전
         assertThat(saved.expiresAt()).isAfter(Instant.now().plus(Duration.ofHours(119)));
     }
 
-    // 정상 갱신: 유효한 RT → touchExpiry 호출 + 동일 RT 반환 (드리프트 불가 — 회귀 방지 핵심)
+    // 정상 갱신: 미회전 RT → markRotated + 새 RT 발급
     @Test
-    void refresh_validToken_touchesExpiryAndReturnsSameToken() {
+    void refresh_validToken_rotatesAndIssuesNewToken() {
         String rawToken = "validRawToken12345";
         String hash = TokenService.sha256Hex(rawToken);
-        RefreshToken existing = makeRt(hash, Instant.now().plus(Duration.ofHours(120)));
-        User user = mockUser(USER_ID, User.UserRole.USER);
+        RefreshToken existing = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), null);
+        User user = mockUser();
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(existing));
+        given(refreshTokenPort.markRotated(eq(hash), any())).willReturn(1); // 회전 승자
         given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
 
         TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
 
-        // 회전 없음 — 새 RT 저장·구 RT 삭제 없이 touchExpiry만 호출
-        verify(refreshTokenPort, never()).save(any(RefreshToken.class));
-        verify(refreshTokenPort, never()).deleteByTokenHash(any());
-        verify(refreshTokenPort, never()).deleteAllByUserId(any());
-        verify(refreshTokenPort).touchExpiry(eq(hash), any(Instant.class));
-        // 동일 RT 반환 — 브라우저 쿠키 드리프트 원천 불가
-        assertThat(result.newRawRefreshToken()).isEqualTo(rawToken);
+        verify(refreshTokenPort).markRotated(eq(hash), any(Instant.class));
+        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 저장
+        assertThat(result.newRawRefreshToken()).isNotEqualTo(rawToken); // 새 RT 반환
         assertThat(result.userId()).isEqualTo(USER_ID);
-        assertThat(result.userRole()).isEqualTo(User.UserRole.USER);
     }
 
-    // 회귀 방지: 동일 RT를 Set-Cookie 유실 시뮬레이션으로 여러 번 refresh → 세션 폐기 없이 정상 처리
+    // grace 이내 회전된 RT 재제시 → 동시 경쟁 패자로 허용, 새 RT 발급
     @Test
-    void refresh_sameToken_repeatedly_neverRevokesSession() {
-        String rawToken = "stableRawToken";
+    void refresh_rotatedWithinGrace_allowsAndIssuesNewToken() {
+        String rawToken = "rotatedToken";
         String hash = TokenService.sha256Hex(rawToken);
-        RefreshToken rt = makeRt(hash, Instant.now().plus(Duration.ofHours(120)));
-        User user = mockUser(USER_ID, User.UserRole.USER);
+        Instant rotatedAt = Instant.now().minusSeconds(30); // 30초 전 회전 (grace 60초 이내)
+        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
+        User user = mockUser();
 
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
         given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
 
-        // 같은 RT로 5번 연속 refresh (드리프트 시 구 RT를 반복 제시하는 상황)
-        for (int i = 0; i < 5; i++) {
-            TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
-            assertThat(result.newRawRefreshToken()).isEqualTo(rawToken);
-        }
+        TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
 
-        // 세션 폐기(deleteAllByUserId) 절대 미호출
-        verify(refreshTokenPort, never()).deleteAllByUserId(any());
-        // touchExpiry 5번 호출
-        verify(refreshTokenPort, times(5)).touchExpiry(eq(hash), any(Instant.class));
+        verify(refreshTokenPort, never()).deleteAllByUserId(any()); // 세션 폐기 없음
+        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 발급
+        assertThat(result.userId()).isEqualTo(USER_ID);
+    }
+
+    // grace 초과 회전된 RT 재제시 → 재사용 공격 의심, 전체 세션 폐기
+    @Test
+    void refresh_rotatedBeyondGrace_revokesAllSessions() {
+        String rawToken = "staleRotatedToken";
+        String hash = TokenService.sha256Hex(rawToken);
+        Instant rotatedAt = Instant.now().minusSeconds(120); // 120초 전 회전 (grace 60초 초과)
+        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
+
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
+
+        assertThatThrownBy(() -> tokenService.refresh(rawToken, "ua"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(refreshTokenPort).deleteAllByUserId(USER_ID); // 전체 세션 폐기
     }
 
     @Test
@@ -105,7 +112,6 @@ class TokenServiceTest {
         assertThatThrownBy(() -> tokenService.refresh("unknown", "ua"))
                 .isInstanceOf(InvalidRefreshTokenException.class)
                 .hasMessageContaining("유효하지 않은");
-        // 단건 401 — 전체 세션 폐기 없음
         verify(refreshTokenPort, never()).deleteAllByUserId(any());
     }
 
@@ -113,22 +119,22 @@ class TokenServiceTest {
     void refresh_expiredToken_throwsAndCleansUp() {
         String raw = "expiredToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken expired = makeRt(hash, Instant.now().minusSeconds(1));
+        RefreshToken expired = makeRt(hash, Instant.now().minusSeconds(1), null);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> tokenService.refresh(raw, "ua"))
                 .isInstanceOf(InvalidRefreshTokenException.class)
                 .hasMessageContaining("만료된");
-        verify(refreshTokenPort).deleteByTokenHash(hash); // 만료 토큰 정리
-        verify(refreshTokenPort, never()).deleteAllByUserId(any()); // 전체 세션 폐기 없음
+        verify(refreshTokenPort).deleteByTokenHash(hash);
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
     }
 
     @Test
     void logout_validToken_deletesAndBlacklists() {
         String raw = "logoutToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000));
+        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
@@ -141,7 +147,7 @@ class TokenServiceTest {
     @Test
     void logout_unknownToken_noOp() {
         given(refreshTokenPort.findByTokenHash(any())).willReturn(Optional.empty());
-        tokenService.logout("unknownToken"); // 예외 없이 종료
+        tokenService.logout("unknownToken");
         verify(blacklistPort, never()).add(any(), any());
     }
 
@@ -149,16 +155,16 @@ class TokenServiceTest {
     void sha256Hex_deterministicAndLength64() {
         String hash = TokenService.sha256Hex("test");
         assertThat(hash).hasSize(64);
-        assertThat(TokenService.sha256Hex("test")).isEqualTo(hash); // 결정론적
+        assertThat(TokenService.sha256Hex("test")).isEqualTo(hash);
     }
 
-    private RefreshToken makeRt(String hash, Instant expiresAt) {
-        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, Instant.now());
+    private RefreshToken makeRt(String hash, Instant expiresAt, Instant rotatedAt) {
+        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, rotatedAt, Instant.now());
     }
 
-    private User mockUser(UUID id, User.UserRole role) {
-        return new User(id, "kakaoId", "닉네임",
-                User.UserStatus.ACTIVE, role, null, null, null, null,
+    private User mockUser() {
+        return new User(USER_ID, "kakaoId", "닉네임",
+                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null,
                 User.NotificationChannel.FCM);
     }
 }
