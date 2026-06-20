@@ -1,10 +1,13 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.model.user.UserSettings;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public record UserResponse(
         @Schema(description = "사용자 고유 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
@@ -19,13 +22,17 @@ public record UserResponse(
         User.UserRole role,
         @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
         String telegramBotUsername,
-        @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL)", example = "TELEGRAM")
+        @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL/NONE)", example = "TELEGRAM")
         NotificationChannel notificationChannel,
         @Schema(description = "전략 등록·재등록 시 실잔고 검증 여부 (false=바이패스)", example = "true")
-        boolean balanceCheckEnabled
+        boolean balanceCheckEnabled,
+        @Schema(description = "알림 타입별 on/off (예: {\"TRADING_ALERT\": true})")
+        Map<String, Boolean> notificationPrefs
 ) {
-    // balanceCheckEnabled는 user_settings 테이블에서 별도 조회 후 주입
-    public static UserResponse from(User user, boolean balanceCheckEnabled) {
+    public static UserResponse from(User user, UserSettings settings) {
+        // notificationPrefs — enum key를 String으로 변환하여 JSON 직렬화
+        Map<String, Boolean> prefs = settings.notificationPrefs().entrySet().stream()
+                .collect(Collectors.toMap(e -> e.getKey().name(), Map.Entry::getValue));
         return new UserResponse(
                 user.id(),
                 user.nickname(),
@@ -34,7 +41,8 @@ public record UserResponse(
                 user.role(),
                 user.telegramBotUsername(),
                 user.notificationChannel(),
-                balanceCheckEnabled
+                settings.balanceCheckEnabled(),
+                prefs
         );
     }
 }

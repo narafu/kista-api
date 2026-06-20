@@ -62,7 +62,7 @@ public class AuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
         UserSettings settings = getUserSettingsQuery.getByUserId(user.id());
-        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings.balanceCheckEnabled()));
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings));
     }
 
     // RT 쿠키로 새 AT + RT 발급 (RTR)
@@ -106,7 +106,7 @@ public class AuthController {
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
         User user = userUseCase.getById(userId);
         UserSettings settings = getUserSettingsQuery.getByUserId(userId);
-        return UserResponse.from(user, settings.balanceCheckEnabled());
+        return UserResponse.from(user, settings);
     }
 
     // PENDING 상태 사용자의 SSE 연결 — 승인/거절 시 브라우저 자동 리다이렉트

@@ -12,8 +12,11 @@ import com.kista.domain.model.strategy.ReverseModePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.TradingReport;
+import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.LoadUserSettingsPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -45,6 +48,7 @@ class TradingReporter {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
+    private final LoadUserSettingsPort loadUserSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
 
     void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
                          Account account, User user,
@@ -61,9 +65,16 @@ class TradingReporter {
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
+        // TRADING_ALERT 알림 활성 여부 확인 후 발송 (기본값 true)
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
-        userNotificationPort.notifyTradingReport(user, account, report);
-        log.info("[{}] 리포트 발송 완료", account.nickname());
+        UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+                .orElse(UserSettings.defaultFor(user.id()));
+        if (settings.isNotificationEnabled(NotificationType.TRADING_ALERT)) {
+            userNotificationPort.notifyTradingReport(user, account, report);
+            log.info("[{}] 리포트 발송 완료", account.nickname());
+        } else {
+            log.info("[{}] TRADING_ALERT 비활성 — 리포트 발송 생략", account.nickname());
+        }
         // 체결 건별 SSE 실시간 알림
         for (Execution e : executions) {
             TradeEvent event = e.direction() == SELL

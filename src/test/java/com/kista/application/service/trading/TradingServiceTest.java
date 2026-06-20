@@ -116,7 +116,7 @@ class TradingServiceTest {
         BrokerExecutionRouter executionRouter = new BrokerExecutionRouter(kisExecutionPort, tosExecutionPort);
         TradingReporter reporter = new TradingReporter(
                 executionRouter, orderPort, userNotificationPort, realtimeNotificationPort,
-                cycleHistoryPort, strategyCyclePort, rotationService);
+                cycleHistoryPort, strategyCyclePort, rotationService, loadUserSettingsPort);
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
