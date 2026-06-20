@@ -1,8 +1,10 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.PortfolioSnapshotResponse;
 import com.kista.adapter.in.web.dto.TradeHistoryResponse;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.PortfolioUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.kista.common.TimeZones;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +30,7 @@ import java.util.UUID;
 public class DashboardController {
 
     private final PortfolioUseCase portfolioUseCase;
+    private final AccountStatisticsUseCase accountStatistics;
 
     @Operation(summary = "거래 내역 조회", description = "날짜 범위와 종목으로 필터링. 기본: 최근 30일, 종목 SOXL.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -65,6 +69,43 @@ public class DashboardController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return portfolioUseCase.getSnapshots(userId, resolveFrom(from), resolveTo(to))
                 .stream().map(PortfolioSnapshotResponse::from).toList();
+    }
+
+    // 계좌별 포지션 스냅샷 목록 (DB 기반, 차트용 시계열)
+    @Operation(summary = "계좌 스냅샷 목록", description = "cycle_position DB 기반 계좌별 포지션 이력 반환.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @GetMapping("/accounts/{accountId}/snapshots")
+    public List<PortfolioSnapshotResponse> getAccountSnapshots(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return accountStatistics.getSnapshotsByAccount(accountId, userId, from, to)
+                .stream().map(PortfolioSnapshotResponse::from).toList();
+    }
+
+    // 사이클 이력 (DB 기반, 커서 페이지네이션)
+    @Operation(summary = "사이클 이력 조회", description = "DB의 strategy_cycle 기반 계좌 거래 이력 조회.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @GetMapping("/accounts/{accountId}/cycle-history")
+    public CycleHistoryPageResponse getCycleHistory(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "50") int size) {
+        Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
+        return CycleHistoryPageResponse.from(
+                accountStatistics.getByAccount(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 
     // 조회 시작일 기본값: 오늘 - 30일
