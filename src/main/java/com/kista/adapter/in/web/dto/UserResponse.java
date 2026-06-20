@@ -14,7 +14,7 @@ public record UserResponse(
         UUID id,
         @Schema(description = "닉네임", example = "홍길동")
         String nickname,
-        @Schema(description = "계정 상태 (PENDING/APPROVED/REJECTED)", example = "APPROVED")
+        @Schema(description = "계정 상태 (PENDING/ACTIVE/REJECTED)", example = "ACTIVE")
         User.UserStatus status,
         @Schema(description = "텔레그램 알림 설정 여부", example = "true")
         boolean hasTelegram,
