@@ -59,8 +59,17 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     public void changeRole(UUID adminId, UUID targetUserId, User.UserRole role) {
+        if (role == User.UserRole.USER) {
+            // 자기 자신 강등 방지
+            if (adminId.equals(targetUserId)) {
+                throw new IllegalArgumentException("자기 자신의 역할을 강등할 수 없습니다");
+            }
+            // 마지막 ADMIN 강등 방지
+            if (userPort.countByRole(User.UserRole.ADMIN) <= 1) {
+                throw new IllegalStateException("최소 1명의 관리자가 존재해야 합니다");
+            }
+        }
         User user = userPort.findByIdOrThrow(targetUserId);
-        // role만 교체, updatedAt=null (JPA @LastModifiedDate 자동 처리)
         userPort.save(user.withRole(role));
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,

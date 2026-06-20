@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -73,6 +74,40 @@ class AdminServiceTest {
         verify(userPort).save(captor.capture());
         assertThat(captor.getValue().role()).isEqualTo(User.UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
+    }
+
+    @Test
+    void changeRole_throwsWhenSelfDemotion() {
+        UUID adminId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> adminService.changeRole(adminId, adminId, User.UserRole.USER))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("자기 자신");
+    }
+
+    @Test
+    void changeRole_throwsWhenLastAdmin() {
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userPort.countByRole(User.UserRole.ADMIN)).thenReturn(1L);
+
+        assertThatThrownBy(() -> adminService.changeRole(adminId, targetId, User.UserRole.USER))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("최소 1명");
+    }
+
+    @Test
+    void changeRole_allowsDemotionWhenMultipleAdmins() {
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        User existing = user(targetId, User.UserStatus.ACTIVE);
+        when(userPort.countByRole(User.UserRole.ADMIN)).thenReturn(2L);
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService.changeRole(adminId, targetId, User.UserRole.USER);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userPort).save(captor.capture());
+        assertThat(captor.getValue().role()).isEqualTo(User.UserRole.USER);
     }
 
     @Test
