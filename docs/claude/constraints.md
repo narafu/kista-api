@@ -35,8 +35,8 @@
 
 
 ### MetaController (enum SSOT)
-- `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses)
-- `/api/meta/strategy-types`, `/api/meta/tickers`, `/api/meta/brokers`, `/api/meta/strategy-statuses` — 개별 조회
+- `/api/meta` — `MetaBundle` 번들 (strategyTypes/tickers/brokers/strategyStatuses/cycleSeedTypes) 단일 엔드포인트
+- 개별 엔드포인트(`/api/meta/strategy-types` 등) 삭제됨 — UI는 번들 엔드포인트만 사용
 - `Strategy.Type`/`Strategy.Status`, `Strategy.Ticker`, `Account.Broker` enum에 label/description 필드 포함 (DTO `from()` 팩토리)
 - UI는 이 엔드포인트로 라벨/available tickers/default값 수신 — enum 리터럴 UI 하드코딩 금지
 - `TickerMeta` 응답 필드: `code`/`label`/`description`/`targetProfitRate` — KIS 거래소 코드(OVRS_EXCG_CD/EXCD)는 어댑터 내부(`KisExchangeRegistry`) 전용, UI 미노출

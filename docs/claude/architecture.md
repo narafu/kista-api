@@ -42,18 +42,19 @@ adapter/in/
                    TradingScheduler (월~금 04:00 KST — INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
   web/           ← REST Controller + DTO
-                    AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행), DashboardController (DB기반 포트폴리오/거래내역), KisStatisticsController (KIS live 잔고/수익/가격), MetaController (enum SSOT /api/meta/**, Cache 1h), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), PrivacyTradeController, Admin*Controller×7 (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
+                    AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행), DashboardController (DB기반 포트폴리오 스냅샷·사이클 이력), StatisticsController (KIS/Toss live 잔고/수익/가격 브로커 자동 분기), MetaController (enum SSOT /api/meta 번들만, Cache 1h), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), PrivacyTradeController, Admin*Controller×7 (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
-### DashboardController vs KisStatisticsController 응답 형식 차이
+### DashboardController vs StatisticsController 응답 형식 차이
 - `DashboardController`: DB 기반 전용 DTO 반환
-  - `GET /api/portfolio/current` / `GET /api/portfolio/snapshots` → `PortfolioSnapshotResponse`(`CyclePositionHistoryEntry` 기반, `marketValueUsd`/`totalAssetUsd`는 `currentPrice × holdings` computed 값, `snapshotDate` 제거됨)
-  - `GET /api/trades` → `TradeHistoryResponse`(`Order` 기반)
+  - `GET /api/portfolio/snapshots` → `PortfolioSnapshotResponse`(`CyclePositionHistoryEntry` 기반, `marketValueUsd`/`totalAssetUsd`는 `currentPrice × holdings` computed 값, `snapshotDate` 제거됨)
+  - `GET /api/accounts/{accountId}/snapshots` → `PortfolioSnapshotResponse` (계좌별 DB 포지션 이력)
+  - `GET /api/accounts/{accountId}/cycle-history` → `CycleHistoryPageResponse` (커서 페이지네이션)
   - kista-ui: 포트폴리오 날짜는 `snapshotDate`(제거) 대신 `createdAt`(Instant)에서 추출
-- `KisStatisticsController`: KIS live API 직접 호출 → `PresentBalanceResult`, `PeriodProfitResult` 등 도메인 모델 그대로 반환
+- `StatisticsController`: KIS/Toss live API 직접 호출 → `PresentBalanceResult`, `PeriodProfitResult` 등 도메인 모델 그대로 반환 (브로커 자동 분기)
   - kista-ui에서 소비 시 normalizer 함수 필요 (예: `normalizePortfolio()`, `ProfitSummary` optional 필드 fallback)
-  - 신규 KIS live 엔드포인트 추가 시 kista-ui 타입과 응답 필드명 반드시 대조 확인
+  - 신규 live 엔드포인트 추가 시 kista-ui 타입과 응답 필드명 반드시 대조 확인
 
 adapter/out/
   kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리)
