@@ -60,8 +60,9 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴
-- `User.Role`, `User.Status`, `User.NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum으로 선언
+- `User.UserRole`, `User.UserStatus`, `User.NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum으로 선언
 - import: `import com.kista.domain.model.user.User.NotificationChannel` (독립 파일 `NotificationChannel.java` 삭제됨)
+- 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE` (domain 상수 — 서비스/컨트롤러에서 직접 `NotificationChannel.NONE` 하드코딩 금지)
 - 새 사용자 관련 enum 추가 시 동일 패턴으로 `User` record 내부에 선언
 
 ### 도메인 Command 명명 규칙
