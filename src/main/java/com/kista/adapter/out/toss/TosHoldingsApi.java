@@ -7,9 +7,13 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossExchangeRate;
+import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.port.out.TosAccountPort;
 import com.kista.domain.port.out.TosMarginPort;
+import com.kista.domain.port.out.TossExchangeRatePort;
 import com.kista.domain.port.out.TossPortfolioPort;
+import com.kista.domain.port.out.TossSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,7 +29,8 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort {
+public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort,
+        TossExchangeRatePort, TossSellableQuantityPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -33,6 +38,8 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
     private static final String BUYING_POWER_PATH = "/api/v1/buying-power";
     // Toss 환율 API 경로 (GET /api/v1/exchange-rate?baseCurrency=USD&quoteCurrency=KRW)
     private static final String EXCHANGE_RATE_PATH = "/api/v1/exchange-rate";
+    // Toss 판매 가능 수량 API 경로
+    private static final String SELLABLE_QUANTITY_PATH = "/api/v1/sellable-quantity";
 
     private final TossHttpClient tossHttpClient;
 
@@ -171,15 +178,42 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
 
     // USD/KRW 환율 조회 (1 USD = ? KRW) — 계좌 컨텍스트 불필요
     private BigDecimal fetchUsdToKrwRate(Account account) {
+        return getExchangeRate(account).rate();
+    }
+
+    // ── TossExchangeRatePort ───────────────────────────────────────────────────
+
+    @Override
+    public TossExchangeRate getExchangeRate(Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
         ExchangeRateWrapper wrapper = tossHttpClient.getNoAccountHeader(
                 EXCHANGE_RATE_PATH, account, params, ExchangeRateWrapper.class);
-        if (wrapper == null || wrapper.result() == null || wrapper.result().rate() == null) {
-            return BigDecimal.ZERO;
+        if (wrapper == null || wrapper.result() == null) {
+            return new TossExchangeRate(BigDecimal.ZERO, BigDecimal.ZERO);
         }
-        return new BigDecimal(wrapper.result().rate()).round(new MathContext(6));
+        ExchangeRateResult r = wrapper.result();
+        BigDecimal rate    = r.rate()    != null ? new BigDecimal(r.rate()).round(new MathContext(6))    : BigDecimal.ZERO;
+        BigDecimal midRate = r.midRate() != null ? new BigDecimal(r.midRate()).round(new MathContext(6)) : BigDecimal.ZERO;
+        return new TossExchangeRate(rate, midRate);
+    }
+
+    // ── TossSellableQuantityPort ───────────────────────────────────────────────
+
+    @Override
+    public TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+        var params = new LinkedMultiValueMap<String, String>();
+        params.add("symbol", ticker.name());
+        SellableQuantityWrapper wrapper = tossHttpClient.get(
+                SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
+        if (wrapper == null || wrapper.result() == null) {
+            log.warn("Toss 판매 가능 수량 응답 없음: ticker={}", ticker);
+            return new TossSellableQuantity(ticker.name(), 0);
+        }
+        SellableQuantityResult result = wrapper.result();
+        int quantity = result.quantity() != null ? Integer.parseInt(result.quantity()) : 0;
+        return new TossSellableQuantity(ticker.name(), quantity);
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
@@ -204,7 +238,15 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
     record ExchangeRateWrapper(@JsonProperty("result") ExchangeRateResult result) {}
 
     record ExchangeRateResult(
-        @JsonProperty("rate") String rate,           // 매수 환율 (1 USD = ? KRW)
-        @JsonProperty("midRate") String midRate      // 매매기준율
+        @JsonProperty("rate")    String rate,    // 매수 환율 (1 USD = ? KRW)
+        @JsonProperty("midRate") String midRate  // 매매기준율
+    ) {}
+
+    // GET /api/v1/sellable-quantity 응답 래퍼 — {"result": {...}}
+    record SellableQuantityWrapper(@JsonProperty("result") SellableQuantityResult result) {}
+
+    record SellableQuantityResult(
+        @JsonProperty("symbol")   String symbol,   // 종목 코드
+        @JsonProperty("quantity") String quantity  // 판매 가능 수량
     ) {}
 }

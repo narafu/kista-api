@@ -4,7 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossStockInfo;
 import com.kista.domain.port.out.TosPricePort;
+import com.kista.domain.port.out.TossStockInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,10 +21,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosPriceApi implements TosPricePort {
+public class TosPriceApi implements TosPricePort, TossStockInfoPort {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
+    // Toss 종목 기본 정보 API: GET /api/v1/stocks?symbol=SOXL
+    private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
 
@@ -70,15 +74,51 @@ public class TosPriceApi implements TosPricePort {
                         e -> new PriceSnapshot(e.getValue(), e.getValue())));  // prevClose = current
     }
 
+    // ── TossStockInfoPort ──────────────────────────────────────────────────────
+
+    @Override
+    public TossStockInfo getStockInfo(Ticker ticker, Account account) {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("symbol", ticker.name());
+
+        StockInfoResponse response = tossHttpClient.getNoAccountHeader(
+                STOCKS_PATH, account, params, StockInfoResponse.class);
+
+        if (response == null || response.result() == null) {
+            log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
+            return new TossStockInfo(ticker.name(), ticker.name(), "", "USD", BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        StockItem s = response.result();
+        BigDecimal lastPrice = s.lastPrice() != null ? new BigDecimal(s.lastPrice()) : BigDecimal.ZERO;
+        BigDecimal prevClose = s.prevClosePrice() != null ? new BigDecimal(s.prevClosePrice()) : lastPrice;
+        return new TossStockInfo(s.symbol(), s.name(), s.exchange(), s.currency(), lastPrice, prevClose);
+    }
+
+    // ── 내부 응답 record ──────────────────────────────────────────────────────
+
     // package-private — TosPriceApiTest에서 직접 생성하여 stub에 사용
     record PriceItem(
-        @JsonProperty("symbol") String symbol,        // 종목 코드 (예: SOXL)
-        @JsonProperty("lastPrice") String lastPrice,  // 현재가 (문자열 소수 형식)
-        @JsonProperty("currency") String currency     // 통화 (예: USD)
+        @JsonProperty("symbol")    String symbol,    // 종목 코드 (예: SOXL)
+        @JsonProperty("lastPrice") String lastPrice, // 현재가 (문자열 소수 형식)
+        @JsonProperty("currency")  String currency   // 통화 (예: USD)
     ) {}
 
-    // Toss API 공통 래퍼: {"result": [...]} — TossAuthApi.AccountsResponse 와 동일 패턴
+    // Toss API 공통 래퍼: {"result": [...]}
     record PricesResponse(
         @JsonProperty("result") List<PriceItem> result
+    ) {}
+
+    // GET /api/v1/stocks 응답 래퍼: {"result": {...}}
+    record StockInfoResponse(
+        @JsonProperty("result") StockItem result
+    ) {}
+
+    record StockItem(
+        @JsonProperty("symbol")         String symbol,         // 종목 코드
+        @JsonProperty("name")           String name,           // 종목명
+        @JsonProperty("exchange")       String exchange,       // 거래소
+        @JsonProperty("currency")       String currency,       // 통화
+        @JsonProperty("lastPrice")      String lastPrice,      // 현재가
+        @JsonProperty("prevClosePrice") String prevClosePrice  // 전일종가
     ) {}
 }
