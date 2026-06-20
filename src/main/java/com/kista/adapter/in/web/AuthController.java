@@ -58,7 +58,8 @@ public class AuthController {
         String rawRt = tokenUseCase.issueRefreshToken(user.id(), httpRequest.getHeader("User-Agent"));
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
-        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user));
+        // rawRt를 body에도 포함 — Next.js Route Handler가 Edge Runtime Set-Cookie 필터링을 우회해 HttpOnly 쿠키로 변환
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user), rawRt);
     }
 
     // RT 쿠키로 새 AT + RT 발급 (RTR)

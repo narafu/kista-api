@@ -10,5 +10,7 @@ public record KakaoLoginResponse(
         @Schema(description = "토큰 유효 기간 (초)", example = "604800")
         long expiresIn,
         @Schema(description = "로그인한 사용자 정보")
-        UserResponse user
+        UserResponse user,
+        @Schema(description = "raw refresh token — Next.js Route Handler가 HttpOnly 쿠키로 변환. 브라우저에 직접 노출되지 않음")
+        String rawRefreshToken
 ) {}
