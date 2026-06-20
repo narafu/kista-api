@@ -37,7 +37,7 @@ class AdminServiceTest {
     // (id, kakaoId, nickname, status, role, telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt)
     private User user(UUID id, User.UserStatus status) {
         return new User(id, "kakao-" + id, "테스트", status, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM, true);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test

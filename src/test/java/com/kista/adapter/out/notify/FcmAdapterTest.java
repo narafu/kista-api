@@ -27,7 +27,7 @@ class FcmAdapterTest {
 
     static User user(UUID id) {
         return new User(id, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.FCM, true);
+                null, null, null, null, NotificationChannel.FCM);
     }
 
     @BeforeEach

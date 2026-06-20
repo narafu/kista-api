@@ -6,14 +6,11 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.KakaoOAuthPort;
 import com.kista.domain.port.out.RefreshTokenPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
-import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
@@ -37,8 +34,6 @@ import java.util.UUID;
 class UserService implements UserUseCase {
 
     private final UserPort userPort;
-    private final AccountPort accountPort;         // OFF→ON 전환 시 활성 전략 조회용
-    private final StrategyPort strategyPort;       // OFF→ON 전환 시 활성 전략 조회용
     private final UserCascadeDeleter userCascadeDeleter;
     private final UserNotificationPort notificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
@@ -93,8 +88,7 @@ class UserService implements UserUseCase {
                     user.id(), user.kakaoId(), user.nickname(), User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                     user.telegramBotToken(), user.telegramChatId(), user.telegramBotUsername(),
                     user.lastReappliedAt(),
-                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.FCM,
-                    user.balanceCheckEnabled()
+                    user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.FCM
             ));
         }
         return user;
@@ -109,7 +103,7 @@ class UserService implements UserUseCase {
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
-                    null, null, null, null, NotificationChannel.FCM, true);
+                    null, null, null, null, NotificationChannel.FCM);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
@@ -196,39 +190,6 @@ class UserService implements UserUseCase {
         User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withNotificationChannel(channel));
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
-    }
-
-    @Override
-    public void updateBalanceCheckEnabled(UUID userId, boolean enabled) {
-        User user = userPort.findByIdOrThrow(userId);
-        boolean previous = user.balanceCheckEnabled();
-        userPort.save(user.withBalanceCheckEnabled(enabled));
-        log.info("잔고 검증 설정 변경: userId={}, {}→{}", userId, previous, enabled);
-
-        // OFF→ON: 활성 전략 시드 vs 실잔고 미검증 경고
-        if (!previous && enabled) {
-            long activeCount = countActiveStrategies(userId);
-            if (activeCount > 0) {
-                log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략 {}개가 있습니다. " +
-                        "시드가 실잔고를 초과하면 다음 사이클 회전 시 PAUSED됩니다.", userId, activeCount);
-            } else {
-                log.info("[잔고검증 OFF→ON] userId={} — 활성 전략 없음, 즉시 영향 없음.", userId);
-            }
-        }
-        // ON→OFF: 잔고 미검증으로 인한 KIS 주문 거부 가능성 경고
-        if (previous && !enabled) {
-            long activeCount = countActiveStrategies(userId);
-            log.warn("[잔고검증 ON→OFF] userId={} — 활성 전략 {}개. " +
-                    "실잔고보다 큰 시드로 재등록되면 KIS에서 주문이 거부(APBK0988)될 수 있습니다.", userId, activeCount);
-        }
-    }
-
-    // 사용자의 활성 전략 수 — 계좌별 ACTIVE 전략 합산
-    private long countActiveStrategies(UUID userId) {
-        return accountPort.findByUserId(userId).stream()
-                .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
-                .filter(strategy -> strategy.isActive())
-                .count();
     }
 
     @Override

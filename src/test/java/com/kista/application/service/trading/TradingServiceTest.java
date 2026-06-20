@@ -53,6 +53,7 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
     @Mock TosAccountPort tosAccountPort;
+    @Mock LoadUserSettingsPort loadUserSettingsPort;
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -90,7 +91,7 @@ class TradingServiceTest {
 
     static final User USER = new User(
             ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM, true
+            null, null, null, null, NotificationChannel.TELEGRAM
     );
 
     @BeforeEach
@@ -106,7 +107,7 @@ class TradingServiceTest {
         // CycleRotationService: brokerMarginRouter wraps kisMarginPort for KIS 계좌 테스트
         BrokerMarginRouter marginRouter = new BrokerMarginRouter(kisMarginPort, null);
         CycleRotationService rotationService = new CycleRotationService(
-                marginRouter, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies);
+                marginRouter, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);

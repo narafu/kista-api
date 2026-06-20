@@ -2,6 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.TelegramSettingsResponse;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
+import com.kista.domain.port.in.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class SettingsController {
 
     private final UserUseCase userUseCase;
+    private final UpdateBalanceCheckUseCase updateBalanceCheckUseCase; // 잔고검증 설정 — user_settings 테이블
 
     record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
     record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
@@ -83,7 +86,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateBalanceCheck(@AuthenticationPrincipal UUID userId,
                                    @RequestBody BalanceCheckRequest body) {
-        userUseCase.updateBalanceCheckEnabled(userId, body.enabled());
+        updateBalanceCheckUseCase.update(new UpdateBalanceCheckCommand(userId, body.enabled()));
     }
 
     // 닉네임 변경 (1~10자, 한글·영문·숫자·공백)

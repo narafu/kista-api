@@ -7,6 +7,8 @@ import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserSettings;
+import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +40,7 @@ public class AuthController {
     private final JwtIssuerService jwtIssuerService;
     private final RefreshTokenCookieHelper cookieHelper;
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
+    private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse.balanceCheckEnabled 조회용
 
     record KakaoCallbackRequest(
             @Schema(description = "카카오 OAuth 인가 코드", example = "xxxxxxxxxxxxxxxxxxxxxxxx")
@@ -59,7 +62,8 @@ public class AuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
         // rawRt를 body에도 포함 — Next.js Route Handler가 Edge Runtime Set-Cookie 필터링을 우회해 HttpOnly 쿠키로 변환
-        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user), rawRt);
+        UserSettings settings = getUserSettingsQuery.getByUserId(user.id());
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings.balanceCheckEnabled()), rawRt);
     }
 
     // RT 쿠키로 새 AT + RT 발급 (RTR)
@@ -102,7 +106,9 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
-        return UserResponse.from(userUseCase.getById(userId));
+        User user = userUseCase.getById(userId);
+        UserSettings settings = getUserSettingsQuery.getByUserId(userId);
+        return UserResponse.from(user, settings.balanceCheckEnabled());
     }
 
     // PENDING 상태 사용자의 SSE 연결 — 승인/거절 시 브라우저 자동 리다이렉트

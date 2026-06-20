@@ -4,6 +4,7 @@ import com.kista.adapter.in.web.security.*;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ class AuthControllerTokenTest {
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean GetUserSettingsQuery getUserSettingsQuery;
     @MockitoBean com.kista.adapter.out.sse.SseEmitterRegistry sseEmitterRegistry;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -92,6 +94,6 @@ class AuthControllerTokenTest {
     private User stubUser(UUID id) {
         return new User(id, "kakaoId", "닉네임",
                 User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, User.NotificationChannel.FCM, true);
+                null, null, null, null, User.NotificationChannel.FCM);
     }
 }

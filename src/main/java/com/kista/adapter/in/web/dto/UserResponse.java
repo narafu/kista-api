@@ -24,7 +24,8 @@ public record UserResponse(
         @Schema(description = "전략 등록·재등록 시 실잔고 검증 여부 (false=바이패스)", example = "true")
         boolean balanceCheckEnabled
 ) {
-    public static UserResponse from(User user) {
+    // balanceCheckEnabled는 user_settings 테이블에서 별도 조회 후 주입
+    public static UserResponse from(User user, boolean balanceCheckEnabled) {
         return new UserResponse(
                 user.id(),
                 user.nickname(),
@@ -33,7 +34,7 @@ public record UserResponse(
                 user.role(),
                 user.telegramBotUsername(),
                 user.notificationChannel(),
-                user.balanceCheckEnabled()
+                balanceCheckEnabled
         );
     }
 }

@@ -13,6 +13,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.LoadUserSettingsPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -46,6 +47,7 @@ class StrategyServiceTest {
     @Mock UserPort userPort;
     @Mock BrokerPriceRouter brokerPriceRouter;
     @Mock BrokerMarginRouter brokerMarginRouter;
+    @Mock LoadUserSettingsPort loadUserSettingsPort;
 
     @InjectMocks StrategyService strategyService;
 
@@ -80,7 +82,7 @@ class StrategyServiceTest {
     private User activeUser() {
         return new User(USER_ID, "kakao123", "테스터",
                 User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM, true);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test

@@ -14,8 +14,7 @@ public record User(
         String telegramChatId,          // 전체 계좌 텔레그램 Chat ID (null 가능)
         String telegramBotUsername,     // 텔레그램 봇 username (저장 시 getMe로 취득, 평문, null 가능)
         Instant lastReappliedAt,        // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
-        NotificationChannel notificationChannel, // 알림 수단 (기본: TELEGRAM)
-        boolean balanceCheckEnabled     // true=전략 등록/재등록 시 실잔고 검증, false=바이패스
+        NotificationChannel notificationChannel // 알림 수단 (기본: TELEGRAM)
 ) {
     public enum UserRole { USER, ADMIN }
 
@@ -54,47 +53,40 @@ public record User(
     public User withStatus(UserStatus newStatus) {
         return new User(id, kakaoId, nickname, newStatus, role,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, notificationChannel, balanceCheckEnabled);
+                lastReappliedAt, notificationChannel);
     }
 
     // 상태 + lastReappliedAt 동시 교체 (reject/reapply 용)
     public User withStatus(UserStatus newStatus, Instant newLastReappliedAt) {
         return new User(id, kakaoId, nickname, newStatus, role,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                newLastReappliedAt, notificationChannel, balanceCheckEnabled);
+                newLastReappliedAt, notificationChannel);
     }
 
     // 텔레그램 설정 교체
     public User withTelegram(String botToken, String chatId, String botUsername) {
         return new User(id, kakaoId, nickname, status, role,
-                botToken, chatId, botUsername, lastReappliedAt, notificationChannel, balanceCheckEnabled);
+                botToken, chatId, botUsername, lastReappliedAt, notificationChannel);
     }
 
     // 알림 채널 교체
     public User withNotificationChannel(NotificationChannel channel) {
         return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, channel, balanceCheckEnabled);
+                lastReappliedAt, channel);
     }
 
     // 역할만 교체 — AdminService.changeRole 전용
     public User withRole(UserRole newRole) {
         return new User(id, kakaoId, nickname, status, newRole,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, notificationChannel, balanceCheckEnabled);
-    }
-
-    // 잔고 검증 설정 교체
-    public User withBalanceCheckEnabled(boolean value) {
-        return new User(id, kakaoId, nickname, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, notificationChannel, value);
+                lastReappliedAt, notificationChannel);
     }
 
     // 닉네임 교체
     public User withNickname(String nickname) {
         return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername,
-                lastReappliedAt, notificationChannel, balanceCheckEnabled);
+                lastReappliedAt, notificationChannel);
     }
 }

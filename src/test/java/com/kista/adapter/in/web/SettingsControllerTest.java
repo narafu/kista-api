@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -38,6 +39,7 @@ class SettingsControllerTest {
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserUseCase userUseCase;
+    @MockitoBean UpdateBalanceCheckUseCase updateBalanceCheckUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

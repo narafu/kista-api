@@ -59,14 +59,14 @@ class DevAuthControllerTest {
             DEV_USER_ID, "dev-test-user", "개발 테스트 유저",
             User.UserStatus.ACTIVE, User.UserRole.USER,
             null, null, null, null,
-            User.NotificationChannel.TELEGRAM, true
+            User.NotificationChannel.TELEGRAM
     );
 
     private static final User MOCK_ADMIN_USER = new User(
             DEV_ADMIN_ID, "dev-admin", "dev-admin",
             User.UserStatus.ACTIVE, User.UserRole.ADMIN,
             null, null, null, null,
-            User.NotificationChannel.TELEGRAM, true
+            User.NotificationChannel.TELEGRAM
     );
 
     @Test

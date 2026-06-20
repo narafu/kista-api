@@ -38,7 +38,7 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void notifyTradingReport_withUserBot_sendsToUserChatId() {
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                "user-bot-token", "user-chat-789", null, null, NotificationChannel.TELEGRAM, true);
+                "user-bot-token", "user-chat-789", null, null, NotificationChannel.TELEGRAM);
         Account account = mock(Account.class);
         when(account.nickname()).thenReturn("SOXL계좌");
 
@@ -50,7 +50,7 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void notifyTradingReport_noUserBot_skips() {
         User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM, true);
+                null, null, null, null, NotificationChannel.TELEGRAM);
         Account account = mock(Account.class);
 
         adapter.notifyTradingReport(user, account, buildTestReport());

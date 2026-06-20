@@ -55,9 +55,6 @@ class UserEntity extends BaseAuditEntity {
     @Column(name = "notification_channel", nullable = false, length = 20)
     private NotificationChannel notificationChannel; // 알림 수단 (기본: TELEGRAM)
 
-    @Column(name = "balance_check_enabled", nullable = false)
-    private boolean balanceCheckEnabled; // true=실잔고 검증, false=바이패스
-
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
@@ -74,14 +71,12 @@ class UserEntity extends BaseAuditEntity {
         e.lastReappliedAt = user.lastReappliedAt();
         e.notificationChannel = user.notificationChannel() != null
                 ? user.notificationChannel() : NotificationChannel.TELEGRAM;
-        e.balanceCheckEnabled = user.balanceCheckEnabled();
         return e;
     }
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, lastReappliedAt,
-                notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM,
-                balanceCheckEnabled);
+                notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
     }
 }

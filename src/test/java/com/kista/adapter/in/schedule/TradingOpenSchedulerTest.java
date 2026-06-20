@@ -61,7 +61,7 @@ class TradingOpenSchedulerTest {
 
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM, true);
+                null, null, null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test

@@ -12,9 +12,11 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.UpdateStrategyCommand;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.LoadUserSettingsPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
@@ -41,6 +43,7 @@ class StrategyService implements StrategyUseCase {
     private final UserPort userPort;
     private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 브로커 무관
     private final BrokerMarginRouter brokerMarginRouter;         // 등록 시점 가용 시드 검증 — 브로커 무관
+    private final LoadUserSettingsPort loadUserSettingsPort;     // 잔고 검증 설정 조회 (user_settings)
 
     @Override
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
@@ -58,8 +61,9 @@ class StrategyService implements StrategyUseCase {
         }
 
         // 잔고 검증 활성 시: 새 시드는 KIS 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
-        User user = userPort.findByIdOrThrow(userId);
-        if (user.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
+        userPort.findByIdOrThrow(userId); // 사용자 존재 확인
+        UserSettings settings = loadUserSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        if (settings.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {
                 throw new IllegalArgumentException(

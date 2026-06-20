@@ -71,8 +71,7 @@ public class UserPersistenceAdapter implements UserPort {
         return new User(user.id(), user.kakaoId(), user.nickname(), user.status(), user.role(),
                 crypto.encrypt(user.telegramBotToken()), user.telegramChatId(), user.telegramBotUsername(),
                 user.lastReappliedAt(),
-                user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM,
-                user.balanceCheckEnabled());
+                user.notificationChannel() != null ? user.notificationChannel() : NotificationChannel.TELEGRAM);
     }
 
     // persistence 경계에서 telegramBotToken 복호화
@@ -82,7 +81,6 @@ public class UserPersistenceAdapter implements UserPort {
         return new User(raw.id(), raw.kakaoId(), raw.nickname(), raw.status(), raw.role(),
                 crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername(),
                 raw.lastReappliedAt(),
-                raw.notificationChannel() != null ? raw.notificationChannel() : NotificationChannel.TELEGRAM,
-                raw.balanceCheckEnabled());
+                raw.notificationChannel() != null ? raw.notificationChannel() : NotificationChannel.TELEGRAM);
     }
 }

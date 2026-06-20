@@ -168,6 +168,6 @@ class TokenServiceTest {
     private User mockUser(UUID id, User.UserRole role) {
         return new User(id, "kakaoId", "닉네임",
                 User.UserStatus.ACTIVE, role, null, null, null, null,
-                User.NotificationChannel.FCM, true);
+                User.NotificationChannel.FCM);
     }
 }

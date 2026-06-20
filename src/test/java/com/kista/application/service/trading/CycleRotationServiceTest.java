@@ -8,6 +8,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.LoadUserSettingsPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -49,6 +50,7 @@ class CycleRotationServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
+    @Mock LoadUserSettingsPort loadUserSettingsPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
 
@@ -63,7 +65,7 @@ class CycleRotationServiceTest {
 
     static final User USER = new User(ACCOUNT.userId(), "kakao-1", "홍길동",
             User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM, true);
+            null, null, null, null, NotificationChannel.TELEGRAM);
 
     @BeforeEach
     void setUp() {
@@ -72,7 +74,7 @@ class CycleRotationServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         service = new CycleRotationService(brokerMarginRouter, strategyPort, strategyCyclePort,
-                cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies);
+                cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
     }
 
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
