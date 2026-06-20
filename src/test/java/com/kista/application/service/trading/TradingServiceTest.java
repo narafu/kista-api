@@ -96,6 +96,11 @@ class TradingServiceTest {
 
     @BeforeEach
     void setUp() {
+        // loadUserSettingsPort — TRADING_ALERT 기본값(활성) 반환: 리포트 발송 경로로 진행
+        // lenient: 일부 테스트(휴장·placeOpenOrders 등)에서 reporter까지 도달하지 않아 미사용 가능
+        lenient().when(loadUserSettingsPort.loadByUserId(any()))
+                .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
+
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);

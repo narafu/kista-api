@@ -27,10 +27,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.kista.domain.model.user.UserSettings;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,6 +72,10 @@ class CycleRotationServiceTest {
 
     @BeforeEach
     void setUp() {
+        // loadUserSettingsPort — 잔고검증 기본값(ON) 반환: 브로커 실잔고 경로로 진행
+        when(loadUserSettingsPort.loadByUserId(any()))
+                .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
+
         ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
