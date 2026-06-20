@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -121,5 +122,37 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"   \"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patch_notifications_trading_alert_returns_204() throws Exception {
+        mockMvc.perform(patch("/api/settings/notifications/TRADING_ALERT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\": false}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isNoContent());
+
+        verify(updateNotificationPrefUseCase).update(
+                argThat(cmd -> cmd.type().name().equals("TRADING_ALERT") && !cmd.enabled()));
+    }
+
+    @Test
+    void patch_notifications_unknown_type_returns_400() throws Exception {
+        mockMvc.perform(patch("/api/settings/notifications/UNKNOWN_TYPE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\": false}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patch_balance_check_calls_use_case() throws Exception {
+        mockMvc.perform(patch("/api/settings/balance-check")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\": false}")
+                        .with(csrf()).with(authentication(mockAuth())))
+                .andExpect(status().isNoContent());
+
+        verify(updateBalanceCheckUseCase).update(argThat(cmd -> !cmd.enabled()));
     }
 }
