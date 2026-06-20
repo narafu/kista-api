@@ -61,9 +61,8 @@ public class AuthController {
         String rawRt = tokenUseCase.issueRefreshToken(user.id(), httpRequest.getHeader("User-Agent"));
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
-        // rawRt를 body에도 포함 — Next.js Route Handler가 Edge Runtime Set-Cookie 필터링을 우회해 HttpOnly 쿠키로 변환
         UserSettings settings = getUserSettingsQuery.getByUserId(user.id());
-        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings.balanceCheckEnabled()), rawRt);
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings.balanceCheckEnabled()));
     }
 
     // RT 쿠키로 새 AT + RT 발급 (RTR)
@@ -83,8 +82,7 @@ public class AuthController {
         var result = tokenUseCase.refresh(rawRt, request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(result.newRawRefreshToken()).toString());
         String newAt = jwtIssuerService.issue(result.userId(), result.userRole());
-        // rawRefreshToken을 body에 포함 — proxy.ts가 Edge Runtime에서 Set-Cookie 헤더 필터링을 우회하는 데 사용
-        return new RefreshResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds(), result.newRawRefreshToken());
+        return new RefreshResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds());
     }
 
     // 로그아웃 — RT 삭제 + userId 블랙리스트 + 쿠키 삭제
