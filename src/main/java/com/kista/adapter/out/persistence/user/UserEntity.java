@@ -53,7 +53,7 @@ class UserEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "notification_channel", nullable = false, length = 20)
-    private NotificationChannel notificationChannel; // 알림 수단 (기본: TELEGRAM)
+    private NotificationChannel notificationChannel; // 알림 수단 (기본: NONE)
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
@@ -70,13 +70,13 @@ class UserEntity extends BaseAuditEntity {
         e.telegramBotUsername = user.telegramBotUsername();
         e.lastReappliedAt = user.lastReappliedAt();
         e.notificationChannel = user.notificationChannel() != null
-                ? user.notificationChannel() : NotificationChannel.TELEGRAM;
+                ? user.notificationChannel() : NotificationChannel.NONE;
         return e;
     }
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, lastReappliedAt,
-                notificationChannel != null ? notificationChannel : NotificationChannel.TELEGRAM);
+                notificationChannel != null ? notificationChannel : NotificationChannel.NONE);
     }
 }
