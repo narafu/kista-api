@@ -50,16 +50,26 @@ class TradingOrderExecutor {
     private List<Order> placeEach(List<Order> orders, Account account) {
         List<Order> placed = new ArrayList<>();
         for (Order p : orders) {
+            Order placedOrder;
             try {
-                Order placedOrder = brokerOrderRouter.place(p, account);
-                orderPort.markPlaced(p.id(), placedOrder.externalOrderId()); // 접수 완료 즉시 기록
-                placed.add(new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
-                        p.orderType(), p.timing(), p.direction(), p.quantity(), p.price(),
-                        Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null));
+                placedOrder = brokerOrderRouter.place(p, account);
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
                 notifyPort.notifyError(e);
+                continue;
+            }
+            // 브로커 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
+            try {
+                orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
+                placed.add(new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
+                        p.orderType(), p.timing(), p.direction(), p.quantity(), p.price(),
+                        Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null));
+            } catch (Exception e) {
+                log.error("[{}] {} {} 브로커 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
+                        account.nickname(), p.direction(), p.ticker(), placedOrder.externalOrderId(), e.getMessage());
+                notifyPort.notifyError(new IllegalStateException(
+                        "[DB 불일치] 브로커 접수 완료 후 PLACED 기록 실패 — externalOrderId=" + placedOrder.externalOrderId(), e));
             }
         }
         return placed;
