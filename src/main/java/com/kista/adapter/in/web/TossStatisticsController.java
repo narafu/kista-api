@@ -133,10 +133,10 @@ public class TossStatisticsController {
                 accountStatistics.getTossAccountList(accountId, userId));
     }
 
-    // 현재가 조회 (GET /api/v1/prices) — KisStatisticsController.getPrices와 동일 기능, Toss 경로 제공
+    // 현재가 조회 (GET /api/v1/prices) — StatisticsController.getPrices와 동일 기능, Toss 경로 제공
     @Operation(
             summary = "현재가 조회",
-            description = "Toss API GET /api/v1/prices — 종목 현재가 반환. Toss·KIS 공용 (KisStatisticsController /prices와 동일)."
+            description = "Toss API GET /api/v1/prices — 종목 현재가 반환. Toss·KIS 공용 (StatisticsController /prices와 동일)."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),

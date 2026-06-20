@@ -23,11 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "통계", description = "KIS live API 계좌별 손익·체결·잔고·증거금·현재가 조회")
+@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 브로커 자동 분기)")
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
-public class KisStatisticsController {
+public class StatisticsController {
 
     private final AccountStatisticsUseCase accountStatistics;
 
