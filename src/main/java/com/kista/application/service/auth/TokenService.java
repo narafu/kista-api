@@ -114,7 +114,7 @@ class TokenService implements TokenUseCase {
             // AT jti만 차단 — 재로그인 후 새 AT는 영향 없음
             if (jti != null && atExpiresAt != null) {
                 Duration remaining = Duration.between(Instant.now(), atExpiresAt);
-                if (!remaining.isNegative()) {
+                if (remaining.isPositive()) {
                     blacklistPort.addJti(jti, remaining);
                 }
             }
