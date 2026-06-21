@@ -2,7 +2,6 @@ package com.kista.application.service.auth;
 
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.RefreshToken;
-import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.BlacklistPort;
@@ -132,24 +131,58 @@ class TokenServiceTest {
     }
 
     @Test
-    void logout_validToken_deletesAndBlacklists() {
+    void logout_withJti_deletesRtAndBlacklistsJti() {
         String raw = "logoutToken";
+        String hash = TokenService.sha256Hex(raw);
+        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        String jti = UUID.randomUUID().toString();
+        Instant atExpiresAt = Instant.now().plusSeconds(3600); // 미래 만료
+
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
+
+        tokenService.logout(raw, jti, atExpiresAt);
+
+        verify(refreshTokenPort).deleteByTokenHash(hash);
+        ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
+        verify(blacklistPort).addJti(eq(jti), ttlCaptor.capture());
+        assertThat(ttlCaptor.getValue()).isPositive(); // remaining > 0
+    }
+
+    @Test
+    void logout_withExpiredAt_skipsJtiBlacklist() {
+        String raw = "logoutToken2";
+        String hash = TokenService.sha256Hex(raw);
+        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        String jti = UUID.randomUUID().toString();
+        Instant alreadyExpired = Instant.now().minusSeconds(1); // 이미 만료된 AT
+
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
+
+        tokenService.logout(raw, jti, alreadyExpired);
+
+        verify(refreshTokenPort).deleteByTokenHash(hash);
+        verify(blacklistPort, never()).addJti(any(), any()); // 만료된 AT는 블랙리스트 생략
+    }
+
+    @Test
+    void logout_withNullJti_skipsJtiBlacklist() {
+        String raw = "logoutToken3";
         String hash = TokenService.sha256Hex(raw);
         RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
-        tokenService.logout(raw);
+        tokenService.logout(raw, null, null); // jti 없이 호출 (AT 파싱 실패 케이스)
 
         verify(refreshTokenPort).deleteByTokenHash(hash);
-        verify(blacklistPort).add(USER_ID, TokenConstants.AT_TTL);
+        verify(blacklistPort, never()).addJti(any(), any()); // jti 없으면 블랙리스트 생략
     }
 
     @Test
     void logout_unknownToken_noOp() {
         given(refreshTokenPort.findByTokenHash(any())).willReturn(Optional.empty());
-        tokenService.logout("unknownToken");
-        verify(blacklistPort, never()).add(any(), any());
+        tokenService.logout("unknownToken", null, null);
+        verify(blacklistPort, never()).addJti(any(), any());
     }
 
     @Test

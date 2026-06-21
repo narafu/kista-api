@@ -107,11 +107,17 @@ class TokenService implements TokenUseCase {
     }
 
     @Override
-    public void logout(String rawRefreshToken) {
+    public void logout(String rawRefreshToken, String jti, Instant atExpiresAt) {
         String hash = sha256Hex(rawRefreshToken);
         refreshTokenPort.findByTokenHash(hash).ifPresent(rt -> {
             refreshTokenPort.deleteByTokenHash(hash);
-            blacklistPort.add(rt.userId(), AT_TTL);
+            // AT jti만 차단 — 재로그인 후 새 AT는 영향 없음
+            if (jti != null && atExpiresAt != null) {
+                Duration remaining = Duration.between(Instant.now(), atExpiresAt);
+                if (!remaining.isNegative()) {
+                    blacklistPort.addJti(jti, remaining);
+                }
+            }
         });
     }
 

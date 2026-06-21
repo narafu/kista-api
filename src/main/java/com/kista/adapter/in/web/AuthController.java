@@ -24,9 +24,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Tag(name = "인증", description = "카카오 OAuth 로그인, 토큰 갱신, 사용자 정보 조회, 승인 신청")
@@ -38,6 +41,7 @@ public class AuthController {
     private final UserUseCase userUseCase;
     private final TokenUseCase tokenUseCase;
     private final JwtIssuerService jwtIssuerService;
+    private final JwtDecoder jwtDecoder; // AT 파싱용 — logout 시 jti 추출
     private final RefreshTokenCookieHelper cookieHelper;
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
     private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse.balanceCheckEnabled 조회용
@@ -85,16 +89,29 @@ public class AuthController {
         return new RefreshResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds());
     }
 
-    // 로그아웃 — RT 삭제 + userId 블랙리스트 + 쿠키 삭제
-    @Operation(summary = "로그아웃", description = "refresh_token 쿠키를 무효화하고 AT를 즉시 차단합니다.")
+    // 로그아웃 — RT 삭제 + AT jti 블랙리스트 + 쿠키 삭제
+    @Operation(summary = "로그아웃", description = "refresh_token 쿠키를 무효화하고 AT jti를 즉시 차단합니다.")
     @ApiResponse(responseCode = "204", description = "로그아웃 성공")
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @SecurityRequirements
     public void logout(HttpServletRequest request, HttpServletResponse response) {
         String rawRt = cookieHelper.extract(request);
+        String jti = null;
+        Instant atExpiresAt = null;
+        // AT가 있으면 파싱하여 jti + exp 추출 — 실패해도 RT 삭제만으로 로그아웃 효과
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                Jwt jwt = jwtDecoder.decode(authHeader.substring(7));
+                jti = jwt.getId();           // jti 클레임
+                atExpiresAt = jwt.getExpiresAt(); // exp 클레임
+            } catch (Exception ignored) {
+                // AT 파싱 실패는 무시 — RT 삭제만으로도 로그아웃 효과
+            }
+        }
         if (rawRt != null) {
-            tokenUseCase.logout(rawRt);
+            tokenUseCase.logout(rawRt, jti, atExpiresAt);
         }
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }

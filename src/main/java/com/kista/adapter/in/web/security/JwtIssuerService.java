@@ -24,6 +24,7 @@ public class JwtIssuerService {
     public String issue(UUID userId, User.UserRole role) {
         ECPrivateKey privateKey = parsePrivateKey();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString()) // jti — 로그아웃 시 단일 AT 차단용
                 .subject(userId.toString())
                 .claim("role", role.name()) // 역할(USER/ADMIN) 클레임 — JwtAuthFilter에서 권한 추출
                 .expiration(new Date(System.currentTimeMillis() + TokenConstants.AT_TTL.toMillis()))
