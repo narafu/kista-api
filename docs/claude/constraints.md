@@ -15,8 +15,10 @@
 ### GlobalExceptionHandler 자동 예외 처리
 - Controller에서 별도 catch/rethrow 불필요 — 아래 예외는 모두 `GlobalExceptionHandler`에서 자동 처리됨
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `IllegalStateException` → 400, `PrivacyTradeConflictException` → 409
-- `SecurityException` → 403, `KisApiException` → 503, `Account.InvalidKisKeyException` → 422
-- `ManualTradingException` / `OrderCancelException` → 409, `Account.CooldownException` → 429(Retry-After 포함)
+- `SecurityException` → 403, `KisApiException` → 503, `TossApiException` → 503, `Account.InvalidKisKeyException` → 422
+- `ManualTradingException` / `OrderCancelException` → 409, `Account.DuplicateAccountException` → 409
+- `Account.CooldownException` → 429(Retry-After 포함), `Account.KisRateLimitException` → 429
+- `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
 
 ### Account ↔ Strategy 분리
 - `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
@@ -29,9 +31,11 @@
 - `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 시드 수정 시 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
-### 잔고검증 토글 (User.balanceCheckEnabled)
-- `User.balanceCheckEnabled`: ON이면 `StrategyService` 시드 등록/수정 시 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
-- `UserService.updateBalanceCheckEnabled()`: OFF→ON 전환 시 활성 전략 존재하면 "시드>실잔고면 다음 사이클 회전 시 PAUSED" 경고 로그, ON→OFF 전환 시 "APBK0988 주문거부 가능" 경고 로그 (audit 목적, 차단 아님)
+### 잔고검증 토글 (UserSettings.balanceCheckEnabled)
+- `UserSettings.balanceCheckEnabled`: `User` record 아님 — `UserSettings` aggregate(`domain/model/user/UserSettings.java`)에 위치 (커밋 9a02f56에서 이전)
+- ON이면 `StrategyService` 시드 등록/수정 시 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
+- `UserSettingsService.updateBalanceCheckEnabled()`: OFF→ON 전환 시 활성 전략 존재하면 "시드>실잔고면 다음 사이클 회전 시 PAUSED" 경고 로그, ON→OFF 전환 시 "APBK0988 주문거부 가능" 경고 로그 (audit 목적, 차단 아님)
+- 설정 미존재 시 `UserSettings.defaultFor(userId)` — `balanceCheckEnabled=true`, 빈 notificationPrefs
 
 
 ### MetaController (enum SSOT)
@@ -186,7 +190,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `@Setter(AccessLevel.PACKAGE)` 범위는 **선언 클래스 패키지 기준** — `BaseAuditEntity`(`adapter.out.persistence`)의 setter는 하위 패키지(`adapter.out.persistence.account` 등)에서 접근 불가. 서브패키지 어댑터/테스트에서 `setCreatedAt()`/`setUpdatedAt()` 호출 시 컴파일 오류 발생
 
 ### 자체 JWT 인증 (ECC P-256)
-- `JwtIssuerService`: `jwt.signing-key` EC P-256 JWK로 ES256 JWT 발급 (AT TTL: 1일 = 86_400_000ms)
+- `JwtIssuerService`: `jwt.signing-key` EC P-256 JWK로 ES256 JWT 발급 (AT TTL: `TokenConstants.AT_TTL` = 1일, `domain/model/auth/`)
 - `JwtAuthFilter`: Bearer 토큰 추출 → `JwtDecoder`(NimbusJwtDecoder) 검증 → principal UUID 설정 (log.warn 실패 시)
 - `JwtDecoderConfig`: 단일 빈, 프로파일 분기 없음 — `${jwt.signing-key}` 공개키만으로 검증
 - **`JwtDecoder` @Bean은 반드시 `JwtDecoderConfig.java`에 분리** — `SecurityConfig`에 두면 `JwtAuthFilter` 순환 참조로 `APPLICATION FAILED TO START`
