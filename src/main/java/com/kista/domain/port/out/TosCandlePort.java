@@ -9,4 +9,7 @@ import java.util.List;
 public interface TosCandlePort {
     // GET /api/v1/candles — interval: "1d"(일봉)만 openapi.json 검증됨. "1w" 등 미지원
     List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to);
+
+    // 최신 캔들 N개 조회 — count는 토스 API 1회 호출 최대치인 200으로 clamp
+    List<TossCandle> getLatestCandles(String symbol, String interval, int count);
 }

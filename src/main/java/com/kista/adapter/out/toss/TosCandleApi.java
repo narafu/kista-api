@@ -39,6 +39,20 @@ public class TosCandleApi implements TosCandlePort {
         long calendarDays = from.until(to).getDays() + 1;
         int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
 
+        List<TossCandle> candles = fetchCandles(symbol, interval, count, beforeParam);
+        // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
+        return candles.stream().filter(c -> !c.date().isBefore(from)).toList();
+    }
+
+    @Override
+    public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
+        int clamped = Math.max(1, Math.min(count, MAX_COUNT));
+        // before = 내일 00:00 UTC (오늘 봉까지 포함) — 토스 1회 호출 최대치(count)만큼 최신 캔들 그대로 사용
+        String beforeParam = LocalDate.now().plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
+        return fetchCandles(symbol, interval, clamped, beforeParam);
+    }
+
+    private List<TossCandle> fetchCandles(String symbol, String interval, int count, String beforeParam) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbol",   symbol);
         params.add("interval", interval);
@@ -67,8 +81,6 @@ public class TosCandleApi implements TosCandlePort {
                             c.volume() != null ? Long.parseLong(c.volume()) : 0L
                     );
                 })
-                // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
-                .filter(c -> !c.date().isBefore(from))
                 // Toss 응답 순서가 최신순(내림차순)일 수 있음 — 캔들차트 라이브러리는 오름차순 필수
                 .sorted(Comparator.comparing(TossCandle::date))
                 .toList();
