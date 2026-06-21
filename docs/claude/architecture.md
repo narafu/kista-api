@@ -16,7 +16,8 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
                    StrategyCycle 필드: id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt, seedResolvedBy (9필드, isReverseMode 제거됨)
                    CyclePosition 필드: id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, isReverseMode(boolean), createdAt, deletedAt (9필드 — isReverseMode가 리버스모드 SSOT)
     order/       ← Order, TradeEvent
-                   Order 필드: id, accountId, strategyCycleId, tradeDate, ticker, orderType, direction, quantity, price, status, kisOrderId, filledQuantity, filledPrice
+                   Order 필드: id, accountId, strategyCycleId, tradeDate, ticker, orderType, timing, direction, quantity, price, status, externalOrderId, filledQuantity, filledPrice
+                   Order.withPlaced(externalOrderId) — 브로커 접수 완료 표시 헬퍼 (KisOrderApi/TosOrderApi/TradingOrderExecutor 사용)
                    OrderPort 조회/삭제는 strategyCycleId+tradeDate 기준 (1계좌 다중 전략 시 cycle 단위 격리): findPlannedByCycleAndDate, findPlacedByCycleAndDate, findPlannedOrPlacedByCycleAndDate, deletePlannedByCycleAndDate, deletePlannedBuyByCycleAndDate
     auth/        ← RefreshToken(id, userId, tokenHash, userAgent, expiresAt, rotatedAt, createdAt),
                    TokenRefreshResult(userId, userRole, newRawRefreshToken),
