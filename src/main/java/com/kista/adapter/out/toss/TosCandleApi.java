@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.List;
 
 // Toss 캔들 API 스펙 (openapi.json 검증):
@@ -68,6 +69,8 @@ public class TosCandleApi implements TosCandlePort {
                 })
                 // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
                 .filter(c -> !c.date().isBefore(from))
+                // Toss 응답 순서가 최신순(내림차순)일 수 있음 — 캔들차트 라이브러리는 오름차순 필수
+                .sorted(Comparator.comparing(TossCandle::date))
                 .toList();
     }
 
