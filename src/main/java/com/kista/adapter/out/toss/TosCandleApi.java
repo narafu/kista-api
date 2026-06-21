@@ -1,7 +1,6 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.port.out.TosCandlePort;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +31,7 @@ public class TosCandleApi implements TosCandlePort {
     private final TossHttpClient tossHttpClient;
 
     @Override
-    public List<TossCandle> getCandles(Ticker ticker, String interval, LocalDate from, LocalDate to) {
+    public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
         // before = to 다음날 00:00 UTC (to 당일 봉 포함)
         String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
         // count = from~to 달력 일수 × 1.5 (주말·공휴일 여유분), 최대 200
@@ -40,7 +39,7 @@ public class TosCandleApi implements TosCandlePort {
         int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("symbol",   ticker.name());
+        params.add("symbol",   symbol);
         params.add("interval", interval);
         params.add("count",    String.valueOf(count));
         params.add("before",   beforeParam);
@@ -48,12 +47,12 @@ public class TosCandleApi implements TosCandlePort {
         // 공통 API — 관리자 토큰 사용
         CandlesResponse response = tossHttpClient.getCommon(CANDLES_PATH, params, CandlesResponse.class);
 
-        if (response == null || response.result() == null) {
-            log.warn("Toss 캔들 응답 없음: ticker={}, interval={}", ticker, interval);
+        if (response == null || response.result() == null || response.result().candles() == null) {
+            log.warn("Toss 캔들 응답 없음: symbol={}, interval={}", symbol, interval);
             return List.of();
         }
 
-        return response.result().stream()
+        return response.result().candles().stream()
                 .filter(c -> c.timestamp() != null)
                 .map(c -> {
                     // timestamp(ISO8601 UTC) → LocalDate
@@ -80,7 +79,12 @@ public class TosCandleApi implements TosCandlePort {
 
     // package-private — 테스트에서 직접 생성
     record CandlesResponse(
-        @JsonProperty("result") List<CandleItem> result
+        @JsonProperty("result") CandlesResult result
+    ) {}
+
+    record CandlesResult(
+        @JsonProperty("candles") List<CandleItem> candles,
+        @JsonProperty("nextBefore") String nextBefore
     ) {}
 
     record CandleItem(
