@@ -55,4 +55,38 @@ class RedisBlacklistAdapterTest {
 
         assertThat(adapter.isBlacklisted(userId)).isFalse();
     }
+
+    @Test
+    void addJti_setsKeyWithTtl() {
+        String jti = "test-jti-value";
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+
+        adapter.addJti(jti, Duration.ofDays(1));
+
+        verify(valueOps).set("blacklist:jti:" + jti, "1", Duration.ofDays(1));
+    }
+
+    @Test
+    void isJtiBlacklisted_keyExists_returnsTrue() {
+        String jti = "test-jti-value";
+        given(redisTemplate.hasKey("blacklist:jti:" + jti)).willReturn(true);
+
+        assertThat(adapter.isJtiBlacklisted(jti)).isTrue();
+    }
+
+    @Test
+    void isJtiBlacklisted_keyAbsent_returnsFalse() {
+        String jti = "test-jti-value";
+        given(redisTemplate.hasKey("blacklist:jti:" + jti)).willReturn(false);
+
+        assertThat(adapter.isJtiBlacklisted(jti)).isFalse();
+    }
+
+    @Test
+    void isJtiBlacklisted_nullFromRedis_returnsFalse() {
+        String jti = "test-jti-value";
+        given(redisTemplate.hasKey("blacklist:jti:" + jti)).willReturn(null);
+
+        assertThat(adapter.isJtiBlacklisted(jti)).isFalse();
+    }
 }

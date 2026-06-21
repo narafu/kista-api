@@ -17,4 +17,9 @@ class BlacklistService implements BlacklistUseCase {
     public boolean isBlacklisted(UUID userId) {
         return blacklistPort.isBlacklisted(userId);
     }
+
+    @Override
+    public boolean isJtiBlacklisted(String jti) {
+        return blacklistPort.isJtiBlacklisted(jti);
+    }
 }
