@@ -2,6 +2,7 @@ package com.kista.domain.model.strategy;
 
 import com.kista.common.TimeZones;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,8 +23,10 @@ public record DstInfo(
         BLOCKED  // 장마감 후~프리마켓 전: 주문 불가 (DST: 05:00~17:00, 비DST: 06:00~18:00)
     }
 
-    // 현재 KST 시각 기준 주문 가능 시간대 판단
+    // 현재 KST 기준 주문 가능 시간대 판단 — 주말은 요일 무관 BLOCKED
     public MarketSession currentSession() {
+        DayOfWeek day = LocalDate.now(KST).getDayOfWeek();
+        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) return MarketSession.BLOCKED;
         LocalTime t = LocalTime.now(KST);
         // DST: 장마감 05:00, 프리마켓시작 17:00 / 비DST: 장마감 06:00, 프리마켓시작 18:00
         LocalTime marketClose    = isDst ? LocalTime.of(5, 0)  : LocalTime.of(6, 0);
