@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.security;
 
+import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.user.User;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.ECKey;
@@ -80,9 +81,9 @@ class JwtIssuerServiceTest {
     }
 
     @Test
-    @DisplayName("expiresInSeconds() — 15분(900초) 반환")
+    @DisplayName("expiresInSeconds() — AT_TTL(1일, 86400초) 반환")
     void expiresInSeconds_returns_900() {
-        assertThat(jwtIssuerService.expiresInSeconds()).isEqualTo(900L);
+        assertThat(jwtIssuerService.expiresInSeconds()).isEqualTo(TokenConstants.AT_TTL.toSeconds());
     }
 
     // 공개키로 ES256 서명 검증 후 클레임 반환

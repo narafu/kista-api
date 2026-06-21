@@ -2,6 +2,7 @@ package com.kista.application.service.auth;
 
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.RefreshToken;
+import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.BlacklistPort;
@@ -141,7 +142,7 @@ class TokenServiceTest {
         tokenService.logout(raw);
 
         verify(refreshTokenPort).deleteByTokenHash(hash);
-        verify(blacklistPort).add(USER_ID, Duration.ofMinutes(15));
+        verify(blacklistPort).add(USER_ID, TokenConstants.AT_TTL);
     }
 
     @Test
