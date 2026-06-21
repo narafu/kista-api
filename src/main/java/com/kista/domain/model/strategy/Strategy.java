@@ -37,10 +37,21 @@ public record Strategy(
         return new Strategy(id, accountId, type, status, ticker, newCycleSeedType, divisionCount);
     }
 
-    public boolean isInfinite() { return type == Type.INFINITE; }
-    public boolean isPrivacy()  { return type == Type.PRIVACY; }
-    public boolean isActive()   { return status == Status.ACTIVE; }
-    public boolean isPaused()   { return status == Status.PAUSED; }
+    public boolean isInfinite() {
+        return type == Type.INFINITE;
+    }
+
+    public boolean isPrivacy() {
+        return type == Type.PRIVACY;
+    }
+
+    public boolean isActive() {
+        return status == Status.ACTIVE;
+    }
+
+    public boolean isPaused() {
+        return status == Status.PAUSED;
+    }
 
     // 분할 수만 교체
     public Strategy withDivisionCount(int newDivisionCount) {
@@ -84,12 +95,10 @@ public record Strategy(
     @Getter
     @RequiredArgsConstructor
     public enum Ticker {
-        TQQQ(new BigDecimal("0.15"), "PROSHARES QQQ 3X"),
-        SOXL(new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"),
-        USD(new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"),
-        MAGX(new BigDecimal("0.20"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"),
-        FNGU(new BigDecimal("0.20"), "MICROSECTORS FANG+ 3X"),
-        BULZ(new BigDecimal("0.20"), "MICROSECTORS SOLACTIVE FANG & INNOVATION 3X");
+        MAGX(new BigDecimal("0.15"), "ROUNDHILL DAILY MAGNIFICENT SEVEN 2X"), // 베타: 2.2~2.4
+        USD(new BigDecimal("0.20"), "PROSHARES SEMICONDUCTORS 2X"), // 베타: 3.5~3.7
+        TQQQ(new BigDecimal("0.15"), "PROSHARES QQQ 3X"), // 베타: 3.4~3.5
+        SOXL(new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X"); // 베타: 5.3~5.5
 
         private final BigDecimal targetProfitRate;  // 익절 목표 수익률 (매매 도메인 정책)
         private final String description;           // 종목 설명 (UI 메타)

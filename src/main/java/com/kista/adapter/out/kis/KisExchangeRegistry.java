@@ -17,9 +17,7 @@ public class KisExchangeRegistry {
             Ticker.TQQQ, new Mapping("NASD", "NAS"),
             Ticker.SOXL, new Mapping("AMEX", "AMS"),
             Ticker.USD,  new Mapping("AMEX", "AMS"),
-            Ticker.MAGX, new Mapping("AMEX", "AMS"),
-            Ticker.FNGU, new Mapping("AMEX", "AMS"),
-            Ticker.BULZ, new Mapping("AMEX", "AMS")
+            Ticker.MAGX, new Mapping("AMEX", "AMS")
     );
 
     public String ovrsExcgCd(Ticker ticker) {
