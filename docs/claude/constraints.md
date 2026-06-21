@@ -76,7 +76,7 @@
 
 ### Ticker enum (Strategy.Ticker nested enum)
 - **import 경로**: `import com.kista.domain.model.strategy.Strategy.Ticker;`
-- `Strategy.Ticker` enum: TQQQ/SOXL/USD/MAGX/FNGU/BULZ — `targetProfitRate`/`description` 필드만 보유. KIS 거래소 코드(OVRS_EXCG_CD/EXCD)는 `Ticker`가 아닌 `KisExchangeRegistry`(adapter/out/kis)가 매핑 관리 — 새 종목 추가 시 양쪽 모두 갱신 필요
+- `Strategy.Ticker` enum: MAGX/USD/TQQQ/SOXL (4종) — `targetProfitRate`/`description` 필드만 보유. KIS 거래소 코드(OVRS_EXCG_CD/EXCD)는 `Ticker`가 아닌 `KisExchangeRegistry`(adapter/out/kis)가 매핑 관리 — 새 종목 추가 시 양쪽 모두 갱신 필요
 - PRIVACY 전략: 항상 `Strategy.Ticker.SOXL` 강제 (`Strategy.Type.resolveTicker()`)
 - `Strategy.Ticker.tryParse(String)` — KIS 응답 종목코드 안전 변환 (`Optional` 반환)
 - **Account에서 ticker 제거됨** — 매매 시 `strategy.ticker()` 사용

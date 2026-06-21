@@ -71,7 +71,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 - `priceOffsetRate` 기대값: scale=2 반올림된 currentRound 기준으로 계산 후 scale=2 HALF_UP 반올림 (T=200/150=1.33 → 0.1734 → 0.17)
 - `TradingServiceTest`는 `when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음
-- TQQQ `targetProfitRate=0.15`, SOXL/USD `targetProfitRate=0.20` — `Ticker` enum이 관리
+- TQQQ/MAGX `targetProfitRate=0.15`, SOXL/USD `targetProfitRate=0.20` — `Ticker` enum이 관리
 
 ### JPA 엔티티 저장 패턴
 - `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
