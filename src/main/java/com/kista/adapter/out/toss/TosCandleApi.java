@@ -1,7 +1,6 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.port.out.TosCandlePort;
@@ -33,7 +32,7 @@ public class TosCandleApi implements TosCandlePort {
     private final TossHttpClient tossHttpClient;
 
     @Override
-    public List<TossCandle> getCandles(Ticker ticker, String interval, LocalDate from, LocalDate to, Account account) {
+    public List<TossCandle> getCandles(Ticker ticker, String interval, LocalDate from, LocalDate to) {
         // before = to 다음날 00:00 UTC (to 당일 봉 포함)
         String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
         // count = from~to 달력 일수 × 1.5 (주말·공휴일 여유분), 최대 200
@@ -46,9 +45,8 @@ public class TosCandleApi implements TosCandlePort {
         params.add("count",    String.valueOf(count));
         params.add("before",   beforeParam);
 
-        // 캔들은 계좌 컨텍스트 불필요 — 시세 조회 경로
-        CandlesResponse response = tossHttpClient.getNoAccountHeader(
-                CANDLES_PATH, account, params, CandlesResponse.class);
+        // 공통 API — 관리자 토큰 사용
+        CandlesResponse response = tossHttpClient.getCommon(CANDLES_PATH, params, CandlesResponse.class);
 
         if (response == null || response.result() == null) {
             log.warn("Toss 캔들 응답 없음: ticker={}, interval={}", ticker, interval);

@@ -32,13 +32,20 @@ import java.util.concurrent.locks.ReentrantLock;
 @RequiredArgsConstructor
 public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
 
-    // 계좌별 락 — 동시 요청 시 중복 발급 방지
+    // 공통 API 관리자 토큰 캐시 키 — 실제 계좌 UUID와 절대 충돌 없는 nil UUID
+    private static final UUID ADMIN_TOKEN_CACHE_ID = new UUID(0L, 0L);
+
+    // 계좌별 락 — 동시 요청 시 중복 발급 방지 (관리자 토큰 캐시 키도 포함)
     private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     private final RestTemplate tossRestTemplate;
     private final BrokerTokenCachePort brokerTokenCachePort;
     @Value("${toss.base-url}")
     private final String tossBaseUrl;
+    @Value("${toss.admin-client-id}")
+    private final String adminClientId;         // 공통 API용 관리자 Toss client_id
+    @Value("${toss.admin-client-secret}")
+    private final String adminClientSecret;     // 공통 API용 관리자 Toss client_secret
 
     // ── TossTokenPort ──────────────────────────────────────────────────────────
 
@@ -79,6 +86,29 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
     public void invalidateToken(UUID accountId) {
         // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
         brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+    }
+
+    // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
+
+    @Override
+    public String getAdminToken() {
+        // 1차 조회 — 락 없이 빠른 경로
+        Optional<String> cached = brokerTokenCachePort.findValidToken(ADMIN_TOKEN_CACHE_ID, threshold());
+        if (cached.isPresent()) return cached.get();
+        // 캐시 miss 시 관리자 캐시 키 락으로 경합 차단
+        ReentrantLock lock = locks.computeIfAbsent(ADMIN_TOKEN_CACHE_ID, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            return brokerTokenCachePort.findValidToken(ADMIN_TOKEN_CACHE_ID, threshold())
+                    .orElseGet(() -> fetchAndCacheToken(ADMIN_TOKEN_CACHE_ID, adminClientId, adminClientSecret));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void invalidateAdminToken() {
+        brokerTokenCachePort.saveToken(ADMIN_TOKEN_CACHE_ID, "EXPIRED", OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
     }
 
     // ── TossConnectionTestPort ─────────────────────────────────────────────────

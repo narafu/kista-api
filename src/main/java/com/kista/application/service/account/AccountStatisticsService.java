@@ -142,7 +142,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // Toss 계좌는 KIS 아닌 Toss 가격 API 사용
-        if (account.isToss()) return tosPricePort.getPrices(tickers, account);
+        if (account.isToss()) return tosPricePort.getPrices(tickers); // 공통 API — account 불필요
         return kisPricePort.getPrices(tickers, account);
     }
 
@@ -209,21 +209,21 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                                            LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tosCandlePort.getCandles(ticker, interval, from, to, account);
+        return tosCandlePort.getCandles(ticker, interval, from, to); // 공통 API — account 불필요
     }
 
     @Override
     public TossStockInfo getTossStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossStockInfoPort.getStockInfo(ticker, account);
+        return tossStockInfoPort.getStockInfo(ticker); // 공통 API — account 불필요
     }
 
     @Override
     public TossExchangeRate getTossExchangeRate(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossExchangeRatePort.getExchangeRate(account);
+        return tossExchangeRatePort.getExchangeRate(); // 공통 API — account 불필요
     }
 
     @Override
@@ -231,7 +231,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                                                          LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossMarketCalendarPort.getMarketCalendar(from, to, account);
+        return tossMarketCalendarPort.getMarketCalendar(from, to); // 공통 API — account 불필요
     }
 
     @Override

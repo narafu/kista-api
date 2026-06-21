@@ -46,10 +46,12 @@ class TossAuthApiTest {
     private static final String BASE_URL = "https://openapi.tossinvest.com";
     private static final String CLIENT_ID = "test-client-id";
     private static final String CLIENT_SECRET = "test-client-secret";
+    private static final String ADMIN_CLIENT_ID = "admin-client-id";
+    private static final String ADMIN_CLIENT_SECRET = "admin-client-secret";
 
     @BeforeEach
     void setUp() {
-        api = new TossAuthApi(tossRestTemplate, brokerTokenCachePort, BASE_URL);
+        api = new TossAuthApi(tossRestTemplate, brokerTokenCachePort, BASE_URL, ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
     }
 
     @Nested

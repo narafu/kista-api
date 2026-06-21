@@ -1,7 +1,6 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossStockInfo;
@@ -32,16 +31,15 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     private final TossHttpClient tossHttpClient;
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
         // symbols 쿼리 파라미터: 콤마 구분 종목 코드 목록
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", tickers.stream().map(Ticker::name).collect(Collectors.joining(",")));
 
-        // Toss API 응답: {"result": [{symbol, lastPrice, currency, timestamp}]} 래퍼 구조
-        PricesResponse response = tossHttpClient.getNoAccountHeader(
-                PRICES_PATH, account, params, PricesResponse.class);
+        // 공통 API — 관리자 토큰 사용
+        PricesResponse response = tossHttpClient.getCommon(PRICES_PATH, params, PricesResponse.class);
 
         List<PriceItem> items = response != null ? response.result() : null;
 
@@ -55,21 +53,21 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     }
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, Account account) {
+    public BigDecimal getPrice(Ticker ticker) {
         // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일
-        return getPrices(List.of(ticker), account).getOrDefault(ticker, BigDecimal.ZERO);
+        return getPrices(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
-        BigDecimal price = getPrice(ticker, account);
+    public PriceSnapshot getPriceSnapshot(Ticker ticker) {
+        BigDecimal price = getPrice(ticker);
         // Toss 전일종가 전용 API 없음 — prevClose = current (0회차 진입 방향 보수적 처리)
         return new PriceSnapshot(price, price);
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
-        return getPrices(tickers, account).entrySet().stream()
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers) {
+        return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         e -> new PriceSnapshot(e.getValue(), e.getValue())));  // prevClose = current
@@ -78,13 +76,13 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     // ── TossStockInfoPort ──────────────────────────────────────────────────────
 
     @Override
-    public TossStockInfo getStockInfo(Ticker ticker, Account account) {
+    public TossStockInfo getStockInfo(Ticker ticker) {
         // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", ticker.name());
 
-        StocksResponse response = tossHttpClient.getNoAccountHeader(
-                STOCKS_PATH, account, params, StocksResponse.class);
+        // 공통 API — 관리자 토큰 사용
+        StocksResponse response = tossHttpClient.getCommon(STOCKS_PATH, params, StocksResponse.class);
 
         List<StockItem> items = response != null ? response.result() : null;
         if (items == null || items.isEmpty()) {

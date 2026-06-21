@@ -22,29 +22,29 @@ public class BrokerPriceRouter {
 
     public BigDecimal getPrice(Ticker ticker, Account account) {
         return switch (account.broker()) {
-            case KIS -> kisPricePort.getPrice(ticker, account);
-            case TOSS -> tosPricePort.getPrice(ticker, account);
+            case KIS  -> kisPricePort.getPrice(ticker, account);
+            case TOSS -> tosPricePort.getPrice(ticker);          // 공통 API — account 불필요
         };
     }
 
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
         return switch (account.broker()) {
-            case KIS -> kisPricePort.getPrices(tickers, account);
-            case TOSS -> tosPricePort.getPrices(tickers, account);
+            case KIS  -> kisPricePort.getPrices(tickers, account);
+            case TOSS -> tosPricePort.getPrices(tickers);        // 공통 API — account 불필요
         };
     }
 
     public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
         return switch (account.broker()) {
-            case KIS -> kisPricePort.getPriceSnapshot(ticker, account);
-            case TOSS -> tosPricePort.getPriceSnapshot(ticker, account);
+            case KIS  -> kisPricePort.getPriceSnapshot(ticker, account);
+            case TOSS -> tosPricePort.getPriceSnapshot(ticker);  // 공통 API — account 불필요
         };
     }
 
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
         return switch (account.broker()) {
-            case KIS -> kisPricePort.getPriceSnapshots(tickers, account);
-            case TOSS -> tosPricePort.getPriceSnapshots(tickers, account);
+            case KIS  -> kisPricePort.getPriceSnapshots(tickers, account);
+            case TOSS -> tosPricePort.getPriceSnapshots(tickers);// 공통 API — account 불필요
         };
     }
 }

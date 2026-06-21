@@ -69,6 +69,8 @@ kis:
 
 toss:
   base-url: https://openapi.tossinvest.com
+  admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}      # 공통 API(시세·환율·시장정보)용 관리자 자격증명
+  admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
 
 telegram:
   bot-token: ${TELEGRAM_BOT_TOKEN}

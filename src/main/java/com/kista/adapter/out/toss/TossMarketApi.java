@@ -40,25 +40,25 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
     // ── TossMarketCalendarPort ─────────────────────────────────────────────────
 
     @Override
-    public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to, Account account) {
+    public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
         long days = from.until(to).getDays() + 1;
         if (days > MAX_RANGE_DAYS) {
             throw new IllegalArgumentException("market-calendar 조회는 최대 " + MAX_RANGE_DAYS + "일 범위만 지원합니다");
         }
         List<TossMarketSession> sessions = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            sessions.add(fetchSession(date, account));
+            sessions.add(fetchSession(date));
         }
         return sessions;
     }
 
-    private TossMarketSession fetchSession(LocalDate date, Account account) {
+    private TossMarketSession fetchSession(LocalDate date) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("date", date.toString()); // YYYY-MM-DD
 
-        // 장 운영 정보는 계좌 컨텍스트 불필요
-        MarketCalendarResponse response = tossHttpClient.getNoAccountHeader(
-                MARKET_CALENDAR_PATH, account, params, MarketCalendarResponse.class);
+        // 공통 API — 관리자 토큰 사용
+        MarketCalendarResponse response = tossHttpClient.getCommon(
+                MARKET_CALENDAR_PATH, params, MarketCalendarResponse.class);
 
         if (response == null || response.today() == null) {
             log.warn("Toss market-calendar 응답 없음: date={}", date);

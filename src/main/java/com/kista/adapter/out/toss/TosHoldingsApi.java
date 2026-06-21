@@ -78,7 +78,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
         BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");
-        BigDecimal usdToKrwRate = fetchUsdToKrwRate(account);
+        BigDecimal usdToKrwRate = fetchUsdToKrwRate();
 
         // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
         log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
@@ -97,7 +97,7 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         // 2~4. USD·KRW 예수금 및 환율 조회
         BigDecimal usdDeposit = fetchBuyingPower(account, "USD");
         BigDecimal krwDeposit = fetchBuyingPower(account, "KRW");
-        BigDecimal rate = fetchUsdToKrwRate(account);
+        BigDecimal rate = fetchUsdToKrwRate();
 
         // 5. Ticker 파싱 성공·수량 > 0 항목만 Item 변환
         List<PresentBalanceResult.Item> items = List.of();
@@ -176,20 +176,21 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         return new BigDecimal(wrapper.result().cashBuyingPower());
     }
 
-    // USD/KRW 환율 조회 (1 USD = ? KRW) — 계좌 컨텍스트 불필요
-    private BigDecimal fetchUsdToKrwRate(Account account) {
-        return getExchangeRate(account).rate();
+    // USD/KRW 환율 조회 (1 USD = ? KRW) — 공통 API, 관리자 토큰 사용
+    private BigDecimal fetchUsdToKrwRate() {
+        return getExchangeRate().rate();
     }
 
     // ── TossExchangeRatePort ───────────────────────────────────────────────────
 
     @Override
-    public TossExchangeRate getExchangeRate(Account account) {
+    public TossExchangeRate getExchangeRate() {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
-        ExchangeRateWrapper wrapper = tossHttpClient.getNoAccountHeader(
-                EXCHANGE_RATE_PATH, account, params, ExchangeRateWrapper.class);
+        // 공통 API — 관리자 토큰 사용
+        ExchangeRateWrapper wrapper = tossHttpClient.getCommon(
+                EXCHANGE_RATE_PATH, params, ExchangeRateWrapper.class);
         if (wrapper == null || wrapper.result() == null) {
             return new TossExchangeRate(BigDecimal.ZERO, BigDecimal.ZERO);
         }

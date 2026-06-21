@@ -37,10 +37,8 @@ class TosHoldingsApiTest {
         tosHoldingsApi = new TosHoldingsApi(tossHttpClient);
     }
 
-    // getMarginItems는 exchange-rate API에 getNoAccountHeader를 사용 — 별도 stub 불필요
-    private void stubNoAccountHeader() {
-        // buildHeadersNoAccount 제거됨 — getNoAccountHeader stub은 개별 테스트에서 직접 설정
-    }
+    // exchange-rate API는 getCommon 사용 — 개별 테스트에서 직접 stub
+    private void stubNoAccountHeader() {}
 
     @Test
     @DisplayName("보유 종목 있음: 정상 AccountBalance 반환")
@@ -111,7 +109,7 @@ class TosHoldingsApiTest {
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
                 return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
             });
-        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(new TosHoldingsApi.ExchangeRateWrapper(new TosHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
 
         List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
@@ -140,7 +138,7 @@ class TosHoldingsApiTest {
                 String amount = "USD".equals(currency) ? "100.00" : "50000";
                 return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
             });
-        when(tossHttpClient.getNoAccountHeader(eq("/api/v1/exchange-rate"), any(), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(null);
 
         List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
