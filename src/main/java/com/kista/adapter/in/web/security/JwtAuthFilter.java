@@ -37,10 +37,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Jwt jwt = jwtDecoder.decode(token);
                 UUID userId = UUID.fromString(jwt.getSubject()); // sub 클레임 = 사용자 UUID
 
-                // 블랙리스트 체크 — 탈퇴·로그아웃·거절된 userId 즉시 차단
-                if (blacklistUseCase.isBlacklisted(userId)) {
-                    log.debug("블랙리스트 차단: userId={}", userId);
+                // jti 블랙리스트 체크 (로그아웃된 AT) → userId 블랙리스트 체크 (탈퇴/거절)
+                String jti = jwt.getId();
+                if ((jti != null && blacklistUseCase.isJtiBlacklisted(jti)) || blacklistUseCase.isBlacklisted(userId)) {
+                    log.debug("블랙리스트 차단: userId={}, jti={}", userId, jti);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\":\"TOKEN_BLACKLISTED\",\"message\":\"로그아웃된 토큰입니다. 다시 로그인해 주세요.\"}");
                     return;
                 }
 

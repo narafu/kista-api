@@ -8,6 +8,7 @@ import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -15,15 +16,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -89,6 +93,69 @@ class AuthControllerTokenTest {
     void logout_noCookie_returns204() throws Exception {
         mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("jti 블랙리스트 차단 — 401 + JSON body TOKEN_BLACKLISTED 반환")
+    void request_jtiBlacklisted_returns401WithJsonBody() throws Exception {
+        String jti = "blacklisted-jti";
+        Jwt jwt = Jwt.withTokenValue("test-at")
+                .header("alg", "ES256")
+                .jti(jti)
+                .claim("sub", USER_ID.toString())
+                .claim("role", "USER")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+        given(jwtDecoder.decode(anyString())).willReturn(jwt);
+        given(blacklistUseCase.isJtiBlacklisted(jti)).willReturn(true); // jti 블랙리스트 hit
+        given(blacklistUseCase.isBlacklisted(any())).willReturn(false);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer test-at"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType("application/json;charset=UTF-8"))
+                .andExpect(jsonPath("$.error").value("TOKEN_BLACKLISTED"));
+    }
+
+    @Test
+    @DisplayName("userId 블랙리스트 차단 — 401 + JSON body TOKEN_BLACKLISTED 반환")
+    void request_userIdBlacklisted_returns401WithJsonBody() throws Exception {
+        String jti = "valid-jti";
+        Jwt jwt = Jwt.withTokenValue("test-at")
+                .header("alg", "ES256")
+                .jti(jti)
+                .claim("sub", USER_ID.toString())
+                .claim("role", "USER")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+        given(jwtDecoder.decode(anyString())).willReturn(jwt);
+        given(blacklistUseCase.isJtiBlacklisted(jti)).willReturn(false); // jti 정상
+        given(blacklistUseCase.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer test-at"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType("application/json;charset=UTF-8"))
+                .andExpect(jsonPath("$.error").value("TOKEN_BLACKLISTED"));
+    }
+
+    @Test
+    @DisplayName("jti null이어도 userId 블랙리스트 체크 수행 — 차단 시 401 반환")
+    void request_jtiNullUserIdBlacklisted_returns401() throws Exception {
+        // jti 없는 JWT (getId() → null)
+        Jwt jwt = Jwt.withTokenValue("test-at")
+                .header("alg", "ES256")
+                .claim("sub", USER_ID.toString())
+                .claim("role", "USER")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+        given(jwtDecoder.decode(anyString())).willReturn(jwt);
+        given(blacklistUseCase.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer test-at"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("TOKEN_BLACKLISTED"));
     }
 
     private User stubUser(UUID id) {
