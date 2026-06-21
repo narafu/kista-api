@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.TossCandleResponse;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.in.MarketUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +49,15 @@ public class MarketHolidayController {
     public MarketSessionResponse getSession() {
         DstInfo dst = DstInfo.immediate();
         return new MarketSessionResponse(dst.currentSession().name(), dst.isDst());
+    }
+
+    @Operation(summary = "종목 일봉 캔들 조회 (최대 200개, 계좌 무관 공용 시세)")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/candles")
+    public List<TossCandleResponse> getCandles(
+            @Parameter(description = "종목코드", example = "QQQ") @RequestParam String ticker,
+            @Parameter(description = "캔들 개수 (최대 200)", example = "200") @RequestParam(defaultValue = "200") int count) {
+        return TossCandleResponse.fromList(marketUseCase.getDailyCandles(ticker, count));
     }
 
     record MarketSessionResponse(

@@ -209,7 +209,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                                            LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tosCandlePort.getCandles(ticker, interval, from, to); // 공통 API — account 불필요
+        return tosCandlePort.getCandles(ticker.name(), interval, from, to); // 공통 API — account 불필요
     }
 
     @Override
