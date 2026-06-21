@@ -2,6 +2,7 @@ package com.kista.application.service.auth;
 
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.RefreshToken;
+import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.auth.TokenRefreshResult;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.out.BlacklistPort;
@@ -30,7 +31,7 @@ import java.util.UUID;
 class TokenService implements TokenUseCase {
 
     private static final Duration RT_TTL = Duration.ofHours(120); // 5일
-    private static final Duration AT_TTL = Duration.ofDays(1); // AT 수명 — 블랙리스트 등재 기간
+    private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
     // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 동시 요청 패자로 허용
     static final Duration RT_GRACE = Duration.ofSeconds(60);
 

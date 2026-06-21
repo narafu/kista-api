@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.kista.domain.model.auth.TokenConstants;
+
 import java.security.interfaces.ECPrivateKey;
 import java.util.Date;
 import java.util.UUID;
@@ -14,8 +16,6 @@ import java.util.UUID;
 @Slf4j
 @Component
 public class JwtIssuerService {
-
-    public static final long TOKEN_TTL_MS = 86_400_000L; // 1일 (밀리초)
 
     @Value("${jwt.signing-key}")
     private String signingJwk; // EC JWK JSON 문자열
@@ -26,14 +26,14 @@ public class JwtIssuerService {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("role", role.name()) // 역할(USER/ADMIN) 클레임 — JwtAuthFilter에서 권한 추출
-                .expiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MS))
+                .expiration(new Date(System.currentTimeMillis() + TokenConstants.AT_TTL.toMillis()))
                 .signWith(privateKey, Jwts.SIG.ES256)
                 .compact();
     }
 
     // 토큰 유효 기간 (초 단위)
     public long expiresInSeconds() {
-        return TOKEN_TTL_MS / 1000;
+        return TokenConstants.AT_TTL.toSeconds();
     }
 
     // JWK JSON 문자열에서 EC 개인키 파싱
