@@ -62,9 +62,7 @@ class TradingOrderExecutor {
             // 브로커 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
             try {
                 orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
-                placed.add(new Order(p.id(), p.accountId(), p.strategyCycleId(), p.tradeDate(), p.ticker(),
-                        p.orderType(), p.timing(), p.direction(), p.quantity(), p.price(),
-                        Order.OrderStatus.PLACED, placedOrder.externalOrderId(), null, null));
+                placed.add(p.withPlaced(placedOrder.externalOrderId()));
             } catch (Exception e) {
                 log.error("[{}] {} {} 브로커 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
                         account.nickname(), p.direction(), p.ticker(), placedOrder.externalOrderId(), e.getMessage());

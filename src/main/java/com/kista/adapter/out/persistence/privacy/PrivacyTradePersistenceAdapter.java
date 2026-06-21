@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Component
@@ -102,7 +103,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
             Order o = incomingOrders.get(i);
             if (e.getDirection() != o.direction()) return false;
             if (e.getOrderType() != o.orderType()) return false;
-            if (!quantityEquals(e.getQuantity(), o.quantity())) return false;
+            if (!Objects.equals(e.getQuantity(), o.quantity())) return false;
             if (e.getPrice().compareTo(o.price()) != 0) return false;
         }
         return true;
@@ -139,12 +140,6 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                     return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
                             entity.getCurrentCycleStart(), trades);
                 });
-    }
-
-    private static boolean quantityEquals(Integer a, Integer b) {
-        if (a == null && b == null) return true;
-        if (a == null || b == null) return false;
-        return a.equals(b);
     }
 
     @Override

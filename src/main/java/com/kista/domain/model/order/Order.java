@@ -71,4 +71,11 @@ public record Order(
         return new Order(null, null, null, tradeDate, ticker, orderType, timing, direction,
                 quantity, price, OrderStatus.PLANNED, null, null, null);
     }
+
+    // 브로커 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
+    public Order withPlaced(String externalOrderId) {
+        return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, quantity, price,
+                OrderStatus.PLACED, externalOrderId, null, null);
+    }
 }

@@ -25,10 +25,9 @@ public class KisOrderApi implements KisOrderPort {
     @Override
     public Order place(Order order, Account account) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
-        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
-        String[] acctParts = account.accountNo().split("-", 2);
+        String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
-        String acntPrdtCd = acctParts.length > 1 ? acctParts[1] : "01";
+        String acntPrdtCd = acctParts[1];
 
         // autotrade 성공 패턴과 동일한 필드 순서 및 raw JSON String 포맷으로 전송
         String body = """
@@ -66,17 +65,14 @@ public class KisOrderApi implements KisOrderPort {
         String odno = response.output() != null ? response.output().odno() : null;
 
         // id=null, accountId=null, strategyCycleId=null — KIS 응답 객체이므로 DB PK 없음, 호출자가 markPlaced()로 별도 처리
-        return new Order(
-                null, null, null, order.tradeDate(), order.ticker(), order.orderType(), order.timing(), order.direction(),
-                order.quantity(), order.price(), Order.OrderStatus.PLACED, odno, null, null
-        );
+        return order.withPlaced(odno);
     }
 
     @Override
     public void cancel(Order order, Account account) {
-        String[] acctParts = account.accountNo().split("-", 2);
+        String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
-        String acntPrdtCd = acctParts.length > 1 ? acctParts[1] : "01";
+        String acntPrdtCd = acctParts[1];
 
         // place()와 동일하게 raw JSON String으로 전송 — Map+Jackson 직렬화 시 EGW00202 발생
         String body = """
@@ -99,6 +95,12 @@ public class KisOrderApi implements KisOrderPort {
                 order.externalOrderId());
 
         kisHttpClient.post(CANCEL_PATH, kisHttpClient.buildHeaders(CANCEL_TR_ID, account), body, Void.class);
+    }
+
+    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KIS: accountNo에 접수유형 통합)
+    private static String[] splitAccountNo(Account account) {
+        String[] parts = account.accountNo().split("-", 2);
+        return new String[]{ parts[0], parts.length > 1 ? parts[1] : "01" };
     }
 
     private String resolveOrderDvsn(Order.OrderType type) {
