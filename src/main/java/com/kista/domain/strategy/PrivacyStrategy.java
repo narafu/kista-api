@@ -37,6 +37,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         List<BuyEntry> buyEntries = new ArrayList<>();
         List<PrivacyTrade> explicitSells = new ArrayList<>();
         PrivacyTrade nullSellTemplate = null; // null quantity SELL — "잔량 전부 매도" 후보
+        BigDecimal totalBuyAmount = BigDecimal.ZERO; // 기준표 원본 매수금 합계 (배수 적용 전)
 
         // BUY/SELL 분리 — BUY null은 skip, SELL null은 단 1개만 허용
         for (PrivacyTrade t : privacyTradeBase.trades()) {
@@ -45,6 +46,7 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                     log.warn("[PRIVACY] BUY 수량 미정 건너뜀: ticker={}, price={}", t.ticker(), t.price());
                     continue;
                 }
+                totalBuyAmount = totalBuyAmount.add(t.price().multiply(BigDecimal.valueOf(t.quantity())));
                 buyEntries.add(new BuyEntry(t.price(), applyMultiple(t.quantity(), multiple), t.orderType(), t.tradeDate(), t.ticker()));
             } else {
                 if (t.quantity() == null) {
@@ -57,6 +59,9 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
                 }
             }
         }
+
+        // 배수 적용 후 잔여 매수금을 최저가 BUY에 추가 배분
+        allocateRemainingBudget(buyEntries, totalBuyAmount, multiple);
 
         // 기준표 목표 보유량과 현재 잔량의 차이로 BUY 가감
         int target = applyMultiple(privacyTradeBase.holdings(), multiple);
@@ -96,6 +101,34 @@ class PrivacyStrategy implements PrivacyTradingStrategy {
         withNull.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
                 nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return withNull;
+    }
+
+    // 배수 적용 후 소수점 버림으로 생긴 잔여 매수금을 최저가 BUY에 추가 수량으로 배분
+    private void allocateRemainingBudget(List<BuyEntry> buyEntries, BigDecimal totalBuyAmount, BigDecimal multiple) {
+        if (buyEntries.isEmpty() || totalBuyAmount.signum() <= 0) return;
+
+        // 목표 매수금 = 기준표 원본 매수금 합계 × 배수
+        BigDecimal targetBuyAmount = totalBuyAmount.multiply(multiple);
+
+        // 실제 사용금 = 배수 적용 후 각 엔트리의 price × quantity 합산
+        BigDecimal usedAmount = buyEntries.stream()
+                .reduce(BigDecimal.ZERO,
+                        (sum, e) -> sum.add(e.price.multiply(BigDecimal.valueOf(e.quantity))),
+                        BigDecimal::add);
+
+        BigDecimal remaining = targetBuyAmount.subtract(usedAmount);
+        if (remaining.signum() <= 0) return;
+
+        // 최저가 BUY 엔트리에 floor(잔여금 / 최저가) 만큼 추가 수량 배분
+        BuyEntry lowest = buyEntries.stream()
+                .min(Comparator.comparing(e -> e.price))
+                .orElseThrow();
+        int additionalQty = remaining.divide(lowest.price, 0, RoundingMode.DOWN).intValue();
+        if (additionalQty <= 0) return;
+
+        log.info("[PRIVACY] 잔여 매수금 배분: targetBuyAmount={}, usedAmount={}, remaining={}, lowestPrice={}, additionalQty={}",
+                targetBuyAmount, usedAmount, remaining, lowest.price, additionalQty);
+        lowest.quantity += additionalQty;
     }
 
     private void adjustBuyQuantities(List<BuyEntry> buyEntries, int diff) {
