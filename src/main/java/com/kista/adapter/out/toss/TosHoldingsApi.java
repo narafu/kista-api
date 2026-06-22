@@ -13,10 +13,7 @@ import com.kista.domain.port.out.BrokerMarginPort;
 import com.kista.domain.port.out.BrokerPortfolioPort;
 import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.TosAccountPort;
-import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossExchangeRatePort;
-import com.kista.domain.port.out.TossPortfolioPort;
-import com.kista.domain.port.out.TossSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,8 +29,8 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort,
-        TossExchangeRatePort, TossSellableQuantityPort,
+public class TosHoldingsApi implements TosAccountPort,
+        TossExchangeRatePort,
         BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
 
     // Toss 보유주식 API 경로
@@ -72,12 +69,12 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
                 .orElse(new AccountBalance(0, null, usdDeposit));
     }
 
-    @Override
+    // USD 매수가능금액 — BrokerMarginPort.getUsdBuyableAmount()에서 위임
     public BigDecimal getBuyableAmount(Account account) {
         return fetchBuyingPower(account, "USD");
     }
 
-    @Override
+    // USD·KRW 예수금 통화별 — BrokerMarginPort.getMargin()에서 위임
     public List<MarginItem> getMarginItems(Account account) {
         // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
@@ -216,15 +213,14 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         return getBuyableAmount(account); // 단일 API 호출 — getMargin()보다 효율적
     }
 
-    // ── TossSellableQuantityPort / BrokerSellableQuantityPort ─────────────────
-    // 두 포트 모두 SellableQuantity 반환 — 단일 메서드로 구현
+    // ── BrokerSellableQuantityPort ─────────────────────────────────────────────
 
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return fetchSellableQuantity(ticker, account);
     }
 
-    // 내부 헬퍼: Toss 판매 가능 수량 조회 — TossSellableQuantityPort/BrokerSellableQuantityPort 공유
+    // 내부 헬퍼: Toss 판매 가능 수량 조회
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());

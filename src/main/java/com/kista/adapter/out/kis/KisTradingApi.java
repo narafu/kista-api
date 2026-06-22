@@ -20,9 +20,6 @@ import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.KisPortfolioPort;
-import com.kista.domain.port.out.KisSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -36,8 +33,8 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfolioPort,
-        KisExecutionPort, KisDailyTransactionPort, KisSellableQuantityPort,
+public class KisTradingApi implements KisAccountPort,
+        KisExecutionPort, KisDailyTransactionPort,
         BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
@@ -92,7 +89,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
 
-    // ── KisMarginPort ──────────────────────────────────────────────────────────
+    // ── BrokerMarginPort.getMargin() ───────────────────────────────────────────
 
     @Override
     public List<MarginItem> getMargin(Account account) {
@@ -121,7 +118,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
 
     @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
-        // getMargin()은 KisMarginPort와 BrokerMarginPort 양쪽에서 동일 구현 공유
+        // getMargin()은 BrokerMarginPort 구현 — KisAccountPort.getBalance()에서도 사용
         return getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()
@@ -134,7 +131,7 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
         return getUsdBuyableAmount(account);
     }
 
-    // ── KisPortfolioPort ───────────────────────────────────────────────────────
+    // ── BrokerPortfolioPort ────────────────────────────────────────────────────
 
     @Override
     public PresentBalanceResult getPresentBalance(Account account) {
@@ -173,15 +170,14 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
-    // ── KisSellableQuantityPort / BrokerSellableQuantityPort ─────────────────
-    // 두 포트 모두 SellableQuantity 반환 — 단일 메서드로 구현
+    // ── BrokerSellableQuantityPort ─────────────────────────────────────────────
 
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return fetchSellableQuantity(ticker, account);
     }
 
-    // 내부 헬퍼: CTRP6504R 잔고수량 조회 — KisSellableQuantityPort/BrokerSellableQuantityPort 공유
+    // 내부 헬퍼: CTRP6504R 잔고수량 조회
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         PortfolioResponse response = kisHttpClient.tradingGet(
                 PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,

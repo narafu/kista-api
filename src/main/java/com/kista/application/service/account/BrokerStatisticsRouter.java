@@ -13,15 +13,12 @@ import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCommissionRate;
+import com.kista.domain.port.out.BrokerMarginPort;
+import com.kista.domain.port.out.BrokerPortfolioPort;
+import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.KisPortfolioPort;
-import com.kista.domain.port.out.KisSellableQuantityPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossCommissionsPort;
-import com.kista.domain.port.out.TossPortfolioPort;
-import com.kista.domain.port.out.TossSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -33,29 +30,26 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// account.broker() 기반으로 KIS/Toss 통계 포트 선택 — AccountStatisticsService의 if(isToss()) 분기 제거
+// account.broker() 기반 통계 포트 라우터 — 단일 공통 포트로 브로커 무관 호출
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class BrokerStatisticsRouter {
 
-    private final KisPortfolioPort kisPortfolioPort;
-    private final TossPortfolioPort tossPortfolioPort;
-    private final KisMarginPort kisMarginPort;
-    private final TosMarginPort tosMarginPort;
+    private final BrokerPortfolioPort brokerPortfolioPort;
+    private final BrokerMarginPort brokerMarginPort;
+    private final BrokerSellableQuantityPort brokerSellableQuantityPort;
     private final KisDailyTransactionPort kisDailyTransactionPort;
-    private final KisSellableQuantityPort kisSellableQuantityPort;
-    private final TossSellableQuantityPort tossSellableQuantityPort;
     private final TossCommissionsPort tossCommissionsPort;
     private final BrokerExecutionRouter brokerExecutionRouter;
     private final StrategyPort strategyPort;
 
     // 체결기준현재잔고 — KIS: CTRP6504R + TTTC2101R 보정 / Toss: 보유종목+예수금 직접 산출
     PresentBalanceResult getPresentBalance(Account account) {
-        if (account.isToss()) return tossPortfolioPort.getPresentBalance(account);
-        // KIS: CTRP6504R은 예수금·환율 미제공 → TTTC2101R(margin)로 보정
-        PresentBalanceResult portfolio = kisPortfolioPort.getPresentBalance(account);
-        List<MarginItem> margins = kisMarginPort.getMargin(account);
+        if (account.isToss()) return brokerPortfolioPort.getPresentBalance(account);
+        // KIS: CTRP6504R은 예수금·환율 미제공 → margin으로 보정
+        PresentBalanceResult portfolio = brokerPortfolioPort.getPresentBalance(account);
+        List<MarginItem> margins = brokerMarginPort.getMargin(account);
         BigDecimal usdDeposit = margins.stream()
                 .filter(m -> m.currency() == Currency.USD)
                 .map(MarginItem::purchasableAmount)
@@ -72,14 +66,12 @@ class BrokerStatisticsRouter {
 
     // 증거금 통화별 조회 — KIS: TTTC2101R / Toss: buying-power USD+KRW
     List<MarginItem> getMargin(Account account) {
-        return account.isToss() ? tosMarginPort.getMarginItems(account) : kisMarginPort.getMargin(account);
+        return brokerMarginPort.getMargin(account);
     }
 
     // 판매 가능 수량 — KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity
     SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
-        return account.isToss()
-                ? tossSellableQuantityPort.getSellableQuantity(ticker, account)
-                : kisSellableQuantityPort.getSellableQuantity(ticker, account);
+        return brokerSellableQuantityPort.getSellableQuantity(ticker, account);
     }
 
     // 일별 거래내역 — KIS: CTOS4001R / Toss: execution+commission 조합 구성
