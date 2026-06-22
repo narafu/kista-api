@@ -9,7 +9,7 @@
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
 - 다른 패키지 adapter에서 DB 조작이 필요하면 도메인 포트(`domain/port/out/`) 경유 필수
 - 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(domain.port.out) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
-- 참고: `KisTokenAdapter`(adapter.out.kis) → `KisTokenCachePort` → `KisTokenPersistenceAdapter`(persistence.kistoken)
+- 참고: `KisAuthApi`(adapter.out.kis) → `BrokerTokenCachePort` → `KisTokenPersistenceAdapter`(persistence.kistoken)
 
 
 ### GlobalExceptionHandler 자동 예외 처리
@@ -128,7 +128,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - 재생성 패턴에서 **명시적으로 이름 붙인 제약조건** (`CONSTRAINT foo UNIQUE (...)`) 주의: 테이블 리네임 후 `_old`에 제약조건명이 남아 새 테이블 CREATE 시 충돌 → `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 추가 필수 (`uq_privacy_trade_bases_date_ticker` 같은 named UNIQUE). unnamed `UNIQUE`는 PostgreSQL이 자동으로 충돌 없는 이름 생성하므로 해당 없음
 - 컬럼 타입 변경 시 `USING` 캐스팅 필수 — `ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(20) USING c::text` (미작성 시 오류)
 - **컬럼 순서는 Entity 필드 선언 순서와 반드시 일치** — 테이블 재생성 시 SQL `CREATE TABLE` 컬럼 순서를 Entity 필드 선언 순서에 맞춰 작성할 것 (불일치 시 코드 리뷰 혼란 및 향후 마이그레이션 추적 오류 유발)
-- **컬럼 순서 규칙 (모든 테이블 공통)**: `pk, fk, 비즈니스 컬럼…, created_at, updated_at, deleted_at` — 감사·삭제 컬럼은 반드시 이 순서로 맨 뒤에 위치 (없는 컬럼은 생략). 신규 컬럼은 항상 `created_at` 앞에 추가. `ADD COLUMN`이 맨 뒤에 붙으므로 위치 강제가 필요하면 테이블 재생성 패턴 사용 (V3 `orders`, V6 `strategy_cycle` 사례)
+- **컬럼 순서 규칙 (모든 테이블 공통)**: `pk, fk, 비즈니스 컬럼…, created_at, updated_at, deleted_at` — 감사·삭제 컬럼은 반드시 이 순서로 맨 뒤에 위치 (없는 컬럼은 생략). 신규 컬럼은 항상 `created_at` 앞에 추가. `ADD COLUMN`이 맨 뒤에 붙으므로 위치 강제가 필요하면 테이블 재생성 패턴 사용 (`orders`, `strategy_cycle` 재생성 선례 — 이 마이그레이션들은 현재 V1 단일화에 통합됨)
 - Java 코드만 삭제해도 DB 테이블은 자동 제거 안 됨 — 미사용 테이블은 신규 마이그레이션으로 `DROP TABLE IF EXISTS`
 - **FK 추가 시 `ON DELETE CASCADE` 여부 반드시 명시** — 기본값 `ON DELETE RESTRICT` → 부모 레코드 삭제 시 FK 위반 유발
 - Flyway checksum mismatch (로컬 마이그레이션 파일 수정 시): `DELETE FROM flyway_schema_history WHERE version = 'N'` + 해당 테이블 DROP → 앱 재시작 (로컬 전용 — 운영 DB에 절대 적용 금지)
@@ -236,7 +236,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - 인라인 `REFERENCES` 대신 `CONSTRAINT 명시_fkey FOREIGN KEY (...)` 형식 사용 권장 — 명시적 이름으로 충돌 없이 생성됨
 - 기존 접미사 제약 정리: `ALTER TABLE t RENAME CONSTRAINT old_fkey1 TO old_fkey;` 후 다음 마이그레이션에서 정상 이름으로 참조 가능
 - 실제 제약명 확인: `SELECT conname FROM pg_constraint WHERE conrelid = 'table'::regclass AND contype = 'f';`
-- **PK 인덱스도 Postgres가 자동 리네임**(`t_pkey` → `t_old_pkey`) — RENAME 후 수동 `ALTER INDEX t_pkey ...` 호출 시 "relation does not exist" 오류 (V16 운영 배포 실패 사례, 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 `t_pkey` 생성됨
+- **PK 인덱스도 Postgres가 자동 리네임**(`t_pkey` → `t_old_pkey`) — RENAME 후 수동 `ALTER INDEX t_pkey ...` 호출 시 "relation does not exist" 오류 (운영 배포 실패 사례, commit 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 `t_pkey` 생성됨
 
 ### .env 파일 멀티라인 값 금지
 - JSON 환경변수(예: `FIREBASE_SERVICE_ACCOUNT_JSON`)는 반드시 한 줄로 직렬화 — `.env` 파서는 줄바꿈을 값 끝으로 인식, 첫 줄 이후 무시됨
