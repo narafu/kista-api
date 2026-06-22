@@ -67,7 +67,7 @@ class ManualTradingService {
 
         // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케쥴러가 담당
         Map<Strategy.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
-                List.of(strategy.ticker()));
+                List.of(strategy.ticker()), account);
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
 
