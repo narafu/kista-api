@@ -2,50 +2,35 @@ package com.kista.application.service.account;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.in.AccountStatisticsUseCase;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.KisDailyTransactionPort;
-import com.kista.application.service.trading.BrokerExecutionRouter;
-import com.kista.domain.model.toss.TossCommissionRate;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.TossCommissionsPort;
-import com.kista.domain.port.out.KisPortfolioPort;
-import com.kista.domain.port.out.KisSellableQuantityPort;
-import com.kista.domain.port.out.KisPricePort;
-import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.model.toss.TossExchangeRate;
 import com.kista.domain.model.toss.TossMarketSession;
 import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.model.toss.TossStockInfo;
+import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.TosCandlePort;
-import com.kista.domain.port.out.TosMarginPort;
-import com.kista.domain.port.out.TosPricePort;
 import com.kista.domain.port.out.TossAccountListPort;
 import com.kista.domain.port.out.TossExchangeRatePort;
 import com.kista.domain.port.out.TossMarketCalendarPort;
-import com.kista.domain.port.out.TossPortfolioPort;
 import com.kista.domain.port.out.TossStockInfoPort;
-import com.kista.domain.port.out.TossSellableQuantityPort;
+import com.kista.application.service.trading.BrokerExecutionRouter;
+import com.kista.application.service.trading.BrokerPriceRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -54,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
 
 @Slf4j
 @Service
@@ -65,21 +49,14 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
     private final BrokerExecutionRouter brokerExecutionRouter;
-    private final KisPortfolioPort kisPortfolioPort;
-    private final KisMarginPort kisMarginPort;
-    private final TosMarginPort tosMarginPort;
-    private final TossPortfolioPort tossPortfolioPort;
-    private final KisDailyTransactionPort kisDailyTransactionPort;
-    private final KisPricePort kisPricePort;
-    private final TosPricePort tosPricePort;
+    private final BrokerStatisticsRouter brokerStatisticsRouter;
+    private final BrokerPriceRouter brokerPriceRouter;
+    // Toss 전용 — Stage 2에서 TossStatisticsService로 이전 예정
     private final TosCandlePort tosCandlePort;
     private final TossStockInfoPort tossStockInfoPort;
     private final TossExchangeRatePort tossExchangeRatePort;
     private final TossMarketCalendarPort tossMarketCalendarPort;
     private final TossAccountListPort tossAccountListPort;
-    private final TossSellableQuantityPort tossSellableQuantityPort;
-    private final TossCommissionsPort tossCommissionsPort;
-    private final KisSellableQuantityPort kisSellableQuantityPort;
 
     @Override
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
@@ -93,49 +70,32 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 KIS 체결기준잔고 미지원 — Toss 보유종목·예수금 기반으로 산출
-        if (account.isToss()) return tossPortfolioPort.getPresentBalance(account);
-        // KIS: CTRP6504R은 예수금·환율 미제공 → TTTC2101R(margin) 조회로 보정
-        PresentBalanceResult portfolio = kisPortfolioPort.getPresentBalance(account);
-        List<MarginItem> margins = kisMarginPort.getMargin(account);
-        BigDecimal usdDeposit = margins.stream()
-                .filter(m -> m.currency() == Currency.USD)
-                .map(MarginItem::purchasableAmount)
-                .findFirst().orElse(BigDecimal.ZERO);
-        BigDecimal rate = margins.stream()
-                .filter(m -> m.currency() == Currency.USD)
-                .map(MarginItem::usdToKrwRate)
-                .findFirst().orElse(BigDecimal.ZERO);
-        return new PresentBalanceResult(
-                portfolio.items(), portfolio.totalAssetUsd(), portfolio.totalEvalProfit(),
-                portfolio.totalReturnRate(), usdDeposit, rate
-        );
+        return brokerStatisticsRouter.getPresentBalance(account);
     }
 
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 KIS API 미지원 — USD·KRW 통화별 매수가능금액 반환
-        if (account.isToss()) {
-            return tosMarginPort.getMarginItems(account);
-        }
-        return kisMarginPort.getMargin(account);
+        return brokerStatisticsRouter.getMargin(account);
     }
 
     @Override
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (account.isToss()) return buildTossDailyTransactions(accountId, account, from, to);
-        return kisDailyTransactionPort.getDailyTransactions(from, to, account);
+        return brokerStatisticsRouter.getDailyTransactions(accountId, account, from, to);
     }
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 KIS 아닌 Toss 가격 API 사용
-        if (account.isToss()) return tosPricePort.getPrices(tickers); // 공통 API — account 불필요
-        return kisPricePort.getPrices(tickers, account);
+        return brokerPriceRouter.getPrices(tickers, account);
+    }
+
+    @Override
+    public TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        return brokerStatisticsRouter.getSellableQuantity(ticker, account);
     }
 
     @Override
@@ -154,7 +114,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                                           Instant cursor, int size) {
         accountPort.requireOwnedAccount(accountId, requesterId);
         Instant fromInstant = resolveFrom(from);
-        // cursor 없으면 to(=내일)가 상한 — cursor는 그 이전 지점으로 좁혀감
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
         List<CyclePositionHistoryEntry> raw =
                 cyclePositionPort.findByAccountIdWithCursor(accountId, fromInstant, effectiveCursor, size + 1);
@@ -174,99 +133,28 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         return toPage(raw, size);
     }
 
-    // size+1 조회 결과로 hasMore 판단 후 CycleHistoryPage 생성
-    private CycleHistoryPage toPage(List<CyclePositionHistoryEntry> raw, int size) {
-        boolean hasMore = raw.size() > size;
-        List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
-        // 다음 커서 = 현재 페이지 마지막 항목의 createdAt (DESC 정렬이므로 가장 오래된 것)
-        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
-        return new CycleHistoryPage(items, nextCursor, hasMore);
-    }
-
-    // null이면 전체 기간 — Epoch(1970-01-01)부터 조회
-    private Instant resolveFrom(LocalDate from) {
-        return from != null ? from.atStartOfDay(ZoneOffset.UTC).toInstant() : Instant.EPOCH;
-    }
-
-    // null이면 오늘 + 1일 (오늘 데이터 포함)
-    private Instant resolveTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
-        return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-    }
-
-    // Toss 체결 내역 + 수수료율로 DailyTransactionResult 조립
-    private DailyTransactionResult buildTossDailyTransactions(UUID accountId, Account account,
-                                                               LocalDate from, LocalDate to) {
-        Optional<Ticker> ticker = strategyPort.findActiveTicker(accountId);
-        if (ticker.isEmpty()) {
-            return new DailyTransactionResult(List.of(),
-                    new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
-        }
-        List<Execution> executions = brokerExecutionRouter.getExecutions(from, to, ticker.get(), account);
-
-        // US 수수료율 조회 — 실패 시 0으로 처리 (수수료 미표시)
-        BigDecimal usCommissionRate = tossCommissionsPort.getCommissions(account).stream()
-                .filter(c -> "US".equals(c.marketCountry()))
-                .map(TossCommissionRate::rate)
-                .findFirst()
-                .orElseGet(() -> {
-                    log.warn("Toss US 수수료율 조회 실패 — overseasFee=0으로 처리: accountId={}", account.id());
-                    return BigDecimal.ZERO;
-                });
-
-        List<DailyTransaction> items = executions.stream()
-                .map(e -> new DailyTransaction(
-                        e.tradeDate().toString(),
-                        null,              // Toss — 결제일 미제공
-                        e.direction(),
-                        e.ticker(),
-                        e.ticker().name(), // Toss — 한글 종목명 미제공
-                        e.quantity(),
-                        e.price(),
-                        e.amountUsd(),
-                        BigDecimal.ZERO,   // Toss — KRW 정산금액 미제공
-                        BigDecimal.ZERO,   // Toss — 체결 시점 환율 미제공
-                        "USD"
-                ))
-                .toList();
-
-        BigDecimal buyTotal = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.BUY)
-                .map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sellTotal = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.SELL)
-                .map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-        // overseasFee = 전체 거래금액 × 수수료율(%) / 100
-        BigDecimal overseasFee = buyTotal.add(sellTotal)
-                .multiply(usCommissionRate)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
-        return new DailyTransactionResult(items,
-                new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, overseasFee));
-    }
-
-    // ── Toss 전용 메서드 ──────────────────────────────────────────────────────
+    // ── Toss 전용 (Stage 2에서 TossStatisticsService로 이전) ──────────────────
 
     @Override
     public List<TossCandle> getTossCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval,
                                            LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tosCandlePort.getCandles(ticker.name(), interval, from, to); // 공통 API — account 불필요
+        return tosCandlePort.getCandles(ticker.name(), interval, from, to);
     }
 
     @Override
     public TossStockInfo getTossStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossStockInfoPort.getStockInfo(ticker); // 공통 API — account 불필요
+        return tossStockInfoPort.getStockInfo(ticker);
     }
 
     @Override
     public TossExchangeRate getTossExchangeRate(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossExchangeRatePort.getExchangeRate(); // 공통 API — account 불필요
+        return tossExchangeRatePort.getExchangeRate();
     }
 
     @Override
@@ -274,7 +162,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                                                          LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossMarketCalendarPort.getMarketCalendar(from, to); // 공통 API — account 불필요
+        return tossMarketCalendarPort.getMarketCalendar(from, to);
     }
 
     @Override
@@ -284,11 +172,21 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         return tossAccountListPort.getAccountList(account);
     }
 
-    @Override
-    public TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (account.isToss()) return tossSellableQuantityPort.getSellableQuantity(ticker, account);
-        return kisSellableQuantityPort.getSellableQuantity(ticker, account);
+    // ── private 헬퍼 ─────────────────────────────────────────────────────────
+
+    private CycleHistoryPage toPage(List<CyclePositionHistoryEntry> raw, int size) {
+        boolean hasMore = raw.size() > size;
+        List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
+        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
+        return new CycleHistoryPage(items, nextCursor, hasMore);
     }
 
+    private Instant resolveFrom(LocalDate from) {
+        return from != null ? from.atStartOfDay(ZoneOffset.UTC).toInstant() : Instant.EPOCH;
+    }
+
+    private Instant resolveTo(LocalDate to) {
+        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
+        return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    }
 }
