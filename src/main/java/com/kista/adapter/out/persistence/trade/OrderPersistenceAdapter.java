@@ -124,6 +124,12 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // 계좌 기준 당일 PLANNED BUY 합계 — 타 전략 점유분 차감 계산에 사용
+        return repository.sumPlannedBuyAmountByAccountIdAndTradeDate(accountId, TradeDateConverter.toUtc(tradeDate));
+    }
+
+    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         OrderEntity e = repository.findById(orderId)

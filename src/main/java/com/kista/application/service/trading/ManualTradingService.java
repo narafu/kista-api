@@ -38,6 +38,7 @@ class ManualTradingService {
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
+    private final BrokerAccountRouter brokerAccountRouter;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
@@ -66,7 +67,7 @@ class ManualTradingService {
 
         // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케쥴러가 담당
         Map<Strategy.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
-                List.of(strategy.ticker()), account);
+                List.of(strategy.ticker()));
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
 
@@ -83,6 +84,20 @@ class ManualTradingService {
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
                 .orElse(null);
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
+
+        // 예수금 부족 체크: 신규 BUY 합계 > (실잔고 - 타 전략 당일 PLANNED BUY 합계)
+        BigDecimal newBuyTotal = result.orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (newBuyTotal.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal usdDeposit = brokerAccountRouter.getUsdDeposit(account, strategy.ticker());
+            BigDecimal otherBuyTotal = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
+            BigDecimal available = usdDeposit.subtract(otherBuyTotal);
+            if (newBuyTotal.compareTo(available) > 0) {
+                throw new ManualTradingException("예수금이 부족합니다");
+            }
+        }
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 

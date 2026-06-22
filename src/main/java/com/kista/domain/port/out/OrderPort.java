@@ -48,4 +48,7 @@ public interface OrderPort {
 
     // 체결 완료 → FILLED 또는 PARTIALLY_FILLED 상태 + 체결 수량·가중평균가 기록
     void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status);
+
+    // 계좌 기준 당일 PLANNED BUY 주문 합계 (수동 실행 예수금 체크 — 타 전략 점유분 차감용)
+    BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
 }
