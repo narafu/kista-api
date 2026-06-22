@@ -14,12 +14,12 @@ import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.BrokerMarginPort;
-import com.kista.domain.port.out.BrokerPortfolioPort;
-import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
+import com.kista.domain.port.out.KisMarginPort;
+import com.kista.domain.port.out.KisPortfolioPort;
+import com.kista.domain.port.out.KisSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -35,7 +35,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KisTradingApi implements KisAccountPort,
         KisExecutionPort, KisDailyTransactionPort,
-        BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
+        KisPortfolioPort, KisMarginPort, KisSellableQuantityPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회

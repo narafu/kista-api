@@ -9,11 +9,11 @@ import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.port.out.BrokerMarginPort;
-import com.kista.domain.port.out.BrokerPortfolioPort;
-import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.TosAccountPort;
+import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossExchangeRatePort;
+import com.kista.domain.port.out.TossPortfolioPort;
+import com.kista.domain.port.out.TossSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class TosHoldingsApi implements TosAccountPort,
         TossExchangeRatePort,
-        BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
+        TossPortfolioPort, TosMarginPort, TossSellableQuantityPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -69,12 +69,15 @@ public class TosHoldingsApi implements TosAccountPort,
                 .orElse(new AccountBalance(0, null, usdDeposit));
     }
 
-    // USD 매수가능금액 — BrokerMarginPort.getUsdBuyableAmount()에서 위임
+    // ── TosMarginPort ──────────────────────────────────────────────────────────
+
+    @Override
     public BigDecimal getBuyableAmount(Account account) {
         return fetchBuyingPower(account, "USD");
     }
 
-    // USD·KRW 예수금 통화별 — BrokerMarginPort.getMargin()에서 위임
+    // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
+    @Override
     public List<MarginItem> getMarginItems(Account account) {
         // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
@@ -201,19 +204,7 @@ public class TosHoldingsApi implements TosAccountPort,
         return new TossExchangeRate(rate, midRate);
     }
 
-    // ── BrokerMarginPort ───────────────────────────────────────────────────────
-
-    @Override
-    public List<MarginItem> getMargin(Account account) {
-        return getMarginItems(account); // buying-power USD + KRW 각각 조회
-    }
-
-    @Override
-    public BigDecimal getUsdBuyableAmount(Account account) {
-        return getBuyableAmount(account); // 단일 API 호출 — getMargin()보다 효율적
-    }
-
-    // ── BrokerSellableQuantityPort ─────────────────────────────────────────────
+    // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
