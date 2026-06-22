@@ -1,29 +1,30 @@
-app = 'kista-api'
-primary_region = 'nrt'
-
-[build]
+app = "kista-api"
+primary_region = "nrt"
 
 [env]
-  SPRING_PROFILES_ACTIVE = "prod"
+SPRING_PROFILES_ACTIVE = "prod"
 
 [http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  # 04:00 KST 스케쥴러가 항상 실행될 수 있도록 최소 1대 유지
-  min_machines_running = 1
-  processes = ['app']
+auto_start_machines = true
+auto_stop_machines = true       # 평소 트래픽 없으면 잠재우기
+force_https = true
+internal_port = 8080
+min_machines_running = 1         # 평소 최소 가동 대수 1대
+processes = [ "app" ]
 
-  [[http_service.checks]]
-    grace_period = "180s"
-    interval = "30s"
-    method = "GET"
-    path = "/actuator/health"
-    protocol = "http"
-    timeout = "10s"
+[[http_service.checks]]
+grace_period = "3m0s"
+interval = "30s"
+method = "GET"
+path = "/actuator/health"
+protocol = "http"
+timeout = "10s"
 
+[deployment]
+strategy = "rolling"            # 배포 시 무중단을 보장하는 전략
+
+# 원래 사용하시던 VM 사양 그대로 명시 (정상 구동에 필수!)
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
-  cpus = 1
+cpu_kind = "shared"
+cpus = 1
+memory = "1gb"
