@@ -27,7 +27,7 @@ public class FearGreedController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/fear-greed")
     public FearGreedResponse getFearGreed(
-            @Parameter(description = "조회 기간(일)", example = "90") @RequestParam(defaultValue = "90") int days) {
+            @Parameter(description = "조회 기간(일)", example = "200") @RequestParam(defaultValue = "200") int days) {
         // 두 소스를 각각 조회해 번들 응답으로 조립
         return FearGreedResponse.from(
                 getFearGreedUseCase.getRecent(SOURCE_CNN, days),

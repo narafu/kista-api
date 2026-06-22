@@ -120,7 +120,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `74420614-01` 형태로 하나의 필드에 합치면 KIS API CANO 파라미터 오류 — 반드시 분리
 
 ### Flyway
-- `V1__init.sql` **수정 금지** — 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인)
+- 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지** (V1 포함 전체 버전) — Flyway 체크섬 불일치로 앱 기동 즉시 크래시. 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인) [V12 수정→운영 크래시 사례]
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale`, `columnDefinition` 변경 시 해당 컬럼을 생성/변경한 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 컬럼 타입·`precision`·`scale` 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 등 제약 불일치만 런타임까지 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException` (`avg_price` 사례, V1/V5/V7)
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, INSERT/UPDATE 시 Hibernate가 BigDecimal을 자동 반올림하지 않음. PostgreSQL이 컬럼 타입(`NUMERIC(12,2)`)에 맞춰 INSERT 시 반올림. 단 JPA 1차 캐시에는 원본 scale의 BigDecimal이 유지됨 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
