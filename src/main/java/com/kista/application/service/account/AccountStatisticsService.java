@@ -9,7 +9,6 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
@@ -24,7 +23,6 @@ import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.TossCommissionsPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisPricePort;
-import com.kista.domain.port.out.KisProfitPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossCandle;
@@ -65,7 +63,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
-    private final KisProfitPort kisProfitPort;
     private final BrokerExecutionRouter brokerExecutionRouter;
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
@@ -81,16 +78,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final TossAccountListPort tossAccountListPort;
     private final TossSellableQuantityPort tossSellableQuantityPort;
     private final TossCommissionsPort tossCommissionsPort;
-
-    @Override
-    public PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId,
-                                               LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        // Toss 계좌는 기간별 손익 API 미지원 — 빈 결과 반환
-        if (account.isToss()) return new PeriodProfitResult(List.of(), BigDecimal.ZERO, BigDecimal.ZERO);
-        // KIS 예외는 그대로 전파 → 컨트롤러에서 503 처리
-        return kisProfitPort.getPeriodProfit(account, from, to);
-    }
 
     @Override
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,

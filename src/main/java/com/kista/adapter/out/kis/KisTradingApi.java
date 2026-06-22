@@ -9,7 +9,6 @@ import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -19,7 +18,6 @@ import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
-import com.kista.domain.port.out.KisProfitPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,7 +32,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfolioPort,
-        KisProfitPort, KisExecutionPort, KisDailyTransactionPort {
+        KisExecutionPort, KisDailyTransactionPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
@@ -45,9 +43,6 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
 
     private static final String PORTFOLIO_PATH = "/uapi/overseas-stock/v1/trading/inquire-present-balance";
     private static final String PORTFOLIO_TR_ID = "CTRP6504R"; // 해외주식 체결기준현재잔고 (실전투자)
-
-    private static final String PROFIT_PATH = "/uapi/overseas-stock/v1/trading/inquire-period-profit";
-    private static final String PROFIT_TR_ID = "TTTS3039R"; // 해외주식 기간손익
 
     private static final String EXECUTION_PATH  = "/uapi/overseas-stock/v1/trading/inquire-ccnl";
     private static final String EXECUTION_TR_ID = "TTTS3035R"; // 해외주식 체결 내역 조회
@@ -162,47 +157,6 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
             totalRate = KisResponseParser.parseBd(response.output3().evluErngRt1());
         }
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
-    }
-
-    // ── KisProfitPort ──────────────────────────────────────────────────────────
-
-    @Override
-    public PeriodProfitResult getPeriodProfit(Account account, LocalDate from, LocalDate to) {
-        ProfitResponse response = kisHttpClient.tradingGet(
-                PROFIT_TR_ID, PROFIT_PATH, account, ProfitResponse.class,
-                p -> {
-                    p.add("OVRS_EXCG_CD", exchangeRegistry.defaultUsExchange()); // 미국 전체
-                    p.add("NATN_CD", "");
-                    p.add("CRCY_CD", "USD");
-                    p.add("PDNO", "");              // 전종목
-                    p.add("INQR_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
-                    p.add("INQR_END_DT", formatTradeDate(to));
-                    p.add("WCRC_FRCR_DVSN_CD", "01"); // 01=외화
-                    p.add("CTX_AREA_FK200", "");
-                    p.add("CTX_AREA_NK200", "");
-                });
-        if (response == null) {
-            return new PeriodProfitResult(Collections.emptyList(), BigDecimal.ZERO, BigDecimal.ZERO);
-        }
-        List<PeriodProfitResult.Item> items = KisResponseParser.streamTickered(response.output1(),
-                ProfitResponse.Output1::ovrsPdno,
-                (ticker, o) -> new PeriodProfitResult.Item(
-                        o.tradDay(),
-                        ticker,
-                        KisResponseParser.parseIntSafe(o.sellLiquidationQuantity()),
-                        KisResponseParser.parseBd(o.pchsAvgPric()),
-                        KisResponseParser.parseBd(o.avgSllUnpr()),
-                        KisResponseParser.parseBd(o.ovrsRlztPflsAmt()),
-                        KisResponseParser.parseBd(o.pftrt()),
-                        o.ovrsExcgCd()
-                ));
-        BigDecimal totalProfit = BigDecimal.ZERO;
-        BigDecimal totalRate = BigDecimal.ZERO;
-        if (response.output2() != null) {
-            totalProfit = KisResponseParser.parseBd(response.output2().ovrsRlztPflsTotAmt());
-            totalRate = KisResponseParser.parseBd(response.output2().totPftrt());
-        }
-        return new PeriodProfitResult(items, totalProfit, totalRate);
     }
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────
@@ -340,27 +294,6 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                 @JsonProperty("tot_asst_amt") String totAsstAmt,          // 총자산금액
                 @JsonProperty("tot_evlu_pfls_amt") String totEvluPflsAmt, // 총평가손익
                 @JsonProperty("evlu_erng_rt1") String evluErngRt1         // 총수익률
-        ) {}
-    }
-
-    record ProfitResponse(
-            @JsonProperty("output1") List<Output1> output1,
-            @JsonProperty("output2") Output2 output2
-    ) {
-        record Output1(
-                @JsonProperty("trad_day") String tradDay,                          // 매매일
-                @JsonProperty("ovrs_pdno") String ovrsPdno,                        // 해외상품번호
-                @JsonProperty("slcl_qty") String sellLiquidationQuantity,          // 매도청산수량
-                @JsonProperty("pchs_avg_pric") String pchsAvgPric,                 // 매입평균가격
-                @JsonProperty("avg_sll_unpr") String avgSllUnpr,                   // 평균매도단가
-                @JsonProperty("ovrs_rlzt_pfls_amt") String ovrsRlztPflsAmt,        // 실현손익
-                @JsonProperty("pftrt") String pftrt,                               // 수익률
-                @JsonProperty("ovrs_excg_cd") String ovrsExcgCd                   // 해외거래소코드
-        ) {}
-
-        record Output2(
-                @JsonProperty("ovrs_rlzt_pfls_tot_amt") String ovrsRlztPflsTotAmt, // 총실현손익
-                @JsonProperty("tot_pftrt") String totPftrt                          // 총수익률
         ) {}
     }
 

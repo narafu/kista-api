@@ -3,7 +3,6 @@ package com.kista.domain.port.in;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
@@ -24,7 +23,6 @@ import java.util.UUID;
 
 // KIS/Toss 통계 + trading_cycle_history 조회 통합 인터페이스
 public interface AccountStatisticsUseCase {
-    PeriodProfitResult getPeriodProfit(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     List<Execution> getExecutions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId);
     List<MarginItem> getMargin(UUID accountId, UUID requesterId);

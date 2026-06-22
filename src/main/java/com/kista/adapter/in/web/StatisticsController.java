@@ -4,7 +4,6 @@ import com.kista.adapter.in.web.dto.DailyTransactionResponse;
 import com.kista.adapter.in.web.dto.ExecutionResponse;
 import com.kista.adapter.in.web.dto.MarginResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
-import com.kista.adapter.in.web.dto.PeriodProfitResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
 import com.kista.adapter.in.web.dto.TossAccountInfoResponse;
 import com.kista.adapter.in.web.dto.TossCandleResponse;
@@ -36,26 +35,6 @@ import java.util.UUID;
 public class StatisticsController {
 
     private final AccountStatisticsUseCase accountStatistics;
-
-    // 기간손익 조회 (TTTS3039R)
-    @Operation(summary = "기간손익 조회", description = "KIS API TTTS3039R — 지정 기간 동안의 종목별 실현손익 및 수익률 조회.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
-    })
-    @GetMapping("/profit")
-    public PeriodProfitResponse getPeriodProfit(
-            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "조회 시작일", example = "2025-01-01")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "조회 종료일", example = "2025-01-31")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return PeriodProfitResponse.from(accountStatistics.getPeriodProfit(accountId, userId, from, to));
-    }
 
     // 체결 내역 조회 (TTTS3035R)
     @Operation(summary = "체결 내역 조회", description = "KIS API TTTS3035R — 지정 기간 동안의 체결된 주문 목록 조회.")
