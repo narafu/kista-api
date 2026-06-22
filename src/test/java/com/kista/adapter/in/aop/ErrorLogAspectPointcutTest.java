@@ -43,6 +43,7 @@ class ErrorLogAspectPointcutTest {
                 @Override public void notifyMarketClosed() {}
                 @Override public void notifyInsufficientBalance(Account account, AccountBalance b, Strategy.Ticker ticker) {}
                 @Override public void notifyError(Exception e) {} // 실제 발송 없이 포인트컷 매칭만 검증
+                @Override public void notifyInfo(String message) {}
             };
         }
     }

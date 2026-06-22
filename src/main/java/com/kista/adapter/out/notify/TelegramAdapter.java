@@ -32,6 +32,11 @@ public class TelegramAdapter implements NotifyPort {
         send(String.format("<b>⚠️ 매매 오류 발생</b>%n%s", e.getMessage()));
     }
 
+    @Override
+    public void notifyInfo(String message) {
+        send(message); // 일반 정보성 메시지 그대로 전송
+    }
+
     // 관리자 봇 채팅방으로 단순 메시지 전송
     private void send(String text) {
         telegramHttpClient.sendMessage(props.chatId(), text, props.botToken());

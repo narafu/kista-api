@@ -36,6 +36,7 @@ public class TradingOpenScheduler {
 
     @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST (개장 30분~90분 전)
     public void run() {
+        notifyPort.notifyInfo("장 개시 스케쥴러 시작");
         List<Strategy> strategies = strategyPort.findAllActive();
         log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());
 
@@ -64,5 +65,6 @@ public class TradingOpenScheduler {
         }
 
         log.info("장 개시 스케쥴러 완료");
+        notifyPort.notifyInfo("장 개시 스케쥴러 완료");
     }
 }

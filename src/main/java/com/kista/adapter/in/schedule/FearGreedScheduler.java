@@ -2,6 +2,7 @@ package com.kista.adapter.in.schedule;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.port.in.FetchFearGreedUseCase;
+import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,9 +17,11 @@ import java.time.LocalDate;
 public class FearGreedScheduler {
 
     private final FetchFearGreedUseCase fetchFearGreedUseCase;
+    private final NotifyPort notifyPort; // 스케쥴러 시작/종료 알림
 
     @Scheduled(cron = "0 10 9 * * *", zone = TimeZones.KST_ID) // 매일 09:10 KST
     public void run() {
+        notifyPort.notifyInfo("공포탐욕지수 수집 스케쥴러 시작");
         LocalDate today = LocalDate.now(TimeZones.KST);
         log.info("공포탐욕지수 수집 스케쥴러 시작 (date={})", today);
         try {
@@ -27,5 +30,6 @@ public class FearGreedScheduler {
             log.error("공포탐욕지수 수집 실패: {}", e.getMessage(), e);
         }
         log.info("공포탐욕지수 수집 스케쥴러 완료");
+        notifyPort.notifyInfo("공포탐욕지수 수집 스케쥴러 완료");
     }
 }

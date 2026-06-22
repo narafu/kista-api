@@ -35,6 +35,7 @@ public class TradingCloseScheduler {
 
     @Scheduled(cron = "0 0 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:00 KST (미국 장 마감 30분 전)
     public void run() {
+        notifyPort.notifyInfo("마감 매매 스케쥴러 시작");
         List<Strategy> strategies = strategyPort.findAllActive();
         log.info("마감 매매 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());
 
@@ -64,5 +65,6 @@ public class TradingCloseScheduler {
         }
 
         log.info("마감 매매 스케쥴러 완료");
+        notifyPort.notifyInfo("마감 매매 스케쥴러 완료");
     }
 }
