@@ -1,7 +1,6 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
@@ -78,12 +77,12 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
         boolean hasNext = true;
 
         while (hasNext) {
-            // 토스 from/to → TradeDateConverter.toUtc: KST 매매일을 US 거래일(UTC)로 변환
+            // 토스 from/to: KST 날짜 그대로 사용 — Toss는 KST 기준 날짜 필터링 (KIS와 달리 toUtc 변환 없음)
             MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
             params.add("status", status);
             params.add("symbol", ticker.name());
-            params.add("from",   TradeDateConverter.toUtc(from).toString());
-            params.add("to",     TradeDateConverter.toUtc(to).toString());
+            params.add("from",   from.toString());
+            params.add("to",     to.toString());
             params.add("limit",  "100");
             if (cursor != null) params.add("cursor", cursor);
 
