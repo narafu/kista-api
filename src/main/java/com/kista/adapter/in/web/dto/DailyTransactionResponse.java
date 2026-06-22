@@ -9,28 +9,26 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import java.math.BigDecimal;
 import java.util.List;
 
+
 public record DailyTransactionResponse(
         List<ItemDto> items,
         SummaryDto summary
 ) {
     public record ItemDto(
             String tradeDate,
-            String settlementDate,
             OrderDirection direction,
             Ticker ticker,
             String symbolName,
             int quantity,
             BigDecimal price,
             BigDecimal tradeAmountUsd,
-            BigDecimal settlementAmountKrw,
-            BigDecimal exchangeRate,
             String currency
     ) {
         static ItemDto from(DailyTransaction t) {
             return new ItemDto(
-                    t.tradeDate(), t.settlementDate(), t.direction(), t.ticker(),
+                    t.tradeDate(), t.direction(), t.ticker(),
                     t.symbolName(), t.quantity(), t.price(), t.tradeAmountUsd(),
-                    t.settlementAmountKrw(), t.exchangeRate(), t.currency()
+                    t.currency()
             );
         }
     }
