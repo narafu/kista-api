@@ -216,6 +216,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - 도메인 `tradeDate`: **KST 일자** / DB `trade_date`: **UTC 일자(= US 거래일)** — KST 04:30 기준 ±1일 차이
 - 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일`
 - 적용 위치: `OrderPersistenceAdapter`, `PrivacyTradePersistenceAdapter`의 toEntity/toDomain + LocalDate 파라미터 조회만 — JPA `@Converter` 자동 적용 금지 (가시성)
+- **Toss API 예외**: `TosOrderApi.fetchExecutions()` from/to 파라미터는 `toUtc()` 변환 없이 KST 날짜 그대로 전달 — Toss는 KST 기준 날짜 필터링 (KIS는 US 거래일(UTC) 기준이라 변환 필요, Toss는 KST 기준이라 변환 시 전날 체결 조회 → 빈 결과)
 - FIDA 외부 입력(UTC) → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출
 - 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — `TradeDateConverter` 헬퍼 경유 필수
 
