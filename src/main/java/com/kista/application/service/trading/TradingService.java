@@ -262,6 +262,13 @@ class TradingService {
         Account account = ctx.account();
         User user = ctx.user();
 
+        // 수동 '지금 주문' 등으로 당일 주문이 이미 있으면 중복 생성 skip
+        List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), tradeDate);
+        if (!existingOrders.isEmpty()) {
+            log.info("[{}] 당일 주문 {}건 이미 존재 — 개장 스케쥴러 skip", account.nickname(), existingOrders.size());
+            return;
+        }
+
         // 잔고 로드
         AccountBalance balance = loadBalance(strategy, account);
 
