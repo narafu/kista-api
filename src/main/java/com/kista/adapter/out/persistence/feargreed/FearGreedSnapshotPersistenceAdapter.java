@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -21,5 +22,14 @@ public class FearGreedSnapshotPersistenceAdapter implements FearGreedSnapshotPor
     @Override
     public boolean existsBySourceAndDate(String source, LocalDate date) {
         return repository.existsBySourceAndSnapshotDate(source, date);
+    }
+
+    @Override
+    public List<FearGreedSnapshot> findBySourceSince(String source, LocalDate since) {
+        return repository
+                .findBySourceAndSnapshotDateGreaterThanEqualOrderBySnapshotDateAsc(source, since)
+                .stream()
+                .map(FearGreedSnapshotEntity::toDomain)
+                .toList();
     }
 }
