@@ -59,15 +59,15 @@
 ```bash
 # 운영 로그 실시간 조회
 fly logs -a kista-api                                           # kista-api 운영 로그
+vercel logs                                                     # kista-ui 운영 로그
 
-# 헬스 체크
+# 헬스 체크 / 배포 상태
 curl https://kista-api.fly.dev/actuator/health
-# 배포 상태 확인
 fly status -a kista-api
 # 수동 배포 (main 브랜치 push 시 GitHub Actions 자동 배포)
 fly deploy --app kista-api
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
-# 로컬 Docker 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB) — kista-kista-api-1 아님
+# 로컬 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB)
 # 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
 ```
 
@@ -78,24 +78,12 @@ fly secrets set KEY=VALUE KEY2=VALUE2 --app kista-api
 # 환경변수 목록 확인
 fly secrets list --app kista-api
 # 필수: KIS_APP_KEY/SECRET/HTS_ID, KIS_ACCOUNT_NO/TYPE, KIS_SYMBOL/EXCHANGE_CODE,
-#        TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD, GEMINI_API_KEY,
+#        TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD,
 #        JWT_SIGNING_KEY, AES_ENCRYPTION_KEY,
 #        ADMIN_KAKAO_IDS (쉼표 구분 카카오 ID 목록, 자동 ADMIN 승격)
 #        CORS_ALLOWED_ORIGINS (Vercel 프로덕션 URL)
 # SPRING_PROFILES_ACTIVE=prod 는 fly.toml [env]에 이미 고정
 ```
-
-### kista-ui 운영 로그 조회
-```bash
-# 운영 로그 실시간 조회 (vercel-cli)
-vercel logs                                                     # kista-ui 운영 로그
-```
-
-### kista-ui URL 변경 연동 (멀티 레포)
-# kista-api URL 변경 후 kista-ui에 전달하는 방법:
-# 1) 이 대화의 변경 목록을 kista-ui 세션에 붙여넣기 (가장 빠름)
-# 2) kista-ui 세션에서: git -C <kista-api 절대경로> diff HEAD~1
-# kista-api 세션에서 절대경로로 kista-ui 파일 직접 편집 가능하나 git 커밋은 kista-ui 세션에서 따로 수행
 
 ### kis-trade-mcp 재시작
 ```bash
@@ -125,8 +113,6 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
 
 ### Privacy 기준표 운영 → 로컬 마이그레이션 (supabase-cli)
-# "privacy 기준표 운영에서 로컬로 마이그레이션" 요청 시 이 절차 사용
-# 대상 테이블: privacy_trade_bases (기준 마스터), privacy_trade_base_orders (주문 세트)
 ```bash
 # 1. 운영 DB에서 CSV 덤프
 supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" > /tmp/privacy_trade_bases.csv
@@ -141,6 +127,6 @@ docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
   "COPY privacy_trade_bases (id, trade_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
   "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, quantity, price, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
-```
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
 # docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases;"
+```

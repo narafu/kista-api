@@ -24,7 +24,7 @@
 - `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
 - `Strategy` record 필드 7개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType), divisionCount(int)`
 - `StrategyCycle` record 필드 9개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt, seedResolvedBy` — 사이클 단위 메타(시드/기간)
-- `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
+- `CyclePosition` record 필드 9개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, isReverseMode(boolean), createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
 - `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, boolean isReverseMode` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
@@ -91,7 +91,6 @@
 ### JPA 설정
 - `@ManyToOne`에 `@JoinColumn(name="...", nullable=false)` 항상 명시 — 생략 시 Hibernate 기본 추론(`필드명_id`)에 의존 → 네이밍 전략 변경 시 운영 이슈
 - IDE 경고 "열을 해결할 수 없습니다" — Flyway 미적용 상태의 false positive. `compileJava BUILD SUCCESSFUL`이 실제 검증 기준
-- **`BaseAuditEntity` vs `BaseCreatedAtEntity`**: `createdAt`+`updatedAt` 필요 시 `BaseAuditEntity` 상속, `createdAt`만 필요 시 `BaseCreatedAtEntity` 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패)
 
 ### Java Enum ↔ DB 컬럼 매핑 규칙 (전 프로젝트 통일)
 - **DB 컬럼**: PostgreSQL 네이티브 ENUM (`CREATE TYPE ... AS ENUM`) **사용 금지** — VARCHAR(20) 사용
@@ -173,13 +172,6 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (미설정 시 항상 401)
 - `SecurityConfig`: `/api/internal/**` → `hasRole("INTERNAL")`, `InternalTokenAuthFilter` JWT 필터보다 먼저 실행
 - `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
-
-### 소유권 검증 예외 패턴 (V2)
-- Service 내 반복 검증은 `private Account requireOwnedAccount(UUID accountId, UUID requesterId)` 헬퍼로 추출 — `AccountStatisticsService` 패턴 참고
-- Service에서 소유권 위반 시 `SecurityException`(Java 내장 unchecked) throw → `GlobalExceptionHandler`가 403 자동 처리
-- KIS API 오류: Service에서 `KisApiException` 그대로 전파 → `GlobalExceptionHandler`가 503 자동 처리
-- `InvalidKisKeyException`(domain/model/) → `GlobalExceptionHandler`가 422 자동 처리
-- Controller에 try/catch 추가 금지 — `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 사용 불가 (ArchUnit 규칙)
 
 ### @EnableJpaAuditing 위치
 - `@SpringBootApplication` 아닌 별도 `JpaAuditingConfig.java` (`adapter/out/persistence/`)에 선언 — 아니면 `@WebMvcTest` `BeanCreationException` 발생

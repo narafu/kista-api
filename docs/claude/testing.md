@@ -17,11 +17,9 @@
 ### @WebMvcTest + Spring Security 패턴
 - `@WebMvcTest` 슬라이스에서 커스텀 `SecurityConfig`가 로드되지 않음 — Spring Boot 기본 Security 적용
 - POST 요청 테스트: `.with(csrf())` 추가 필수 (없으면 403) — `import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf`
-- 인증 필요 엔드포인트 테스트: 클래스 또는 메서드에 `@WithMockUser` 추가 (없으면 401)
-- `/telegram/webhook` 같은 permitAll 경로도 `@WebMvcTest`에서는 `@WithMockUser` + `csrf()` 필요
-- `@WithMockUser` 사용 금지 (principal이 UserDetails → `@AuthenticationPrincipal UUID`로 바인딩 시 ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuidString), null, List.of())))` 패턴 사용
+- **`@WithMockUser` 사용 금지** (principal이 UserDetails → `@AuthenticationPrincipal UUID`로 바인딩 시 ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuidString), null, List.of())))` 패턴 사용
 - `JwtAuthFilter`는 principal을 `UUID` 타입으로 저장 — 테스트 mock도 반드시 `UUID` 사용 (`String` 사용 시 컨트롤러에서 ClassCastException)
-- `JwtDecoder`가 profile-conditional `@Bean`인 경우: `@WebMvcTest`에 `@MockBean JwtDecoder jwtDecoder;` 필수 — 없으면 prod 프로파일 decoder가 빈 URI로 생성 시도 → `MalformedURLException` 컨텍스트 실패
+- JwtAuthFilter를 `@Import`하는 `@WebMvcTest`: `@MockBean JwtDecoder jwtDecoder` 필수 — `JwtDecoderConfig`가 슬라이스 컨텍스트에 자동 로드되지 않으므로
 - `@SpringBootTest @ActiveProfiles("test")`: `application-test.yml`에 `jwt.signing-key` EC JWK 추가 필요 (`JwtDecoderConfig` 단일 빈이 이 값으로 검증)
 - role 기반 인가 규칙(`hasRole`) 검증이 필요한 `@WebMvcTest`는 `@Import({SecurityConfig.class, JwtAuthFilter.class})` 추가 필수 — 미추가 시 `AuthorizationFilter`가 로드되지 않아 ROLE 검사 없이 200 반환 (`AdminPingControllerTest` 패턴 참고)
 
