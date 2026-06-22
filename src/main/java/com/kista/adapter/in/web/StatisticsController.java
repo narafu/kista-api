@@ -5,7 +5,7 @@ import com.kista.adapter.in.web.dto.ExecutionResponse;
 import com.kista.adapter.in.web.dto.MarginResponse;
 import com.kista.adapter.in.web.dto.MultiPriceResponse;
 import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
-import com.kista.adapter.in.web.dto.TossSellableQuantityResponse;
+import com.kista.adapter.in.web.dto.SellableQuantityResponse;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -141,10 +141,10 @@ public class StatisticsController {
             @ApiResponse(responseCode = "503", description = "브로커 API 호출 실패")
     })
     @GetMapping("/sellable-quantity")
-    public TossSellableQuantityResponse getSellableQuantity(
+    public SellableQuantityResponse getSellableQuantity(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker) {
-        return TossSellableQuantityResponse.from(accountStatistics.getSellableQuantity(accountId, userId, ticker));
+        return SellableQuantityResponse.from(accountStatistics.getSellableQuantity(accountId, userId, ticker));
     }
 }

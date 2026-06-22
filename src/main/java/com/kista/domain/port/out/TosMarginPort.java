@@ -9,7 +9,7 @@ import java.util.List;
 // Toss 전용 증거금 조회 — buying-power API
 public interface TosMarginPort {
     // GET /api/v1/buying-power?currency=USD — USD 매수가능금액
-    BigDecimal getBuyableAmount(Account account);
+    BigDecimal getUsdBuyableAmount(Account account);
     // GET /api/v1/buying-power?currency=USD+KRW — USD·KRW 통화별 매수가능금액 (UI 표시용)
-    List<MarginItem> getMarginItems(Account account);
+    List<MarginItem> getMargin(Account account);
 }

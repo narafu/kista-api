@@ -60,14 +60,14 @@ class TossStatisticsService implements TossStatisticsUseCase {
 
     @Override
     public List<TossAccountInfo> getAccountList(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
+        Account account = requireTossAccount(accountId, requesterId);
         return tossAccountListPort.getAccountList(account);
     }
 
-    // 소유권 + Toss 계좌 여부 검증
-    private void requireTossAccount(UUID accountId, UUID requesterId) {
+    // 소유권 + Toss 계좌 여부 검증 — Account 반환으로 호출자가 재사용 가능
+    private Account requireTossAccount(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
+        return account;
     }
 }

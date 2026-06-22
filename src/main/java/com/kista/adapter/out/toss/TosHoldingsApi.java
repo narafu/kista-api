@@ -51,7 +51,7 @@ public class TosHoldingsApi implements TosAccountPort,
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
 
         // 토스 API는 USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
-        BigDecimal usdDeposit = getBuyableAmount(account);
+        BigDecimal usdDeposit = getUsdBuyableAmount(account);
 
         if (holdingsResponse == null || holdingsResponse.items() == null) {
             return new AccountBalance(0, null, usdDeposit);
@@ -72,13 +72,13 @@ public class TosHoldingsApi implements TosAccountPort,
     // ── TosMarginPort ──────────────────────────────────────────────────────────
 
     @Override
-    public BigDecimal getBuyableAmount(Account account) {
+    public BigDecimal getUsdBuyableAmount(Account account) {
         return fetchBuyingPower(account, "USD");
     }
 
     // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
     @Override
-    public List<MarginItem> getMarginItems(Account account) {
+    public List<MarginItem> getMargin(Account account) {
         // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
         BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");

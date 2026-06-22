@@ -24,7 +24,7 @@ public class BrokerMarginRouter implements BrokerMarginPort {
     public List<MarginItem> getMargin(Account account) {
         return switch (account.broker()) {
             case KIS -> kisMarginPort.getMargin(account);
-            case TOSS -> tosMarginPort.getMarginItems(account);
+            case TOSS -> tosMarginPort.getMargin(account);
         };
     }
 
@@ -32,7 +32,7 @@ public class BrokerMarginRouter implements BrokerMarginPort {
     public BigDecimal getUsdBuyableAmount(Account account) {
         return switch (account.broker()) {
             case KIS -> kisMarginPort.getUsdBuyableAmount(account);
-            case TOSS -> tosMarginPort.getBuyableAmount(account);
+            case TOSS -> tosMarginPort.getUsdBuyableAmount(account);
         };
     }
 }

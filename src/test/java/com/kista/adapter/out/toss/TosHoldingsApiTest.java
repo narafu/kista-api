@@ -86,19 +86,19 @@ class TosHoldingsApiTest {
     }
 
     @Test
-    @DisplayName("getBuyableAmount: 정상 금액 반환")
-    void getBuyableAmount_returnsAmount() {
+    @DisplayName("getUsdBuyableAmount: 정상 금액 반환")
+    void getUsdBuyableAmount_returnsAmount() {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1234.56", "USD")));
 
-        BigDecimal amount = tosHoldingsApi.getBuyableAmount(ACCOUNT);
+        BigDecimal amount = tosHoldingsApi.getUsdBuyableAmount(ACCOUNT);
 
         assertThat(amount).isEqualByComparingTo("1234.56");
     }
 
     @Test
-    @DisplayName("getMarginItems: USD·KRW 통화별 2건 반환 (통합 아님)")
-    void getMarginItems_returnsUsdAndKrwSeparately() {
+    @DisplayName("getMargin: USD·KRW 통화별 2건 반환 (통합 아님)")
+    void getMargin_returnsUsdAndKrwSeparately() {
         stubNoAccountHeader();
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenAnswer(inv -> {
@@ -112,7 +112,7 @@ class TosHoldingsApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(new TosHoldingsApi.ExchangeRateWrapper(new TosHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
 
-        List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
+        List<MarginItem> items = tosHoldingsApi.getMargin(ACCOUNT);
 
         // 통합 아님 — USD·KRW 원본 금액 각각 반환
         assertThat(items).hasSize(2);
@@ -126,8 +126,8 @@ class TosHoldingsApiTest {
     }
 
     @Test
-    @DisplayName("getMarginItems: 환율 조회 실패 시 USD·KRW 금액은 원본 반환")
-    void getMarginItems_exchangeRateZero_returnsOriginalAmounts() {
+    @DisplayName("getMargin: 환율 조회 실패 시 USD·KRW 금액은 원본 반환")
+    void getMargin_exchangeRateZero_returnsOriginalAmounts() {
         stubNoAccountHeader();
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenAnswer(inv -> {
@@ -141,7 +141,7 @@ class TosHoldingsApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(null);
 
-        List<MarginItem> items = tosHoldingsApi.getMarginItems(ACCOUNT);
+        List<MarginItem> items = tosHoldingsApi.getMargin(ACCOUNT);
 
         assertThat(items).hasSize(2);
         assertThat(items.get(0).currency()).isEqualTo(Currency.USD);
