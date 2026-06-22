@@ -4,10 +4,10 @@ import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.TossSellableQuantity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,7 +23,7 @@ public interface AccountStatisticsUseCase {
     List<MarginItem> getMargin(UUID accountId, UUID requesterId);
     DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
-    TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker);
+    SellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker);
     CycleHistoryPage getByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     // 계좌 기준 스냅샷 조회 (차트용 — DB 기반, KIS API 미사용)

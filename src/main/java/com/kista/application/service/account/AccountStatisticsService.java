@@ -6,10 +6,10 @@ import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
@@ -77,7 +77,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     @Override
-    public TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
+    public SellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return brokerStatisticsRouter.getSellableQuantity(ticker, account);
     }

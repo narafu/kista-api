@@ -11,9 +11,12 @@ import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.common.TradeDateConverter;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.TossSellableQuantity;
+import com.kista.domain.port.out.BrokerMarginPort;
+import com.kista.domain.port.out.BrokerPortfolioPort;
+import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
@@ -34,7 +37,8 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfolioPort,
-        KisExecutionPort, KisDailyTransactionPort, KisSellableQuantityPort {
+        KisExecutionPort, KisDailyTransactionPort, KisSellableQuantityPort,
+        BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
@@ -113,13 +117,21 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                 .toList();
     }
 
-    // 내부 헬퍼: USD 주문가능금액 추출 (KisAccountPort.getBalance에서 사용)
-    private BigDecimal fetchUsdDeposit(Account account) {
+    // ── BrokerMarginPort ───────────────────────────────────────────────────────
+
+    @Override
+    public BigDecimal getUsdBuyableAmount(Account account) {
+        // getMargin()은 KisMarginPort와 BrokerMarginPort 양쪽에서 동일 구현 공유
         return getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()
                 .map(MarginItem::purchasableAmount)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    // 내부 헬퍼: USD 주문가능금액 추출 (KisAccountPort.getBalance에서 사용)
+    private BigDecimal fetchUsdDeposit(Account account) {
+        return getUsdBuyableAmount(account);
     }
 
     // ── KisPortfolioPort ───────────────────────────────────────────────────────
@@ -161,11 +173,16 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
-    // ── KisSellableQuantityPort ────────────────────────────────────────────────
+    // ── KisSellableQuantityPort / BrokerSellableQuantityPort ─────────────────
+    // 두 포트 모두 SellableQuantity 반환 — 단일 메서드로 구현
 
     @Override
-    public TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
-        // CTRP6504R 체결기준현재잔고 — cblc_qty13(잔고수량) = 해외주식 판매가능수량
+    public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+        return fetchSellableQuantity(ticker, account);
+    }
+
+    // 내부 헬퍼: CTRP6504R 잔고수량 조회 — KisSellableQuantityPort/BrokerSellableQuantityPort 공유
+    private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         PortfolioResponse response = kisHttpClient.tradingGet(
                 PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,
                 p -> {
@@ -175,14 +192,14 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
                     p.add("INQR_DVSN_CD", "00");       // 00=전체
                 });
         if (response == null || response.output1() == null) {
-            return new TossSellableQuantity(ticker.name(), 0);
+            return new SellableQuantity(ticker.name(), 0);
         }
         int quantity = response.output1().stream()
                 .filter(o -> ticker.name().equals(o.pdno()))
                 .findFirst()
                 .map(o -> KisResponseParser.parseIntSafe(o.balanceQuantity13()))
                 .orElse(0);
-        return new TossSellableQuantity(ticker.name(), quantity);
+        return new SellableQuantity(ticker.name(), quantity);
     }
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────

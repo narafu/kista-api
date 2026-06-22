@@ -2,13 +2,16 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.Currency;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.model.toss.TossSellableQuantity;
+import com.kista.domain.port.out.BrokerMarginPort;
+import com.kista.domain.port.out.BrokerPortfolioPort;
+import com.kista.domain.port.out.BrokerSellableQuantityPort;
 import com.kista.domain.port.out.TosAccountPort;
 import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossExchangeRatePort;
@@ -30,7 +33,8 @@ import java.util.stream.Stream;
 @Component
 @RequiredArgsConstructor
 public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfolioPort,
-        TossExchangeRatePort, TossSellableQuantityPort {
+        TossExchangeRatePort, TossSellableQuantityPort,
+        BrokerPortfolioPort, BrokerMarginPort, BrokerSellableQuantityPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -200,21 +204,39 @@ public class TosHoldingsApi implements TosAccountPort, TosMarginPort, TossPortfo
         return new TossExchangeRate(rate, midRate);
     }
 
-    // ── TossSellableQuantityPort ───────────────────────────────────────────────
+    // ── BrokerMarginPort ───────────────────────────────────────────────────────
 
     @Override
-    public TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+    public List<MarginItem> getMargin(Account account) {
+        return getMarginItems(account); // buying-power USD + KRW 각각 조회
+    }
+
+    @Override
+    public BigDecimal getUsdBuyableAmount(Account account) {
+        return getBuyableAmount(account); // 단일 API 호출 — getMargin()보다 효율적
+    }
+
+    // ── TossSellableQuantityPort / BrokerSellableQuantityPort ─────────────────
+    // 두 포트 모두 SellableQuantity 반환 — 단일 메서드로 구현
+
+    @Override
+    public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+        return fetchSellableQuantity(ticker, account);
+    }
+
+    // 내부 헬퍼: Toss 판매 가능 수량 조회 — TossSellableQuantityPort/BrokerSellableQuantityPort 공유
+    private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
         SellableQuantityWrapper wrapper = tossHttpClient.get(
                 SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
         if (wrapper == null || wrapper.result() == null) {
             log.warn("Toss 판매 가능 수량 응답 없음: ticker={}", ticker);
-            return new TossSellableQuantity(ticker.name(), 0);
+            return new SellableQuantity(ticker.name(), 0);
         }
         SellableQuantityResult result = wrapper.result();
         int quantity = result.quantity() != null ? Integer.parseInt(result.quantity()) : 0;
-        return new TossSellableQuantity(ticker.name(), quantity);
+        return new SellableQuantity(ticker.name(), quantity);
     }
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용

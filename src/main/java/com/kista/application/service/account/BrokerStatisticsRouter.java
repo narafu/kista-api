@@ -9,10 +9,10 @@ import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCommissionRate;
-import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
@@ -76,7 +76,7 @@ class BrokerStatisticsRouter {
     }
 
     // 판매 가능 수량 — KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity
-    TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+    SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return account.isToss()
                 ? tossSellableQuantityPort.getSellableQuantity(ticker, account)
                 : kisSellableQuantityPort.getSellableQuantity(ticker, account);
