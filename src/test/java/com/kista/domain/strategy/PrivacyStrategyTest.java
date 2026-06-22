@@ -146,6 +146,55 @@ class PrivacyStrategyTest {
         assertThat(buyOrders(orders).getFirst().price()).isEqualTo(new BigDecimal("9"));
     }
 
+    // ── 잔여 매수금 배분 (allocateRemainingBudget) ───────────────────────────
+
+    @Test
+    @DisplayName("잔여 매수금 배분 — 배수 0.5 적용 후 버림 잔여분이 최저가 BUY에 추가")
+    void remainingBudgetAllocatedToLowestPrice() {
+        // BUY: $298.8×3, $279.02×3 → 총 매수금 1733.46, 배수 0.5 → 목표 866.73
+        // 배수 적용: floor(3×0.5)=1주씩 → 사용금 577.82, 잔여 288.91
+        // floor(288.91 / 279.02) = 1 → 최저가(279.02) 엔트리에 +1 = 2주
+        BigDecimal initialUsdDeposit = new BigDecimal("500"); // 500/1000 = 0.50
+        PrivacyTradeBase base = base(6, List.of(
+                buy(3, "298.8"),
+                buy(3, "279.02")
+        ));
+        // target = floor(6 × 0.5) = 3, balance=3 → diff=0
+        List<Order> orders = strategy.buildOrders(balance(3), initialUsdDeposit, base);
+
+        List<Order> buys = buyOrders(orders);
+        assertThat(buys).hasSize(2);
+        Order highBuy = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("298.8")) == 0).findFirst().orElseThrow();
+        Order lowBuy  = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("279.02")) == 0).findFirst().orElseThrow();
+        assertThat(highBuy.quantity()).isEqualTo(1);
+        assertThat(lowBuy.quantity()).isEqualTo(2); // 1 + 잔여 1
+    }
+
+    @Test
+    @DisplayName("잔여 매수금 배분 — 잔여금이 최저가보다 작으면 추가 수량 없음")
+    void remainingBudgetTooSmallForAdditionalShare() {
+        // BUY: $500×1 → 총 매수금 500, 배수 0.3 → 목표 150
+        // 배수 적용: floor(1×0.3)=0주 → 사용금 0, 잔여 150
+        // floor(150 / 500) = 0 → 추가 없음 (quantity=0이므로 필터링되어 BUY 결과 없음)
+        BigDecimal initialUsdDeposit = new BigDecimal("300"); // 300/1000 = 0.30
+        PrivacyTradeBase base = base(1, List.of(buy(1, "500")));
+        // target = floor(1×0.3) = 0, balance=0 → diff=0
+        List<Order> orders = strategy.buildOrders(balance(0), initialUsdDeposit, base);
+
+        assertThat(buyOrders(orders)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("잔여 매수금 배분 — 배수가 정수이면 잔여금 0, 추가 배분 없음")
+    void noRemainingBudgetWhenMultipleIsExact() {
+        // BUY: $10×100, $9×80, multiple=1.00 → 잔여금 0
+        PrivacyTradeBase base = base(240, List.of(buy(100, "10"), buy(80, "9"), sell(50, "12")));
+        List<Order> orders = strategy.buildOrders(balance(240), INITIAL_USD_DEPOSIT, base);
+
+        // 기존 수량 그대로 — 잔여 배분 없음
+        assertThat(buyOrders(orders)).extracting(Order::quantity).containsExactlyInAnyOrder(100, 80);
+    }
+
     @Test
     @DisplayName("multiple 적용 — initialUsdDeposit/currentCycleStart=1.5 → BUY/SELL 수량 1.5배 반영 (소수점 버림)")
     void multipleApplied() {
