@@ -3,7 +3,9 @@ package com.kista.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.model.toss.TossStockInfo;
+import com.kista.domain.port.out.TosCandlePort;
 import com.kista.domain.port.out.TosPricePort;
 import com.kista.domain.port.out.TossStockInfoPort;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
+    private final TosCandlePort tosCandlePort;
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
@@ -61,8 +64,7 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker) {
         BigDecimal price = getPrice(ticker);
-        // Toss 전일종가 전용 API 없음 — prevClose = current (0회차 진입 방향 보수적 처리)
-        return new PriceSnapshot(price, price);
+        return new PriceSnapshot(price, fetchPrevClose(ticker.name(), price));
     }
 
     @Override
@@ -70,7 +72,21 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
         return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        e -> new PriceSnapshot(e.getValue(), e.getValue())));  // prevClose = current
+                        e -> new PriceSnapshot(e.getValue(), fetchPrevClose(e.getKey().name(), e.getValue()))));
+    }
+
+    // 일봉 최신 2개 조회 → 오름차순 [0]이 확정 전일종가, 실패 시 current fallback
+    private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
+        try {
+            List<TossCandle> candles = tosCandlePort.getLatestCandles(symbol, "1d", 2);
+            if (candles.size() >= 2) {
+                return candles.get(0).close();
+            }
+            log.warn("Toss 캔들 부족({}개), prevClose=current 사용: symbol={}", candles.size(), symbol);
+        } catch (Exception e) {
+            log.warn("Toss 전일종가 조회 실패, prevClose=current 사용: symbol={}, error={}", symbol, e.getMessage());
+        }
+        return fallback;
     }
 
     // ── TossStockInfoPort ──────────────────────────────────────────────────────

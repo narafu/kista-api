@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +33,19 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 기간 전체 (관리자용)
     List<OrderEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
+
+    // 계좌·날짜 기준 PLANNED BUY 합계 (수동 실행 예수금 체크용)
+    @Query(value = """
+            SELECT COALESCE(SUM(price * quantity), 0)
+            FROM orders
+            WHERE account_id = :accountId
+              AND trade_date = :tradeDate
+              AND status = 'PLANNED'
+              AND direction = 'BUY'
+            """, nativeQuery = true)
+    BigDecimal sumPlannedBuyAmountByAccountIdAndTradeDate(
+            @Param("accountId") UUID accountId,
+            @Param("tradeDate") LocalDate tradeDate);
 
     // 사용자 기준 기간+종목 조회 (account 경유 JOIN — native)
     @Query(value = """
