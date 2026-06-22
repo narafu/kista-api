@@ -16,6 +16,7 @@ import com.kista.domain.model.toss.TossMarketSession;
 import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.model.toss.TossStockInfo;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.domain.port.in.TossStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyPort;
@@ -43,7 +44,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class AccountStatisticsService implements AccountStatisticsUseCase {
+class AccountStatisticsService implements AccountStatisticsUseCase, TossStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -136,41 +137,42 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     // ── Toss 전용 (Stage 2에서 TossStatisticsService로 이전) ──────────────────
 
     @Override
-    public List<TossCandle> getTossCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval,
-                                           LocalDate from, LocalDate to) {
+    public List<TossCandle> getCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval,
+                                       LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
         return tosCandlePort.getCandles(ticker.name(), interval, from, to);
     }
 
     @Override
-    public TossStockInfo getTossStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
+    public TossStockInfo getStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
         return tossStockInfoPort.getStockInfo(ticker);
     }
 
     @Override
-    public TossExchangeRate getTossExchangeRate(UUID accountId, UUID requesterId) {
+    public TossExchangeRate getExchangeRate(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
         return tossExchangeRatePort.getExchangeRate();
     }
 
     @Override
-    public List<TossMarketSession> getTossMarketCalendar(UUID accountId, UUID requesterId,
-                                                         LocalDate from, LocalDate to) {
+    public List<TossMarketSession> getMarketCalendar(UUID accountId, UUID requesterId,
+                                                      LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
         return tossMarketCalendarPort.getMarketCalendar(from, to);
     }
 
     @Override
-    public List<TossAccountInfo> getTossAccountList(UUID accountId, UUID requesterId) {
+    public List<TossAccountInfo> getAccountList(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
         return tossAccountListPort.getAccountList(account);
     }
+
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 

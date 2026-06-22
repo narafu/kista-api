@@ -13,6 +13,7 @@ import com.kista.adapter.in.web.dto.TossSellableQuantityResponse;
 import com.kista.adapter.in.web.dto.TossStockInfoResponse;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.domain.port.in.TossStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,7 @@ import java.util.UUID;
 public class StatisticsController {
 
     private final AccountStatisticsUseCase accountStatistics;
+    private final TossStatisticsUseCase tossStatistics;
 
     // 체결 내역 조회 (TTTS3035R)
     @Operation(summary = "체결 내역 조회", description = "KIS API TTTS3035R — 지정 기간 동안의 체결된 주문 목록 조회.")
@@ -156,7 +158,7 @@ public class StatisticsController {
             @Parameter(description = "간격 (1D/1W/1M)", example = "1D") @RequestParam String interval,
             @Parameter(description = "조회 시작일", example = "2025-01-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return TossCandleResponse.fromList(accountStatistics.getTossCandles(accountId, userId, ticker, interval, from, to));
+        return TossCandleResponse.fromList(tossStatistics.getCandles(accountId, userId, ticker, interval, from, to));
     }
 
     // 종목 기본정보 조회 (Toss /api/v1/stocks)
@@ -173,7 +175,7 @@ public class StatisticsController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker) {
-        return TossStockInfoResponse.from(accountStatistics.getTossStockInfo(accountId, userId, ticker));
+        return TossStockInfoResponse.from(tossStatistics.getStockInfo(accountId, userId, ticker));
     }
 
     // 환율 조회 (Toss /api/v1/exchange-rate)
@@ -189,7 +191,7 @@ public class StatisticsController {
     public TossExchangeRateResponse getExchangeRate(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return TossExchangeRateResponse.from(accountStatistics.getTossExchangeRate(accountId, userId));
+        return TossExchangeRateResponse.from(tossStatistics.getExchangeRate(accountId, userId));
     }
 
     // 장 운영 일정 조회 (Toss /api/v1/market-calendar/US)
@@ -207,7 +209,7 @@ public class StatisticsController {
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "조회 시작일", example = "2025-01-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return TossMarketSessionResponse.fromList(accountStatistics.getTossMarketCalendar(accountId, userId, from, to));
+        return TossMarketSessionResponse.fromList(tossStatistics.getMarketCalendar(accountId, userId, from, to));
     }
 
     // 증권사 계좌 목록 조회 (Toss /api/v1/accounts)
@@ -223,7 +225,7 @@ public class StatisticsController {
     public List<TossAccountInfoResponse> getBrokerAccounts(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
-        return TossAccountInfoResponse.fromList(accountStatistics.getTossAccountList(accountId, userId));
+        return TossAccountInfoResponse.fromList(tossStatistics.getAccountList(accountId, userId));
     }
 
     // 판매 가능 수량 조회 (KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity)
