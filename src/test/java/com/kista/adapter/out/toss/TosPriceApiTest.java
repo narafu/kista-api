@@ -2,6 +2,7 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.out.TosCandlePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,11 +23,12 @@ import static org.mockito.Mockito.when;
 class TosPriceApiTest {
 
     @Mock TossHttpClient tossHttpClient;
+    @Mock TosCandlePort tosCandlePort; // TosPriceApi 생성자 주입 의존성
     TosPriceApi tosPriceApi;
 
     @BeforeEach
     void setUp() {
-        tosPriceApi = new TosPriceApi(tossHttpClient);
+        tosPriceApi = new TosPriceApi(tossHttpClient, tosCandlePort);
     }
 
     // Toss API 응답: {"result": [...]} 래퍼 헬퍼

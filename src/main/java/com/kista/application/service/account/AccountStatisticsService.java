@@ -9,22 +9,11 @@ import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.TossAccountInfo;
-import com.kista.domain.model.toss.TossCandle;
-import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.model.toss.TossMarketSession;
 import com.kista.domain.model.toss.TossSellableQuantity;
-import com.kista.domain.model.toss.TossStockInfo;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
-import com.kista.domain.port.in.TossStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.TosCandlePort;
-import com.kista.domain.port.out.TossAccountListPort;
-import com.kista.domain.port.out.TossExchangeRatePort;
-import com.kista.domain.port.out.TossMarketCalendarPort;
-import com.kista.domain.port.out.TossStockInfoPort;
 import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +33,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class AccountStatisticsService implements AccountStatisticsUseCase, TossStatisticsUseCase {
+class AccountStatisticsService implements AccountStatisticsUseCase {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -52,12 +41,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase, TossStatisti
     private final BrokerExecutionRouter brokerExecutionRouter;
     private final BrokerStatisticsRouter brokerStatisticsRouter;
     private final BrokerPriceRouter brokerPriceRouter;
-    // Toss 전용 — Stage 2에서 TossStatisticsService로 이전 예정
-    private final TosCandlePort tosCandlePort;
-    private final TossStockInfoPort tossStockInfoPort;
-    private final TossExchangeRatePort tossExchangeRatePort;
-    private final TossMarketCalendarPort tossMarketCalendarPort;
-    private final TossAccountListPort tossAccountListPort;
 
     @Override
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
@@ -133,46 +116,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase, TossStatisti
                 cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
         return toPage(raw, size);
     }
-
-    // ── Toss 전용 (Stage 2에서 TossStatisticsService로 이전) ──────────────────
-
-    @Override
-    public List<TossCandle> getCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval,
-                                       LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tosCandlePort.getCandles(ticker.name(), interval, from, to);
-    }
-
-    @Override
-    public TossStockInfo getStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossStockInfoPort.getStockInfo(ticker);
-    }
-
-    @Override
-    public TossExchangeRate getExchangeRate(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossExchangeRatePort.getExchangeRate();
-    }
-
-    @Override
-    public List<TossMarketSession> getMarketCalendar(UUID accountId, UUID requesterId,
-                                                      LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossMarketCalendarPort.getMarketCalendar(from, to);
-    }
-
-    @Override
-    public List<TossAccountInfo> getAccountList(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossAccountListPort.getAccountList(account);
-    }
-
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 

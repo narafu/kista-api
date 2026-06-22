@@ -2,7 +2,6 @@ package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.kis.PeriodProfitResult;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -175,53 +174,4 @@ class KisTradingApiTest {
         }
     }
 
-    @Nested
-    @DisplayName("KisProfitPort — 기간손익")
-    class ProfitTests {
-
-        @Test
-        @DisplayName("API 응답 정상 시 기간손익 목록과 요약 반환")
-        void getPeriodProfit_returnsResult_whenApiSucceeds() {
-            KisTradingApi.ProfitResponse response = new KisTradingApi.ProfitResponse(
-                    List.of(new KisTradingApi.ProfitResponse.Output1(
-                            "20240615", "SOXL", "5", "20.00", "25.00", "25.00", "25.0", "NASD"
-                    )),
-                    new KisTradingApi.ProfitResponse.Output2("125.00", "25.0")
-            );
-            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), eq(KisTradingApi.ProfitResponse.class), any()))
-                    .thenReturn(response);
-
-            PeriodProfitResult result = api.getPeriodProfit(
-                    ACCOUNT, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
-
-            assertThat(result.items()).hasSize(1);
-            assertThat(result.items().getFirst().ticker()).isEqualTo(Ticker.SOXL);
-            assertThat(result.items().getFirst().quantity()).isEqualTo(5);
-            assertThat(result.totalRealizedProfit()).isEqualByComparingTo("125.00");
-            assertThat(result.totalReturnRate()).isEqualByComparingTo("25.0");
-        }
-
-        @Test
-        @DisplayName("null 응답 시 빈 목록과 0 반환")
-        void getPeriodProfit_returnsEmpty_whenApiReturnsNull() {
-            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), eq(KisTradingApi.ProfitResponse.class), any()))
-                    .thenReturn(null);
-
-            PeriodProfitResult result = api.getPeriodProfit(
-                    ACCOUNT, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
-
-            assertThat(result.items()).isEmpty();
-            assertThat(result.totalRealizedProfit()).isEqualByComparingTo("0");
-        }
-
-        @Test
-        @DisplayName("TR_ID TTTS3039R로 조회")
-        void getPeriodProfit_usesTrId() {
-            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(null);
-
-            api.getPeriodProfit(ACCOUNT, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
-
-            verify(kisHttpClient).tradingGet(eq("TTTS3039R"), anyString(), eq(ACCOUNT), any(), any());
-        }
-    }
 }
