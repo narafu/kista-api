@@ -19,7 +19,7 @@ public class FearGreedSnapshotPersistenceAdapter implements FearGreedSnapshotPor
     }
 
     @Override
-    public boolean existsByDate(LocalDate date) {
-        return repository.existsBySnapshotDate(date);
+    public boolean existsBySourceAndDate(String source, LocalDate date) {
+        return repository.existsBySourceAndSnapshotDate(source, date);
     }
 }

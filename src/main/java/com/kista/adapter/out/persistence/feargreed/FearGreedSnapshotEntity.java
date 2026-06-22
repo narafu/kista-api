@@ -7,12 +7,17 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "fear_greed_snapshots")
+@Table(
+    name = "fear_greed_snapshots",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_fear_greed_source_date",
+        columnNames = {"source", "snapshot_date"}
+    )
+)
 @Getter
 @NoArgsConstructor
 class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
@@ -21,34 +26,29 @@ class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "snapshot_date", nullable = false, unique = true)
+    @Column(name = "source", nullable = false, length = 20)
+    private String source; // "CRYPTO" | "CNN"
+
+    @Column(name = "snapshot_date", nullable = false)
     private LocalDate snapshotDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "crypto_rating", nullable = false, length = 20)
-    private FearGreedRating cryptoRating;
-
-    @Column(name = "crypto_value", nullable = false)
-    private int cryptoValue;
+    @Column(name = "value", nullable = false)
+    private int value; // 0-100
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "cnn_rating", nullable = false, length = 20)
-    private FearGreedRating cnnRating;
-
-    @Column(name = "cnn_score", nullable = false, precision = 5, scale = 2)
-    private BigDecimal cnnScore;
+    @Column(name = "rating", nullable = false, length = 20)
+    private FearGreedRating rating;
 
     static FearGreedSnapshotEntity from(FearGreedSnapshot snapshot) {
         FearGreedSnapshotEntity entity = new FearGreedSnapshotEntity();
+        entity.source       = snapshot.source();
         entity.snapshotDate = snapshot.snapshotDate();
-        entity.cryptoRating = snapshot.cryptoRating();
-        entity.cryptoValue  = snapshot.cryptoValue();
-        entity.cnnRating    = snapshot.cnnRating();
-        entity.cnnScore     = snapshot.cnnScore();
+        entity.value        = snapshot.value();
+        entity.rating       = snapshot.rating();
         return entity;
     }
 
     FearGreedSnapshot toDomain() {
-        return new FearGreedSnapshot(id, snapshotDate, cryptoRating, cryptoValue, cnnRating, cnnScore, createdAt);
+        return new FearGreedSnapshot(id, source, snapshotDate, value, rating, createdAt);
     }
 }

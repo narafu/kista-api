@@ -6,5 +6,5 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 interface FearGreedSnapshotJpaRepository extends JpaRepository<FearGreedSnapshotEntity, UUID> {
-    boolean existsBySnapshotDate(LocalDate snapshotDate);
+    boolean existsBySourceAndSnapshotDate(String source, LocalDate snapshotDate);
 }

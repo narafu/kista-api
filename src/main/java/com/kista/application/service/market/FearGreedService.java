@@ -21,23 +21,30 @@ class FearGreedService implements FetchFearGreedUseCase {
     private final CnnFearGreedPort cnnFearGreedPort;
     private final FearGreedSnapshotPort fearGreedSnapshotPort;
 
+    private static final String SOURCE_CRYPTO = "CRYPTO";
+    private static final String SOURCE_CNN    = "CNN";
+
     @Override
     @Transactional
     public void fetchAndSave(LocalDate date) {
-        // 당일 데이터가 이미 있으면 중복 저장 skip
-        if (fearGreedSnapshotPort.existsByDate(date)) {
+        boolean cryptoExists = fearGreedSnapshotPort.existsBySourceAndDate(SOURCE_CRYPTO, date);
+        boolean cnnExists    = fearGreedSnapshotPort.existsBySourceAndDate(SOURCE_CNN, date);
+
+        if (cryptoExists && cnnExists) {
             log.info("공포탐욕지수 이미 저장됨 — skip (date={})", date);
             return;
         }
 
-        // 두 API에서 데이터 수집
-        CryptoFearGreedPort.CryptoFearGreedData crypto = cryptoFearGreedPort.fetch();
-        CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
+        if (!cryptoExists) {
+            CryptoFearGreedPort.CryptoFearGreedData crypto = cryptoFearGreedPort.fetch();
+            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CRYPTO, date, crypto.value(), crypto.rating()));
+            log.info("CRYPTO 공포탐욕지수 저장 (date={}, value={}, rating={})", date, crypto.value(), crypto.rating());
+        }
 
-        FearGreedSnapshot snapshot = FearGreedSnapshot.of(date, crypto.rating(), crypto.value(), cnn.rating(), cnn.score());
-        fearGreedSnapshotPort.save(snapshot);
-
-        log.info("공포탐욕지수 저장 완료 (date={}, crypto={}/{}, cnn={}/{})",
-                date, crypto.rating(), crypto.value(), cnn.rating(), cnn.score());
+        if (!cnnExists) {
+            CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
+            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, date, cnn.value(), cnn.rating()));
+            log.info("CNN 공포탐욕지수 저장 (date={}, value={}, rating={})", date, cnn.value(), cnn.rating());
+        }
     }
 }

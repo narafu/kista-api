@@ -6,5 +6,5 @@ import java.time.LocalDate;
 
 public interface FearGreedSnapshotPort {
     void save(FearGreedSnapshot snapshot);
-    boolean existsByDate(LocalDate date);
+    boolean existsBySourceAndDate(String source, LocalDate date);
 }
