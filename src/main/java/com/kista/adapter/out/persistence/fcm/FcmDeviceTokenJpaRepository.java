@@ -10,4 +10,5 @@ interface FcmDeviceTokenJpaRepository extends JpaRepository<FcmDeviceTokenEntity
     List<FcmDeviceTokenEntity> findAllByUserId(UUID userId);
     Optional<FcmDeviceTokenEntity> findByUserIdAndToken(UUID userId, String token);
     void deleteByUserIdAndToken(UUID userId, String token);
+    void deleteByUserIdAndPlatform(UUID userId, String platform); // 같은 플랫폼 구형 토큰 일괄 삭제
 }

@@ -17,8 +17,9 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     @Override
     @Transactional
     public void save(UUID userId, String token, String platform) {
-        // 중복 토큰은 무시 (UNIQUE 제약)
+        // 같은 플랫폼 기존 토큰 삭제 후 신규 등록 (재로그인 시 구형 토큰 누적 방지)
         if (repository.findByUserIdAndToken(userId, token).isEmpty()) {
+            repository.deleteByUserIdAndPlatform(userId, platform);
             repository.save(FcmDeviceTokenEntity.of(userId, token, platform));
         }
     }
