@@ -226,20 +226,19 @@ public class StatisticsController {
         return TossAccountInfoResponse.fromList(accountStatistics.getTossAccountList(accountId, userId));
     }
 
-    // 판매 가능 수량 조회 (Toss /api/v1/sellable-quantity)
-    @Operation(summary = "판매 가능 수량 조회 (Toss 전용)", description = "Toss API — 지정 종목의 현재 판매 가능 수량 조회.")
+    // 판매 가능 수량 조회 (KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity)
+    @Operation(summary = "판매 가능 수량 조회", description = "KIS: CTRP6504R 체결기준현재잔고 잔고수량 / Toss: /api/v1/sellable-quantity — 지정 종목의 현재 판매 가능 수량 조회.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "Toss 계좌가 아님"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "Toss API 호출 실패")
+            @ApiResponse(responseCode = "503", description = "브로커 API 호출 실패")
     })
     @GetMapping("/sellable-quantity")
     public TossSellableQuantityResponse getSellableQuantity(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker) {
-        return TossSellableQuantityResponse.from(accountStatistics.getTossSellableQuantity(accountId, userId, ticker));
+        return TossSellableQuantityResponse.from(accountStatistics.getSellableQuantity(accountId, userId, ticker));
     }
 }

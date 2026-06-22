@@ -44,6 +44,6 @@ public interface AccountStatisticsUseCase {
     List<TossMarketSession> getTossMarketCalendar(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     // GET /api/v1/accounts — 계좌 목록
     List<TossAccountInfo> getTossAccountList(UUID accountId, UUID requesterId);
-    // GET /api/v1/sellable-quantity — 판매 가능 수량
-    TossSellableQuantity getTossSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker);
+    // KIS: CTRP6504R 잔고수량 / Toss: GET /api/v1/sellable-quantity — 판매 가능 수량
+    TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker);
 }

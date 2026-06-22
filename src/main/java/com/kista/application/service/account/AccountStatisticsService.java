@@ -22,6 +22,7 @@ import com.kista.domain.model.toss.TossCommissionRate;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.TossCommissionsPort;
 import com.kista.domain.port.out.KisPortfolioPort;
+import com.kista.domain.port.out.KisSellableQuantityPort;
 import com.kista.domain.port.out.KisPricePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.model.toss.TossAccountInfo;
@@ -78,6 +79,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final TossAccountListPort tossAccountListPort;
     private final TossSellableQuantityPort tossSellableQuantityPort;
     private final TossCommissionsPort tossCommissionsPort;
+    private final KisSellableQuantityPort kisSellableQuantityPort;
 
     @Override
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
@@ -283,10 +285,10 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     @Override
-    public TossSellableQuantity getTossSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
+    public TossSellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (!account.isToss()) throw new IllegalStateException("Toss 계좌에서만 사용 가능한 기능입니다");
-        return tossSellableQuantityPort.getSellableQuantity(ticker, account);
+        if (account.isToss()) return tossSellableQuantityPort.getSellableQuantity(ticker, account);
+        return kisSellableQuantityPort.getSellableQuantity(ticker, account);
     }
 
 }

@@ -13,11 +13,13 @@ import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossSellableQuantity;
 import com.kista.domain.port.out.KisAccountPort;
 import com.kista.domain.port.out.KisDailyTransactionPort;
 import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
+import com.kista.domain.port.out.KisSellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,7 +34,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfolioPort,
-        KisExecutionPort, KisDailyTransactionPort {
+        KisExecutionPort, KisDailyTransactionPort, KisSellableQuantityPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
@@ -157,6 +159,30 @@ public class KisTradingApi implements KisAccountPort, KisMarginPort, KisPortfoli
             totalRate = KisResponseParser.parseBd(response.output3().evluErngRt1());
         }
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    // ── KisSellableQuantityPort ────────────────────────────────────────────────
+
+    @Override
+    public TossSellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+        // CTRP6504R 체결기준현재잔고 — cblc_qty13(잔고수량) = 해외주식 판매가능수량
+        PortfolioResponse response = kisHttpClient.tradingGet(
+                PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,
+                p -> {
+                    p.add("WCRC_FRCR_DVSN_CD", "02"); // 02=외화
+                    p.add("NATN_CD", "000");           // 000=전체
+                    p.add("TR_MKET_CD", "00");         // 00=전체
+                    p.add("INQR_DVSN_CD", "00");       // 00=전체
+                });
+        if (response == null || response.output1() == null) {
+            return new TossSellableQuantity(ticker.name(), 0);
+        }
+        int quantity = response.output1().stream()
+                .filter(o -> ticker.name().equals(o.pdno()))
+                .findFirst()
+                .map(o -> KisResponseParser.parseIntSafe(o.balanceQuantity13()))
+                .orElse(0);
+        return new TossSellableQuantity(ticker.name(), quantity);
     }
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────
