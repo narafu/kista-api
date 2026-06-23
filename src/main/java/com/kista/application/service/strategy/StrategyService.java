@@ -1,8 +1,9 @@
 package com.kista.application.service.strategy;
 
 import com.kista.common.TimeZones;
-import com.kista.application.service.trading.BrokerMarginRouter;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.trading.BrokerPriceRouter;
+import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.CyclePosition;
@@ -42,7 +43,7 @@ class StrategyService implements StrategyUseCase {
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 브로커 무관
-    private final BrokerMarginRouter brokerMarginRouter;         // 등록 시점 가용 시드 검증 — 브로커 무관
+    private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
     private final LoadUserSettingsPort loadUserSettingsPort;     // 잔고 검증 설정 조회 (user_settings)
 
     @Override
@@ -168,7 +169,7 @@ class StrategyService implements StrategyUseCase {
 
     // 예수금 = 브로커 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
-        BigDecimal kisUsdAmount = brokerMarginRouter.getUsdBuyableAmount(account);
+        BigDecimal kisUsdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
                 .map(s -> cyclePositionPort.findLatestByStrategyId(s.id(), 1).stream()

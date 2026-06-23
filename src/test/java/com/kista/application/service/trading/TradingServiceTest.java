@@ -53,6 +53,7 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
     @Mock TosMarginPort tosMarginPort;
+    @Mock com.kista.domain.port.out.broker.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
     @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
@@ -108,10 +109,13 @@ class TradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cycleHistoryPort);
-        // CycleRotationService: BrokerMarginRouter가 KIS/Toss 포트를 브로커 기반으로 라우팅
-        BrokerMarginRouter marginRouter = new BrokerMarginRouter(kisMarginPort, tosMarginPort);
+        // CycleRotationService: BrokerAdapterRegistry.require(account, MarginPort) → kisMarginPort로 위임
+        com.kista.application.service.broker.BrokerAdapterRegistry marginRegistry =
+                mock(com.kista.application.service.broker.BrokerAdapterRegistry.class);
+        lenient().when(marginRegistry.require(any(com.kista.domain.model.account.Account.class),
+                eq(com.kista.domain.port.out.broker.MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
-                marginRouter, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+                marginRegistry, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
@@ -557,7 +561,7 @@ class TradingServiceTest {
         when(orderPort.findPlannedByCycleAndDate(eq(maintainCycle.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         // MAINTAIN은 KIS 실잔고 확인 필수 — initDeposit 이상이면 재등록
-        when(kisMarginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(initDeposit);
+        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(initDeposit);
         // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
         StrategyCycle savedMaintainCycle = new StrategyCycle(UUID.randomUUID(), maintainStrategy.id(), initDeposit, null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
         when(strategyCyclePort.save(any())).thenReturn(savedMaintainCycle);
@@ -590,7 +594,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(kisMarginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(marginAmount);
+        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(marginAmount);
         // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
         StrategyCycle savedMaxCycle = new StrategyCycle(UUID.randomUUID(), maxStrategy.id(), expectedSeed, null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
         when(strategyCyclePort.save(any())).thenReturn(savedMaxCycle);
@@ -622,7 +626,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(kisMarginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(marginAmount);
+        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(marginAmount);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -669,7 +673,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
-        when(kisMarginPort.getUsdBuyableAmount(ACCOUNT)).thenThrow(kisError);
+        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenThrow(kisError);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
 

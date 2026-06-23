@@ -1,7 +1,8 @@
 package com.kista.application.service.strategy;
 
-import com.kista.application.service.trading.BrokerMarginRouter;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.trading.BrokerPriceRouter;
+import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
@@ -46,7 +47,8 @@ class StrategyServiceTest {
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock BrokerPriceRouter brokerPriceRouter;
-    @Mock BrokerMarginRouter brokerMarginRouter;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock MarginPort marginPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
 
     @InjectMocks StrategyService strategyService;
@@ -309,7 +311,8 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
-        when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
 
@@ -337,7 +340,8 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
-        when(brokerMarginRouter.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);

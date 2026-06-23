@@ -14,7 +14,9 @@ import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +32,7 @@ import java.util.Optional;
 @Slf4j
 class CycleRotationService {
 
-    private final BrokerMarginRouter brokerMarginRouter;        // USD 매수가능금액 조회 (MAX 재등록)
+    private final BrokerAdapterRegistry registry;               // USD 매수가능금액 조회 (MAX 재등록)
     private final StrategyPort strategyPort;                   // 전략 상태 갱신
     private final StrategyCyclePort strategyCyclePort;         // 새 StrategyCycle 생성
     private final CyclePositionPort cyclePositionPort;         // 새 시작 스냅샷 저장
@@ -137,7 +139,7 @@ class CycleRotationService {
     // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
     private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
         try {
-            BigDecimal usdAmount = brokerMarginRouter.getUsdBuyableAmount(account);
+            BigDecimal usdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
                 notifyPort.notifyError(new IllegalStateException("재등록 실패: USD 잔고 없음 strategyId=" + strategy.id()));
