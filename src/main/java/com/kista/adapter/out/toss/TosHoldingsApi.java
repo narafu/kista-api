@@ -214,11 +214,13 @@ public class TosHoldingsApi implements TosAccountPort,
         SellableQuantityWrapper wrapper = tossHttpClient.get(
                 SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
         if (wrapper == null || wrapper.result() == null) {
-            log.warn("Toss 판매 가능 수량 응답 없음: ticker={}", ticker);
+            log.warn("Toss 판매 가능 수량 응답 없음: ticker={}, wrapper={}", ticker, wrapper);
             return new SellableQuantity(ticker.name(), 0);
         }
         SellableQuantityResult result = wrapper.result();
         int quantity = result.quantity() != null ? Integer.parseInt(result.quantity()) : 0;
+        log.info("Toss 판매 가능 수량 응답: ticker={}, symbol={}, quantityRaw={}, parsed={}",
+                ticker, result.symbol(), result.quantity(), quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
 

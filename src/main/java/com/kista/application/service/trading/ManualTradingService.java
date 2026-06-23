@@ -87,6 +87,8 @@ class ManualTradingService {
         AccountBalance liveBalance;
         try {
             liveBalance = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+            log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
+                    account.nickname(), strategy.ticker().name(), liveBalance.holdings(), liveBalance.usdDeposit());
         } catch (Exception e) {
             log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.id(), strategy.ticker().name(), e.getMessage());
@@ -111,7 +113,8 @@ class ManualTradingService {
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
         int sellableQty = brokerAccountRouter.getSellableQuantity(account, strategy.ticker());
-        log.info("판매가능수량 조회: [{}] {} {}주", account.nickname(), strategy.ticker().name(), sellableQty);
+        log.info("SELL 수량 검증: [{}] {} 계획={}주, 판매가능={}주",
+                account.nickname(), strategy.ticker().name(), newSellTotal, sellableQty);
         if (newSellTotal > sellableQty) {
             throw new ManualTradingException("보유 수량이 부족합니다");
         }
