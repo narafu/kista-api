@@ -37,7 +37,8 @@ application/
     trading/     ← TradingExecutionFacade(TradingExecutionUseCase 구현 Facade — preview/executeManually/cancelOrder/cancelByCycle/execute/executeBatch 단일 진입점),
                    TradingService(배치·단건 실행 코어), ManualTradingService(수동 실행), TradingPreviewService(미리보기 전용, @Transactional readOnly),
                    OrderCancelService(주문 취소), CycleRotationService(사이클 종료 후 cycleSeedType 기반 재등록),
-                   TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer (helper, package-private)
+                   TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/BrokerAccountRouter (helper, package-private)
+                   BrokerAccountRouter: getLiveBalance/getUsdDeposit/getSellableQuantity — BrokerAdapterRegistry 경유 브로커별 잔고·판매가능수량 라우팅 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
     account/     ← AccountService, AccountStatisticsService, TossStatisticsService
                    BrokerStatisticsRouter (package-private — BrokerAdapterRegistry 경유 브로커별 통계 라우팅)
     broker/      ← BrokerAdapterRegistry (public @Component — require(account, Port.class) / find())
