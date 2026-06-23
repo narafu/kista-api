@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,9 +30,14 @@ public class TradingOpenScheduler {
     private final StrategyCyclePort strategyCyclePort;
     private final UserPort userPort;
     private final NotifyPort notifyPort;
+    private final SchedulerLockService schedulerLockService;
 
     @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST (개장 30분~90분 전)
-    public void run() {
+    public void run() throws InterruptedException {
+        schedulerLockService.tryRun("trading-open", Duration.ofHours(2), this::runLocked);
+    }
+
+    private void runLocked() {
         notifyPort.notifyInfo("장 개시 스케쥴러 시작");
         List<Strategy> strategies = strategyPort.findAllActive();
         log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());

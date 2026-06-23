@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,6 +36,7 @@ class TradingOpenSchedulerTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock UserPort userPort;
     @Mock NotifyPort notifyPort;
+    @Mock SchedulerLockService schedulerLockService;
     @InjectMocks TradingOpenScheduler scheduler;
 
     private static final UUID USER_ID    = UUID.randomUUID();
@@ -58,6 +60,15 @@ class TradingOpenSchedulerTest {
     private User mockUser() {
         return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, null, NotificationChannel.TELEGRAM);
+    }
+
+    @BeforeEach
+    void setUp() throws InterruptedException {
+        lenient().doAnswer(invocation -> {
+            SchedulerLockService.LockedTask task = invocation.getArgument(2);
+            task.run();
+            return true;
+        }).when(schedulerLockService).tryRun(any(), any(), any());
     }
 
     @Test
@@ -157,5 +168,14 @@ class TradingOpenSchedulerTest {
         scheduler.run();
 
         verify(notifyPort).notifyError(ex);
+    }
+
+    @Test
+    void run_lockNotAcquired_skipsSchedulerBody() throws InterruptedException {
+        doReturn(false).when(schedulerLockService).tryRun(any(), any(), any());
+
+        scheduler.run();
+
+        verifyNoInteractions(strategyPort, useCase, notifyPort);
     }
 }

@@ -17,10 +17,11 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     @Override
     @Transactional
     public void save(UUID userId, String token, String platform) {
+        String normalizedPlatform = normalizePlatform(platform);
         // 같은 플랫폼 기존 토큰 삭제 후 신규 등록 (재로그인 시 구형 토큰 누적 방지)
         if (repository.findByUserIdAndToken(userId, token).isEmpty()) {
-            repository.deleteByUserIdAndPlatform(userId, platform);
-            repository.save(FcmDeviceTokenEntity.of(userId, token, platform));
+            repository.deleteByUserIdAndPlatform(userId, normalizedPlatform);
+            repository.save(FcmDeviceTokenEntity.of(userId, token, normalizedPlatform));
         }
     }
 
@@ -35,6 +36,15 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     public List<String> findTokensByUserId(UUID userId) {
         return repository.findAllByUserId(userId).stream()
                 .map(FcmDeviceTokenEntity::getToken)
+                .distinct()
                 .toList();
+    }
+
+    private static String normalizePlatform(String platform) {
+        String normalized = platform == null ? "" : platform.strip().toUpperCase();
+        if (!List.of("WEB", "ANDROID", "IOS").contains(normalized)) {
+            throw new IllegalArgumentException("알 수 없는 FCM 플랫폼: " + platform + ". 허용값: WEB, ANDROID, IOS");
+        }
+        return normalized;
     }
 }
