@@ -211,6 +211,9 @@ public class TosHoldingsApi implements TosAccountPort,
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
+        // raw 응답 먼저 로깅 — 필드명 확인용
+        String rawResponse = tossHttpClient.get(SELLABLE_QUANTITY_PATH, account, params, String.class);
+        log.warn("Toss sellable-quantity raw: {}", rawResponse);
         SellableQuantityWrapper wrapper = tossHttpClient.get(
                 SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
         if (wrapper == null || wrapper.result() == null) {
