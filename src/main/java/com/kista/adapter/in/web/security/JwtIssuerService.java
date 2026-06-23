@@ -1,13 +1,12 @@
 package com.kista.adapter.in.web.security;
 
+import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.user.User;
 import com.nimbusds.jose.jwk.ECKey;
 import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import com.kista.domain.model.auth.TokenConstants;
 
 import java.security.interfaces.ECPrivateKey;
 import java.util.Date;

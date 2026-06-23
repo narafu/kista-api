@@ -12,5 +12,5 @@ public record Execution(
         int quantity,                   // 체결 수량
         BigDecimal price,               // 체결 단가 (USD)
         BigDecimal amountUsd,           // 체결 금액 (USD) = price × quantity
-        String externalOrderId          // 브로커 주문 번호 (KIS: ODNO)
+        String externalOrderId          // 증권사 주문 번호 (KIS: ODNO)
 ) {}

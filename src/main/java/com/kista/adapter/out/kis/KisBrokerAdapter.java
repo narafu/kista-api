@@ -2,23 +2,10 @@ package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.kis.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.KisDailyTransactionPort;
-import com.kista.domain.port.out.KisExecutionPort;
-import com.kista.domain.port.out.KisMarginPort;
-import com.kista.domain.port.out.KisPortfolioPort;
-import com.kista.domain.port.out.KisSellableQuantityPort;
-import com.kista.domain.port.out.broker.BrokerAdapterPort;
-import com.kista.domain.port.out.broker.DailyTradePort;
-import com.kista.domain.port.out.broker.ExecutionPort;
-import com.kista.domain.port.out.broker.MarginPort;
-import com.kista.domain.port.out.broker.PortfolioPort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-// KIS 브로커 어댑터 — 공통 5개 Port 구현 (BalancePort 미구현 — DB cycle_position 스냅샷 사용)
+// KIS 증권사 어댑터 — 공통 5개 Port 구현 (BalancePort 미구현 — DB cycle_position 스냅샷 사용)
 @Component
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerAdapterPort,

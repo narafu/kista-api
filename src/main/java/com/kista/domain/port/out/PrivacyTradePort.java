@@ -1,10 +1,6 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.privacy.FidaOrderCommand;
-import com.kista.domain.model.privacy.PrivacyCurrentBase;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.privacy.PrivacyTradeBaseView;
-import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.*;
 
 import java.time.LocalDate;
 import java.util.List;

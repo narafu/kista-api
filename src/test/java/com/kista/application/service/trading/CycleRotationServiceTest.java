@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
@@ -7,20 +8,10 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.domain.model.user.UserSettings;
+import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.StrategyCyclePort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.UserNotificationPort;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
-import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.domain.strategy.PrivacyTradingStrategy;
-import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
+import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,8 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import com.kista.domain.model.user.UserSettings;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,9 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 // 사이클 종료 후 재등록(MAINTAIN/MAX) 정책 검증 — 최소금액 가드(InfiniteCycleOrderStrategy.MIN_DEPOSIT_MULTIPLIER=44) 포함
@@ -75,7 +62,7 @@ class CycleRotationServiceTest {
 
     @BeforeEach
     void setUp() {
-        // loadUserSettingsPort — 잔고검증 기본값(ON) 반환: 브로커 실잔고 경로로 진행
+        // loadUserSettingsPort — 잔고검증 기본값(ON) 반환: 증권사 실잔고 경로로 진행
         when(loadUserSettingsPort.loadByUserId(any()))
                 .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
 

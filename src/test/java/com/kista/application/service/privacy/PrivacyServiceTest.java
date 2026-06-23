@@ -1,10 +1,10 @@
 package com.kista.application.service.privacy;
 
 import com.kista.common.TradeDateConverter;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.privacy.FidaOrderCommand;
-import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.out.PrivacyTradePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -1,23 +1,17 @@
 package com.kista.application.service.trading;
 
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.order.*;
-import com.kista.domain.model.kis.*;
-import com.kista.domain.model.user.*;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
-import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.domain.strategy.PrivacyTradingStrategy;
-import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
+import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -422,7 +416,7 @@ class TradingServiceTest {
         verify(userNotificationPort).notifyInsufficientBalance(eq(USER), eq(ACCOUNT), eq(Strategy.Type.INFINITE), eq(Ticker.SOXL));
         // 저장 없음
         verify(orderPort, never()).saveAll(any());
-        // 브로커 접수 없음
+        // 증권사 접수 없음
         verify(kisOrderPort, never()).place(any(), any());
     }
 

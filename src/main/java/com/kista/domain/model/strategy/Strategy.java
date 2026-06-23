@@ -1,6 +1,5 @@
 package com.kista.domain.model.strategy;
 
-import com.kista.domain.model.account.Account;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 

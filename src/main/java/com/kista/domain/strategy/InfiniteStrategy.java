@@ -12,8 +12,8 @@ import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderTiming.AT_OPEN;
 import static com.kista.domain.model.order.Order.OrderType.*;
-import static com.kista.domain.model.order.Order.OrderTiming.*;
 
 @Component
 class InfiniteStrategy implements InfiniteTradingStrategy {

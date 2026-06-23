@@ -1,8 +1,8 @@
 package com.kista.domain.strategy;
 
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,9 +13,7 @@ import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
-import static com.kista.domain.model.order.Order.OrderType.LIMIT;
-import static com.kista.domain.model.order.Order.OrderType.LOC;
-import static com.kista.domain.model.order.Order.OrderType.MOC;
+import static com.kista.domain.model.order.Order.OrderType.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("InfiniteStrategy 매매 변수 계산 검증")

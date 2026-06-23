@@ -1,8 +1,8 @@
 package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;

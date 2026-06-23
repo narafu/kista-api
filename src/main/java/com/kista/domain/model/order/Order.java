@@ -12,13 +12,13 @@ public record Order(
         UUID strategyCycleId,            // FK → strategy_cycle.id (멀티 전략 주문 격리)
         LocalDate tradeDate,             // 거래일
         Ticker ticker,                   // 거래 종목
-        OrderType orderType,             // 주문 유형 (LOC/MOC/LIMIT) — 브로커 실행 지시
+        OrderType orderType,             // 주문 유형 (LOC/MOC/LIMIT) — 증권사 실행 지시
         OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
         OrderDirection direction,        // 매수/매도 방향
         Integer quantity,                // 주문 수량(nullable)
         BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,              // 주문 상태
-        String externalOrderId,          // 브로커 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
+        String externalOrderId,          // 증권사 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
         Integer filledQuantity,          // 체결 수량 (null=미확인, 0=미체결)
         BigDecimal filledPrice           // 체결 가중평균가 (null=미체결)
 ) {
@@ -72,7 +72,7 @@ public record Order(
                 quantity, price, OrderStatus.PLANNED, null, null, null);
     }
 
-    // 브로커 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
+    // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
     public Order withPlaced(String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
                 orderType, timing, direction, quantity, price,

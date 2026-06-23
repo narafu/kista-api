@@ -3,8 +3,8 @@ package com.kista.adapter.out.notify;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 

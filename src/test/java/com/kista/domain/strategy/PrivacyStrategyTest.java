@@ -15,8 +15,8 @@ import java.util.UUID;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
-import static com.kista.domain.model.order.Order.OrderType.LOC;
 import static com.kista.domain.model.order.Order.OrderType.LIMIT;
+import static com.kista.domain.model.order.Order.OrderType.LOC;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

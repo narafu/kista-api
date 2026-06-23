@@ -19,7 +19,7 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 브로커 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록
+    // 증권사 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록
     void markPlaced(UUID orderId, String externalOrderId);
 
     // 기간+종목 필터 조회 (대시보드·텔레그램 이력 조회용)
@@ -34,10 +34,10 @@ public interface OrderPort {
     // 단건 조회 (취소 전 상태 확인용)
     Optional<Order> findById(UUID orderId);
 
-    // KIS 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
+    // 증권사 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
     void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // BUY PLANNED만 삭제 (KIS 접수 전 가격 보정 시 재저장 준비)
+    // BUY PLANNED만 삭제 (증권사 접수 전 가격 보정 시 재저장 준비)
     void deletePlannedBuyByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 오늘 PLANNED 또는 PLACED 주문 조회 (스케쥴러 재계산 skip 판정용)

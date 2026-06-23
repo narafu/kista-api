@@ -1,11 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.DailyTransactionResponse;
-import com.kista.adapter.in.web.dto.ExecutionResponse;
-import com.kista.adapter.in.web.dto.MarginResponse;
-import com.kista.adapter.in.web.dto.MultiPriceResponse;
-import com.kista.adapter.in.web.dto.PortfolioSummaryResponse;
-import com.kista.adapter.in.web.dto.SellableQuantityResponse;
+import com.kista.adapter.in.web.dto.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,13 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 브로커 자동 분기)")
+@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 증권사 자동 분기)")
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
@@ -138,7 +134,7 @@ public class StatisticsController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "브로커 API 호출 실패")
+            @ApiResponse(responseCode = "503", description = "증권사 API 호출 실패")
     })
     @GetMapping("/sellable-quantity")
     public SellableQuantityResponse getSellableQuantity(

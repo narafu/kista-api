@@ -1,23 +1,14 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
-import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.domain.strategy.PrivacyTradingStrategy;
-import com.kista.domain.strategy.ReverseInfiniteTradingStrategy;
+import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

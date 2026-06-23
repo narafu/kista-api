@@ -1,9 +1,9 @@
 package com.kista.application.service.trading;
 
+import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.port.out.CyclePositionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

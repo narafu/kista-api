@@ -1,9 +1,9 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.InfinitePosition;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.order.NextOrdersPreview;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

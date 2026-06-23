@@ -2,42 +2,13 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
-import com.kista.domain.model.kis.DailyTransaction;
-import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.DailyTransactionSummary;
-import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.kis.*;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.TossAccountInfo;
-import com.kista.domain.model.toss.TossCandle;
-import com.kista.domain.model.toss.TossCommissionRate;
-import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.model.toss.TossMarketSession;
-import com.kista.domain.model.toss.TossStockInfo;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.TossAccountListPort;
-import com.kista.domain.port.out.TossCommissionsPort;
-import com.kista.domain.port.out.TossExchangeRatePort;
-import com.kista.domain.port.out.TossMarketCalendarPort;
-import com.kista.domain.port.out.TossPortfolioPort;
-import com.kista.domain.port.out.TossStockInfoPort;
-import com.kista.domain.port.out.TosCandlePort;
-import com.kista.domain.port.out.TosExecutionPort;
-import com.kista.domain.port.out.TosMarginPort;
-import com.kista.domain.port.out.TossSellableQuantityPort;
-import com.kista.domain.port.out.broker.BrokerAccountPort;
-import com.kista.domain.port.out.broker.BrokerAdapterPort;
-import com.kista.domain.port.out.broker.CandlePort;
-import com.kista.domain.port.out.broker.DailyTradePort;
-import com.kista.domain.port.out.broker.ExchangeRatePort;
-import com.kista.domain.port.out.broker.ExecutionPort;
-import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.model.toss.*;
+import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.*;
 import com.kista.domain.port.out.broker.MarketCalendarPort;
-import com.kista.domain.port.out.broker.PortfolioPort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
-import com.kista.domain.port.out.broker.StockInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -48,7 +19,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-// Toss 브로커 어댑터 — 공통 5개 + Toss 전용 5개 Port 구현 (BalancePort 미구현 — BrokerAccountRouter 담당)
+// Toss 증권사 어댑터 — 공통 5개 + Toss 전용 5개 Port 구현 (BalancePort 미구현 — BrokerAccountRouter 담당)
 @Slf4j
 @Component
 @RequiredArgsConstructor

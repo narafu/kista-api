@@ -16,7 +16,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, Order.OrderStatus status);
 
-    // KIS 접수 실패 시 누적 PLANNED 주문 정리
+    // 증권사 접수 실패 시 누적 PLANNED 주문 정리
     void deleteAllByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, Order.OrderStatus status);
 

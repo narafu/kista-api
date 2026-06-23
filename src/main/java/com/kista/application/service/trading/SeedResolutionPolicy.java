@@ -11,7 +11,7 @@ import java.util.Optional;
 // package-private — application/service 패키지 전용
 interface SeedResolutionPolicy {
 
-    // 가용 잔고를 반환. 브로커 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
+    // 가용 잔고를 반환. 증권사 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
     Optional<BigDecimal> resolveAvailableBalance(Strategy strategy, BigDecimal maintainSeed, BigDecimal maxSeed);
 
     StrategyCycle.SeedResolvedBy seedResolvedBy();

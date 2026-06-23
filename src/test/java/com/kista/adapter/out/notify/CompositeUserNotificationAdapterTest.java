@@ -1,10 +1,10 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,12 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

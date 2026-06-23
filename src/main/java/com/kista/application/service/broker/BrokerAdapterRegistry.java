@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// 브로커 어댑터 레지스트리 — account.broker()로 BrokerAdapterPort 조회 후 Capability 캐스팅
+// 증권사 어댑터 레지스트리 — account.broker()로 BrokerAdapterPort 조회 후 Capability 캐스팅
 @Slf4j
 @Component
 public class BrokerAdapterRegistry {
@@ -44,7 +44,7 @@ public class BrokerAdapterRegistry {
     private BrokerAdapterPort getAdapter(Account account) {
         BrokerAdapterPort adapter = registry.get(account.broker());
         if (adapter == null) {
-            throw new IllegalArgumentException("지원하지 않는 브로커: " + account.broker());
+            throw new IllegalArgumentException("지원하지 않는 증권사: " + account.broker());
         }
         return adapter;
     }

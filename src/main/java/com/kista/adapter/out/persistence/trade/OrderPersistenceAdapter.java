@@ -97,7 +97,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     @Transactional
     public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // KIS 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
+        // 증권사 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
         repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
                 strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED);
     }

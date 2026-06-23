@@ -39,7 +39,7 @@ class AccountEntity extends BaseAuditEntity {
     private String accountNo;            // AES-256 암호화 저장
 
     @Column(name = "broker_account_code", length = 10)
-    private String brokerAccountCode;    // 브로커 API 보조 식별자 — KIS: null, TOSS: accountSeq
+    private String brokerAccountCode;    // 증권사 API 보조 식별자 — KIS: null, TOSS: accountSeq
 
     @Column(name = "app_key", nullable = false, length = 512)
     private String appKey;            // AES-256 암호화 저장

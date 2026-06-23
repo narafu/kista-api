@@ -7,12 +7,10 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -43,7 +40,7 @@ class TradingService {
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
-    private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + KIS 접수
+    private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
     private final UserPort userPort;                           // ACTIVE 사용자 전체 조회 (장 알림용)
     private final LoadUserSettingsPort loadUserSettingsPort;   // MARKET_ALERT 활성 여부 조회
@@ -57,7 +54,7 @@ class TradingService {
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
-    // KIS 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
+    // 증권사 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
 
     void execute(Strategy strategy, Account account, User user) throws InterruptedException {
@@ -99,7 +96,7 @@ class TradingService {
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
         waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
 
-        // KIS 접수 — 전략별: BUY 가격 보정 후 PLANNED → KIS 접수
+        // 증권사 접수 — 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수
         List<CyclePlacedState> placedStates = placeAll(states, today);
 
         // 공통 대기 — 마감 시각까지 (모든 전략이 공유하는 단 1회)
@@ -125,11 +122,11 @@ class TradingService {
         return states;
     }
 
-    // 전략별: BUY 가격 보정 후 PLANNED → KIS 접수 (실패 사이클은 격리)
+    // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리)
     private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
-            runSafely("KIS 접수", state.ctx(), () -> {
+            runSafely("증권사 접수", state.ctx(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());

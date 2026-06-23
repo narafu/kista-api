@@ -1,29 +1,24 @@
 package com.kista.adapter.in.web;
 
-import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.adapter.in.web.security.JwtAuthFilter;
-import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
-import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.adapter.in.web.security.JwtIssuerService;
+import com.kista.adapter.in.web.security.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
-import org.springframework.http.ResponseCookie;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,7 +27,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DevAuthController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})

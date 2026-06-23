@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -8,15 +9,9 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.StrategyCyclePort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.application.service.broker.BrokerAdapterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,10 +49,10 @@ class CycleRotationService {
         BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
         BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
 
-        // 잔고검증 정책 — ON: 브로커 실잔고 조회, OFF: 내부 원장만 사용
+        // 잔고검증 정책 — ON: 증권사 실잔고 조회, OFF: 내부 원장만 사용
         SeedResolutionPolicy policy = resolvePolicy(user, account, strategy);
         Optional<BigDecimal> balanceOpt = policy.resolveAvailableBalance(strategy, maintainSeed, maxSeed);
-        if (balanceOpt.isEmpty()) return; // 브로커 조회 실패 — 내부에서 notifyError 완료
+        if (balanceOpt.isEmpty()) return; // 증권사 조회 실패 — 내부에서 notifyError 완료
         BigDecimal actualBalance = balanceOpt.get();
 
         BigDecimal targetSeed;
@@ -107,7 +102,7 @@ class CycleRotationService {
         UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
                 .orElse(UserSettings.defaultFor(user.id())); // 미설정 시 기본값(검증 ON)
         if (!settings.balanceCheckEnabled()) {
-            // OFF: 내부 원장만 사용 (브로커 조회 없음)
+            // OFF: 내부 원장만 사용 (증권사 조회 없음)
             return new SeedResolutionPolicy() {
                 @Override
                 public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
@@ -117,7 +112,7 @@ class CycleRotationService {
                 public StrategyCycle.SeedResolvedBy seedResolvedBy() { return StrategyCycle.SeedResolvedBy.LEDGER_ONLY; }
             };
         }
-        // ON: 브로커 실잔고 조회
+        // ON: 증권사 실잔고 조회
         return new SeedResolutionPolicy() {
             @Override
             public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {

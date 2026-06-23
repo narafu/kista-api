@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
-// 브로커 무관하게 체결 내역 조회 — KIS/TOSS 분기 캡슐화
+// 증권사 무관하게 체결 내역 조회 — KIS/TOSS 분기 캡슐화
 @Component
 @RequiredArgsConstructor
 public class BrokerExecutionRouter {

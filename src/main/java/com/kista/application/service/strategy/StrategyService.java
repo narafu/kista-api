@@ -1,26 +1,15 @@
 package com.kista.application.service.strategy;
 
-import com.kista.common.TimeZones;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.trading.BrokerPriceRouter;
-import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.strategy.StrategyDetail;
-import com.kista.domain.model.strategy.UpdateStrategyCommand;
-import com.kista.domain.model.user.User;
+import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.StrategyCyclePort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.MarginPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,7 +31,7 @@ class StrategyService implements StrategyUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
-    private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 브로커 무관
+    private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 증권사 무관
     private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
     private final LoadUserSettingsPort loadUserSettingsPort;     // 잔고 검증 설정 조회 (user_settings)
 
@@ -56,12 +45,12 @@ class StrategyService implements StrategyUseCase {
                 : Strategy.CycleSeedType.NONE;
         Strategy.Ticker resolvedTicker = cmd.type().resolveTicker(cmd.ticker(), Strategy.Ticker.SOXL);
 
-        // 같은 계좌 내 종목 중복 방지 — 체결 귀속(KIS 종목별 합산 잔고 ↔ 전략) 일대일 보장
+        // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
         if (strategyPort.existsByAccountIdAndTicker(accountId, resolvedTicker)) {
             throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + resolvedTicker);
         }
 
-        // 잔고 검증 활성 시: 새 시드는 KIS 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
+        // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
         userPort.findByIdOrThrow(userId); // 사용자 존재 확인
         UserSettings settings = loadUserSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
         if (settings.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
@@ -167,7 +156,7 @@ class StrategyService implements StrategyUseCase {
         return toDetail(saved);
     }
 
-    // 예수금 = 브로커 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
+    // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
         BigDecimal kisUsdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
 

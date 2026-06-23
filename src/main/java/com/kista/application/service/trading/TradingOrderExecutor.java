@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-// 브로커 접수: BUY 가격 보정 → PLANNED 개별 접수 → PLACED 마킹 (접수 실패 주문은 로그 후 skip)
+// 증권사 접수: BUY 가격 보정 → PLANNED 개별 접수 → PLACED 마킹 (접수 실패 주문은 로그 후 skip)
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -26,7 +26,7 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final NotifyPort notifyPort;
 
-    // 지정된 주문 목록만 브로커 접수 (장 개시 스케쥴러 매도 선접수용 — BUY 보정 없음)
+    // 지정된 주문 목록만 증권사 접수 (장 개시 스케쥴러 매도 선접수용 — BUY 보정 없음)
     List<Order> placeGiven(List<Order> orders, Account account) {
         if (orders.isEmpty()) return List.of();
         List<Order> placed = placeEach(orders, account);
@@ -59,15 +59,15 @@ class TradingOrderExecutor {
                 notifyPort.notifyError(e);
                 continue;
             }
-            // 브로커 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
+            // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
             try {
                 orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
                 placed.add(p.withPlaced(placedOrder.externalOrderId()));
             } catch (Exception e) {
-                log.error("[{}] {} {} 브로커 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
+                log.error("[{}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
                         account.nickname(), p.direction(), p.ticker(), placedOrder.externalOrderId(), e.getMessage());
                 notifyPort.notifyError(new IllegalStateException(
-                        "[DB 불일치] 브로커 접수 완료 후 PLACED 기록 실패 — externalOrderId=" + placedOrder.externalOrderId(), e));
+                        "[DB 불일치] 증권사 접수 완료 후 PLACED 기록 실패 — externalOrderId=" + placedOrder.externalOrderId(), e));
             }
         }
         return placed;

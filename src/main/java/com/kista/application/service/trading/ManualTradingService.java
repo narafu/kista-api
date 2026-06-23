@@ -5,17 +5,12 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.DstInfo;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import com.kista.domain.model.strategy.PriceSnapshot;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -63,7 +58,7 @@ class ManualTradingService {
 
         User user = userPort.findByIdOrThrow(account.userId());
 
-        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — KIS 접수는 스케쥴러가 담당
+        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — 증권사 접수는 스케쥴러가 담당
         Map<Strategy.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
                 List.of(strategy.ticker()), account);
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());

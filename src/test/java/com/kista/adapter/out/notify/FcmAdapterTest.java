@@ -1,8 +1,8 @@
 package com.kista.adapter.out.notify;
 
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,12 +10,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FcmAdapterTest {

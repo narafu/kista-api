@@ -2,7 +2,6 @@ package com.kista.domain.model.order;
 
 import com.kista.domain.model.strategy.InfinitePosition;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 

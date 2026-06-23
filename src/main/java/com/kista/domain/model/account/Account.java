@@ -13,7 +13,7 @@ public record Account(
         String accountNo,      // 계좌번호 (복호화된 값)
         String appKey,      // API 앱 키 — KIS App Key / Toss Client ID (복호화된 값)
         String secretKey,   // API 앱 시크릿 — KIS Secret Key / Toss Client Secret (복호화된 값)
-        String brokerAccountCode, // 브로커 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
+        String brokerAccountCode, // 증권사 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
         Broker broker             // 증권사 (기본: KIS)
 ) {
     @Getter

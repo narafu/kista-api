@@ -2,29 +2,18 @@ package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.trading.BrokerPriceRouter;
-import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.strategy.StrategyDetail;
-import com.kista.domain.model.strategy.UpdateStrategyCommand;
+import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.StrategyCyclePort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.MarginPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
