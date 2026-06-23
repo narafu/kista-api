@@ -75,8 +75,10 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public AdminAnomalies getAnomalies(int inactiveDays) {
+    public AdminAnomalies getAnomalies(int inactiveDays, LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate rangeFrom = from != null ? from : today.minusDays(inactiveDays);
+        LocalDate rangeTo   = to   != null ? to   : today;
         List<Account> allAccounts = accountPort.findAll();
 
         // PAUSED 전략이 있는 계좌
@@ -85,11 +87,11 @@ class AdminQueryService implements AdminQueryUseCase {
                         .anyMatch(Strategy::isPaused))
                 .toList();
 
-        // 최근 inactiveDays일 거래 있는 accountId 집합
-        Set<UUID> activeAccountIds = orderPort.findAll(today.minusDays(inactiveDays), today)
+        // 범위 내 거래 있는 accountId 집합
+        Set<UUID> activeAccountIds = orderPort.findAll(rangeFrom, rangeTo)
                 .stream().map(Order::accountId).collect(Collectors.toSet());
 
-        // ACTIVE 전략이 있지만 inactiveDays 내 거래 없는 계좌
+        // ACTIVE 전략이 있지만 범위 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
                 .filter(a -> strategyPort.findByAccountId(a.id()).stream()
                         .anyMatch(Strategy::isActive))

@@ -42,7 +42,7 @@ class TradingOpenSchedulerTest {
 
     private Account mockAccount(UUID accountId) {
         return new Account(accountId, USER_ID, "테스트계좌",
-                "74420614", "key", "secret", "01", Account.Broker.KIS);
+                "74420614", "key", "secret", null, Account.Broker.KIS, null);
     }
 
     private Strategy mockStrategy(UUID accountId, Strategy.Type type) {

@@ -44,8 +44,8 @@ class TradingCloseSchedulerTest {
     // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 없음)
     private Account mockAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-                "74420614", "key", "secret", "01",
-                Account.Broker.KIS);
+                "74420614", "key", "secret", null,
+                Account.Broker.KIS, null);
     }
 
     private Strategy mockStrategy() {
@@ -122,8 +122,8 @@ class TradingCloseSchedulerTest {
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
         StrategyCycle currentCycle2 = mockStrategyCycle(strategy2.id());
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
-                "99999999", "key2", "secret2", "01",
-                Account.Broker.KIS);
+                "99999999", "key2", "secret2", null,
+                Account.Broker.KIS, null);
         User user = mockUser();
 
         when(cyclePort.findAllActive()).thenReturn(List.of(strategy1, strategy2));

@@ -32,8 +32,8 @@ class TradingOrderPlannerTest {
 
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", "01",
-            Account.Broker.KIS);
+            "74420614", "key", "secret", null,
+            Account.Broker.KIS, null);
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 

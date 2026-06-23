@@ -53,6 +53,7 @@ class TradingServiceTest {
     @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
+    @Mock UserPort userPort;
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -64,8 +65,8 @@ class TradingServiceTest {
 
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", "01",
-            Account.Broker.KIS
+            "74420614", "key", "secret", null,
+            Account.Broker.KIS, null
     );
 
     // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
@@ -120,7 +121,8 @@ class TradingServiceTest {
         TradingReporter reporter = new TradingReporter(
                 executionRouter, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService, loadUserSettingsPort);
-        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort);
+        BrokerAdapterRegistry accountRegistry = mock(BrokerAdapterRegistry.class);
+        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort, accountRegistry);
         // KIS 계좌 기준 테스트 — live 잔고 체크 시 kisAccountPort.getBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(kisAccountPort.getBalance(eq(ACCOUNT), any()))
@@ -129,7 +131,8 @@ class TradingServiceTest {
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, brokerAccountRouter, orderComputer, orderPlanner,
-                priceFetcher, orderExecutor, reporter);
+                priceFetcher, orderExecutor, reporter,
+                userPort, loadUserSettingsPort);
     }
 
     @Test

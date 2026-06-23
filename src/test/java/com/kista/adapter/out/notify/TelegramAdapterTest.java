@@ -41,8 +41,8 @@ class TelegramAdapterTest {
     // Account 10개 필드 생성자
     private Account account(UUID userId, String nickname) {
         return new Account(UUID.randomUUID(), userId, nickname,
-                "74420614", "key", "secret", "01",
-                Account.Broker.KIS);
+                "74420614", "key", "secret", null,
+                Account.Broker.KIS, null);
     }
 
     @Test

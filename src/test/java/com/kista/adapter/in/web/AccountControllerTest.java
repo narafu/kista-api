@@ -96,7 +96,7 @@ class AccountControllerTest {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Account.Broker.TOSS));
+                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Account.Broker.TOSS, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +115,7 @@ class AccountControllerTest {
         // KIS 계좌 등록: testAccountNo()에 전체 accountNo 전달, 내부에서 CANO 분리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "KIS계좌", "74420614", "appKey", "appSecret", "01", Account.Broker.KIS));
+                        "KIS계좌", "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

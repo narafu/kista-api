@@ -17,7 +17,7 @@ public interface AdminQueryUseCase {
     List<Account> listAccounts(LocalDate from, LocalDate to);   // null = 전체
     List<Order> listTrades(LocalDate from, LocalDate to);       // null = 전체
     List<AuditLog> listAuditLogs(Instant from, Instant to);     // null = 전체
-    AdminAnomalies getAnomalies(int inactiveDays);
+    AdminAnomalies getAnomalies(int inactiveDays, LocalDate from, LocalDate to);  // from/to null = inactiveDays 기준
 
     // PRIVACY 기준 매매표 목록 — days==null 이면 전체, 그 외 최근 N일
     List<PrivacyTradeBaseView> listPrivacyBases(Integer days);

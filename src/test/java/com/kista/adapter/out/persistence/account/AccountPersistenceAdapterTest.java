@@ -58,8 +58,8 @@ class AccountPersistenceAdapterTest {
     void save_new_account_delegates_to_jpa() {
         // given: id=null 신규 계좌 (10개 필드)
         Account newAccount = new Account(null, userId, "테스트계좌",
-                "74420614", "appKey", "appSecret", "01",
-                Account.Broker.KIS);
+                "74420614", "appKey", "appSecret", null,
+                Account.Broker.KIS, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);

@@ -40,6 +40,7 @@ class ManualTradingServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
+    @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock InfiniteTradingStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
 
     ManualTradingService service;
@@ -47,7 +48,7 @@ class ManualTradingServiceTest {
     static final UUID REQUESTER_ID = UUID.randomUUID();
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), REQUESTER_ID, "테스트계좌",
-            "74420614", "key", "secret", "01", Account.Broker.KIS
+            "74420614", "key", "secret", null, Account.Broker.KIS, null
     );
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
@@ -73,7 +74,7 @@ class ManualTradingServiceTest {
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cyclePositionPort);
-        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort);
+        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort, brokerAdapterRegistry);
         ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         PrivacyTradingStrategy privacyStrategy = mock(PrivacyTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(

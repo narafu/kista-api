@@ -80,7 +80,7 @@ class BrokerOrderRouterTest {
 
     private Account accountWith(Account.Broker broker) {
         return new Account(UUID.randomUUID(), UUID.randomUUID(), "test",
-                "acctno", "key", "secret", "01", broker);
+                "acctno", "key", "secret", null, broker, null);
     }
 
     private Order sampleOrder() {

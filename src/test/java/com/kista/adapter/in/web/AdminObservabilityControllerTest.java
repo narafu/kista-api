@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -124,15 +125,26 @@ class AdminObservabilityControllerTest {
 
     @Test
     void getAnomalies_adminRole_returns200() throws Exception {
-        when(adminQuery.getAnomalies(7))
+        when(adminQuery.getAnomalies(7, null, null))
                 .thenReturn(new AdminAnomalies(List.of(), List.of()));
-        when(adminUser.listAll()).thenReturn(List.of());
+        when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/anomalies")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pausedAccounts").isArray())
                 .andExpect(jsonPath("$.inactiveAccounts").isArray());
+    }
+
+    @Test
+    void getAnomalies_withDateRange_passesRangeToService() throws Exception {
+        when(adminQuery.getAnomalies(7, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 1)))
+                .thenReturn(new AdminAnomalies(List.of(), List.of()));
+        when(adminUser.listAll(null, null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/logs/anomalies?from=2026-01-01&to=2026-06-01")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk());
     }
 
     private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {

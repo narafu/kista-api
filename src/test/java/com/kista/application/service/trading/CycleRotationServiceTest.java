@@ -53,8 +53,8 @@ class CycleRotationServiceTest {
 
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", "01",
-            Account.Broker.KIS);
+            "74420614", "key", "secret", null,
+            Account.Broker.KIS, null);
 
     static final User USER = new User(ACCOUNT.userId(), "kakao-1", "홍길동",
             User.UserStatus.ACTIVE, User.UserRole.USER,

@@ -69,8 +69,10 @@ public class AdminObservabilityController {
     // 이상 징후 — 일시정지·비활성 계좌
     @GetMapping("/anomalies")
     public AnomaliesResponse getAnomalies(
-            @RequestParam(defaultValue = "7") int inactiveDays) {
-        AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays);
+            @RequestParam(defaultValue = "7") int inactiveDays,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays, from, to);
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 

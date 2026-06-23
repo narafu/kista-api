@@ -35,7 +35,7 @@ class TosOrderApiTest {
 
     static final Account ACCOUNT = new Account(
         UUID.randomUUID(), UUID.randomUUID(), "테스트",
-        "12345678901", "cid", "csecret", "1", Account.Broker.TOSS
+        "12345678901", "cid", "csecret", "1", Account.Broker.TOSS, null
     );
 
     @BeforeEach

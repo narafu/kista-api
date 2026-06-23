@@ -67,7 +67,7 @@ class StrategyServiceTest {
 
     private Account ownerAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-                "74420614", "appKey", "appSecret", "01", Account.Broker.KIS);
+                "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null);
     }
 
     private User activeUser() {
@@ -250,8 +250,8 @@ class StrategyServiceTest {
     void listByUserId_aggregatesStrategiesAcrossAccounts() {
         UUID accountAId = UUID.randomUUID();
         UUID accountBId = UUID.randomUUID();
-        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", "01", Account.Broker.KIS);
-        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", "01", Account.Broker.KIS);
+        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", null, Account.Broker.KIS, null);
+        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", null, Account.Broker.KIS, null);
 
         UUID strategyAId = UUID.randomUUID();
         UUID strategyBId = UUID.randomUUID();

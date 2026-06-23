@@ -60,7 +60,7 @@ class AdminUserControllerTest {
     @Test
     void listUsers_withAdminToken_returns200() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(adminUser.listAll()).thenReturn(List.of(sampleUser(userId)));
+        when(adminUser.listAll(null, null)).thenReturn(List.of(sampleUser(userId)));
 
         mockMvc.perform(get("/api/admin/users").with(authentication(adminToken())))
                 .andExpect(status().isOk())

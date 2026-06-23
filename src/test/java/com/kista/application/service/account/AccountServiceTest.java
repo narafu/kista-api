@@ -38,8 +38,8 @@ class AccountServiceTest {
     // Account 10개 필드 생성자 (strategyType/strategyStatus/ticker/multiple 제거)
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
-                "74420614", "appKey", "appSecret", "01",
-                Account.Broker.KIS);
+                "74420614", "appKey", "appSecret", null,
+                Account.Broker.KIS, null);
     }
 
     private RegisterAccountCommand registerCmd() {
@@ -56,7 +56,7 @@ class AccountServiceTest {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.appKey(), a.secretKey(),
-                    a.brokerAccountCode(), a.broker());
+                    a.brokerAccountCode(), a.broker(), null);
         });
 
         Account result = accountService.register(userId, registerCmd());

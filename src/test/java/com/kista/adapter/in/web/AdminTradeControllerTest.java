@@ -58,7 +58,7 @@ class AdminTradeControllerTest {
     void listTrades_adminRole_returns200() throws Exception {
         when(adminQuery.listTrades(null, null)).thenReturn(List.of());
         when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
-        when(adminUser.listAll()).thenReturn(List.of());
+        when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/trades")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))

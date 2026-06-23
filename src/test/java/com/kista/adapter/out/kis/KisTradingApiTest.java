@@ -34,8 +34,8 @@ class KisTradingApiTest {
 
     private static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "appKey", "appSecret", "01",
-            Account.Broker.KIS
+            "74420614", "appKey", "appSecret", null,
+            Account.Broker.KIS, null
     );
 
     @Nested
