@@ -1,6 +1,7 @@
 package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminUserUseCase;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,14 +33,26 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUserView> listAll() {
-        return adminUserViewPort.findAll();
+    public List<AdminUserView> listAll(LocalDate from, LocalDate to) {
+        return filterByDate(adminUserViewPort.findAll(), from, to);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUserView> listByStatus(User.UserStatus status) {
-        return adminUserViewPort.findAllByStatus(status);
+    public List<AdminUserView> listByStatus(User.UserStatus status, LocalDate from, LocalDate to) {
+        return filterByDate(adminUserViewPort.findAllByStatus(status), from, to);
+    }
+
+    private List<AdminUserView> filterByDate(List<AdminUserView> views, LocalDate from, LocalDate to) {
+        if (from == null && to == null) return views;
+        return views.stream()
+                .filter(v -> {
+                    if (v.createdAt() == null) return true;
+                    LocalDate d = v.createdAt().atZone(TimeZones.KST).toLocalDate();
+                    return (from == null || !d.isBefore(from))
+                        && (to   == null || !d.isAfter(to));
+                })
+                .toList();
     }
 
     @Override

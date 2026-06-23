@@ -29,8 +29,8 @@ public class AdminUserController {
             @RequestParam(required = false) User.UserStatus status,
             @AuthenticationPrincipal UUID adminId) {
         List<AdminUserView> views = status == null
-                ? adminUser.listAll()
-                : adminUser.listByStatus(status);
+                ? adminUser.listAll(null, null)
+                : adminUser.listByStatus(status, null, null);
         return AdminUserResponse.fromList(views);
     }
 

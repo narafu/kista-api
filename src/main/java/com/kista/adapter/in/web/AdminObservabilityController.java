@@ -56,7 +56,7 @@ public class AdminObservabilityController {
     @GetMapping("/anomalies")
     public AnomaliesResponse getAnomalies() {
         AdminAnomalies anomalies = adminQuery.getAnomalies(7);
-        Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
+        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 
         List<AccountItem> paused = anomalies.pausedAccounts().stream()

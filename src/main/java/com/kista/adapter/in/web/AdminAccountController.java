@@ -28,7 +28,7 @@ public class AdminAccountController {
     @GetMapping
     public List<AdminAccountResponse> listAccounts() {
         // 사용자 맵 빌드 (userId → AdminUserView) — N+1 방지 일괄 조회
-        Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
+        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
         return adminQuery.listAccounts(null, null).stream()
                 .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId())))
