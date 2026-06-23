@@ -2,6 +2,7 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.admin.AppErrorLog;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface AppErrorLogPort {
@@ -9,4 +10,6 @@ public interface AppErrorLogPort {
     void save(Exception e, String caller);
     // 최신순 limit건 조회
     List<AppErrorLog> findRecent(int limit);
+    // 기간 범위 조회 (최신순, limit건)
+    List<AppErrorLog> findRecent(int limit, Instant from, Instant to);
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -50,6 +51,13 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
     @Override
     public List<AppErrorLog> findRecent(int limit) {
         return repo.findTopNByOrderByCreatedAtDesc(limit).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AppErrorLog> findRecent(int limit, Instant from, Instant to) {
+        return repo.findTopNByCreatedAtBetween(from, to, limit).stream()
                 .map(this::toDomain)
                 .toList();
     }
