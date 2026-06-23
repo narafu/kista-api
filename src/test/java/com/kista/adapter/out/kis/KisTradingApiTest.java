@@ -41,7 +41,7 @@ class KisTradingApiTest {
     );
 
     @Nested
-    @DisplayName("BrokerPortfolioPort — 체결기준현재잔고")
+    @DisplayName("PortfolioPort — 체결기준현재잔고")
     class PortfolioTests {
 
         @Test

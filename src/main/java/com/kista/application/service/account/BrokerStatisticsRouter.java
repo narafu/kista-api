@@ -1,7 +1,6 @@
 package com.kista.application.service.account;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.DailyTransactionResult;
@@ -27,7 +26,6 @@ import java.time.LocalDate;
 class BrokerStatisticsRouter {
 
     private final BrokerAdapterRegistry registry;
-    private final BrokerExecutionRouter brokerExecutionRouter; // 체결 조회는 별도 라우터 유지
 
     // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
     PresentBalanceResult getPresentBalance(Account account) {
