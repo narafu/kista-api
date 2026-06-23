@@ -14,7 +14,8 @@ public record Account(
         String appKey,      // API 앱 키 — KIS App Key / Toss Client ID (복호화된 값)
         String secretKey,   // API 앱 시크릿 — KIS Secret Key / Toss Client Secret (복호화된 값)
         String brokerAccountCode, // 증권사 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
-        Broker broker             // 증권사 (기본: KIS)
+        Broker broker,            // 증권사 (기본: KIS)
+        Instant createdAt         // DB created_at, 신규 등록 시 null
 ) {
     @Getter
     @RequiredArgsConstructor
@@ -29,7 +30,7 @@ public record Account(
     // nickname만 교체 — AccountService.update 전용
     public Account withNickname(String newNickname) {
         return new Account(id, userId, newNickname != null ? newNickname : nickname,
-                accountNo, appKey, secretKey, brokerAccountCode, broker);
+                accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt);
     }
 
     // 소유권 불일치 시 SecurityException → 컨트롤러에서 403 매핑

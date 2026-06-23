@@ -57,7 +57,8 @@ class AccountService implements AccountUseCase {
                 null, userId, cmd.nickname(),
                 cmd.accountNo(), cmd.appKey(), cmd.secretKey(),
                 brokerAccountCode,
-                broker
+                broker,
+                null    // createdAt — DB에서 자동 설정
         );
         Account saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}, broker={}", userId, saved.id(), broker);

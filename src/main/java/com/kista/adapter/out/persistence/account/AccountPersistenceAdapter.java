@@ -96,7 +96,8 @@ public class AccountPersistenceAdapter implements AccountPort {
                 crypto.decrypt(e.getAppKey()),
                 crypto.decrypt(e.getSecretKey()),
                 e.getBrokerAccountCode(),
-                e.getBroker()
+                e.getBroker(),
+                e.getCreatedAt()
         );
     }
 }
