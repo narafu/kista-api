@@ -202,8 +202,8 @@ class TradingService {
 
         // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
         AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-        if (isLiveBalanceInsufficient(result.orders(), live)) {
-            log.warn("[{}] live 잔고 부족 — 마감 스케쥴러 plan 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
+        if (!live.isOrderValid(result.orders())) {
+            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 마감 plan 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
             userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
             return null;
         }
@@ -292,7 +292,7 @@ class TradingService {
 
         // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
         AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-        if (isLiveBalanceInsufficient(result.orders(), live)) {
+        if (!live.isOrderValid(result.orders())) {
             log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
             userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
             return;
@@ -337,19 +337,6 @@ class TradingService {
             notifyPort.notifyMarketClosed();
         }
         return open;
-    }
-
-    // BUY 예수금 부족 또는 SELL 보유수량 부족 여부 판단
-    private static boolean isLiveBalanceInsufficient(List<Order> orders, AccountBalance live) {
-        BigDecimal buyTotal = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        int sellTotal = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.SELL)
-                .mapToInt(Order::quantity).sum();
-        return buyTotal.compareTo(live.usdDeposit()) > 0
-                || sellTotal > live.holdings();
     }
 
     // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 + 사용자 알림 후 Optional.empty() 반환 (격리 실행)
