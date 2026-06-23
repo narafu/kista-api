@@ -13,12 +13,12 @@ import com.kista.domain.port.out.KisExecutionPort;
 import com.kista.domain.port.out.KisMarginPort;
 import com.kista.domain.port.out.KisPortfolioPort;
 import com.kista.domain.port.out.KisSellableQuantityPort;
-import com.kista.domain.port.out.broker.BrokerAdapter;
-import com.kista.domain.port.out.broker.DailyTradeCapable;
-import com.kista.domain.port.out.broker.ExecutionCapable;
-import com.kista.domain.port.out.broker.MarginCapable;
-import com.kista.domain.port.out.broker.PortfolioCapable;
-import com.kista.domain.port.out.broker.SellableQuantityCapable;
+import com.kista.domain.port.out.broker.BrokerAdapterPort;
+import com.kista.domain.port.out.broker.DailyTradePort;
+import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.port.out.broker.PortfolioPort;
+import com.kista.domain.port.out.broker.SellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,12 +26,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-// KIS 브로커 어댑터 — 공통 6개 Capability 구현, BalanceCapable 미구현(DB 스냅샷 사용)
+// KIS 브로커 어댑터 — 공통 5개 Capability 구현, BalanceCapable 미구현(DB 스냅샷 사용)
 @Component
 @RequiredArgsConstructor
-public class KisBrokerAdapter implements BrokerAdapter,
-        PortfolioCapable, MarginCapable, SellableQuantityCapable,
-        DailyTradeCapable, ExecutionCapable {
+public class KisBrokerAdapter implements BrokerAdapterPort,
+        PortfolioPort, MarginPort, SellableQuantityPort,
+        DailyTradePort, ExecutionPort {
 
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;

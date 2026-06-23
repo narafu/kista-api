@@ -8,6 +8,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 // 체결 내역 조회 — KIS: TTTS3035R / Toss: /api/v1/executions
-public interface ExecutionCapable {
+public interface ExecutionPort {
     List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account);
 }

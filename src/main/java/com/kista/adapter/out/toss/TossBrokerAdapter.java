@@ -27,17 +27,17 @@ import com.kista.domain.port.out.TosCandlePort;
 import com.kista.domain.port.out.TosExecutionPort;
 import com.kista.domain.port.out.TosMarginPort;
 import com.kista.domain.port.out.TossSellableQuantityPort;
-import com.kista.domain.port.out.broker.BrokerAccountCapable;
-import com.kista.domain.port.out.broker.BrokerAdapter;
-import com.kista.domain.port.out.broker.CandleCapable;
-import com.kista.domain.port.out.broker.DailyTradeCapable;
-import com.kista.domain.port.out.broker.ExchangeRateCapable;
-import com.kista.domain.port.out.broker.ExecutionCapable;
-import com.kista.domain.port.out.broker.MarginCapable;
-import com.kista.domain.port.out.broker.MarketCalendarCapable;
-import com.kista.domain.port.out.broker.PortfolioCapable;
-import com.kista.domain.port.out.broker.SellableQuantityCapable;
-import com.kista.domain.port.out.broker.StockInfoCapable;
+import com.kista.domain.port.out.broker.BrokerAccountPort;
+import com.kista.domain.port.out.broker.BrokerAdapterPort;
+import com.kista.domain.port.out.broker.CandlePort;
+import com.kista.domain.port.out.broker.DailyTradePort;
+import com.kista.domain.port.out.broker.ExchangeRatePort;
+import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.port.out.broker.MarketCalendarPort;
+import com.kista.domain.port.out.broker.PortfolioPort;
+import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.domain.port.out.broker.StockInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,11 +52,11 @@ import java.util.Optional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossBrokerAdapter implements BrokerAdapter,
-        PortfolioCapable, MarginCapable, SellableQuantityCapable,
-        DailyTradeCapable, ExecutionCapable,
-        CandleCapable, ExchangeRateCapable, StockInfoCapable,
-        MarketCalendarCapable, BrokerAccountCapable {
+public class TossBrokerAdapter implements BrokerAdapterPort,
+        PortfolioPort, MarginPort, SellableQuantityPort,
+        DailyTradePort, ExecutionPort,
+        CandlePort, ExchangeRatePort, StockInfoPort,
+        MarketCalendarPort, BrokerAccountPort {
 
     private final TossPortfolioPort tossPortfolioPort;
     private final TosMarginPort tosMarginPort;
