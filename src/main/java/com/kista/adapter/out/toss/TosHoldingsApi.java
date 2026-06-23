@@ -211,9 +211,6 @@ public class TosHoldingsApi implements TosAccountPort,
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
-        // raw 응답 먼저 로깅 — 필드명 확인용
-        String rawResponse = tossHttpClient.get(SELLABLE_QUANTITY_PATH, account, params, String.class);
-        log.warn("Toss sellable-quantity raw: {}", rawResponse);
         SellableQuantityWrapper wrapper = tossHttpClient.get(
                 SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
         if (wrapper == null || wrapper.result() == null) {
@@ -221,9 +218,8 @@ public class TosHoldingsApi implements TosAccountPort,
             return new SellableQuantity(ticker.name(), 0);
         }
         SellableQuantityResult result = wrapper.result();
-        int quantity = result.quantity() != null ? Integer.parseInt(result.quantity()) : 0;
-        log.info("Toss 판매 가능 수량 응답: ticker={}, symbol={}, quantityRaw={}, parsed={}",
-                ticker, result.symbol(), result.quantity(), quantity);
+        int quantity = result.sellableQuantity() != null ? Integer.parseInt(result.sellableQuantity()) : 0;
+        log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
 
@@ -253,11 +249,10 @@ public class TosHoldingsApi implements TosAccountPort,
         @JsonProperty("midRate") String midRate  // 매매기준율
     ) {}
 
-    // GET /api/v1/sellable-quantity 응답 래퍼 — {"result": {...}}
+    // GET /api/v1/sellable-quantity 응답 래퍼 — {"result": {"sellableQuantity": "100"}}
     record SellableQuantityWrapper(@JsonProperty("result") SellableQuantityResult result) {}
 
     record SellableQuantityResult(
-        @JsonProperty("symbol")   String symbol,   // 종목 코드
-        @JsonProperty("quantity") String quantity  // 판매 가능 수량
+        @JsonProperty("sellableQuantity") String sellableQuantity  // 판매 가능 수량
     ) {}
 }
