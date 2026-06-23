@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -45,25 +46,33 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public List<Account> listAccounts() {
-        return accountPort.findAll();
+    public List<Account> listAccounts(LocalDate from, LocalDate to) {
+        List<Account> all = accountPort.findAll();
+        if (from == null && to == null) return all;
+        return all.stream()
+                .filter(a -> {
+                    if (a.createdAt() == null) return true;
+                    LocalDate d = a.createdAt().atZone(TimeZones.KST).toLocalDate();
+                    return (from == null || !d.isBefore(from))
+                        && (to   == null || !d.isAfter(to));
+                })
+                .toList();
     }
 
     @Override
-    public List<Order> listTrades() {
-        // 최근 30일 전체 계좌 거래 내역 조회
-        LocalDate to = LocalDate.now(TimeZones.KST);
-        LocalDate from = to.minusDays(30);
-        return orderPort.findAll(from, to);
+    public List<Order> listTrades(LocalDate from, LocalDate to) {
+        LocalDate f = from != null ? from : LocalDate.EPOCH;
+        LocalDate t = to   != null ? to   : LocalDate.now(TimeZones.KST);
+        return orderPort.findAll(f, t);
     }
 
     @Override
-    public List<AuditLog> listAuditLogs() {
-        return auditLogPort.findAll(); // 최신순 100건
+    public List<AuditLog> listAuditLogs(Instant from, Instant to) {
+        return auditLogPort.findAll(); // Task 5에서 날짜 필터 추가
     }
 
     @Override
-    public AdminAnomalies getAnomalies() {
+    public AdminAnomalies getAnomalies(int inactiveDays) {
         LocalDate today = LocalDate.now(TimeZones.KST);
         List<Account> allAccounts = accountPort.findAll();
 
@@ -73,11 +82,11 @@ class AdminQueryService implements AdminQueryUseCase {
                         .anyMatch(Strategy::isPaused))
                 .toList();
 
-        // 최근 7일 거래 있는 accountId 집합
-        Set<UUID> activeAccountIds = orderPort.findAll(today.minusDays(7), today)
+        // 최근 inactiveDays일 거래 있는 accountId 집합
+        Set<UUID> activeAccountIds = orderPort.findAll(today.minusDays(inactiveDays), today)
                 .stream().map(Order::accountId).collect(Collectors.toSet());
 
-        // ACTIVE 전략이 있지만 7일 내 거래 없는 계좌
+        // ACTIVE 전략이 있지만 inactiveDays 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
                 .filter(a -> strategyPort.findByAccountId(a.id()).stream()
                         .anyMatch(Strategy::isActive))

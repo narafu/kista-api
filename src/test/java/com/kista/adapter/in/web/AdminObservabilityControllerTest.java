@@ -63,7 +63,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void listAuditLogs_adminRole_returns200() throws Exception {
-        when(adminQuery.listAuditLogs()).thenReturn(List.of());
+        when(adminQuery.listAuditLogs(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/audit")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
@@ -124,7 +124,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void getAnomalies_adminRole_returns200() throws Exception {
-        when(adminQuery.getAnomalies())
+        when(adminQuery.getAnomalies(7))
                 .thenReturn(new AdminAnomalies(List.of(), List.of()));
         when(adminUser.listAll()).thenReturn(List.of());
 

@@ -56,7 +56,7 @@ class AdminAccountControllerTest {
 
     @Test
     void listAccounts_adminRole_returns200() throws Exception {
-        when(adminQuery.listAccounts()).thenReturn(List.of());
+        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
         when(adminUser.listAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/accounts")

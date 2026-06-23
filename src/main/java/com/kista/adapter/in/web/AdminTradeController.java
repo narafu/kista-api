@@ -32,11 +32,11 @@ public class AdminTradeController {
     @GetMapping
     public List<AdminTradeResponse> listTrades() {
         // 계좌·사용자 맵 일괄 생성
-        Map<UUID, Account> accountMap = adminQuery.listAccounts().stream()
+        Map<UUID, Account> accountMap = adminQuery.listAccounts(null, null).stream()
                 .collect(Collectors.toMap(Account::id, Function.identity()));
         Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return adminQuery.listTrades().stream()
+        return adminQuery.listTrades(null, null).stream()
                 .map(t -> AdminTradeResponse.from(t, accountMap, userMap))
                 .toList();
     }

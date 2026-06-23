@@ -37,7 +37,7 @@ public class AdminObservabilityController {
     // 감사 로그 — 관리자 액션 기록
     @GetMapping("/audit")
     public List<AuditLogResponse> listAuditLogs() {
-        return adminQuery.listAuditLogs().stream()
+        return adminQuery.listAuditLogs(null, null).stream()
                 .map(AuditLogResponse::from)
                 .toList();
     }
@@ -55,7 +55,7 @@ public class AdminObservabilityController {
     // 이상 징후 — 일시정지·비활성 계좌
     @GetMapping("/anomalies")
     public AnomaliesResponse getAnomalies() {
-        AdminAnomalies anomalies = adminQuery.getAnomalies();
+        AdminAnomalies anomalies = adminQuery.getAnomalies(7);
         Map<UUID, AdminUserView> userMap = adminUser.listAll().stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 
