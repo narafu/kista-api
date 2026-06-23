@@ -9,6 +9,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -44,6 +45,13 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
     public List<AuditLog> findAll() {
         // 최신순 상위 100건 조회 후 도메인 변환
         return repo.findTop100ByOrderByCreatedAtDesc().stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AuditLog> findAll(Instant from, Instant to) {
+        return repo.findTop100ByCreatedAtBetween(from, to).stream()
                 .map(this::toDomain)
                 .toList();
     }

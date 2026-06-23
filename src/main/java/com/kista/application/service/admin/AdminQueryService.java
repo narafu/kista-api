@@ -68,7 +68,10 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public List<AuditLog> listAuditLogs(Instant from, Instant to) {
-        return auditLogPort.findAll(); // Task 5에서 날짜 필터 추가
+        if (from == null && to == null) return auditLogPort.findAll();
+        Instant f = from != null ? from : Instant.EPOCH;
+        Instant t = to   != null ? to   : Instant.now();
+        return auditLogPort.findAll(f, t);
     }
 
     @Override

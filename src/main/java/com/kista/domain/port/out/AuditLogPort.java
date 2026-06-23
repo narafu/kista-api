@@ -2,6 +2,7 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.admin.AuditLog;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -13,4 +14,6 @@ public interface AuditLogPort {
     AuditLog findById(UUID id);
     // 감사 로그 전체 조회 (최신순, 최대 100건) — 관리자 목록 화면용
     List<AuditLog> findAll();
+    // 기간 범위 조회 (최신순, 최대 100건)
+    List<AuditLog> findAll(Instant from, Instant to);
 }
