@@ -89,7 +89,7 @@ public class KisTradingApi implements KisAccountPort,
                 .orElse(new HoldingResult(0, BigDecimal.ZERO));
     }
 
-    // ── BrokerMarginPort.getMargin() ───────────────────────────────────────────
+    // ── MarginPort.getMargin() ────────────────────────────────────────────────
 
     @Override
     public List<MarginItem> getMargin(Account account) {
@@ -114,11 +114,11 @@ public class KisTradingApi implements KisAccountPort,
                 .toList();
     }
 
-    // ── BrokerMarginPort ───────────────────────────────────────────────────────
+    // ── MarginPort.getUsdBuyableAmount() ──────────────────────────────────────
 
     @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
-        // getMargin()은 BrokerMarginPort 구현 — KisAccountPort.getBalance()에서도 사용
+        // getMargin()은 MarginPort 구현 — KisAccountPort.getBalance()에서도 사용
         return getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()
@@ -131,7 +131,7 @@ public class KisTradingApi implements KisAccountPort,
         return getUsdBuyableAmount(account);
     }
 
-    // ── BrokerPortfolioPort ────────────────────────────────────────────────────
+    // ── PortfolioPort.getPresentBalance() ─────────────────────────────────────
 
     @Override
     public PresentBalanceResult getPresentBalance(Account account) {
@@ -170,7 +170,7 @@ public class KisTradingApi implements KisAccountPort,
         return new PresentBalanceResult(items, totalAsset, totalProfit, totalRate, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
-    // ── BrokerSellableQuantityPort ─────────────────────────────────────────────
+    // ── SellableQuantityPort.getSellableQuantity() ────────────────────────────
 
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
