@@ -55,10 +55,18 @@ class TradingPreviewService {
         List<com.kista.domain.model.order.Order> todayPlannedOrders =
                 orderPort.findPlannedByCycleAndDate(currentCycle.id(), today);
 
+        // 계좌 내 타 전략 당일 PLANNED BUY 합계 (이 전략 분 제외 — 예수금 부족 계산에 사용)
+        BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
+        BigDecimal thisStrategyPlannedBuy = todayPlannedOrders.stream()
+                .filter(o -> o.direction() == com.kista.domain.model.order.Order.OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
+
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
         if (load.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders);
+            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd);
         }
         AccountBalance balance = load.balance();
 
@@ -82,9 +90,9 @@ class TradingPreviewService {
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (result.isSkipped()) {
-            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders);
+            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
         }
 
-        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders);
+        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
     }
 }

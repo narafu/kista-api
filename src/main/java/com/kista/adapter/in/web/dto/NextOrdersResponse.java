@@ -12,10 +12,11 @@ import java.util.UUID;
 
 public record NextOrdersResponse(
         LocalDate tradeDate,
-        PositionSnapshot position,                 // PRIVACY/skip 시 null
+        PositionSnapshot position,                    // PRIVACY/skip 시 null
         List<OrderItem> orders,
-        NextOrdersPreview.SkipReason skipReason,   // 정상이면 null
-        List<TodayOrderItem> todayOrders           // 오늘 이미 등록된 PLANNED 주문
+        NextOrdersPreview.SkipReason skipReason,      // 정상이면 null
+        List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED 주문
+        BigDecimal otherStrategiesPlannedBuyUsd       // 계좌 내 타 전략 당일 PLANNED BUY 합계
 ) {
     public record PositionSnapshot(
             Ticker ticker,           // 거래 종목
@@ -85,7 +86,8 @@ public record NextOrdersResponse(
                 result.position() == null ? null : PositionSnapshot.from(result.position()),
                 result.orders().stream().map(OrderItem::from).toList(),
                 result.skipReason(),
-                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList()
+                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList(),
+                result.otherStrategiesPlannedBuyUsd()
         );
     }
 }

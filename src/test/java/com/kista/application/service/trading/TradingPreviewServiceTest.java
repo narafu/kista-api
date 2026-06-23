@@ -79,6 +79,7 @@ class TradingPreviewServiceTest {
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
         // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
         lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
+        lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
     @Test
