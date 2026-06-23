@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.*;
@@ -8,6 +9,7 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.SellableQuantityPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,7 @@ class ManualTradingServiceTest {
     @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
+    @Mock SellableQuantityPort sellableQuantityPort;
     @Mock InfiniteTradingStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
 
     ManualTradingService service;
@@ -88,6 +91,12 @@ class ManualTradingServiceTest {
                 userPort, privacyTradePort, priceFetcher, balanceLoader,
                 orderComputer, orderPlanner, brokerAccountRouter);
 
+        // getSellableQuantity 기본 stub — BUY 전용 테스트에서 SELL 체크가 0>충분값으로 통과
+        lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
+                .thenReturn(sellableQuantityPort);
+        lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
+                .thenReturn(new SellableQuantity("SOXL", 100));
+
         // 공통 stubbing
         when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         // requireOwnedAccount는 default 메서드 — mock이 override하므로 직접 stub
@@ -110,9 +119,11 @@ class ManualTradingServiceTest {
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
-        // live holdings=10 < SELL 15주
+        // live holdings=10, sellable=10 < SELL 15주
         when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
+        when(sellableQuantityPort.getSellableQuantity(any(), any()))
+                .thenReturn(new SellableQuantity("SOXL", 10));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
