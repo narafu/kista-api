@@ -48,7 +48,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-// Toss 브로커 어댑터 — 공통 5개 + Toss 전용 5개 Capability 구현 (BalanceCapable 미구현 — BrokerAccountRouter 담당)
+// Toss 브로커 어댑터 — 공통 5개 + Toss 전용 5개 Port 구현 (BalancePort 미구현 — BrokerAccountRouter 담당)
 @Slf4j
 @Component
 @RequiredArgsConstructor

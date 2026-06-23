@@ -26,7 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-// KIS 브로커 어댑터 — 공통 5개 Capability 구현, BalanceCapable 미구현(DB 스냅샷 사용)
+// KIS 브로커 어댑터 — 공통 5개 Port 구현 (BalancePort 미구현 — DB cycle_position 스냅샷 사용)
 @Component
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerAdapterPort,
