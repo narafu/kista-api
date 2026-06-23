@@ -9,7 +9,9 @@ import com.kista.domain.model.order.*;
 import com.kista.domain.model.kis.*;
 import com.kista.domain.model.user.*;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteTradingStrategy;
@@ -110,10 +112,9 @@ class TradingServiceTest {
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cycleHistoryPort);
         // CycleRotationService: BrokerAdapterRegistry.require(account, MarginPort) → kisMarginPort로 위임
-        com.kista.application.service.broker.BrokerAdapterRegistry marginRegistry =
-                mock(com.kista.application.service.broker.BrokerAdapterRegistry.class);
-        lenient().when(marginRegistry.require(any(com.kista.domain.model.account.Account.class),
-                eq(com.kista.domain.port.out.broker.MarginPort.class))).thenReturn(kisMarginBrokerPort);
+        BrokerAdapterRegistry marginRegistry = mock(BrokerAdapterRegistry.class);
+        lenient().when(marginRegistry.require(any(Account.class),
+                eq(MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
