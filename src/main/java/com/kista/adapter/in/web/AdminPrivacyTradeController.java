@@ -22,23 +22,12 @@ public class AdminPrivacyTradeController {
 
     private final AdminQueryUseCase adminQuery;
 
-    // PRIVACY 기준 매매표(master) + 주문 명세(detail) 목록 — range: ALL | 30 | 90
+    // PRIVACY 기준 매매표(master) + 주문 명세(detail) 목록 — days 미전달 시 전체
     @GetMapping
-    public List<AdminPrivacyBaseResponse> listBases(@RequestParam(defaultValue = "ALL") String range) {
-        Integer days = parseRange(range);
+    public List<AdminPrivacyBaseResponse> listBases(@RequestParam(required = false) Integer days) {
         return adminQuery.listPrivacyBases(days).stream()
                 .map(AdminPrivacyBaseResponse::from)
                 .toList();
-    }
-
-    // 조회 범위 파싱 — ALL→전체(null), 그 외 허용값 외 입력은 IllegalArgumentException → 400
-    private Integer parseRange(String range) {
-        return switch (range) {
-            case "ALL" -> null;
-            case "30" -> 30;
-            case "90" -> 90;
-            default -> throw new IllegalArgumentException("range는 ALL, 30, 90만 허용됩니다: " + range);
-        };
     }
 
     // 응답 DTO — 마스터 + 주문 명세
