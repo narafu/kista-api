@@ -65,4 +65,16 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
         if (user.notificationChannel().includesTelegram()) telegram.notifyError(user, e);
         if (user.notificationChannel().includesFcm())      fcm.notifyError(user, e);
     }
+
+    @Override
+    public void notifyMarketOpen(User user) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyMarketOpen(user);
+        if (user.notificationChannel().includesFcm())      fcm.notifyMarketOpen(user);
+    }
+
+    @Override
+    public void notifyMarketClose(User user) {
+        if (user.notificationChannel().includesTelegram()) telegram.notifyMarketClose(user);
+        if (user.notificationChannel().includesFcm())      fcm.notifyMarketClose(user);
+    }
 }

@@ -120,4 +120,16 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         String text = String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage());
         telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
+
+    @Override
+    public void notifyMarketOpen(User user) {
+        if (!user.hasTelegramBot()) return;
+        telegramHttpClient.sendMessage(user.telegramChatId(), "🟢 미국 장이 열렸습니다.", user.telegramBotToken());
+    }
+
+    @Override
+    public void notifyMarketClose(User user) {
+        if (!user.hasTelegramBot()) return;
+        telegramHttpClient.sendMessage(user.telegramChatId(), "🔴 미국 장이 마감되었습니다.", user.telegramBotToken());
+    }
 }

@@ -8,6 +8,9 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.NotificationType;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,8 @@ class TradingService {
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + KIS 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
+    private final UserPort userPort;                           // ACTIVE 사용자 전체 조회 (장 알림용)
+    private final LoadUserSettingsPort loadUserSettingsPort;   // MARKET_ALERT 활성 여부 조회
 
     // planAndSaveOrders 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
@@ -97,8 +102,9 @@ class TradingService {
         // KIS 접수 — 전략별: BUY 가격 보정 후 PLANNED → KIS 접수
         List<CyclePlacedState> placedStates = placeAll(states, today);
 
-        // 공통 대기 — 마감 후 시각까지 (모든 전략이 공유하는 단 1회)
-        waitFor("마감 후 시각", dst.waitUntilPostClose(), dst);
+        // 공통 대기 — 마감 시각까지 (모든 전략이 공유하는 단 1회)
+        waitFor("마감 시각", dst.waitUntilPostClose(), dst);
+        notifyMarketEvent(NotificationType.MARKET_ALERT, user -> userNotificationPort.notifyMarketClose(user));
 
         // 장 마감 후 종가 일괄 조회
         Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, priceAccount);
@@ -249,6 +255,7 @@ class TradingService {
 
         // 개장 시각까지 대기
         waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
+        notifyMarketEvent(NotificationType.MARKET_ALERT, user -> userNotificationPort.notifyMarketOpen(user));
 
         // 전략별: order 생성·저장 + INFINITE 매도 선접수
         for (BatchContext ctx : contexts) {
@@ -309,6 +316,21 @@ class TradingService {
             return;
         }
         orderExecutor.placeGiven(atOpenOrders, account);
+    }
+
+    // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
+    private void notifyMarketEvent(NotificationType type, java.util.function.Consumer<User> notify) {
+        userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
+            UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+                    .orElse(UserSettings.defaultFor(user.id()));
+            if (settings.isNotificationEnabled(type)) {
+                try {
+                    notify.accept(user);
+                } catch (Exception e) {
+                    log.warn("[userId={}] 장 알림 발송 실패: {}", user.id(), e.getMessage());
+                }
+            }
+        });
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그

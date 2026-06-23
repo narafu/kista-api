@@ -74,6 +74,16 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.id(), "⚠️ 매매 오류 발생", e.getMessage());
     }
 
+    @Override
+    public void notifyMarketOpen(User user) {
+        send(user.id(), "KISTA 알림", "🟢 미국 장이 열렸습니다.");
+    }
+
+    @Override
+    public void notifyMarketClose(User user) {
+        send(user.id(), "KISTA 알림", "🔴 미국 장이 마감되었습니다.");
+    }
+
     private void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             return;
