@@ -10,12 +10,15 @@ import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.out.AppErrorLogPort;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,8 +39,12 @@ public class AdminObservabilityController {
 
     // 감사 로그 — 관리자 액션 기록
     @GetMapping("/audit")
-    public List<AuditLogResponse> listAuditLogs() {
-        return adminQuery.listAuditLogs(null, null).stream()
+    public List<AuditLogResponse> listAuditLogs(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        Instant fromInstant = from != null ? from.atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+        Instant toInstant   = to   != null ? to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+        return adminQuery.listAuditLogs(fromInstant, toInstant).stream()
                 .map(AuditLogResponse::from)
                 .toList();
     }
@@ -45,17 +52,25 @@ public class AdminObservabilityController {
     // 오류 로그 — 서버 예외 기록
     @GetMapping("/errors")
     public List<ErrorLogResponse> listErrorLogs(
-            @RequestParam(defaultValue = "100") int limit) {
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         int safeLimit = Math.min(limit, MAX_LIMIT);
-        return appErrorLogPort.findRecent(safeLimit).stream()
+        if (from == null && to == null) {
+            return appErrorLogPort.findRecent(safeLimit).stream().map(ErrorLogResponse::from).toList();
+        }
+        Instant fromInstant = from != null ? from.atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.EPOCH;
+        Instant toInstant   = to   != null ? to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.now();
+        return appErrorLogPort.findRecent(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();
     }
 
     // 이상 징후 — 일시정지·비활성 계좌
     @GetMapping("/anomalies")
-    public AnomaliesResponse getAnomalies() {
-        AdminAnomalies anomalies = adminQuery.getAnomalies(7);
+    public AnomaliesResponse getAnomalies(
+            @RequestParam(defaultValue = "7") int inactiveDays) {
+        AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays);
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 

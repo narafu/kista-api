@@ -7,8 +7,10 @@ import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
@@ -30,13 +32,14 @@ public class AdminTradeController {
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @GetMapping
-    public List<AdminTradeResponse> listTrades() {
-        // 계좌·사용자 맵 일괄 생성
+    public List<AdminTradeResponse> listTrades(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Map<UUID, Account> accountMap = adminQuery.listAccounts(null, null).stream()
                 .collect(Collectors.toMap(Account::id, Function.identity()));
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return adminQuery.listTrades(null, null).stream()
+        return adminQuery.listTrades(from, to).stream()
                 .map(t -> AdminTradeResponse.from(t, accountMap, userMap))
                 .toList();
     }

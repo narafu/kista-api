@@ -7,10 +7,12 @@ import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,10 +29,12 @@ public class AdminUserController {
     @GetMapping
     public List<AdminUserResponse> listUsers(
             @RequestParam(required = false) User.UserStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @AuthenticationPrincipal UUID adminId) {
         List<AdminUserView> views = status == null
-                ? adminUser.listAll(null, null)
-                : adminUser.listByStatus(status, null, null);
+                ? adminUser.listAll(from, to)
+                : adminUser.listByStatus(status, from, to);
         return AdminUserResponse.fromList(views);
     }
 

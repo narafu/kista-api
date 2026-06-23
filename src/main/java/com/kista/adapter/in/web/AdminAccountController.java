@@ -6,10 +6,13 @@ import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,11 +29,12 @@ public class AdminAccountController {
     private final AdminUserUseCase adminUser;    // ownerNickname 조회용 사용자 목록
 
     @GetMapping
-    public List<AdminAccountResponse> listAccounts() {
-        // 사용자 맵 빌드 (userId → AdminUserView) — N+1 방지 일괄 조회
+    public List<AdminAccountResponse> listAccounts(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return adminQuery.listAccounts(null, null).stream()
+        return adminQuery.listAccounts(from, to).stream()
                 .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId())))
                 .toList();
     }
