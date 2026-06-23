@@ -53,6 +53,7 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
     @Mock TosMarginPort tosMarginPort;
+    @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
     TradingService service;
@@ -123,10 +124,15 @@ class TradingServiceTest {
         TradingReporter reporter = new TradingReporter(
                 executionRouter, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, strategyCyclePort, rotationService, loadUserSettingsPort);
+        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort);
+        // KIS 계좌 기준 테스트 — live 잔고 체크 시 kisAccountPort.getBalance() 호출
+        // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
+        lenient().when(kisAccountPort.getBalance(eq(ACCOUNT), any()))
+                .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
-                balanceLoader, tosAccountPort, orderComputer, orderPlanner,
+                balanceLoader, brokerAccountRouter, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter);
     }
 

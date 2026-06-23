@@ -35,8 +35,8 @@ class TradingService {
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
     private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
-    private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼 (KIS: DB 이력 기반)
-    private final TosAccountPort tosAccountPort;               // Toss live 잔고 조회 (holdings + usdDeposit)
+    private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼 — KIS·Toss 모두 DB 이력(cycle_position)
+    private final BrokerAccountRouter brokerAccountRouter;     // live 잔고 검사 전용 (주문 저장 직전 유효성 확인)
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
@@ -155,11 +155,9 @@ class TradingService {
         }
     }
 
-    // 잔고 로드 — Toss는 /api/v1/holdings live 조회, KIS는 cycle_position DB 이력 사용
+    // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
     private AccountBalance loadBalance(Strategy strategy, Account account) {
-        AccountBalance balance = account.isToss()
-                ? tosAccountPort.getBalance(account, strategy.ticker())
-                : balanceLoader.loadBalanceOrThrow(strategy).balance();
+        AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         return balance;
