@@ -65,9 +65,6 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    // 잔액 $10, 평단 $20, 보유 5주 — buildOrders가 $20 매수 주문 반환 시 매수금액($20) > 잔액($10) → skip
-    static final AccountBalance LOW_BALANCE = new AccountBalance(5, new BigDecimal("20.00"), new BigDecimal("10.00"));
-
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", "01",
@@ -331,6 +328,8 @@ class TradingServiceTest {
         when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(LOW_HISTORY)); // usdDeposit=10
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigBuy));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of());
         // live 잔고 부족: BUY $50,000 > usdDeposit $10
         when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(0, null, new BigDecimal("10.00")));
@@ -389,6 +388,36 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         verify(orderPort).saveAll(anyList());
+        verify(kisOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void executeBatch_liveBalanceInsufficient_skipsOrderPlanAndNotifies() throws InterruptedException {
+        // 마감 스케쥴러 plan 단계 — live 잔고 부족 시 PLANNED 저장 건너뜀
+        BigDecimal prevClose = new BigDecimal("19.00");
+        Order bigBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 100, new BigDecimal("500.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(bigBuy));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of());
+        // live 잔고 부족: BUY $50,000 > usdDeposit $10
+        when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("10.00")));
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 알림 발송
+        verify(userNotificationPort).notifyInsufficientBalance(eq(USER), eq(ACCOUNT), eq(Strategy.Type.INFINITE), eq(Ticker.SOXL));
+        // 저장 없음
+        verify(orderPort, never()).saveAll(any());
+        // 브로커 접수 없음
         verify(kisOrderPort, never()).place(any(), any());
     }
 

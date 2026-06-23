@@ -170,6 +170,7 @@ class TradingService {
         Strategy strategy = ctx.strategy();
         StrategyCycle currentCycle = ctx.currentCycle();
         Account account = ctx.account();
+        User user = ctx.user();
 
         // 1. 잔고 로드
         AccountBalance balance = loadBalance(strategy, account);
@@ -198,6 +199,14 @@ class TradingService {
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
                 .orElse(null);
         if (result == null) return null;
+
+        // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
+        AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+        if (isLiveBalanceInsufficient(result.orders(), live)) {
+            log.warn("[{}] live 잔고 부족 — 마감 스케쥴러 plan 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
+            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
+            return null;
+        }
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
@@ -284,7 +293,7 @@ class TradingService {
         // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
         AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
         if (isLiveBalanceInsufficient(result.orders(), live)) {
-            log.warn("[{}] live 잔고 부족 — 주문 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
+            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
             userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
             return;
         }
