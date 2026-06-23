@@ -41,16 +41,6 @@ class ManualTradingService {
     private final BrokerAccountRouter brokerAccountRouter;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
-        // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~17:00, 비DST 06:00~18:00)면 즉시 거부
-        DstInfo dst = DstInfo.immediate();
-        if (dst.currentSession() == DstInfo.MarketSession.BLOCKED) {
-            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + dst.blockedRangeDescription() + ")");
-        }
-        return executeInternal(strategyId, requesterId);
-    }
-
-    // 테스트용 오버로드 — DstInfo 주입으로 BLOCKED 시간대 체크 우회
-    List<Order> execute(UUID strategyId, UUID requesterId, DstInfo ignoredDst) {
         return executeInternal(strategyId, requesterId);
     }
 

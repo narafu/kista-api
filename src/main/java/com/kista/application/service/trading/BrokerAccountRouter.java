@@ -18,7 +18,7 @@ class BrokerAccountRouter {
     private final KisAccountPort kisAccountPort;
     private final TosAccountPort tosAccountPort;
 
-    // live 잔고 조회 — holdings + usdDeposit (주문 생성 직전 유효성 검사 전용)
+    // live 잔고 조회 — holdings + usdDeposit. 주문 저장 직전 유효성 검사에서 호출
     AccountBalance getLiveBalance(Account account, Ticker ticker) {
         return switch (account.broker()) {
             case KIS  -> kisAccountPort.getBalance(account, ticker);
@@ -26,7 +26,7 @@ class BrokerAccountRouter {
         };
     }
 
-    // 계좌의 USD 주문가능금액(실잔고) 조회
+    // usdDeposit만 필요할 때 getLiveBalance() 위임
     BigDecimal getUsdDeposit(Account account, Ticker ticker) {
         return getLiveBalance(account, ticker).usdDeposit();
     }

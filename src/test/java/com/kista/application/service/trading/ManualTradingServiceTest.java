@@ -21,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -49,12 +48,6 @@ class ManualTradingServiceTest {
     @Mock InfiniteTradingStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
 
     ManualTradingService service;
-
-    // DIRECT 시간대를 나타내는 DstInfo — orderAt/postClose/marketOpen 모두 과거로 설정해 BLOCKED 체크 우회
-    static final DstInfo DIRECT_DST = new DstInfo(true,
-            Instant.now().minusSeconds(3600),
-            Instant.now().minusSeconds(1800),
-            Instant.now().minusSeconds(7200));
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
     static final Account ACCOUNT = new Account(
@@ -125,7 +118,7 @@ class ManualTradingServiceTest {
         when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
 
-        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID, DIRECT_DST))
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessageContaining("보유 수량이 부족합니다");
     }
@@ -149,7 +142,7 @@ class ManualTradingServiceTest {
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of(savedOrder));
 
-        List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID, DIRECT_DST);
+        List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 
         verify(orderPort).saveAll(anyList());
         assertThat(orders).hasSize(1);
