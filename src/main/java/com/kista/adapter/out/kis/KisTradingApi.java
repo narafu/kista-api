@@ -165,24 +165,10 @@ public class KisTradingApi implements KisAccountPort,
         return fetchSellableQuantity(ticker, account);
     }
 
-    // 내부 헬퍼: CTRP6504R 잔고수량 조회
+    // 내부 헬퍼: TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
-        PortfolioResponse response = kisHttpClient.tradingGet(
-                PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,
-                p -> {
-                    p.add("WCRC_FRCR_DVSN_CD", "02"); // 02=외화
-                    p.add("NATN_CD", "000");           // 000=전체
-                    p.add("TR_MKET_CD", "00");         // 00=전체
-                    p.add("INQR_DVSN_CD", "00");       // 00=전체
-                });
-        if (response == null || response.output1() == null) {
-            return new SellableQuantity(ticker.name(), 0);
-        }
-        int quantity = response.output1().stream()
-                .filter(o -> ticker.name().equals(o.pdno()))
-                .findFirst()
-                .map(o -> KisResponseParser.parseIntSafe(o.balanceQuantity13()))
-                .orElse(0);
+        int quantity = fetchHolding(account, ticker).quantity();
+        log.info("KIS 판매 가능 수량: ticker={}, quantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
 
