@@ -323,7 +323,7 @@ class TradingService {
     private Account selectPriceAccount(List<BatchContext> contexts) {
         return contexts.stream()
                 .map(BatchContext::account)
-                .filter(Account::isToss)
+                .filter(a -> a.broker() == Account.Broker.TOSS)
                 .findFirst()
                 .orElseGet(() -> contexts.getFirst().account());
     }
