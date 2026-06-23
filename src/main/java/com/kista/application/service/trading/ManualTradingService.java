@@ -41,6 +41,20 @@ class ManualTradingService {
     private final BrokerAccountRouter brokerAccountRouter;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
+        // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~17:00, 비DST 06:00~18:00)면 즉시 거부
+        DstInfo dst = DstInfo.immediate();
+        if (dst.currentSession() == DstInfo.MarketSession.BLOCKED) {
+            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + dst.blockedRangeDescription() + ")");
+        }
+        return executeInternal(strategyId, requesterId);
+    }
+
+    // 테스트용 오버로드 — DstInfo 주입으로 BLOCKED 시간대 체크 우회
+    List<Order> execute(UUID strategyId, UUID requesterId, DstInfo ignoredDst) {
+        return executeInternal(strategyId, requesterId);
+    }
+
+    private List<Order> executeInternal(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
@@ -49,12 +63,6 @@ class ManualTradingService {
 
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
-
-        // 주문 가능 시간대 확인 — BLOCKED(DST 05:00~17:00, 비DST 06:00~18:00)면 즉시 거부
-        DstInfo dst = DstInfo.immediate();
-        if (dst.currentSession() == DstInfo.MarketSession.BLOCKED) {
-            throw new ManualTradingException("주문 불가 시간대입니다 (KST " + dst.blockedRangeDescription() + ")");
-        }
 
         // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
         LocalDate today = DstInfo.nextTradeDate();
@@ -85,18 +93,28 @@ class ManualTradingService {
                 .orElse(null);
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 
+        // live 잔고 1회 조회 — BUY 예수금·SELL 보유수량 모두 검사
+        AccountBalance liveBalance = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+
         // 예수금 부족 체크: 신규 BUY 합계 > (실잔고 - 타 전략 당일 PLANNED BUY 합계)
         BigDecimal newBuyTotal = result.orders().stream()
                 .filter(o -> o.direction() == Order.OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (newBuyTotal.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal usdDeposit = brokerAccountRouter.getUsdDeposit(account, strategy.ticker());
             BigDecimal otherBuyTotal = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
-            BigDecimal available = usdDeposit.subtract(otherBuyTotal);
+            BigDecimal available = liveBalance.usdDeposit().subtract(otherBuyTotal);
             if (newBuyTotal.compareTo(available) > 0) {
                 throw new ManualTradingException("예수금이 부족합니다");
             }
+        }
+
+        // 보유수량 부족 체크: SELL 수량 합계 > live holdings
+        int newSellTotal = result.orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.SELL)
+                .mapToInt(Order::quantity).sum();
+        if (newSellTotal > liveBalance.holdings()) {
+            throw new ManualTradingException("보유 수량이 부족합니다");
         }
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
