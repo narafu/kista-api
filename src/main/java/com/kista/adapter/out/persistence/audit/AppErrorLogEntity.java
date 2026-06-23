@@ -3,6 +3,8 @@ package com.kista.adapter.out.persistence.audit;
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -28,6 +30,7 @@ class AppErrorLogEntity extends BaseCreatedAtEntity {
     @Column(name = "stack_trace", columnDefinition = "TEXT")
     private String stackTrace; // 전체 스택트레이스
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String context; // 발생 위치 메타 JSON
 }
