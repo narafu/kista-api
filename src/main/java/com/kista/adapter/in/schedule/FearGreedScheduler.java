@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDate;
 
 // 매일 09:10 KST — 크립토·CNN 공포탐욕지수 수집 및 저장
@@ -18,9 +19,14 @@ public class FearGreedScheduler {
 
     private final FetchFearGreedUseCase fetchFearGreedUseCase;
     private final NotifyPort notifyPort; // 스케쥴러 시작/종료 알림
+    private final SchedulerLockService schedulerLockService;
 
     @Scheduled(cron = "0 10 9 * * *", zone = TimeZones.KST_ID) // 매일 09:10 KST
-    public void run() {
+    public void run() throws InterruptedException {
+        schedulerLockService.tryRun("fear-greed-daily", Duration.ofMinutes(30), this::runLocked);
+    }
+
+    private void runLocked() {
         notifyPort.notifyInfo("공포탐욕지수 수집 스케쥴러 시작");
         LocalDate today = LocalDate.now(TimeZones.KST);
         log.info("공포탐욕지수 수집 스케쥴러 시작 (date={})", today);
