@@ -32,6 +32,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(FidaOrderController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -42,6 +43,7 @@ class FidaOrderControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean PrivacyUseCase privacy;

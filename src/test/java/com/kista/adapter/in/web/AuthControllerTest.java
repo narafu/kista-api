@@ -40,6 +40,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(AuthController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -47,6 +48,7 @@ class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
 
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean TokenUseCase tokenUseCase; // AuthController RT 발급 의존성
     @MockitoBean RefreshTokenCookieHelper cookieHelper; // RT 쿠키 헬퍼 의존성

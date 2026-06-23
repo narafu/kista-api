@@ -26,6 +26,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(MarketHolidayController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MarketHolidayControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean MarketUseCase marketUseCase;

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(TradeStreamController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TradeStreamControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TradeSseEmitterRegistry tradeSseEmitterRegistry;

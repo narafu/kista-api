@@ -23,12 +23,14 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(FcmController.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class FcmControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성

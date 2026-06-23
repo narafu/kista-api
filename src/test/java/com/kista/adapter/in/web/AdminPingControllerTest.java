@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(AdminPingController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -32,6 +33,7 @@ class AdminPingControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean
     private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성

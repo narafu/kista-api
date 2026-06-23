@@ -15,12 +15,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(TelegramWebhookController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 class TelegramWebhookControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TelegramBotService botService;

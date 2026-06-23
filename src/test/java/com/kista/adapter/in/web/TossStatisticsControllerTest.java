@@ -27,12 +27,14 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(TossStatisticsController.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class TossStatisticsControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 의존성
     @MockitoBean TossStatisticsUseCase tossStatistics;

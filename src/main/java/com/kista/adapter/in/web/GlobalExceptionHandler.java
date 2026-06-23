@@ -7,6 +7,8 @@ import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import com.kista.domain.model.toss.TossApiException;
+import com.kista.domain.port.out.AppErrorLogPort;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,23 +21,29 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.NoSuchElementException;
 
 @Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final AppErrorLogPort appErrorLogPort;
 
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
         // refresh 인증 실패 — AuthController Swagger 401 명세와 실제 동작 일치
+        saveErrorLog(ex);
         return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
     }
 
     @ExceptionHandler(SecurityException.class)
     public ProblemDetail handleForbidden(SecurityException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.FORBIDDEN, "Access Denied", ex.getMessage());
     }
 
     @ExceptionHandler(Account.CooldownException.class)
     public ResponseEntity<ProblemDetail> handleCooldown(Account.CooldownException ex) {
         // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
+        saveErrorLog(ex);
         ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Cooldown Active", ex.getMessage());
         detail.setProperty("retryAfter", ex.getRetryAfter().toString());
         HttpHeaders headers = new HttpHeaders();
@@ -45,26 +53,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Account.InvalidKisKeyException.class)
     public ProblemDetail handleInvalidKisKey(Account.InvalidKisKeyException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid KIS Credentials", ex.getMessage());
     }
 
     @ExceptionHandler(Account.KisRateLimitException.class)
     public ProblemDetail handleKisRateLimit(Account.KisRateLimitException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.TOO_MANY_REQUESTS, "KIS Rate Limit", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.BAD_REQUEST, "Invalid State", ex.getMessage());
     }
 
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNotFound(NoSuchElementException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.NOT_FOUND, "Resource Not Found", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+        saveErrorLog(ex);
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .toList()
@@ -74,37 +87,44 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage());
     }
 
     @ExceptionHandler(Account.DuplicateAccountException.class)
     public ProblemDetail handleDuplicateAccount(Account.DuplicateAccountException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.CONFLICT, "Duplicate Account", ex.getMessage());
     }
 
     @ExceptionHandler(ManualTradingException.class)
     public ProblemDetail handleManualTrading(ManualTradingException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.CONFLICT, "Manual Trading Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(OrderCancelException.class)
     public ProblemDetail handleOrderCancel(OrderCancelException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.CONFLICT, "Order Cancel Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(PrivacyTradeConflictException.class)
     public ProblemDetail handlePrivacyTradeConflict(PrivacyTradeConflictException ex) {
+        saveErrorLog(ex);
         return problem(HttpStatus.CONFLICT, "Privacy Trade Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(KisApiException.class)
     public ProblemDetail handleKisApiException(KisApiException ex) {
+        saveErrorLog(ex);
         log.error("KIS API 오류: {}", ex.getMessage(), ex);
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
     }
 
     @ExceptionHandler(TossApiException.class)
     public ProblemDetail handleTossApiException(TossApiException ex) {
+        saveErrorLog(ex);
         log.error("Toss API 오류: {}", ex.getMessage(), ex);
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Toss API Error", ex.getMessage());
     }
@@ -114,5 +134,14 @@ public class GlobalExceptionHandler {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, msg);
         detail.setTitle(title);
         return detail;
+    }
+
+    // DB 저장 실패가 원래 응답을 막지 않도록 격리
+    private void saveErrorLog(Exception e) {
+        try {
+            appErrorLogPort.save(e, "GlobalExceptionHandler");
+        } catch (Exception saveEx) {
+            log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
+        }
     }
 }
