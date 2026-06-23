@@ -24,11 +24,17 @@ class SchedulerLockService {
             log.info("[{}] 스케쥴러 락 획득 실패 — 다른 인스턴스가 실행 중", lockName);
             return false;
         }
+        // 작업 성공 시 락을 lockAtMostFor 동안 유지 — 즉시 해제하면 스케쥴링 지터로 다른 인스턴스가 순차 획득 가능
+        // 작업 실패(예외) 시에만 즉시 해제해 다른 인스턴스가 재시도할 수 있도록 허용
+        boolean completed = false;
         try {
             task.run();
+            completed = true;
             return true;
         } finally {
-            release(lockName);
+            if (!completed) {
+                release(lockName);
+            }
         }
     }
 
