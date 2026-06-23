@@ -9,7 +9,6 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossCandle;
