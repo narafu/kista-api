@@ -54,7 +54,7 @@ class TradingReporter {
                          Account account, User user,
                          AccountBalance balance, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
-        // today는 KST — 브로커별 어댑터에서 toUtc 변환 처리
+        // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = brokerExecutionRouter.getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 

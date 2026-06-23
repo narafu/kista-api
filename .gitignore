@@ -64,3 +64,4 @@ logs/
 
 # superpowers
 .superpowers/**
+docs/superpowers/**
