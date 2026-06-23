@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -130,12 +133,15 @@ class TradingService {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
                         state.startPrice(), state.position());
-                // 장 개시 스케쥴러에서 AT_OPEN 선접수된 주문도 포함 — markFilledOrders 누락 방지
-                List<Order> prePlacedAtOpen = orderPort
+                // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
+                // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
+                Set<UUID> mainOrderIds = mainOrders.stream()
+                        .map(Order::id).collect(Collectors.toSet());
+                List<Order> prePlaced = orderPort
                         .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
-                        .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
-                if (!prePlacedAtOpen.isEmpty()) {
-                    mainOrders = Stream.concat(prePlacedAtOpen.stream(), mainOrders.stream()).toList();
+                        .stream().filter(o -> !mainOrderIds.contains(o.id())).toList();
+                if (!prePlaced.isEmpty()) {
+                    mainOrders = Stream.concat(prePlaced.stream(), mainOrders.stream()).toList();
                 }
                 return new CyclePlacedState(state, mainOrders);
             }).ifPresent(placedStates::add);

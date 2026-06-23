@@ -76,12 +76,16 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
         String cursor = null;
         boolean hasNext = true;
 
+        // Toss API는 주문 접수일 기준으로 from/to 필터링 — 전날 저녁 접수된 주문이 당일 장마감에 체결되는 경우 누락 방지
+        // 1일 앞당겨 조회 후 filledAt(체결일, KST +09:00) 기준으로 요청 날짜 범위 재필터링
+        LocalDate queryFrom = from.minusDays(1);
+
         while (hasNext) {
-            // 토스 from/to: KST 날짜 그대로 사용 — Toss는 KST 기준 날짜 필터링 (KIS와 달리 toUtc 변환 없음)
+            // KST 날짜 그대로 전달 — KIS와 달리 toUtc 변환 없음 (Toss는 KST 기준)
             MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
             params.add("status", status);
             params.add("symbol", ticker.name());
-            params.add("from",   from.toString());
+            params.add("from",   queryFrom.toString()); // 1일 앞당겨 조회
             params.add("to",     to.toString());
             params.add("limit",  "100");
             if (cursor != null) params.add("cursor", cursor);
@@ -107,11 +111,14 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
                         ? new BigDecimal(amtStr)
                         : price.multiply(BigDecimal.valueOf(filledQuantity)); // nullable 가드
 
-                // filledAt은 KST(+09:00) — 직접 LocalDate 추출, 없으면 from 날짜 fallback
+                // filledAt은 KST(+09:00) — toLocalDate()로 KST 날짜 추출, 없으면 요청 from 날짜 fallback
                 String filledAtStr = order.execution().filledAt();
                 LocalDate tradeDate = (filledAtStr != null && !filledAtStr.isBlank())
                         ? OffsetDateTime.parse(filledAtStr).toLocalDate()
-                        : from;
+                        : from; // queryFrom이 아닌 원래 from
+
+                // queryFrom~to로 넓게 조회했으므로 체결일이 요청 범위(from~to) 밖인 체결 제외
+                if (tradeDate.isBefore(from) || tradeDate.isAfter(to)) continue;
 
                 Order.OrderDirection direction = "BUY".equals(order.side())
                         ? Order.OrderDirection.BUY
