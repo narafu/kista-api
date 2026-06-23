@@ -97,8 +97,8 @@ class TradingService {
         // KIS 접수 — 전략별: BUY 가격 보정 후 PLANNED → KIS 접수
         List<CyclePlacedState> placedStates = placeAll(states, today);
 
-        // 공통 대기 — PostClose까지 (모든 전략이 공유하는 단 1회)
-        waitFor("PostClose", dst.waitUntilPostClose(), dst);
+        // 공통 대기 — 마감 후 시각까지 (모든 전략이 공유하는 단 1회)
+        waitFor("마감 후 시각", dst.waitUntilPostClose(), dst);
 
         // 장 마감 후 종가 일괄 조회
         Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, priceAccount);
