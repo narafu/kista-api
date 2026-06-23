@@ -69,7 +69,13 @@ class StrategyService implements StrategyUseCase {
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.startFromUserInput(saved.id(), cmd.initialUsdDeposit()));
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 종가는 등록 시점 현재가
-        BigDecimal currentPrice = brokerPriceRouter.getPrice(resolvedTicker, account);
+        BigDecimal currentPrice;
+        try {
+            currentPrice = brokerPriceRouter.getPrice(resolvedTicker, account);
+        } catch (Exception e) {
+            log.warn("현재가 조회 실패 — 전략 등록 중단: ticker={}, error={}", resolvedTicker.name(), e.getMessage());
+            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+        }
         cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());

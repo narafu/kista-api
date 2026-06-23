@@ -59,8 +59,13 @@ class ManualTradingService {
         User user = userPort.findByIdOrThrow(account.userId());
 
         // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — 증권사 접수는 스케쥴러가 담당
-        Map<Strategy.Ticker, PriceSnapshot> snapshots = priceFetcher.fetchPriceSnapshots(
-                List.of(strategy.ticker()), account);
+        Map<Strategy.Ticker, PriceSnapshot> snapshots;
+        try {
+            snapshots = priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
+        } catch (Exception e) {
+            log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+        }
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
 
@@ -79,7 +84,14 @@ class ManualTradingService {
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 
         // live 잔고 1회 조회 — BUY 예수금·SELL 보유수량 모두 검사
-        AccountBalance liveBalance = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+        AccountBalance liveBalance;
+        try {
+            liveBalance = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+        } catch (Exception e) {
+            log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                    account.id(), strategy.ticker().name(), e.getMessage());
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+        }
 
         // 예수금 부족 체크: 신규 BUY 합계 > (실잔고 - 타 전략 당일 PLANNED BUY 합계)
         BigDecimal newBuyTotal = result.orders().stream()
