@@ -106,11 +106,13 @@ class ManualTradingService {
             }
         }
 
-        // 보유수량 부족 체크: SELL 수량 합계 > live holdings
+        // 보유수량 부족 체크: SELL 수량 합계 > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
         int newSellTotal = result.orders().stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
-        if (newSellTotal > liveBalance.holdings()) {
+        int sellableQty = brokerAccountRouter.getSellableQuantity(account, strategy.ticker());
+        log.info("판매가능수량 조회: [{}] {} {}주", account.nickname(), strategy.ticker().name(), sellableQty);
+        if (newSellTotal > sellableQty) {
             throw new ManualTradingException("보유 수량이 부족합니다");
         }
 
