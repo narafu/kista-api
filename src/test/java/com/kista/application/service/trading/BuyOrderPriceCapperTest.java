@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 // BUY PLANNED 가격이 currentPrice × 1.10 초과 시 InfiniteTradingStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
 // 캡 가격 재산정 공식(병합/보정 등)은 InfiniteStrategyTypeTest.buildCappedBuyOrders 참고
+// PRIVACY: position 없이 단순 가격 캡만 적용 (capPrivacyIfNeeded)
 @ExtendWith(MockitoExtension.class)
 class BuyOrderPriceCapperTest {
 
@@ -109,5 +110,52 @@ class BuyOrderPriceCapperTest {
 
         verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    // ─── PRIVACY 캡 (capPrivacyIfNeeded) ────────────────────────────────────────
+
+    @Test
+    void capPrivacyIfNeeded_noBuyOrders_doesNothing() {
+        // PLANNED 주문이 없으면 아무 작업도 하지 않음
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
+
+        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    void capPrivacyIfNeeded_allBuysWithinCap_doesNothing() {
+        // cap = 50 × 1.10 = 55.00 — BUY 가격 50.00 ≤ 55.00 → 보정 불필요
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
+                .thenReturn(List.of(buy("50.00", 5)));
+
+        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
+
+        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void capPrivacyIfNeeded_buysExceedCap_capsToCurrentPriceX110KeepingQuantity() {
+        // currentPrice=30, cap=33.00 — FIDA 가격 40.00이 cap 초과 → 33.00으로 보정, 수량 유지
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
+                .thenReturn(List.of(buy("40.00", 5), buy("28.00", 3)));
+
+        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("30.00"));
+
+        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        ArgumentCaptor<List<Order>> captor = ArgumentCaptor.forClass(List.class);
+        verify(orderPlanner).savePlannedOrders(captor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
+        List<Order> saved = captor.getValue();
+        // 40.00 → 33.00으로 보정, 수량 5 유지
+        assertThat(saved).hasSize(2);
+        assertThat(saved.get(0).price()).isEqualByComparingTo("33.00");
+        assertThat(saved.get(0).quantity()).isEqualTo(5);
+        // 28.00은 cap 이하이므로 그대로
+        assertThat(saved.get(1).price()).isEqualByComparingTo("28.00");
+        assertThat(saved.get(1).quantity()).isEqualTo(3);
     }
 }

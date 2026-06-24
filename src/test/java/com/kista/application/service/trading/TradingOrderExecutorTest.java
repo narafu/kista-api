@@ -93,8 +93,8 @@ class TradingOrderExecutorTest {
     }
 
     @Test
-    @DisplayName("position이 없으면 가격 보정 생략")
-    void placeOrders_withoutPosition_skipsCapping() {
+    @DisplayName("position이 없으면 INFINITE 보정 생략 — PRIVACY 캡으로 대체")
+    void placeOrders_withoutPosition_skipsInfiniteCapping() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
@@ -102,7 +102,10 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
 
+        // INFINITE 보정(capIfNeeded)은 호출되지 않음
         verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
+        // PRIVACY 캡(capPrivacyIfNeeded)은 currentPrice가 있을 때 호출됨
+        verify(buyOrderPriceCapper).capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE);
     }
 
     @Test

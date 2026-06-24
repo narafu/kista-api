@@ -31,6 +31,34 @@ class BuyOrderPriceCapper {
     private final TradingOrderPlanner orderPlanner;
     private final InfiniteTradingStrategy infiniteStrategy;
 
+    // PRIVACY 전용: position 없이 단순 가격 캡만 적용 (INFINITE buildCappedBuyOrders 위임 없음)
+    // cap = currentPrice × 1.10 초과 BUY를 cap 가격으로 보정, 수량 유지
+    void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
+        List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
+                .stream().filter(o -> o.direction() == BUY).toList();
+        if (buyOrders.isEmpty()) return;
+
+        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;
+
+        log.info("[{}] PRIVACY BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap,
+                buyOrders.stream().map(o -> o.price() + "×" + o.quantity()).toList());
+
+        // cap 초과 BUY → cap 가격으로 교체, 나머지는 유지 (수량 변경 없음)
+        List<Order> capped = buyOrders.stream()
+                .map(o -> o.price().compareTo(cap) > 0
+                        ? new Order(null, o.accountId(), o.strategyCycleId(), o.tradeDate(), o.ticker(),
+                                o.orderType(), o.timing(), BUY, o.quantity(), cap,
+                                Order.OrderStatus.PLANNED, null, null, null)
+                        : o)
+                .toList();
+
+        orderPort.deletePlannedBuyByCycleAndDate(strategyCycleId, today);
+        orderPlanner.savePlannedOrders(capped, account, strategyCycleId);
+        log.info("[{}] PRIVACY BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(),
+                capped.stream().map(o -> o.price() + "×" + o.quantity()).toList());
+    }
+
     void capIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position) {
         List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)

@@ -199,8 +199,8 @@ class TradingService {
                 InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
                 return new CycleState(ctx, balance, recalcPos, price, null);
             }
-            // PRIVACY: privacyBase 보존 (reportAll에서 사이클 회전 등에 필요)
-            return new CycleState(ctx, balance, null, null, privacyBase);
+            // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
+            return new CycleState(ctx, balance, null, price, privacyBase);
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
@@ -219,9 +219,9 @@ class TradingService {
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
-        // CycleState: INFINITE는 position/startPrice, PRIVACY는 privacyBase 보존
+        // CycleState: INFINITE는 position, PRIVACY는 privacyBase — startPrice는 공통(둘 다 캡에 필요)
         InfinitePosition position = result.position();
-        BigDecimal startPrice = strategy.isInfinite() ? price : null;
+        BigDecimal startPrice = price; // INFINITE: BuyOrderPriceCapper, PRIVACY: capPrivacyIfNeeded
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
         return new CycleState(ctx, balance, position, startPrice, privacyBaseForState);
     }

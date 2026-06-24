@@ -34,11 +34,14 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // position이 있고 currentPrice가 있을 때만 보정 (수동 선행 주문은 그대로 접수)
+    // INFINITE: position 있을 때만 capIfNeeded / PRIVACY: position 없어도 currentPrice 있으면 capPrivacyIfNeeded
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position) {
         if (currentPrice != null && position != null) {
             buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
+        } else if (currentPrice != null) {
+            // PRIVACY: InfinitePosition 없이 단순 가격 캡 적용
+            buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
         }
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = placeEach(planned, account);
