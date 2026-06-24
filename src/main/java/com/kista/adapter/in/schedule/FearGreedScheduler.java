@@ -21,7 +21,7 @@ public class FearGreedScheduler {
     private final NotifyPort notifyPort; // 스케쥴러 시작/종료 알림
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 10 10 * * *", zone = TimeZones.KST_ID) // 매일 10:10 KST
+    @Scheduled(cron = "0 0 10 * * *", zone = TimeZones.KST_ID) // 매일 10:00 KST
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("fear-greed-daily", Duration.ofMinutes(30), this::runLocked);
     }
