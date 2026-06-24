@@ -24,11 +24,17 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
     private final AppErrorLogJpaRepository repo; // app_error_logs 테이블 JPA 저장소
     private final ObjectMapper objectMapper; // Spring Boot 자동 구성 빈
 
+    private static final int MAX_STACK_LINES = 30;
+
     @Override
     public void save(Exception e, String caller) {
-        // 스택트레이스 문자열 변환
+        // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
         StringWriter sw = new StringWriter();
         e.printStackTrace(new PrintWriter(sw));
+        String fullTrace = sw.toString();
+        String stackTrace = fullTrace.lines()
+                .limit(MAX_STACK_LINES)
+                .collect(java.util.stream.Collectors.joining("\n"));
 
         // context JSON 직렬화
         String contextJson;
@@ -42,7 +48,7 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
                 null,
                 e.getClass().getSimpleName(), // 예외 클래스 단순명
                 e.getMessage(),
-                sw.toString(),
+                stackTrace,
                 contextJson
         );
         repo.save(entity);
