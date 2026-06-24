@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ class ManualTradingService {
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
+    private final TradingOrderExecutor orderExecutor;
     private final BrokerAccountRouter brokerAccountRouter;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
@@ -121,7 +123,18 @@ class ManualTradingService {
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
-        // 저장된 PLANNED 주문 반환 (UI에서 예약 확인용)
-        return orderPort.findPlannedByCycleAndDate(currentCycle.id(), today);
+        // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+        DstInfo dst = DstInfo.calculate();
+        if (strategy.isInfinite() && Instant.now().isAfter(dst.marketOpen())) {
+            List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), today)
+                    .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+            if (!atOpenOrders.isEmpty()) {
+                log.info("[{}] 개장 후 수동 실행 — AT_OPEN 매도 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
+                orderExecutor.placeGiven(atOpenOrders, account);
+            }
+        }
+
+        // 저장된 주문 반환 (UI에서 예약 확인용)
+        return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
     }
 }
