@@ -26,8 +26,13 @@ public class RefreshTokenCleanupScheduler {
 
     private void cleanupExpiredTokensLocked() {
         notifyPort.notifyInfo("만료 RT 정리 스케쥴러 시작");
-        int deleted = tokenUseCase.cleanupExpiredTokens();
-        log.info("만료 refresh_token {} 건 정리 완료", deleted);
+        try {
+            int deleted = tokenUseCase.cleanupExpiredTokens();
+            log.info("만료 refresh_token {} 건 정리 완료", deleted);
+        } catch (Exception e) {
+            log.error("만료 RT 정리 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
+        }
         notifyPort.notifyInfo("만료 RT 정리 스케쥴러 완료");
     }
 
@@ -39,8 +44,13 @@ public class RefreshTokenCleanupScheduler {
 
     private void cleanupRotatedTokensLocked() {
         notifyPort.notifyInfo("회전 RT 정리 스케쥴러 시작");
-        int deleted = tokenUseCase.cleanupRotatedTokens();
-        log.info("grace 초과 회전 refresh_token {} 건 정리 완료", deleted);
+        try {
+            int deleted = tokenUseCase.cleanupRotatedTokens();
+            log.info("grace 초과 회전 refresh_token {} 건 정리 완료", deleted);
+        } catch (Exception e) {
+            log.error("회전 RT 정리 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
+        }
         notifyPort.notifyInfo("회전 RT 정리 스케쥴러 완료");
     }
 }

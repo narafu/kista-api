@@ -32,6 +32,7 @@ public class MarketCalendarRefreshScheduler {
             } catch (Exception e) {
                 // 기동 중단 방지 — 오류 로그만 남기고 계속 (isMarketOpen이 안전 폴백 처리)
                 log.error("기동 시 시장 캘린더 갱신 실패: {}", e.getMessage(), e);
+                notifyPort.notifyError(e);
             }
         });
     }
@@ -50,6 +51,7 @@ public class MarketCalendarRefreshScheduler {
             refreshYears(year, 3);
         } catch (Exception e) {
             log.error("연간 시장 캘린더 갱신 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
         }
         notifyPort.notifyInfo("연간 캘린더 갱신 스케쥴러 완료");
     }
@@ -68,6 +70,7 @@ public class MarketCalendarRefreshScheduler {
             marketCalendarRefreshPort.refreshMonth(today.getYear(), today.getMonthValue());
         } catch (Exception e) {
             log.error("월간 시장 캘린더 갱신 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
         }
         notifyPort.notifyInfo("월간 캘린더 갱신 스케쥴러 완료");
     }
