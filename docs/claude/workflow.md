@@ -15,14 +15,22 @@
 - `GET /api/market/session`: UI 수동 실행 버튼 활성화 판단용, `{ session: "DIRECT"|"BLOCKED", isDst: boolean }` 반환
 - kista-ui `NextOrderPreviewCard`: BLOCKED이거나 오늘이 휴장일이면 "지금 실행" 버튼 disabled + title 툴팁
 
-### BuyOrderPriceCapper 보정 주문 (전후반 공통)
-- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.10` 초과 시 가격 캡 후 수량 재산정
+### BuyOrderPriceCapper 보정 주문
+
+#### INFINITE 전략 (전후반 공통)
+- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.10` 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded`)
 - 전반(buyOrders 2건): `computeEarlyBuys` — cappedAvg/cappedRef 기준 buy①② 재산정, 동가 시 병합
 - 후반(buyOrders 1건): `computeLateBuys` — cappedPrice 기준 단일 LOC 수량 재산정
 - **보정 주문 (전후반 공통)**: base buy 재산정 후 `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (HALF_UP, scale=2) — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
 - 재산정 결과가 모두 비어있으면 BUY 주문 전체 제외 (log.warn)
+
+#### PRIVACY 전략
+- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.10` 초과 시 (`capPrivacyIfNeeded`)
+- **수량 재산정 없음** — cap 초과 BUY 주문가만 `currentPrice × 1.10`으로 교체, 수량은 FIDA 원본 유지
+- `TradingOrderExecutor.placeOrders()`: `position == null && currentPrice != null` 분기 → `capPrivacyIfNeeded` 호출
+- `TradingService`: PRIVACY도 `startPrice = price`로 `CycleState`에 전달 (이전에는 `null` → 캡 미적용 버그)
 
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
