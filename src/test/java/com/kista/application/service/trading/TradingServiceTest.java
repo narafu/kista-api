@@ -317,6 +317,39 @@ class TradingServiceTest {
     }
 
     @Test
+    void placeOpenOrders_existingPlannedOrders_skipsCreationButStillPlacesAtOpenSells() throws InterruptedException {
+        // 장 개시 전 수동 '바로 주문'으로 PLANNED 주문이 이미 존재하는 경우 — order 신규 생성은 skip하되
+        // AT_OPEN 매도 선접수는 반드시 수행해야 함 (회귀: 기존엔 여기서 통째로 return되어 선접수 누락됨)
+        UUID sellPlannedId = UUID.randomUUID();
+        Order existingPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                Order.OrderStatus.PLACED, "ORD-SELL-002", null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingPlanned)); // 수동 실행으로 이미 주문 존재
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(sellPlanned)); // AT_OPEN SELL만 반환
+        when(kisOrderPort.place(any(), eq(ACCOUNT))).thenReturn(sellPlacedKis);
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 신규 order 생성은 skip
+        verify(orderPort, never()).saveAll(any());
+        // 그러나 AT_OPEN SELL은 반드시 선접수
+        verify(kisOrderPort).place(eq(sellPlanned), eq(ACCOUNT));
+        verify(orderPort).markPlaced(eq(sellPlannedId), eq("ORD-SELL-002"));
+    }
+
+    @Test
     void placeOpenOrders_insufficientBalance_notifiesUserAndSkipsSave() throws InterruptedException {
         // 매수 금액 초과 → live 잔고 부족 → 사용자 알람, 저장 건너뜀
         BigDecimal prevClose = new BigDecimal("19.00");

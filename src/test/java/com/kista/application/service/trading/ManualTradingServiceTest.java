@@ -148,7 +148,10 @@ class ManualTradingServiceTest {
         when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
-        when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of(savedOrder));
+        when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of()); // AT_OPEN 없음(BUY뿐) — 선접수 대상 아님
+        // 1번째 호출(이중 실행 방지 가드)=빈 목록, 2번째 호출(최종 반환)=저장된 주문
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
+                .thenReturn(List.of(), List.of(savedOrder));
 
         List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 

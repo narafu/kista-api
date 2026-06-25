@@ -279,39 +279,38 @@ class TradingService {
         Account account = ctx.account();
         User user = ctx.user();
 
-        // 수동 '지금 주문' 등으로 당일 주문이 이미 있으면 중복 생성 skip
+        // 수동 '지금 주문' 등으로 당일 주문이 이미 있으면 신규 생성만 skip — AT_OPEN 선접수는 아래에서 항상 시도
         List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), tradeDate);
         if (!existingOrders.isEmpty()) {
-            log.info("[{}] 당일 주문 {}건 이미 존재 — 개장 스케쥴러 skip", account.nickname(), existingOrders.size());
-            return;
+            log.info("[{}] 당일 주문 {}건 이미 존재 — order 생성 skip, 매도 선접수만 진행", account.nickname(), existingOrders.size());
+        } else {
+            // 잔고 로드
+            AccountBalance balance = loadBalance(strategy, account);
+
+            PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
+            BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
+
+            // 전략 계산 (skip 결과는 건너뜀 — PRIVACY 기준 매매표 없을 시 정상 skip)
+            CycleOrderComputer.ComputeResult result = orderComputer.compute(
+                    balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, account.nickname());
+            if (result.isSkipped()) {
+                log.info("[{}] 개장 order 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+                return;
+            }
+
+            // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
+            AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+            if (!live.isOrderValid(result.orders())) {
+                log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
+                userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
+                return;
+            }
+
+            // 전체 PLANNED 저장
+            orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
         }
 
-        // 잔고 로드
-        AccountBalance balance = loadBalance(strategy, account);
-
-        PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
-
-        // 전략 계산 (skip 결과는 건너뜀 — PRIVACY 기준 매매표 없을 시 정상 skip)
-        CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, account.nickname());
-        if (result.isSkipped()) {
-            log.info("[{}] 개장 order 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
-            return;
-        }
-
-        // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-        AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-        if (!live.isOrderValid(result.orders())) {
-            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
-            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
-            return;
-        }
-
-        // 전체 PLANNED 저장
-        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
-
-        // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관)
+        // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)
         List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
                 .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
         if (atOpenOrders.isEmpty()) {
