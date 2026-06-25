@@ -5,6 +5,7 @@ import com.kista.domain.port.out.MarketCalendarRefreshPort;
 import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class MarketCalendarRefreshScheduler {
 
     private final MarketCalendarRefreshPort marketCalendarRefreshPort;
