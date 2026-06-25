@@ -2,7 +2,7 @@
 - 스케쥴러 기동: `TradingCloseScheduler` 화~토 04:00 KST (미국 장마감 30분 전) → `StrategyPort.findAllActive()`로 ACTIVE 사이클 목록 조회
 - context 리스트 빌드: 사이클별 계좌·사용자 조회 (실패 시 해당 사이클 skip + `notifyError`) → `ExecuteTradingUseCase.executeBatch(contexts)` 1회 호출
 - `TradingService.executeBatch()`: 고유 ticker 수집 → `KisPricePort.getPrices()` 1회 일괄 조회 → 사이클별 순차 실행 (각 실패 격리 catch + `notifyError`)
-- 각 사이클: 휴장 확인 → **당일 PLANNED/PLACED 주문 존재 시 skip** (`OrderPort.findPlannedOrPlacedByCycleAndDate`) → 잔고 조회 → 현재가(배치 캐시 or 단건 fallback) → 전략 계산 → `orders` PLANNED 저장 → `DstInfo.waitUntilOrderTime()` 대기 (DST=30분, 비DST=90분) → `orders` 조회 → KIS 접수 (PLACED 기록)
+- 각 사이클: 휴장 확인 → **당일 PLANNED/PLACED 주문 존재 시 신규 생성만 skip** (`OrderPort.findPlannedOrPlacedByCycleAndDate`) → (skip 아니면) 잔고 조회 → 현재가(배치 캐시 or 단건 fallback) → 전략 계산 → `orders` PLANNED 저장 → AT_OPEN 주문 선접수는 기존 주문 존재 여부와 무관하게 항상 시도 → `DstInfo.waitUntilOrderTime()` 대기 (DST=30분, 비DST=90분) → `orders` 조회 → KIS 접수 (PLACED 기록)
 - 계좌별 KIS 토큰: `kis_tokens` 테이블에 account_id 기준 독립 관리
 - 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 미설정 시 생략
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 사이클 계속 실행
