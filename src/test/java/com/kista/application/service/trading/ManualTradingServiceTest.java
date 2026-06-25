@@ -44,6 +44,7 @@ class ManualTradingServiceTest {
     @Mock TosAccountPort tosAccountPort;
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock SellableQuantityPort sellableQuantityPort;
+    @Mock TradingOrderExecutor orderExecutor;
     @Mock InfiniteTradingStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
 
     ManualTradingService service;
@@ -89,7 +90,7 @@ class ManualTradingServiceTest {
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 userPort, privacyTradePort, priceFetcher, balanceLoader,
-                orderComputer, orderPlanner, brokerAccountRouter);
+                orderComputer, orderPlanner, orderExecutor, brokerAccountRouter);
 
         // getSellableQuantity 기본 stub — BUY 전용 테스트에서 SELL 체크가 0>충분값으로 통과
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
