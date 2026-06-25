@@ -40,7 +40,7 @@ public class AccountPersistenceAdapter implements AccountPort {
 
     @Override
     public List<Account> findAll() {
-        return jpaRepository.findAll().stream()
+        return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toDomain)
                 .toList();
     }

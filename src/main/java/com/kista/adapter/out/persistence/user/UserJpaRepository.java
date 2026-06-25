@@ -14,7 +14,9 @@ import java.util.UUID;
 interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByKakaoId(String kakaoId);
     Optional<UserEntity> findByTelegramChatId(String chatId); // 텔레그램 봇 명령 발신자 식별용
+    List<UserEntity> findAllByOrderByCreatedAtDesc(); // 관리자 전체 조회 — 최신순
     List<UserEntity> findAllByStatus(User.UserStatus status); // 상태별 조회 (관리자용)
+    List<UserEntity> findAllByStatusOrderByCreatedAtDesc(User.UserStatus status); // 상태별 최신순
     long countByStatus(User.UserStatus status); // 상태별 사용자 수 (관리자 통계용)
     long countByRole(User.UserRole role); // 역할별 사용자 수 (Spring Data JPA 자동 파생)
 

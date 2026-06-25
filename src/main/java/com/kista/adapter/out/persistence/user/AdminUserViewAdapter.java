@@ -16,14 +16,14 @@ class AdminUserViewAdapter implements AdminUserViewPort {
 
     @Override
     public List<AdminUserView> findAll() {
-        return jpaRepository.findAll().stream()
+        return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toView)
                 .toList();
     }
 
     @Override
     public List<AdminUserView> findAllByStatus(User.UserStatus status) {
-        return jpaRepository.findAllByStatus(status).stream()
+        return jpaRepository.findAllByStatusOrderByCreatedAtDesc(status).stream()
                 .map(this::toView)
                 .toList();
     }

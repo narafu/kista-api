@@ -11,6 +11,7 @@ import java.util.UUID;
 
 interface AccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
+    List<AccountEntity> findAllByOrderByCreatedAtDesc(); // 관리자 전체 조회 — 최신순
     List<AccountEntity> findByUserId(UUID userId);
 
     int countByUserId(UUID userId);
