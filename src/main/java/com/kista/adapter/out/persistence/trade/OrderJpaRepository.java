@@ -34,6 +34,9 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // 기간 전체 (관리자용)
     List<OrderEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
 
+    // 관리자 거래내역 — 최신순
+    List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDesc(LocalDate from, LocalDate to);
+
     // 계좌·날짜 기준 PLANNED BUY 합계 (수동 실행 예수금 체크용)
     @Query(value = """
             SELECT COALESCE(SUM(price * quantity), 0)

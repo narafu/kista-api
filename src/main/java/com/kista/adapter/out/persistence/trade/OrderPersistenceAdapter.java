@@ -83,7 +83,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     public List<Order> findAll(LocalDate from, LocalDate to) {
         return repository
-                .findByTradeDateBetween(TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
+                .findByTradeDateBetweenOrderByTradeDateDesc(TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
                 .stream()
                 .map(this::toDomain)
                 .toList();
