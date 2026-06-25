@@ -44,8 +44,8 @@ class TosHoldingsApiTest {
     @DisplayName("보유 종목 있음: 정상 AccountBalance 반환")
     void getBalance_holdingFound_returnsBalance() {
         var item = new TosHoldingsApi.HoldingItem("SOXL", "5", "20.00", "22.00");
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
-            .thenReturn(new TosHoldingsApi.HoldingsResponse(List.of(item)));
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
+            .thenReturn(new TosHoldingsApi.HoldingsResponseWrapper(new TosHoldingsApi.HoldingsResponse(List.of(item))));
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
 
@@ -59,8 +59,8 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("보유 종목 없음: holdings=0, avgPrice=null")
     void getBalance_noHolding_returnsZeroBalance() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
-            .thenReturn(new TosHoldingsApi.HoldingsResponse(List.of()));
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
+            .thenReturn(new TosHoldingsApi.HoldingsResponseWrapper(new TosHoldingsApi.HoldingsResponse(List.of())));
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("500.00", "USD")));
 
@@ -74,7 +74,7 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("null 응답: holdings=0, usdDeposit=0")
     void getBalance_nullResponse_returnsZeroBalance() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponse.class)))
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
             .thenReturn(null);
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(null);

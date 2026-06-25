@@ -90,7 +90,9 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
             params.add("limit",  "100");
             if (cursor != null) params.add("cursor", cursor);
 
-            OrdersResponse response = tossHttpClient.get(ORDER_PATH, account, params, OrdersResponse.class);
+            // Toss 응답은 {"result": {...}} 래퍼 구조 — OrderResponseWrapper(POST)와 동일 패턴
+            OrdersResponseWrapper wrapper = tossHttpClient.get(ORDER_PATH, account, params, OrdersResponseWrapper.class);
+            OrdersResponse response = wrapper != null ? wrapper.result() : null;
             if (response == null || response.orders() == null) break;
 
             // filledQuantity > 0인 주문만 Execution으로 변환
@@ -157,6 +159,11 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
     record OrderResponse(
         @JsonProperty("orderId") String orderId,
         @JsonProperty("clientOrderId") String clientOrderId
+    ) {}
+
+    // GET /api/v1/orders 응답 래퍼 — Toss API 공통 {"result": {...}} 구조
+    record OrdersResponseWrapper(
+        @JsonProperty("result") OrdersResponse result
     ) {}
 
     // GET /api/v1/orders 응답 — package-private으로 테스트에서 직접 생성 가능

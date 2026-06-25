@@ -42,9 +42,10 @@ public class TosHoldingsApi implements TosAccountPort,
 
     @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
-        // 보유 종목 조회
-        HoldingsResponse holdingsResponse = tossHttpClient.get(
-                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
+        // 보유 종목 조회 — 응답 {"result": {"items": [...]}} 래퍼 구조
+        HoldingsResponseWrapper wrapper = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponseWrapper.class);
+        HoldingsResponse holdingsResponse = wrapper != null ? wrapper.result() : null;
 
         // 토스 API는 USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
@@ -91,9 +92,10 @@ public class TosHoldingsApi implements TosAccountPort,
 
     @Override
     public PresentBalanceResult getPresentBalance(Account account) {
-        // 1. 전체 보유 종목 조회
-        HoldingsResponse holdingsResponse = tossHttpClient.get(
-                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponse.class);
+        // 1. 전체 보유 종목 조회 — 응답 {"result": {"items": [...]}} 래퍼 구조
+        HoldingsResponseWrapper holdingsWrapper = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponseWrapper.class);
+        HoldingsResponse holdingsResponse = holdingsWrapper != null ? holdingsWrapper.result() : null;
         // 2~4. USD·KRW 예수금 및 환율 조회
         BigDecimal usdDeposit = fetchBuyingPower(account, "USD");
         BigDecimal krwDeposit = fetchBuyingPower(account, "KRW");
@@ -222,6 +224,9 @@ public class TosHoldingsApi implements TosAccountPort,
         log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
+
+    // GET /api/v1/holdings 응답 래퍼 — {"result": {"items": [...], ...}}
+    record HoldingsResponseWrapper(@JsonProperty("result") HoldingsResponse result) {}
 
     // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
     record HoldingsResponse(@JsonProperty("items") List<HoldingItem> items) {}

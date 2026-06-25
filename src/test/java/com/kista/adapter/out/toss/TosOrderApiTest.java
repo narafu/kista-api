@@ -48,6 +48,11 @@ class TosOrderApiTest {
         return new TosOrderApi.OrderResponseWrapper(new TosOrderApi.OrderResponse(orderId, null));
     }
 
+    // GET /api/v1/orders 응답 {"result": {...}} 래퍼 헬퍼
+    private static TosOrderApi.OrdersResponseWrapper wrapOrders(TosOrderApi.OrdersResponse response) {
+        return new TosOrderApi.OrdersResponseWrapper(response);
+    }
+
     @Test
     @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, PLACED 상태 반환")
     void place_loc_mapsToLimitCls() {
@@ -134,9 +139,9 @@ class TosOrderApiTest {
         TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
 
         // CLOSED 먼저, OPEN 두 번째로 반환
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
-            .thenReturn(closedResp)
-            .thenReturn(openResp);
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+            .thenReturn(wrapOrders(closedResp))
+            .thenReturn(wrapOrders(openResp));
 
         List<Execution> executions = tosOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
@@ -161,9 +166,9 @@ class TosOrderApiTest {
         TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
         TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
-            .thenReturn(closedResp)
-            .thenReturn(openResp);
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+            .thenReturn(wrapOrders(closedResp))
+            .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tosOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
@@ -179,9 +184,9 @@ class TosOrderApiTest {
         TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(), null, false);
         TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(partial), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
-            .thenReturn(closedResp)
-            .thenReturn(openResp);
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+            .thenReturn(wrapOrders(closedResp))
+            .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tosOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
@@ -200,9 +205,9 @@ class TosOrderApiTest {
         TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(item), null, false);
         TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponse.class)))
-            .thenReturn(closedResp)
-            .thenReturn(openResp);
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+            .thenReturn(wrapOrders(closedResp))
+            .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tosOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);

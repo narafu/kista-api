@@ -20,7 +20,7 @@ import java.util.List;
 
 // Toss market-calendar API 스펙 (openapi.json 검증):
 // - GET /api/v1/market-calendar/US?date={YYYY-MM-DD} — 단건 조회 (date 미지정 시 오늘)
-// - response: { today: { date, dayMarket, preMarket, regularMarket, afterMarket } }
+// - response: { "result": { today: { date, dayMarket, preMarket, regularMarket, afterMarket } } } — Toss 공통 {"result": {...}} 래퍼
 //   각 세션: { startTime(ISO8601), endTime(ISO8601) }
 // - isOpen boolean 없음 — regularMarket != null 이면 개장일로 판단
 // 범위 조회(from~to)는 날짜별 루프로 처리, 최대 30일 제한
@@ -55,9 +55,10 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("date", date.toString()); // YYYY-MM-DD
 
-        // 공통 API — 관리자 토큰 사용
-        MarketCalendarResponse response = tossHttpClient.getCommon(
-                MARKET_CALENDAR_PATH, params, MarketCalendarResponse.class);
+        // 공통 API — 관리자 토큰 사용, 응답 {"result": {"today": {...}}} 래퍼 구조
+        MarketCalendarResponseWrapper wrapper = tossHttpClient.getCommon(
+                MARKET_CALENDAR_PATH, params, MarketCalendarResponseWrapper.class);
+        MarketCalendarResponse response = wrapper != null ? wrapper.result() : null;
 
         if (response == null || response.today() == null) {
             log.warn("Toss market-calendar 응답 없음: date={}", date);
@@ -99,7 +100,11 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
-    // GET /api/v1/market-calendar/US 응답 래퍼 — { today: {...} }
+    // GET /api/v1/market-calendar/US 응답 최상위 래퍼 — { "result": { today: {...} } }
+    record MarketCalendarResponseWrapper(
+        @JsonProperty("result") MarketCalendarResponse result
+    ) {}
+
     record MarketCalendarResponse(
         @JsonProperty("today") MarketDay today
     ) {}
