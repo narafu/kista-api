@@ -3,29 +3,24 @@ package com.kista.adapter.out.toss;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.*;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.*;
 import com.kista.domain.port.out.broker.MarketCalendarPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 // Toss 증권사 어댑터 — 공통 5개 + Toss 전용 5개 Port 구현 (BalancePort 미구현 — BrokerAccountRouter 담당)
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
-        DailyTradePort, ExecutionPort,
+        ExecutionPort,
         CandlePort, ExchangeRatePort, StockInfoPort,
         MarketCalendarPort, BrokerAccountPort {
 
@@ -33,8 +28,6 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     private final TosMarginPort tosMarginPort;
     private final TossSellableQuantityPort tossSellableQuantityPort;
     private final TosExecutionPort tosExecutionPort;
-    private final TossCommissionsPort tossCommissionsPort;
-    private final StrategyPort strategyPort;
     private final TosCandlePort tosCandlePort;
     private final TossExchangeRatePort tossExchangeRatePort;
     private final TossStockInfoPort tossStockInfoPort;
@@ -66,55 +59,6 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return tossSellableQuantityPort.getSellableQuantity(ticker, account);
-    }
-
-    // Toss 체결 내역 + 수수료율로 DailyTransactionResult 조립
-    @Override
-    public DailyTransactionResult getDailyTransactions(LocalDate from, LocalDate to, Account account) {
-        Optional<Ticker> ticker = strategyPort.findActiveTicker(account.id());
-        if (ticker.isEmpty()) {
-            return new DailyTransactionResult(List.of(), emptySummary());
-        }
-        List<Execution> executions = tosExecutionPort.getExecutions(from, to, ticker.get(), account);
-
-        // US 수수료율 조회 — 실패 시 0으로 처리 (수수료 미표시)
-        BigDecimal usCommissionRate = tossCommissionsPort.getCommissions(account).stream()
-                .filter(c -> "US".equals(c.marketCountry()))
-                .map(TossCommissionRate::rate)
-                .findFirst()
-                .orElseGet(() -> {
-                    log.warn("Toss US 수수료율 조회 실패 — overseasFee=0으로 처리: accountId={}", account.id());
-                    return BigDecimal.ZERO;
-                });
-
-        List<DailyTransaction> items = executions.stream()
-                .map(e -> new DailyTransaction(
-                        e.tradeDate().toString(),
-                        null,              // Toss — 결제일 미제공
-                        e.direction(),
-                        e.ticker(),
-                        e.ticker().name(), // Toss — 한글 종목명 미제공
-                        e.quantity(),
-                        e.price(),
-                        e.amountUsd(),
-                        BigDecimal.ZERO,   // Toss — KRW 정산금액 미제공
-                        BigDecimal.ZERO,   // Toss — 체결 시점 환율 미제공
-                        "USD"
-                ))
-                .toList();
-
-        BigDecimal buyTotal = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.BUY)
-                .map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sellTotal = executions.stream()
-                .filter(e -> e.direction() == Order.OrderDirection.SELL)
-                .map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-        // overseasFee = 전체 거래금액 × 수수료율(%) / 100
-        BigDecimal overseasFee = buyTotal.add(sellTotal)
-                .multiply(usCommissionRate)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
-        return new DailyTransactionResult(items, new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, overseasFee));
     }
 
     @Override
@@ -154,7 +98,4 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
         return tossAccountListPort.getAccountList(account);
     }
 
-    private static DailyTransactionSummary emptySummary() {
-        return new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-    }
 }

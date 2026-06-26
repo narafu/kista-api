@@ -12,9 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import com.kista.domain.model.order.Order;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -24,7 +22,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class KisTradingApi implements KisAccountPort,
-        KisExecutionPort, KisDailyTransactionPort,
+        KisExecutionPort,
         KisPortfolioPort, KisMarginPort, KisSellableQuantityPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
@@ -39,9 +37,6 @@ public class KisTradingApi implements KisAccountPort,
 
     private static final String EXECUTION_PATH  = "/uapi/overseas-stock/v1/trading/inquire-ccnl";
     private static final String EXECUTION_TR_ID = "TTTS3035R"; // 해외주식 체결 내역 조회
-
-    private static final String DAILY_TRANS_PATH = "/uapi/overseas-stock/v1/trading/inquire-period-trans";
-    private static final String DAILY_TRANS_TR_ID = "CTOS4001R"; // 해외주식 일별거래내역
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -213,83 +208,9 @@ public class KisTradingApi implements KisAccountPort,
                 .toList();
     }
 
-    // ── KisDailyTransactionPort ────────────────────────────────────────────────
-
-    @Override
-    public DailyTransactionResult getDailyTransactions(LocalDate from, LocalDate to, Account account) {
-        TransactionResponse response = kisHttpClient.tradingGet(
-                DAILY_TRANS_TR_ID, DAILY_TRANS_PATH, account, TransactionResponse.class,
-                p -> {
-                    p.add("ERLM_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
-                    p.add("ERLM_END_DT", formatTradeDate(to));
-                    p.add("OVRS_EXCG_CD", exchangeRegistry.defaultUsExchange()); // 미국 전체
-                    p.add("PDNO", "");                         // 전종목
-                    p.add("SLL_BUY_DVSN_CD", "00");           // 00=전체, 01=매도, 02=매수
-                    p.add("LOAN_DVSN_CD", "");
-                    p.add("CTX_AREA_FK100", "");
-                    p.add("CTX_AREA_NK100", "");
-                });
-        if (response == null) {
-            return new DailyTransactionResult(Collections.emptyList(), emptySummary());
-        }
-        List<DailyTransaction> items = KisResponseParser.streamTickered(response.output1(),
-                TransactionResponse.Output1::pdno,
-                (ticker, o) -> {
-                    int qty = KisResponseParser.parseIntSafe(o.filledQuantity());
-                    BigDecimal tradeAmountUsd = KisResponseParser.parseBd(o.trFrcrAmt2());
-                    // ovrs_stck_ccld_unpr은 KRW 단가를 반환하므로 USD 단가를 직접 계산
-                    BigDecimal priceUsd = qty > 0
-                            ? tradeAmountUsd.divide(BigDecimal.valueOf(qty), 6, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    return new DailyTransaction(
-                            TradeDateConverter.toKst(LocalDate.parse(o.tradDt(), FMT)).toString(), // US거래일(UTC) → KST
-                            o.sttlDt(),
-                            KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
-                            ticker,
-                            o.ovrsItemName(),
-                            qty,
-                            priceUsd,
-                            tradeAmountUsd,
-                            KisResponseParser.parseBd(o.wcrcExccAmt()),
-                            KisResponseParser.parseBd(o.erlmExrt()),
-                            o.crcyCd()
-                    );
-                });
-        // KIS summary의 frcr_buy/sll_amt_smtl은 KRW 단위이므로 items에서 USD로 재계산 (Toss와 동일 방식)
-        BigDecimal buyTotal = items.stream()
-                .filter(t -> t.direction() == Order.OrderDirection.BUY)
-                .map(DailyTransaction::tradeAmountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sellTotal = items.stream()
-                .filter(t -> t.direction() == Order.OrderDirection.SELL)
-                .map(DailyTransaction::tradeAmountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        // KIS dmst_fee_smtl·ovrs_fee_smtl은 KRW 단위 — items의 erlm_exrt로 USD 환산
-        BigDecimal rate = items.stream()
-                .map(DailyTransaction::exchangeRate)
-                .filter(r -> r.compareTo(BigDecimal.ZERO) > 0)
-                .findFirst()
-                .orElse(BigDecimal.ZERO);
-        BigDecimal domesticFeeUsd = BigDecimal.ZERO;
-        BigDecimal overseasFeeUsd = BigDecimal.ZERO;
-        if (response.output2() != null && rate.compareTo(BigDecimal.ZERO) > 0) {
-            domesticFeeUsd = KisResponseParser.parseBd(response.output2().dmstFeeSmtl())
-                    .divide(rate, 2, RoundingMode.HALF_UP);
-            overseasFeeUsd = KisResponseParser.parseBd(response.output2().ovrsFeeSmtl())
-                    .divide(rate, 2, RoundingMode.HALF_UP);
-        }
-        DailyTransactionSummary summary = new DailyTransactionSummary(
-                buyTotal, sellTotal, domesticFeeUsd, overseasFeeUsd);
-        return new DailyTransactionResult(items, summary);
-    }
-
     // KST 날짜 → KIS API 날짜 파라미터 (UTC=US거래일 YYYYMMDD)
     private String formatTradeDate(LocalDate kst) {
         return TradeDateConverter.toUtc(kst).format(FMT);
-    }
-
-    private static DailyTransactionSummary emptySummary() {
-        return new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     // ── Inner response records ─────────────────────────────────────────────────
@@ -348,29 +269,4 @@ public class KisTradingApi implements KisAccountPort,
         ) {}
     }
 
-    record TransactionResponse(
-            @JsonProperty("output1") List<Output1> output1,
-            @JsonProperty("output2") Output2 output2
-    ) {
-        record Output1(
-                @JsonProperty("trad_dt") String tradDt,                      // 매매일자
-                @JsonProperty("sttl_dt") String sttlDt,                      // 결제일자
-                @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd,        // 매도매수구분코드
-                @JsonProperty("pdno") String pdno,                            // 종목코드
-                @JsonProperty("ovrs_item_name") String ovrsItemName,          // 종목명
-                @JsonProperty("ccld_qty") String filledQuantity,               // 체결수량
-                @JsonProperty("ovrs_stck_ccld_unpr") String ovrsStckCcldUnpr, // 체결단가
-                @JsonProperty("tr_frcr_amt2") String trFrcrAmt2,              // 거래외화금액
-                @JsonProperty("wcrc_excc_amt") String wcrcExccAmt,            // 원화정산금액
-                @JsonProperty("erlm_exrt") String erlmExrt,                   // 등록환율
-                @JsonProperty("crcy_cd") String crcyCd                        // 통화코드
-        ) {}
-
-        record Output2(
-                @JsonProperty("frcr_buy_amt_smtl") String frcrBuyAmtSmtl, // 외화매수금액합계
-                @JsonProperty("frcr_sll_amt_smtl") String frcrSllAmtSmtl, // 외화매도금액합계
-                @JsonProperty("dmst_fee_smtl") String dmstFeeSmtl,        // 국내수수료합계
-                @JsonProperty("ovrs_fee_smtl") String ovrsFeeSmtl         // 해외수수료합계
-        ) {}
-    }
 }

@@ -18,12 +18,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
-        DailyTradePort, ExecutionPort {
+        ExecutionPort {
 
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final KisSellableQuantityPort kisSellableQuantityPort;
-    private final KisDailyTransactionPort kisDailyTransactionPort;
     private final KisExecutionPort kisExecutionPort;
 
     @Override
@@ -63,11 +62,6 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return kisSellableQuantityPort.getSellableQuantity(ticker, account);
-    }
-
-    @Override
-    public DailyTransactionResult getDailyTransactions(LocalDate from, LocalDate to, Account account) {
-        return kisDailyTransactionPort.getDailyTransactions(from, to, account);
     }
 
     @Override

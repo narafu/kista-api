@@ -3,11 +3,9 @@ package com.kista.application.service.account;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
-import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.broker.DailyTradePort;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.port.out.broker.PortfolioPort;
 import com.kista.domain.port.out.broker.SellableQuantityPort;
@@ -15,9 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 // account.broker() 기반 통계 라우터 — BrokerAdapterRegistry 경유
 @Slf4j
@@ -42,8 +38,4 @@ class BrokerStatisticsRouter {
         return registry.require(account, SellableQuantityPort.class).getSellableQuantity(ticker, account);
     }
 
-    // 일별 거래내역 — KIS: CTOS4001R / Toss: execution+commission 조합 (accountId는 하위 호환 유지)
-    DailyTransactionResult getDailyTransactions(UUID accountId, Account account, LocalDate from, LocalDate to) {
-        return registry.require(account, DailyTradePort.class).getDailyTransactions(from, to, account);
-    }
 }
