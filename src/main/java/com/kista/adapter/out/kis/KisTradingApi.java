@@ -264,11 +264,22 @@ public class KisTradingApi implements KisAccountPort,
                 .filter(t -> t.direction() == Order.OrderDirection.SELL)
                 .map(DailyTransaction::tradeAmountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        DailyTransactionSummary summary = response.output2() != null
-                ? new DailyTransactionSummary(buyTotal, sellTotal,
-                        KisResponseParser.parseBd(response.output2().dmstFeeSmtl()),
-                        KisResponseParser.parseBd(response.output2().ovrsFeeSmtl()))
-                : new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO);
+        // KIS dmst_fee_smtl·ovrs_fee_smtl은 KRW 단위 — items의 erlm_exrt로 USD 환산
+        BigDecimal rate = items.stream()
+                .map(DailyTransaction::exchangeRate)
+                .filter(r -> r.compareTo(BigDecimal.ZERO) > 0)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+        BigDecimal domesticFeeUsd = BigDecimal.ZERO;
+        BigDecimal overseasFeeUsd = BigDecimal.ZERO;
+        if (response.output2() != null && rate.compareTo(BigDecimal.ZERO) > 0) {
+            domesticFeeUsd = KisResponseParser.parseBd(response.output2().dmstFeeSmtl())
+                    .divide(rate, 2, RoundingMode.HALF_UP);
+            overseasFeeUsd = KisResponseParser.parseBd(response.output2().ovrsFeeSmtl())
+                    .divide(rate, 2, RoundingMode.HALF_UP);
+        }
+        DailyTransactionSummary summary = new DailyTransactionSummary(
+                buyTotal, sellTotal, domesticFeeUsd, overseasFeeUsd);
         return new DailyTransactionResult(items, summary);
     }
 
