@@ -242,7 +242,7 @@ public class KisTradingApi implements KisAccountPort,
                             ? tradeAmountUsd.divide(BigDecimal.valueOf(qty), 6, RoundingMode.HALF_UP)
                             : BigDecimal.ZERO;
                     return new DailyTransaction(
-                            LocalDate.parse(o.tradDt(), FMT).toString(), // YYYYMMDD → ISO YYYY-MM-DD
+                            TradeDateConverter.toKst(LocalDate.parse(o.tradDt(), FMT)).toString(), // US거래일(UTC) → KST
                             o.sttlDt(),
                             KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
                             ticker,
