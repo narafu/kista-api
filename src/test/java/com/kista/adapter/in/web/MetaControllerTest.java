@@ -2,6 +2,10 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -15,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,8 +34,17 @@ class MetaControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean CycleOrderStrategies cycleStrategies;
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @BeforeEach
+    void setUp() {
+        var infinite = new InfiniteCycleOrderStrategy(null, null);
+        var privacy = new PrivacyCycleOrderStrategy(null);
+        when(cycleStrategies.of(Strategy.Type.INFINITE)).thenReturn(infinite);
+        when(cycleStrategies.of(Strategy.Type.PRIVACY)).thenReturn(privacy);
+    }
 
     private UsernamePasswordAuthenticationToken mockAuth() {
         return new UsernamePasswordAuthenticationToken(USER_UUID, null, List.of());

@@ -35,6 +35,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(TradingCycleController.class)
@@ -50,8 +52,9 @@ class TradingCycleControllerTest {
     @MockitoBean AccountStatisticsUseCase accountStatistics;
     @MockitoBean TradingExecutionUseCase tradingExecution;
 
-    private static final UUID CYCLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
-    private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
+    private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
 
     // JwtAuthFilter와 동일하게 principal을 UUID로 설정
     private UsernamePasswordAuthenticationToken mockAuth() {
@@ -251,5 +254,28 @@ class TradingCycleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasMore").value(true))
                 .andExpect(jsonPath("$.nextCursor").value("2024-06-01T00:00:00Z"));
+    }
+
+    @Test
+    void seedPreview_returns200_with_minSeed() throws Exception {
+        var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null);
+        when(accountStatistics.strategySeedPreview(eq(ACCOUNT_ID), any(),
+                eq(Strategy.Type.INFINITE), eq(Strategy.Ticker.SOXL), eq(20)))
+                .thenReturn(preview);
+
+        mockMvc.perform(get("/api/accounts/{accountId}/strategy-seed-preview", ACCOUNT_ID)
+                        .param("type", "INFINITE").param("ticker", "SOXL").param("divisionCount", "20")
+                        .with(authentication(mockAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minSeed").value(1320.00))
+                .andExpect(jsonPath("$.basePrice").value(30.00))
+                .andExpect(jsonPath("$.skipReason").doesNotExist());
+    }
+
+    @Test
+    void seedPreview_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/accounts/{accountId}/strategy-seed-preview", ACCOUNT_ID)
+                        .param("type", "INFINITE").param("ticker", "SOXL").param("divisionCount", "20"))
+                .andExpect(status().isUnauthorized());
     }
 }

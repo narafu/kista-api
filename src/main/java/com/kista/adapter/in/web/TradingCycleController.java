@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
@@ -129,6 +130,19 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         return NextOrdersResponse.from(tradingExecution.preview(id, userId));
+    }
+
+    // 전략 등록/수정 폼용 최소시드·기준가 미리보기
+    @Operation(summary = "전략 최소시드·기준가 미리보기")
+    @GetMapping("/api/accounts/{accountId}/strategy-seed-preview")
+    public StrategySeedPreviewResponse seedPreview(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam Strategy.Type type,
+            @RequestParam Strategy.Ticker ticker,
+            @RequestParam(defaultValue = "20") int divisionCount) {
+        return StrategySeedPreviewResponse.from(
+                accountStatistics.strategySeedPreview(accountId, userId, type, ticker, divisionCount));
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

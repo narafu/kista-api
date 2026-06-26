@@ -3,6 +3,7 @@ package com.kista.application.service.account;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.OrderPort;

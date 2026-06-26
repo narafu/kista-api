@@ -1,6 +1,5 @@
 package com.kista.application.service.account;
 
-import com.kista.adapter.in.web.dto.StrategySeedPreviewResponse;
 import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.TimeZones;
@@ -18,6 +17,7 @@ import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
@@ -176,7 +176,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     @Override
-    public StrategySeedPreviewResponse strategySeedPreview(
+    public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             Strategy.Type type, Strategy.Ticker ticker, int divisionCount) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -187,7 +187,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 : null;
 
         if (strategy.requiresPrivacyBase() && privacyBase == null) {
-            return new StrategySeedPreviewResponse(ticker.name(), null, null, "NO_PRIVACY_BASE");
+            return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
         }
 
         BigDecimal price = strategy.requiresPrivacyBase()
@@ -198,7 +198,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 : price;
         BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyBase, divisionCount);
 
-        return new StrategySeedPreviewResponse(ticker.name(), basePrice, minSeed, null);
+        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

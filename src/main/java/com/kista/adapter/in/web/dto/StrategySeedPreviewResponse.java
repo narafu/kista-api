@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.domain.model.strategy.StrategySeedPreview;
+
 import java.math.BigDecimal;
 
 // 전략 등록/수정 폼의 최소시드·기준가 미리보기 응답
@@ -9,4 +11,9 @@ public record StrategySeedPreviewResponse(
         BigDecimal basePrice,
         BigDecimal minSeed,
         String skipReason
-) {}
+) {
+    public static StrategySeedPreviewResponse from(StrategySeedPreview preview) {
+        return new StrategySeedPreviewResponse(
+                preview.ticker(), preview.basePrice(), preview.minSeed(), preview.skipReason());
+    }
+}
