@@ -1,5 +1,6 @@
 package com.kista.application.service.account;
 
+import com.kista.adapter.in.web.dto.StrategySeedPreviewResponse;
 import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.TimeZones;
@@ -12,14 +13,19 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +48,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final BrokerExecutionRouter brokerExecutionRouter;
     private final BrokerStatisticsRouter brokerStatisticsRouter;
     private final BrokerPriceRouter brokerPriceRouter;
+    private final PrivacyTradePort privacyTradePort;
+    private final CycleOrderStrategies cycleStrategies;
 
     @Override
     public List<Execution> getExecutions(UUID accountId, UUID requesterId,
@@ -165,6 +173,32 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         List<CyclePositionHistoryEntry> raw =
                 cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
         return toPage(raw, size);
+    }
+
+    @Override
+    public StrategySeedPreviewResponse strategySeedPreview(
+            UUID accountId, UUID requesterId,
+            Strategy.Type type, Strategy.Ticker ticker, int divisionCount) {
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        CycleOrderStrategy strategy = cycleStrategies.of(type);
+
+        PrivacyTradeBase privacyBase = strategy.requiresPrivacyBase()
+                ? privacyTradePort.findTodayTrade(LocalDate.now(TimeZones.KST)).orElse(null)
+                : null;
+
+        if (strategy.requiresPrivacyBase() && privacyBase == null) {
+            return new StrategySeedPreviewResponse(ticker.name(), null, null, "NO_PRIVACY_BASE");
+        }
+
+        BigDecimal price = strategy.requiresPrivacyBase()
+                ? null
+                : brokerPriceRouter.getPrice(ticker, account);
+        BigDecimal basePrice = strategy.requiresPrivacyBase()
+                ? privacyBase.currentCycleStart()
+                : price;
+        BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyBase, divisionCount);
+
+        return new StrategySeedPreviewResponse(ticker.name(), basePrice, minSeed, null);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

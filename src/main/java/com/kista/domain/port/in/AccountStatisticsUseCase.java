@@ -1,5 +1,6 @@
 package com.kista.domain.port.in;
 
+import com.kista.adapter.in.web.dto.StrategySeedPreviewResponse;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
@@ -7,6 +8,7 @@ import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
@@ -28,4 +30,7 @@ public interface AccountStatisticsUseCase {
     CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     // 계좌 기준 스냅샷 조회 (차트용 — DB 기반, KIS API 미사용)
     List<CyclePositionHistoryEntry> getSnapshotsByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+    // 전략 등록/수정 폼용 최소시드·기준가 미리보기
+    StrategySeedPreviewResponse strategySeedPreview(UUID accountId, UUID requesterId,
+            Strategy.Type type, Strategy.Ticker ticker, int divisionCount);
 }
