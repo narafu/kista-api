@@ -112,21 +112,29 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
 
-### Privacy 기준표 운영 → 로컬 마이그레이션 (supabase-cli)
+### 운영 → 로컬 마이그레이션 (supabase-cli)
 ```bash
-# 1. 운영 DB에서 CSV 덤프
-supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" > /tmp/privacy_trade_bases.csv
-supabase db query --linked --output csv "SELECT * FROM privacy_trade_base_orders ORDER BY created_at" > /tmp/privacy_trade_base_orders.csv
+# 1. 운영 DB에서 CSV 덤프 (supabase CLI 출력 메시지가 CSV에 섞이므로 UUID 행만 grep으로 추출)
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" | \
+  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/privacy_trade_bases.csv
+supabase db query --linked --output csv "SELECT * FROM privacy_trade_base_orders ORDER BY created_at" | \
+  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/privacy_trade_base_orders.csv
+supabase db query --linked --output csv "SELECT * FROM fear_greed_snapshots ORDER BY created_at" | \
+  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/fear_greed_snapshots.csv
 
 # 2. CSV를 로컬 컨테이너에 복사
 docker cp /tmp/privacy_trade_bases.csv kista-api-postgres-1:/tmp/privacy_trade_bases.csv
 docker cp /tmp/privacy_trade_base_orders.csv kista-api-postgres-1:/tmp/privacy_trade_base_orders.csv
+docker cp /tmp/fear_greed_snapshots.csv kista-api-postgres-1:/tmp/fear_greed_snapshots.csv
 
 # 3. 로컬 DB에 임포트 (NULL 'NULL' 옵션 필수 — supabase CSV에서 NULL이 문자열 "NULL"로 출력됨)
+#    컬럼 순서는 CSV 헤더(SELECT * 순서)와 일치해야 함
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
   "COPY privacy_trade_bases (id, trade_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
-  "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, quantity, price, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+  "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, price, quantity, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
+  "COPY fear_greed_snapshots (id, source, snapshot_date, value, rating, created_at) FROM '/tmp/fear_greed_snapshots.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
-# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases;"
+# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases, fear_greed_snapshots;"
 ```
