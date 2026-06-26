@@ -5,6 +5,7 @@ import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.BatchContext;
+import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.TradingExecutionUseCase;
@@ -38,6 +39,16 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     @Override
     public void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException {
         tradingService.placeOpenOrders(contexts);
+    }
+
+    @Override
+    public void placeOpenOrdersNow(List<BatchContext> contexts) throws InterruptedException {
+        tradingService.placeOpenOrders(contexts, DstInfo.immediateOpen());
+    }
+
+    @Override
+    public void executeBatchNow(List<BatchContext> contexts) throws InterruptedException {
+        tradingService.executeBatch(contexts, DstInfo.immediateClose());
     }
 
     @Override

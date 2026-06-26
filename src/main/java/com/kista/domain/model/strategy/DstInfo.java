@@ -75,6 +75,28 @@ public record DstInfo(
                 : LocalDate.now(KST).plusDays(1);
     }
 
+    // 개장 스케쥴러 수동 트리거용: marketOpen을 과거로 설정해 waitUntilMarketOpen() 스킵
+    public static DstInfo immediateOpen() {
+        ZonedDateTime now = ZonedDateTime.now(KST);
+        boolean isDst = NY.getRules().isDaylightSavings(now.toInstant());
+        LocalTime locTime  = isDst ? LocalTime.of(4, 30) : LocalTime.of(5, 30);
+        LocalTime postTime = isDst ? LocalTime.of(5, 10) : LocalTime.of(6, 10);
+        LocalDate date = now.toLocalDate();
+        Instant orderAt   = date.atTime(locTime).atZone(KST).toInstant();
+        Instant postClose = date.atTime(postTime).atZone(KST).toInstant();
+        return new DstInfo(isDst, orderAt, postClose, Instant.now().minusMillis(1));
+    }
+
+    // 마감 스케쥴러 수동 트리거용: orderAt·postClose를 과거로 설정해 모든 대기 스킵
+    public static DstInfo immediateClose() {
+        ZonedDateTime now = ZonedDateTime.now(KST);
+        boolean isDst = NY.getRules().isDaylightSavings(now.toInstant());
+        LocalTime openTime = isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30);
+        Instant past = Instant.now().minusMillis(1);
+        Instant marketOpen = now.toLocalDate().atTime(openTime).atZone(KST).toInstant();
+        return new DstInfo(isDst, past, past, marketOpen);
+    }
+
     // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose/marketOpen은 정상 계산
     public static DstInfo immediate() {
         ZonedDateTime now = ZonedDateTime.now(KST);

@@ -19,6 +19,10 @@ public interface TradingExecutionUseCase {
     void executeBatch(List<BatchContext> contexts) throws InterruptedException;
     // 개장 스케쥴러 — 전략 order 생성 + INFINITE 매도 선접수 + 예수금 부족 시 사용자 알람
     void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException;
+    // 개장 스케쥴러 수동 트리거 — 개장 대기 없이 즉시 실행
+    void placeOpenOrdersNow(List<BatchContext> contexts) throws InterruptedException;
+    // 마감 스케쥴러 수동 트리거 — 주문 대기 없이 즉시 실행
+    void executeBatchNow(List<BatchContext> contexts) throws InterruptedException;
     // 수동 실행 (INFINITE 전용)
     List<Order> executeManually(UUID strategyId, UUID requesterId);
     // 전략 주문 전체 취소 (오늘 PLACED, best-effort)

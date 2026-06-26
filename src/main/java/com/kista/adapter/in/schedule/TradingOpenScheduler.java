@@ -34,29 +34,35 @@ public class TradingOpenScheduler {
     private final NotifyPort notifyPort;
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST (개장 30분~90분 전)
+    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("trading-open", Duration.ofHours(2), this::runLocked);
     }
 
-    private void runLocked() {
-        notifyPort.notifyInfo("장 개시 스케쥴러 시작");
-        List<Strategy> strategies = strategyPort.findAllActive();
-        log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", strategies.size());
-
-        // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
-        List<BatchContext> contexts = new ArrayList<>();
-        for (Strategy strategy : strategies) {
+    // 수동 트리거 — 개장 대기 없이 즉시 실행
+    public void runNow() throws InterruptedException {
+        schedulerLockService.tryRun("trading-open", Duration.ofHours(2), () -> {
+            notifyPort.notifyInfo("장 개시 스케쥴러 수동 시작");
+            List<BatchContext> contexts = buildContexts();
+            log.info("장 개시 스케쥴러 수동 시작 — ACTIVE 전략 {}개", contexts.size());
             try {
-                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
-                Account account = accountPort.findByIdOrThrow(strategy.accountId());
-                User user = userPort.findByIdOrThrow(account.userId());
-                contexts.add(new BatchContext(strategy, currentCycle, account, user));
+                useCase.placeOpenOrdersNow(contexts);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("장 개시 스케쥴러 수동 인터럽트: {}", e.getMessage());
             } catch (Exception e) {
-                log.error("[strategyId={}] 컨텍스트 조회 오류: {}", strategy.id(), e.getMessage(), e);
+                log.error("장 개시 스케쥴러 수동 오류: {}", e.getMessage(), e);
                 notifyPort.notifyError(e);
             }
-        }
+            log.info("장 개시 스케쥴러 수동 완료");
+            notifyPort.notifyInfo("장 개시 스케쥴러 수동 완료");
+        });
+    }
+
+    private void runLocked() {
+        notifyPort.notifyInfo("장 개시 스케쥴러 시작");
+        List<BatchContext> contexts = buildContexts();
+        log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", contexts.size());
 
         try {
             useCase.placeOpenOrders(contexts);
@@ -70,5 +76,23 @@ public class TradingOpenScheduler {
 
         log.info("장 개시 스케쥴러 완료");
         notifyPort.notifyInfo("장 개시 스케쥴러 완료");
+    }
+
+    // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
+    private List<BatchContext> buildContexts() {
+        List<Strategy> strategies = strategyPort.findAllActive();
+        List<BatchContext> contexts = new ArrayList<>();
+        for (Strategy strategy : strategies) {
+            try {
+                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+                Account account = accountPort.findByIdOrThrow(strategy.accountId());
+                User user = userPort.findByIdOrThrow(account.userId());
+                contexts.add(new BatchContext(strategy, currentCycle, account, user));
+            } catch (Exception e) {
+                log.error("[strategyId={}] 컨텍스트 조회 오류: {}", strategy.id(), e.getMessage(), e);
+                notifyPort.notifyError(e);
+            }
+        }
+        return contexts;
     }
 }
