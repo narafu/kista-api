@@ -5,16 +5,20 @@ import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
+import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
+import com.kista.domain.model.kis.DailyTransactionSummary;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +38,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
+    private final OrderPort orderPort;
     private final BrokerExecutionRouter brokerExecutionRouter;
     private final BrokerStatisticsRouter brokerStatisticsRouter;
     private final BrokerPriceRouter brokerPriceRouter;
@@ -67,13 +72,42 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        try {
-            return brokerStatisticsRouter.getDailyTransactions(accountId, account, from, to);
-        } catch (Exception e) {
-            log.warn("일별 거래내역 조회 실패: accountId={}, error={}", accountId, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
-        }
+        accountPort.requireOwnedAccount(accountId, requesterId);
+        List<Order> filled = orderPort.findFilledByAccount(accountId, from, to);
+
+        List<DailyTransaction> items = filled.stream()
+                .filter(o -> o.filledQuantity() != null && o.filledQuantity() > 0)
+                .map(o -> {
+                    BigDecimal price = o.filledPrice() != null ? o.filledPrice() : o.price();
+                    int qty = o.filledQuantity();
+                    BigDecimal amount = price.multiply(BigDecimal.valueOf(qty));
+                    return new DailyTransaction(
+                            o.tradeDate().toString(),
+                            null,
+                            o.direction(),
+                            o.ticker(),
+                            o.ticker().name(),
+                            qty,
+                            price,
+                            amount,
+                            null,
+                            null,
+                            "USD"
+                    );
+                })
+                .toList();
+
+        BigDecimal buyTotal = items.stream()
+                .filter(t -> t.direction() == Order.OrderDirection.BUY)
+                .map(DailyTransaction::tradeAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sellTotal = items.stream()
+                .filter(t -> t.direction() == Order.OrderDirection.SELL)
+                .map(DailyTransaction::tradeAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new DailyTransactionResult(items,
+                new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
     }
 
     @Override
