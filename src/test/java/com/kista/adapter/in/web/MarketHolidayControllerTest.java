@@ -47,11 +47,12 @@ class MarketHolidayControllerTest {
     }
 
     @Test
-    void holidays_anonymous_returns_401() throws Exception {
+    void holidays_anonymous_returns_200() throws Exception {
+        // GET /api/market/**은 SecurityConfig에서 permitAll() — 비인증 대시보드 공개 엔드포인트
         mockMvc.perform(get("/api/market/holidays")
                         .param("year", "2026")
                         .param("month", "1"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 
     @Test

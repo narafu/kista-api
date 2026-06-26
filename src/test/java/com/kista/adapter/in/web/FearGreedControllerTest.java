@@ -69,8 +69,9 @@ class FearGreedControllerTest {
     }
 
     @Test
-    void getFearGreed_anonymous_returns_401() throws Exception {
+    void getFearGreed_anonymous_returns_200() throws Exception {
+        // GET /api/market/**은 SecurityConfig에서 permitAll() — 비인증 대시보드 공개 엔드포인트
         mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
     }
 }
