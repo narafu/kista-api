@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/trades/stream").authenticated() // 매매 SSE 연결은 인증 필수
                         .requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated() // 회원 탈퇴는 인증 필수
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/market/**").permitAll() // 비인증 대시보드용 공개 엔드포인트
+                        .requestMatchers(HttpMethod.GET, "/api/meta").permitAll() // enum SSOT — 레이아웃 로드 시 인증 불필요
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()
