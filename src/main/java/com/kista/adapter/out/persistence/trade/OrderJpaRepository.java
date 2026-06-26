@@ -64,4 +64,9 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             @Param("ticker") String ticker);
+
+    // 계좌·날짜범위·상태 복합 조건 조회 (daily-trades DB 전환용)
+    List<OrderEntity> findByAccountIdAndTradeDateBetweenAndStatusIn(
+            UUID accountId, LocalDate from, LocalDate to,
+            List<Order.OrderStatus> statuses);
 }

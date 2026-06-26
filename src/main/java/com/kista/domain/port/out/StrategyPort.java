@@ -2,7 +2,9 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.strategy.Strategy;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +26,9 @@ public interface StrategyPort {
     void delete(UUID id);
     void deleteByAccountId(UUID accountId); // 계좌 삭제 시 전략 일괄 소프트 삭제
     void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 전략 일괄 소프트 삭제
+
+    // strategy_cycle.id → strategy.type 배치 조회 (관리자 거래내역용)
+    Map<UUID, Strategy.Type> findTypesByCycleIds(Collection<UUID> cycleIds);
 
     // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
     boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker);

@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,8 +42,14 @@ public class AdminTradeController {
                 .collect(Collectors.toMap(Account::id, Function.identity()));
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return adminQuery.listTrades(from, to).stream()
-                .map(t -> AdminTradeResponse.from(t, accountMap, userMap))
+        List<Order> trades = adminQuery.listTrades(from, to);
+        Set<UUID> cycleIds = trades.stream()
+                .map(Order::strategyCycleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
+        return trades.stream()
+                .map(t -> AdminTradeResponse.from(t, accountMap, userMap, strategyTypeMap))
                 .toList();
     }
 
@@ -49,6 +58,7 @@ public class AdminTradeController {
             UUID id,
             UUID userId,
             String ownerNickname,    // 계좌 소유자 닉네임
+            String strategyType,     // INFINITE | PRIVACY (null 가능)
             LocalDate tradeDate,
             String ticker,
             String direction,        // BUY | SELL
@@ -57,14 +67,19 @@ public class AdminTradeController {
             BigDecimal price,
             String status            // PLACED | FILLED | FAILED
     ) {
-        static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap, Map<UUID, AdminUserView> userMap) {
+        static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap,
+                                       Map<UUID, AdminUserView> userMap,
+                                       Map<UUID, Strategy.Type> strategyTypeMap) {
             // accountId → userId → nickname 순서로 역방향 조회
             Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
             UUID userId = account != null ? account.userId() : null;
             AdminUserView user = userId != null ? userMap.get(userId) : null;
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
+            Strategy.Type strategyType = t.strategyCycleId() != null ? strategyTypeMap.get(t.strategyCycleId()) : null;
             return new AdminTradeResponse(
-                    t.id(), userId, nickname, t.tradeDate(), t.ticker().name(),
+                    t.id(), userId, nickname,
+                    strategyType != null ? strategyType.name() : null,
+                    t.tradeDate(), t.ticker().name(),
                     t.direction().name(), t.orderType().name(),
                     t.quantity(), t.price(), t.status().name());
         }

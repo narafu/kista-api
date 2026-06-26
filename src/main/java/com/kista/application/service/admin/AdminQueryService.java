@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -99,6 +100,11 @@ class AdminQueryService implements AdminQueryUseCase {
                 .toList();
 
         return new AdminAnomalies(pausedAccounts, inactiveAccounts);
+    }
+
+    @Override
+    public Map<UUID, Strategy.Type> getStrategyTypesByCycleIds(Set<UUID> cycleIds) {
+        return strategyPort.findTypesByCycleIds(cycleIds);
     }
 
     @Override

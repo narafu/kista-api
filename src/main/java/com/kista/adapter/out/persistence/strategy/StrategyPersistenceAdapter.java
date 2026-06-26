@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -55,6 +58,16 @@ class StrategyPersistenceAdapter implements StrategyPort {
     @Override
     public void deleteByUserId(UUID userId) {
         jpaRepository.softDeleteByUserId(userId, Instant.now());
+    }
+
+    @Override
+    public Map<UUID, Strategy.Type> findTypesByCycleIds(Collection<UUID> cycleIds) {
+        if (cycleIds.isEmpty()) return Map.of();
+        return jpaRepository.findStrategyTypesByCycleIds(cycleIds).stream()
+                .collect(Collectors.toMap(
+                        StrategyJpaRepository.CycleStrategyType::getCycleId,
+                        r -> Strategy.Type.valueOf(r.getStrategyType())
+                ));
     }
 
     @Override

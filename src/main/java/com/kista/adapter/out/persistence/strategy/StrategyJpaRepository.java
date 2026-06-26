@@ -7,10 +7,24 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
+
+    interface CycleStrategyType {
+        UUID getCycleId();
+        String getStrategyType();
+    }
+
+    @Query(value = """
+            SELECT sc.id AS cycleId, s.type AS strategyType
+            FROM strategy_cycle sc
+            JOIN strategy s ON sc.strategy_id = s.id
+            WHERE sc.id IN :cycleIds
+            """, nativeQuery = true)
+    List<CycleStrategyType> findStrategyTypesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
 
     // 계좌 ID로 전략 목록 조회 (1:N, @SQLRestriction 자동 적용)
     List<StrategyEntity> findAllByAccountId(UUID accountId);
