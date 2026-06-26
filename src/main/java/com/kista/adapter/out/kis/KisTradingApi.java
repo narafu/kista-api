@@ -12,7 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import com.kista.domain.model.order.Order;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -232,28 +234,41 @@ public class KisTradingApi implements KisAccountPort,
         }
         List<DailyTransaction> items = KisResponseParser.streamTickered(response.output1(),
                 TransactionResponse.Output1::pdno,
-                (ticker, o) -> new DailyTransaction(
-                        o.tradDt(),
-                        o.sttlDt(),
-                        KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
-                        ticker,
-                        o.ovrsItemName(),
-                        KisResponseParser.parseIntSafe(o.filledQuantity()),
-                        KisResponseParser.parseBd(o.ovrsStckCcldUnpr()),
-                        KisResponseParser.parseBd(o.trFrcrAmt2()),
-                        KisResponseParser.parseBd(o.wcrcExccAmt()),
-                        KisResponseParser.parseBd(o.erlmExrt()),
-                        o.crcyCd()
-                ));
-        DailyTransactionSummary summary = emptySummary();
-        if (response.output2() != null) {
-            summary = new DailyTransactionSummary(
-                    KisResponseParser.parseBd(response.output2().frcrBuyAmtSmtl()),
-                    KisResponseParser.parseBd(response.output2().frcrSllAmtSmtl()),
-                    KisResponseParser.parseBd(response.output2().dmstFeeSmtl()),
-                    KisResponseParser.parseBd(response.output2().ovrsFeeSmtl())
-            );
-        }
+                (ticker, o) -> {
+                    int qty = KisResponseParser.parseIntSafe(o.filledQuantity());
+                    BigDecimal tradeAmountUsd = KisResponseParser.parseBd(o.trFrcrAmt2());
+                    // ovrs_stck_ccld_unpr은 KRW 단가를 반환하므로 USD 단가를 직접 계산
+                    BigDecimal priceUsd = qty > 0
+                            ? tradeAmountUsd.divide(BigDecimal.valueOf(qty), 6, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    return new DailyTransaction(
+                            LocalDate.parse(o.tradDt(), FMT).toString(), // YYYYMMDD → ISO YYYY-MM-DD
+                            o.sttlDt(),
+                            KisResponseParser.parseDirection(o.sllBuyDvsnCd()),
+                            ticker,
+                            o.ovrsItemName(),
+                            qty,
+                            priceUsd,
+                            tradeAmountUsd,
+                            KisResponseParser.parseBd(o.wcrcExccAmt()),
+                            KisResponseParser.parseBd(o.erlmExrt()),
+                            o.crcyCd()
+                    );
+                });
+        // KIS summary의 frcr_buy/sll_amt_smtl은 KRW 단위이므로 items에서 USD로 재계산 (Toss와 동일 방식)
+        BigDecimal buyTotal = items.stream()
+                .filter(t -> t.direction() == Order.OrderDirection.BUY)
+                .map(DailyTransaction::tradeAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sellTotal = items.stream()
+                .filter(t -> t.direction() == Order.OrderDirection.SELL)
+                .map(DailyTransaction::tradeAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        DailyTransactionSummary summary = response.output2() != null
+                ? new DailyTransactionSummary(buyTotal, sellTotal,
+                        KisResponseParser.parseBd(response.output2().dmstFeeSmtl()),
+                        KisResponseParser.parseBd(response.output2().ovrsFeeSmtl()))
+                : new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO);
         return new DailyTransactionResult(items, summary);
     }
 
