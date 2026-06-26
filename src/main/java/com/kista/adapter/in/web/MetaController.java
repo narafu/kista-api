@@ -6,8 +6,10 @@ import com.kista.adapter.in.web.dto.StrategyTypeMeta;
 import com.kista.adapter.in.web.dto.TickerMeta;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.strategy.CycleOrderStrategies;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +23,12 @@ import java.util.concurrent.TimeUnit;
 @Tag(name = "메타", description = "UI 렌더링용 enum 메타데이터 (라벨, 설명, 유효값 목록)")
 @RestController
 @RequestMapping("/api/meta")
+@RequiredArgsConstructor
 public class MetaController {
 
     private static final CacheControl CACHE = CacheControl.maxAge(1, TimeUnit.HOURS); // 1시간 캐시
+
+    private final CycleOrderStrategies cycleStrategies;
 
     @Operation(summary = "전체 메타 번들 조회")
     @GetMapping
@@ -37,7 +42,7 @@ public class MetaController {
 
     private List<StrategyTypeMeta> getStrategyTypeList() {
         return Arrays.stream(Strategy.Type.values())
-                .map(StrategyTypeMeta::from)
+                .map(t -> StrategyTypeMeta.from(t, cycleStrategies.of(t)))
                 .toList();
     }
 
