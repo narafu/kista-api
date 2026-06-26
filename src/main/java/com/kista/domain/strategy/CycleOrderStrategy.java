@@ -24,6 +24,12 @@ public interface CycleOrderStrategy {
     // 미리보기 실행 전 기준매매표 조회 필요 여부 (PRIVACY만 true)
     default boolean requiresPrivacyBase() { return false; }
 
+    // 리버스모드(소진 후 모드) 지원 여부 (INFINITE만 true) — UI 배지/표시 가드
+    default boolean supportsReverseMode() { return false; }
+
+    // 지원하는 분할 수 옵션 — 빈 목록이면 분할 개념 없음 (PRIVACY). UI 분할 선택지·divisionCount 전송 여부 결정
+    default List<Integer> availableDivisionCounts() { return List.of(); }
+
     // 주문 계획 — Optional.empty()는 "전략 차원에서 skip" (예: PRIVACY 기준매매표 미수신)
     // INFINITE: position non-null / PRIVACY: position null
     Optional<OrderPlan> plan(PlanContext ctx);

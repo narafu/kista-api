@@ -37,6 +37,12 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public boolean requiresPrevClose() { return true; }
 
     @Override
+    public boolean supportsReverseMode() { return true; }
+
+    @Override
+    public List<Integer> availableDivisionCounts() { return List.of(20); }
+
+    @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         // 리버스모드 분기 — cycle_position 최신 행의 isReverseMode가 true이면 리버스모드 전략 사용
         if (ctx.isReverseMode()) {
