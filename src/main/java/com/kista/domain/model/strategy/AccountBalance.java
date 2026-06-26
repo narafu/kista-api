@@ -25,7 +25,7 @@ public record AccountBalance(
         return totalBuyAmount.compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
     }
 
-    // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (기존 매입금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
+    // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (매도 후 잔여 보유금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
     public AccountBalance applyExecutions(List<Execution> executions) {
         if (executions.isEmpty()) return this;
 
@@ -35,11 +35,13 @@ public record AccountBalance(
         BigDecimal sellAmount = sumAmount(executions, Order.OrderDirection.SELL);
 
         int newHoldings = holdings + buyQuantity - sellQuantity;
-        BigDecimal preAmount = (holdings == 0 || avgPrice == null)
+        // 매도 후 남은 수량 기준으로 cost basis 산정 — 매도는 평단가에 영향을 주지 않음
+        int holdingsAfterSell = Math.max(0, holdings - sellQuantity);
+        BigDecimal costAfterSell = (holdingsAfterSell == 0 || avgPrice == null)
                 ? BigDecimal.ZERO
-                : avgPrice.multiply(BigDecimal.valueOf(holdings));
+                : avgPrice.multiply(BigDecimal.valueOf(holdingsAfterSell));
         BigDecimal newAvgPrice = newHoldings > 0
-                ? preAmount.add(buyAmount).divide(BigDecimal.valueOf(newHoldings), 4, HALF_UP)
+                ? costAfterSell.add(buyAmount).divide(BigDecimal.valueOf(newHoldings), 4, HALF_UP)
                 : null;
         BigDecimal newUsdDeposit = usdDeposit.subtract(buyAmount).add(sellAmount);
         return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
