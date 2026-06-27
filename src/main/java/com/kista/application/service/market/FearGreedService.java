@@ -45,10 +45,13 @@ class FearGreedService implements FetchFearGreedUseCase {
         }
 
         if (!cnnExists) {
-            // 예외는 스케쥴러로 전파 — notifyError 알림 처리
-            CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
-            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, date, cnn.value(), cnn.rating()));
-            log.info("CNN 공포탐욕지수 저장 (date={}, value={}, rating={})", date, cnn.value(), cnn.rating());
+            try {
+                CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
+                fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, date, cnn.value(), cnn.rating()));
+                log.info("CNN 공포탐욕지수 저장 (date={}, value={}, rating={})", date, cnn.value(), cnn.rating());
+            } catch (Exception e) {
+                log.error("CNN 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
+            }
         }
     }
 }
