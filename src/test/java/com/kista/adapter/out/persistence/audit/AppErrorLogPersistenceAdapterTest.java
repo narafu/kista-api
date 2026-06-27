@@ -45,7 +45,7 @@ class AppErrorLogPersistenceAdapterTest {
     @Test
     void findRecent_returns_mapped_list() {
         AppErrorLogEntity entity = new AppErrorLogEntity(
-                null, "KisApiException", "KIS 오류", "stack", "{\"caller\":\"TradingService\"}"
+                null, "KisApiException", "KIS 오류", "stack", "{\"caller\":\"TradingService\"}", null
         );
         when(repo.findTopNByOrderByCreatedAtDesc(50)).thenReturn(List.of(entity));
 

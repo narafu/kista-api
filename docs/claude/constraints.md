@@ -221,6 +221,6 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — `TradeDateConverter` 헬퍼 경유 필수
 
 ### 소프트 삭제(Soft Delete) 패턴
-- `users`, `accounts`, `strategy`, `strategy_cycle`, `cycle_position` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언
+- `users`, `accounts`, `strategy`, `strategy_cycle`, `cycle_position`, `app_error_logs` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언
 - **`nativeQuery = true` 쿼리는 `@SQLRestriction` 미적용** — `AND tc.deleted_at IS NULL` 수동 명시 필수 (`findAllActiveCycles` 등)
 - Cascade 순서: 서비스 레이어에서 사이클 → 계좌 → 사용자 순으로 명시 처리 (DB FK CASCADE 미작동)
