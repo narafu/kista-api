@@ -195,6 +195,7 @@ public class KisTradingApi implements KisAccountPort,
         LocalDate utcFrom = TradeDateConverter.toUtc(from); // KST fallback → UTC 기준으로 역변환 대응
         return response.output().stream()
                 .filter(item -> ticker.name().equals(item.pdno()))
+                .filter(item -> KisResponseParser.parseIntSafe(item.filledQuantity()) > 0) // 미체결(ft_ccld_qty=0) 제외
                 .map(item -> new Execution(
                         // KIS ord_dt는 UTC(US거래일) → toKst()로 도메인 KST 일자로 복원
                         TradeDateConverter.toKst(KisResponseParser.parseDate(item.ordDt(), utcFrom)),
