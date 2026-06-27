@@ -11,10 +11,9 @@ import com.kista.domain.port.out.AppErrorLogPort;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -64,6 +63,13 @@ public class AdminObservabilityController {
         return appErrorLogPort.findRecent(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();
+    }
+
+    // 오류 로그 소프트 삭제 — 조치 완료 처리
+    @DeleteMapping("/errors/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void softDeleteErrorLog(@PathVariable UUID id) {
+        appErrorLogPort.softDelete(id);
     }
 
     // 이상 징후 — 일시정지·비활성 계좌

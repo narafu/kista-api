@@ -15,6 +15,8 @@ import java.io.StringWriter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -49,7 +51,8 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
                 e.getClass().getSimpleName(), // 예외 클래스 단순명
                 e.getMessage(),
                 stackTrace,
-                contextJson
+                contextJson,
+                null // deletedAt
         );
         repo.save(entity);
     }
@@ -66,6 +69,14 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         return repo.findTopNByCreatedAtBetween(from, to, limit).stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public void softDelete(UUID id) {
+        AppErrorLogEntity entity = repo.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("앱 오류 로그를 찾을 수 없습니다: " + id));
+        entity.setDeletedAt(Instant.now());
+        repo.save(entity);
     }
 
     // 엔티티 → 도메인 record 변환

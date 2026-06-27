@@ -4,12 +4,15 @@ import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "app_error_logs")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor
@@ -33,4 +36,7 @@ class AppErrorLogEntity extends BaseCreatedAtEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String context; // 발생 위치 메타 JSON
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // 소프트 삭제 일시 (null = 활성)
 }

@@ -4,6 +4,7 @@ import com.kista.domain.model.admin.AppErrorLog;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 public interface AppErrorLogPort {
     // 예외 발생 시 DB 저장 — caller는 호출 클래스 단순명
@@ -12,4 +13,6 @@ public interface AppErrorLogPort {
     List<AppErrorLog> findRecent(int limit);
     // 기간 범위 조회 (최신순, limit건)
     List<AppErrorLog> findRecent(int limit, Instant from, Instant to);
+    // 소프트 삭제 — deleted_at 설정, 없으면 NoSuchElementException
+    void softDelete(UUID id);
 }
