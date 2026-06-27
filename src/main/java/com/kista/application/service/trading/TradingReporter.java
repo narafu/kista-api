@@ -149,7 +149,12 @@ class TradingReporter {
         for (Order order : mainOrders) {
             if (order.externalOrderId() == null) continue;
             List<Execution> matched = byOrderId.get(order.externalOrderId());
-            if (matched == null || matched.isEmpty()) continue; // 미체결 유지
+            if (matched == null || matched.isEmpty()) {
+                // 체결 내역 없음 → 미체결(LOC/MOC 당일 자동 취소) → CANCELLED
+                orderPort.markCancelled(order.id());
+                log.info("[orderId={}] 미체결 → CANCELLED", order.id());
+                continue;
+            }
 
             int filledQuantity = matched.stream().mapToInt(Execution::quantity).sum();
             // 가중평균 체결가: Σ(체결금액) ÷ Σ(체결수량)

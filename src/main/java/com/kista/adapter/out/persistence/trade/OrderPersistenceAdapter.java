@@ -159,6 +159,15 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public void markFailed(UUID orderId) {
+        // 증권사 접수 실패 — FAILED 상태 기록
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        e.setStatus(Order.OrderStatus.FAILED);
+        repository.save(e);
+    }
+
+    @Override
     public void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status) {
         // 체결 완료: 상태 + 체결 수량/가중평균가 기록
         OrderEntity e = repository.findById(orderId)

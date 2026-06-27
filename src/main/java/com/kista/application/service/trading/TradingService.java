@@ -339,7 +339,14 @@ class TradingService {
     private void waitFor(String label, Duration duration, DstInfo dst) throws InterruptedException {
         long ms = duration.toMillis();
         log.info("DST={}, {}까지 대기: {}ms", dst.isDst(), label, ms);
-        if (ms > 0) Thread.sleep(ms);
+        try {
+            if (ms > 0) Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            // 배포·재시작으로 인한 강제 종료 — PLANNED 주문이 접수되지 않을 수 있음
+            notifyPort.notifyError(new IllegalStateException(
+                    "[스케쥴러 인터럽트] " + label + " 대기 중 강제 종료 — PLANNED 주문 접수 미실행 가능", e));
+            throw e;
+        }
         log.info("{} 도달", label);
     }
 

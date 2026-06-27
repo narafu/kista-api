@@ -43,8 +43,11 @@ public interface OrderPort {
     // 오늘 PLANNED 또는 PLACED 주문 조회 (스케쥴러 재계산 skip 판정용)
     List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 취소 완료 → CANCELLED 상태로 변경
+    // 취소 완료 또는 미체결 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
+
+    // 증권사 접수 실패 → FAILED 상태로 변경
+    void markFailed(UUID orderId);
 
     // 체결 완료 → FILLED 또는 PARTIALLY_FILLED 상태 + 체결 수량·가중평균가 기록
     void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status);

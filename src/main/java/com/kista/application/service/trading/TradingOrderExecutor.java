@@ -60,6 +60,7 @@ class TradingOrderExecutor {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
                 notifyPort.notifyError(e);
+                orderPort.markFailed(p.id()); // 접수 실패 → FAILED
                 continue;
             }
             // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
