@@ -6,6 +6,7 @@
 - 계좌별 KIS 토큰: `kis_tokens` 테이블에 account_id 기준 독립 관리
 - 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 미설정 시 생략
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 사이클 계속 실행
+- `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `notifyPort.notifyError()`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
 
 ### DstInfo.MarketSession (수동 실행 시간대 판단)
@@ -34,5 +35,7 @@
 
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
+  - 증권사 접수 실패 → `OrderPort.markFailed(orderId)`로 FAILED 기록 (`TradingOrderExecutor`)
+  - 체결 리포트 집계 시 체결 내역 없는 PLACED 주문(미체결) → `OrderPort.markCancelled(orderId)`로 CANCELLED 기록 (`TradingReporter`)
 - `cycle_position`: 사이클 단위 포지션 스냅샷 — 실행당 1건 append (`CyclePositionPort.save()`, dedup/UNIQUE 제약 없음). 필드: usd_deposit/avg_price/holdings/closing_price
 - `trade_histories`·`portfolio_snapshots` 테이블은 존재하지 않음 — 참조 금지
