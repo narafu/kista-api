@@ -153,7 +153,7 @@ class KisTradingApiTest {
         }
 
         @Test
-        @DisplayName("빈 문자열 필드: quantity=0, price=0, amountUsd=0 안전 파싱")
+        @DisplayName("빈 문자열 수량(ft_ccld_qty=''): 미체결로 간주되어 결과에서 제외됨")
         void getExecutions_blankFields_parsedSafely() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
@@ -164,11 +164,8 @@ class KisTradingApiTest {
 
             List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
-            assertThat(result).hasSize(1);
-            Execution e = result.getFirst();
-            assertThat(e.quantity()).isEqualTo(0);
-            assertThat(e.price()).isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(e.amountUsd()).isEqualByComparingTo(BigDecimal.ZERO);
+            // ft_ccld_qty="" → parseIntSafe → 0 → 미체결 필터에 의해 제외
+            assertThat(result).isEmpty();
         }
     }
 
