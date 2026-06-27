@@ -69,4 +69,21 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByAccountIdAndTradeDateBetweenAndStatusIn(
             UUID accountId, LocalDate from, LocalDate to,
             List<Order.OrderStatus> statuses);
+
+    // 전략 사이클 기준 기간 내 주문 전체 조회 — 최신순
+    List<OrderEntity> findByStrategyCycleIdAndTradeDateBetweenOrderByTradeDateDesc(
+            UUID strategyCycleId, LocalDate from, LocalDate to);
+
+    // 전략 기준 기간 내 주문 전체 조회 — strategy_cycle 경유 JOIN
+    @Query(value = """
+            SELECT o.* FROM orders o
+            JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+            WHERE sc.strategy_id = :strategyId
+              AND o.trade_date BETWEEN :from AND :to
+            ORDER BY o.trade_date DESC
+            """, nativeQuery = true)
+    List<OrderEntity> findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
+            @Param("strategyId") UUID strategyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }

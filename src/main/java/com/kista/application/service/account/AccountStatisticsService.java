@@ -201,6 +201,13 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null);
     }
 
+    @Override
+    public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
+        var strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        return orderPort.findByStrategyId(strategyId, from, to);
+    }
+
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 
     private CycleHistoryPage toPage(List<CyclePositionHistoryEntry> raw, int size) {

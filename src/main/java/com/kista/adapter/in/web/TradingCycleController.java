@@ -160,4 +160,18 @@ public class TradingCycleController {
                 accountStatistics.getByStrategy(
                         strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
+
+    // 전략(사이클) 기준 주문 내역 조회 — 사용자 전략 상세 화면용
+    @Operation(summary = "전략 주문 내역 조회")
+    @GetMapping("/api/trading-cycles/{strategyId}/orders")
+    public StrategyOrdersResponse getStrategyOrders(
+            @PathVariable UUID strategyId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
+        LocalDate resolvedTo = to != null ? to : LocalDate.now();
+        return StrategyOrdersResponse.from(
+                accountStatistics.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
+    }
 }

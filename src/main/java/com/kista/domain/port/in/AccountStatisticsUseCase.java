@@ -5,6 +5,7 @@ import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
@@ -33,4 +34,7 @@ public interface AccountStatisticsUseCase {
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기
     StrategySeedPreview strategySeedPreview(UUID accountId, UUID requesterId,
             Strategy.Type type, Strategy.Ticker ticker, int divisionCount);
+
+    // 전략 기준 기간 내 주문 내역 조회 (사용자 전략 상세 화면용)
+    List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to);
 }

@@ -140,6 +140,16 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
+        return repository
+                .findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
+                        strategyId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         OrderEntity e = repository.findById(orderId)

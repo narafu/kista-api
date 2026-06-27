@@ -54,4 +54,7 @@ public interface OrderPort {
 
     // 계좌 기준 FILLED/PARTIALLY_FILLED 주문 조회 (일별 거래내역 달력용)
     List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to);
+
+    // 전략 기준 기간 내 주문 전체 조회 (사용자 주문내역 탭용) — strategy_cycle을 통한 JOIN 필요
+    List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to);
 }
