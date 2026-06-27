@@ -42,12 +42,12 @@ public record Order(
     }
 
     public enum OrderStatus {
-        PLANNED,           // DB 저장, KIS 접수 대기
-        PLACED,            // KIS 접수 완료
+        PLANNED,           // DB 저장, 증권사 접수 대기
+        PLACED,            // 증권사 접수 완료
         FILLED,            // 전량 체결
         PARTIALLY_FILLED,  // 부분 체결 (filledQuantity < quantity)
-        FAILED,            // 실패
-        CANCELLED          // 사용자 취소 요청으로 KIS 취소 접수 완료
+        FAILED,            // 증권사 접수 실패
+        CANCELLED          // 사용자 취소 또는 미체결로 취소 처리 완료
     }
 
     // 전략 계산 결과(template)를 특정 계좌·사이클의 PLANNED 주문으로 변환 (timing 전파)
