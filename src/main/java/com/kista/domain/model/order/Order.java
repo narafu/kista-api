@@ -78,4 +78,11 @@ public record Order(
                 orderType, timing, direction, quantity, price,
                 OrderStatus.PLACED, externalOrderId, null, null);
     }
+
+    // 가격만 교체한 새 PLANNED 주문 — 보정 주문 재저장 시 기존 id·체결 정보 초기화
+    public Order withPrice(BigDecimal newPrice) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, quantity, newPrice,
+                OrderStatus.PLANNED, null, null, null);
+    }
 }

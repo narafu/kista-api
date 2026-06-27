@@ -78,23 +78,10 @@ public class TossHttpClient {
 
     // 401 → 토큰 무효화 후 1회 재시도. 매 시도마다 call이 buildHeaders로 최신 토큰을 다시 읽는다.
     private <T> T executeWithRetry(Account account, String path, java.util.function.Supplier<T> call) {
-        try {
-            return call.get();
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 401) {
-                // 401 — 토큰 무효화 후 1회 재시도
-                log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
-                tossTokenPort.invalidateToken(account.id());
-                try {
-                    return call.get();
-                } catch (RestClientException retryEx) {
-                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
-                }
-            }
-            throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
-        } catch (RestClientException e) {
-            throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
-        }
+        return execute401Retry(call, () -> {
+            log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
+            tossTokenPort.invalidateToken(account.id());
+        });
     }
 
     // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만
@@ -108,16 +95,23 @@ public class TossHttpClient {
 
     // 공통 API 재시도 — 401 시 관리자 토큰 무효화 후 1회 재시도
     private <T> T executeCommon(String path, java.util.function.Supplier<T> call) {
+        return execute401Retry(call, () -> {
+            log.warn("Toss 관리자 토큰 401 — 무효화 후 재시도: path={}", path);
+            tossTokenPort.invalidateAdminToken();
+        });
+    }
+
+    // 401 재시도 공통 구조 — on401이 토큰 무효화를 담당 (계좌/관리자 분기)
+    private <T> T execute401Retry(java.util.function.Supplier<T> call, Runnable on401) {
         try {
             return call.get();
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() == 401) {
-                log.warn("Toss 관리자 토큰 401 — 무효화 후 재시도: path={}", path);
-                tossTokenPort.invalidateAdminToken();
+                on401.run();
                 try {
                     return call.get();
                 } catch (RestClientException retryEx) {
-                    throw new TossApiException("Toss 공통 API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
+                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
                 }
             }
             throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);

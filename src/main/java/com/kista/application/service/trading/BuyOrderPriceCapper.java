@@ -46,11 +46,7 @@ class BuyOrderPriceCapper {
 
         // cap 초과 BUY → cap 가격으로 교체, 나머지는 유지 (수량 변경 없음)
         List<Order> capped = buyOrders.stream()
-                .map(o -> o.price().compareTo(cap) > 0
-                        ? new Order(null, o.accountId(), o.strategyCycleId(), o.tradeDate(), o.ticker(),
-                                o.orderType(), o.timing(), BUY, o.quantity(), cap,
-                                Order.OrderStatus.PLANNED, null, null, null)
-                        : o)
+                .map(o -> o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
                 .toList();
 
         orderPort.deletePlannedBuyByCycleAndDate(strategyCycleId, today);

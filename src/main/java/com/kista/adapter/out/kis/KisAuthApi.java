@@ -120,13 +120,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
                 tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
             }
         } catch (HttpStatusCodeException e) {
-            // EGW00133: KIS 1분당 1회 발급 제한 초과 — 잘못된 키와 구분해 429로 반환
-            if (e.getResponseBodyAsString().contains("EGW00133")) {
-                log.debug("KIS 연결 테스트 rate limit (EGW00133): accountId={}", accountId);
-                throw new Account.KisRateLimitException();
-            }
-            log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
             throw new Account.InvalidKisKeyException();
@@ -148,12 +142,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             try {
                 token = issueOAuthToken(appKey, appSecret).accessToken();
             } catch (HttpStatusCodeException e) {
-                if (e.getResponseBodyAsString().contains("EGW00133")) {
-                    log.debug("계좌번호 검증 중 rate limit (EGW00133)");
-                    throw new Account.KisRateLimitException();
-                }
-                log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-                throw new Account.InvalidKisKeyException();
+                throw kisKeyException(e, "계좌번호 검증 중 토큰 발급");
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
                 throw new Account.InvalidKisKeyException();
@@ -184,6 +173,16 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
             throw new Account.InvalidKisKeyException();
         }
+    }
+
+    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidKisKeyException
+    private RuntimeException kisKeyException(HttpStatusCodeException e, String context) {
+        if (e.getResponseBodyAsString().contains("EGW00133")) {
+            log.debug("{} rate limit (EGW00133)", context);
+            return new Account.KisRateLimitException();
+        }
+        log.debug("{} 실패: {}", context, e.getMessage());
+        return new Account.InvalidKisKeyException();
     }
 
     // KIS OAuth 토큰 발급 — getToken/test/testAccountNo 공용

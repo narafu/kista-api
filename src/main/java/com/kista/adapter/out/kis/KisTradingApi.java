@@ -48,7 +48,7 @@ public class KisTradingApi implements KisAccountPort,
     @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
-        BigDecimal usdDeposit = fetchUsdDeposit(account);
+        BigDecimal usdDeposit = getUsdBuyableAmount(account);
         BigDecimal avgPrice = holding.quantity() > 0 ? holding.avgPrice() : null;
         return new AccountBalance(holding.quantity(), avgPrice, usdDeposit);
     }
@@ -111,11 +111,6 @@ public class KisTradingApi implements KisAccountPort,
                 .orElse(BigDecimal.ZERO);
     }
 
-    // 내부 헬퍼: USD 주문가능금액 추출 (KisAccountPort.getBalance에서 사용)
-    private BigDecimal fetchUsdDeposit(Account account) {
-        return getUsdBuyableAmount(account);
-    }
-
     // ── PortfolioPort.getPresentBalance() ─────────────────────────────────────
 
     @Override
@@ -157,13 +152,9 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── SellableQuantityPort.getSellableQuantity() ────────────────────────────
 
+    // TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
-        return fetchSellableQuantity(ticker, account);
-    }
-
-    // 내부 헬퍼: TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
-    private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         int quantity = fetchHolding(account, ticker).quantity();
         log.info("KIS 판매 가능 수량: ticker={}, quantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
