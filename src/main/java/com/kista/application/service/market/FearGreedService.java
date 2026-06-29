@@ -5,6 +5,7 @@ import com.kista.domain.port.in.FetchFearGreedUseCase;
 import com.kista.domain.port.out.CnnFearGreedPort;
 import com.kista.domain.port.out.CryptoFearGreedPort;
 import com.kista.domain.port.out.FearGreedSnapshotPort;
+import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ class FearGreedService implements FetchFearGreedUseCase {
     private final CryptoFearGreedPort cryptoFearGreedPort;
     private final CnnFearGreedPort cnnFearGreedPort;
     private final FearGreedSnapshotPort fearGreedSnapshotPort;
+    private final NotifyPort notifyPort;
 
     private static final String SOURCE_CRYPTO = "CRYPTO";
     private static final String SOURCE_CNN    = "CNN";
@@ -32,6 +34,7 @@ class FearGreedService implements FetchFearGreedUseCase {
             log.info("CRYPTO 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, crypto.value(), crypto.rating());
         } catch (Exception e) {
             log.error("CRYPTO 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
         }
 
         try {
@@ -40,6 +43,7 @@ class FearGreedService implements FetchFearGreedUseCase {
             log.info("CNN 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, cnn.value(), cnn.rating());
         } catch (Exception e) {
             log.error("CNN 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
+            notifyPort.notifyError(e);
         }
     }
 }
