@@ -80,10 +80,11 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_ID, 20);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false, null);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false, null, 0);
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
         assertThat(response.divisionCount()).isEqualTo(20);
+        assertThat(response.currentHoldings()).isZero();
     }
 
     @Test
@@ -151,13 +152,12 @@ class StrategyServiceTest {
         assertThat(result.strategy().cycleSeedType()).isEqualTo(Strategy.CycleSeedType.MAINTAIN);
         assertThat(result.initialUsdDeposit()).isEqualTo(new BigDecimal("1000"));
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verify(cyclePositionPort, never()).save(any());
+        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
     }
 
     @Test
-    @DisplayName("update() 시드 증액(보유 중) — usdDeposit = 새시드 - M, startAmount = 새시드")
-    void update_seed_increase_with_holdings_replaces_total_assets() {
-        // 보유 10주 @ avgPrice 100 → M = 1000
+    @DisplayName("update() holdings가 있으면 시드 수정을 거절한다")
+    void update_seed_with_holdings_throws() {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, null, null);
 
@@ -167,20 +167,16 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(latest));
 
-        strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("5000")));
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("5000"))))
+                .isInstanceOf(IllegalArgumentException.class);
 
-        verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("5000"));
-        verify(cyclePositionPort).save(argThat(p ->
-                p.strategyCycleId().equals(CYCLE_ID)
-                        && p.usdDeposit().compareTo(new BigDecimal("4000")) == 0
-                        && p.holdings() == 10
-                        && p.avgPrice().compareTo(new BigDecimal("100")) == 0
-                        && p.closingPrice().compareTo(new BigDecimal("110")) == 0
-        ));
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
     }
 
     @Test
-    @DisplayName("update() 시드 변경(미보유) — usdDeposit = 새시드, startAmount = 새시드")
+    @DisplayName("update() holdings가 0이면 strategy_cycle과 cycle_position 시작점을 함께 갱신한다")
     void update_seed_change_with_no_holdings() {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("1000"), new BigDecimal("110"), null, 0, null, null);
@@ -194,33 +190,7 @@ class StrategyServiceTest {
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
 
         verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
-        verify(cyclePositionPort).save(argThat(p ->
-                p.strategyCycleId().equals(CYCLE_ID)
-                        && p.usdDeposit().compareTo(new BigDecimal("3000")) == 0
-                        && p.holdings() == 0
-                        && p.avgPrice() == null
-        ));
-    }
-
-    @Test
-    @DisplayName("update() 시드가 매입금액(M)보다 작으면 IllegalArgumentException 발생")
-    void update_seed_less_than_purchase_amount_throws() {
-        // 보유 10주 @ avgPrice 100 → M = 1000, newSeed=500 < M
-        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, null, null);
-
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
-        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(latest));
-
-        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
-                new UpdateStrategyCommand(null, new BigDecimal("500"))))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verify(cyclePositionPort, never()).save(any());
+        verify(cyclePositionPort).updateCycleStartSnapshot(STRATEGY_ID, new BigDecimal("3000"));
     }
 
     @Test

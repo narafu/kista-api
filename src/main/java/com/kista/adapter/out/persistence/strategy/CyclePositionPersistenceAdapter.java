@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -107,6 +108,17 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
                 .map(StrategyEntity::getTicker).orElse(null);
         return positionRepo.findByStrategyIdWithCursor(strategyId, from, cursor, PageRequest.of(0, limit))
                 .stream().map(e -> toEntry(e, ticker)).toList();
+    }
+
+    @Override
+    public void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit) {
+        CyclePositionEntity latest = cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
+                .flatMap(sc -> positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(
+                        sc.getId(), PageRequest.of(0, 1)).stream().findFirst())
+                .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
+
+        latest.setUsdDeposit(newDeposit);
+        positionRepo.save(latest);
     }
 
     @Override

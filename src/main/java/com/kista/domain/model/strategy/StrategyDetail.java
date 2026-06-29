@@ -8,5 +8,6 @@ public record StrategyDetail(
         BigDecimal initialUsdDeposit,
         Integer divisionCount,
         boolean isReverseMode,
-        Double currentRound    // INFINITE 전략만 non-null, 이력 없으면 null
+        Double currentRound,   // INFINITE 전략만 non-null, 이력 없으면 null
+        Integer currentHoldings // 최신 cycle_position 기준 보유 수량
 ) {}

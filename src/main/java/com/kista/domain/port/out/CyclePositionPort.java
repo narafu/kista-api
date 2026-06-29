@@ -3,6 +3,7 @@ package com.kista.domain.port.out;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,6 +41,9 @@ public interface CyclePositionPort {
     List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from, Instant cursor, int limit);
 
     List<CyclePositionHistoryEntry> findByStrategyIdWithCursor(UUID strategyId, Instant from, Instant cursor, int limit);
+
+    // holdings=0 시작점 시드 수정 — 최신 시작점 스냅샷 in-place 갱신
+    void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit);
 
     // 시드 수정 시 당일(KST) 기존 스냅샷 중복 제거
     void softDeleteTodayByStrategyId(UUID strategyId, LocalDate kstDate);

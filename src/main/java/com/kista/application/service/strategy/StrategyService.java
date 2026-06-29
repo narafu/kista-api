@@ -2,7 +2,6 @@ package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
-import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
@@ -72,7 +71,7 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false, 0.0);
+        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false, 0.0, 0);
     }
 
     @Override
@@ -169,7 +168,7 @@ class StrategyService implements StrategyUseCase {
         return kisUsdAmount.subtract(reserved);
     }
 
-    // 시드 수정: 새 시드를 총자산 B로 교체 — usdDeposit = newSeed - M (M = avgPrice * holdings)
+    // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
     private void updateSeed(UUID strategyId, BigDecimal newSeed) {
         if (newSeed.signum() <= 0) {
             throw new IllegalArgumentException("시드는 0보다 커야 합니다");
@@ -179,21 +178,13 @@ class StrategyService implements StrategyUseCase {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 
-        BigDecimal purchaseAmount = latest.holdings() == 0
-                ? BigDecimal.ZERO
-                : latest.avgPrice().multiply(BigDecimal.valueOf(latest.holdings()));
-        // 새 시드는 이미 매수한 금액보다 작을 수 없음 (현금 음수 방지)
-        if (newSeed.compareTo(purchaseAmount) < 0) {
-            throw new IllegalArgumentException("시드는 이미 매수한 금액보다 적을 수 없습니다");
+        if (latest.holdings() != 0) {
+            throw new IllegalArgumentException("보유 수량이 있는 사이클은 시드를 수정할 수 없습니다");
         }
-        BigDecimal newDeposit = newSeed.subtract(purchaseAmount);
 
-        // 당일(KST) 기존 스냅샷 소프트 삭제 후 새 스냅샷 저장 — 같은 날 중복 방지
-        cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now(TimeZones.KST));
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
-        cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
-                latest.closingPrice(), latest.avgPrice(), latest.holdings(), null, null));
-        log.info("시드 수정: strategyId={}, newSeed={}, newDeposit={}", strategyId, newSeed, newDeposit);
+        cyclePositionPort.updateCycleStartSnapshot(strategyId, newSeed);
+        log.info("시드 수정: strategyId={}, newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
     }
 
     // 현재 StrategyCycle의 startAmount를 묶고, 리버스모드는 cycle_position 최신 행에서 판단
@@ -205,7 +196,8 @@ class StrategyService implements StrategyUseCase {
                 .stream().findFirst();
         boolean isReverseMode = latestPos.map(CyclePosition::isReverseMode).orElse(false);
         Double currentRound = latestPos.map(pos -> calcCurrentRound(pos, strategy.divisionCount())).orElse(null);
-        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode, currentRound);
+        Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
+        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode, currentRound, currentHoldings);
     }
 
     // INFINITE 전략 회차 계산 — InfinitePosition.currentRound() 동일 로직, KIS 실시간 없이 DB 값만 사용

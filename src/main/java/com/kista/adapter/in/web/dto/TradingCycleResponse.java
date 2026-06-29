@@ -27,7 +27,9 @@ public record TradingCycleResponse(
         @Schema(description = "리버스모드 활성 여부 (소진 후 모드)", example = "false")
         boolean isReverseMode,
         @Schema(description = "현재 회차 (INFINITE 전략만, 이력 없으면 null)", example = "3.5")
-        Double currentRound
+        Double currentRound,
+        @Schema(description = "최신 포지션 보유 수량", example = "0")
+        Integer currentHoldings
 ) {
     public static TradingCycleResponse from(StrategyDetail detail) {
         Strategy c = detail.strategy();
@@ -38,7 +40,8 @@ public record TradingCycleResponse(
                 c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name(),
                 detail.divisionCount() != null ? detail.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
                 detail.isReverseMode(),
-                detail.currentRound()
+                detail.currentRound(),
+                detail.currentHoldings()
         );
     }
 }
