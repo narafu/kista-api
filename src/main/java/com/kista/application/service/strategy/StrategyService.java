@@ -1,7 +1,6 @@
 package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -31,7 +30,6 @@ class StrategyService implements StrategyUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
-    private final BrokerPriceRouter brokerPriceRouter;           // 등록 시점 현재가(종가) 조회 — 증권사 무관
     private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
     private final LoadUserSettingsPort loadUserSettingsPort;     // 잔고 검증 설정 조회 (user_settings)
 
@@ -68,15 +66,8 @@ class StrategyService implements StrategyUseCase {
         // 첫 번째 StrategyCycle 생성 — 사용자 직접 입력 시드
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.startFromUserInput(saved.id(), cmd.initialUsdDeposit()));
 
-        // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 종가는 등록 시점 현재가
-        BigDecimal currentPrice;
-        try {
-            currentPrice = brokerPriceRouter.getPrice(resolvedTicker, account);
-        } catch (Exception e) {
-            log.warn("현재가 조회 실패 — 전략 등록 중단: ticker={}, error={}", resolvedTicker.name(), e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
-        }
-        cyclePositionPort.save(CyclePosition.startSnapshot(cycle.id(), cmd.initialUsdDeposit(), currentPrice));
+        // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 실제 장마감 종가는 첫 매매 후 저장
+        cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
         return new StrategyDetail(saved, cycle.startAmount(), false);

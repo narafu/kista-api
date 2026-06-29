@@ -1,7 +1,6 @@
 package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
@@ -35,7 +34,6 @@ class StrategyServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
-    @Mock BrokerPriceRouter brokerPriceRouter;
     @Mock BrokerAdapterRegistry registry;
     @Mock MarginPort marginPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
@@ -335,14 +333,13 @@ class StrategyServiceTest {
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
-        when(brokerPriceRouter.getPrice(Strategy.Ticker.TQQQ, account)).thenReturn(new BigDecimal("50.00"));
-
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("500");
         verify(cyclePositionPort).save(argThat(p ->
                 p.strategyCycleId().equals(savedCycle.id())
-                        && p.usdDeposit().compareTo(new BigDecimal("500")) == 0));
+                        && p.usdDeposit().compareTo(new BigDecimal("500")) == 0
+                        && p.closingPrice() == null));
     }
 }

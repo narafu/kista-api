@@ -667,12 +667,12 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_firstDayBuyFails_doesNotEndCycle() throws InterruptedException {
-        // 0회차(holdings=0) 매수 실패 — 이전 포지션이 startSnapshot(holdings=0)이므로 사이클 종료가 아님
+        // 0회차(holdings=0) 매수 실패 — 이전 포지션이 initialSnapshot(holdings=0)이므로 사이클 종료가 아님
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(FRESH_HISTORY)); // holdings=0
-        // 이전 포지션도 holdings=0 (startSnapshot) — 진짜 청산 아님
+        // 이전 포지션도 holdings=0 (initialSnapshot) — 진짜 청산 아님
         when(cycleHistoryPort.findLatestByCycleId(eq(STRATEGY_CYCLE.id()), anyInt())).thenReturn(List.of(FRESH_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
         when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of());

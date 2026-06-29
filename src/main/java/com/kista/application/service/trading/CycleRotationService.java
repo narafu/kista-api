@@ -92,7 +92,7 @@ class CycleRotationService {
 
         // 새 StrategyCycle + 시작 스냅샷 생성 (시드 결정 방식 stamp)
         StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed, policy.seedResolvedBy()));
-        cyclePositionPort.save(CyclePosition.startSnapshot(newCycle.id(), targetSeed, price));
+        cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), targetSeed, price));
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
     }
