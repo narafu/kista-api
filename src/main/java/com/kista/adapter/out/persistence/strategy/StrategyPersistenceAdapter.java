@@ -1,6 +1,8 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.domain.port.out.StrategyInfiniteDetailPort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -92,7 +94,41 @@ class StrategyPersistenceAdapter implements StrategyPort {
         e.setStatus(s.status());
         e.setTicker(s.ticker());
         e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : Strategy.CycleSeedType.NONE);
-        e.setDivisionCount(e.getDivisionCount() > 0 ? e.getDivisionCount() : Strategy.DEFAULT_DIVISION_COUNT);
         return e;
+    }
+}
+
+@Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
+
+    private final StrategyInfiniteJpaRepository jpaRepository;
+
+    @Override
+    public Optional<StrategyInfiniteDetail> findByStrategyId(UUID strategyId) {
+        return jpaRepository.findById(strategyId).map(this::toDomain);
+    }
+
+    @Override
+    public StrategyInfiniteDetail save(StrategyInfiniteDetail detail) {
+        return toDomain(jpaRepository.save(toEntity(detail)));
+    }
+
+    @Override
+    public void deleteByStrategyId(UUID strategyId) {
+        jpaRepository.deleteByStrategyId(strategyId);
+    }
+
+    private StrategyInfiniteDetail toDomain(StrategyInfiniteEntity entity) {
+        return new StrategyInfiniteDetail(entity.getStrategyId(), entity.getDivisionCount());
+    }
+
+    private StrategyInfiniteEntity toEntity(StrategyInfiniteDetail detail) {
+        StrategyInfiniteEntity entity = detail.strategyId() != null
+                ? jpaRepository.findById(detail.strategyId()).orElseGet(StrategyInfiniteEntity::new)
+                : new StrategyInfiniteEntity();
+        entity.setStrategyId(detail.strategyId());
+        entity.setDivisionCount(detail.divisionCount());
+        return entity;
     }
 }

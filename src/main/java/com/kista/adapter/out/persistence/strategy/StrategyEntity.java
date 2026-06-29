@@ -44,9 +44,6 @@ class StrategyEntity extends BaseAuditEntity {
     @Column(name = "cycle_seed_type", nullable = false, length = 20)
     private Strategy.CycleSeedType cycleSeedType; // 사이클 종료 후 자동 재등록 정책
 
-    @Column(name = "division_count", nullable = false)
-    private int divisionCount; // 분할 수 (20/30/40)
-
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 }

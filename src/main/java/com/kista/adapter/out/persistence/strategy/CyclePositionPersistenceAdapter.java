@@ -2,8 +2,10 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.CyclePositionInfiniteDetail;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.port.out.CyclePositionInfiniteDetailPort;
 import com.kista.domain.port.out.CyclePositionPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -186,7 +189,49 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         e.setClosingPrice(p.closingPrice());
         e.setAvgPrice(p.avgPrice());
         e.setHoldings(p.holdings());
-        e.setReverseMode(p.isReverseMode());
         return e;
+    }
+}
+
+@Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfiniteDetailPort {
+
+    private final CyclePositionInfiniteJpaRepository jpaRepository;
+
+    @Override
+    public Optional<CyclePositionInfiniteDetail> findByCyclePositionId(UUID cyclePositionId) {
+        return jpaRepository.findById(cyclePositionId).map(this::toDomain);
+    }
+
+    @Override
+    public List<CyclePositionInfiniteDetail> findLatestByCycleId(UUID cycleId, int limit) {
+        return jpaRepository.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public CyclePositionInfiniteDetail save(CyclePositionInfiniteDetail detail) {
+        return toDomain(jpaRepository.save(toEntity(detail)));
+    }
+
+    @Override
+    public void deleteByStrategyId(UUID strategyId) {
+        jpaRepository.deleteByStrategyId(strategyId);
+    }
+
+    private CyclePositionInfiniteDetail toDomain(CyclePositionInfiniteEntity entity) {
+        return new CyclePositionInfiniteDetail(entity.getCyclePositionId(), entity.isReverseMode());
+    }
+
+    private CyclePositionInfiniteEntity toEntity(CyclePositionInfiniteDetail detail) {
+        CyclePositionInfiniteEntity entity = detail.cyclePositionId() != null
+                ? jpaRepository.findById(detail.cyclePositionId()).orElseGet(CyclePositionInfiniteEntity::new)
+                : new CyclePositionInfiniteEntity();
+        entity.setCyclePositionId(detail.cyclePositionId());
+        entity.setReverseMode(detail.isReverseMode());
+        return entity;
     }
 }
