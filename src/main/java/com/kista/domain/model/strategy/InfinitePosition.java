@@ -99,8 +99,8 @@ public record InfinitePosition(
     }
 
     public static int lateBuyQuantity(BigDecimal unitAmount, BigDecimal price) {
-        // 후반 매수: unitAmount / price
-        return unitAmount.divide(price, 0, FLOOR).intValue();
+        // 후반 매수: unitAmount / price — FLOOR 결과가 0이어도 최소 1주 보장
+        return Math.max(1, unitAmount.divide(price, 0, FLOOR).intValue());
     }
 
     public int calcEarlyBuyQuantityByAvgPrice() {

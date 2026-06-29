@@ -94,4 +94,12 @@ class InfinitePositionTest {
         int quantity2 = InfinitePosition.earlyBuyQuantity2(new BigDecimal("10"), new BigDecimal("100"), 1, new BigDecimal("200"));
         assertThat(quantity2).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("lateBuyQuantity: FLOOR 결과가 0이어도 최소 1주 보장")
+    void lateBuyQuantity_minimumOneShare() {
+        // unitAmount=10, price=100 → floor(0.1) = 0 → 최소 1
+        int quantity = InfinitePosition.lateBuyQuantity(new BigDecimal("10"), new BigDecimal("100"));
+        assertThat(quantity).isEqualTo(1);
+    }
 }

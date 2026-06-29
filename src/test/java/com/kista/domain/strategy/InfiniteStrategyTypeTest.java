@@ -99,6 +99,25 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("buildOrders 후반 소액 예수금: 1주 미만 계산이어도 LOC매수 1주 보장")
+    void buildOrders_backHalf_smallDeposit_guaranteesMinimumOneShare() {
+        // averagePrice=48.31, holdings=10, usdDeposit=455.90 → totalAssets=939.00, unitAmount=46.95, currentRound≈10.29 (후반)
+        // referencePrice=48.31, late buy qty=floor(46.95/48.31)=0 이어도 최소 1주
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("48.31"),
+                new BigDecimal("455.90"));
+        InfinitePosition position = new InfinitePosition(balance, Ticker.MAGX, new BigDecimal("48.00"), 20);
+
+        List<Order> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).hasSize(3);
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY
+                && o.quantity() == 1 && o.price().compareTo(new BigDecimal("48.31")) == 0);
+        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
+        assertThat(orders.get(2)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8
+                && o.price().compareTo(new BigDecimal("55.56")) == 0);
+    }
+
+    @Test
     @DisplayName("buildOrders 0회차 + 소액 예수금: unitAmount가 작아도 매수①② 각 1주 보장 = 2건")
     void buildOrders_zeroRound_smallDeposit_guaranteesMinimumOneShare() {
         // 0회차: averagePrice=prevClose=100, usdDeposit=20 → totalAssets=20, unitAmount=1.00
@@ -237,14 +256,19 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0: 매수+보정 모두 제외 = 빈 리스트")
-    void buildCappedBuyOrders_singleBuy_cappedQuantityZero_returnsEmpty() {
-        // cap=55, unitAmount=50(usdDeposit=1000) / qty = floor(50/55) = 0 → 매수 제외, 누적수량 0이므로 보정도 제외
+    @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0이어도 최소 1주+보정 3건")
+    void buildCappedBuyOrders_singleBuy_cappedQuantityZero_guaranteesMinimumOneShare() {
+        // cap=55, unitAmount=50(usdDeposit=1000) / qty = floor(50/55) = 0 이어도 최소 1주
         InfinitePosition position = positionWithUnitAmount("1000");
         List<Order> buyOrders = List.of(buy("200.00", 1));
 
         List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
-        assertThat(result).isEmpty();
+        assertThat(result).hasSize(4);
+        assertThat(result.getFirst().quantity()).isEqualTo(1);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
+        assertThat(result.get(1).price()).isEqualByComparingTo("25.00");
+        assertThat(result.get(2).price()).isEqualByComparingTo("16.67");
+        assertThat(result.get(3).price()).isEqualByComparingTo("12.50");
     }
 }
