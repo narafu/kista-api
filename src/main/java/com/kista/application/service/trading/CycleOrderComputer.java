@@ -4,6 +4,8 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.CyclePositionInfiniteDetailPort;
+import com.kista.domain.port.out.StrategyInfiniteDetailPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,8 @@ class CycleOrderComputer {
 
     private final CycleOrderStrategies cycleStrategies;   // 전략 타입별 주문 전략 라우터
     private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
+    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
+    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
@@ -38,13 +42,14 @@ class CycleOrderComputer {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
+        Integer divisionCount = resolveDivisionCount(strategy, currentCycle);
 
         // 오늘의 리버스모드 여부와 첫날 여부를 cycle_position 최근 2건으로 판단
         boolean isReverseMode = false;
         boolean isFirstReverseDay = false;
         BigDecimal starPointPrice = null;
         if (strategy.isInfinite() && currentCycle != null) {
-            List<CyclePosition> recent = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 2);
+            List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 2);
             isReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
             isFirstReverseDay = isReverseMode && (recent.size() < 2 || !recent.get(1).isReverseMode());
             // 별지점: 리버스모드 2일차+에서만 계산 (첫날은 MOC 즉시 청산이라 별지점 불필요)
@@ -55,7 +60,7 @@ class CycleOrderComputer {
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
+                balance, strategy, divisionCount, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
                 starPointPrice, isReverseMode, isFirstReverseDay));
 
         // 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
@@ -105,5 +110,19 @@ class CycleOrderComputer {
         List<Order> orders() {
             return plan != null ? plan.orders() : List.of();
         }
+    }
+
+    private Integer resolveDivisionCount(Strategy strategy, StrategyCycle currentCycle) {
+        if (!strategy.isInfinite()) {
+            return null;
+        }
+        if (currentCycle != null && currentCycle.strategyVersionId() != null) {
+            return strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
+                    .map(StrategyInfiniteDetail::divisionCount)
+                    .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+        }
+        return strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
+                .map(StrategyInfiniteDetail::divisionCount)
+                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
     }
 }

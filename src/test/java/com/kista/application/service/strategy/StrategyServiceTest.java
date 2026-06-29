@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,8 +32,11 @@ import static org.mockito.Mockito.*;
 class StrategyServiceTest {
 
     @Mock StrategyPort strategyPort;
+    @Mock StrategyVersionPort strategyVersionPort;
+    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock BrokerAdapterRegistry registry;
@@ -44,6 +48,7 @@ class StrategyServiceTest {
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID  = UUID.randomUUID();
     private static final UUID USER_ID     = UUID.randomUUID();
+    private static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     // ACTIVE 상태 전략 픽스처
     private static final Strategy ACTIVE_STRATEGY = new Strategy(
@@ -61,8 +66,32 @@ class StrategyServiceTest {
 
     // 현재 사이클 픽스처 (시작금액 1000)
     private static final StrategyCycle CYCLE = new StrategyCycle(
-            CYCLE_ID, STRATEGY_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null
+            CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null
     );
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
+                .thenAnswer(invocation -> Optional.of(new StrategyVersion(
+                        STRATEGY_VERSION_ID, invocation.getArgument(0), 1, null, null)));
+        lenient().when(strategyVersionPort.nextVersionNo(any())).thenReturn(1);
+        lenient().when(strategyVersionPort.save(any()))
+                .thenAnswer(invocation -> {
+                    StrategyVersion version = invocation.getArgument(0);
+                    return new StrategyVersion(
+                            version.id() != null ? version.id() : STRATEGY_VERSION_ID,
+                            version.strategyId(),
+                            version.versionNo(),
+                            version.createdAt(),
+                            version.deletedAt());
+                });
+        lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(any()))
+                .thenAnswer(invocation -> Optional.of(new StrategyInfiniteDetail(invocation.getArgument(0), 20)));
+        lenient().when(strategyInfiniteDetailPort.save(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(cyclePositionInfiniteDetailPort.findByCyclePositionId(any())).thenReturn(Optional.empty());
+        lenient().when(cyclePositionInfiniteDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     private Account ownerAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
@@ -79,7 +108,7 @@ class StrategyServiceTest {
     void tradingCycleResponse_usesDivisionCountFromDetail() {
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_ID, 20);
+        StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20);
         StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false, null, 0);
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
@@ -186,6 +215,7 @@ class StrategyServiceTest {
         when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(latest));
+        when(cyclePositionInfiniteDetailPort.findByCyclePositionId(latest.id())).thenReturn(Optional.empty());
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
 
@@ -303,8 +333,10 @@ class StrategyServiceTest {
         UUID newStrategyId = UUID.randomUUID();
         Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
-        StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId,
+        StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("500"), null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), savedCycle.id(),
+                new BigDecimal("500"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
@@ -315,6 +347,7 @@ class StrategyServiceTest {
         when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);

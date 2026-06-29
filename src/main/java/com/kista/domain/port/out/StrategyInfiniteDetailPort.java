@@ -7,7 +7,9 @@ import java.util.UUID;
 
 public interface StrategyInfiniteDetailPort {
 
-    Optional<StrategyInfiniteDetail> findByStrategyId(UUID strategyId);
+    Optional<StrategyInfiniteDetail> findByStrategyVersionId(UUID strategyVersionId);
+
+    Optional<StrategyInfiniteDetail> findActiveByStrategyId(UUID strategyId);
 
     StrategyInfiniteDetail save(StrategyInfiniteDetail detail);
 

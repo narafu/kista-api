@@ -46,6 +46,7 @@ public interface CycleOrderStrategy {
     record PlanContext(
             AccountBalance balance,
             Strategy strategy,
+            Integer divisionCount,         // INFINITE 전략 버전 상세값, PRIVACY는 null
             BigDecimal initialUsdDeposit,  // 현재 StrategyCycle.initialUsdDeposit (PRIVACY 전략 입력)
             BigDecimal prevClosePrice,     // 전일종가 (INFINITE 0회차 진입 방향 판단용, PRIVACY는 null)
             LocalDate tradeDate,

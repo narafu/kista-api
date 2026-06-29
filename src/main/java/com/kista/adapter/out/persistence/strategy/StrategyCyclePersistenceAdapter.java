@@ -66,7 +66,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     private StrategyCycle toDomain(StrategyCycleEntity e) {
         return new StrategyCycle(
-                e.getId(), e.getStrategyId(),
+                e.getId(), e.getStrategyId(), e.getStrategyVersionId(),
                 e.getStartAmount(), e.getEndAmount(), e.getStartDate(), e.getEndDate(),
                 e.getCreatedAt(), e.getDeletedAt()
         );
@@ -76,6 +76,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         StrategyCycleEntity e = new StrategyCycleEntity();
         e.setId(c.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setStrategyId(c.strategyId());
+        e.setStrategyVersionId(c.strategyVersionId());
         e.setStartAmount(c.startAmount());
         e.setEndAmount(c.endAmount());
         e.setStartDate(c.startDate());

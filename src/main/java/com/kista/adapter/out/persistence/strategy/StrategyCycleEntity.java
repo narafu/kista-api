@@ -30,6 +30,9 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
     @Column(name = "strategy_id", nullable = false, columnDefinition = "UUID")
     private UUID strategyId; // FK → strategy.id (ON DELETE CASCADE)
 
+    @Column(name = "strategy_version_id", nullable = false, columnDefinition = "UUID")
+    private UUID strategyVersionId; // FK → strategy_version.id (ON DELETE CASCADE)
+
     @Column(name = "start_amount", nullable = false, precision = 20, scale = 2)
     private BigDecimal startAmount; // 사이클 시작금액 (USD 시드)
 

@@ -13,6 +13,7 @@ import java.util.UUID;
 public record StrategyCycle(
         UUID id,                          // PK (null이면 @GeneratedValue)
         UUID strategyId,                  // FK → strategy.id
+        UUID strategyVersionId,           // FK → strategy_version.id
         BigDecimal startAmount,           // 사이클 시작금액 (USD 시드)
         BigDecimal endAmount,             // 사이클 종료금액 (청산 후 USD, 진행 중이면 null)
         LocalDate startDate,              // 사이클 시작일자 (KST)
@@ -20,7 +21,25 @@ public record StrategyCycle(
         Instant createdAt,                // 생성 시각 (null이면 DB DEFAULT)
         Instant deletedAt                 // soft-delete (null=활성)
 ) {
+    public StrategyCycle(
+            UUID id,
+            UUID strategyId,
+            BigDecimal startAmount,
+            BigDecimal endAmount,
+            LocalDate startDate,
+            LocalDate endDate,
+            Instant createdAt,
+            Instant deletedAt
+    ) {
+        this(id, strategyId, null, startAmount, endAmount, startDate, endDate, createdAt, deletedAt);
+    }
+
+    public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount) {
+        return new StrategyCycle(null, strategyId, strategyVersionId,
+                startAmount, null, LocalDate.now(TimeZones.KST), null, null, null);
+    }
+
     public static StrategyCycle start(UUID strategyId, BigDecimal startAmount) {
-        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(TimeZones.KST), null, null, null);
+        return start(strategyId, null, startAmount);
     }
 }

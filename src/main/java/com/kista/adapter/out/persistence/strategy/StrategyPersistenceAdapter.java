@@ -105,8 +105,13 @@ class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetail
     private final StrategyInfiniteJpaRepository jpaRepository;
 
     @Override
-    public Optional<StrategyInfiniteDetail> findByStrategyId(UUID strategyId) {
-        return jpaRepository.findById(strategyId).map(this::toDomain);
+    public Optional<StrategyInfiniteDetail> findByStrategyVersionId(UUID strategyVersionId) {
+        return jpaRepository.findById(strategyVersionId).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<StrategyInfiniteDetail> findActiveByStrategyId(UUID strategyId) {
+        return jpaRepository.findActiveByStrategyId(strategyId).map(this::toDomain);
     }
 
     @Override
@@ -116,18 +121,18 @@ class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetail
 
     @Override
     public void deleteByStrategyId(UUID strategyId) {
-        jpaRepository.deleteByStrategyId(strategyId);
+        jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }
 
     private StrategyInfiniteDetail toDomain(StrategyInfiniteEntity entity) {
-        return new StrategyInfiniteDetail(entity.getStrategyId(), entity.getDivisionCount());
+        return new StrategyInfiniteDetail(entity.getStrategyVersionId(), entity.getDivisionCount());
     }
 
     private StrategyInfiniteEntity toEntity(StrategyInfiniteDetail detail) {
-        StrategyInfiniteEntity entity = detail.strategyId() != null
-                ? jpaRepository.findById(detail.strategyId()).orElseGet(StrategyInfiniteEntity::new)
+        StrategyInfiniteEntity entity = detail.strategyVersionId() != null
+                ? jpaRepository.findById(detail.strategyVersionId()).orElseGet(StrategyInfiniteEntity::new)
                 : new StrategyInfiniteEntity();
-        entity.setStrategyId(detail.strategyId());
+        entity.setStrategyVersionId(detail.strategyVersionId());
         entity.setDivisionCount(detail.divisionCount());
         return entity;
     }

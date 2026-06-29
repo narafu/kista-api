@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +18,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import({
         StrategyPersistenceAdapter.class,
-        StrategyInfiniteDetailPersistenceAdapter.class
+        StrategyInfiniteDetailPersistenceAdapter.class,
+        StrategyVersionPersistenceAdapter.class
 })
 class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired StrategyPersistenceAdapter strategyAdapter;
     @Autowired StrategyInfiniteDetailPersistenceAdapter strategyInfiniteDetailAdapter;
+    @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
 
     private UUID userId;
     private UUID accountId;
@@ -49,27 +52,30 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         );
 
         Strategy saved = strategyAdapter.save(strategy);
-        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(saved.id(), 20));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 20));
 
         Integer strategyRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM strategy WHERE id = ?",
                 Integer.class,
                 saved.id());
         Integer detailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ? AND division_count = 20",
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND division_count = 20",
                 Integer.class,
-                saved.id());
+                version.id());
         Integer auditedRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ? AND created_at IS NOT NULL AND updated_at IS NOT NULL AND deleted_at IS NULL",
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND created_at IS NOT NULL AND updated_at IS NOT NULL AND deleted_at IS NULL",
                 Integer.class,
-                saved.id());
+                version.id());
 
         assertThat(saved.id()).isNotNull();
         assertThat(strategyRows).isEqualTo(1);
         assertThat(detailRows).isEqualTo(1);
         assertThat(auditedRows).isEqualTo(1);
-        assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id()))
-                .contains(new StrategyInfiniteDetail(saved.id(), 20));
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionId(version.id()))
+                .contains(new StrategyInfiniteDetail(version.id(), 20));
+        assertThat(strategyInfiniteDetailAdapter.findActiveByStrategyId(saved.id()))
+                .contains(new StrategyInfiniteDetail(version.id(), 20));
     }
 
     @Test
@@ -78,7 +84,8 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 null, accountId, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE
         ));
-        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(saved.id(), 30));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 30));
 
         strategyInfiniteDetailAdapter.deleteByStrategyId(saved.id());
 
@@ -87,13 +94,14 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 Integer.class,
                 saved.id());
         Integer detailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ?",
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ?",
                 Integer.class,
-                saved.id());
+                version.id());
 
         assertThat(strategyRows).isEqualTo(1);
         assertThat(detailRows).isZero();
-        assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id())).isEmpty();
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionId(version.id())).isEmpty();
+        assertThat(strategyInfiniteDetailAdapter.findActiveByStrategyId(saved.id())).isEmpty();
     }
 
     @Test
@@ -101,15 +109,15 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
-                WHERE table_name = 'strategy_infinite'
+                WHERE table_name = 'strategy_infinite_version'
                 ORDER BY ordinal_position
                 """, String.class))
-                .containsExactly("strategy_id", "division_count", "created_at", "updated_at", "deleted_at");
+                .containsExactly("strategy_version_id", "division_count", "created_at", "updated_at", "deleted_at");
 
         String migration = Files.readString(Path.of("src/main/resources/db/migration/V17__split_infinite_strategy_details.sql"));
 
-        assertThat(migration).contains("INSERT INTO strategy_infinite (strategy_id, division_count, created_at, updated_at, deleted_at)");
-        assertThat(migration).contains("WHERE type = 'INFINITE';");
-        assertThat(migration).doesNotContain("WHERE type = 'INFINITE' AND deleted_at IS NULL");
+        assertThat(migration).contains("INSERT INTO strategy_infinite_version (strategy_version_id, division_count, created_at, updated_at, deleted_at)");
+        assertThat(migration).contains("JOIN strategy_version sv ON sv.strategy_id = s.id");
+        assertThat(migration).contains("WHERE s.type = 'INFINITE';");
     }
 }

@@ -6,6 +6,8 @@ import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
@@ -39,6 +41,8 @@ class CycleRotationServiceTest {
     @Mock BrokerAdapterRegistry registry;
     @Mock MarginPort marginPort;
     @Mock StrategyPort strategyPort;
+    @Mock StrategyVersionPort strategyVersionPort;
+    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock NotifyPort notifyPort;
@@ -50,6 +54,7 @@ class CycleRotationServiceTest {
     CycleRotationService service;
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
+    static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
@@ -70,8 +75,12 @@ class CycleRotationServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        service = new CycleRotationService(registry, strategyPort, strategyCyclePort,
-                cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+        service = new CycleRotationService(registry, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
+                strategyCyclePort, cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+        lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
+                .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
+        lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any()))
+                .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
     }
 
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
@@ -82,7 +91,7 @@ class CycleRotationServiceTest {
 
     // 새 StrategyCycle stub 반환값 (save 후 id 포함)
     private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null);
+        return new StrategyCycle(UUID.randomUUID(), strategyId, STRATEGY_VERSION_ID, deposit, null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {
@@ -110,6 +119,7 @@ class CycleRotationServiceTest {
         verify(strategyCyclePort).save(cycleCaptor.capture());
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(deposit);
         assertThat(cycleCaptor.getValue().strategyId()).isEqualTo(strategy.id());
+        assertThat(cycleCaptor.getValue().strategyVersionId()).isEqualTo(STRATEGY_VERSION_ID);
 
         verify(cyclePositionPort).save(argThat(p ->
                 p.strategyCycleId().equals(newCycle.id())
@@ -162,6 +172,7 @@ class CycleRotationServiceTest {
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(cycleCaptor.capture());
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(maxSeedDeposit);
+        assertThat(cycleCaptor.getValue().strategyVersionId()).isEqualTo(STRATEGY_VERSION_ID);
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(maxSeedDeposit) == 0));
     }

@@ -40,6 +40,8 @@ class ManualTradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisPricePort kisPricePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
+    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock KisAccountPort kisAccountPort;
     @Mock TosAccountPort tosAccountPort;
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
@@ -58,8 +60,9 @@ class ManualTradingServiceTest {
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
+    static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
     static final StrategyCycle CYCLE = new StrategyCycle(
-            UUID.randomUUID(), STRATEGY.id(), new BigDecimal("1000.00"), null,
+            UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null,
             LocalDate.now(), null, null, null
     );
     static final User USER = new User(
@@ -84,7 +87,8 @@ class ManualTradingServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cyclePositionPort);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(
+                cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
         service = new ManualTradingService(
@@ -107,6 +111,11 @@ class ManualTradingServiceTest {
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
         lenient().when(cyclePositionPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(HISTORY));
         lenient().when(cyclePositionPort.findLatestByCycleId(eq(CYCLE.id()), anyInt())).thenReturn(List.of(HISTORY));
+        lenient().when(cyclePositionInfiniteDetailPort.findLatestByCycleId(eq(CYCLE.id()), anyInt())).thenReturn(List.of());
+        lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID))
+                .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
+        lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY.id()))
+                .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         lenient().when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(new BigDecimal("22.00"), new BigDecimal("20.00"))));
     }

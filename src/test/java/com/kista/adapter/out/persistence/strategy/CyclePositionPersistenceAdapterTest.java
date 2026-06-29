@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.CyclePositionInfiniteDetail;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import({
         StrategyPersistenceAdapter.class,
+        StrategyVersionPersistenceAdapter.class,
         StrategyCyclePersistenceAdapter.class,
         CyclePositionPersistenceAdapter.class,
         CyclePositionInfiniteDetailPersistenceAdapter.class
@@ -30,6 +32,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired StrategyPersistenceAdapter strategyAdapter;
+    @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
     @Autowired StrategyCyclePersistenceAdapter strategyCycleAdapter;
     @Autowired CyclePositionPersistenceAdapter cyclePositionAdapter;
     @Autowired CyclePositionInfiniteDetailPersistenceAdapter cyclePositionInfiniteDetailAdapter;
@@ -56,8 +59,9 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 null, accountId, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
         ));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
-                null, strategy.id(), new BigDecimal("1000.00"),
+                null, strategy.id(), version.id(), new BigDecimal("1000.00"),
                 null, LocalDate.now(), null, null, null
         ));
 
@@ -93,8 +97,9 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 null, accountId, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
         ));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
-                null, strategy.id(), new BigDecimal("1000.00"),
+                null, strategy.id(), version.id(), new BigDecimal("1000.00"),
                 null, LocalDate.now(), null, null, null
         ));
 

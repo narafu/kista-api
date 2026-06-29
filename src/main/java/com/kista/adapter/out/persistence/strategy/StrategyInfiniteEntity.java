@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "strategy_infinite")
+@Table(name = "strategy_infinite_version")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)
@@ -23,8 +23,8 @@ import java.util.UUID;
 class StrategyInfiniteEntity extends BaseAuditEntity {
 
     @Id
-    @Column(name = "strategy_id", nullable = false, columnDefinition = "UUID")
-    private UUID strategyId; // FK → strategy.id (ON DELETE CASCADE)
+    @Column(name = "strategy_version_id", nullable = false, columnDefinition = "UUID")
+    private UUID strategyVersionId; // FK → strategy_version.id (ON DELETE CASCADE)
 
     @Column(name = "division_count", nullable = false)
     private int divisionCount; // INFINITE 전략 분할 수 SSOT

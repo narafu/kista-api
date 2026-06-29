@@ -36,6 +36,8 @@ class TradingPreviewServiceTest {
     @Mock KisPricePort kisPricePort; // BrokerPriceRouter(KIS) 내부에서 사용
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CyclePositionPort cycleHistoryPort;
+    @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
+    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock OrderPort orderPort;
@@ -55,9 +57,10 @@ class TradingPreviewServiceTest {
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
+    static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+            UUID.randomUUID(), CYCLE.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
     static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
 
@@ -73,13 +76,17 @@ class TradingPreviewServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        CycleOrderComputer orderComputer = new CycleOrderComputer(cycleStrategies, cycleHistoryPort);
+        CycleOrderComputer orderComputer = new CycleOrderComputer(
+                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
         // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
         // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
         lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(cyclePositionInfiniteDetailPort.findLatestByCycleId(any(), anyInt())).thenReturn(List.of());
+        lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(any())).thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
+        lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any())).thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
     }
 
     @Test
@@ -127,7 +134,7 @@ class TradingPreviewServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
-        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -153,7 +160,7 @@ class TradingPreviewServiceTest {
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
-        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);

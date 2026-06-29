@@ -35,6 +35,8 @@ class TradingReporter {
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
     private final CyclePositionPort cyclePositionPort;
+    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
+    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
     private final LoadUserSettingsPort loadUserSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
@@ -80,7 +82,7 @@ class TradingReporter {
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
         boolean newReverseMode = false;
         if (strategy.isInfinite()) {
-            newReverseMode = computeNewReverseMode(currentCycle.id(), strategy, balance, price);
+            newReverseMode = computeNewReverseMode(currentCycle, strategy, balance, price);
         }
 
         // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
@@ -88,7 +90,10 @@ class TradingReporter {
         boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.get(0).holdings() > 0;
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        cyclePositionPort.save(position);
+        CyclePosition savedPosition = cyclePositionPort.save(position);
+        if (strategy.isInfinite()) {
+            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), newReverseMode));
+        }
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
@@ -104,17 +109,20 @@ class TradingReporter {
 
     // 체결 후 포지션 기반 리버스모드 상태 머신
     // 직전 행 is_reverse_mode → 진입/유지/종료 판정
-    private boolean computeNewReverseMode(java.util.UUID cycleId, Strategy strategy,
+    private boolean computeNewReverseMode(StrategyCycle currentCycle, Strategy strategy,
                                            AccountBalance balance, BigDecimal closingPrice) {
-        List<CyclePosition> recent = cyclePositionPort.findLatestByCycleId(cycleId, 1);
+        List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 1);
         boolean prevReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
+        int divisionCount = strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
+                .map(StrategyInfiniteDetail::divisionCount)
+                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
 
         if (prevReverseMode) {
             // 리버스모드 종료 조건: avgPrice × (1 - targetProfitRate) ≤ closingPrice
             if (closingPrice != null && balance.avgPrice() != null && balance.holdings() > 0) {
                 ReverseModePosition rp = new ReverseModePosition(
                         balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
-                        strategy.ticker(), strategy.divisionCount(), null, false);
+                        strategy.ticker(), divisionCount, null, false);
                 if (rp.shouldExitReverseMode(closingPrice, strategy.ticker().getTargetProfitRate())) {
                     log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
                             strategy.id(), closingPrice, balance.avgPrice());
@@ -126,7 +134,7 @@ class TradingReporter {
             // 일반모드 → 소진 감지: usdDeposit < unitAmount (isFinalRound)
             if (balance.holdings() > 0 && closingPrice != null) {
                 // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
-                InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, strategy.divisionCount());
+                InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, divisionCount);
                 if (ip.isFinalRound()) {
                     log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
                             strategy.id(), ip.unitAmount(), balance.usdDeposit());

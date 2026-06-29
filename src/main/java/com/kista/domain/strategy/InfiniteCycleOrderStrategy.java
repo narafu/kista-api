@@ -57,7 +57,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {
             throw new IllegalStateException("전일종가 조회 실패: " + ctx.strategy().ticker().name());
         }
-        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice(), ctx.strategy().divisionCount());
+        int divisionCount = ctx.divisionCount() != null ? ctx.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice(), divisionCount);
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
@@ -73,7 +74,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 ctx.balance().avgPrice(),
                 ctx.balance().usdDeposit(),
                 ctx.strategy().ticker(),
-                ctx.strategy().divisionCount(),
+                ctx.divisionCount() != null ? ctx.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
                 ctx.starPointPrice(),
                 ctx.isFirstReverseDay()
         );

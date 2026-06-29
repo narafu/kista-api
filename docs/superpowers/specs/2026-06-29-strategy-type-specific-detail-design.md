@@ -1,21 +1,22 @@
-# Strategy Type-Specific Detail Design
+# 전략 버전 기반 상세 테이블 설계
 
-## Scope
+## 범위
 
-Apply only the following schema/model split now:
+이번 변경에서는 기존 `strategy_infinite` 직접 분리안 대신, 전략 설정 버전 부모를 두는 구조로 재설계한다.
 
-- Move `strategy.division_count` to `strategy_infinite.division_count`
-- Move `cycle_position.is_reverse_mode` to `cycle_position_infinite.is_reverse_mode`
-- Remove `strategy_cycle.seed_resolved_by`
-- Keep VR strategy design out of scope for now
+- `strategy_version` 공통 부모 테이블 도입
+- `strategy_cycle.strategy_version_id` 도입
+- `strategy_infinite_version` 도입
+- `cycle_position_infinite` 유지
+- VR은 설계만 반영하고 이번 구현 범위에서는 스키마 예약 수준까지 검토
 
-## Goal
+## 목표
 
-Separate INFINITE-only fields from common strategy tables without introducing premature VR-specific structures.
+전략 설정값 이력과 사이클 실행 이력을 명확히 분리한다. 진행 중인 사이클은 시작 시점의 설정 버전에 고정되고, 전략 설정 변경은 다음 사이클부터 적용되도록 만든다.
 
-## Target Model
+## 목표 스키마
 
-### Common strategy root
+### 전략 루트
 
 `strategy`
 
@@ -26,36 +27,75 @@ Separate INFINITE-only fields from common strategy tables without introducing pr
 - `status`
 - `cycle_seed_type`
 
-### INFINITE strategy detail
+규칙:
 
-`strategy_infinite`
+- 사용자 입장에서 하나의 전략을 나타내는 루트다.
+- `status`, `cycle_seed_type`는 즉시 반영되는 공통 설정이다.
 
+### 전략 설정 버전 부모
+
+`strategy_version`
+
+- `id`
 - `strategy_id`
+- `version_no`
+- `created_at`
+- `deleted_at`
+
+규칙:
+
+- 한 전략의 설정 변경 이력을 표현하는 공통 부모다.
+- 같은 `strategy_id` 아래 활성 버전은 한 번에 1개만 존재해야 한다.
+- 설정 변경 시 기존 활성 버전은 종료되고 새 버전이 생성된다.
+
+### INFINITE 전략 설정 상세
+
+`strategy_infinite_version`
+
+- `strategy_version_id`
 - `division_count`
 
-Rules:
+규칙:
 
-- Exists only when `strategy.type = INFINITE`
-- One-to-one with `strategy`
-- `division_count` is no longer stored on the common strategy row
+- `strategy.type = INFINITE`인 버전에만 존재한다.
+- `strategy_version`과 1:1 관계다.
+- `division_count`는 공통 `strategy`가 아니라 버전 상세에서 관리한다.
 
-### Common cycle metadata
+### VR 전략 설정 상세
+
+`strategy_vr_version`
+
+- `strategy_version_id`
+- `interval_weeks`
+- `recurring_amount`
+- `band_width`
+
+규칙:
+
+- `strategy.type = VR`인 버전에만 존재한다.
+- `strategy_version`과 1:1 관계다.
+- `interval_weeks`, `recurring_amount`, `band_width`는 다음 사이클부터 반영된다.
+
+### 사이클 이력
 
 `strategy_cycle`
 
 - `id`
 - `strategy_id`
+- `strategy_version_id`
 - `start_amount`
 - `end_amount`
 - `start_date`
 - `end_date`
 
-Rules:
+규칙:
 
-- `seed_resolved_by` is removed
-- `strategy_cycle` keeps only type-agnostic cycle lifecycle data
+- 실제 실행된 사이클 이력을 저장한다.
+- 사이클 시작 시점의 `strategy_version_id`를 고정 저장한다.
+- 진행 중 설정 변경이 발생해도 이미 생성된 `strategy_cycle.strategy_version_id`는 바뀌지 않는다.
+- `start_amount`는 사이클 값이며, `holdings = 0`일 때만 수정 가능하다.
 
-### Common cycle position snapshot
+### 공통 포지션 스냅샷
 
 `cycle_position`
 
@@ -66,117 +106,150 @@ Rules:
 - `avg_price`
 - `holdings`
 
-Rules:
+규칙:
 
-- `cycle_position` keeps only type-agnostic position snapshot data
+- 전략 타입과 무관한 포지션 스냅샷 정보만 유지한다.
 
-### INFINITE position detail
+### INFINITE 포지션 상세
 
 `cycle_position_infinite`
 
 - `cycle_position_id`
 - `is_reverse_mode`
 
-Rules:
+규칙:
 
-- Exists only for INFINITE positions
-- One-to-one with `cycle_position`
+- INFINITE 전략 포지션일 때만 존재한다.
+- `cycle_position`과 1:1 관계를 가진다.
 
-## Domain Direction
+### VR 포지션 상세
 
-The current `Strategy` aggregate directly carries `divisionCount`, and `CyclePosition` directly carries `isReverseMode`.
-After this change, the domain should stop treating those as common fields.
+`cycle_position_vr`
 
-Recommended direction:
+- `cycle_position_id`
+- `value`
+- `gradient`
+- `pool_limit`
 
-- `Strategy` contains only common strategy fields
-- Add an INFINITE-specific detail model for `divisionCount`
-- `CyclePosition` contains only common position snapshot fields
-- Add an INFINITE-specific position detail model for `isReverseMode`
+규칙:
 
-This is a real type-specific detail split, not just a table split inside persistence.
+- VR 전략 포지션일 때만 존재한다.
+- 계산 결과 스냅샷을 저장한다.
 
-## Persistence Direction
+## 반영 정책
 
-Persistence must enforce these invariants:
+즉시 반영:
 
-- Saving an INFINITE strategy writes both `strategy` and `strategy_infinite`
-- Saving a non-INFINITE strategy writes only `strategy`
-- Saving an INFINITE cycle position writes both `cycle_position` and `cycle_position_infinite`
-- Saving a non-INFINITE cycle position writes only `cycle_position`
-- Reading an INFINITE strategy/position reconstructs common data plus INFINITE detail
+- `strategy.status`
+- `strategy.cycle_seed_type`
 
-## Migration Direction
+다음 사이클 반영:
 
-Add append-only Flyway migrations that:
+- `strategy_infinite_version.division_count`
+- `strategy_vr_version.recurring_amount`
+- `strategy_vr_version.band_width`
+- `strategy_vr_version.interval_weeks`
 
-1. Create `strategy_infinite`
-2. Backfill `strategy.division_count` into `strategy_infinite`
-3. Create `cycle_position_infinite`
-4. Backfill `cycle_position.is_reverse_mode` into `cycle_position_infinite`
-5. Drop `strategy.division_count`
-6. Drop `cycle_position.is_reverse_mode`
-7. Drop `strategy_cycle.seed_resolved_by`
+조건부 직접 수정:
 
-Migration design constraints:
+- `strategy_cycle.start_amount`
+- 단, 최신 포지션의 `holdings = 0`일 때만 허용
 
-- Preserve existing strategy and cycle position rows
-- Use named PK/FK constraints
-- Keep FK delete behavior explicit
-- Cross-check entity nullability and column order against Flyway SQL
+## 도메인 방향
 
-## Application Impact
+이번 변경 이후 도메인은 아래 방향을 따라야 한다.
 
-Expected impact areas:
+- `Strategy`는 루트 전략 필드만 가진다.
+- `StrategyVersion` 공통 부모 모델을 추가한다.
+- `StrategyInfiniteVersion` 상세 모델을 추가한다.
+- `StrategyCycle`은 `strategyVersionId`를 가진다.
+- `CyclePosition`은 공통 포지션 스냅샷만 가진다.
+- `CyclePositionInfiniteDetail`은 `isReverseMode`를 가진다.
 
-- Strategy registration and load paths
-- Trading calculation paths that currently read `strategy.divisionCount()`
-- Reporting paths that currently read `cycle_position.is_reverse_mode`
-- Cycle rotation logic affected by `seed_resolved_by` removal
-- API DTOs that currently expose common `divisionCount`
+즉, 전략 설정 이력과 사이클 실행 이력을 분리하는 것이 핵심이다.
 
-## Trade-Offs
+## 퍼시스턴스 방향
 
-### Chosen approach
+퍼시스턴스 계층은 아래 불변식을 보장해야 한다.
 
-Adopt a partial type-specific detail split for INFINITE only, while leaving VR for later.
+- 전략 등록 시 `strategy` 저장 후 활성 `strategy_version` 1개를 생성한다.
+- INFINITE 전략 등록 시 같은 버전에 `strategy_infinite_version`을 함께 저장한다.
+- 새 사이클 생성 시 현재 활성 `strategy_version.id`를 `strategy_cycle.strategy_version_id`에 저장한다.
+- 진행 중 사이클은 기존 `strategy_version_id`를 유지한다.
+- INFINITE 계산은 공통 `strategy`가 아니라 `strategy_cycle.strategy_version_id`에 연결된 `strategy_infinite_version.division_count`를 사용한다.
 
-Pros:
+## 마이그레이션 방향
 
-- Removes INFINITE-only fields from common tables now
-- Establishes the pattern for future strategy-specific detail tables
-- Avoids committing to VR schema before VR rules are stable
+기존 direct-detail 분리안 대신 아래 순서로 반영한다.
 
-Cons:
+1. `strategy_version` 테이블 생성
+2. 기존 `strategy` 행마다 현재 상태를 나타내는 초기 `strategy_version` 1건 생성
+3. `strategy_infinite_version` 테이블 생성
+4. 기존 INFINITE 전략의 `division_count`를 `strategy_version` 기준으로 백필
+5. `strategy_cycle.strategy_version_id` 컬럼 추가
+6. 기존 `strategy_cycle` 행을 `strategy_id` 기준 초기 버전에 연결해 백필
+7. `cycle_position_infinite` 테이블 생성 또는 기존 direct-detail 안을 버전 구조와 정합되게 조정
+8. 기존 `strategy.division_count`, `cycle_position.is_reverse_mode`, `strategy_cycle.seed_resolved_by` 제거
 
-- Requires domain and persistence refactoring, not just SQL changes
-- Adds one-to-one joins for INFINITE reads/writes
-- Introduces an asymmetry until another strategy detail table is added
+마이그레이션 제약:
 
-### Rejected alternatives
+- 기존 전략/사이클/포지션 데이터는 보존해야 한다.
+- soft-deleted 이력도 함께 백필해야 한다.
+- PK/FK 제약명은 명시적으로 부여한다.
+- FK의 삭제 동작은 명시적으로 선언한다.
+- Entity의 nullable, length, 컬럼 순서를 Flyway SQL과 반드시 교차 검증한다.
 
-Keep current schema:
+## 애플리케이션 영향 범위
 
-- Lowest cost
-- Leaves INFINITE-only fields in common tables
+영향이 예상되는 영역은 다음과 같다.
 
-Split only the tables but keep common domain fields:
+- 전략 등록 경로
+- 전략 상세 조회 경로
+- 사이클 생성/재생성 경로
+- 현재 `strategy.divisionCount()`를 직접 읽는 매매 계산 경로
+- 현재 `cycle_position.is_reverse_mode`를 직접 읽는 리포트/상태 계산 경로
+- 공통 `divisionCount`를 노출하던 API DTO
 
-- Avoids full domain redesign
-- Creates an awkward model where persistence is split but the aggregate still pretends the fields are common
+## 선택한 접근과 트레이드오프
 
-## Testing Direction
+### 선택안
 
-Add or update tests for:
+`strategy_version` 공통 부모 + 전략별 상세 버전 테이블 구조를 사용한다.
 
-- Strategy persistence round-trip for INFINITE and non-INFINITE strategies
-- Cycle position persistence round-trip for INFINITE and non-INFINITE positions
-- Migration backfill correctness
-- Trading/reporting behavior after INFINITE detail lookup
-- Removal of `seed_resolved_by` dependencies
+장점:
 
-## Non-Goals
+- 새 전략 타입 추가 시 `strategy_cycle` 스키마를 바꾸지 않아도 된다.
+- 과거 사이클과 당시 설정 버전이 FK로 명확히 연결된다.
+- JPA/Flyway/정규화와 가장 잘 맞는다.
 
-- No VR schema in this change
-- No redesign of cycle math or trading formulas
-- No new strategy capabilities beyond the INFINITE detail split
+단점:
+
+- direct-detail 분리보다 구조가 한 단계 더 무겁다.
+- 버전 생성 시 부모/상세를 함께 다뤄야 한다.
+
+### 제외한 대안
+
+`strategy_detail_type + strategy_detail_id` 폴리모픽 참조:
+
+- 확장성은 좋다.
+- DB FK 무결성을 직접 강제하기 어렵다.
+
+JSON 설정 컬럼 통합:
+
+- 테이블 수는 줄어든다.
+- DB 제약과 정규화가 약해지고 JPA 매핑 이후 분석/검증 쿼리가 불편해진다.
+
+## 테스트 방향
+
+다음 테스트를 추가하거나 수정한다.
+
+- `strategy_version` / `strategy_infinite_version` persistence round-trip 검증
+- `strategy_cycle.strategy_version_id` 백필 검증
+- INFINITE 계산이 `strategy_version` 기준 `division_count`를 읽는지 검증
+- 설정 변경 후 새 사이클만 새 버전을 쓰는지 검증
+- `holdings = 0`일 때만 `start_amount` 수정 허용 검증
+
+## 비목표
+
+- 이번 단계에서 VR 전체 비즈니스 로직 구현은 하지 않는다.
+- 매매 공식 자체를 재설계하지 않는다.

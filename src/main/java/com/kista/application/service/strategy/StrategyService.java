@@ -27,8 +27,11 @@ import java.util.UUID;
 class StrategyService implements StrategyUseCase {
 
     private final StrategyPort strategyPort;
+    private final StrategyVersionPort strategyVersionPort;
+    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
+    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
@@ -63,12 +66,21 @@ class StrategyService implements StrategyUseCase {
         int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
         Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType);
         Strategy saved = strategyPort.save(strategy);
+        StrategyVersion initialVersion = strategyVersionPort.save(
+                new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
+        );
+        if (saved.isInfinite()) {
+            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(initialVersion.id(), divisionCount));
+        }
 
         // 첫 번째 StrategyCycle 생성 — 사용자 직접 입력 시드
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), cmd.initialUsdDeposit()));
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), initialVersion.id(), cmd.initialUsdDeposit()));
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 실제 장마감 종가는 첫 매매 후 저장
-        cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
+        CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
+        if (saved.isInfinite()) {
+            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
+        }
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
         return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false, 0.0, 0);
@@ -191,13 +203,21 @@ class StrategyService implements StrategyUseCase {
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
-        // 리버스모드 SSOT = cycle_position.is_reverse_mode (strategy_cycle 아님)
+        Integer divisionCount = strategy.isInfinite()
+                ? strategyVersionPort.findActiveByStrategyId(strategy.id())
+                        .flatMap(version -> strategyInfiniteDetailPort.findByStrategyVersionId(version.id()))
+                        .map(StrategyInfiniteDetail::divisionCount)
+                        .orElse(Strategy.DEFAULT_DIVISION_COUNT)
+                : null;
         Optional<CyclePosition> latestPos = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
                 .stream().findFirst();
-        boolean isReverseMode = latestPos.map(CyclePosition::isReverseMode).orElse(false);
-        Double currentRound = latestPos.map(pos -> calcCurrentRound(pos, strategy.divisionCount())).orElse(null);
+        boolean isReverseMode = latestPos
+                .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
+                .map(CyclePositionInfiniteDetail::isReverseMode)
+                .orElse(false);
+        Double currentRound = latestPos.map(pos -> calcCurrentRound(pos, divisionCount)).orElse(null);
         Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
-        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode, currentRound, currentHoldings);
+        return new StrategyDetail(strategy, initialUsdDeposit, divisionCount, isReverseMode, currentRound, currentHoldings);
     }
 
     // INFINITE 전략 회차 계산 — InfinitePosition.currentRound() 동일 로직, KIS 실시간 없이 DB 값만 사용

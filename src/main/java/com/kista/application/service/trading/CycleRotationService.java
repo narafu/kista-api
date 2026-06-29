@@ -7,6 +7,8 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
@@ -29,6 +31,8 @@ class CycleRotationService {
 
     private final BrokerAdapterRegistry registry;               // USD 매수가능금액 조회 (MAX 재등록)
     private final StrategyPort strategyPort;                   // 전략 상태 갱신
+    private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
+    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;         // 새 StrategyCycle 생성
     private final CyclePositionPort cyclePositionPort;         // 새 시작 스냅샷 저장
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
@@ -82,7 +86,10 @@ class CycleRotationService {
         }
 
         // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임
-        BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, strategy.divisionCount());
+        int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
+                .map(StrategyInfiniteDetail::divisionCount)
+                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+        BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 재등록 취소 — 최소금액 미달: {} < {}", strategy.id(), targetSeed, minRequired);
             notifyPort.notifyInsufficientBalance(account,
@@ -91,7 +98,9 @@ class CycleRotationService {
         }
 
         // 새 StrategyCycle + 시작 스냅샷 생성 (시드 결정 방식 stamp)
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed));
+        StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
+                .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
+        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), activeVersion.id(), targetSeed));
         cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), targetSeed, price));
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
