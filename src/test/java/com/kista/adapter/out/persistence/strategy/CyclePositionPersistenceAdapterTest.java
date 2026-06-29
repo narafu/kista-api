@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -72,10 +74,15 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id = ? AND is_reverse_mode = true",
                 Integer.class,
                 saved.id());
+        Integer auditedRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id = ? AND created_at IS NOT NULL AND deleted_at IS NULL",
+                Integer.class,
+                saved.id());
 
         assertThat(saved.id()).isNotNull();
         assertThat(positionRows).isEqualTo(1);
         assertThat(detailRows).isEqualTo(1);
+        assertThat(auditedRows).isEqualTo(1);
         assertThat(cyclePositionInfiniteDetailAdapter.findByCyclePositionId(saved.id()))
                 .contains(new CyclePositionInfiniteDetail(saved.id(), true));
     }
@@ -123,5 +130,22 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
         assertThat(detailRows).isZero();
         assertThat(positionRows).isEqualTo(2);
+    }
+
+    @Test
+    void cyclePositionInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'cycle_position_infinite'
+                ORDER BY ordinal_position
+                """, String.class))
+                .containsExactly("cycle_position_id", "is_reverse_mode", "created_at", "deleted_at");
+
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V17__split_infinite_strategy_details.sql"));
+
+        assertThat(migration).contains("INSERT INTO cycle_position_infinite (cycle_position_id, is_reverse_mode, created_at, deleted_at)");
+        assertThat(migration).contains("SELECT id, is_reverse_mode, created_at, deleted_at");
+        assertThat(migration).doesNotContain("FROM cycle_position\nWHERE deleted_at IS NULL;");
     }
 }

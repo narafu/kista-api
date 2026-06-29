@@ -72,3 +72,9 @@
 
 ## Remaining Concern
 - The new DataJpa persistence tests could not be executed end-to-end because Gradle compiles the full test source set first, and the out-of-scope `StrategyServiceTest` constructor mismatch still blocks `compileTestJava`.
+
+## Task 2 Fix Pass 2
+- Updated `V17__split_infinite_strategy_details.sql` so both backfills now copy all historical rows, including soft-deleted `strategy` and `cycle_position` records, while also carrying over the source `created_at` / `updated_at` / `deleted_at` values.
+- Added audit/deleted columns to `strategy_infinite` and `cycle_position_infinite` in the same column-order convention used elsewhere in the project.
+- Updated `StrategyInfiniteEntity` to extend `BaseAuditEntity` with `deletedAt` and `CyclePositionInfiniteEntity` to extend `BaseCreatedAtEntity` with `deletedAt`, both guarded by `@SQLRestriction("deleted_at IS NULL")`.
+- Extended the persistence tests to assert the new detail-table audit columns exist, that saved detail rows receive audit timestamps, and that the V17 migration text no longer filters out soft-deleted history during backfill.

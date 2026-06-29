@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,10 +59,15 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ? AND division_count = 20",
                 Integer.class,
                 saved.id());
+        Integer auditedRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ? AND created_at IS NOT NULL AND updated_at IS NOT NULL AND deleted_at IS NULL",
+                Integer.class,
+                saved.id());
 
         assertThat(saved.id()).isNotNull();
         assertThat(strategyRows).isEqualTo(1);
         assertThat(detailRows).isEqualTo(1);
+        assertThat(auditedRows).isEqualTo(1);
         assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id()))
                 .contains(new StrategyInfiniteDetail(saved.id(), 20));
     }
@@ -87,5 +94,22 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(strategyRows).isEqualTo(1);
         assertThat(detailRows).isZero();
         assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id())).isEmpty();
+    }
+
+    @Test
+    void strategyInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'strategy_infinite'
+                ORDER BY ordinal_position
+                """, String.class))
+                .containsExactly("strategy_id", "division_count", "created_at", "updated_at", "deleted_at");
+
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V17__split_infinite_strategy_details.sql"));
+
+        assertThat(migration).contains("INSERT INTO strategy_infinite (strategy_id, division_count, created_at, updated_at, deleted_at)");
+        assertThat(migration).contains("WHERE type = 'INFINITE';");
+        assertThat(migration).doesNotContain("WHERE type = 'INFINITE' AND deleted_at IS NULL");
     }
 }
