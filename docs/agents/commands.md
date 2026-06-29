@@ -41,7 +41,7 @@ tail -f logs/kista-api.log
 
 ## 배포/인프라/외부 연동 런북
 
-저빈도 운영 작업 — 필요시 `docs/claude/docker-infra.md` 참고:
+저빈도 운영 작업 — 필요시 `docs/agents/docker-infra.md` 참고:
 - Fly.io 배포 모니터링/환경변수 설정
 - kista-ui 운영 로그 조회, kista-api↔kista-ui URL 변경 연동
 - kis-trade-mcp 재시작, .mcp.json 경로 이식성

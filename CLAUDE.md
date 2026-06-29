@@ -3,6 +3,8 @@
 한국투자증권(KIS) REST API를 통한 SOXL 분할매매 자동화 서비스.
 Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 
+이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
+
 ## 코드 철학
 
 - 반복 코드보다 재사용성·가독성·최신 문법을 우선
@@ -42,18 +44,19 @@ docker compose up -d postgres                               # DB만 기동
 - `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
 - 커밋 전 `git config user.name` / `git config user.email` 확인 — 올바른 author: `narafu <narafu@kakao.com>`
 
-@docs/claude/commands.md
-@docs/claude/architecture.md
-@docs/claude/constraints.md
-@docs/claude/testing.md
-@docs/claude/workflow.md
+@AGENTS.md
+@docs/agents/commands.md
+@docs/agents/architecture.md
+@docs/agents/constraints.md
+@docs/agents/testing.md
+@docs/agents/workflow.md
 
 ## 운영 도구
 
-- **API 운영 로그**: flyio-cli — `fly logs -a kista-api` (상세 명령어 → `docs/claude/docker-infra.md`)
-- **DB 작업**: supabase-cli — `supabase db query --linked` (상세 명령어 → `docs/claude/docker-infra.md`)
+- **API 운영 로그**: flyio-cli — `fly logs -a kista-api` (상세 명령어 → `docs/agents/docker-infra.md`)
+- **DB 작업**: supabase-cli — `supabase db query --linked` (상세 명령어 → `docs/agents/docker-infra.md`)
 
 ## 참고 문서 (필요시 Read)
-- KIS API 작업: `docs/claude/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
-- 토스증권 API 작업: `docs/claude/toss-api.md`
-- Docker/배포/인프라 작업: `docs/claude/docker-infra.md`
+- KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
+- 토스증권 API 작업: `docs/agents/toss-api.md`
+- Docker/배포/인프라 작업: `docs/agents/docker-infra.md`

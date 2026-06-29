@@ -1,4 +1,22 @@
-# Repository Guidelines
+# Agent Guidelines
+
+This file is the Codex entrypoint. Claude Code uses `CLAUDE.md`.
+Keep tool-specific behavior in the root entrypoint files and keep shared project knowledge under `docs/agents/`.
+
+## Shared Context
+
+Read the relevant shared documents before changing related code:
+
+- `docs/agents/commands.md`: common Gradle, Docker, local auth, and operations commands.
+- `docs/agents/architecture.md`: package map, hexagonal architecture rules, controller/service/adapter patterns.
+- `docs/agents/constraints.md`: project-specific implementation constraints and known failure modes.
+- `docs/agents/testing.md`: test patterns for WebMvc, Spring Boot, Mockito, integration tests, and security.
+- `docs/agents/workflow.md`: scheduler and trading execution flow.
+- `docs/agents/kis-api.md`: KIS adapter/API work.
+- `docs/agents/toss-api.md`: Toss adapter/API work.
+- `docs/agents/docker-infra.md`: Fly.io, Supabase, Docker, and deployment operations.
+
+Claude-specific agents, hooks, and skills remain under `.claude/`. Codex does not execute those hooks automatically, so after Java edits run `./gradlew compileJava` or the focused test command explicitly when practical.
 
 ## Project Structure & Module Organization
 
