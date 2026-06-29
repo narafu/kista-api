@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "file=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); [[ \"$file\" == *.java ]] && ./gradlew compileJava -q 2>&1 | tail -30 || true"
+            "command": "file=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); [[ \"$file\" == *.java ]] && ./gradlew compileJava -q >/dev/null 2>&1 || true"
           }
         ]
       }
