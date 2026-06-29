@@ -56,11 +56,11 @@ class ManualTradingServiceTest {
     );
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
     static final StrategyCycle CYCLE = new StrategyCycle(
             UUID.randomUUID(), STRATEGY.id(), new BigDecimal("1000.00"), null,
-            LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED
+            LocalDate.now(), null, null, null
     );
     static final User USER = new User(
             REQUESTER_ID, "kakao-1", "테스터", User.UserStatus.ACTIVE, User.UserRole.USER,
@@ -69,7 +69,7 @@ class ManualTradingServiceTest {
     // DB 잔고 이력 — cycle_position 기반 (TradingBalanceLoader가 읽음)
     static final CyclePosition HISTORY = new CyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),
-            new BigDecimal("20.00"), 10, false, null, null
+            new BigDecimal("20.00"), 10, null, null
     );
 
     @BeforeEach

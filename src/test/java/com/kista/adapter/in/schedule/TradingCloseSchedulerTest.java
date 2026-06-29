@@ -52,12 +52,12 @@ class TradingCloseSchedulerTest {
 
     private Strategy mockStrategy() {
         return new Strategy(CYCLE_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
     }
 
     private StrategyCycle mockStrategyCycle(UUID strategyId) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
-                null, LocalDate.now(), null, Instant.now(), null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+                null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private User mockUser() {
@@ -130,7 +130,7 @@ class TradingCloseSchedulerTest {
         UUID cycleId2 = UUID.randomUUID();
         UUID accountId2 = UUID.randomUUID();
         Strategy strategy2 = new Strategy(cycleId2, accountId2, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE, 20);
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
         StrategyCycle currentCycle2 = mockStrategyCycle(strategy2.id());
         Account account2 = new Account(accountId2, USER_ID, "계좌2",
                 "99999999", "key2", "secret2", null,

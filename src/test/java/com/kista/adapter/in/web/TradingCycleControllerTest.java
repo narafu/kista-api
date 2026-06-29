@@ -6,10 +6,12 @@ import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyDetail;
+import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.out.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -35,9 +37,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategySeedPreview;
-import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(TradingCycleController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -189,8 +188,8 @@ class TradingCycleControllerTest {
     @Test
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), false);
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), 20, false, null);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
@@ -225,8 +224,8 @@ class TradingCycleControllerTest {
                         com.kista.domain.model.strategy.Strategy.Type.INFINITE,
                         com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
                         com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
-                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE, 20),
-                new java.math.BigDecimal("1000"), false);
+                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE),
+                new java.math.BigDecimal("1000"), 20, false, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(mockAuth())))

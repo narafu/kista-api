@@ -2,84 +2,126 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.CyclePositionInfiniteDetail;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-class CyclePositionPersistenceAdapterTest {
+@Import({
+        StrategyPersistenceAdapter.class,
+        StrategyCyclePersistenceAdapter.class,
+        CyclePositionPersistenceAdapter.class,
+        CyclePositionInfiniteDetailPersistenceAdapter.class
+})
+class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
-    @Mock CyclePositionJpaRepository cyclePositionRepository;
-    @Mock StrategyCycleJpaRepository strategyCycleRepository;
-    @Mock StrategyJpaRepository strategyRepository;
-    @Mock CyclePositionInfiniteJpaRepository cyclePositionInfiniteRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired StrategyPersistenceAdapter strategyAdapter;
+    @Autowired StrategyCyclePersistenceAdapter strategyCycleAdapter;
+    @Autowired CyclePositionPersistenceAdapter cyclePositionAdapter;
+    @Autowired CyclePositionInfiniteDetailPersistenceAdapter cyclePositionInfiniteDetailAdapter;
 
-    private CyclePositionPersistenceAdapter cyclePositionAdapter;
-    private CyclePositionInfiniteDetailPersistenceAdapter cyclePositionInfiniteDetailAdapter;
-
-    private final UUID cycleId = UUID.randomUUID();
-    private final UUID cyclePositionId = UUID.randomUUID();
+    private UUID userId;
+    private UUID accountId;
 
     @BeforeEach
     void setUp() {
-        cyclePositionAdapter = new CyclePositionPersistenceAdapter(
-                cyclePositionRepository,
-                strategyCycleRepository,
-                strategyRepository
-        );
-        cyclePositionInfiniteDetailAdapter = new CyclePositionInfiniteDetailPersistenceAdapter(
-                cyclePositionInfiniteRepository
-        );
+        userId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                userId, "kakao_" + userId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
     }
 
     @Test
     void save_infinitePosition_persistsCommonAndDetailRows() {
-        CyclePosition position = CyclePosition.initialSnapshot(cycleId, new BigDecimal("1000.00"));
-        CyclePositionEntity savedPositionEntity = new CyclePositionEntity();
-        savedPositionEntity.setId(cyclePositionId);
-        savedPositionEntity.setStrategyCycleId(cycleId);
-        savedPositionEntity.setUsdDeposit(new BigDecimal("1000.00"));
-        savedPositionEntity.setHoldings(0);
-        when(cyclePositionRepository.save(any(CyclePositionEntity.class))).thenReturn(savedPositionEntity);
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
+                null, strategy.id(), new BigDecimal("1000.00"),
+                null, LocalDate.now(), null, null, null
+        ));
 
-        CyclePosition saved = cyclePositionAdapter.save(position);
-
-        CyclePositionInfiniteEntity savedDetailEntity = new CyclePositionInfiniteEntity();
-        savedDetailEntity.setCyclePositionId(cyclePositionId);
-        savedDetailEntity.setReverseMode(true);
-        when(cyclePositionInfiniteRepository.save(any(CyclePositionInfiniteEntity.class))).thenReturn(savedDetailEntity);
-        when(cyclePositionInfiniteRepository.findTopNByStrategyCycleIdOrderByCreatedAtDesc(eq(cycleId), any()))
-                .thenReturn(List.of(savedDetailEntity));
-
+        CyclePosition saved = cyclePositionAdapter.save(
+                CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00"))
+        );
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(saved.id(), true));
 
-        assertThat(saved.id()).isEqualTo(cyclePositionId);
-        assertThat(cyclePositionInfiniteDetailAdapter.findLatestByCycleId(cycleId, 1))
-                .extracting(CyclePositionInfiniteDetail::isReverseMode)
-                .containsExactly(true);
-        verify(cyclePositionRepository).save(any(CyclePositionEntity.class));
-        verify(cyclePositionInfiniteRepository).save(any(CyclePositionInfiniteEntity.class));
+        Integer positionRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cycle_position WHERE id = ?",
+                Integer.class,
+                saved.id());
+        Integer detailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id = ? AND is_reverse_mode = true",
+                Integer.class,
+                saved.id());
+
+        assertThat(saved.id()).isNotNull();
+        assertThat(positionRows).isEqualTo(1);
+        assertThat(detailRows).isEqualTo(1);
+        assertThat(cyclePositionInfiniteDetailAdapter.findByCyclePositionId(saved.id()))
+                .contains(new CyclePositionInfiniteDetail(saved.id(), true));
     }
 
     @Test
-    void deleteByStrategyId_delegatesToDetailRepository() {
-        UUID strategyId = UUID.randomUUID();
+    void findLatestByCycleId_andDeleteByStrategyId_followPersistedRows() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
+                null, strategy.id(), new BigDecimal("1000.00"),
+                null, LocalDate.now(), null, null, null
+        ));
 
-        cyclePositionInfiniteDetailAdapter.deleteByStrategyId(strategyId);
+        CyclePosition older = cyclePositionAdapter.save(
+                CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00"))
+        );
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(older.id(), false));
+        CyclePosition newer = cyclePositionAdapter.save(new CyclePosition(
+                null, cycle.id(), new BigDecimal("900.00"),
+                new BigDecimal("25.00"), new BigDecimal("24.00"), 5, null, null
+        ));
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(newer.id(), true));
 
-        verify(cyclePositionInfiniteRepository).deleteByStrategyId(eq(strategyId));
+        List<CyclePositionInfiniteDetail> latest = cyclePositionInfiniteDetailAdapter.findLatestByCycleId(cycle.id(), 2);
+
+        assertThat(latest)
+                .extracting(CyclePositionInfiniteDetail::cyclePositionId)
+                .containsExactly(newer.id(), older.id());
+        assertThat(latest)
+                .extracting(CyclePositionInfiniteDetail::isReverseMode)
+                .containsExactly(true, false);
+
+        cyclePositionInfiniteDetailAdapter.deleteByStrategyId(strategy.id());
+
+        Integer detailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id IN (?, ?)",
+                Integer.class,
+                older.id(), newer.id());
+        Integer positionRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cycle_position WHERE id IN (?, ?)",
+                Integer.class,
+                older.id(), newer.id());
+
+        assertThat(detailRows).isZero();
+        assertThat(positionRows).isEqualTo(2);
     }
 }

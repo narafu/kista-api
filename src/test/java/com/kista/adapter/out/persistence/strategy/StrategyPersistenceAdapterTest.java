@@ -2,66 +2,90 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-class StrategyPersistenceAdapterTest {
+@Import({
+        StrategyPersistenceAdapter.class,
+        StrategyInfiniteDetailPersistenceAdapter.class
+})
+class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
-    @Mock StrategyJpaRepository strategyRepository;
-    @Mock StrategyInfiniteJpaRepository strategyInfiniteRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired StrategyPersistenceAdapter strategyAdapter;
+    @Autowired StrategyInfiniteDetailPersistenceAdapter strategyInfiniteDetailAdapter;
 
-    private StrategyPersistenceAdapter strategyAdapter;
-    private StrategyInfiniteDetailPersistenceAdapter strategyInfiniteDetailAdapter;
-
-    private final UUID accountId = UUID.randomUUID();
-    private final UUID strategyId = UUID.randomUUID();
+    private UUID userId;
+    private UUID accountId;
 
     @BeforeEach
     void setUp() {
-        strategyAdapter = new StrategyPersistenceAdapter(strategyRepository);
-        strategyInfiniteDetailAdapter = new StrategyInfiniteDetailPersistenceAdapter(strategyInfiniteRepository);
+        userId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                userId, "kakao_" + userId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
     }
 
     @Test
     void save_infiniteStrategy_persistsCommonAndDetailRows() {
-        Strategy strategy = new Strategy(null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyEntity savedStrategyEntity = new StrategyEntity();
-        savedStrategyEntity.setId(strategyId);
-        savedStrategyEntity.setAccountId(accountId);
-        savedStrategyEntity.setType(Strategy.Type.INFINITE);
-        savedStrategyEntity.setStatus(Strategy.Status.ACTIVE);
-        savedStrategyEntity.setTicker(Strategy.Ticker.SOXL);
-        savedStrategyEntity.setCycleSeedType(Strategy.CycleSeedType.NONE);
-        when(strategyRepository.save(any(StrategyEntity.class))).thenReturn(savedStrategyEntity);
+        Strategy strategy = new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        );
 
         Strategy saved = strategyAdapter.save(strategy);
-
-        StrategyInfiniteEntity savedDetailEntity = new StrategyInfiniteEntity();
-        savedDetailEntity.setStrategyId(strategyId);
-        savedDetailEntity.setDivisionCount(20);
-        when(strategyInfiniteRepository.save(any(StrategyInfiniteEntity.class))).thenReturn(savedDetailEntity);
-        when(strategyInfiniteRepository.findById(strategyId)).thenReturn(Optional.of(savedDetailEntity));
-
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(saved.id(), 20));
 
-        assertThat(saved.id()).isEqualTo(strategyId);
+        Integer strategyRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy WHERE id = ?",
+                Integer.class,
+                saved.id());
+        Integer detailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ? AND division_count = 20",
+                Integer.class,
+                saved.id());
+
+        assertThat(saved.id()).isNotNull();
+        assertThat(strategyRows).isEqualTo(1);
+        assertThat(detailRows).isEqualTo(1);
         assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id()))
-                .map(StrategyInfiniteDetail::divisionCount)
-                .contains(20);
-        verify(strategyRepository).save(any(StrategyEntity.class));
-        verify(strategyInfiniteRepository).save(any(StrategyInfiniteEntity.class));
+                .contains(new StrategyInfiniteDetail(saved.id(), 20));
+    }
+
+    @Test
+    void deleteByStrategyId_removesInfiniteDetailRowOnly() {
+        Strategy saved = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE
+        ));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(saved.id(), 30));
+
+        strategyInfiniteDetailAdapter.deleteByStrategyId(saved.id());
+
+        Integer strategyRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy WHERE id = ?",
+                Integer.class,
+                saved.id());
+        Integer detailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite WHERE strategy_id = ?",
+                Integer.class,
+                saved.id());
+
+        assertThat(strategyRows).isEqualTo(1);
+        assertThat(detailRows).isZero();
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyId(saved.id())).isEmpty();
     }
 }

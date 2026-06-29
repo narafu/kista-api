@@ -53,18 +53,18 @@ class TradingPreviewServiceTest {
 
     static final Strategy CYCLE = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
     );
 
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+            UUID.randomUUID(), CYCLE.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
     static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
 
     static final CyclePosition NORMAL_HISTORY = new CyclePosition(
-            null, CYCLE_ID, new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, false, null, null);
+            null, CYCLE_ID, new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null);
     static final CyclePosition FRESH_HISTORY = new CyclePosition(
-            null, CYCLE_ID, new BigDecimal("1000.00"), null, null, 0, false, null, null);
+            null, CYCLE_ID, new BigDecimal("1000.00"), null, null, 0, null, null);
 
     @BeforeEach
     void setUp() {
@@ -125,9 +125,9 @@ class TradingPreviewServiceTest {
     void preview_returnsSkipNoPrivacyBase_whenPrivacyAndNoBase() {
         Strategy privacyCycle = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
-        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
@@ -146,14 +146,14 @@ class TradingPreviewServiceTest {
     void preview_returnsOrders_whenPrivacyAndBaseExists() {
         Strategy privacyCycle = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         PrivacyTradeBase base = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
         Order buyOrder = new Order(null, ACCOUNT.id(), null, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
 
-        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);

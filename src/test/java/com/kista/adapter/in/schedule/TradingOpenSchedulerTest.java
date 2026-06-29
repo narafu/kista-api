@@ -49,12 +49,12 @@ class TradingOpenSchedulerTest {
 
     private Strategy mockStrategy(UUID accountId, Strategy.Type type) {
         return new Strategy(UUID.randomUUID(), accountId, type,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE, 20);
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
     }
 
     private StrategyCycle mockCycle(UUID strategyId) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
-                null, LocalDate.now(), null, Instant.now(), null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+                null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private User mockUser() {
