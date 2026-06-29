@@ -80,7 +80,7 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_ID, 20);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false, null);
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
         assertThat(response.divisionCount()).isEqualTo(20);
