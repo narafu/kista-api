@@ -6,5 +6,6 @@ import java.math.BigDecimal;
 public record StrategyDetail(
         Strategy strategy,
         BigDecimal initialUsdDeposit,
+        Integer divisionCount,
         boolean isReverseMode
 ) {}

@@ -77,17 +77,17 @@ class CycleRotationServiceTest {
     // StrategyCycle — 현재 사이클 (MAINTAIN/MAX 시드 계산 기준)
     private StrategyCycle currentCycle(UUID strategyId, BigDecimal startAmount) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, startAmount,
-                null, LocalDate.now(), null, Instant.now(), null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+                null, LocalDate.now(), null, Instant.now(), null);
     }
 
     // 새 StrategyCycle stub 반환값 (save 후 id 포함)
     private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null, StrategyCycle.SeedResolvedBy.BROKER_VERIFIED);
+        return new StrategyCycle(UUID.randomUUID(), strategyId, deposit, null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {
         return new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, seedType, 20);
+                Strategy.Status.ACTIVE, Ticker.SOXL, seedType);
     }
 
 
@@ -150,7 +150,7 @@ class CycleRotationServiceTest {
         StrategyCycle newCycle = savedNewCycle(strategy.id(), maxSeedDeposit);
 
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
-        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, false, null, null);
+        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
 
         when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("2000.00"));

@@ -18,23 +18,9 @@ public record StrategyCycle(
         LocalDate startDate,              // 사이클 시작일자 (KST)
         LocalDate endDate,                // 사이클 종료일자 (KST, 진행 중이면 null)
         Instant createdAt,                // 생성 시각 (null이면 DB DEFAULT)
-        Instant deletedAt,                // soft-delete (null=활성)
-        SeedResolvedBy seedResolvedBy     // 시드 결정 방식 (audit용)
+        Instant deletedAt                 // soft-delete (null=활성)
 ) {
-    // 시드 결정 방식 — 운영 audit / 사일런트 PAUSE 원인 추적용
-    public enum SeedResolvedBy {
-        BROKER_VERIFIED, // 잔고검증 ON: KIS 실잔고 조회 후 결정
-        LEDGER_ONLY,     // 잔고검증 OFF: 내부 원장 기준 결정
-        USER_INPUT       // 전략 등록/수정 시 사용자 직접 입력
-    }
-
-    // 사이클 회전 시 사용 — seedResolvedBy 명시 필수
-    public static StrategyCycle start(UUID strategyId, BigDecimal startAmount, SeedResolvedBy seedResolvedBy) {
-        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(TimeZones.KST), null, null, null, seedResolvedBy);
-    }
-
-    // 최초 전략 등록 시 — 사용자 직접 입력
-    public static StrategyCycle startFromUserInput(UUID strategyId, BigDecimal startAmount) {
-        return start(strategyId, startAmount, SeedResolvedBy.USER_INPUT);
+    public static StrategyCycle start(UUID strategyId, BigDecimal startAmount) {
+        return new StrategyCycle(null, strategyId, startAmount, null, LocalDate.now(TimeZones.KST), null, null, null);
     }
 }
