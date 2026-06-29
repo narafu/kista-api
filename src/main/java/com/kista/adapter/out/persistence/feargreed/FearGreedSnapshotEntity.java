@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -30,7 +30,7 @@ class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
     private String source; // "CRYPTO" | "CNN"
 
     @Column(name = "snapshot_date", nullable = false)
-    private LocalDate snapshotDate;
+    private Instant snapshotDate;
 
     @Column(name = "value", nullable = false)
     private int value; // 0-100

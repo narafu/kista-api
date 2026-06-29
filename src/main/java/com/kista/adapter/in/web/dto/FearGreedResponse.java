@@ -10,7 +10,7 @@ public record FearGreedResponse(SourceView cnn, SourceView crypto) {
     // 소스별 현재값 + 추이 이력
     public record SourceView(Point current, List<Point> history) {}
 
-    // 단일 시점 — date(ISO), value(0~100), rating(enum 이름)
+    // 단일 시점 — date(ISO-8601 Instant), value(0~100), rating(enum 이름)
     public record Point(String date, int value, String rating) {}
 
     public static FearGreedResponse from(List<FearGreedSnapshot> cnn, List<FearGreedSnapshot> crypto) {

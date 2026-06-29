@@ -5,7 +5,7 @@ import com.kista.domain.port.out.FearGreedSnapshotPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 
 @Component
@@ -20,12 +20,7 @@ public class FearGreedSnapshotPersistenceAdapter implements FearGreedSnapshotPor
     }
 
     @Override
-    public boolean existsBySourceAndDate(String source, LocalDate date) {
-        return repository.existsBySourceAndSnapshotDate(source, date);
-    }
-
-    @Override
-    public List<FearGreedSnapshot> findBySourceSince(String source, LocalDate since) {
+    public List<FearGreedSnapshot> findBySourceSince(String source, Instant since) {
         return repository
                 .findBySourceAndSnapshotDateGreaterThanEqualOrderBySnapshotDateAsc(source, since)
                 .stream()

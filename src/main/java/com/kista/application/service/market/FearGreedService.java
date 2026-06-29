@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
+import java.time.Instant;
 
 @Slf4j
 @Service
@@ -24,34 +24,22 @@ class FearGreedService implements FetchFearGreedUseCase {
     private static final String SOURCE_CNN    = "CNN";
 
     @Override
-    public void fetchAndSave(LocalDate date) {
-        boolean cryptoExists = fearGreedSnapshotPort.existsBySourceAndDate(SOURCE_CRYPTO, date);
-        boolean cnnExists    = fearGreedSnapshotPort.existsBySourceAndDate(SOURCE_CNN, date);
-
-        if (cryptoExists && cnnExists) {
-            log.info("공포탐욕지수 이미 저장됨 — skip (date={})", date);
-            return;
-        }
-
+    public void fetchAndSave(Instant snapshotDate) {
         // CRYPTO와 CNN을 독립 처리 — 한쪽 실패가 다른쪽 저장을 롤백하지 않도록
-        if (!cryptoExists) {
-            try {
-                CryptoFearGreedPort.CryptoFearGreedData crypto = cryptoFearGreedPort.fetch();
-                fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CRYPTO, date, crypto.value(), crypto.rating()));
-                log.info("CRYPTO 공포탐욕지수 저장 (date={}, value={}, rating={})", date, crypto.value(), crypto.rating());
-            } catch (Exception e) {
-                log.error("CRYPTO 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
-            }
+        try {
+            CryptoFearGreedPort.CryptoFearGreedData crypto = cryptoFearGreedPort.fetch();
+            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CRYPTO, snapshotDate, crypto.value(), crypto.rating()));
+            log.info("CRYPTO 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, crypto.value(), crypto.rating());
+        } catch (Exception e) {
+            log.error("CRYPTO 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
         }
 
-        if (!cnnExists) {
-            try {
-                CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
-                fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, date, cnn.value(), cnn.rating()));
-                log.info("CNN 공포탐욕지수 저장 (date={}, value={}, rating={})", date, cnn.value(), cnn.rating());
-            } catch (Exception e) {
-                log.error("CNN 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
-            }
+        try {
+            CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
+            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, snapshotDate, cnn.value(), cnn.rating()));
+            log.info("CNN 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, cnn.value(), cnn.rating());
+        } catch (Exception e) {
+            log.error("CNN 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
         }
     }
 }

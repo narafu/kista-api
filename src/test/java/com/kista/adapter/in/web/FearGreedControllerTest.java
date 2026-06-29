@@ -19,7 +19,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -53,10 +53,10 @@ class FearGreedControllerTest {
     @Test
     void getFearGreed_returns_cnn_and_crypto_bundle() throws Exception {
         when(getFearGreedUseCase.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
-                new FearGreedSnapshot(null, "CNN", LocalDate.of(2026, 6, 21), 60, FearGreedRating.GREED, null),
-                new FearGreedSnapshot(null, "CNN", LocalDate.of(2026, 6, 22), 72, FearGreedRating.GREED, null)));
+                new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-21T00:00:00Z"), 60, FearGreedRating.GREED, null),
+                new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
         when(getFearGreedUseCase.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of(
-                new FearGreedSnapshot(null, "CRYPTO", LocalDate.of(2026, 6, 22), 30, FearGreedRating.FEAR, null)));
+                new FearGreedSnapshot(null, "CRYPTO", Instant.parse("2026-06-22T00:00:00Z"), 30, FearGreedRating.FEAR, null)));
 
         mockMvc.perform(get("/api/market/fear-greed")
                         .param("days", "90")
@@ -65,6 +65,7 @@ class FearGreedControllerTest {
                 .andExpect(jsonPath("$.cnn.current.value").value(72))
                 .andExpect(jsonPath("$.cnn.current.rating").value("GREED"))
                 .andExpect(jsonPath("$.cnn.history.length()").value(2))
+                .andExpect(jsonPath("$.cnn.history[0].date").value("2026-06-21T00:00:00Z"))
                 .andExpect(jsonPath("$.crypto.current.value").value(30));
     }
 
