@@ -59,18 +59,18 @@ class StrategyService implements StrategyUseCase {
             }
         }
 
-        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : 20;
-        Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType, divisionCount);
+        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType);
         Strategy saved = strategyPort.save(strategy);
 
         // 첫 번째 StrategyCycle 생성 — 사용자 직접 입력 시드
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.startFromUserInput(saved.id(), cmd.initialUsdDeposit()));
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), cmd.initialUsdDeposit()));
 
         // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 실제 장마감 종가는 첫 매매 후 저장
         cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount(), false);
+        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false);
     }
 
     @Override
@@ -190,7 +190,7 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.softDeleteTodayByStrategyId(strategyId, LocalDate.now(TimeZones.KST));
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.save(new CyclePosition(null, cycle.id(), newDeposit,
-                latest.closingPrice(), latest.avgPrice(), latest.holdings(), latest.isReverseMode(), null, null));
+                latest.closingPrice(), latest.avgPrice(), latest.holdings(), null, null));
         log.info("시드 수정: strategyId={}, newSeed={}, newDeposit={}", strategyId, newSeed, newDeposit);
     }
 
@@ -201,6 +201,6 @@ class StrategyService implements StrategyUseCase {
         // 리버스모드 SSOT = cycle_position.is_reverse_mode (strategy_cycle 아님)
         boolean isReverseMode = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
                 .stream().findFirst().map(CyclePosition::isReverseMode).orElse(false);
-        return new StrategyDetail(strategy, initialUsdDeposit, isReverseMode);
+        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode);
     }
 }

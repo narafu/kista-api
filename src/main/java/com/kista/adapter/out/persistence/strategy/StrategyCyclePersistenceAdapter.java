@@ -68,7 +68,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         return new StrategyCycle(
                 e.getId(), e.getStrategyId(),
                 e.getStartAmount(), e.getEndAmount(), e.getStartDate(), e.getEndDate(),
-                e.getCreatedAt(), e.getDeletedAt(), e.getSeedResolvedBy()
+                e.getCreatedAt(), e.getDeletedAt()
         );
     }
 
@@ -80,7 +80,6 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         e.setEndAmount(c.endAmount());
         e.setStartDate(c.startDate());
         e.setEndDate(c.endDate());
-        e.setSeedResolvedBy(c.seedResolvedBy());
         return e;
     }
 }

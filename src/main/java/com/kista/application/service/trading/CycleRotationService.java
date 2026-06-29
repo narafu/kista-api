@@ -91,7 +91,7 @@ class CycleRotationService {
         }
 
         // 새 StrategyCycle + 시작 스냅샷 생성 (시드 결정 방식 stamp)
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed, policy.seedResolvedBy()));
+        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), targetSeed));
         cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), targetSeed, price));
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
@@ -108,8 +108,6 @@ class CycleRotationService {
                 public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
                     return Optional.of(s.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed);
                 }
-                @Override
-                public StrategyCycle.SeedResolvedBy seedResolvedBy() { return StrategyCycle.SeedResolvedBy.LEDGER_ONLY; }
             };
         }
         // ON: 증권사 실잔고 조회
@@ -118,8 +116,6 @@ class CycleRotationService {
             public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
                 return Optional.ofNullable(fetchUsdBalance(s, account));
             }
-            @Override
-            public StrategyCycle.SeedResolvedBy seedResolvedBy() { return StrategyCycle.SeedResolvedBy.BROKER_VERIFIED; }
         };
     }
 

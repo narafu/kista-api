@@ -78,19 +78,21 @@ class StrategyPersistenceAdapter implements StrategyPort {
     private Strategy toDomain(StrategyEntity e) {
         return new Strategy(
                 e.getId(), e.getAccountId(), e.getType(), e.getStatus(),
-                e.getTicker(), e.getCycleSeedType(), e.getDivisionCount()
+                e.getTicker(), e.getCycleSeedType()
         );
     }
 
     private StrategyEntity toEntity(Strategy s) {
-        StrategyEntity e = new StrategyEntity();
+        StrategyEntity e = s.id() != null
+                ? jpaRepository.findById(s.id()).orElseGet(StrategyEntity::new)
+                : new StrategyEntity();
         e.setId(s.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setAccountId(s.accountId());
         e.setType(s.type());
         e.setStatus(s.status());
         e.setTicker(s.ticker());
         e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : Strategy.CycleSeedType.NONE);
-        e.setDivisionCount(s.divisionCount() > 0 ? s.divisionCount() : 20);
+        e.setDivisionCount(e.getDivisionCount() > 0 ? e.getDivisionCount() : Strategy.DEFAULT_DIVISION_COUNT);
         return e;
     }
 }

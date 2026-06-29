@@ -87,7 +87,7 @@ class TradingReporter {
         List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
         boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.get(0).holdings() > 0;
 
-        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price, newReverseMode);
+        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         cyclePositionPort.save(position);
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 

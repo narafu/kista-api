@@ -1,6 +1,7 @@
 package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
@@ -75,14 +76,14 @@ class StrategyServiceTest {
     }
 
     @Test
-    void toDetail_infiniteStrategy_returnsDivisionCountFromDetail() {
+    void tradingCycleResponse_usesDivisionCountFromDetail() {
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_ID, 20);
-
         StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false);
+        TradingCycleResponse response = TradingCycleResponse.from(detail);
 
-        assertThat(detail.divisionCount()).isEqualTo(20);
+        assertThat(response.divisionCount()).isEqualTo(20);
     }
 
     @Test
@@ -325,7 +326,7 @@ class StrategyServiceTest {
     void register_uniqueTickerWithinFreeCash_succeeds() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 500 == 500 → 허용
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 20);
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 40);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
@@ -348,6 +349,7 @@ class StrategyServiceTest {
 
         assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("500");
+        assertThat(result.divisionCount()).isEqualTo(40);
         verify(cyclePositionPort).save(argThat(p ->
                 p.strategyCycleId().equals(savedCycle.id())
                         && p.usdDeposit().compareTo(new BigDecimal("500")) == 0

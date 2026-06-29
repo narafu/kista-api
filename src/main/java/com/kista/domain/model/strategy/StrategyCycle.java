@@ -9,7 +9,7 @@ import java.util.UUID;
 
 // 전략 안의 매매 한 라운드 — 매수 시작에서 holdings=0 청산까지
 // 여러 StrategyCycle이 동일 Strategy에 누적됨 (사이클 이력 추적 가능)
-// 리버스모드 여부는 strategy_cycle이 아닌 cycle_position.is_reverse_mode가 SSOT
+// 리버스모드 여부는 공통 strategy_cycle이 아닌 INFINITE 상세 모델이 SSOT
 public record StrategyCycle(
         UUID id,                          // PK (null이면 @GeneratedValue)
         UUID strategyId,                  // FK → strategy.id

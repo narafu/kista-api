@@ -34,7 +34,7 @@ public record TradingCycleResponse(
                 c.type().name(), c.status().name(),
                 c.ticker().name(), detail.initialUsdDeposit(),
                 c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name(),
-                c.divisionCount(),
+                detail.divisionCount() != null ? detail.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
                 detail.isReverseMode()
         );
     }
