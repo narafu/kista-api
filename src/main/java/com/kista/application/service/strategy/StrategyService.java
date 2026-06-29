@@ -15,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -70,7 +72,7 @@ class StrategyService implements StrategyUseCase {
         cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false);
+        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false, 0.0);
     }
 
     @Override
@@ -199,8 +201,21 @@ class StrategyService implements StrategyUseCase {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
         // 리버스모드 SSOT = cycle_position.is_reverse_mode (strategy_cycle 아님)
-        boolean isReverseMode = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
-                .stream().findFirst().map(CyclePosition::isReverseMode).orElse(false);
-        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode);
+        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
+                .stream().findFirst();
+        boolean isReverseMode = latestPos.map(CyclePosition::isReverseMode).orElse(false);
+        Double currentRound = latestPos.map(pos -> calcCurrentRound(pos, strategy.divisionCount())).orElse(null);
+        return new StrategyDetail(strategy, initialUsdDeposit, strategy.divisionCount(), isReverseMode, currentRound);
+    }
+
+    // INFINITE 전략 회차 계산 — InfinitePosition.currentRound() 동일 로직, KIS 실시간 없이 DB 값만 사용
+    private Double calcCurrentRound(CyclePosition pos, Integer divisionCount) {
+        if (divisionCount == null || divisionCount == 0 || pos.holdings() == 0 || pos.avgPrice() == null) {
+            return 0.0;
+        }
+        BigDecimal purchaseAmount = pos.avgPrice().multiply(BigDecimal.valueOf(pos.holdings()));
+        BigDecimal unitAmount = pos.usdDeposit().add(purchaseAmount)
+                .divide(BigDecimal.valueOf(divisionCount), 2, RoundingMode.HALF_UP);
+        return purchaseAmount.divide(unitAmount, 2, RoundingMode.HALF_UP).doubleValue();
     }
 }

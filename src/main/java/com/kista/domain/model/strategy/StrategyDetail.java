@@ -7,5 +7,6 @@ public record StrategyDetail(
         Strategy strategy,
         BigDecimal initialUsdDeposit,
         Integer divisionCount,
-        boolean isReverseMode
+        boolean isReverseMode,
+        Double currentRound    // INFINITE 전략만 non-null, 이력 없으면 null
 ) {}
