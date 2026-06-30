@@ -38,6 +38,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Create test database
+        run: psql -h localhost -U kista -d kistadb -c "CREATE DATABASE kistadb_test OWNER kista;"
+        env:
+          PGPASSWORD: kista
+
       - name: Run tests
         run: ./gradlew test
         env:
