@@ -53,11 +53,6 @@ public record Strategy(
         return status == Status.PAUSED;
     }
 
-    // Task 1 전환 단계: INFINITE 상세 퍼시스턴스 도입 전까지 기본 분할 수만 노출
-    public int divisionCount() {
-        return DEFAULT_DIVISION_COUNT;
-    }
-
     @Getter
     @RequiredArgsConstructor
     public enum Type {

@@ -31,9 +31,4 @@ public record CyclePosition(
         return new CyclePosition(null, strategyCycleId,
                 balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
     }
-
-    // Task 1 전환 단계: INFINITE 상세 퍼시스턴스 도입 전까지 공통 모델에서는 false로 본다
-    public boolean isReverseMode() {
-        return false;
-    }
 }

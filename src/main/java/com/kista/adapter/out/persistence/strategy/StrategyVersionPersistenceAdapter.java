@@ -28,7 +28,7 @@ class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
 
     @Override
     public Optional<StrategyVersion> findActiveByStrategyId(UUID strategyId) {
-        return jpaRepository.findTop1ByStrategyIdOrderByVersionNoDesc(strategyId)
+        return jpaRepository.findTop1ByStrategyIdAndDeletedAtIsNullOrderByVersionNoDesc(strategyId)
                 .map(this::toDomain);
     }
 

@@ -22,13 +22,16 @@
 
 ### Account ↔ Strategy 분리
 - `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
-- `Strategy` record 필드 7개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType), divisionCount(int)`
-- `StrategyCycle` record 필드 9개: `id, strategyId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt, seedResolvedBy` — 사이클 단위 메타(시드/기간)
-- `CyclePosition` record 필드 9개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, isReverseMode(boolean), createdAt, deletedAt` — 체결마다 append되는 포지션 스냅샷
-- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, boolean isReverseMode` — 최신 `StrategyCycle.startAmount`를 묶어 응답 조립 (`StrategyService.toDetail()`)
+- `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
+- `StrategyVersion` record 필드 5개: `id, strategyId, versionNo, createdAt, deletedAt` — 전략 설정 이력 부모
+- `StrategyInfiniteDetail` record 필드 2개: `strategyVersionId, divisionCount`
+- `StrategyCycle` record 필드 9개: `id, strategyId, strategyVersionId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 실행된 사이클과 적용 버전 고정값
+- `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 공통 포지션 스냅샷
+- `CyclePositionInfiniteDetail` record 필드 2개: `cyclePositionId, isReverseMode`
+- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, Integer divisionCount, boolean isReverseMode, Double currentRound, Integer currentHoldings` — 최신 사이클/활성 버전/최신 포지션을 합쳐 응답 조립 (`StrategyService.toDetail()`)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
-- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 시드 수정 시 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
+- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
 
 ### 잔고검증 토글 (UserSettings.balanceCheckEnabled)

@@ -11,7 +11,7 @@ import java.util.UUID;
 
 interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEntity, UUID> {
 
-    Optional<StrategyVersionEntity> findTop1ByStrategyIdOrderByVersionNoDesc(UUID strategyId);
+    Optional<StrategyVersionEntity> findTop1ByStrategyIdAndDeletedAtIsNullOrderByVersionNoDesc(UUID strategyId);
 
     @Query("""
             SELECT COALESCE(MAX(sv.versionNo), 0)

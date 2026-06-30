@@ -122,19 +122,20 @@
 - INFINITE 전략 포지션일 때만 존재한다.
 - `cycle_position`과 1:1 관계를 가진다.
 
-### VR 포지션 상세
+### VR 사이클 상세
 
-`cycle_position_vr`
+`strategy_cycle_vr`
 
-- `cycle_position_id`
+- `strategy_cycle_id`
 - `value`
 - `gradient`
 - `pool_limit`
 
 규칙:
 
-- VR 전략 포지션일 때만 존재한다.
-- 계산 결과 스냅샷을 저장한다.
+- VR 전략 사이클일 때만 존재한다.
+- `strategy_cycle`과 1:1 관계를 가진다.
+- `value`, `gradient`, `pool_limit`는 포지션 단위가 아니라 사이클 단위 계산 결과다.
 
 ## 반영 정책
 
@@ -206,7 +207,7 @@
 - 전략 등록 경로
 - 전략 상세 조회 경로
 - 사이클 생성/재생성 경로
-- 현재 `strategy.divisionCount()`를 직접 읽는 매매 계산 경로
+- 현재 공통 `Strategy` 기본값에 기대는 INFINITE 분할 계산 경로
 - 현재 `cycle_position.is_reverse_mode`를 직접 읽는 리포트/상태 계산 경로
 - 공통 `divisionCount`를 노출하던 API DTO
 
