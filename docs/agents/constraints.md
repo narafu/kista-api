@@ -1,5 +1,8 @@
 ## 핵심 제약 사항
 
+### Git 규칙
+- 커밋 메시지는 한글로 작성한다.
+
 ### domain/port/out/ 네이밍 규칙
 - 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `StrategyPort`)
 - Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
