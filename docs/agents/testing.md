@@ -42,7 +42,7 @@
 
 ### 테스트 DB
 
-통합 테스트는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).
+`application-test.yml` 기준 테스트 DB는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. `DataJpaTestBase`를 상속한 persistence 테스트도 Testcontainers가 아니라 `localhost:5432/kistadb_test`에 직접 연결된다. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).
 
 ```bash
 docker-compose up -d postgres   # 테스트 전 postgres 기동 필수

@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
 import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
     @Autowired StrategyPersistenceAdapter strategyAdapter;
     @Autowired StrategyInfiniteDetailPersistenceAdapter strategyInfiniteDetailAdapter;
     @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
@@ -40,8 +42,8 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
     @Test
@@ -54,6 +56,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         Strategy saved = strategyAdapter.save(strategy);
         StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 20));
+        entityManager.flush();
 
         Integer strategyRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM strategy WHERE id = ?",
@@ -88,18 +91,25 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 30));
 
         strategyInfiniteDetailAdapter.deleteByStrategyId(saved.id());
+        entityManager.flush();
+        entityManager.clear();
 
         Integer strategyRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM strategy WHERE id = ?",
                 Integer.class,
                 saved.id());
-        Integer detailRows = jdbcTemplate.queryForObject(
+        Integer activeDetailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND deleted_at IS NULL",
+                Integer.class,
+                version.id());
+        Integer totalDetailRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ?",
                 Integer.class,
                 version.id());
 
         assertThat(strategyRows).isEqualTo(1);
-        assertThat(detailRows).isZero();
+        assertThat(activeDetailRows).isZero();
+        assertThat(totalDetailRows).isEqualTo(1);
         assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionId(version.id())).isEmpty();
         assertThat(strategyInfiniteDetailAdapter.findActiveByStrategyId(saved.id())).isEmpty();
     }

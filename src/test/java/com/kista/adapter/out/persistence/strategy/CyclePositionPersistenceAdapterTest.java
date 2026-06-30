@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
     @Autowired StrategyPersistenceAdapter strategyAdapter;
     @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
     @Autowired StrategyCyclePersistenceAdapter strategyCycleAdapter;
@@ -49,8 +51,8 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
     @Test
@@ -69,6 +71,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00"))
         );
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(saved.id(), true));
+        entityManager.flush();
 
         Integer positionRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cycle_position WHERE id = ?",
