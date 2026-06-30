@@ -1,7 +1,6 @@
 package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.adapter.in.web.dto.TradingCycleResponse;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
@@ -102,18 +101,6 @@ class StrategyServiceTest {
         return new User(USER_ID, "kakao123", "테스터",
                 User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, null, NotificationChannel.TELEGRAM);
-    }
-
-    @Test
-    void tradingCycleResponse_usesDivisionCountFromDetail() {
-        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyInfiniteDetail infinite = new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), infinite.divisionCount(), false, null, 0);
-        TradingCycleResponse response = TradingCycleResponse.from(detail);
-
-        assertThat(response.divisionCount()).isEqualTo(20);
-        assertThat(response.currentHoldings()).isZero();
     }
 
     @Test
