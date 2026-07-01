@@ -38,6 +38,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDesc(LocalDate from, LocalDate to);
 
     // 계좌·날짜 기준 PLANNED BUY 합계 (수동 실행 예수금 체크용)
+    // 주의: 'PLANNED'/'BUY'는 Order.OrderStatus/OrderDirection enum name() 값 — enum 이름 변경 시 이 쿼리도 수정 필요
     @Query(value = """
             SELECT COALESCE(SUM(price * quantity), 0)
             FROM orders

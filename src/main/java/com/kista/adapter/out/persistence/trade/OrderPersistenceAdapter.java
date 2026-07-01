@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
@@ -52,11 +53,10 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     public void markPlaced(UUID orderId, String externalOrderId) {
         // 명시적 save로 dirty checking 의존 없이 PLACED + externalOrderId 기록
-        OrderEntity e = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
-        e.setStatus(Order.OrderStatus.PLACED);
-        e.setExternalOrderId(externalOrderId);
-        repository.save(e);
+        mutate(orderId, e -> {
+            e.setStatus(Order.OrderStatus.PLACED);
+            e.setExternalOrderId(externalOrderId);
+        });
     }
 
     @Override
@@ -151,42 +151,43 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
-        OrderEntity e = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
-        if (e.getStatus() != Order.OrderStatus.PLANNED) {
-            throw new IllegalStateException("PLANNED 주문만 수정할 수 있습니다: " + orderId);
-        }
-        e.setPrice(price);
-        e.setQuantity(quantity);
-        repository.save(e);
+        // PLANNED 상태 주문만 가격·수량 수정 허용
+        mutate(orderId, e -> {
+            if (e.getStatus() != Order.OrderStatus.PLANNED) {
+                throw new IllegalStateException("PLANNED 주문만 수정할 수 있습니다: " + orderId);
+            }
+            e.setPrice(price);
+            e.setQuantity(quantity);
+        });
     }
 
     @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
-        OrderEntity e = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
-        e.setStatus(Order.OrderStatus.CANCELLED);
-        repository.save(e);
+        mutate(orderId, e -> e.setStatus(Order.OrderStatus.CANCELLED));
     }
 
     @Override
     public void markFailed(UUID orderId) {
         // 증권사 접수 실패 — FAILED 상태 기록
-        OrderEntity e = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
-        e.setStatus(Order.OrderStatus.FAILED);
-        repository.save(e);
+        mutate(orderId, e -> e.setStatus(Order.OrderStatus.FAILED));
     }
 
     @Override
     public void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status) {
         // 체결 완료: 상태 + 체결 수량/가중평균가 기록
+        mutate(orderId, e -> {
+            e.setStatus(status);
+            e.setFilledQuantity(filledQuantity);
+            e.setFilledPrice(filledPrice);
+        });
+    }
+
+    // 주문 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)
+    private void mutate(UUID orderId, Consumer<OrderEntity> change) {
         OrderEntity e = repository.findById(orderId)
                 .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
-        e.setStatus(status);
-        e.setFilledQuantity(filledQuantity);
-        e.setFilledPrice(filledPrice);
+        change.accept(e);
         repository.save(e);
     }
 
@@ -199,7 +200,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setOrderType(o.orderType());
         e.setTiming(o.timing());
         e.setDirection(o.direction());
-        e.setQuantity(o.quantity());
+        e.setQuantity(o.quantity()); // quantity는 모든 저장 경로에서 non-null 보장 (Order.planned/withPrice 팩토리 int 파라미터)
         e.setPrice(o.price());
         e.setStatus(o.status());
         e.setExternalOrderId(o.externalOrderId());
