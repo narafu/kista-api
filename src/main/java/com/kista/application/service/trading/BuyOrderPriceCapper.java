@@ -34,7 +34,7 @@ class BuyOrderPriceCapper {
 
     // PRIVACY 전용: position 없이 단순 가격 캡만 적용 (수량 유지)
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
-        applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
+        applyCapIfNeeded("PRIVACY ", today, account, strategyCycleId, currentPrice,
                 (orders, cap) -> orders.stream()
                         .map(o -> o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
                         .toList());
@@ -43,12 +43,12 @@ class BuyOrderPriceCapper {
     // INFINITE 전용: position 기반 수량 재산정 + 보정 주문 포함
     void capIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position) {
-        applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
+        applyCapIfNeeded("", today, account, strategyCycleId, currentPrice,
                 (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
     }
 
     // 공통 cap 적용 골격: PLANNED BUY 조회 → cap 초과 확인 → 보정 함수 적용 → 재저장
-    private void applyCapIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
+    private void applyCapIfNeeded(String prefix, LocalDate today, Account account, UUID strategyCycleId,
                                   BigDecimal currentPrice,
                                   BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
         List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
@@ -58,18 +58,18 @@ class BuyOrderPriceCapper {
         BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
         if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;
 
-        log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap, describeOrders(buyOrders));
+        log.info("[{}] {}BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), prefix, cap, describeOrders(buyOrders));
 
         List<Order> newBuys = correctFn.apply(buyOrders, cap);
 
         // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장
         orderPort.deletePlannedBuyByCycleAndDate(strategyCycleId, today);
         if (newBuys.isEmpty()) {
-            log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
+            log.warn("[{}] {}보정 후 BUY 주문 없음 — 매수 제외", account.nickname(), prefix);
             return;
         }
         orderPlanner.savePlannedOrders(newBuys, account, strategyCycleId);
-        log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describeOrders(newBuys));
+        log.info("[{}] {}BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), prefix, describeOrders(newBuys));
     }
 
     // 주문 목록을 "가격×수량" 형식으로 표현 — 가격 보정 전후 로그용
