@@ -147,22 +147,79 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     private AdminOrderCorrectionResult correctFilledOrder(UUID adminId, AdminOrderCorrectionCommand command,
                                                           Strategy strategy, StrategyCycle currentCycle, Order order) {
-        if (order.status() != Order.OrderStatus.FILLED && order.status() != Order.OrderStatus.PARTIALLY_FILLED) {
-            throw new IllegalArgumentException("FILLED_CORRECTION은 체결 주문만 지원합니다. 현재 상태: " + order.status());
-        }
-
+        // 1. 검증
+        validateFilledStatus(order);
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
         Order.OrderDirection direction = command.direction() != null ? command.direction() : order.direction();
+        AccountBalance balance = loadLatestBalance(currentCycle);
+        validateSellQuantity(direction, quantity, balance);
+
+        // 2. 보정 주문 + 체결 내역 빌드
+        Order correctionOrder = buildCorrectionOrder(command, order, direction, quantity, price);
+        Execution execution = toExecution(correctionOrder);
+
+        // 3. 포지션 업데이트
+        AccountBalance updatedBalance = balance.applyExecutions(List.of(execution));
+        cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updatedBalance, price));
+
+        // 4. holdings 소진 시 사이클 종료 처리
+        CycleEndResult cycleEnd = closeCycleIfExhausted(strategy, currentCycle, updatedBalance, correctionOrder.tradeDate());
+
+        // 5. 주문 저장 + 감사 로그
+        orderPort.saveAll(List.of(correctionOrder));
+        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+                auditPayload(command, order, Map.of(
+                        "direction", correctionOrder.direction().name(),
+                        "newPrice", price.toPlainString(),
+                        "newQuantity", quantity,
+                        "cycleEnded", cycleEnd.ended()
+                )));
+
+        return new AdminOrderCorrectionResult(
+                command.userId(),
+                command.accountId(),
+                command.strategyId(),
+                order.id(),
+                command.mode(),
+                order.status(),
+                Order.OrderStatus.FILLED,
+                null,
+                updatedBalance.holdings(),
+                updatedBalance.avgPrice(),
+                updatedBalance.usdDeposit(),
+                cycleEnd.strategy().status(),
+                cycleEnd.ended(),
+                cycleEnd.endDate()
+        );
+    }
+
+    // 체결 상태 검증 — FILLED_CORRECTION은 FILLED/PARTIALLY_FILLED만 허용
+    private static void validateFilledStatus(Order order) {
+        if (order.status() != Order.OrderStatus.FILLED && order.status() != Order.OrderStatus.PARTIALLY_FILLED) {
+            throw new IllegalArgumentException("FILLED_CORRECTION은 체결 주문만 지원합니다. 현재 상태: " + order.status());
+        }
+    }
+
+    // 최신 CyclePosition에서 AccountBalance 구성
+    private AccountBalance loadLatestBalance(StrategyCycle currentCycle) {
         CyclePosition latest = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
-        AccountBalance balance = new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+        return new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+    }
+
+    // SELL 수량이 현재 holdings를 초과하는지 검증
+    private static void validateSellQuantity(Order.OrderDirection direction, int quantity, AccountBalance balance) {
         if (direction == Order.OrderDirection.SELL && quantity > balance.holdings()) {
             throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
         }
+    }
 
-        Order correctionOrder = new Order(
+    // 보정 주문(Order) 빌드 — status=FILLED, orderedQuantity/filledPrice 즉시 기록
+    private static Order buildCorrectionOrder(AdminOrderCorrectionCommand command, Order order,
+                                              Order.OrderDirection direction, int quantity, BigDecimal price) {
+        return new Order(
                 null,
                 order.accountId(),
                 order.strategyCycleId(),
@@ -178,7 +235,11 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                 quantity,
                 price
         );
-        Execution execution = new Execution(
+    }
+
+    // 보정 주문에서 체결 내역(Execution) 빌드 — applyExecutions에 전달용
+    private static Execution toExecution(Order correctionOrder) {
+        return new Execution(
                 correctionOrder.tradeDate(),
                 correctionOrder.ticker(),
                 correctionOrder.direction(),
@@ -187,45 +248,21 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                 correctionOrder.price().multiply(BigDecimal.valueOf(correctionOrder.quantity())),
                 correctionOrder.externalOrderId()
         );
-        AccountBalance updatedBalance = balance.applyExecutions(List.of(execution));
-        cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updatedBalance, price));
-
-        Strategy updatedStrategy = strategy;
-        boolean cycleEnded = false;
-        LocalDate cycleEndDate = null;
-        if (updatedBalance.holdings() == 0) {
-            strategyCyclePort.markEnded(currentCycle.id(), updatedBalance.usdDeposit(), correctionOrder.tradeDate());
-            updatedStrategy = strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
-            cycleEnded = true;
-            cycleEndDate = correctionOrder.tradeDate();
-        }
-
-        orderPort.saveAll(List.of(correctionOrder));
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
-                auditPayload(command, order, Map.of(
-                        "direction", correctionOrder.direction().name(),
-                        "newPrice", price.toPlainString(),
-                        "newQuantity", quantity,
-                        "cycleEnded", cycleEnded
-                )));
-
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.FILLED,
-                null,
-                updatedBalance.holdings(),
-                updatedBalance.avgPrice(),
-                updatedBalance.usdDeposit(),
-                updatedStrategy.status(),
-                cycleEnded,
-                cycleEndDate
-        );
     }
+
+    // holdings 소진(==0) 시 사이클 종료 + 전략 PAUSED 처리
+    private CycleEndResult closeCycleIfExhausted(Strategy strategy, StrategyCycle currentCycle,
+                                                  AccountBalance updatedBalance, LocalDate tradeDate) {
+        if (updatedBalance.holdings() == 0) {
+            strategyCyclePort.markEnded(currentCycle.id(), updatedBalance.usdDeposit(), tradeDate);
+            Strategy updated = strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+            return new CycleEndResult(updated, true, tradeDate);
+        }
+        return new CycleEndResult(strategy, false, null);
+    }
+
+    // 사이클 종료 여부와 갱신된 전략 상태를 함께 반환하는 값 객체
+    record CycleEndResult(Strategy strategy, boolean ended, LocalDate endDate) {}
 
     private void validateSelectionChain(User user, Account account, Strategy strategy,
                                         StrategyCycle currentCycle, Order order) {
