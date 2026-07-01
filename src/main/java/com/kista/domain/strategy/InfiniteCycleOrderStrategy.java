@@ -23,9 +23,9 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
-    // 사이클 재등록 최소금액 안전 계수 — 현재가 × (divisionCount × 2.2)
-    // divisionCount=20: × 44, divisionCount=40: × 88
-    private static final double MIN_DEPOSIT_FACTOR = 2.2;
+    // 사이클 재등록 최소금액 계수 — 현재가 × (divisionCount × 2)
+    // 평단가 매수 + LOC 매수 각 최소 1주 보장
+    private static final double MIN_DEPOSIT_FACTOR = 2.0;
 
     private final InfiniteTradingStrategy infiniteStrategy;
     private final ReverseInfiniteTradingStrategy reverseStrategy; // 리버스모드 전략 (구현체: ReverseInfiniteStrategy)

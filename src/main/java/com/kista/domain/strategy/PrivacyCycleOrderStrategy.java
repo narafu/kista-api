@@ -41,6 +41,7 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     @Override
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
         if (privacyBase == null) return null;
-        return privacyBase.currentCycleStart();
+        // currentCycleStart 0.5배 적용
+        return privacyBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
     }
 }
