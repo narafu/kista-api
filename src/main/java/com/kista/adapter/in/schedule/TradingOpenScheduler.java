@@ -1,6 +1,6 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.application.service.privacy.PrivacyTradeValidationService;
+import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -38,7 +38,7 @@ public class TradingOpenScheduler {
     private final NotifyPort notifyPort;
     private final SchedulerLockService schedulerLockService;
     private final PrivacyTradePort privacyTradePort;
-    private final PrivacyTradeValidationService validationService;
+    private final PrivacyTradeValidationUseCase validationService;
 
     @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
     public void run() throws InterruptedException {

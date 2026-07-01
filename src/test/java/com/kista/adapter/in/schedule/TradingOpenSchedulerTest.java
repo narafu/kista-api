@@ -10,7 +10,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.*;
-import com.kista.application.service.privacy.PrivacyTradeValidationService;
+import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +41,7 @@ class TradingOpenSchedulerTest {
     @Mock NotifyPort notifyPort;
     @Mock SchedulerLockService schedulerLockService;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock PrivacyTradeValidationService validationService;
+    @Mock PrivacyTradeValidationUseCase validationService;
     @InjectMocks TradingOpenScheduler scheduler;
 
     private static final UUID USER_ID    = UUID.randomUUID();

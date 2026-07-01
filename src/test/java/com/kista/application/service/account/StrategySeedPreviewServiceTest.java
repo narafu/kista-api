@@ -73,9 +73,9 @@ class StrategySeedPreviewServiceTest {
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 20);
 
-        // then: minSeed = 30.00 * (20 * 2.2) = 1320.00
+        // then: minSeed = 30.00 * (20 * 2.0) = 1200.00
         assertThat(result.basePrice()).isEqualByComparingTo("30.00");
-        assertThat(result.minSeed()).isEqualByComparingTo("1320.00");
+        assertThat(result.minSeed()).isEqualByComparingTo("1200.00");
         assertThat(result.skipReason()).isNull();
         assertThat(result.ticker()).isEqualTo("SOXL");
     }
@@ -104,9 +104,9 @@ class StrategySeedPreviewServiceTest {
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
 
-        // then: PRIVACY minSeed = currentCycleStart 그대로
+        // then: PRIVACY minSeed = currentCycleStart / 2
         assertThat(result.basePrice()).isEqualByComparingTo("5000.00");
-        assertThat(result.minSeed()).isEqualByComparingTo("5000.00");
+        assertThat(result.minSeed()).isEqualByComparingTo("2500.00");
         assertThat(result.skipReason()).isNull();
     }
 }
