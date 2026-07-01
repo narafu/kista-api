@@ -63,6 +63,14 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     @Override
+    public Map<UUID, List<Strategy>> findByAccountIds(Collection<UUID> accountIds) {
+        if (accountIds.isEmpty()) return Map.of();
+        return jpaRepository.findAllByAccountIdIn(accountIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.groupingBy(Strategy::accountId));
+    }
+
+    @Override
     public Map<UUID, Strategy.Type> findTypesByCycleIds(Collection<UUID> cycleIds) {
         if (cycleIds.isEmpty()) return Map.of();
         return jpaRepository.findStrategyTypesByCycleIds(cycleIds).stream()

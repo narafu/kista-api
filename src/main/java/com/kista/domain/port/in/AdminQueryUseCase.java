@@ -32,6 +32,9 @@ public interface AdminQueryUseCase {
     // 계좌 선택 이후 전략 선택 UI용 목록
     List<Strategy> listStrategies(UUID accountId);
 
+    // 여러 계좌 ID → 전략 목록 배치 조회 (관리자 계좌 목록 전략 표시용)
+    Map<UUID, List<Strategy>> listStrategiesByAccountIds(Set<UUID> accountIds);
+
     // 선택한 전략의 특정 거래일 주문 목록 조회
     List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate);
 }

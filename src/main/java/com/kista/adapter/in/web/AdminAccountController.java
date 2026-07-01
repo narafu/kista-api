@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminUserView;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminStrategyUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -42,8 +44,11 @@ public class AdminAccountController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        return adminQuery.listAccounts(from, to).stream()
-                .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId())))
+        List<Account> accounts = adminQuery.listAccounts(from, to);
+        Set<UUID> accountIds = accounts.stream().map(Account::id).collect(Collectors.toSet());
+        Map<UUID, List<Strategy>> strategyMap = adminQuery.listStrategiesByAccountIds(accountIds);
+        return accounts.stream()
+                .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId()), strategyMap.getOrDefault(a.id(), List.of())))
                 .toList();
     }
 
@@ -75,15 +80,17 @@ public class AdminAccountController {
             UUID userId,
             String ownerNickname,   // User.nickname
             String accountNoMasked, // "****1234"
-            String broker           // Broker.name()
+            String broker,          // Broker.name()
+            List<AdminStrategyResponse> strategies
     ) {
-        static AdminAccountResponse from(Account a, AdminUserView user) {
+        static AdminAccountResponse from(Account a, AdminUserView user, List<Strategy> strategies) {
             String nickname = user != null ? user.nickname() : "(알 수 없음)";
             String masked = "****" + a.accountNo().substring(
                     Math.max(0, a.accountNo().length() - 4));
             return new AdminAccountResponse(
                     a.id(), a.userId(), nickname, masked,
-                    a.broker() != null ? a.broker().name() : null);
+                    a.broker() != null ? a.broker().name() : null,
+                    strategies.stream().map(AdminStrategyResponse::from).toList());
         }
     }
 
