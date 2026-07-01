@@ -187,7 +187,7 @@ class TradingService {
         // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (장 개시 스케쥴러 선행 또는 수동 주문 보존)
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
-        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
+        BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
         List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
         if (!todayOrders.isEmpty()) {
             return buildCycleStateFromExistingOrders(ctx, balance, price, privacyBase, today, prevClosePrice, todayOrders.size());
@@ -291,7 +291,7 @@ class TradingService {
             AccountBalance balance = loadBalance(strategy, account);
 
             PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-            BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
+            BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
 
             // 전략 계산 (skip 결과는 건너뜀 — PRIVACY 기준 매매표 없을 시 정상 skip)
             CycleOrderComputer.ComputeResult result = orderComputer.compute(

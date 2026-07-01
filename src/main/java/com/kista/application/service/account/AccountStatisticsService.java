@@ -24,7 +24,6 @@ import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -33,7 +32,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 class AccountStatisticsService implements AccountStatisticsUseCase {
@@ -56,12 +54,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        try {
-            return brokerStatisticsRouter.getMargin(account);
-        } catch (Exception e) {
-            log.warn("예수금 조회 실패: accountId={}, error={}", accountId, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
+        return BrokerCallGuard.wrap("예수금 조회", () -> brokerStatisticsRouter.getMargin(account));
     }
 
     @Override
@@ -108,12 +101,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        try {
-            return brokerPriceRouter.getPrices(tickers, account);
-        } catch (Exception e) {
-            log.warn("현재가 조회 실패: accountId={}, tickers={}, error={}", accountId, tickers, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
+        return BrokerCallGuard.wrap("현재가 조회", () -> brokerPriceRouter.getPrices(tickers, account));
     }
 
     @Override

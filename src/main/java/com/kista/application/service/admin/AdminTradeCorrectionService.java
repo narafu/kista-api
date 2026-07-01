@@ -54,12 +54,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
 
         // 선택 체인 무결성 검증 — 관리자 UI에서 user -> account -> strategy 순 선택을 강제하는 백엔드 가드
-        if (!account.userId().equals(user.id())) {
-            throw new IllegalArgumentException("account가 user에 속하지 않습니다");
-        }
-        if (!strategy.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("strategy가 account에 속하지 않습니다");
-        }
+        AdminSelectionChain.validate(user, account, strategy);
         if (currentCycle.endDate() != null) {
             throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다");
         }

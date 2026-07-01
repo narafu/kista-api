@@ -11,7 +11,6 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +20,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 class TradingPreviewService {
@@ -74,12 +72,8 @@ class TradingPreviewService {
         var orderStrategy = cycleOrderStrategies.of(strategy);
         BigDecimal prevClosePrice = null;
         if (orderStrategy.requiresPrevClose()) {
-            try {
-                prevClosePrice = brokerPriceRouter.getPriceSnapshot(strategy.ticker(), account).prevClose();
-            } catch (Exception e) {
-                log.warn("전일종가 조회 실패 — 미리보기 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
-                throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-            }
+            prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
+                    () -> brokerPriceRouter.getPriceSnapshot(strategy.ticker(), account).prevClose());
         }
         PrivacyTradeBase privacyBase = orderStrategy.requiresPrivacyBase()
                 ? privacyTradePort.findTodayTrade(today).orElse(null)

@@ -99,8 +99,7 @@ class ManualTradingService {
         try {
             Map<Strategy.Ticker, PriceSnapshot> snapshots =
                     priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
-            PriceSnapshot snap = snapshots.get(strategy.ticker());
-            return snap != null ? snap.prevClose() : null;
+            return PriceSnapshot.prevCloseOrNull(snapshots.get(strategy.ticker()));
         } catch (Exception e) {
             log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
             throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);

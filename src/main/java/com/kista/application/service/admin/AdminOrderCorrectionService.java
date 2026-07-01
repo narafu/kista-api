@@ -54,7 +54,10 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         Order order = orderPort.findById(command.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + command.orderId()));
 
-        validateSelectionChain(user, account, strategy, currentCycle, order);
+        AdminSelectionChain.validate(user, account, strategy, order);
+        if (!order.strategyCycleId().equals(currentCycle.id())) {
+            throw new IllegalArgumentException("현재 전략 사이클 주문만 보정할 수 있습니다");
+        }
 
         return switch (command.mode()) {
             case PLANNED_EDIT -> correctPlannedOrder(adminId, command, strategy, order);
@@ -263,22 +266,6 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     // 사이클 종료 여부와 갱신된 전략 상태를 함께 반환하는 값 객체
     record CycleEndResult(Strategy strategy, boolean ended, LocalDate endDate) {}
-
-    private void validateSelectionChain(User user, Account account, Strategy strategy,
-                                        StrategyCycle currentCycle, Order order) {
-        if (!account.userId().equals(user.id())) {
-            throw new IllegalArgumentException("account가 user에 속하지 않습니다");
-        }
-        if (!strategy.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("strategy가 account에 속하지 않습니다");
-        }
-        if (!order.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("order가 account에 속하지 않습니다");
-        }
-        if (!order.strategyCycleId().equals(currentCycle.id())) {
-            throw new IllegalArgumentException("현재 전략 사이클 주문만 보정할 수 있습니다");
-        }
-    }
 
     private static void requireStatus(Order order, Order.OrderStatus expected, AdminOrderCorrectionCommand.Mode mode) {
         if (order.status() != expected) {
