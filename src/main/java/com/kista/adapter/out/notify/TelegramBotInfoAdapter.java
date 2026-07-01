@@ -36,7 +36,7 @@ class TelegramBotInfoAdapter implements TelegramBotInfoPort {
             return username;
         } catch (RestClientException e) {
             log.warn("Telegram getMe 실패: {}", e.getMessage());
-            throw new IllegalArgumentException("유효하지 않은 Bot Token입니다: " + e.getMessage());
+            throw new IllegalArgumentException("유효하지 않은 Bot Token입니다: " + e.getMessage(), e);
         }
     }
 }

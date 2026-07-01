@@ -66,7 +66,7 @@ class ManualTradingService {
             snapshots = priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
         } catch (Exception e) {
             log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
         PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
@@ -94,7 +94,7 @@ class ManualTradingService {
         } catch (Exception e) {
             log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.id(), strategy.ticker().name(), e.getMessage());
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
 
         // 예수금 부족 체크: 신규 BUY 합계 > (실잔고 - 타 전략 당일 PLANNED BUY 합계)

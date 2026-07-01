@@ -5,4 +5,8 @@ public class ManualTradingException extends RuntimeException {
     public ManualTradingException(String message) {
         super(message);
     }
+
+    public ManualTradingException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
