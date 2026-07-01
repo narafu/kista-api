@@ -38,10 +38,6 @@ class ManualTradingService {
     private final BrokerAccountRouter brokerAccountRouter;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
-        return executeInternal(strategyId, requesterId);
-    }
-
-    private List<Order> executeInternal(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
@@ -61,15 +57,7 @@ class ManualTradingService {
         User user = userPort.findByIdOrThrow(account.userId());
 
         // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — 증권사 접수는 스케쥴러가 담당
-        Map<Strategy.Ticker, PriceSnapshot> snapshots;
-        try {
-            snapshots = priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
-        } catch (Exception e) {
-            log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
-        PriceSnapshot priceSnapshot = snapshots.get(strategy.ticker());
-        BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
+        BigDecimal prevClosePrice = fetchPrevCloseOrThrow(strategy, account);
 
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
@@ -86,16 +74,7 @@ class ManualTradingService {
         if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
 
         // live 잔고 1회 조회 — BUY 예수금·SELL 보유수량 모두 검사
-        AccountBalance liveBalance;
-        try {
-            liveBalance = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-            log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
-                    account.nickname(), strategy.ticker().name(), liveBalance.holdings(), liveBalance.usdDeposit());
-        } catch (Exception e) {
-            log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
-                    account.id(), strategy.ticker().name(), e.getMessage());
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
+        AccountBalance liveBalance = fetchLiveBalanceOrThrow(account, strategy);
 
         // 예수금 부족 체크: 신규 BUY 합계 > (live 잔고 - 타 전략 당일 PLANNED BUY 합계)
         BigDecimal otherBuyTotal = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
@@ -104,7 +83,47 @@ class ManualTradingService {
         }
 
         // 보유수량 부족 체크: SELL 수량 합계 > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
-        int newSellTotal = result.orders().stream()
+        checkSellableOrThrow(account, strategy, result.orders());
+
+        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
+
+        // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+        placeAtOpenSellsIfMarketOpen(strategy, account, currentCycle.id(), today);
+
+        // 저장된 주문 반환 (UI에서 예약 확인용)
+        return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
+    }
+
+    // 시세 조회 실패 시 ManualTradingException으로 래핑
+    private BigDecimal fetchPrevCloseOrThrow(Strategy strategy, Account account) {
+        try {
+            Map<Strategy.Ticker, PriceSnapshot> snapshots =
+                    priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
+            PriceSnapshot snap = snapshots.get(strategy.ticker());
+            return snap != null ? snap.prevClose() : null;
+        } catch (Exception e) {
+            log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+        }
+    }
+
+    // live 잔고 조회 실패 시 ManualTradingException으로 래핑
+    private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
+        try {
+            AccountBalance lb = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+            log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
+                    account.nickname(), strategy.ticker().name(), lb.holdings(), lb.usdDeposit());
+            return lb;
+        } catch (Exception e) {
+            log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                    account.id(), strategy.ticker().name(), e.getMessage());
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+        }
+    }
+
+    // SELL 수량 합계 > 판매가능수량이면 ManualTradingException
+    private void checkSellableOrThrow(Account account, Strategy strategy, List<Order> orders) {
+        int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
         int sellableQty = brokerAccountRouter.getSellableQuantity(account, strategy.ticker());
@@ -113,21 +132,18 @@ class ManualTradingService {
         if (newSellTotal > sellableQty) {
             throw new ManualTradingException("보유 수량이 부족합니다");
         }
+    }
 
-        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
-
-        // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+    // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+    private void placeAtOpenSellsIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today) {
         DstInfo dst = DstInfo.calculate();
         if (strategy.isInfinite() && Instant.now().isAfter(dst.marketOpen())) {
-            List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), today)
+            List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(cycleId, today)
                     .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
             if (!atOpenOrders.isEmpty()) {
                 log.info("[{}] 개장 후 수동 실행 — AT_OPEN 매도 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
                 orderExecutor.placeGiven(atOpenOrders, account);
             }
         }
-
-        // 저장된 주문 반환 (UI에서 예약 확인용)
-        return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
     }
 }

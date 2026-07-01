@@ -190,17 +190,7 @@ class TradingService {
         BigDecimal prevClosePrice = priceSnapshot != null ? priceSnapshot.prevClose() : null;
         List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
         if (!todayOrders.isEmpty()) {
-            log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), todayOrders.size());
-
-            if (strategy.isInfinite()) {
-                // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
-                CycleOrderComputer.ComputeResult recalc = orderComputer.compute(
-                        balance, strategy, prevClosePrice, today, currentCycle, null, account.nickname());
-                InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
-                return new CycleState(ctx, balance, recalcPos, price, null);
-            }
-            // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
-            return new CycleState(ctx, balance, null, price, privacyBase);
+            return buildCycleStateFromExistingOrders(ctx, balance, price, privacyBase, today, prevClosePrice, todayOrders.size());
         }
 
         // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
@@ -219,6 +209,24 @@ class TradingService {
         BigDecimal startPrice = price; // INFINITE: BuyOrderPriceCapper, PRIVACY: capPrivacyIfNeeded
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
         return new CycleState(ctx, balance, position, startPrice, privacyBaseForState);
+    }
+
+    // 오늘 PLANNED·PLACED 주문이 이미 있을 때 캡 보정을 위해 position만 재계산 (저장 없음)
+    // INFINITE: position 재계산(skip이면 null), PRIVACY: privacyBase만 담아 반환
+    private CycleState buildCycleStateFromExistingOrders(BatchContext ctx, AccountBalance balance,
+            BigDecimal price, PrivacyTradeBase privacyBase, LocalDate today, BigDecimal prevClosePrice, int existingCount) {
+        Strategy strategy = ctx.strategy();
+        Account account = ctx.account();
+        log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
+        if (strategy.isInfinite()) {
+            // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
+            CycleOrderComputer.ComputeResult recalc = orderComputer.compute(
+                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname());
+            InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
+            return new CycleState(ctx, balance, recalcPos, price, null);
+        }
+        // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
+        return new CycleState(ctx, balance, null, price, privacyBase);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
