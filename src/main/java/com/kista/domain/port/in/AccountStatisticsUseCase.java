@@ -1,13 +1,10 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CycleHistoryPage;
-import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
@@ -21,16 +18,12 @@ import java.util.UUID;
 
 // KIS/Toss 공통 통계 + trading_cycle_history 조회 인터페이스
 public interface AccountStatisticsUseCase {
-    List<Execution> getExecutions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId);
     List<MarginItem> getMargin(UUID accountId, UUID requesterId);
     DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
-    SellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker);
     CycleHistoryPage getByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
-    // 계좌 기준 스냅샷 조회 (차트용 — DB 기반, KIS API 미사용)
-    List<CyclePositionHistoryEntry> getSnapshotsByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기
     StrategySeedPreview strategySeedPreview(UUID accountId, UUID requesterId,
             Strategy.Type type, Strategy.Ticker ticker, int divisionCount);

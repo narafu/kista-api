@@ -27,27 +27,6 @@ public class StatisticsController {
 
     private final AccountStatisticsUseCase accountStatistics;
 
-    // 체결 내역 조회 (TTTS3035R)
-    @Operation(summary = "체결 내역 조회", description = "KIS API TTTS3035R — 지정 기간 동안의 체결된 주문 목록 조회.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "KIS API 호출 실패")
-    })
-    @GetMapping("/trades")
-    public List<ExecutionResponse> getTrades(
-            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "조회 시작일", example = "2025-01-01")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "조회 종료일", example = "2025-01-31")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return accountStatistics.getExecutions(accountId, userId, from, to)
-                .stream().map(ExecutionResponse::from).toList();
-    }
-
     // 체결기준현재잔고 조회 (CTRP6504R)
     @Operation(summary = "현재 잔고 조회", description = "KIS API CTRP6504R — 체결 기준 현재 보유 종목별 잔고 및 평가손익 조회.")
     @ApiResponses({
@@ -128,19 +107,4 @@ public class StatisticsController {
         return MultiPriceResponse.from(result);
     }
 
-    // 판매 가능 수량 조회 (KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity)
-    @Operation(summary = "판매 가능 수량 조회", description = "KIS: CTRP6504R 체결기준현재잔고 잔고수량 / Toss: /api/v1/sellable-quantity — 지정 종목의 현재 판매 가능 수량 조회.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "증권사 API 호출 실패")
-    })
-    @GetMapping("/sellable-quantity")
-    public SellableQuantityResponse getSellableQuantity(
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker) {
-        return SellableQuantityResponse.from(accountStatistics.getSellableQuantity(accountId, userId, ticker));
-    }
 }

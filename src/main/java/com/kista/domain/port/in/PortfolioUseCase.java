@@ -10,6 +10,5 @@ import java.util.UUID;
 
 public interface PortfolioUseCase {
     CyclePositionHistoryEntry getCurrent(UUID userId);
-    List<CyclePositionHistoryEntry> getSnapshots(UUID userId, LocalDate from, LocalDate to);
     List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, Ticker ticker);
 }

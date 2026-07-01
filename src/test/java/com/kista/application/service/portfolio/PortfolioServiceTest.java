@@ -13,15 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,15 +48,6 @@ class PortfolioServiceTest {
         assertThatThrownBy(() -> sut.getCurrent(USER_ID))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("포트폴리오");
-    }
-
-    @Test
-    @DisplayName("getSnapshots: from/to 파라미터를 findBetween에 위임")
-    void getSnapshots_delegates_date_range_to_port() {
-        CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
-        when(cycleHistoryPort.findBetweenByUser(eq(USER_ID), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(entry));
-
-        assertThat(sut.getSnapshots(USER_ID, LocalDate.now().minusDays(30), LocalDate.now())).hasSize(1);
     }
 
     private CyclePositionHistoryEntry entry(BigDecimal currentPrice) {

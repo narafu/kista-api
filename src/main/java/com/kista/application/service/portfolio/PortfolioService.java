@@ -30,11 +30,6 @@ class PortfolioService implements PortfolioUseCase {
     }
 
     @Override
-    public List<CyclePositionHistoryEntry> getSnapshots(UUID userId, LocalDate from, LocalDate to) {
-        return cycleHistoryPort.findBetweenByUser(userId, from, to);
-    }
-
-    @Override
     public List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
         return orderPort.findByUser(userId, from, to, ticker);
     }

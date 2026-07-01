@@ -89,13 +89,6 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
-    public List<CyclePositionHistoryEntry> findBetweenByUser(UUID userId, LocalDate from, LocalDate to) {
-        Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
-        Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
-        return toEntries(positionRepo.findBetweenDatesByUserId(userId, fromInstant, toInstant));
-    }
-
-    @Override
     public List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
                                                                       Instant cursor, int limit) {
         return toEntries(positionRepo.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit)));

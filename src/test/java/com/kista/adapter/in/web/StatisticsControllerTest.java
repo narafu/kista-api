@@ -48,18 +48,6 @@ class StatisticsControllerTest {
     }
 
     @Test
-    void trades_returns_200_with_list() throws Exception {
-        when(accountStatistics.getExecutions(eq(ACCOUNT_ID), any(), any(), any()))
-                .thenReturn(List.of());
-
-        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/trades")
-                        .param("from", "2024-01-01").param("to", "2024-12-31")
-                        .with(authentication(mockAuth())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
-    }
-
-    @Test
     void portfolio_returns_200_with_result() throws Exception {
         PresentBalanceResult result = new PresentBalanceResult(
                 List.of(), new BigDecimal("1000.00"), new BigDecimal("50.00"), new BigDecimal("5.0"),

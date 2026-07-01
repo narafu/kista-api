@@ -1,14 +1,11 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.DailyTransaction;
 import com.kista.domain.model.kis.DailyTransactionResult;
 import com.kista.domain.model.kis.DailyTransactionSummary;
-import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
@@ -45,20 +42,10 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
-    private final BrokerExecutionRouter brokerExecutionRouter;
     private final BrokerStatisticsRouter brokerStatisticsRouter;
     private final BrokerPriceRouter brokerPriceRouter;
     private final PrivacyTradePort privacyTradePort;
     private final CycleOrderStrategies cycleStrategies;
-
-    @Override
-    public List<Execution> getExecutions(UUID accountId, UUID requesterId,
-                                          LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        Optional<Ticker> ticker = strategyPort.findActiveTicker(accountId);
-        if (ticker.isEmpty()) return Collections.emptyList();
-        return brokerExecutionRouter.getExecutions(from, to, ticker.get(), account);
-    }
 
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
@@ -127,27 +114,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
             log.warn("현재가 조회 실패: accountId={}, tickers={}, error={}", accountId, tickers, e.getMessage());
             throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
-    }
-
-    @Override
-    public SellableQuantity getSellableQuantity(UUID accountId, UUID requesterId, Ticker ticker) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        try {
-            return brokerStatisticsRouter.getSellableQuantity(ticker, account);
-        } catch (Exception e) {
-            log.warn("판매가능수량 조회 실패: accountId={}, ticker={}, error={}", accountId, ticker, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
-    }
-
-    @Override
-    public List<CyclePositionHistoryEntry> getSnapshotsByAccount(UUID accountId, UUID requesterId,
-                                                                  LocalDate from, LocalDate to) {
-        accountPort.requireOwnedAccount(accountId, requesterId);
-        Instant fromInstant = from != null ? from.atStartOfDay(TimeZones.KST).toInstant() : Instant.EPOCH;
-        Instant toInstant = (to != null ? to.plusDays(1) : LocalDate.now(TimeZones.KST).plusDays(1))
-                .atStartOfDay(TimeZones.KST).toInstant();
-        return cyclePositionPort.findByAccountId(accountId, fromInstant, toInstant);
     }
 
     @Override

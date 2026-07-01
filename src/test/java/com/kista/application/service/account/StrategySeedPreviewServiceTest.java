@@ -13,7 +13,6 @@ import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.application.service.account.BrokerStatisticsRouter;
-import com.kista.application.service.trading.BrokerExecutionRouter;
 import com.kista.application.service.trading.BrokerPriceRouter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,6 @@ class StrategySeedPreviewServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
-    @Mock BrokerExecutionRouter brokerExecutionRouter;
     @Mock BrokerStatisticsRouter brokerStatisticsRouter;
     @Mock BrokerPriceRouter brokerPriceRouter;
     @Mock PrivacyTradePort privacyTradePort;
@@ -57,7 +55,7 @@ class StrategySeedPreviewServiceTest {
         ));
         service = new AccountStatisticsService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
-                brokerExecutionRouter, brokerStatisticsRouter, brokerPriceRouter,
+                brokerStatisticsRouter, brokerPriceRouter,
                 privacyTradePort, cycleStrategies
         );
         mockAccount = mock(Account.class);

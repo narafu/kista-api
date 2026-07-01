@@ -2,13 +2,10 @@ package com.kista.application.service.account;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.MarginItem;
 import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.port.out.broker.PortfolioPort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -31,11 +28,6 @@ class BrokerStatisticsRouter {
     // 증거금 통화별 조회 — KIS: TTTC2101R / Toss: buying-power USD+KRW
     List<MarginItem> getMargin(Account account) {
         return registry.require(account, MarginPort.class).getMargin(account);
-    }
-
-    // 판매 가능 수량 — KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity
-    SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
-        return registry.require(account, SellableQuantityPort.class).getSellableQuantity(ticker, account);
     }
 
 }
