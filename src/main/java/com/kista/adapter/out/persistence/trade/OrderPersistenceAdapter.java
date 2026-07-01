@@ -150,6 +150,18 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        if (e.getStatus() != Order.OrderStatus.PLANNED) {
+            throw new IllegalStateException("PLANNED 주문만 수정할 수 있습니다: " + orderId);
+        }
+        e.setPrice(price);
+        e.setQuantity(quantity);
+        repository.save(e);
+    }
+
+    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         OrderEntity e = repository.findById(orderId)

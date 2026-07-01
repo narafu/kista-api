@@ -120,4 +120,9 @@ class AdminQueryService implements AdminQueryUseCase {
     public List<Strategy> listStrategies(UUID accountId) {
         return strategyPort.findByAccountId(accountId);
     }
+
+    @Override
+    public List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate) {
+        return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate);
+    }
 }

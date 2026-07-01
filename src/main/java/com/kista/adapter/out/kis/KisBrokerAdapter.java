@@ -18,12 +18,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
+        BrokerOrderCorrectionPort,
         ExecutionPort {
 
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final KisSellableQuantityPort kisSellableQuantityPort;
     private final KisExecutionPort kisExecutionPort;
+    private final KisOrderPort kisOrderPort;
 
     @Override
     public Account.Broker supports() {
@@ -67,5 +69,15 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         return kisExecutionPort.getExecutions(from, to, ticker, account);
+    }
+
+    @Override
+    public void cancel(com.kista.domain.model.order.Order order, Account account) {
+        kisOrderPort.cancel(order, account);
+    }
+
+    @Override
+    public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
+        return kisOrderPort.place(order, account);
     }
 }

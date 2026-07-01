@@ -20,6 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
+        BrokerOrderCorrectionPort,
         ExecutionPort,
         CandlePort, ExchangeRatePort, StockInfoPort,
         MarketCalendarPort, BrokerAccountPort {
@@ -33,6 +34,7 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     private final TossStockInfoPort tossStockInfoPort;
     private final TossMarketCalendarPort tossMarketCalendarPort;
     private final TossAccountListPort tossAccountListPort;
+    private final TosOrderPort tosOrderPort;
 
     @Override
     public Account.Broker supports() {
@@ -64,6 +66,16 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         return tosExecutionPort.getExecutions(from, to, ticker, account);
+    }
+
+    @Override
+    public void cancel(com.kista.domain.model.order.Order order, Account account) {
+        tosOrderPort.cancel(order, account);
+    }
+
+    @Override
+    public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
+        return tosOrderPort.place(order, account);
     }
 
     // --- Toss 전용 Capability ---

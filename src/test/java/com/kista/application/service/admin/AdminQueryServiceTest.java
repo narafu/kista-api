@@ -11,8 +11,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,5 +50,16 @@ class AdminQueryServiceTest {
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
         org.mockito.Mockito.verify(privacyTradePort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(expected);
+    }
+
+    @Test
+    void listStrategyOrders_전략과_거래일로_주문을_조회한다() {
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
+        LocalDate tradeDate = LocalDate.of(2026, 7, 1);
+        when(orderPort.findByStrategyId(strategyId, tradeDate, tradeDate)).thenReturn(List.of());
+
+        service.listStrategyOrders(strategyId, tradeDate);
+
+        verify(orderPort).findByStrategyId(strategyId, tradeDate, tradeDate);
     }
 }

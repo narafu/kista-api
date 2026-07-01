@@ -1,12 +1,15 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminOrderCorrectionCommand;
+import com.kista.domain.model.admin.AdminOrderCorrectionResult;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.domain.port.in.AdminOrderCorrectionUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,16 +40,17 @@ import java.util.stream.Collectors;
 
 @Tag(name = "Admin", description = "관리자 API")
 @RestController
-@RequestMapping("/api/admin/trades")
+@RequestMapping("/api/admin")
 @RequiredArgsConstructor
 public class AdminTradeController {
 
     private final AdminQueryUseCase adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
     private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
+    private final AdminOrderCorrectionUseCase adminOrderCorrection; // 관리자 주문 보정
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
-    @GetMapping
+    @GetMapping("/trades")
     public List<AdminTradeResponse> listTrades(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -64,13 +69,42 @@ public class AdminTradeController {
                 .toList();
     }
 
+    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
+    public List<AdminTradeResponse> listStrategyOrders(
+            @PathVariable UUID accountId,
+            @PathVariable UUID strategyId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
+        Map<UUID, Account> accountMap = adminQuery.listAccounts(null, null).stream()
+                .collect(Collectors.toMap(Account::id, Function.identity()));
+        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
+                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
+        List<Order> orders = adminQuery.listStrategyOrders(strategyId, tradeDate);
+        Set<UUID> cycleIds = orders.stream()
+                .map(Order::strategyCycleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
+        return orders.stream()
+                .filter(order -> accountId.equals(order.accountId()))
+                .map(order -> AdminTradeResponse.from(order, accountMap, userMap, strategyTypeMap))
+                .toList();
+    }
+
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
-    @PostMapping("/manual-fills")
+    @PostMapping("/trades/manual-fills")
     public AdminTradeCorrectionResponse correctManualFills(
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid AdminManualTradeCorrectionRequest request) {
         AdminTradeCorrectionResult result = adminTradeCorrection.correctManualFills(adminId, request.toCommand());
         return AdminTradeCorrectionResponse.from(result);
+    }
+
+    @PostMapping("/trades/order-corrections")
+    public AdminOrderCorrectionResponse correctOrder(
+            @AuthenticationPrincipal UUID adminId,
+            @RequestBody @Valid AdminOrderCorrectionRequest request) {
+        return AdminOrderCorrectionResponse.from(
+                adminOrderCorrection.correctOrder(adminId, request.toCommand()));
     }
 
     // 거래 내역 응답 DTO — package-private record (같은 패키지 AdminAnomaliesController에서 재사용 가능)
@@ -83,9 +117,13 @@ public class AdminTradeController {
             String ticker,
             String direction,        // BUY | SELL
             String orderType,        // LOC | MOC | LIMIT
+            String timing,           // AT_OPEN | AT_CLOSE
             int quantity,
             BigDecimal price,
-            String status            // PLACED | FILLED | FAILED
+            String status,           // PLACED | FILLED | FAILED
+            String externalOrderId,
+            Integer filledQuantity,
+            BigDecimal filledPrice
     ) {
         static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap,
                                        Map<UUID, AdminUserView> userMap,
@@ -100,8 +138,9 @@ public class AdminTradeController {
                     t.id(), userId, nickname,
                     strategyType != null ? strategyType.name() : null,
                     t.tradeDate(), t.ticker().name(),
-                    t.direction().name(), t.orderType().name(),
-                    t.quantity(), t.price(), t.status().name());
+                    t.direction().name(), t.orderType().name(), t.timing().name(),
+                    t.quantity(), t.price(), t.status().name(),
+                    t.externalOrderId(), t.filledQuantity(), t.filledPrice());
         }
     }
 
@@ -157,6 +196,70 @@ public class AdminTradeController {
                     result.accountId(),
                     result.strategyId(),
                     result.processedCount(),
+                    result.finalHoldings(),
+                    result.finalAvgPrice(),
+                    result.finalUsdDeposit(),
+                    result.strategyStatus().name(),
+                    result.cycleEnded(),
+                    result.cycleEndDate()
+            );
+        }
+    }
+
+    record AdminOrderCorrectionRequest(
+            @NotNull UUID userId,
+            @NotNull UUID accountId,
+            @NotNull UUID strategyId,
+            @NotNull UUID orderId,
+            @NotNull String mode,
+            @NotNull LocalDate tradeDateKst,
+            String direction,
+            Integer quantity,
+            BigDecimal price,
+            String memo
+    ) {
+        AdminOrderCorrectionCommand toCommand() {
+            return new AdminOrderCorrectionCommand(
+                    userId,
+                    accountId,
+                    strategyId,
+                    orderId,
+                    AdminOrderCorrectionCommand.Mode.valueOf(mode),
+                    tradeDateKst,
+                    direction != null ? Order.OrderDirection.valueOf(direction) : null,
+                    quantity,
+                    price,
+                    memo
+            );
+        }
+    }
+
+    record AdminOrderCorrectionResponse(
+            UUID userId,
+            UUID accountId,
+            UUID strategyId,
+            UUID orderId,
+            String mode,
+            String originalStatus,
+            String resultingStatus,
+            String replacementExternalOrderId,
+            int finalHoldings,
+            BigDecimal finalAvgPrice,
+            BigDecimal finalUsdDeposit,
+            String strategyStatus,
+            boolean cycleEnded,
+            LocalDate cycleEndDate
+    ) {
+        static AdminOrderCorrectionResponse from(AdminOrderCorrectionResult result) {
+            return new AdminOrderCorrectionResponse(
+                    result.userId(),
+                    result.accountId(),
+                    result.strategyId(),
+                    result.orderId(),
+                    result.mode().name(),
+                    result.originalStatus().name(),
+                    result.resultingStatus().name(),
+                    result.replacementExternalOrderId(),
                     result.finalHoldings(),
                     result.finalAvgPrice(),
                     result.finalUsdDeposit(),
