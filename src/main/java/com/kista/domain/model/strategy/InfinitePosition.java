@@ -84,6 +84,27 @@ public record InfinitePosition(
         return unitAmount().compareTo(usdDeposit()) > 0;
     }
 
+    // 체결 후 리버스모드 상태 전이 — prevReverseMode: 이전 상태
+    // 진입: 일반모드 + holdings>0 + isFinalRound (소진 발동)
+    // 종료: 리버스모드 + holdings>0 + 종가가 회복 임계선 이상 (shouldExitReverseMode)
+    public boolean nextReverseMode(boolean prevReverseMode) {
+        if (prevReverseMode) {
+            // 종료 조건: 종가 ≥ avgPrice × (1 - targetProfitRate)
+            if (prevClosePrice != null && balance.avgPrice() != null && holdings() > 0) {
+                ReverseModePosition rp = new ReverseModePosition(
+                        holdings(), balance.avgPrice(), usdDeposit(),
+                        ticker, divisionCount, null, false);
+                if (rp.shouldExitReverseMode(prevClosePrice, ticker.getTargetProfitRate())) {
+                    return false; // 일반모드 복귀
+                }
+            }
+            return true; // 리버스모드 유지
+        } else {
+            // 진입 조건: isFinalRound (소진 감지)
+            return holdings() > 0 && prevClosePrice != null && isFinalRound();
+        }
+    }
+
     // --- 수량 계산 로직 (주문 수량 계산 책임 위임) ---
 
     // static 헬퍼: 실제 평단가·기준가 대신 임의 가격(예: 캡가격)으로도 재사용 가능

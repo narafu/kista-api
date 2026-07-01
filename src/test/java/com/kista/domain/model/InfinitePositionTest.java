@@ -102,4 +102,48 @@ class InfinitePositionTest {
         int quantity = InfinitePosition.lateBuyQuantity(new BigDecimal("10"), new BigDecimal("100"));
         assertThat(quantity).isEqualTo(1);
     }
+
+    // --- nextReverseMode: 리버스모드 상태 전이 검증 ---
+
+    @Test
+    @DisplayName("nextReverseMode: 일반모드 + isFinalRound → 리버스모드 진입")
+    void nextReverseMode_enters_when_finalRound() {
+        // unitAmount=100.00, usdDeposit=50 → isFinalRound=true (unitAmount > usdDeposit)
+        // holdings=5, avgPrice=20 → purchaseAmount=100, totalAssets=150, unitAmount=7.50
+        // unitAmount(7.50) > usdDeposit(50)? → No... 재계산: deposit=50, holdings=5, avg=20
+        // totalAssets=50+100=150, unitAmount=150/20=7.50 → isFinalRound: 7.50>50? No
+        // 소진 조건은 unitAmount > usdDeposit: holdings=18, avg=22, deposit=22 → purchase=396, total=418, unit=20.90 > 22 → true
+        AccountBalance balance = new AccountBalance(18, new BigDecimal("22"), new BigDecimal("22"));
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"), 20);
+
+        // unitAmount(20.90) > usdDeposit(22)? No... 재계산
+        // totalAssets=22+(22*18)=22+396=418, unitAmount=418/20=20.90 → 20.90 < 22 → isFinalRound=false
+        // holdings=19, avg=22, deposit=8 → purchase=418, total=426, unit=21.30 > 8 → true
+        AccountBalance balance2 = new AccountBalance(19, new BigDecimal("22"), new BigDecimal("8"));
+        InfinitePosition pos2 = new InfinitePosition(balance2, Ticker.SOXL, new BigDecimal("22"), 20);
+        assertThat(pos2.isFinalRound()).isTrue();
+        assertThat(pos2.nextReverseMode(false)).isTrue(); // 소진 발동 → 리버스모드 진입
+    }
+
+    @Test
+    @DisplayName("nextReverseMode: 리버스모드 + 종가 회복 → 일반모드 복귀")
+    void nextReverseMode_exits_when_priceRecovered() {
+        // SOXL targetProfitRate=0.20 → threshold = avgPrice × (1 - 0.20) = 22 × 0.80 = 17.60
+        // closingPrice=18.00 ≥ threshold(17.60) → shouldExitReverseMode=true → 일반모드 복귀
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("18.00"), 20);
+
+        assertThat(pos.nextReverseMode(true)).isFalse(); // 종가 회복 → 일반모드 복귀
+    }
+
+    @Test
+    @DisplayName("nextReverseMode: 리버스모드 + 종가 미회복 → 리버스모드 유지")
+    void nextReverseMode_stays_when_priceNotRecovered() {
+        // SOXL targetProfitRate=0.20 → threshold = 22 × 0.80 = 17.60
+        // closingPrice=15.00 < threshold(17.60) → shouldExitReverseMode=false → 리버스모드 유지
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
+        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("15.00"), 20);
+
+        assertThat(pos.nextReverseMode(true)).isTrue(); // 종가 미회복 → 리버스모드 유지
+    }
 }

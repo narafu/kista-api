@@ -117,32 +117,18 @@ class TradingReporter {
                 .map(StrategyInfiniteDetail::divisionCount)
                 .orElse(Strategy.DEFAULT_DIVISION_COUNT);
 
-        if (prevReverseMode) {
-            // 리버스모드 종료 조건: avgPrice × (1 - targetProfitRate) ≤ closingPrice
-            if (closingPrice != null && balance.avgPrice() != null && balance.holdings() > 0) {
-                ReverseModePosition rp = new ReverseModePosition(
-                        balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
-                        strategy.ticker(), divisionCount, null, false);
-                if (rp.shouldExitReverseMode(closingPrice, strategy.ticker().getTargetProfitRate())) {
-                    log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
-                            strategy.id(), closingPrice, balance.avgPrice());
-                    return false;
-                }
-            }
-            return true;
-        } else {
-            // 일반모드 → 소진 감지: usdDeposit < unitAmount (isFinalRound)
-            if (balance.holdings() > 0 && closingPrice != null) {
-                // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
-                InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, divisionCount);
-                if (ip.isFinalRound()) {
-                    log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
-                            strategy.id(), ip.unitAmount(), balance.usdDeposit());
-                    return true;
-                }
-            }
-            return false;
+        // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
+        InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, divisionCount);
+        boolean nextReverseMode = ip.nextReverseMode(prevReverseMode);
+
+        if (!prevReverseMode && nextReverseMode) {
+            log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
+                    strategy.id(), ip.unitAmount(), balance.usdDeposit());
+        } else if (prevReverseMode && !nextReverseMode) {
+            log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
+                    strategy.id(), closingPrice, balance.avgPrice());
         }
+        return nextReverseMode;
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
