@@ -33,8 +33,8 @@ class CycleRotationService {
     private final StrategyPort strategyPort;                   // 전략 상태 갱신
     private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final StrategyCyclePort strategyCyclePort;         // 새 StrategyCycle 생성
-    private final CyclePositionPort cyclePositionPort;         // 새 시작 스냅샷 저장
+    private final CyclePositionPort cyclePositionPort;         // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)
+    private final CycleSnapshotCreator cycleSnapshotCreator;   // StrategyCycle + CyclePosition 원자적 저장
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
     private final UserNotificationPort userNotificationPort;   // 사용자 알림 (재등록 완료)
     private final CycleOrderStrategies cycleStrategies;        // 전략 타입별 최소금액 정책
@@ -97,11 +97,11 @@ class CycleRotationService {
             return;
         }
 
-        // 새 StrategyCycle + 시작 스냅샷 생성 (시드 결정 방식 stamp)
+        // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
         StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategy.id(), activeVersion.id(), targetSeed));
-        cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), targetSeed, price));
+        StrategyCycle newCycle = cycleSnapshotCreator.createCycleAndSnapshot(
+                strategy.id(), activeVersion.id(), targetSeed, price);
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
     }

@@ -49,6 +49,7 @@ class TradingServiceTest {
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
+    @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
     @Mock TosMarginPort tosMarginPort;
@@ -117,7 +118,7 @@ class TradingServiceTest {
                 eq(MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
-                strategyCyclePort, cycleHistoryPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+                cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
         BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
@@ -621,14 +622,12 @@ class TradingServiceTest {
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         // MAINTAIN은 KIS 실잔고 확인 필수 — initDeposit 이상이면 재등록
         when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(initDeposit);
-        // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
-        StrategyCycle savedMaintainCycle = new StrategyCycle(UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now(), null, null, null);
-        when(strategyCyclePort.save(any())).thenReturn(savedMaintainCycle);
 
         service.executeBatch(List.of(new BatchContext(maintainStrategy, maintainCycle, ACCOUNT, USER)), PAST_DST);
 
-        // 재등록: startAmount 동일 유지 (StrategyCycle로 저장)
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(initDeposit) == 0));
+        // 재등록: StrategyCycle + CyclePosition 원자 저장이 startAmount=initDeposit으로 호출됨
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(
+                eq(maintainStrategy.id()), any(UUID.class), eq(initDeposit), eq(PRICE));
         // 성공 알림 발송
     }
 
@@ -654,14 +653,12 @@ class TradingServiceTest {
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
         when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(marginAmount);
-        // CycleRotationService.rotate → strategyCyclePort.save 후 id로 CyclePosition 생성
-        StrategyCycle savedMaxCycle = new StrategyCycle(UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), expectedSeed, null, LocalDate.now(), null, null, null);
-        when(strategyCyclePort.save(any())).thenReturn(savedMaxCycle);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
 
-        // 재등록: 내부 원장(maxSeed=1000)으로 새 StrategyCycle 생성
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(expectedSeed) == 0));
+        // 재등록: 내부 원장(maxSeed=expectedSeed)으로 원자 저장
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(
+                eq(maxStrategy.id()), any(UUID.class), eq(expectedSeed), eq(PRICE));
         // 성공 알림 발송
     }
 

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -43,8 +41,8 @@ class CycleRotationServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock CyclePositionPort cyclePositionPort;
+    @Mock CyclePositionPort cyclePositionPort;           // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)
+    @Mock CycleSnapshotCreator cycleSnapshotCreator;    // StrategyCycle + CyclePosition 원자적 저장
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
@@ -76,7 +74,7 @@ class CycleRotationServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         service = new CycleRotationService(registry, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
-                strategyCyclePort, cyclePositionPort, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+                cyclePositionPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any()))
@@ -87,11 +85,6 @@ class CycleRotationServiceTest {
     private StrategyCycle currentCycle(UUID strategyId, BigDecimal startAmount) {
         return new StrategyCycle(UUID.randomUUID(), strategyId, startAmount,
                 null, LocalDate.now(), null, Instant.now(), null);
-    }
-
-    // 새 StrategyCycle stub 반환값 (save 후 id 포함)
-    private StrategyCycle savedNewCycle(UUID strategyId, BigDecimal deposit) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, STRATEGY_VERSION_ID, deposit, null, LocalDate.now(), null, Instant.now(), null);
     }
 
     private Strategy strategy(Strategy.CycleSeedType seedType) {
@@ -107,25 +100,14 @@ class CycleRotationServiceTest {
         BigDecimal deposit = new BigDecimal("1000.00");
         Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
-        StrategyCycle newCycle = savedNewCycle(strategy.id(), deposit);
         // MAINTAIN도 실잔고 확인 — actual >= maintainSeed 이면 재등록
         when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("1500.00"));
-        when(strategyCyclePort.save(any())).thenReturn(newCycle);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
-        verify(strategyCyclePort).save(cycleCaptor.capture());
-        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(deposit);
-        assertThat(cycleCaptor.getValue().strategyId()).isEqualTo(strategy.id());
-        assertThat(cycleCaptor.getValue().strategyVersionId()).isEqualTo(STRATEGY_VERSION_ID);
-
-        verify(cyclePositionPort).save(argThat(p ->
-                p.strategyCycleId().equals(newCycle.id())
-                        && p.usdDeposit().compareTo(deposit) == 0
-                        && p.holdings() == 0
-                        && p.avgPrice() == null));
+        // StrategyCycle + CyclePosition 원자적 저장 위임 검증
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, deposit, PRICE);
         verify(notifyPort, never()).notifyInsufficientBalance(any(), any(), any());
     }
 
@@ -144,8 +126,7 @@ class CycleRotationServiceTest {
 
         verify(notifyPort).notifyInsufficientBalance(eq(ACCOUNT),
                 argThat(b -> b.usdDeposit().compareTo(deposit) == 0), eq(Ticker.SOXL));
-        verify(strategyCyclePort, never()).save(any());
-        verify(cyclePositionPort, never()).save(any());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
     @Test
@@ -157,7 +138,6 @@ class CycleRotationServiceTest {
         BigDecimal maxSeedDeposit = new BigDecimal("1500.00");
         Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), maintainDeposit);
-        StrategyCycle newCycle = savedNewCycle(strategy.id(), maxSeedDeposit);
 
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
         CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
@@ -165,16 +145,11 @@ class CycleRotationServiceTest {
         when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("2000.00"));
         when(cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)).thenReturn(List.of(lastPosition));
-        when(strategyCyclePort.save(any())).thenReturn(newCycle);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
-        verify(strategyCyclePort).save(cycleCaptor.capture());
-        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(maxSeedDeposit);
-        assertThat(cycleCaptor.getValue().strategyVersionId()).isEqualTo(STRATEGY_VERSION_ID);
-        verify(cyclePositionPort).save(argThat(p ->
-                p.usdDeposit().compareTo(maxSeedDeposit) == 0));
+        // KIS 잔고(2000) >= maxSeed(1500) → maxSeedDeposit으로 재등록
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, maxSeedDeposit, PRICE);
     }
 
     @Test
@@ -189,8 +164,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(notifyPort).notifyError(kisError);
-        verify(strategyCyclePort, never()).save(any());
-        verify(cyclePositionPort, never()).save(any());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
     @Test
@@ -205,8 +179,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(notifyPort).notifyError(any(IllegalStateException.class));
-        verify(strategyCyclePort, never()).save(any());
-        verify(cyclePositionPort, never()).save(any());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
 }
