@@ -59,14 +59,15 @@ public record NextOrdersResponse(
         }
     }
 
-    // 취소 가능한 오늘 PLANNED 주문 항목 (id 포함)
+    // 오늘 등록된 주문 항목 (PLANNED·PLACED 모두 포함 — status로 취소 가능 여부 판단)
     public record TodayOrderItem(
             UUID id,
             String ticker,
             String direction,
             String orderType,
             int quantity,
-            BigDecimal price
+            BigDecimal price,
+            Order.OrderStatus status
     ) {
         public static TodayOrderItem from(Order o) {
             return new TodayOrderItem(
@@ -75,7 +76,8 @@ public record NextOrdersResponse(
                     o.direction().name(),
                     o.orderType().name(),
                     o.quantity(),
-                    o.price()
+                    o.price(),
+                    o.status()
             );
         }
     }

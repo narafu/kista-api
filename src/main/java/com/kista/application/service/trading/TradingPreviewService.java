@@ -51,9 +51,9 @@ class TradingPreviewService {
         // 스케쥴러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
         LocalDate today = DstInfo.nextTradeDate();
 
-        // 오늘 이미 등록된 PLANNED 주문 조회 (새로고침 후에도 취소 버튼 복원용)
+        // 오늘 이미 등록된 주문 조회 — PLANNED(취소 가능) + PLACED(AT_OPEN 선접수됨) 모두 포함
         List<com.kista.domain.model.order.Order> todayPlannedOrders =
-                orderPort.findPlannedByCycleAndDate(currentCycle.id(), today);
+                orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
 
         // 계좌 내 타 전략 당일 PLANNED BUY 합계 (이 전략 분 제외 — 예수금 부족 계산에 사용)
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
