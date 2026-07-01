@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
@@ -11,6 +12,7 @@ import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +39,8 @@ import static org.mockito.Mockito.*;
 class OrderCancelServiceTest {
 
     @Mock OrderPort orderPort;
-    @Mock BrokerOrderRouter brokerOrderRouter;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -61,6 +64,8 @@ class OrderCancelServiceTest {
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
                 null, LocalDate.now(), null, null, null);
+        // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().doReturn(brokerPort).when(registry).require(any(), any());
     }
 
     // --- cancelByCycle ---
@@ -81,7 +86,7 @@ class OrderCancelServiceTest {
 
         assertThat(result.cancelledCount()).isEqualTo(2);
         assertThat(result.failedCount()).isEqualTo(0);
-        verify(brokerOrderRouter, times(2)).cancel(any(), eq(ownedAccount));
+        verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount));
         verify(orderPort, times(2)).markCancelled(any());
     }
 
@@ -97,8 +102,8 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
-        doNothing().when(brokerOrderRouter).cancel(eq(order1), any());
-        doThrow(new RuntimeException("KIS 오류")).when(brokerOrderRouter).cancel(eq(order2), any());
+        doNothing().when(brokerPort).cancel(eq(order1), any());
+        doThrow(new RuntimeException("KIS 오류")).when(brokerPort).cancel(eq(order2), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
@@ -121,7 +126,7 @@ class OrderCancelServiceTest {
 
         assertThat(result.cancelledCount()).isEqualTo(0);
         assertThat(result.failedCount()).isEqualTo(0);
-        verifyNoInteractions(brokerOrderRouter);
+        verifyNoInteractions(brokerPort);
     }
 
     @Test
@@ -147,7 +152,7 @@ class OrderCancelServiceTest {
 
         service.cancelOrder(orderId, requesterId);
 
-        verify(brokerOrderRouter).cancel(order, ownedAccount);
+        verify(brokerPort).cancel(order, ownedAccount);
         verify(orderPort).markCancelled(orderId);
     }
 

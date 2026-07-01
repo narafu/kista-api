@@ -9,6 +9,8 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.SellableQuantityPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +40,11 @@ class ManualTradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock UserPort userPort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock KisPricePort kisPricePort;
+    @Mock KisPricePort kisPricePort;         // BrokerPricePort 위임 대상
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock KisAccountPort kisAccountPort;
-    @Mock TosAccountPort tosAccountPort;
+    @Mock KisAccountPort kisAccountPort;     // LiveBalancePort 위임 대상
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
@@ -78,10 +79,7 @@ class ManualTradingServiceTest {
     @BeforeEach
     void setUp() {
         // 실제 헬퍼 컴포넌트 조립 — TradingServiceTest 패턴 동일
-        BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cyclePositionPort);
-        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort, brokerAdapterRegistry);
         ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
         PrivacyTradingStrategy privacyStrategy = mock(PrivacyTradingStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
@@ -91,10 +89,25 @@ class ManualTradingServiceTest {
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
+        // BrokerPricePort → kisPricePort 위임 (기존 스텁 유지)
+        BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
+        lenient().when(brokerPricePort.getPriceSnapshots(any(), any()))
+                .thenAnswer(inv -> kisPricePort.getPriceSnapshots(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(brokerPricePort.getPrice(any(), any()))
+                .thenAnswer(inv -> kisPricePort.getPrice(inv.getArgument(0), inv.getArgument(1)));
+        doReturn(brokerPricePort).when(brokerAdapterRegistry).require(any(Account.class), eq(BrokerPricePort.class));
+
+        // LiveBalancePort → kisAccountPort 위임 (기존 스텁 유지)
+        LiveBalancePort brokerLiveBalancePort = mock(LiveBalancePort.class);
+        lenient().when(brokerLiveBalancePort.getLiveBalance(any(), any()))
+                .thenAnswer(inv -> kisAccountPort.getBalance(inv.getArgument(0), inv.getArgument(1)));
+        doReturn(brokerLiveBalancePort).when(brokerAdapterRegistry).require(any(Account.class), eq(LiveBalancePort.class));
+
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry);
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 userPort, privacyTradePort, priceFetcher, balanceLoader,
-                orderComputer, orderPlanner, orderExecutor, brokerAccountRouter);
+                orderComputer, orderPlanner, orderExecutor, brokerAdapterRegistry);
 
         // getSellableQuantity 기본 stub — BUY 전용 테스트에서 SELL 체크가 0>충분값으로 통과
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))

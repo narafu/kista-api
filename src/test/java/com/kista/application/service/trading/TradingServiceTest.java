@@ -10,6 +10,10 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,18 +123,41 @@ class TradingServiceTest {
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
                 cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
-        BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(priceRouter);
-        BrokerOrderRouter orderRouter = new BrokerOrderRouter(kisOrderPort, null);
+        // 브로커 포트 → KIS 포트 위임 레지스트리 구성 (기존 kis*Port 스텁·검증 유지)
+        BrokerAdapterRegistry tradingRegistry = mock(BrokerAdapterRegistry.class);
+
+        // BrokerPricePort → kisPricePort 위임
+        BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
+        lenient().when(brokerPricePort.getPrices(any(), any())).thenAnswer(inv -> kisPricePort.getPrices(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(brokerPricePort.getPriceSnapshots(any(), any())).thenAnswer(inv -> kisPricePort.getPriceSnapshots(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(brokerPricePort.getPrice(any(), any())).thenAnswer(inv -> kisPricePort.getPrice(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(brokerPricePort.getPriceSnapshot(any(), any())).thenAnswer(inv -> kisPricePort.getPriceSnapshot(inv.getArgument(0), inv.getArgument(1)));
+        lenient().doReturn(brokerPricePort).when(tradingRegistry).require(any(Account.class), eq(BrokerPricePort.class));
+
+        // BrokerOrderCorrectionPort → kisOrderPort 위임
+        BrokerOrderCorrectionPort brokerOrderPort = mock(BrokerOrderCorrectionPort.class);
+        lenient().when(brokerOrderPort.place(any(), any())).thenAnswer(inv -> kisOrderPort.place(inv.getArgument(0), inv.getArgument(1)));
+        lenient().doAnswer(inv -> { kisOrderPort.cancel(inv.getArgument(0), inv.getArgument(1)); return null; }).when(brokerOrderPort).cancel(any(), any());
+        lenient().doReturn(brokerOrderPort).when(tradingRegistry).require(any(Account.class), eq(BrokerOrderCorrectionPort.class));
+
+        // ExecutionPort → kisExecutionPort 위임 (KIS 계좌 기준 테스트)
+        ExecutionPort brokerExecutionPort = mock(ExecutionPort.class);
+        lenient().when(brokerExecutionPort.getExecutions(any(), any(), any(), any())).thenAnswer(inv ->
+                kisExecutionPort.getExecutions(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2), inv.getArgument(3)));
+        lenient().doReturn(brokerExecutionPort).when(tradingRegistry).require(any(Account.class), eq(ExecutionPort.class));
+
+        // LiveBalancePort → kisAccountPort 위임
+        LiveBalancePort brokerLiveBalancePort = mock(LiveBalancePort.class);
+        lenient().when(brokerLiveBalancePort.getLiveBalance(any(), any())).thenAnswer(inv -> kisAccountPort.getBalance(inv.getArgument(0), inv.getArgument(1)));
+        lenient().doReturn(brokerLiveBalancePort).when(tradingRegistry).require(any(Account.class), eq(LiveBalancePort.class));
+
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, orderRouter, priceCapper, notifyPort);
-        BrokerExecutionRouter executionRouter = new BrokerExecutionRouter(kisExecutionPort, tosExecutionPort);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort);
         TradingReporter reporter = new TradingReporter(
-                executionRouter, orderPort, userNotificationPort, realtimeNotificationPort,
+                tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCyclePort, rotationService, loadUserSettingsPort);
-        BrokerAdapterRegistry accountRegistry = mock(BrokerAdapterRegistry.class);
-        BrokerAccountRouter brokerAccountRouter = new BrokerAccountRouter(kisAccountPort, tosAccountPort, accountRegistry);
         // KIS 계좌 기준 테스트 — live 잔고 체크 시 kisAccountPort.getBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(kisAccountPort.getBalance(eq(ACCOUNT), any()))
@@ -159,7 +186,7 @@ class TradingServiceTest {
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
-                balanceLoader, brokerAccountRouter, orderComputer, orderPlanner,
+                balanceLoader, tradingRegistry, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
                 userPort, loadUserSettingsPort);
     }

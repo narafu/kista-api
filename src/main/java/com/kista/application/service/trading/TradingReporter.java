@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
@@ -10,6 +11,7 @@ import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.ExecutionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,7 +32,7 @@ import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 @Slf4j
 class TradingReporter {
 
-    private final BrokerExecutionRouter brokerExecutionRouter;
+    private final BrokerAdapterRegistry registry;
     private final OrderPort orderPort;
     private final UserNotificationPort userNotificationPort;
     private final RealtimeNotificationPort realtimeNotificationPort;
@@ -46,7 +48,7 @@ class TradingReporter {
                          AccountBalance balance, BigDecimal closingPrice,
                          List<Order> mainOrders, PrivacyTradeBase privacyBase) {
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
-        List<Execution> executions = brokerExecutionRouter.getExecutions(today, today, strategy.ticker(), account);
+        List<Execution> executions = registry.require(account, ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)

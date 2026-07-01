@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.ManualTradingException;
@@ -8,6 +9,8 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.LiveBalancePort;
+import com.kista.domain.port.out.broker.SellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,7 +38,7 @@ class ManualTradingService {
     private final CycleOrderComputer orderComputer;
     private final TradingOrderPlanner orderPlanner;
     private final TradingOrderExecutor orderExecutor;
-    private final BrokerAccountRouter brokerAccountRouter;
+    private final BrokerAdapterRegistry registry;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
@@ -109,7 +112,7 @@ class ManualTradingService {
     // live 잔고 조회 실패 시 ManualTradingException으로 래핑
     private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
         try {
-            AccountBalance lb = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+            AccountBalance lb = registry.require(account, LiveBalancePort.class).getLiveBalance(account, strategy.ticker());
             log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
                     account.nickname(), strategy.ticker().name(), lb.holdings(), lb.usdDeposit());
             return lb;
@@ -125,7 +128,7 @@ class ManualTradingService {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
-        int sellableQty = brokerAccountRouter.getSellableQuantity(account, strategy.ticker());
+        int sellableQty = registry.require(account, SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account).quantity();
         log.info("SELL 수량 검증: [{}] {} 계획={}주, 판매가능={}주",
                 account.nickname(), strategy.ticker().name(), newSellTotal, sellableQty);
         if (newSellTotal > sellableQty) {

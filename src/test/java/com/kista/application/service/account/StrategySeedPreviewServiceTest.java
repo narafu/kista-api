@@ -9,11 +9,12 @@ import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.application.service.account.BrokerStatisticsRouter;
-import com.kista.application.service.trading.BrokerPriceRouter;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -39,7 +42,8 @@ class StrategySeedPreviewServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
     @Mock BrokerStatisticsRouter brokerStatisticsRouter;
-    @Mock BrokerPriceRouter brokerPriceRouter;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock BrokerPricePort pricePort;  // registry.require(account, BrokerPricePort.class) 반환값
     @Mock PrivacyTradePort privacyTradePort;
 
     AccountStatisticsService service;
@@ -55,17 +59,19 @@ class StrategySeedPreviewServiceTest {
         ));
         service = new AccountStatisticsService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
-                brokerStatisticsRouter, brokerPriceRouter,
+                brokerStatisticsRouter, registry,
                 privacyTradePort, cycleStrategies
         );
         mockAccount = mock(Account.class);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mockAccount);
+        // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
     }
 
     @Test
     void infinite_uses_current_price() {
         // given: 현재가 30.00, divisionCount=20
-        when(brokerPriceRouter.getPrice(Strategy.Ticker.SOXL, mockAccount))
+        when(pricePort.getPrice(Strategy.Ticker.SOXL, mockAccount))
                 .thenReturn(new BigDecimal("30.00"));
 
         // when

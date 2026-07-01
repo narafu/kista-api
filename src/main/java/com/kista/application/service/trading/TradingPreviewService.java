@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
@@ -9,6 +10,7 @@ import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,7 @@ class TradingPreviewService {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
-    private final BrokerPriceRouter brokerPriceRouter;
+    private final BrokerAdapterRegistry registry;
     private final PrivacyTradePort privacyTradePort;
     private final TradingBalanceLoader balanceLoader;
     private final CycleOrderComputer orderComputer;
@@ -73,7 +75,7 @@ class TradingPreviewService {
         BigDecimal prevClosePrice = null;
         if (orderStrategy.requiresPrevClose()) {
             prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
-                    () -> brokerPriceRouter.getPriceSnapshot(strategy.ticker(), account).prevClose());
+                    () -> registry.require(account, BrokerPricePort.class).getPriceSnapshot(strategy.ticker(), account).prevClose());
         }
         PrivacyTradeBase privacyBase = orderStrategy.requiresPrivacyBase()
                 ? privacyTradePort.findTodayTrade(today).orElse(null)

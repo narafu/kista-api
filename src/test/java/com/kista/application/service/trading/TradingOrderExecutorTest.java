@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -7,6 +8,8 @@ import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +31,8 @@ import static org.mockito.Mockito.*;
 class TradingOrderExecutorTest {
 
     @Mock OrderPort orderPort;
-    @Mock BrokerOrderRouter brokerOrderRouter;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
     @Mock NotifyPort notifyPort;
 
@@ -46,8 +50,14 @@ class TradingOrderExecutorTest {
     static final InfinitePosition POSITION = new InfinitePosition(
             new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
+    @BeforeEach
+    void setUp() {
+        // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().doReturn(brokerPort).when(registry).require(any(Account.class), any());
+    }
+
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, brokerOrderRouter, buyOrderPriceCapper, notifyPort);
+        return new TradingOrderExecutor(orderPort, registry, buyOrderPriceCapper, notifyPort);
     }
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
@@ -67,7 +77,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerOrderRouter.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-001"));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-001"));
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
@@ -85,7 +95,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerOrderRouter.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-002"));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-002"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION);
 
@@ -98,7 +108,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerOrderRouter.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-003"));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-003"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
 
@@ -116,7 +126,7 @@ class TradingOrderExecutorTest {
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 
         assertThat(result).isEmpty();
-        verify(brokerOrderRouter, never()).place(any(), any());
+        verify(brokerPort, never()).place(any(), any());
         verify(orderPort, never()).markPlaced(any(), any());
     }
 
@@ -127,8 +137,8 @@ class TradingOrderExecutorTest {
         Order order1 = planned(id1, Order.OrderDirection.BUY, "50.00", 10);
         Order order2 = planned(id2, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(order1, order2));
-        when(brokerOrderRouter.place(order1, ACCOUNT)).thenReturn(kisResponse("KIS-101"));
-        when(brokerOrderRouter.place(order2, ACCOUNT)).thenReturn(kisResponse("KIS-102"));
+        when(brokerPort.place(order1, ACCOUNT)).thenReturn(kisResponse("KIS-101"));
+        when(brokerPort.place(order2, ACCOUNT)).thenReturn(kisResponse("KIS-102"));
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
 

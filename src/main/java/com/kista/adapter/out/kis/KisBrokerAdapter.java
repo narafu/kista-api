@@ -3,6 +3,8 @@ package com.kista.adapter.out.kis;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.*;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.*;
@@ -12,20 +14,24 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
-// KIS 증권사 어댑터 — 공통 5개 Port 구현 (BalancePort 미구현 — DB cycle_position 스냅샷 사용)
+// KIS 증권사 어댑터 — 공통 7개 Port 구현 (BrokerPricePort + LiveBalancePort 추가)
 @Component
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
         BrokerOrderCorrectionPort,
-        ExecutionPort {
+        ExecutionPort,
+        BrokerPricePort, LiveBalancePort {
 
     private final KisPortfolioPort kisPortfolioPort;
     private final KisMarginPort kisMarginPort;
     private final KisSellableQuantityPort kisSellableQuantityPort;
     private final KisExecutionPort kisExecutionPort;
     private final KisOrderPort kisOrderPort;
+    private final KisPricePort kisPricePort;       // 현재가·스냅샷 조회
+    private final KisAccountPort kisAccountPort;   // live 잔고 조회
 
     @Override
     public Account.Broker supports() {
@@ -79,5 +85,30 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     @Override
     public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
         return kisOrderPort.place(order, account);
+    }
+
+    @Override
+    public BigDecimal getPrice(Ticker ticker, Account account) {
+        return kisPricePort.getPrice(ticker, account);
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+        return kisPricePort.getPrices(tickers, account);
+    }
+
+    @Override
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
+        return kisPricePort.getPriceSnapshot(ticker, account);
+    }
+
+    @Override
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
+        return kisPricePort.getPriceSnapshots(tickers, account);
+    }
+
+    @Override
+    public AccountBalance getLiveBalance(Account account, Ticker ticker) {
+        return kisAccountPort.getBalance(account, ticker);
     }
 }

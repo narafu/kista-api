@@ -1,6 +1,6 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.trading.BrokerPriceRouter;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.DailyTransaction;
@@ -21,6 +21,7 @@ import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final BrokerStatisticsRouter brokerStatisticsRouter;
-    private final BrokerPriceRouter brokerPriceRouter;
+    private final BrokerAdapterRegistry registry;
     private final PrivacyTradePort privacyTradePort;
     private final CycleOrderStrategies cycleStrategies;
 
@@ -101,7 +102,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("현재가 조회", () -> brokerPriceRouter.getPrices(tickers, account));
+        return BrokerCallGuard.wrap("현재가 조회", () -> registry.require(account, BrokerPricePort.class).getPrices(tickers, account));
     }
 
     @Override
@@ -146,7 +147,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : brokerPriceRouter.getPrice(ticker, account);
+                : registry.require(account, BrokerPricePort.class).getPrice(ticker, account);
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyBase.currentCycleStart()
                 : price;

@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -11,6 +12,7 @@ import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.LiveBalancePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,7 @@ class TradingService {
     private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼 — KIS·Toss 모두 DB 이력(cycle_position)
-    private final BrokerAccountRouter brokerAccountRouter;     // live 잔고 검사 전용 (주문 저장 직전 유효성 확인)
+    private final BrokerAdapterRegistry registry;             // live 잔고 검사 전용 (주문 저장 직전 유효성 확인)
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
@@ -321,7 +323,7 @@ class TradingService {
     // live 잔고 부족 시 사용자 알림 발송 후 true 반환 — 호출부에서 저장 건너뜀 처리
     private boolean notifyIfInsufficientLiveBalance(Account account, User user, Strategy strategy,
                                                     List<Order> orders) {
-        AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+        AccountBalance live = registry.require(account, LiveBalancePort.class).getLiveBalance(account, strategy.ticker());
         if (!live.isOrderValid(orders)) {
             log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
             userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());

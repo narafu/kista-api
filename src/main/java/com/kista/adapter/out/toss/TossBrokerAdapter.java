@@ -3,6 +3,8 @@ package com.kista.adapter.out.toss;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.kis.*;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.*;
 import com.kista.domain.port.out.*;
@@ -14,14 +16,16 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
-// Toss 증권사 어댑터 — 공통 5개 + Toss 전용 5개 Port 구현 (BalancePort 미구현 — BrokerAccountRouter 담당)
+// Toss 증권사 어댑터 — 공통 7개 + Toss 전용 5개 Port 구현
 @Component
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
         BrokerOrderCorrectionPort,
         ExecutionPort,
+        BrokerPricePort, LiveBalancePort,
         CandlePort, ExchangeRatePort, StockInfoPort,
         MarketCalendarPort, BrokerAccountPort {
 
@@ -35,6 +39,8 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     private final TossMarketCalendarPort tossMarketCalendarPort;
     private final TossAccountListPort tossAccountListPort;
     private final TosOrderPort tosOrderPort;
+    private final TosPricePort tosPricePort;         // 현재가·스냅샷 조회 (공통 API — account 불필요)
+    private final TosAccountPort tosAccountPort;     // live 잔고 조회
 
     @Override
     public Account.Broker supports() {
@@ -108,6 +114,33 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     @Override
     public List<TossAccountInfo> getAccountList(Account account) {
         return tossAccountListPort.getAccountList(account);
+    }
+
+    // --- BrokerPricePort (공통 API — account 불필요) ---
+
+    @Override
+    public BigDecimal getPrice(Ticker ticker, Account account) {
+        return tosPricePort.getPrice(ticker); // 공통 API — account 불필요
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+        return tosPricePort.getPrices(tickers); // 공통 API — account 불필요
+    }
+
+    @Override
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
+        return tosPricePort.getPriceSnapshot(ticker); // 공통 API — account 불필요
+    }
+
+    @Override
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
+        return tosPricePort.getPriceSnapshots(tickers); // 공통 API — account 불필요
+    }
+
+    @Override
+    public AccountBalance getLiveBalance(Account account, Ticker ticker) {
+        return tosAccountPort.getBalance(account, ticker);
     }
 
 }

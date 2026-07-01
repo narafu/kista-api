@@ -1,8 +1,10 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,20 +21,20 @@ import java.util.function.BiFunction;
 @Slf4j
 class TradingPriceFetcher {
 
-    private final BrokerPriceRouter brokerPriceRouter;
+    private final BrokerAdapterRegistry registry;
 
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<Ticker, BigDecimal> fetchPrices(List<Ticker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "현재가",
-                (t, acc) -> brokerPriceRouter.getPrices(t, acc),
-                (t, acc) -> brokerPriceRouter.getPrice(t, acc));
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrices(t, acc),
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrice(t, acc));
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<Ticker, PriceSnapshot> fetchPriceSnapshots(List<Ticker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "스냅샷",
-                (t, acc) -> brokerPriceRouter.getPriceSnapshots(t, acc),
-                (t, acc) -> brokerPriceRouter.getPriceSnapshot(t, acc));
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPriceSnapshots(t, acc),
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPriceSnapshot(t, acc));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격

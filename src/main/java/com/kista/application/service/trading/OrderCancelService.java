@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
@@ -10,6 +11,7 @@ import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,7 +29,7 @@ import java.util.UUID;
 class OrderCancelService {
 
     private final OrderPort orderPort;
-    private final BrokerOrderRouter brokerOrderRouter;
+    private final BrokerAdapterRegistry registry;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -58,7 +60,7 @@ class OrderCancelService {
 
         for (Order order : placedOrders) {
             try {
-                brokerOrderRouter.cancel(order, account);
+                registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
                 orderPort.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
@@ -89,7 +91,7 @@ class OrderCancelService {
             throw new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: " + order.status());
         }
 
-        brokerOrderRouter.cancel(order, account);
+        registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
         orderPort.markCancelled(orderId);
     }
 

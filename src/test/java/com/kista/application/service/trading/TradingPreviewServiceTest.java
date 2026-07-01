@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
@@ -8,6 +9,7 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +35,8 @@ class TradingPreviewServiceTest {
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
-    @Mock KisPricePort kisPricePort; // BrokerPriceRouter(KIS) 내부에서 사용
+    @Mock BrokerAdapterRegistry registry;  // BrokerPricePort 조회 경유
+    @Mock BrokerPricePort pricePort;       // registry.require(account, BrokerPricePort.class) 반환값
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -78,9 +81,9 @@ class TradingPreviewServiceTest {
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
-        // BrokerPriceRouter: KIS 계좌 테스트이므로 KIS 포트만 주입, Toss는 null
-        BrokerPriceRouter priceRouter = new BrokerPriceRouter(kisPricePort, null);
-        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, priceRouter, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
+        // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
+        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, registry, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
         // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
         lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
@@ -98,7 +101,7 @@ class TradingPreviewServiceTest {
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(kisPricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
+        when(pricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
                 .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
@@ -125,7 +128,7 @@ class TradingPreviewServiceTest {
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
         assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
-        verify(kisPricePort, never()).getPriceSnapshot(any(), any());
+        verify(pricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
