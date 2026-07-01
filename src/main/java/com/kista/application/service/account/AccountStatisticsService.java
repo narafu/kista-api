@@ -73,7 +73,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
             return brokerStatisticsRouter.getMargin(account);
         } catch (Exception e) {
             log.warn("예수금 조회 실패: accountId={}, error={}", accountId, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }
 
@@ -125,7 +125,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
             return brokerPriceRouter.getPrices(tickers, account);
         } catch (Exception e) {
             log.warn("현재가 조회 실패: accountId={}, tickers={}, error={}", accountId, tickers, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }
 
@@ -136,7 +136,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
             return brokerStatisticsRouter.getSellableQuantity(ticker, account);
         } catch (Exception e) {
             log.warn("판매가능수량 조회 실패: accountId={}, ticker={}, error={}", accountId, ticker, e.getMessage());
-            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
+            throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }
 
