@@ -77,11 +77,17 @@ fly deploy --app kista-api
 fly secrets set KEY=VALUE KEY2=VALUE2 --app kista-api
 # 환경변수 목록 확인
 fly secrets list --app kista-api
-# 필수: KIS_APP_KEY/SECRET/HTS_ID, KIS_ACCOUNT_NO/TYPE, KIS_SYMBOL/EXCHANGE_CODE,
-#        TELEGRAM_BOT_TOKEN/CHAT_ID, DB_URL/USERNAME/PASSWORD,
-#        JWT_SIGNING_KEY, AES_ENCRYPTION_KEY,
-#        ADMIN_KAKAO_IDS (쉼표 구분 카카오 ID 목록, 자동 ADMIN 승격)
-#        CORS_ALLOWED_ORIGINS (Vercel 프로덕션 URL)
+# 필수 환경변수 (V2 멀티계좌 — KIS 자격증명은 accounts 테이블에 계좌별 암호화 저장, 전역 env 아님):
+#   JWT_SIGNING_KEY          — EC P-256 JWK JSON (JWT 서명/검증)
+#   AES_ENCRYPTION_KEY       — AES-256 암호화 키 (계좌 자격증명 복호화)
+#   ADMIN_KAKAO_IDS          — 쉼표 구분 카카오 ID (로그인 시 ADMIN 자동 승격)
+#   INTERNAL_API_TOKEN       — 서버 간 내부 인증 (/api/internal/**)
+#   KAKAO_CLIENT_ID          — 카카오 OAuth 클라이언트 ID
+#   KAKAO_CLIENT_SECRET      — 카카오 OAuth 클라이언트 시크릿 (선택)
+#   TELEGRAM_BOT_TOKEN       — 관리자봇 토큰 (NotifyPort 오류/리포트 알림)
+#   TELEGRAM_CHAT_ID         — 관리자봇 chat ID
+#   DB_URL, DB_USERNAME, DB_PASSWORD — Supabase PostgreSQL 연결
+#   CORS_ALLOWED_ORIGINS     — 쉼표 구분 허용 Origin (Vercel 프로덕션 URL)
 # SPRING_PROFILES_ACTIVE=prod 는 fly.toml [env]에 이미 고정
 ```
 

@@ -27,7 +27,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 docker compose up -d postgres                               # DB만 기동
 ```
 
-필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격)
+필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`)
 
 로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 
