@@ -11,7 +11,9 @@ public record InfinitePosition(
         BigDecimal prevClosePrice,     // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
         int divisionCount              // 분할 수 (20/30/40) — totalAssets ÷ divisionCount = unitAmount
 ) {
-    private static final int MONEY_SCALE = 2;   // 금액·가격·회차 반올림 자리수 (센트 단위)
+    private static final int MONEY_SCALE = 2;           // 금액·가격·회차 반올림 자리수 (센트 단위)
+    // LOC/MOC 매도 시 전체 보유 수량의 1/4씩 분할 (4회전 완료 = 전량 매도)
+    private static final int SELL_QUARTER_DIVISOR = 4;
 
     // --- 기본 도메인 속성 조회 ---
 
@@ -131,6 +133,6 @@ public record InfinitePosition(
     }
 
     private int sellQuantityQuarter() {
-        return holdings() / 4;
+        return holdings() / SELL_QUARTER_DIVISOR;
     }
 }

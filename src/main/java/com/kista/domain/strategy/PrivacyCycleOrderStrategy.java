@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static java.math.RoundingMode.HALF_UP;
+
 // PRIVACY 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcPrivacy + CycleRotationService.resolveMinRequired(PRIVACY) 이전
 @Slf4j
@@ -42,6 +44,6 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
         if (privacyBase == null) return null;
         // currentCycleStart 0.5배 적용
-        return privacyBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
+        return privacyBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP);
     }
 }
