@@ -25,6 +25,18 @@ public record AccountBalance(
         return totalBuyAmount.compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
     }
 
+    // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live usdDeposit − 타 전략 당일 PLANNED BUY 합계)
+    // 배치 스케쥴러의 isOrderValid()와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
+    public boolean hasSufficientDepositFor(List<Order> orders, BigDecimal otherStrategyBuyTotal) {
+        BigDecimal newBuyTotal = orders.stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (newBuyTotal.compareTo(BigDecimal.ZERO) <= 0) return true; // BUY 없으면 통과
+        BigDecimal available = usdDeposit().subtract(otherStrategyBuyTotal);
+        return newBuyTotal.compareTo(available) <= 0;
+    }
+
     // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (매도 후 잔여 보유금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
     public AccountBalance applyExecutions(List<Execution> executions) {
         if (executions.isEmpty()) return this;

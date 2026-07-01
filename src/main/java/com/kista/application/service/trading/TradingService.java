@@ -210,12 +210,7 @@ class TradingService {
         if (result == null) return null;
 
         // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-        AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-        if (!live.isOrderValid(result.orders())) {
-            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 마감 plan 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
-            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
-            return null;
-        }
+        if (notifyIfInsufficientLiveBalance(account, user, strategy, result.orders())) return null;
 
         orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
 
@@ -299,12 +294,7 @@ class TradingService {
             }
 
             // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-            AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
-            if (!live.isOrderValid(result.orders())) {
-                log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
-                userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
-                return;
-            }
+            if (notifyIfInsufficientLiveBalance(account, user, strategy, result.orders())) return;
 
             // 전체 PLANNED 저장
             orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
@@ -318,6 +308,18 @@ class TradingService {
             return;
         }
         orderExecutor.placeGiven(atOpenOrders, account);
+    }
+
+    // live 잔고 부족 시 사용자 알림 발송 후 true 반환 — 호출부에서 저장 건너뜀 처리
+    private boolean notifyIfInsufficientLiveBalance(Account account, User user, Strategy strategy,
+                                                    List<Order> orders) {
+        AccountBalance live = brokerAccountRouter.getLiveBalance(account, strategy.ticker());
+        if (!live.isOrderValid(orders)) {
+            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
+            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
+            return true;
+        }
+        return false;
     }
 
     // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
