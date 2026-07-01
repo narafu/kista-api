@@ -28,4 +28,7 @@ public interface AdminQueryUseCase {
 
     // strategy_cycle.id → strategy.type 배치 조회 (관리자 거래내역 전략 타입 표시용)
     Map<UUID, Strategy.Type> getStrategyTypesByCycleIds(Set<UUID> cycleIds);
+
+    // 계좌 선택 이후 전략 선택 UI용 목록
+    List<Strategy> listStrategies(UUID accountId);
 }

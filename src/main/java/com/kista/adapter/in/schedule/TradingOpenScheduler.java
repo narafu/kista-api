@@ -1,8 +1,11 @@
 package com.kista.adapter.in.schedule;
 
+import com.kista.application.service.privacy.PrivacyTradeValidationService;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
@@ -16,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +37,8 @@ public class TradingOpenScheduler {
     private final UserPort userPort;
     private final NotifyPort notifyPort;
     private final SchedulerLockService schedulerLockService;
+    private final PrivacyTradePort privacyTradePort;
+    private final PrivacyTradeValidationService validationService;
 
     @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
     public void run() throws InterruptedException {
@@ -81,6 +87,8 @@ public class TradingOpenScheduler {
     // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
     private List<BatchContext> buildContexts() {
         List<Strategy> strategies = strategyPort.findAllActive();
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        strategies = guardPrivacyStrategies(strategies, today);
         List<BatchContext> contexts = new ArrayList<>();
         for (Strategy strategy : strategies) {
             try {
@@ -94,5 +102,25 @@ public class TradingOpenScheduler {
             }
         }
         return contexts;
+    }
+
+    // PRIVACY 기준 매매표가 위험 패턴이면 그 실행에서만 주문 생성 skip + 관리자 알림
+    private List<Strategy> guardPrivacyStrategies(List<Strategy> strategies, LocalDate today) {
+        List<Strategy> privacyStrategies = strategies.stream()
+                .filter(Strategy::isPrivacy)
+                .toList();
+        if (privacyStrategies.isEmpty()) return strategies;
+
+        PrivacyTradeBase base = privacyTradePort.findTodayTrade(today).orElse(null);
+        if (base == null) return strategies;
+
+        PrivacyTradeValidationReport report = validationService.inspect(base);
+        if (!report.hasIssues()) return strategies;
+
+        notifyPort.notifyError(new IllegalStateException(
+                "[PRIVACY] 장전 가드 발동 — 기준 매매표 이상으로 주문 생성 skip: " + report.summary()));
+        return strategies.stream()
+                .filter(s -> !s.isPrivacy())
+                .toList();
     }
 }

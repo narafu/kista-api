@@ -1,6 +1,8 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
@@ -8,6 +10,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.application.service.privacy.PrivacyTradeValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +40,8 @@ class TradingOpenSchedulerTest {
     @Mock UserPort userPort;
     @Mock NotifyPort notifyPort;
     @Mock SchedulerLockService schedulerLockService;
+    @Mock PrivacyTradePort privacyTradePort;
+    @Mock PrivacyTradeValidationService validationService;
     @InjectMocks TradingOpenScheduler scheduler;
 
     private static final UUID USER_ID    = UUID.randomUUID();
@@ -177,5 +182,35 @@ class TradingOpenSchedulerTest {
         scheduler.run();
 
         verifyNoInteractions(strategyPort, useCase, notifyPort);
+    }
+
+    @Test
+    void run_invalidPrivacyBase_pausesPrivacyStrategiesAndSkipsThem() throws InterruptedException {
+        Strategy infinite = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
+        UUID privacyAccountId = UUID.randomUUID();
+        Strategy privacy = mockStrategy(privacyAccountId, Strategy.Type.PRIVACY);
+        Account infiniteAccount = mockAccount(ACCOUNT_ID);
+        Account privacyAccount = mockAccount(privacyAccountId);
+        User user = mockUser();
+        PrivacyTradeBase invalidBase = new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("225.75"),
+                4, new BigDecimal("13977.43"), List.of());
+
+        when(strategyPort.findAllActive()).thenReturn(List.of(infinite, privacy));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(invalidBase));
+        when(validationService.inspect(invalidBase))
+                .thenReturn(PrivacyTradeValidationReport.warning("MISSING_SELL", "SELL 주문이 없습니다"));
+        when(strategyCyclePort.findLatestByStrategyId(infinite.id())).thenReturn(Optional.of(mockCycle(infinite.id())));
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(infiniteAccount);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+
+        scheduler.run();
+
+        verify(strategyPort, never()).save(any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
+        verify(useCase).placeOpenOrders(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().getFirst().strategy().type()).isEqualTo(Strategy.Type.INFINITE);
+        verify(notifyPort).notifyError(any(IllegalStateException.class));
     }
 }

@@ -4,7 +4,9 @@ import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
+import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.port.in.PrivacyUseCase;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ import java.util.NoSuchElementException;
 class PrivacyService implements PrivacyUseCase {
 
     private final PrivacyTradePort privacyTradePort;
+    private final NotifyPort notifyPort;
+    private final PrivacyTradeValidationService validationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -39,6 +43,15 @@ class PrivacyService implements PrivacyUseCase {
                 command.holdings(),
                 command.orders()
         );
+        PrivacyTradeValidationReport report = validationService.inspect(kstCommand);
+        if (report.hasBlockingIssues()) {
+            IllegalArgumentException exception = new IllegalArgumentException(report.summary());
+            notifyPort.notifyError(exception);
+            throw exception;
+        }
+        if (report.hasIssues()) {
+            notifyPort.notifyInfo("[PRIVACY] 기준 매매표 경고: " + report.summary());
+        }
         return privacyTradePort.saveBaseWithOrders(kstCommand);
     }
 }

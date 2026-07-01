@@ -115,4 +115,9 @@ class AdminQueryService implements AdminQueryUseCase {
                 : TradeDateConverter.toUtc(LocalDate.now(TimeZones.KST).minusDays(days));
         return privacyTradePort.findBasesFromTradeDate(fromUtc);
     }
+
+    @Override
+    public List<Strategy> listStrategies(UUID accountId) {
+        return strategyPort.findByAccountId(accountId);
+    }
 }
