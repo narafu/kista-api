@@ -60,20 +60,17 @@ adapter/in/
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
                    BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리)
   web/           ← REST Controller + DTO
-                    AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`), DashboardController (DB기반 포트폴리오 스냅샷·사이클 이력), StatisticsController (KIS 전용 live 잔고/수익/가격), TossStatisticsController (Toss 전용 live 6개 엔드포인트, /api/accounts/{accountId}/*), FearGreedController (CNN·크립토 공포탐욕지수, GET /api/market/fear-greed), MetaController (enum SSOT /api/meta 번들만, Cache 1h — StrategyTypeMeta에 capability 7필드: code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), PrivacyTradeController, Admin*Controller (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminObservabilityController (/api/admin/logs/ — 감사로그+앱에러로그 조회, DELETE /errors/{id} 앱에러로그 소프트 삭제), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
+                    AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`), DashboardController (DB기반 사이클 이력), StatisticsController (KIS 전용 live 잔고/수익/가격), TossStatisticsController (Toss 전용 live 5개 엔드포인트, /api/accounts/{accountId}/*), FearGreedController (CNN·크립토 공포탐욕지수, GET /api/market/fear-greed), MetaController (enum SSOT /api/meta 번들만, Cache 1h — StrategyTypeMeta에 capability 7필드: code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), Admin*Controller (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminObservabilityController (/api/admin/logs/ — 감사로그+앱에러로그 조회, DELETE /errors/{id} 앱에러로그 소프트 삭제), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 ### DashboardController vs StatisticsController 응답 형식 차이
 - `DashboardController`: DB 기반 전용 DTO 반환
-  - `GET /api/portfolio/snapshots` → `PortfolioSnapshotResponse`(`CyclePositionHistoryEntry` 기반, `marketValueUsd`/`totalAssetUsd`는 `currentPrice × holdings` computed 값, `snapshotDate` 제거됨)
-  - `GET /api/accounts/{accountId}/snapshots` → `PortfolioSnapshotResponse` (계좌별 DB 포지션 이력)
   - `GET /api/accounts/{accountId}/cycle-history` → `CycleHistoryPageResponse` (커서 페이지네이션)
-  - kista-ui: 포트폴리오 날짜는 `snapshotDate`(제거) 대신 `createdAt`(Instant)에서 추출
 - `StatisticsController`: **KIS 전용** live API 직접 호출 → `PresentBalanceResult`, `PeriodProfitResult` 등 도메인 모델 그대로 반환
   - kista-ui에서 소비 시 normalizer 함수 필요 (예: `normalizePortfolio()`, `ProfitSummary` optional 필드 fallback)
   - 신규 live 엔드포인트 추가 시 kista-ui 타입과 응답 필드명 반드시 대조 확인
-- `TossStatisticsController`: **Toss 전용** — 잔고/캔들/환율/세션/종목정보/판매가능수량 6개 엔드포인트 (`/api/accounts/{accountId}/*`)
+- `TossStatisticsController`: **Toss 전용** — 캔들/환율/세션/종목정보/계좌정보 5개 엔드포인트 (`/api/accounts/{accountId}/*`)
   - `TossStatisticsUseCase` → `TossStatisticsService` 구현
 
 adapter/out/
