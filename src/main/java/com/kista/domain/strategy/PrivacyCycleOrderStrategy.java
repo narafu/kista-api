@@ -20,7 +20,7 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
 
-    private final PrivacyTradingStrategy privacyStrategy;
+    private final PrivacyStrategy privacyStrategy;
 
     @Override
     public Strategy.Type cycleType() { return Strategy.Type.PRIVACY; }

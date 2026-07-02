@@ -48,7 +48,7 @@ class ManualTradingServiceTest {
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
-    @Mock InfiniteTradingStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
+    @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
 
     ManualTradingService service;
 
@@ -80,8 +80,8 @@ class ManualTradingServiceTest {
     void setUp() {
         // 실제 헬퍼 컴포넌트 조립 — TradingServiceTest 패턴 동일
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cyclePositionPort);
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
-        PrivacyTradingStrategy privacyStrategy = mock(PrivacyTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
+        PrivacyStrategy privacyStrategy = mock(PrivacyStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));

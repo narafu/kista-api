@@ -19,10 +19,9 @@ import static com.kista.domain.model.order.Order.OrderType.MOC;
 // 리버스모드(소진 후) 전략 — 별지점 기준 분할 매도 + 쿼터 매수
 @Slf4j
 @Component
-class ReverseInfiniteStrategy implements ReverseInfiniteTradingStrategy {
+public class ReverseInfiniteStrategy {
 
-    // 첫날: MOC 매도만 (별지점 계산 없이 즉시 청산 시작)
-    @Override
+    // 소진 직후 첫날: MOC 매도만 생성 (별지점 계산 없이 즉시 청산 시작)
     public List<Order> buildFirstDayOrders(ReverseModePosition position, LocalDate tradeDate) {
         int mocSellQuantity = position.calcMocSellQuantity();
         if (mocSellQuantity < 1) {
@@ -34,7 +33,6 @@ class ReverseInfiniteStrategy implements ReverseInfiniteTradingStrategy {
     }
 
     // 두번째 날 이후: LOC 매도(별지점 위) + LOC 쿼터매수(별지점 아래)
-    @Override
     public List<Order> buildOrders(ReverseModePosition position, LocalDate tradeDate) {
         List<Order> orders = new ArrayList<>();
 

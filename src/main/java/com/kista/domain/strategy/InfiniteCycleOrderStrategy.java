@@ -27,8 +27,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     // 평단가 매수 + LOC 매수 각 최소 1주 보장
     private static final double MIN_DEPOSIT_FACTOR = 2.0;
 
-    private final InfiniteTradingStrategy infiniteStrategy;
-    private final ReverseInfiniteTradingStrategy reverseStrategy; // 리버스모드 전략 (구현체: ReverseInfiniteStrategy)
+    private final InfiniteStrategy infiniteStrategy;
+    private final ReverseInfiniteStrategy reverseStrategy; // 리버스모드 전략
 
     @Override
     public Strategy.Type cycleType() { return Strategy.Type.INFINITE; }
@@ -51,7 +51,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         return planNormalMode(ctx);
     }
 
-    // 일반 모드 — 기존 InfiniteTradingStrategy 사용
+    // 일반 모드 — InfiniteStrategy 사용
     private Optional<OrderPlan> planNormalMode(PlanContext ctx) {
         // 0회차(holdings==0)에서 전일종가 없으면 InfinitePosition 생성 자체가 불가
         if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {

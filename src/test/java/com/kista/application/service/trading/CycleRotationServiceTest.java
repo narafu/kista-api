@@ -46,8 +46,8 @@ class CycleRotationServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock UserSettingsPort userSettingsPort;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
-    @Mock PrivacyTradingStrategy privacyStrategy;
+    @Mock InfiniteStrategy infiniteStrategy;
+    @Mock PrivacyStrategy privacyStrategy;
 
     CycleRotationService service;
 
@@ -69,7 +69,7 @@ class CycleRotationServiceTest {
         when(userSettingsPort.loadByUserId(any()))
                 .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
 
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));

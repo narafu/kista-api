@@ -41,8 +41,8 @@ class TradingServiceTest {
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
     @Mock TossExecutionPort tossExecutionPort;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
-    @Mock PrivacyTradingStrategy privacyStrategy;
+    @Mock InfiniteStrategy infiniteStrategy;
+    @Mock PrivacyStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort; // TradingService + TradingReporter 양쪽에서 사용
     @Mock OrderPort orderPort;
@@ -110,7 +110,7 @@ class TradingServiceTest {
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
