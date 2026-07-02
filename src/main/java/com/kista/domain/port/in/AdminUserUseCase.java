@@ -5,6 +5,7 @@ import com.kista.domain.model.user.User;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 // 관리자 사용자 관리 — 조회 + 상태/역할 변경 + 삭제 통합
@@ -15,4 +16,7 @@ public interface AdminUserUseCase {
     void rejectUser(UUID adminId, UUID targetUserId);
     void changeRole(UUID adminId, UUID targetUserId, User.UserRole role);
     void deleteUser(UUID adminId, UUID targetUserId);
+
+    // 단일 사용자 뷰 조회 — listStrategyOrders 전용 (전체 풀스캔 없이 단건 반환)
+    Optional<AdminUserView> findUser(UUID userId);
 }

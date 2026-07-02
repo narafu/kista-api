@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -129,5 +130,11 @@ class AdminQueryService implements AdminQueryUseCase {
     @Override
     public List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate) {
         return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate);
+    }
+
+    @Override
+    public Optional<Account> findAccount(UUID accountId) {
+        // 단일 계좌 조회 — 전체 계좌 풀스캔 없이 ID 기반 직접 조회
+        return accountPort.findById(accountId);
     }
 }

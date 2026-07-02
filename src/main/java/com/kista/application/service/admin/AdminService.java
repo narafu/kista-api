@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -96,5 +97,14 @@ class AdminService implements AdminUserUseCase {
         userCascadeDeleter.deleteCascade(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AdminUserView> findUser(UUID userId) {
+        // 전체 조회 후 ID 필터 — AdminUserViewPort에 단건 조회 미지원
+        return adminUserViewPort.findAll().stream()
+                .filter(v -> userId.equals(v.id()))
+                .findFirst();
     }
 }

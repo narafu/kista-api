@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,4 +38,7 @@ public interface AdminQueryUseCase {
 
     // 선택한 전략의 특정 거래일 주문 목록 조회
     List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate);
+
+    // 단일 계좌 조회 — listStrategyOrders 전용 (전체 풀스캔 불필요)
+    Optional<Account> findAccount(UUID accountId);
 }

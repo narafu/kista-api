@@ -25,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -86,7 +87,8 @@ class AdminTradeControllerTest {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
-        when(adminQuery.listAccounts(null, null)).thenReturn(List.of(
+        // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
+        when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
                 new com.kista.domain.model.account.Account(
                         accountId,
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
@@ -99,7 +101,7 @@ class AdminTradeControllerTest {
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));
-        when(adminUser.listAll(null, null)).thenReturn(List.of(
+        when(adminUser.findUser(UUID.fromString("00000000-0000-0000-0000-000000000010"))).thenReturn(Optional.of(
                 new com.kista.domain.model.admin.AdminUserView(
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "privacy-user",

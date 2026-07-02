@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -62,7 +63,17 @@ public class AdminTradeController {
         List<Order> orders = adminQuery.listStrategyOrders(strategyId, tradeDate).stream()
                 .filter(order -> accountId.equals(order.accountId()))
                 .toList();
-        return toResponses(orders);
+        if (orders.isEmpty()) return List.of();
+        // 단일 계좌만 조회 — 전체 풀스캔 불필요
+        Account account = adminQuery.findAccount(accountId)
+                .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+        AdminUserView user = adminUser.findUser(account.userId())
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId()));
+        Map<UUID, Account> accountMap = Map.of(accountId, account);
+        Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
+        Set<UUID> cycleIds = orders.stream().map(Order::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
+        return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategyTypeMap)).toList();
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
