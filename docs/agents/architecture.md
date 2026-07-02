@@ -26,7 +26,7 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     market/      ← FearGreedSnapshot, FearGreedRating
     admin/       ← AdminAnomalies, AdminStats, AdminUserView, AuditLog, AppErrorLog
     privacy/     ← FidaOrderCommand, PrivacyCurrentBase, PrivacyTradeBase, PrivacyTradeBaseView, PrivacyTradeSaveResult, PrivacyTradeConflictException
-  strategy/      ← InfiniteTradingStrategy/PrivacyTradingStrategy 인터페이스 + InfiniteStrategy/PrivacyStrategy 구현 — @Component 허용 예외 (ArchUnit)
+  strategy/      ← InfiniteStrategy/ReverseInfiniteStrategy/PrivacyStrategy 구현 클래스 (1:1 인터페이스 통폐합됨) — @Component 허용 예외 (ArchUnit)
                    CycleOrderStrategy (인터페이스 + InfiniteCycleOrderStrategy/PrivacyCycleOrderStrategy 구현): 최소시드·capability SSOT (아래 "CycleOrderStrategy Capability 패턴" 참고)
                    CycleOrderStrategies (@Component 라우터): Map<Strategy.Type, CycleOrderStrategy> 자동 수집
   port/in/       ← UseCase 인터페이스 (인바운드 포트)
