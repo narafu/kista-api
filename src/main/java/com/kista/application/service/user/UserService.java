@@ -133,16 +133,8 @@ class UserService implements UserUseCase {
 
         // 상태별 쿨다운 검증
         switch (user.status()) {
-            case PENDING -> {
-                if (user.lastReappliedAt() != null &&
-                        now.isBefore(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
-                    throw new User.CooldownException(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
-            }
-            case REJECTED -> {
-                if (user.lastReappliedAt() != null &&
-                        now.isBefore(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
-                    throw new User.CooldownException(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
-            }
+            case PENDING  -> requireCooldownPassed(user, PENDING_REAPPLY_COOLDOWN_HOURS, now);
+            case REJECTED -> requireCooldownPassed(user, REJECTED_REAPPLY_COOLDOWN_HOURS, now);
             default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }
 
@@ -151,6 +143,13 @@ class UserService implements UserUseCase {
         userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
         notificationPort.notifyNewUser(updated);
+    }
+
+    // 쿨다운 미경과 시 CooldownException 발생 — PENDING/REJECTED 공통 판정
+    private void requireCooldownPassed(User user, long cooldownHours, Instant now) {
+        if (user.lastReappliedAt() != null &&
+                now.isBefore(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS)))
+            throw new User.CooldownException(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS));
     }
 
     @Override

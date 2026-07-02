@@ -84,9 +84,7 @@ class TokenService implements TokenUseCase {
                 return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
             }
             // grace 초과 → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
-            log.warn("[RT] 재사용 공격 의심: grace 초과 회전 토큰 재제시 (userId={})", rt.userId());
-            refreshTokenPort.deleteAllByUserId(rt.userId());
-            throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+            throw revokeAllSessionsAndReject(rt.userId(), "재사용 공격 의심: grace 초과 회전 토큰 재제시");
         }
 
         // 미회전 RT — markRotated로 원자적 회전 마킹 (동시 요청 시 1건만 1 반환)
@@ -96,9 +94,7 @@ class TokenService implements TokenUseCase {
             rt = refreshTokenPort.findByTokenHash(hash)
                     .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
             if (rt.rotatedAt() == null || Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) > 0) {
-                log.warn("[RT] refresh 거부: markRotated 경쟁 후 grace 초과 (userId={})", rt.userId());
-                refreshTokenPort.deleteAllByUserId(rt.userId());
-                throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+                throw revokeAllSessionsAndReject(rt.userId(), "refresh 거부: markRotated 경쟁 후 grace 초과");
             }
             // grace 이내 경쟁 패자 → 정상 처리
         }
@@ -150,6 +146,13 @@ class TokenService implements TokenUseCase {
                 Instant.now().plus(RT_TTL), null, null
         ));
         return newRaw;
+    }
+
+    // grace 초과 — 해당 사용자 전체 세션 폐기 후 거부 예외 반환 (throw 용)
+    private InvalidRefreshTokenException revokeAllSessionsAndReject(UUID userId, String warnContext) {
+        log.warn("[RT] {} (userId={})", warnContext, userId);
+        refreshTokenPort.deleteAllByUserId(userId);
+        return new InvalidRefreshTokenException("유효하지 않은 refresh token");
     }
 
     private static String generateRawToken() {

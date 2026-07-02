@@ -46,44 +46,72 @@ class StrategyService implements StrategyUseCase {
                 : Strategy.CycleSeedType.NONE;
         Strategy.Ticker resolvedTicker = cmd.type().resolveTicker(cmd.ticker(), Strategy.Ticker.SOXL);
 
-        // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
-        if (strategyPort.existsByAccountIdAndTicker(accountId, resolvedTicker)) {
-            throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + resolvedTicker);
-        }
+        // 종목 중복 + 잔고 검증
+        validateUniqueTicker(accountId, resolvedTicker);
+        validateBalanceIfRequired(account, accountId, userId, cmd.initialUsdDeposit());
 
-        // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
+        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+
+        // 전략·버전·상세 저장 (strategy → strategy_versions → strategy_infinite_details)
+        var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount);
+
+        // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → cycle_position_infinite_details)
+        StrategyCycle cycle = saveInitialCycleAndPosition(
+                persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit());
+
+        log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
+        return new StrategyDetail(persisted.strategy(), cycle.startAmount(), divisionCount, false, 0.0, 0);
+    }
+
+    // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
+    private void validateUniqueTicker(UUID accountId, Strategy.Ticker ticker) {
+        if (strategyPort.existsByAccountIdAndTicker(accountId, ticker)) {
+            throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + ticker);
+        }
+    }
+
+    // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
+    private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit) {
         userPort.findByIdOrThrow(userId); // 사용자 존재 확인
         UserSettings settings = userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
-        if (settings.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
+        if (settings.balanceCheckEnabled() && initialUsdDeposit != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
-            if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {
+            if (initialUsdDeposit.compareTo(freeCash) > 0) {
                 throw new IllegalArgumentException(
                         "다른 전략이 사용 중인 시드를 제외한 예수금(" + freeCash + ")을 초과했습니다");
             }
         }
+    }
 
-        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
-        Strategy strategy = new Strategy(null, accountId, cmd.type(), Strategy.Status.ACTIVE, resolvedTicker, seedType);
+    // strategy → strategy_versions → strategy_infinite_details 순 저장
+    private SavedStrategyAndVersion saveStrategyWithVersion(
+            UUID accountId, Strategy.Type type, Strategy.Ticker ticker,
+            Strategy.CycleSeedType seedType, int divisionCount) {
+        Strategy strategy = new Strategy(null, accountId, type, Strategy.Status.ACTIVE, ticker, seedType);
         Strategy saved = strategyPort.save(strategy);
-        StrategyVersion initialVersion = strategyVersionPort.save(
+        StrategyVersion version = strategyVersionPort.save(
                 new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
         );
         if (saved.isInfinite()) {
-            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(initialVersion.id(), divisionCount));
+            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), divisionCount));
         }
+        return new SavedStrategyAndVersion(saved, version);
+    }
 
-        // 첫 번째 StrategyCycle 생성 — 사용자 직접 입력 시드
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), initialVersion.id(), cmd.initialUsdDeposit()));
-
-        // 초기 스냅샷 저장: 입금액 기준, 보유 없음, 실제 장마감 종가는 첫 매매 후 저장
-        CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), cmd.initialUsdDeposit()));
+    // strategy_cycles → cycle_positions → cycle_position_infinite_details 순 저장
+    private StrategyCycle saveInitialCycleAndPosition(
+            Strategy saved, UUID versionId, BigDecimal initialUsdDeposit) {
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, initialUsdDeposit));
+        // 초기 스냅샷 저장: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
+        CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
         if (saved.isInfinite()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
         }
-
-        log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, saved.id(), saved.type());
-        return new StrategyDetail(saved, cycle.startAmount(), divisionCount, false, 0.0, 0);
+        return cycle;
     }
+
+    // 전략 저장 후 버전 ID를 함께 전달하기 위한 내부 전달 객체
+    private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version) {}
 
     @Override
     public void delete(UUID strategyId, UUID requesterId) {

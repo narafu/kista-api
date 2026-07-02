@@ -136,16 +136,19 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
             UUID accountId, UUID requesterId,
             Strategy.Type type, Strategy.Ticker ticker, int divisionCount) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+
+        // 1단계: 전략 타입별 capability 로드
         CycleOrderStrategy strategy = cycleStrategies.of(type);
 
+        // 2단계: PRIVACY 기준 매매표 조회 — 기준가 소스가 필요한 전략만 조회
         PrivacyTradeBase privacyBase = strategy.requiresPrivacyBase()
                 ? privacyTradePort.findTodayTrade(LocalDate.now(TimeZones.KST)).orElse(null)
                 : null;
-
         if (strategy.requiresPrivacyBase() && privacyBase == null) {
             return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
         }
 
+        // 3단계: 현재가 + 기준가 결정 후 최소 시드 계산
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
                 : registry.require(account, BrokerPricePort.class).getPrice(ticker, account);
