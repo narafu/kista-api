@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.ManualTradingException;
@@ -40,8 +41,8 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "Access Denied", ex.getMessage());
     }
 
-    @ExceptionHandler(Account.CooldownException.class)
-    public ResponseEntity<ProblemDetail> handleCooldown(Account.CooldownException ex) {
+    @ExceptionHandler(User.CooldownException.class)
+    public ResponseEntity<ProblemDetail> handleCooldown(User.CooldownException ex) {
         // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
         saveErrorLog(ex);
         ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Cooldown Active", ex.getMessage());

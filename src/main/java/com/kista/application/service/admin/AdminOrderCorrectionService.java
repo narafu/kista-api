@@ -5,7 +5,7 @@ import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminOrderCorrectionCommand;
 import com.kista.domain.model.admin.AdminOrderCorrectionResult;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;
@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
+
+    private static final String AUDIT_ACTION = "ORDER_CORRECTION"; // 감사 로그 액션 코드
+    private static final String AUDIT_TARGET_TYPE = "ORDER";       // 감사 로그 대상 타입
 
     private final UserPort userPort;
     private final AccountPort accountPort;
@@ -72,27 +76,13 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
         orderPort.updatePlannedOrder(order.id(), price, quantity);
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "newPrice", price.toPlainString(),
                         "newQuantity", quantity
                 )));
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.PLANNED,
-                null,
-                0,
-                null,
-                null,
-                strategy.status(),
-                false,
-                null
-        );
+        return AdminOrderCorrectionResult.simple(command, order.id(),
+                order.status(), Order.OrderStatus.PLANNED, null, strategy.status());
     }
 
     private AdminOrderCorrectionResult replacePlacedOrder(UUID adminId, AdminOrderCorrectionCommand command,
@@ -104,48 +94,21 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         broker.cancel(order, account);
         orderPort.markCancelled(order.id());
 
-        Order replacementTemplate = new Order(
-                null,
-                order.accountId(),
-                order.strategyCycleId(),
+        Order replacementTemplate = order.replacementWith(
                 command.tradeDateKst() != null ? command.tradeDateKst() : order.tradeDate(),
-                order.ticker(),
-                order.orderType(),
-                order.timing(),
-                order.direction(),
-                quantity,
-                price,
-                Order.OrderStatus.PLANNED,
-                null,
-                null,
-                null
-        );
+                quantity, price);
         Order replacement = broker.place(replacementTemplate, account);
         orderPort.saveAll(List.of(replacement));
 
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "newPrice", price.toPlainString(),
                         "newQuantity", quantity,
                         "replacementExternalOrderId", replacement.externalOrderId()
                 )));
 
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.PLACED,
-                replacement.externalOrderId(),
-                0,
-                null,
-                null,
-                strategy.status(),
-                false,
-                null
-        );
+        return AdminOrderCorrectionResult.simple(command, order.id(),
+                order.status(), Order.OrderStatus.PLACED, replacement.externalOrderId(), strategy.status());
     }
 
     private AdminOrderCorrectionResult correctFilledOrder(UUID adminId, AdminOrderCorrectionCommand command,
@@ -167,11 +130,12 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updatedBalance, price));
 
         // 4. holdings 소진 시 사이클 종료 처리
-        CycleEndResult cycleEnd = closeCycleIfExhausted(strategy, currentCycle, updatedBalance, correctionOrder.tradeDate());
+        AdminCycleCloser.CycleEndResult cycleEnd = AdminCycleCloser.closeIfExhausted(
+                strategyCyclePort, strategyPort, strategy, currentCycle, updatedBalance, correctionOrder.tradeDate());
 
         // 5. 주문 저장 + 감사 로그
         orderPort.saveAll(List.of(correctionOrder));
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "direction", correctionOrder.direction().name(),
                         "newPrice", price.toPlainString(),
@@ -179,22 +143,9 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                         "cycleEnded", cycleEnd.ended()
                 )));
 
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.FILLED,
-                null,
-                updatedBalance.holdings(),
-                updatedBalance.avgPrice(),
-                updatedBalance.usdDeposit(),
-                cycleEnd.strategy().status(),
-                cycleEnd.ended(),
-                cycleEnd.endDate()
-        );
+        return AdminOrderCorrectionResult.filled(command, order.id(), order.status(),
+                updatedBalance.holdings(), updatedBalance.avgPrice(), updatedBalance.usdDeposit(),
+                cycleEnd.strategy().status(), cycleEnd.ended(), cycleEnd.endDate());
     }
 
     // 체결 상태 검증 — FILLED_CORRECTION은 FILLED/PARTIALLY_FILLED만 허용
@@ -206,10 +157,10 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     // 최신 CyclePosition에서 AccountBalance 구성
     private AccountBalance loadLatestBalance(StrategyCycle currentCycle) {
-        CyclePosition latest = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
+        return cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
-        return new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+                .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()))
+                .toBalance();
     }
 
     // SELL 수량이 현재 holdings를 초과하는지 검증
@@ -222,50 +173,17 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
     // 보정 주문(Order) 빌드 — status=FILLED, orderedQuantity/filledPrice 즉시 기록
     private static Order buildCorrectionOrder(AdminOrderCorrectionCommand command, Order order,
                                               Order.OrderDirection direction, int quantity, BigDecimal price) {
-        return new Order(
-                null,
-                order.accountId(),
-                order.strategyCycleId(),
+        return Order.filledManual(order.accountId(), order.strategyCycleId(),
                 command.tradeDateKst() != null ? command.tradeDateKst() : order.tradeDate(),
-                order.ticker(),
-                Order.OrderType.LIMIT,
-                order.timing(),
-                direction,
-                quantity,
-                price,
-                Order.OrderStatus.FILLED,
-                null,
-                quantity,
-                price
-        );
+                order.ticker(), order.timing(), direction, quantity, price, null);
     }
 
     // 보정 주문에서 체결 내역(Execution) 빌드 — applyExecutions에 전달용
     private static Execution toExecution(Order correctionOrder) {
-        return new Execution(
-                correctionOrder.tradeDate(),
-                correctionOrder.ticker(),
-                correctionOrder.direction(),
-                correctionOrder.quantity(),
-                correctionOrder.price(),
-                correctionOrder.price().multiply(BigDecimal.valueOf(correctionOrder.quantity())),
-                correctionOrder.externalOrderId()
-        );
+        return Execution.ofManualFill(correctionOrder.tradeDate(), correctionOrder.ticker(),
+                correctionOrder.direction(), correctionOrder.quantity(), correctionOrder.price(),
+                correctionOrder.externalOrderId());
     }
-
-    // holdings 소진(==0) 시 사이클 종료 + 전략 PAUSED 처리
-    private CycleEndResult closeCycleIfExhausted(Strategy strategy, StrategyCycle currentCycle,
-                                                  AccountBalance updatedBalance, LocalDate tradeDate) {
-        if (updatedBalance.holdings() == 0) {
-            strategyCyclePort.markEnded(currentCycle.id(), updatedBalance.usdDeposit(), tradeDate);
-            Strategy updated = strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
-            return new CycleEndResult(updated, true, tradeDate);
-        }
-        return new CycleEndResult(strategy, false, null);
-    }
-
-    // 사이클 종료 여부와 갱신된 전략 상태를 함께 반환하는 값 객체
-    record CycleEndResult(Strategy strategy, boolean ended, LocalDate endDate) {}
 
     private static void requireStatus(Order order, Order.OrderStatus expected, AdminOrderCorrectionCommand.Mode mode) {
         if (order.status() != expected) {
@@ -289,7 +207,7 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     private static Map<String, Object> auditPayload(AdminOrderCorrectionCommand command, Order order,
                                                     Map<String, Object> extra) {
-        java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("mode", command.mode().name());
         payload.put("strategyId", command.strategyId().toString());
         payload.put("accountId", command.accountId().toString());

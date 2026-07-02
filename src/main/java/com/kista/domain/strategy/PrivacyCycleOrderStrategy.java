@@ -20,7 +20,7 @@ import static java.math.RoundingMode.HALF_UP;
 @RequiredArgsConstructor
 public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
 
-    private final PrivacyTradingStrategy privacyStrategy;
+    private final PrivacyStrategy privacyStrategy;
 
     @Override
     public Strategy.Type cycleType() { return Strategy.Type.PRIVACY; }
@@ -30,13 +30,14 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
+        PlanContext.PrivacyInputs inputs = ctx.privacy();
         // 기준매매표 없으면 전략 차원 skip — 서비스는 OrderPlan absent로 skip 처리
-        if (ctx.privacyBase() == null) {
+        if (inputs.privacyBase() == null) {
             log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [{}]", ctx.label());
             return Optional.empty();
         }
         // initialUsdDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
-        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), ctx.initialUsdDeposit(), ctx.privacyBase());
+        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyBase());
         return Optional.of(new OrderPlan(null, orders));
     }
 

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.kis.PresentBalanceResult;
-import com.kista.domain.model.kis.PresentBalanceResult.Item;
+import com.kista.domain.model.broker.PresentBalanceResult;
+import com.kista.domain.model.broker.PresentBalanceResult.Item;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;

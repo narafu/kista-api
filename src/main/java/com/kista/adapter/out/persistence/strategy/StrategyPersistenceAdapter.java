@@ -1,8 +1,6 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyInfiniteDetail;
-import com.kista.domain.port.out.StrategyInfiniteDetailPort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -93,9 +91,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     private StrategyEntity toEntity(Strategy s) {
-        StrategyEntity e = s.id() != null
-                ? jpaRepository.findById(s.id()).orElseGet(StrategyEntity::new)
-                : new StrategyEntity();
+        StrategyEntity e = PersistenceSupport.findOrCreate(s.id(), jpaRepository, StrategyEntity::new);
         e.setId(s.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setAccountId(s.accountId());
         e.setType(s.type());
@@ -103,45 +99,5 @@ class StrategyPersistenceAdapter implements StrategyPort {
         e.setTicker(s.ticker());
         e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : Strategy.CycleSeedType.NONE);
         return e;
-    }
-}
-
-@Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
-
-    private final StrategyInfiniteJpaRepository jpaRepository;
-
-    @Override
-    public Optional<StrategyInfiniteDetail> findByStrategyVersionId(UUID strategyVersionId) {
-        return jpaRepository.findById(strategyVersionId).map(this::toDomain);
-    }
-
-    @Override
-    public Optional<StrategyInfiniteDetail> findActiveByStrategyId(UUID strategyId) {
-        return jpaRepository.findActiveByStrategyId(strategyId).map(this::toDomain);
-    }
-
-    @Override
-    public StrategyInfiniteDetail save(StrategyInfiniteDetail detail) {
-        return toDomain(jpaRepository.save(toEntity(detail)));
-    }
-
-    @Override
-    public void deleteByStrategyId(UUID strategyId) {
-        jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
-    }
-
-    private StrategyInfiniteDetail toDomain(StrategyInfiniteEntity entity) {
-        return new StrategyInfiniteDetail(entity.getStrategyVersionId(), entity.getDivisionCount());
-    }
-
-    private StrategyInfiniteEntity toEntity(StrategyInfiniteDetail detail) {
-        StrategyInfiniteEntity entity = detail.strategyVersionId() != null
-                ? jpaRepository.findById(detail.strategyVersionId()).orElseGet(StrategyInfiniteEntity::new)
-                : new StrategyInfiniteEntity();
-        entity.setStrategyVersionId(detail.strategyVersionId());
-        entity.setDivisionCount(detail.divisionCount());
-        return entity;
     }
 }

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.broker.Currency;
+import com.kista.domain.model.broker.MarginItem;
 
 import java.math.BigDecimal;
 

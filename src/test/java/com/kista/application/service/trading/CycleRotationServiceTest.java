@@ -45,9 +45,9 @@ class CycleRotationServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;    // StrategyCycle + CyclePosition 원자적 저장
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
-    @Mock LoadUserSettingsPort loadUserSettingsPort;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
-    @Mock PrivacyTradingStrategy privacyStrategy;
+    @Mock UserSettingsPort userSettingsPort;
+    @Mock InfiniteStrategy infiniteStrategy;
+    @Mock PrivacyStrategy privacyStrategy;
 
     CycleRotationService service;
 
@@ -65,16 +65,16 @@ class CycleRotationServiceTest {
 
     @BeforeEach
     void setUp() {
-        // loadUserSettingsPort — 잔고검증 기본값(ON) 반환: 증권사 실잔고 경로로 진행
-        when(loadUserSettingsPort.loadByUserId(any()))
+        // userSettingsPort — 잔고검증 기본값(ON) 반환: 증권사 실잔고 경로로 진행
+        when(userSettingsPort.loadByUserId(any()))
                 .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
 
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         service = new CycleRotationService(registry, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
-                cyclePositionPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+                cyclePositionPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, userSettingsPort);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any()))

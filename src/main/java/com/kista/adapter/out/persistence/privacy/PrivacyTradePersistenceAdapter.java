@@ -16,24 +16,27 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Component
 @RequiredArgsConstructor
 class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
-    // BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순
-    private static final Comparator<Order> ORDER_SORT = Comparator
-            .comparingInt((Order o) -> o.direction() == Order.OrderDirection.BUY ? 0 : 1)
-            .thenComparing((a, b) -> a.direction() == Order.OrderDirection.BUY
-                    ? b.price().compareTo(a.price())
-                    : a.price().compareTo(b.price()));
+    // BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순 (제네릭 헬퍼 — 도메인/엔티티 공용)
+    private static <T> Comparator<T> orderSort(Function<T, Order.OrderDirection> dirFn,
+                                               Function<T, BigDecimal> priceFn) {
+        return Comparator.<T, Integer>comparing(t -> dirFn.apply(t) == Order.OrderDirection.BUY ? 0 : 1)
+                .thenComparing((a, b) -> dirFn.apply(a) == Order.OrderDirection.BUY
+                        ? priceFn.apply(b).compareTo(priceFn.apply(a))
+                        : priceFn.apply(a).compareTo(priceFn.apply(b)));
+    }
 
-    // 주문 표시 정렬: BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순
-    private static final Comparator<PrivacyTradeBaseOrderEntity> BASE_ORDER_SORT = Comparator
-            .comparingInt((PrivacyTradeBaseOrderEntity o) -> o.getDirection() == Order.OrderDirection.BUY ? 0 : 1)
-            .thenComparing((a, b) -> a.getDirection() == Order.OrderDirection.BUY
-                    ? b.getPrice().compareTo(a.getPrice())
-                    : a.getPrice().compareTo(b.getPrice()));
+    private static final Comparator<Order> ORDER_SORT =
+            orderSort(Order::direction, Order::price);
+
+    // 주문 표시 정렬 (엔티티용 — 동일 기준)
+    private static final Comparator<PrivacyTradeBaseOrderEntity> BASE_ORDER_SORT =
+            orderSort(PrivacyTradeBaseOrderEntity::getDirection, PrivacyTradeBaseOrderEntity::getPrice);
 
     private final PrivacyTradeBaseJpaRepository baseRepository;
 

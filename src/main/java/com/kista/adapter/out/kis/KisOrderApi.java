@@ -53,7 +53,7 @@ public class KisOrderApi implements KisOrderPort {
                 order.quantity(),
                 order.direction().kisSllType());
 
-        OrderResponse response = kisHttpClient.post(PATH, kisHttpClient.buildHeaders(trId, account), body, OrderResponse.class);
+        OrderResponse response = kisHttpClient.post(trId, PATH, account, body, OrderResponse.class);
 
         // rt_cd != "0" = KIS 비즈니스 오류 (HTTP 200이어도 실패) — msg_cd/msg1 포함해 예외 발생
         if (response == null || !"0".equals(response.rtCd())) {
@@ -94,13 +94,12 @@ public class KisOrderApi implements KisOrderPort {
                 order.ticker().name(),
                 order.externalOrderId());
 
-        kisHttpClient.post(CANCEL_PATH, kisHttpClient.buildHeaders(CANCEL_TR_ID, account), body, Void.class);
+        kisHttpClient.post(CANCEL_TR_ID, CANCEL_PATH, account, body, Void.class);
     }
 
-    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KIS: accountNo에 접수유형 통합)
+    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KisHttpClient 공용 헬퍼 위임)
     private static String[] splitAccountNo(Account account) {
-        String[] parts = account.accountNo().split("-", 2);
-        return new String[]{ parts[0], parts.length > 1 ? parts[1] : "01" };
+        return KisHttpClient.splitAccountNo(account.accountNo());
     }
 
     private String resolveOrderDvsn(Order.OrderType type) {

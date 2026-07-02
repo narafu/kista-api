@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.kis.KisApiException;
-import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;

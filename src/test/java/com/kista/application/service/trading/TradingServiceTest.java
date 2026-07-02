@@ -2,7 +2,7 @@ package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -40,9 +40,9 @@ class TradingServiceTest {
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
-    @Mock TosExecutionPort tosExecutionPort;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
-    @Mock PrivacyTradingStrategy privacyStrategy;
+    @Mock TossExecutionPort tossExecutionPort;
+    @Mock InfiniteStrategy infiniteStrategy;
+    @Mock PrivacyStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort; // TradingService + TradingReporter 양쪽에서 사용
     @Mock OrderPort orderPort;
@@ -56,11 +56,11 @@ class TradingServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
-    @Mock TosMarginPort tosMarginPort;
+    @Mock TossMarginPort tossMarginPort;
     @Mock com.kista.domain.port.out.broker.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
     @Mock KisAccountPort kisAccountPort;
-    @Mock TosAccountPort tosAccountPort;
-    @Mock LoadUserSettingsPort loadUserSettingsPort;
+    @Mock TossAccountPort tossAccountPort;
+    @Mock UserSettingsPort userSettingsPort;
     @Mock UserPort userPort;
     TradingService service;
 
@@ -102,15 +102,15 @@ class TradingServiceTest {
 
     @BeforeEach
     void setUp() {
-        // loadUserSettingsPort — TRADING_ALERT 기본값(활성) 반환: 리포트 발송 경로로 진행
+        // userSettingsPort — TRADING_ALERT 기본값(활성) 반환: 리포트 발송 경로로 진행
         // lenient: 일부 테스트(휴장·placeOpenOrders 등)에서 reporter까지 도달하지 않아 미사용 가능
-        lenient().when(loadUserSettingsPort.loadByUserId(any()))
+        lenient().when(userSettingsPort.loadByUserId(any()))
                 .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
 
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
@@ -122,7 +122,7 @@ class TradingServiceTest {
                 eq(MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
-                cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, loadUserSettingsPort);
+                cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, userSettingsPort);
         // 브로커 포트 → KIS 포트 위임 레지스트리 구성 (기존 kis*Port 스텁·검증 유지)
         BrokerAdapterRegistry tradingRegistry = mock(BrokerAdapterRegistry.class);
 
@@ -157,7 +157,7 @@ class TradingServiceTest {
         TradingReporter reporter = new TradingReporter(
                 tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, loadUserSettingsPort);
+                strategyCyclePort, rotationService, userSettingsPort);
         // KIS 계좌 기준 테스트 — live 잔고 체크 시 kisAccountPort.getBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(kisAccountPort.getBalance(eq(ACCOUNT), any()))
@@ -188,7 +188,7 @@ class TradingServiceTest {
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, tradingRegistry, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
-                userPort, loadUserSettingsPort);
+                userPort, userSettingsPort);
     }
 
     @Test

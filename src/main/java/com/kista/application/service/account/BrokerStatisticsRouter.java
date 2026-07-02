@@ -2,8 +2,8 @@ package com.kista.application.service.account;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.MarginItem;
-import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.broker.MarginItem;
+import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.port.out.broker.PortfolioPort;
 import lombok.RequiredArgsConstructor;

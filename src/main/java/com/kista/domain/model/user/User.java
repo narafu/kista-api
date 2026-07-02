@@ -46,6 +46,18 @@ public record User(
         public boolean includesFcm()      { return this == FCM      || this == ALL; }
     }
 
+    // 재신청 쿨다운 미경과 시 발생 — GlobalExceptionHandler에서 429(Retry-After) 매핑
+    public static class CooldownException extends RuntimeException {
+        private final Instant retryAfter; // 재신청 가능 시각
+
+        public CooldownException(Instant retryAfter) {
+            super("재신청 대기 중입니다. 가능 시각: " + retryAfter);
+            this.retryAfter = retryAfter;
+        }
+
+        public Instant getRetryAfter() { return retryAfter; }
+    }
+
     // 텔레그램 봇 토큰 + Chat ID가 모두 설정된 경우에만 true
     public boolean hasTelegramBot() {
         return telegramBotToken != null && !telegramBotToken.isBlank() && telegramChatId != null;

@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
@@ -29,8 +30,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.ReentrantLock;
 
 // KisTokenPort + KisConnectionTestPort 통합 구현체
 // OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
@@ -43,8 +42,8 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // 계좌별 락 — 동시 요청 시 중복 발급 방지
-    private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+    // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
+    private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
 
     // 연결 테스트 직후 계좌번호 검증 시 재발급 방지 — KIS EGW00133(1분당 1회 제한) 우회용 단기 캐시
     private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
@@ -59,21 +58,8 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
 
     @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
-        // 1차 조회 — 락 없이 빠른 경로
-        Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, threshold());
-        if (cached.isPresent()) {
-            return cached.get();
-        }
-        // 캐시 miss 시 accountId별 락으로 경합 차단 — 같은 계좌 동시 호출이 N번 발급하는 것 방지
-        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // 2차 조회 (double-check) — 다른 스레드가 이미 발급했을 수 있음
-            return brokerTokenCachePort.findValidToken(accountId, threshold())
-                    .orElseGet(() -> fetchAndCacheToken(accountId, appKey, appSecret));
-        } finally {
-            lock.unlock();
-        }
+        return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
+                () -> fetchAndCacheToken(accountId, appKey, appSecret));
     }
 
     private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
@@ -89,6 +75,12 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         } catch (Exception e) {
             throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
         }
+    }
+
+    @Override
+    public void invalidateToken(UUID accountId) {
+        // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
+        brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(KST).minusHours(1));
     }
 
     // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
@@ -150,14 +142,13 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         }
 
         // 2단계: TTTC2101R 호출로 계좌번호 유효성 검증
-        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
-        String[] parts = accountNo.split("-", 2);
+        String[] parts = KisHttpClient.splitAccountNo(accountNo);
         HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, appSecret, KisTradingApi.MARGIN_TR_ID);
 
         String url = UriComponentsBuilder
                 .fromUriString(kisBaseUrl + KisTradingApi.MARGIN_PATH)
                 .queryParam("CANO", parts[0])
-                .queryParam("ACNT_PRDT_CD", parts.length > 1 ? parts[1] : "01")
+                .queryParam("ACNT_PRDT_CD", parts[1])
                 .toUriString();
 
         try {

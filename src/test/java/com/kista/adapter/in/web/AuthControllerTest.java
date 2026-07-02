@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.JwtIssuerService;
 import com.kista.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.adapter.out.sse.SseEmitterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
@@ -76,7 +76,7 @@ class AuthControllerTest {
     @DisplayName("쿨다운 중 재신청 시 429 Too Many Requests 반환")
     void reapply_cooldown_returns_429() throws Exception {
         Instant retryAfter = Instant.now().plus(1, ChronoUnit.HOURS);
-        doThrow(new Account.CooldownException(retryAfter)).when(userUseCase).reapply(USER_ID);
+        doThrow(new User.CooldownException(retryAfter)).when(userUseCase).reapply(USER_ID);
 
         mockMvc.perform(post("/api/auth/approval-requests")
                         .with(csrf())

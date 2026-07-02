@@ -7,7 +7,7 @@
 ### 어댑터 구조
 
 - `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`에서 RestTemplate 빈 주입
-- API 클래스 7개: `TossAuthApi`, `TosCandleApi`, `TosHoldingsApi`, `TosOrderApi`, `TosPriceApi`, `TossCommissionsApi`, `TossMarketApi`
+- API 클래스 7개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossCommissionsApi`, `TossMarketApi`
 - `TossBrokerAdapter`: `BrokerAdapterPort` + 공통 5개 Port + Toss 전용 5개 Port 구현
   - Toss 전용: `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `MarketCalendarPort`, `BrokerAccountPort`
 
@@ -17,7 +17,7 @@
 
 ### 날짜 처리 (KIS와 다름)
 
-- `TosOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — `toUtc()` 변환 없이 KST 날짜 전달
+- `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — `toUtc()` 변환 없이 KST 날짜 전달
 - **`queryFrom = from - 1일`**: 전날 저녁 선접수 주문이 당일 장마감에 체결될 수 있어 1일 앞당겨 조회 후, `filledAt(KST)` 기반 필터링
 - KIS(`toUtc()` 변환 필수)와 반대 방향 — 혼용 금지
 

@@ -6,7 +6,7 @@ import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
-import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.port.in.UserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SettingsController {
 
-    private final UserUseCase userUseCase;
+    private final UserProfileUseCase userProfileUseCase;
     private final UpdateBalanceCheckUseCase updateBalanceCheckUseCase;       // 잔고검증 설정 — user_settings 테이블
     private final UpdateNotificationPrefUseCase updateNotificationPrefUseCase; // 알림 타입별 on/off — user_notification_prefs 테이블
 
@@ -50,7 +50,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
                                @Valid @RequestBody TelegramUpdateRequest body) {
-        userUseCase.updateTelegram(userId, body.botToken(), body.chatId());
+        userProfileUseCase.updateTelegram(userId, body.botToken(), body.chatId());
     }
 
     // 텔레그램 봇 설정 해제
@@ -59,7 +59,7 @@ public class SettingsController {
     @DeleteMapping("/telegram")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeTelegram(@AuthenticationPrincipal UUID userId) {
-        userUseCase.removeTelegram(userId);
+        userProfileUseCase.removeTelegram(userId);
     }
 
     // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 GlobalExceptionHandler 처리
@@ -72,7 +72,7 @@ public class SettingsController {
         NotificationChannel channel = NotificationChannel.tryParse(body.channel())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
-        userUseCase.updateNotificationChannel(userId, channel);
+        userProfileUseCase.updateNotificationChannel(userId, channel);
     }
 
     // 잔고 검증 설정 변경 (false=예수금 부족해도 전략 생성·재등록 허용)
@@ -112,6 +112,6 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateNickname(@AuthenticationPrincipal UUID userId,
                                @Valid @RequestBody NicknameRequest body) {
-        userUseCase.updateNickname(userId, body.nickname());
+        userProfileUseCase.updateNickname(userId, body.nickname());
     }
 }

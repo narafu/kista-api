@@ -14,8 +14,6 @@ import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -34,15 +32,14 @@ import static org.mockito.Mockito.*;
 class TradingOpenSchedulerTest {
 
     @Mock TradingExecutionUseCase useCase;
-    @Mock AccountPort accountPort;
     @Mock StrategyPort strategyPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock UserPort userPort;
-    @Mock NotifyPort notifyPort;
     @Mock SchedulerLockService schedulerLockService;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock PrivacyTradeValidationUseCase validationService;
-    @InjectMocks TradingOpenScheduler scheduler;
+    @Mock BatchContextFactory contextFactory;
+    @Mock NotifyPort notifyPort;
+
+    TradingOpenScheduler scheduler;
 
     private static final UUID USER_ID    = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -69,6 +66,11 @@ class TradingOpenSchedulerTest {
 
     @BeforeEach
     void setUp() throws InterruptedException {
+        // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
+        SchedulerJobRunner jobRunner = new SchedulerJobRunner(notifyPort);
+        scheduler = new TradingOpenScheduler(useCase, strategyPort, notifyPort, schedulerLockService,
+                privacyTradePort, validationService, contextFactory, jobRunner);
+
         lenient().doAnswer(invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
             task.run();
@@ -83,91 +85,54 @@ class TradingOpenSchedulerTest {
         Strategy privacy  = mockStrategy(ACCOUNT_ID, Strategy.Type.PRIVACY);
         Account account   = mockAccount(ACCOUNT_ID);
         User user         = mockUser();
+        BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), account, user);
+        BatchContext privacyCtx  = new BatchContext(privacy,  mockCycle(privacy.id()),  account, user);
 
         when(strategyPort.findAllActive()).thenReturn(List.of(infinite, privacy));
-        when(strategyCyclePort.findLatestByStrategyId(infinite.id())).thenReturn(Optional.of(mockCycle(infinite.id())));
-        when(strategyCyclePort.findLatestByStrategyId(privacy.id())).thenReturn(Optional.of(mockCycle(privacy.id())));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+        // PRIVACY 가드: 기준 매매표 없음 → 필터 없이 통과
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
+        when(contextFactory.buildAll(List.of(infinite, privacy))).thenReturn(List.of(infiniteCtx, privacyCtx));
 
         scheduler.run();
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
-        verify(useCase).placeOpenOrders(captor.capture());
-        assertThat(captor.getValue()).hasSize(2);
-        assertThat(captor.getValue().stream().map(c -> c.strategy().type()).toList())
-                .containsExactlyInAnyOrder(Strategy.Type.INFINITE, Strategy.Type.PRIVACY);
+        verify(useCase).placeOpenOrders(List.of(infiniteCtx, privacyCtx));
     }
 
     @Test
     void run_noActiveStrategies_callsPlaceOpenOrdersWithEmptyList() throws InterruptedException {
         when(strategyPort.findAllActive()).thenReturn(List.of());
+        when(contextFactory.buildAll(List.of())).thenReturn(List.of());
 
         scheduler.run();
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
-        verify(useCase).placeOpenOrders(captor.capture());
-        assertThat(captor.getValue()).isEmpty();
-    }
-
-    @Test
-    void run_contextBuildFails_skipsFailedStrategyAndNotifiesAdmin() throws InterruptedException {
-        // strategy1 계좌 조회 실패 → skip + notifyError, strategy2는 포함
-        Strategy strategy1 = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
-        UUID accountId2    = UUID.randomUUID();
-        Strategy strategy2 = mockStrategy(accountId2, Strategy.Type.PRIVACY);
-        Account account2   = mockAccount(accountId2);
-        User user          = mockUser();
-
-        when(strategyPort.findAllActive()).thenReturn(List.of(strategy1, strategy2));
-        when(strategyCyclePort.findLatestByStrategyId(strategy1.id())).thenReturn(Optional.of(mockCycle(strategy1.id())));
-        when(strategyCyclePort.findLatestByStrategyId(strategy2.id())).thenReturn(Optional.of(mockCycle(strategy2.id())));
-        RuntimeException ex = new RuntimeException("계좌 없음");
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
-        when(accountPort.findByIdOrThrow(accountId2)).thenReturn(account2);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
-
-        scheduler.run();
-
-        verify(notifyPort).notifyError(ex);
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
-        verify(useCase).placeOpenOrders(captor.capture());
-        assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().getFirst().strategy()).isEqualTo(strategy2);
+        verify(useCase).placeOpenOrders(List.of());
     }
 
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
         Strategy strategy = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
-        Account account   = mockAccount(ACCOUNT_ID);
-        User user         = mockUser();
+        BatchContext context = new BatchContext(strategy, mockCycle(strategy.id()), mockAccount(ACCOUNT_ID), mockUser());
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
-        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(mockCycle(strategy.id())));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+        // INFINITE만 있으면 guardPrivacyStrategies 조기 반환 — privacyTradePort 호출 없음
+        when(contextFactory.buildAll(any())).thenReturn(List.of(context));
         doThrow(new InterruptedException("interrupted")).when(useCase).placeOpenOrders(any());
 
         scheduler.run();
 
-        assert Thread.currentThread().isInterrupted();
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
         Thread.interrupted(); // 플래그 초기화
     }
 
     @Test
     void run_placeOpenOrdersException_notifiesAdmin() throws InterruptedException {
         Strategy strategy = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
-        Account account   = mockAccount(ACCOUNT_ID);
-        User user         = mockUser();
+        BatchContext context = new BatchContext(strategy, mockCycle(strategy.id()), mockAccount(ACCOUNT_ID), mockUser());
+        RuntimeException ex = new RuntimeException("KIS API 오류");
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
-        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(mockCycle(strategy.id())));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
-        RuntimeException ex = new RuntimeException("KIS API 오류");
+        // INFINITE만 있으면 guardPrivacyStrategies 조기 반환 — privacyTradePort 호출 없음
+        when(contextFactory.buildAll(any())).thenReturn(List.of(context));
         doThrow(ex).when(useCase).placeOpenOrders(any());
 
         scheduler.run();
@@ -181,7 +146,7 @@ class TradingOpenSchedulerTest {
 
         scheduler.run();
 
-        verifyNoInteractions(strategyPort, useCase, notifyPort);
+        verifyNoInteractions(strategyPort, contextFactory, useCase, notifyPort);
     }
 
     @Test
@@ -190,8 +155,8 @@ class TradingOpenSchedulerTest {
         UUID privacyAccountId = UUID.randomUUID();
         Strategy privacy = mockStrategy(privacyAccountId, Strategy.Type.PRIVACY);
         Account infiniteAccount = mockAccount(ACCOUNT_ID);
-        Account privacyAccount = mockAccount(privacyAccountId);
         User user = mockUser();
+        BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), infiniteAccount, user);
         PrivacyTradeBase invalidBase = new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("225.75"),
                 4, new BigDecimal("13977.43"), List.of());
 
@@ -199,18 +164,13 @@ class TradingOpenSchedulerTest {
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(invalidBase));
         when(validationService.inspect(invalidBase))
                 .thenReturn(PrivacyTradeValidationReport.warning("MISSING_SELL", "SELL 주문이 없습니다"));
-        when(strategyCyclePort.findLatestByStrategyId(infinite.id())).thenReturn(Optional.of(mockCycle(infinite.id())));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(infiniteAccount);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+        // 가드 후 INFINITE만 남아 contextFactory에 전달됨
+        when(contextFactory.buildAll(List.of(infinite))).thenReturn(List.of(infiniteCtx));
 
         scheduler.run();
 
         verify(strategyPort, never()).save(any());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<BatchContext>> captor = ArgumentCaptor.forClass(List.class);
-        verify(useCase).placeOpenOrders(captor.capture());
-        assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().getFirst().strategy().type()).isEqualTo(Strategy.Type.INFINITE);
+        verify(useCase).placeOpenOrders(List.of(infiniteCtx));
         verify(notifyPort).notifyError(any(IllegalStateException.class));
     }
 }
