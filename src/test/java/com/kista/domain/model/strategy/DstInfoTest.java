@@ -2,16 +2,22 @@ package com.kista.domain.model.strategy;
 
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+import static com.kista.domain.model.strategy.DstInfo.MarketSession.BLOCKED;
+import static com.kista.domain.model.strategy.DstInfo.MarketSession.DIRECT;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("DstInfo.calculate() DST 판단 검증")
+@DisplayName("DstInfo 검증")
 class DstInfoTest {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -54,5 +60,76 @@ class DstInfoTest {
         ZonedDateTime open = info.marketOpen().atZone(KST);
         assertThat(open.toLocalDate()).isEqualTo(LocalDate.of(2024, 1, 15));
         assertThat(open.toLocalTime()).isEqualTo(LocalTime.of(23, 30));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // sessionAt() — DIRECT/BLOCKED 시간대 판단 (package-private, 같은 패키지에서 접근)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // isDst=true  → BLOCKED: [05:00, 17:00), DIRECT: 그 외
+    // isDst=false → BLOCKED: [06:00, 18:00), DIRECT: 그 외
+    private static final DstInfo DST     = new DstInfo(true,  null, null, null);
+    private static final DstInfo NON_DST = new DstInfo(false, null, null, null);
+
+    @Nested
+    @DisplayName("DST(서머타임) 세션 판단 — BLOCKED=[05:00,17:00)")
+    class DstSessionTest {
+
+        @ParameterizedTest(name = "{0} {1} → DIRECT")
+        @CsvSource({
+            "MONDAY,   04:59",   // BLOCKED 경계 직전 — DIRECT
+            "MONDAY,   17:00",   // BLOCKED 종료 경계(포함 안 됨) — DIRECT
+            "MONDAY,   17:01",   // BLOCKED 종료 직후 — DIRECT
+            "MONDAY,   23:59",   // 자정 직전 — DIRECT
+            "MONDAY,   00:00",   // 자정 — DIRECT
+            "FRIDAY,   20:00",   // 평일 저녁 — DIRECT
+        })
+        void direct_dst(DayOfWeek day, LocalTime time) {
+            assertThat(DST.sessionAt(day, time)).isEqualTo(DIRECT);
+        }
+
+        @ParameterizedTest(name = "{0} {1} → BLOCKED")
+        @CsvSource({
+            "MONDAY,   05:00",   // BLOCKED 시작 경계(포함) — BLOCKED
+            "MONDAY,   05:01",   // BLOCKED 내부 — BLOCKED
+            "MONDAY,   12:00",   // BLOCKED 대표 내부 값 — BLOCKED
+            "MONDAY,   16:59",   // BLOCKED 종료 경계 직전 — BLOCKED
+            "SATURDAY, 20:00",   // 주말(토) 항상 BLOCKED
+            "SUNDAY,   10:00",   // 주말(일) 항상 BLOCKED
+        })
+        void blocked_dst(DayOfWeek day, LocalTime time) {
+            assertThat(DST.sessionAt(day, time)).isEqualTo(BLOCKED);
+        }
+    }
+
+    @Nested
+    @DisplayName("비DST(동절기) 세션 판단 — BLOCKED=[06:00,18:00)")
+    class NonDstSessionTest {
+
+        @ParameterizedTest(name = "{0} {1} → DIRECT")
+        @CsvSource({
+            "TUESDAY,  05:59",   // BLOCKED 경계 직전 — DIRECT
+            "TUESDAY,  18:00",   // BLOCKED 종료 경계(포함 안 됨) — DIRECT
+            "TUESDAY,  18:01",   // BLOCKED 종료 직후 — DIRECT
+            "TUESDAY,  23:59",   // 자정 직전 — DIRECT
+            "TUESDAY,  00:00",   // 자정 — DIRECT
+            "THURSDAY, 21:00",   // 평일 저녁 — DIRECT
+        })
+        void direct_nondst(DayOfWeek day, LocalTime time) {
+            assertThat(NON_DST.sessionAt(day, time)).isEqualTo(DIRECT);
+        }
+
+        @ParameterizedTest(name = "{0} {1} → BLOCKED")
+        @CsvSource({
+            "TUESDAY,  06:00",   // BLOCKED 시작 경계(포함) — BLOCKED
+            "TUESDAY,  06:01",   // BLOCKED 내부 — BLOCKED
+            "TUESDAY,  12:00",   // BLOCKED 대표 내부 값 — BLOCKED
+            "TUESDAY,  17:59",   // BLOCKED 종료 경계 직전 — BLOCKED
+            "SATURDAY, 20:00",   // 주말(토) 항상 BLOCKED
+            "SUNDAY,   10:00",   // 주말(일) 항상 BLOCKED
+        })
+        void blocked_nondst(DayOfWeek day, LocalTime time) {
+            assertThat(NON_DST.sessionAt(day, time)).isEqualTo(BLOCKED);
+        }
     }
 }
