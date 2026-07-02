@@ -46,7 +46,7 @@ application/
                    BrokerStatisticsRouter (package-private — BrokerAdapterRegistry 경유 브로커별 통계 라우팅)
     broker/      ← BrokerAdapterRegistry (public @Component — require(account, Port.class) / find())
     strategy/    ← StrategyService
-    user/        ← UserService, UserSettingsService, UserCascadeDeleter (사용자 소프트 삭제 cascade helper)
+    user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM — UserProfileUseCase 구현), UserSettingsService, UserCascadeDeleter (사용자 소프트 삭제 cascade helper)
     portfolio/   ← PortfolioService
     market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
     privacy/     ← PrivacyService
