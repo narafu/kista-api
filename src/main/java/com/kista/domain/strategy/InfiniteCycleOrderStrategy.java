@@ -69,10 +69,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     // 리버스모드 — 별지점 기준 매도/쿼터매수
     // isFirstReverseDay=true이면 첫날 MOC 즉시 청산, false이면 LOC 분할 매도 + 쿼터매수
     private Optional<OrderPlan> planReverseMode(PlanContext ctx) {
-        ReverseModePosition position = new ReverseModePosition(
-                ctx.balance().holdings(),
-                ctx.balance().avgPrice(),
-                ctx.balance().usdDeposit(),
+        ReverseModePosition position = ReverseModePosition.of(
+                ctx.balance(),
                 ctx.strategy().ticker(),
                 ctx.divisionCount() != null ? ctx.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
                 ctx.starPointPrice(),

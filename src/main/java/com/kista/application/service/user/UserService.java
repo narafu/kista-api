@@ -2,7 +2,6 @@ package com.kista.application.service.user;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
@@ -137,12 +136,12 @@ class UserService implements UserUseCase {
             case PENDING -> {
                 if (user.lastReappliedAt() != null &&
                         now.isBefore(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
-                    throw new Account.CooldownException(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
+                    throw new User.CooldownException(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
             }
             case REJECTED -> {
                 if (user.lastReappliedAt() != null &&
                         now.isBefore(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
-                    throw new Account.CooldownException(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
+                    throw new User.CooldownException(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
             }
             default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }

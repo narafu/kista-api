@@ -20,7 +20,7 @@
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `IllegalStateException` → 400, `PrivacyTradeConflictException` → 409
 - `SecurityException` → 403, `KisApiException` → 503, `TossApiException` → 503, `Account.InvalidKisKeyException` → 422
 - `ManualTradingException` / `OrderCancelException` → 409, `Account.DuplicateAccountException` → 409
-- `Account.CooldownException` → 429(Retry-After 포함), `Account.KisRateLimitException` → 429
+- `User.CooldownException` → 429(Retry-After 포함, 재신청 쿨다운), `Account.KisRateLimitException` → 429
 - `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
 
 ### Account ↔ Strategy 분리

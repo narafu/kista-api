@@ -15,6 +15,13 @@ public record ReverseModePosition(
         BigDecimal starPointPrice,      // 별지점 = 직전 5거래일 종가 평균 (null이면 계산 불가)
         boolean isFirstDay              // 소진 직후 첫날 여부
 ) {
+    // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
+    public static ReverseModePosition of(AccountBalance balance, Strategy.Ticker ticker, int divisionCount,
+                                         BigDecimal starPointPrice, boolean isFirstDay) {
+        return new ReverseModePosition(balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+                ticker, divisionCount, starPointPrice, isFirstDay);
+    }
+
     // 첫날 MOC 매도 수량 — holdings / (divisionCount/2)
     // 20분할이면 holdings/10, 40분할이면 holdings/20
     public int calcMocSellQuantity() {
@@ -45,6 +52,11 @@ public record ReverseModePosition(
     // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
     // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
     public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
+        return shouldExit(avgPrice, closingPrice, targetProfitRate);
+    }
+
+    // static 헬퍼: 포지션 객체 없이 종료 조건만 판단 — InfinitePosition.nextReverseMode에서 재사용
+    public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
                 .setScale(2, HALF_UP);

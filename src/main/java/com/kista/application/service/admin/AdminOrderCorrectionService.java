@@ -108,22 +108,9 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         broker.cancel(order, account);
         orderPort.markCancelled(order.id());
 
-        Order replacementTemplate = new Order(
-                null,
-                order.accountId(),
-                order.strategyCycleId(),
+        Order replacementTemplate = order.replacementWith(
                 command.tradeDateKst() != null ? command.tradeDateKst() : order.tradeDate(),
-                order.ticker(),
-                order.orderType(),
-                order.timing(),
-                order.direction(),
-                quantity,
-                price,
-                Order.OrderStatus.PLANNED,
-                null,
-                null,
-                null
-        );
+                quantity, price);
         Order replacement = broker.place(replacementTemplate, account);
         orderPort.saveAll(List.of(replacement));
 
@@ -210,10 +197,10 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     // 최신 CyclePosition에서 AccountBalance 구성
     private AccountBalance loadLatestBalance(StrategyCycle currentCycle) {
-        CyclePosition latest = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
+        return cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
-        return new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+                .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()))
+                .toBalance();
     }
 
     // SELL 수량이 현재 holdings를 초과하는지 검증
@@ -226,22 +213,9 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
     // 보정 주문(Order) 빌드 — status=FILLED, orderedQuantity/filledPrice 즉시 기록
     private static Order buildCorrectionOrder(AdminOrderCorrectionCommand command, Order order,
                                               Order.OrderDirection direction, int quantity, BigDecimal price) {
-        return new Order(
-                null,
-                order.accountId(),
-                order.strategyCycleId(),
+        return Order.filledManual(order.accountId(), order.strategyCycleId(),
                 command.tradeDateKst() != null ? command.tradeDateKst() : order.tradeDate(),
-                order.ticker(),
-                Order.OrderType.LIMIT,
-                order.timing(),
-                direction,
-                quantity,
-                price,
-                Order.OrderStatus.FILLED,
-                null,
-                quantity,
-                price
-        );
+                order.ticker(), order.timing(), direction, quantity, price, null);
     }
 
     // 보정 주문에서 체결 내역(Execution) 빌드 — applyExecutions에 전달용

@@ -61,7 +61,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
             throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다");
         }
 
-        AccountBalance balance = new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit());
+        AccountBalance balance = latest.toBalance();
         Strategy updatedStrategy = strategy;
         boolean cycleEnded = false;
         List<Order> manualOrders = new ArrayList<>();
@@ -73,22 +73,9 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
             }
 
             // 수동 체결 1건을 FILLED 주문 이력으로 남긴다
-            manualOrders.add(new Order(
-                    null,
-                    account.id(),
-                    currentCycle.id(),
-                    fill.tradeDateKst(),
-                    strategy.ticker(),
-                    Order.OrderType.LIMIT,
-                    Order.OrderTiming.AT_CLOSE,
-                    fill.direction(),
-                    fill.quantity(),
-                    fill.price(),
-                    Order.OrderStatus.FILLED,
-                    fill.externalOrderId(),
-                    fill.quantity(),
-                    fill.price()
-            ));
+            manualOrders.add(Order.filledManual(account.id(), currentCycle.id(), fill.tradeDateKst(),
+                    strategy.ticker(), Order.OrderTiming.AT_CLOSE, fill.direction(),
+                    fill.quantity(), fill.price(), fill.externalOrderId()));
 
             Execution execution = new Execution(
                     fill.tradeDateKst(),

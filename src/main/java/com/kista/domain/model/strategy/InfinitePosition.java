@@ -102,13 +102,9 @@ public record InfinitePosition(
     public boolean nextReverseMode(boolean prevReverseMode) {
         if (prevReverseMode) {
             // 종료 조건: 종가 ≥ avgPrice × (1 - targetProfitRate)
-            if (prevClosePrice != null && balance.avgPrice() != null && holdings() > 0) {
-                ReverseModePosition rp = new ReverseModePosition(
-                        holdings(), balance.avgPrice(), usdDeposit(),
-                        ticker, divisionCount, null, false);
-                if (rp.shouldExitReverseMode(prevClosePrice, ticker.getTargetProfitRate())) {
-                    return false; // 일반모드 복귀
-                }
+            if (holdings() > 0 && ReverseModePosition.shouldExit(
+                    balance.avgPrice(), prevClosePrice, ticker.getTargetProfitRate())) {
+                return false; // 일반모드 복귀
             }
             return true; // 리버스모드 유지
         } else {

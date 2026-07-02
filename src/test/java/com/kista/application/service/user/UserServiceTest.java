@@ -2,7 +2,6 @@ package com.kista.application.service.user;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
@@ -121,7 +120,7 @@ class UserServiceTest {
                 pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
-                .isInstanceOf(Account.CooldownException.class);
+                .isInstanceOf(User.CooldownException.class);
     }
 
     @Test
@@ -159,7 +158,7 @@ class UserServiceTest {
                 rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
-                .isInstanceOf(Account.CooldownException.class);
+                .isInstanceOf(User.CooldownException.class);
     }
 
     @Test
