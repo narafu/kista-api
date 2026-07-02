@@ -1,5 +1,10 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.BalanceCheckRequest;
+import com.kista.adapter.in.web.dto.NicknameRequest;
+import com.kista.adapter.in.web.dto.NotificationChannelRequest;
+import com.kista.adapter.in.web.dto.NotificationPrefRequest;
+import com.kista.adapter.in.web.dto.TelegramUpdateRequest;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
@@ -11,9 +16,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,17 +32,6 @@ public class SettingsController {
     private final UserProfileUseCase userProfileUseCase;
     private final UpdateBalanceCheckUseCase updateBalanceCheckUseCase;       // 잔고검증 설정 — user_settings 테이블
     private final UpdateNotificationPrefUseCase updateNotificationPrefUseCase; // 알림 타입별 on/off — user_notification_prefs 테이블
-
-    record TelegramUpdateRequest(@NotBlank String botToken, @NotBlank String chatId) {} // 텔레그램 설정 요청 body
-    record NotificationChannelRequest(@NotBlank String channel) {}                      // 알림 채널 변경 요청 body
-    record BalanceCheckRequest(boolean enabled) {}                                      // 잔고 검증 설정 요청 body
-    record NotificationPrefRequest(boolean enabled) {}                                  // 알림 타입별 on/off 요청 body
-    record NicknameRequest(                                                             // 닉네임 변경 요청 body
-        @NotBlank
-        @Size(max = 10, message = "닉네임은 10자 이내여야 합니다")
-        @Pattern(regexp = "^[\\p{L}\\d ]{1,10}$", message = "한글·영문·숫자·공백 1~10자")
-        String nickname
-    ) {}
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")

@@ -1,5 +1,8 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.AdminAccountResponse;
+import com.kista.adapter.in.web.dto.AdminStrategyResponse;
+import com.kista.adapter.in.web.dto.StrategyStatusRequest;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.strategy.Strategy;
@@ -74,43 +77,4 @@ public class AdminAccountController {
         }
     }
 
-    // 계좌 목록 응답 DTO
-    record AdminAccountResponse(
-            UUID id,
-            UUID userId,
-            String ownerNickname,   // User.nickname
-            String accountNoMasked, // "****1234"
-            String broker,          // Broker.name()
-            List<AdminStrategyResponse> strategies
-    ) {
-        static AdminAccountResponse from(Account a, AdminUserView user, List<Strategy> strategies) {
-            String nickname = user != null ? user.nickname() : "(알 수 없음)";
-            String masked = "****" + a.accountNo().substring(
-                    Math.max(0, a.accountNo().length() - 4));
-            return new AdminAccountResponse(
-                    a.id(), a.userId(), nickname, masked,
-                    a.broker() != null ? a.broker().name() : null,
-                    strategies.stream().map(AdminStrategyResponse::from).toList());
-        }
-    }
-
-    record AdminStrategyResponse(
-            UUID id,
-            String type,
-            String status,
-            String ticker,
-            String cycleSeedType
-    ) {
-        static AdminStrategyResponse from(com.kista.domain.model.strategy.Strategy strategy) {
-            return new AdminStrategyResponse(
-                    strategy.id(),
-                    strategy.type().name(),
-                    strategy.status().name(),
-                    strategy.ticker().name(),
-                    strategy.cycleSeedType().name()
-            );
-        }
-    }
-
-    record StrategyStatusRequest(com.kista.domain.model.strategy.Strategy.Status status) {}
 }

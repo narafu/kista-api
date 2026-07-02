@@ -1,6 +1,9 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.account.Account;
+import com.kista.adapter.in.web.dto.AdminAccountItem;
+import com.kista.adapter.in.web.dto.AnomaliesResponse;
+import com.kista.adapter.in.web.dto.AuditLogResponse;
+import com.kista.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.admin.AppErrorLog;
@@ -82,69 +85,14 @@ public class AdminObservabilityController {
         Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
 
-        List<AccountItem> paused = anomalies.pausedAccounts().stream()
-                .map(a -> AccountItem.from(a, userMap))
+        List<AdminAccountItem> paused = anomalies.pausedAccounts().stream()
+                .map(a -> AdminAccountItem.from(a, userMap))
                 .toList();
-        List<AccountItem> inactive = anomalies.inactiveAccounts().stream()
-                .map(a -> AccountItem.from(a, userMap))
+        List<AdminAccountItem> inactive = anomalies.inactiveAccounts().stream()
+                .map(a -> AdminAccountItem.from(a, userMap))
                 .toList();
 
         return new AnomaliesResponse(paused, inactive);
     }
 
-    // DTO records
-    record AuditLogResponse(
-            UUID id,
-            UUID adminId,
-            String action,
-            String targetType,
-            UUID targetId,
-            Map<String, Object> payload,
-            Instant createdAt
-    ) {
-        static AuditLogResponse from(AuditLog log) {
-            return new AuditLogResponse(
-                    log.id(), log.adminId(), log.action(), log.targetType(),
-                    log.targetId(), log.payload(), log.createdAt());
-        }
-    }
-
-    record ErrorLogResponse(
-            UUID id,
-            String errorType,
-            String message,
-            String stackTrace,
-            Map<String, String> context,
-            Instant createdAt
-    ) {
-        static ErrorLogResponse from(AppErrorLog log) {
-            return new ErrorLogResponse(
-                    log.id(), log.errorType(), log.message(),
-                    log.stackTrace(), log.context(), log.createdAt());
-        }
-    }
-
-    record AnomaliesResponse(
-            List<AccountItem> pausedAccounts,
-            List<AccountItem> inactiveAccounts
-    ) {}
-
-    record AccountItem(
-            UUID id,
-            UUID userId,
-            String ownerNickname,
-            String accountNoMasked,
-            String broker
-    ) {
-        static AccountItem from(Account a, Map<UUID, AdminUserView> userMap) {
-            AdminUserView user = a.userId() != null ? userMap.get(a.userId()) : null;
-            String nickname = user != null ? user.nickname() : "(알 수 없음)";
-            String masked = a.accountNo() != null
-                    ? "****" + a.accountNo().substring(Math.max(0, a.accountNo().length() - 4))
-                    : "****";
-            return new AccountItem(
-                    a.id(), a.userId(), nickname, masked,
-                    a.broker() != null ? a.broker().name() : null);
-        }
-    }
 }

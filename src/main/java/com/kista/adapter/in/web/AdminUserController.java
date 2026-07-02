@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.AdminRoleRequest;
+import com.kista.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.adapter.in.web.dto.AdminUserResponse;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
@@ -43,7 +45,7 @@ public class AdminUserController {
     @PatchMapping("/{userId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStatus(@PathVariable UUID userId,
-                             @RequestBody StatusRequest body,
+                             @RequestBody AdminStatusRequest body,
                              @AuthenticationPrincipal UUID adminId) {
         switch (body.status()) {
             case ACTIVE   -> adminUser.approveUser(adminId, userId);
@@ -57,7 +59,7 @@ public class AdminUserController {
     @PatchMapping("/{userId}/role")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changeRole(@PathVariable UUID userId,
-                           @RequestBody RoleRequest body,
+                           @RequestBody AdminRoleRequest body,
                            @AuthenticationPrincipal UUID adminId) {
         adminUser.changeRole(adminId, userId, body.role());
     }
@@ -70,6 +72,4 @@ public class AdminUserController {
         adminUser.deleteUser(adminId, userId);
     }
 
-    record StatusRequest(User.UserStatus status) {} // 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)
-    record RoleRequest(User.UserRole role) {} // 역할 변경 요청 body
 }
