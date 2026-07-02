@@ -50,7 +50,7 @@ application/
     portfolio/   ← PortfolioService
     market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
     privacy/     ← PrivacyService
-    admin/       ← AdminService, AdminQueryService
+    admin/       ← AdminService, AdminQueryService, AdminStrategyService, AdminCycleCloser (holdings 소진 시 사이클 종료 helper), AdminSelectionChain, AdminOrderCorrectionService, AdminTradeCorrectionService
     auth/        ← BlacklistService (JWT 블랙리스트), TokenService (RT 발급/갱신/폐기)
 
 adapter/in/
@@ -58,6 +58,7 @@ adapter/in/
                    TradingCloseScheduler (화~토 04:00 KST — 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 03:00 KST — 만료 RT 삭제, 03:05 KST — grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
+                   BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리)
   web/           ← REST Controller + DTO
                     AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`), DashboardController (DB기반 포트폴리오 스냅샷·사이클 이력), StatisticsController (KIS 전용 live 잔고/수익/가격), TossStatisticsController (Toss 전용 live 6개 엔드포인트, /api/accounts/{accountId}/*), FearGreedController (CNN·크립토 공포탐욕지수, GET /api/market/fear-greed), MetaController (enum SSOT /api/meta 번들만, Cache 1h — StrategyTypeMeta에 capability 7필드: code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), PrivacyTradeController, Admin*Controller (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminObservabilityController (/api/admin/logs/ — 감사로그+앱에러로그 조회, DELETE /errors/{id} 앱에러로그 소프트 삭제), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
@@ -76,17 +77,19 @@ adapter/in/
   - `TossStatisticsUseCase` → `TossStatisticsService` 구현
 
 adapter/out/
-  kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리)
+  broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 double-checked locking 토큰 캐시 헬퍼 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급)
+  kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리 + executeWithRetry: 401 시 KisTokenPort.invalidateToken 후 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 5개 Port 구현 — PortfolioPort/MarginPort/SellableQuantityPort/DailyTradePort/ExecutionPort)
   toss/          ← Toss API Adapter (TossHttpClient 공통 헤더 처리, TossConfig)
                    TossAuthApi, TossCandleApi, TossHoldingsApi, TossOrderApi, TossPriceApi, TossCommissionsApi, TossMarketApi
+                   TossResponseParser (응답 숫자·정수 문자열 파싱 헬퍼 — 패키지 내부 전용)
                    TossBrokerAdapter (BrokerAdapterPort + 공통 5개 + Toss 전용 5개 Port 구현)
   feargreed/     ← CnnFearGreedAdapter (CnnFearGreedPort 구현), CryptoFearGreedAdapter (CryptoFearGreedPort 구현)
   redis/         ← RedisBlacklistAdapter (BlacklistPort 구현 — userId/JTI 단위 JWT 블랙리스트, TTL 기반)
   persistence/   ← JPA 인프라 (BaseAuditEntity, BaseCreatedAtEntity, JpaAuditingConfig) + 어그리게이트별 서브패키지
     user/        ← UserEntity + UserJpaRepository + UserPersistenceAdapter + AdminUserViewAdapter
     account/     ← AccountEntity + AccountJpaRepository + AccountPersistenceAdapter
-    strategy/    ← StrategyEntity/StrategyCycleEntity/CyclePositionEntity + 각 JpaRepository + PersistenceAdapter (9파일)
+    strategy/    ← StrategyEntity/StrategyCycleEntity/CyclePositionEntity + 각 JpaRepository + PersistenceAdapter + PersistenceSupport (upsert find-or-create 헬퍼, 패키지 내부 전용)
     kistoken/    ← KisTokenEntity(table=broker_tokens) + KisTokenJpaRepository + KisTokenPersistenceAdapter
     auth/        ← RefreshTokenEntity + RefreshTokenJpaRepository + RefreshTokenPersistenceAdapter
     audit/       ← AuditLogEntity + AuditLogJpaRepository + AuditLogPersistenceAdapter

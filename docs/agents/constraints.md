@@ -24,7 +24,7 @@
 - `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
 
 ### Account ↔ Strategy 분리
-- `Account` record 필드 8개: `id, userId, nickname, accountNo, appKey, secretKey, kisAccountType, broker` — type/status/ticker/multiple/createdAt/updatedAt 없음 (감사 컬럼은 persistence 레이어 `BaseAuditEntity`가 관리)
+- `Account` record 필드 9개: `id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt` — type/status/ticker/multiple/updatedAt 없음 (updatedAt은 persistence 레이어 `BaseAuditEntity`가 관리; `createdAt`은 신규 등록 시 null, persistence 저장 후 채워짐)
 - `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
 - `StrategyVersion` record 필드 5개: `id, strategyId, versionNo, createdAt, deletedAt` — 전략 설정 이력 부모
 - `StrategyInfiniteDetail` record 필드 2개: `strategyVersionId, divisionCount`
@@ -109,9 +109,9 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
 
 ### KIS 계좌번호 DB 저장 방식
-- 계좌번호는 `accounts.account_no` (8자리, AES-256 암호화) + `accounts.kis_account_type` (평문 `"01"`) 으로 분리 저장
-- KIS API 호출: `CANO = account.accountNo()`, `ACNT_PRDT_CD = account.kisAccountType()`
-- `74420614-01` 형태로 하나의 필드에 합치면 KIS API CANO 파라미터 오류 — 반드시 분리
+- 계좌번호는 `accounts.account_no` (AES-256 암호화) + `accounts.broker_account_code` (KIS: null, TOSS: accountSeq) 저장
+- KIS API 호출: `KisHttpClient.splitAccountNo(account.accountNo())` → `[CANO, ACNT_PRDT_CD]` — `-` 기준 분리, 구분자 없으면 `ACNT_PRDT_CD="01"` 기본값
+- `account.accountNo()`에 `"74420614-01"` 형태로 저장된 경우 split 결과 `["74420614","01"]`; `"74420614"` 8자리만 저장된 경우 기본 `"01"` 사용
 
 ### Flyway
 - 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지** (V1 포함 전체 버전) — Flyway 체크섬 불일치로 앱 기동 즉시 크래시. 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인) [V12 수정→운영 크래시 사례]
