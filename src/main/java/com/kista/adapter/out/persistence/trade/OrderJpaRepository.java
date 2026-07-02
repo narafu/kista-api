@@ -87,4 +87,13 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("strategyId") UUID strategyId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    // 전략 기준 distinct 거래일 목록 조회 — 관리자 주문 보정 거래일 드롭다운용
+    @Query(value = """
+            SELECT DISTINCT o.trade_date FROM orders o
+            JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+            WHERE sc.strategy_id = :strategyId
+            ORDER BY o.trade_date DESC
+            """, nativeQuery = true)
+    List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);
 }

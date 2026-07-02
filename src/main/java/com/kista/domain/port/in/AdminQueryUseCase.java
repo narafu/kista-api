@@ -39,6 +39,9 @@ public interface AdminQueryUseCase {
     // 선택한 전략의 특정 거래일 주문 목록 조회
     List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate);
 
+    // 선택한 전략의 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
+    List<LocalDate> listStrategyTradeDates(UUID strategyId);
+
     // 단일 계좌 조회 — listStrategyOrders 전용 (전체 풀스캔 불필요)
     Optional<Account> findAccount(UUID accountId);
 }

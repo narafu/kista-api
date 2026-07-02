@@ -122,6 +122,11 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<LocalDate> findTradeDatesByStrategyId(UUID strategyId) {
+        return repository.findDistinctTradeDatesByStrategyId(strategyId);
+    }
+
+    @Override
     public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
         // PLANNED 상태 주문만 가격·수량 수정 허용
         mutate(orderId, e -> {

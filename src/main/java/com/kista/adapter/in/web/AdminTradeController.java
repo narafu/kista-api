@@ -55,6 +55,13 @@ public class AdminTradeController {
         return toResponses(adminQuery.listTrades(from, to));
     }
 
+    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/trade-dates")
+    public List<LocalDate> listStrategyTradeDates(
+            @PathVariable UUID accountId,
+            @PathVariable UUID strategyId) {
+        return adminQuery.listStrategyTradeDates(strategyId);
+    }
+
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
     public List<AdminTradeResponse> listStrategyOrders(
             @PathVariable UUID accountId,
