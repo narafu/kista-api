@@ -18,6 +18,12 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
         String getStrategyType();
     }
 
+    interface CycleStrategySummaryProjection {
+        UUID getCycleId();
+        UUID getStrategyId();
+        String getStrategyType();
+    }
+
     @Query(value = """
             SELECT sc.id AS cycleId, s.type AS strategyType
             FROM strategy_cycle sc
@@ -25,6 +31,14 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
             WHERE sc.id IN :cycleIds
             """, nativeQuery = true)
     List<CycleStrategyType> findStrategyTypesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
+
+    @Query(value = """
+            SELECT sc.id AS cycleId, s.id AS strategyId, s.type AS strategyType
+            FROM strategy_cycle sc
+            JOIN strategy s ON sc.strategy_id = s.id
+            WHERE sc.id IN :cycleIds
+            """, nativeQuery = true)
+    List<CycleStrategySummaryProjection> findStrategySummariesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
 
     // 계좌 ID로 전략 목록 조회 (1:N, @SQLRestriction 자동 적용)
     List<StrategyEntity> findAllByAccountId(UUID accountId);

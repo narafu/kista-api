@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.strategy;
 
+import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.AccessLevel;
@@ -69,12 +70,15 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     @Override
-    public Map<UUID, Strategy.Type> findTypesByCycleIds(Collection<UUID> cycleIds) {
+    public Map<UUID, AdminCycleStrategySummary> findSummariesByCycleIds(Collection<UUID> cycleIds) {
         if (cycleIds.isEmpty()) return Map.of();
-        return jpaRepository.findStrategyTypesByCycleIds(cycleIds).stream()
+        return jpaRepository.findStrategySummariesByCycleIds(cycleIds).stream()
                 .collect(Collectors.toMap(
-                        StrategyJpaRepository.CycleStrategyType::getCycleId,
-                        r -> Strategy.Type.valueOf(r.getStrategyType())
+                        StrategyJpaRepository.CycleStrategySummaryProjection::getCycleId,
+                        r -> new AdminCycleStrategySummary(
+                                r.getStrategyId(),
+                                Strategy.Type.valueOf(r.getStrategyType())
+                        )
                 ));
     }
 

@@ -6,9 +6,9 @@ import com.kista.adapter.in.web.dto.AdminOrderCorrectionResponse;
 import com.kista.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminOrderCorrectionUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
@@ -79,8 +79,8 @@ public class AdminTradeController {
         Map<UUID, Account> accountMap = Map.of(accountId, account);
         Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
         Set<UUID> cycleIds = orders.stream().map(Order::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
-        return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategyTypeMap)).toList();
+        Map<UUID, AdminCycleStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
@@ -120,9 +120,9 @@ public class AdminTradeController {
                 .map(Order::strategyCycleId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
+        Map<UUID, AdminCycleStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream()
-                .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategyTypeMap))
+                .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap))
                 .toList();
     }
 }

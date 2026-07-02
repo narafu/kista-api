@@ -128,13 +128,18 @@ class AdminTradeControllerTest {
                         null
                 )
         ));
-        when(adminQuery.getStrategyTypesByCycleIds(java.util.Set.of(cycleId)))
-                .thenReturn(java.util.Map.of(cycleId, Strategy.Type.PRIVACY));
+        when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
+                .thenReturn(java.util.Map.of(
+                        cycleId,
+                        new com.kista.domain.model.admin.AdminCycleStrategySummary(strategyId, Strategy.Type.PRIVACY)
+                ));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
                         .param("tradeDate", "2026-07-01")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accountId").value(accountId.toString()))
+                .andExpect(jsonPath("$[0].strategyId").value(strategyId.toString()))
                 .andExpect(jsonPath("$[0].strategyType").value("PRIVACY"))
                 .andExpect(jsonPath("$[0].ownerNickname").value("privacy-user"))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))

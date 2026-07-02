@@ -1,6 +1,7 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AuditLog;
@@ -27,8 +28,8 @@ public interface AdminQueryUseCase {
     // PRIVACY 기준 매매표 목록 — days==null 이면 전체, 그 외 최근 N일
     List<PrivacyTradeBaseView> listPrivacyBases(Integer days);
 
-    // strategy_cycle.id → strategy.type 배치 조회 (관리자 거래내역 전략 타입 표시용)
-    Map<UUID, Strategy.Type> getStrategyTypesByCycleIds(Set<UUID> cycleIds);
+    // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역 전략 식별용)
+    Map<UUID, AdminCycleStrategySummary> getStrategySummariesByCycleIds(Set<UUID> cycleIds);
 
     // 계좌 선택 이후 전략 선택 UI용 목록
     List<Strategy> listStrategies(UUID accountId);

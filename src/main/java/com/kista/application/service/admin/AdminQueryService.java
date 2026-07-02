@@ -3,6 +3,7 @@ package com.kista.application.service.admin;
 import com.kista.common.TimeZones;
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AuditLog;
@@ -104,8 +105,8 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public Map<UUID, Strategy.Type> getStrategyTypesByCycleIds(Set<UUID> cycleIds) {
-        return strategyPort.findTypesByCycleIds(cycleIds);
+    public Map<UUID, AdminCycleStrategySummary> getStrategySummariesByCycleIds(Set<UUID> cycleIds) {
+        return strategyPort.findSummariesByCycleIds(cycleIds);
     }
 
     @Override
