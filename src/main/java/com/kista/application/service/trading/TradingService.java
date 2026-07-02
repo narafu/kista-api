@@ -13,6 +13,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,14 +49,14 @@ class TradingService {
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
     private final UserPort userPort;                           // ACTIVE 사용자 전체 조회 (장 알림용)
-    private final LoadUserSettingsPort loadUserSettingsPort;   // MARKET_ALERT 활성 여부 조회
+    private final UserSettingsPort userSettingsPort; // MARKET_ALERT 활성 여부 조회
 
     // planAndSaveOrders 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
-            BigDecimal startPrice,          // INFINITE만 non-null
+            BigDecimal startPrice,          // 공통 — INFINITE: BuyOrderPriceCapper / PRIVACY: capPrivacyIfNeeded
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
@@ -155,11 +156,9 @@ class TradingService {
     private void reportAll(List<CyclePlacedState> placedStates, Map<Ticker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
         for (CyclePlacedState ps : placedStates) {
             CycleState st = ps.state();
-            Strategy strategy = st.ctx().strategy();
-            StrategyCycle currentCycle = st.ctx().currentCycle();
-            runSafely("recordAndNotify", ps.state().ctx(), () -> {
-                reporter.recordAndNotify(today, strategy, currentCycle, st.ctx().account(), st.ctx().user(),
-                        st.balance(), closingPrices.get(strategy.ticker()),
+            runSafely("recordAndNotify", st.ctx(), () -> {
+                reporter.recordAndNotify(today, st.ctx(), st.balance(),
+                        closingPrices.get(st.ctx().strategy().ticker()),
                         ps.mainOrders(), st.privacyBase());
                 return null;
             });
@@ -181,7 +180,6 @@ class TradingService {
         Strategy strategy = ctx.strategy();
         StrategyCycle currentCycle = ctx.currentCycle();
         Account account = ctx.account();
-        User user = ctx.user();
 
         // 1. 잔고 로드
         AccountBalance balance = loadBalance(strategy, account);
@@ -195,22 +193,34 @@ class TradingService {
             return buildCycleStateFromExistingOrders(ctx, balance, price, privacyBase, today, prevClosePrice, todayOrders.size());
         }
 
-        // 3. 전략 위임 — 주문 계획 산출 (PRIVACY 기준매매표 미수신 등은 skip) + 잔고 유효성 검증
-        CycleOrderComputer.ComputeResult result = orderComputer.computeUnlessSkipped(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
+        // 3. 전략 계산 → live 잔고 검증 → PLANNED 저장 (skip·부족 시 null)
+        CycleOrderStrategy.OrderPlan plan = computeValidateAndSave(ctx, balance, prevClosePrice, today, privacyBase)
                 .orElse(null);
-        if (result == null) return null;
-
-        // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-        if (notifyIfInsufficientLiveBalance(account, user, strategy, result.orders())) return null;
-
-        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
+        if (plan == null) return null;
 
         // CycleState: INFINITE는 position, PRIVACY는 privacyBase — startPrice는 공통(둘 다 캡에 필요)
-        InfinitePosition position = result.position();
         BigDecimal startPrice = price; // INFINITE: BuyOrderPriceCapper, PRIVACY: capPrivacyIfNeeded
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        return new CycleState(ctx, balance, position, startPrice, privacyBaseForState);
+        return new CycleState(ctx, balance, plan.position(), startPrice, privacyBaseForState);
+    }
+
+    // 전략 계산 → live 잔고 검증 → PLANNED 저장 — 마감·개장 스케쥴러 공통 골격
+    // empty = 전략 차원 skip(PRIVACY 기준 미수신 등) 또는 live 잔고 부족(사용자 알림 발송됨)
+    private Optional<CycleOrderStrategy.OrderPlan> computeValidateAndSave(BatchContext ctx, AccountBalance balance,
+            BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase) {
+        Account account = ctx.account();
+        Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(
+                balance, ctx.strategy(), prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname());
+        if (planOpt.isEmpty()) {
+            log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+            return Optional.empty();
+        }
+        // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
+        if (notifyIfInsufficientLiveBalance(account, ctx.user(), ctx.strategy(), planOpt.get().orders())) {
+            return Optional.empty();
+        }
+        orderPlanner.savePlannedOrders(planOpt.get().orders(), account, ctx.currentCycle().id());
+        return planOpt;
     }
 
     // 오늘 PLANNED·PLACED 주문이 이미 있을 때 캡 보정을 위해 position만 재계산 (저장 없음)
@@ -222,9 +232,9 @@ class TradingService {
         log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
         if (strategy.isInfinite()) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
-            CycleOrderComputer.ComputeResult recalc = orderComputer.compute(
-                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname());
-            InfinitePosition recalcPos = recalc.isSkipped() ? null : recalc.position();
+            InfinitePosition recalcPos = orderComputer.compute(
+                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname())
+                    .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
             return new CycleState(ctx, balance, recalcPos, price, null);
         }
         // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
@@ -282,7 +292,6 @@ class TradingService {
         Strategy strategy = ctx.strategy();
         StrategyCycle currentCycle = ctx.currentCycle();
         Account account = ctx.account();
-        User user = ctx.user();
 
         // 수동 '지금 주문' 등으로 당일 주문이 이미 있으면 신규 생성만 skip — AT_OPEN 선접수는 아래에서 항상 시도
         List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), tradeDate);
@@ -295,19 +304,8 @@ class TradingService {
             PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
             BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
 
-            // 전략 계산 (skip 결과는 건너뜀 — PRIVACY 기준 매매표 없을 시 정상 skip)
-            CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                    balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, account.nickname());
-            if (result.isSkipped()) {
-                log.info("[{}] 개장 order 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
-                return;
-            }
-
-            // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-            if (notifyIfInsufficientLiveBalance(account, user, strategy, result.orders())) return;
-
-            // 전체 PLANNED 저장
-            orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
+            // 전략 계산 → live 잔고 검증 → PLANNED 저장 (마감 스케쥴러와 공통 골격)
+            if (computeValidateAndSave(ctx, balance, prevClosePrice, tradeDate, privacyBase).isEmpty()) return;
         }
 
         // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)
@@ -335,7 +333,7 @@ class TradingService {
     // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
     private void notifyMarketEvent(NotificationType type, java.util.function.Consumer<User> notify) {
         userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
-            UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+            UserSettings settings = userSettingsPort.loadByUserId(user.id())
                     .orElse(UserSettings.defaultFor(user.id()));
             if (settings.isNotificationEnabled(type)) {
                 try {

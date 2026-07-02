@@ -1,8 +1,10 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -11,11 +13,15 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class KisHttpClient {
@@ -43,6 +49,12 @@ public class KisHttpClient {
         return headers;
     }
 
+    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 — 구분자 없으면 상품코드 "01" 기본
+    public static String[] splitAccountNo(String accountNo) {
+        String[] parts = accountNo.split("-", 2);
+        return new String[]{parts[0], parts.length > 1 ? parts[1] : "01"};
+    }
+
     public <T> T get(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder
                 .fromUriString(baseUrl + path)
@@ -57,26 +69,50 @@ public class KisHttpClient {
         ).getBody();
     }
 
+    // 계좌 기반 POST — buildHeaders + post + 401 재시도 일괄 처리 (KisOrderApi 등)
+    public <T> T post(String trId, String path, Account account, Object body, Class<T> responseType) {
+        return executeWithRetry(trId, account, headers -> post(path, headers, body, responseType));
+    }
+
     // Trading API용: CANO/ACNT_PRDT_CD 자동 주입 + buildHeaders + get 일괄 처리
     public <T> T tradingGet(String trId, String path, Account account,
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
-        HttpHeaders headers = buildHeaders(trId, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
-        String[] parts = account.accountNo().split("-", 2);
+        String[] parts = splitAccountNo(account.accountNo());
         params.add("CANO", parts[0]);
-        params.add("ACNT_PRDT_CD", parts.length > 1 ? parts[1] : "01");
+        params.add("ACNT_PRDT_CD", parts[1]);
         extraParams.accept(params);
-        return get(path, headers, params, responseType);
+        return executeWithRetry(trId, account, headers -> get(path, headers, params, responseType));
     }
 
     // 시세 API용: AUTH="" 기본 주입 + buildHeaders + get 일괄 처리 (계좌 파라미터 없음)
     public <T> T pricingGet(String trId, String path, Account account,
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
-        HttpHeaders headers = buildHeaders(trId, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
         extraParams.accept(params);
-        return get(path, headers, params, responseType);
+        return executeWithRetry(trId, account, headers -> get(path, headers, params, responseType));
+    }
+
+    // 401 → 토큰 무효화 후 1회 재시도. 매 시도마다 buildHeaders로 최신 토큰을 다시 읽는다.
+    // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
+    private <T> T executeWithRetry(String trId, Account account, Function<HttpHeaders, T> call) {
+        try {
+            return call.apply(buildHeaders(trId, account));
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode().value() == 401) {
+                log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
+                kisTokenPort.invalidateToken(account.id());
+                try {
+                    // 무효화된 캐시 → buildHeaders가 신규 토큰을 재발급해 헤더 재구성
+                    return call.apply(buildHeaders(trId, account));
+                } catch (RestClientException retryEx) {
+                    throw new KisApiException("KIS API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
+                }
+            }
+            throw new KisApiException("KIS API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+        } catch (RestClientException e) {
+            throw new KisApiException("KIS API 요청 실패: " + e.getMessage(), e);
+        }
     }
 }

@@ -15,6 +15,13 @@ public record ReverseModePosition(
         BigDecimal starPointPrice,      // 별지점 = 직전 5거래일 종가 평균 (null이면 계산 불가)
         boolean isFirstDay              // 소진 직후 첫날 여부
 ) {
+    // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
+    public static ReverseModePosition of(AccountBalance balance, Strategy.Ticker ticker, int divisionCount,
+                                         BigDecimal starPointPrice, boolean isFirstDay) {
+        return new ReverseModePosition(balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+                ticker, divisionCount, starPointPrice, isFirstDay);
+    }
+
     // 첫날 MOC 매도 수량 — holdings / (divisionCount/2)
     // 20분할이면 holdings/10, 40분할이면 holdings/20
     public int calcMocSellQuantity() {
@@ -28,16 +35,16 @@ public record ReverseModePosition(
         return divisor > 0 ? holdings / divisor : 0;
     }
 
-    // 쿼터매수 금액 — usdDeposit / 4
+    // 쿼터매수 금액 — usdDeposit / SELL_QUARTER_DIVISOR(4)
     public BigDecimal calcLocBuyAmount() {
-        return usdDeposit.divide(BigDecimal.valueOf(4), 2, HALF_UP);
+        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), 2, HALF_UP);
     }
 
-    // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - $0.01
+    // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - TICK_SIZE($0.01)
     // starPointPrice가 null이거나 0 이하이면 매수 불가 (0 반환)
     public int calcLocBuyQuantity() {
         if (starPointPrice == null || starPointPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
-        BigDecimal buyPrice = starPointPrice.subtract(new BigDecimal("0.01"));
+        BigDecimal buyPrice = starPointPrice.subtract(InfinitePosition.TICK_SIZE);
         if (buyPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
         return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
     }
@@ -45,6 +52,11 @@ public record ReverseModePosition(
     // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
     // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
     public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
+        return shouldExit(avgPrice, closingPrice, targetProfitRate);
+    }
+
+    // static 헬퍼: 포지션 객체 없이 종료 조건만 판단 — InfinitePosition.nextReverseMode에서 재사용
+    public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
                 .setScale(2, HALF_UP);

@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.InfiniteStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ import java.util.function.BiFunction;
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 
-// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — InfiniteTradingStrategy에 위임해 가격 캡 적용 후 재저장
+// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
 // 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
 @Component
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ class BuyOrderPriceCapper {
 
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
-    private final InfiniteTradingStrategy infiniteStrategy;
+    private final InfiniteStrategy infiniteStrategy;
 
     // PRIVACY 전용: position 없이 단순 가격 캡만 적용 (수량 유지)
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {

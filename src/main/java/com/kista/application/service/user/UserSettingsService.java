@@ -6,9 +6,8 @@ import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.SaveUserSettingsPort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,15 +22,14 @@ import java.util.UUID;
 @Slf4j
 class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPrefUseCase, UpdateBalanceCheckUseCase {
 
-    private final LoadUserSettingsPort loadPort;
-    private final SaveUserSettingsPort savePort;
+    private final UserSettingsPort userSettingsPort;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
 
     @Override
     public UserSettings getByUserId(UUID userId) {
         // 저장된 설정이 없으면 기본값 반환 (balanceCheckEnabled=true, 빈 알림 prefs)
-        return loadPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        return userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
     }
 
     @Override
@@ -41,7 +39,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         // 기존 prefs에 변경 항목만 덮어씀
         Map<NotificationType, Boolean> updatedPrefs = new HashMap<>(current.notificationPrefs());
         updatedPrefs.put(command.type(), command.enabled());
-        savePort.save(new UserSettings(command.userId(), current.balanceCheckEnabled(), updatedPrefs));
+        userSettingsPort.save(new UserSettings(command.userId(), current.balanceCheckEnabled(), updatedPrefs));
         log.info("알림 설정 변경: userId={}, type={}, enabled={}", command.userId(), command.type(), command.enabled());
     }
 
@@ -50,7 +48,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
     public void update(UpdateBalanceCheckCommand command) {
         UserSettings current = getByUserId(command.userId());
         boolean previous = current.balanceCheckEnabled();
-        savePort.save(new UserSettings(command.userId(), command.enabled(), current.notificationPrefs()));
+        userSettingsPort.save(new UserSettings(command.userId(), command.enabled(), current.notificationPrefs()));
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", command.userId(), previous, command.enabled());
 
         // 활성 전략 수 계산 — 잔고검증 전환 시 경고 로그 출력

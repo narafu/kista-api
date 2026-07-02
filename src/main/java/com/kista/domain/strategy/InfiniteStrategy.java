@@ -16,15 +16,12 @@ import static com.kista.domain.model.order.Order.OrderTiming.AT_OPEN;
 import static com.kista.domain.model.order.Order.OrderType.*;
 
 @Component
-class InfiniteStrategy implements InfiniteTradingStrategy {
+public class InfiniteStrategy {
 
     // 가격 캡 보정 주문 추가 횟수
     private static final int CORRECTION_ORDER_COUNT = 3;
 
-    // 미국 주식 호가단위 (센트): LOC 매도 지정가 = referencePrice + TICK_SIZE
-    private static final BigDecimal TICK_SIZE = new BigDecimal("0.01");
-
-    @Override
+    // 전략 계산 — 전반/후반 분기 후 주문 목록 반환
     public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
         List<Order> orders = new ArrayList<>();
         if (position.isEarlyStage()) {
@@ -35,7 +32,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         return orders;
     }
 
-    @Override
+    // BUY PLANNED 가격이 cap을 초과할 때 cap 기준으로 매수 수량 재산정 + 보정 주문(1주 LOC × 3회) 추가
     public List<Order> buildCappedBuyOrders(InfinitePosition position, LocalDate tradeDate, List<Order> buyOrders, BigDecimal cap) {
         BigDecimal unitAmount = position.unitAmount(); // 단위금액 (실값)
 
@@ -128,7 +125,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         // LOC 매도 (기준가 + 0.01) — 개장 시 선접수
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
-            BigDecimal locSellPrice = position.referencePrice().add(TICK_SIZE);
+            BigDecimal locSellPrice = position.referencePrice().add(InfinitePosition.TICK_SIZE);
             orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, AT_OPEN));
         }
 

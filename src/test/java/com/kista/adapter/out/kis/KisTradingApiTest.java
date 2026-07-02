@@ -1,8 +1,8 @@
 package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Execution;
-import com.kista.domain.model.kis.PresentBalanceResult;
+import com.kista.domain.model.broker.Execution;
+import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;

@@ -40,7 +40,7 @@ class StrategyServiceTest {
     @Mock UserPort userPort;
     @Mock BrokerAdapterRegistry registry;
     @Mock MarginPort marginPort;
-    @Mock LoadUserSettingsPort loadUserSettingsPort;
+    @Mock UserSettingsPort userSettingsPort;
 
     @InjectMocks StrategyService strategyService;
 

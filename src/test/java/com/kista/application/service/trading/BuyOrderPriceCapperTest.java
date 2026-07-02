@@ -6,7 +6,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.strategy.InfiniteTradingStrategy;
+import com.kista.domain.strategy.InfiniteStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 InfiniteTradingStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
+// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 InfiniteStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
 // 캡 가격 재산정 공식(병합/보정 등)은 InfiniteStrategyTypeTest.buildCappedBuyOrders 참고
 // PRIVACY: position 없이 단순 가격 캡만 적용 (capPrivacyIfNeeded)
 @ExtendWith(MockitoExtension.class)
@@ -32,7 +32,7 @@ class BuyOrderPriceCapperTest {
 
     @Mock OrderPort orderPort;
     @Mock TradingOrderPlanner orderPlanner;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
+    @Mock InfiniteStrategy infiniteStrategy;
     @Captor ArgumentCaptor<List<Order>> ordersCaptor;
     @Captor ArgumentCaptor<BigDecimal> capCaptor;
 

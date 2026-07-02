@@ -22,9 +22,9 @@ import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 
 @Slf4j
 @Component
-class PrivacyStrategy implements PrivacyTradingStrategy {
+public class PrivacyStrategy {
 
-    @Override
+    // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
     public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
         // initialUsdDeposit ÷ currentCycleStart = 배수 (소수 둘째자리 내림)
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {

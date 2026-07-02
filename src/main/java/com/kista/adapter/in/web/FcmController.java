@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.port.in.UserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FcmController {
 
-    private final UserUseCase userUseCase;
+    private final UserProfileUseCase userProfileUseCase;
 
     record FcmTokenRequest(@NotBlank String token, @NotBlank String platform) {} // FCM 토큰 등록 요청 body
 
@@ -30,7 +30,7 @@ public class FcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void registerToken(@AuthenticationPrincipal UUID userId,
                               @Valid @RequestBody FcmTokenRequest body) {
-        userUseCase.registerFcmToken(userId, body.token(), body.platform());
+        userProfileUseCase.registerFcmToken(userId, body.token(), body.platform());
     }
 
     // FCM 디바이스 토큰 삭제
@@ -40,6 +40,6 @@ public class FcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unregisterToken(@AuthenticationPrincipal UUID userId,
                                 @PathVariable String token) {
-        userUseCase.unregisterFcmToken(userId, token);
+        userProfileUseCase.unregisterFcmToken(userId, token);
     }
 }

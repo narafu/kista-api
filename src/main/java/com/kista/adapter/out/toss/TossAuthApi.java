@@ -1,6 +1,7 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
 import com.kista.domain.port.out.TossConnectionTestPort;
@@ -21,7 +22,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 // TossTokenPort + TossConnectionTestPort 통합 구현체
@@ -31,8 +31,8 @@ import java.util.concurrent.locks.ReentrantLock;
 @RequiredArgsConstructor
 public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
 
-    // 계좌별 락 — 동시 요청 시 중복 발급 방지
-    private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+    // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
+    private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
     // 관리자(공통 API) 토큰 락 — broker_tokens는 accounts FK라 계좌 없는 관리자 토큰은 인메모리로 별도 관리
     private final ReentrantLock adminLock = new ReentrantLock();
     private volatile String adminAccessToken;
@@ -51,21 +51,8 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
 
     @Override
     public String getToken(UUID accountId, String clientId, String clientSecret) {
-        // 1차 조회 — 락 없이 빠른 경로
-        Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, threshold());
-        if (cached.isPresent()) {
-            return cached.get();
-        }
-        // 캐시 miss 시 accountId별 락으로 경합 차단
-        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // 2차 조회 (double-check) — 다른 스레드가 이미 발급했을 수 있음
-            return brokerTokenCachePort.findValidToken(accountId, threshold())
-                    .orElseGet(() -> fetchAndCacheToken(accountId, clientId, clientSecret));
-        } finally {
-            lock.unlock();
-        }
+        return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
+                () -> fetchAndCacheToken(accountId, clientId, clientSecret));
     }
 
     private String fetchAndCacheToken(UUID accountId, String clientId, String clientSecret) {

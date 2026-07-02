@@ -31,4 +31,9 @@ public record CyclePosition(
         return new CyclePosition(null, strategyCycleId,
                 balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
     }
+
+    // DB 저장 포지션 → 매매 계산용 잔고 변환 (tradeSnapshot의 역방향)
+    public AccountBalance toBalance() {
+        return new AccountBalance(holdings, avgPrice, usdDeposit);
+    }
 }

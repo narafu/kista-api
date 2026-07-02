@@ -41,8 +41,8 @@ class TradingPreviewServiceTest {
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock InfiniteTradingStrategy infiniteStrategy;
-    @Mock PrivacyTradingStrategy privacyStrategy;
+    @Mock InfiniteStrategy infiniteStrategy;
+    @Mock PrivacyStrategy privacyStrategy;
     @Mock OrderPort orderPort;
     @Mock NotifyPort notifyPort;
 
@@ -75,7 +75,7 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
-        ReverseInfiniteTradingStrategy reverseStrategy = mock(ReverseInfiniteTradingStrategy.class);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));

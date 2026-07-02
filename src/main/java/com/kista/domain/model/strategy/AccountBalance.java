@@ -1,6 +1,6 @@
 package com.kista.domain.model.strategy;
 
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 
 import java.math.BigDecimal;

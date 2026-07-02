@@ -2,7 +2,7 @@ package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -41,26 +41,27 @@ class TradingReporter {
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
-    private final LoadUserSettingsPort loadUserSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
+    private final UserSettingsPort userSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
 
-    void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
-                         Account account, User user,
-                         AccountBalance balance, BigDecimal closingPrice,
-                         List<Order> mainOrders, PrivacyTradeBase privacyBase) {
+    void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
+                         BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
+        Strategy strategy = ctx.strategy();
+        Account account = ctx.account();
+        User user = ctx.user();
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = registry.require(account, ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         AccountBalance postBalance = balance.applyExecutions(executions);
-        saveCyclePosition(today, postBalance, strategy, currentCycle, account, user, closingPrice, privacyBase);
+        saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
         // TRADING_ALERT 알림 활성 여부 확인 후 발송 (기본값 true)
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
-        UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+        UserSettings settings = userSettingsPort.loadByUserId(user.id())
                 .orElse(UserSettings.defaultFor(user.id()));
         if (settings.isNotificationEnabled(NotificationType.TRADING_ALERT)) {
             userNotificationPort.notifyTradingReport(user, account, report);
@@ -79,8 +80,10 @@ class TradingReporter {
     }
 
     // execute() 종료 시 1건 적재, holdings==0이면 사이클 rotation 정책 처리
-    private void saveCyclePosition(LocalDate today, AccountBalance balance, Strategy strategy, StrategyCycle currentCycle,
-                                   Account account, User user, BigDecimal price, PrivacyTradeBase privacyBase) {
+    private void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
+                                   BigDecimal price, PrivacyTradeBase privacyBase) {
+        Strategy strategy = ctx.strategy();
+        StrategyCycle currentCycle = ctx.currentCycle();
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
         boolean newReverseMode = false;
         if (strategy.isInfinite()) {
@@ -104,8 +107,8 @@ class TradingReporter {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
-            userNotificationPort.notifyCycleCompleted(user, account, strategy);
-            cycleRotationService.rotate(strategy, currentCycle, account, user, price, privacyBase);
+            userNotificationPort.notifyCycleCompleted(ctx.user(), ctx.account(), strategy);
+            cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
         }
     }
 
