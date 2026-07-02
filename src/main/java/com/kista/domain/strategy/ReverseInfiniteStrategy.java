@@ -1,6 +1,7 @@
 package com.kista.domain.strategy;
 
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.ReverseModePosition;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -47,7 +48,7 @@ class ReverseInfiniteStrategy implements ReverseInfiniteTradingStrategy {
         // LOC 쿼터매수 — 별지점 아래에서 (starPointPrice - $0.01)
         int locBuyQuantity = position.calcLocBuyQuantity();
         if (locBuyQuantity >= 1 && position.starPointPrice() != null) {
-            BigDecimal buyPrice = position.starPointPrice().subtract(new BigDecimal("0.01"));
+            BigDecimal buyPrice = position.starPointPrice().subtract(InfinitePosition.TICK_SIZE);
             orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity, buyPrice));
             log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQuantity, buyPrice);
         }

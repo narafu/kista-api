@@ -30,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class TokenService implements TokenUseCase {
 
-    private static final Duration RT_TTL = Duration.ofHours(120); // 5일
+    private static final Duration RT_TTL = Duration.ofDays(5); // 리프레시 토큰 유효 기간
     private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
     // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 동시 요청 패자로 허용
     static final Duration RT_GRACE = Duration.ofSeconds(60);

@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
+
+    private static final String AUDIT_ACTION = "ORDER_CORRECTION"; // 감사 로그 액션 코드
+    private static final String AUDIT_TARGET_TYPE = "ORDER";       // 감사 로그 대상 타입
 
     private final UserPort userPort;
     private final AccountPort accountPort;
@@ -72,7 +76,7 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
         orderPort.updatePlannedOrder(order.id(), price, quantity);
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "newPrice", price.toPlainString(),
                         "newQuantity", quantity
@@ -123,7 +127,7 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         Order replacement = broker.place(replacementTemplate, account);
         orderPort.saveAll(List.of(replacement));
 
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "newPrice", price.toPlainString(),
                         "newQuantity", quantity,
@@ -171,7 +175,7 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
         // 5. 주문 저장 + 감사 로그
         orderPort.saveAll(List.of(correctionOrder));
-        auditLogPort.log(adminId, "ORDER_CORRECTION", "ORDER", order.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, order.id(),
                 auditPayload(command, order, Map.of(
                         "direction", correctionOrder.direction().name(),
                         "newPrice", price.toPlainString(),
@@ -289,7 +293,7 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     private static Map<String, Object> auditPayload(AdminOrderCorrectionCommand command, Order order,
                                                     Map<String, Object> extra) {
-        java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("mode", command.mode().name());
         payload.put("strategyId", command.strategyId().toString());
         payload.put("accountId", command.accountId().toString());

@@ -28,16 +28,16 @@ public record ReverseModePosition(
         return divisor > 0 ? holdings / divisor : 0;
     }
 
-    // 쿼터매수 금액 — usdDeposit / 4
+    // 쿼터매수 금액 — usdDeposit / SELL_QUARTER_DIVISOR(4)
     public BigDecimal calcLocBuyAmount() {
-        return usdDeposit.divide(BigDecimal.valueOf(4), 2, HALF_UP);
+        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), 2, HALF_UP);
     }
 
-    // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - $0.01
+    // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - TICK_SIZE($0.01)
     // starPointPrice가 null이거나 0 이하이면 매수 불가 (0 반환)
     public int calcLocBuyQuantity() {
         if (starPointPrice == null || starPointPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
-        BigDecimal buyPrice = starPointPrice.subtract(new BigDecimal("0.01"));
+        BigDecimal buyPrice = starPointPrice.subtract(InfinitePosition.TICK_SIZE);
         if (buyPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
         return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
     }

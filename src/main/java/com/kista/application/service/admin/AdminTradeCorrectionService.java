@@ -35,6 +35,8 @@ import java.util.UUID;
 @Transactional
 class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
 
+    private static final String AUDIT_ACTION = "TRADE_MANUAL_CORRECTION"; // 감사 로그 액션 코드
+
     private final UserPort userPort;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -112,7 +114,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         }
 
         orderPort.saveAll(manualOrders);
-        auditLogPort.log(adminId, "TRADE_MANUAL_CORRECTION", "STRATEGY", strategy.id(),
+        auditLogPort.log(adminId, AUDIT_ACTION, "STRATEGY", strategy.id(),
                 Map.of(
                         "userId", user.id().toString(),
                         "accountId", account.id().toString(),

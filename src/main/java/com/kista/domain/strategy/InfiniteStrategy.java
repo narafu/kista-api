@@ -21,9 +21,6 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
     // 가격 캡 보정 주문 추가 횟수
     private static final int CORRECTION_ORDER_COUNT = 3;
 
-    // 미국 주식 호가단위 (센트): LOC 매도 지정가 = referencePrice + TICK_SIZE
-    private static final BigDecimal TICK_SIZE = new BigDecimal("0.01");
-
     @Override
     public List<Order> buildOrders(InfinitePosition position, LocalDate tradeDate) {
         List<Order> orders = new ArrayList<>();
@@ -128,7 +125,7 @@ class InfiniteStrategy implements InfiniteTradingStrategy {
         // LOC 매도 (기준가 + 0.01) — 개장 시 선접수
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
-            BigDecimal locSellPrice = position.referencePrice().add(TICK_SIZE);
+            BigDecimal locSellPrice = position.referencePrice().add(InfinitePosition.TICK_SIZE);
             orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, locSellPrice, AT_OPEN));
         }
 

@@ -26,6 +26,10 @@ import java.util.UUID;
 @Transactional
 class UserService implements UserUseCase {
 
+    private static final Duration REJECT_BLACKLIST_TTL = Duration.ofMinutes(15); // 거절 직후 AT 차단 기간
+    private static final long PENDING_REAPPLY_COOLDOWN_HOURS = 1;               // PENDING 상태 재신청 쿨다운 (시간)
+    private static final long REJECTED_REAPPLY_COOLDOWN_HOURS = 24;             // REJECTED 상태 재신청 쿨다운 (시간)
+
     private final UserPort userPort;
     private final UserCascadeDeleter userCascadeDeleter;
     private final UserNotificationPort notificationPort;
@@ -119,7 +123,7 @@ class UserService implements UserUseCase {
         log.info("사용자 거절: userId={}", userId);
         notificationPort.notifyRejected(updated);
         realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
-        blacklistPort.add(userId, Duration.ofMinutes(15)); // 거절 즉시 AT 차단
+        blacklistPort.add(userId, REJECT_BLACKLIST_TTL); // 거절 즉시 AT 차단
         refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
 
@@ -132,13 +136,13 @@ class UserService implements UserUseCase {
         switch (user.status()) {
             case PENDING -> {
                 if (user.lastReappliedAt() != null &&
-                        now.isBefore(user.lastReappliedAt().plus(1, ChronoUnit.HOURS)))
-                    throw new Account.CooldownException(user.lastReappliedAt().plus(1, ChronoUnit.HOURS));
+                        now.isBefore(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
+                    throw new Account.CooldownException(user.lastReappliedAt().plus(PENDING_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
             }
             case REJECTED -> {
                 if (user.lastReappliedAt() != null &&
-                        now.isBefore(user.lastReappliedAt().plus(24, ChronoUnit.HOURS)))
-                    throw new Account.CooldownException(user.lastReappliedAt().plus(24, ChronoUnit.HOURS));
+                        now.isBefore(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS)))
+                    throw new Account.CooldownException(user.lastReappliedAt().plus(REJECTED_REAPPLY_COOLDOWN_HOURS, ChronoUnit.HOURS));
             }
             default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }

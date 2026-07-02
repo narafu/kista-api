@@ -1,9 +1,11 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.application.service.broker.BrokerCallGuard;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.DstInfo;
@@ -52,13 +54,13 @@ class TradingPreviewService {
         LocalDate today = DstInfo.nextTradeDate();
 
         // 오늘 이미 등록된 주문 조회 — PLANNED(취소 가능) + PLACED(AT_OPEN 선접수됨) 모두 포함
-        List<com.kista.domain.model.order.Order> todayPlannedOrders =
+        List<Order> todayPlannedOrders =
                 orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
 
         // 계좌 내 타 전략 당일 PLANNED BUY 합계 (이 전략 분 제외 — 예수금 부족 계산에 사용)
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
         BigDecimal thisStrategyPlannedBuy = todayPlannedOrders.stream()
-                .filter(o -> o.direction() == com.kista.domain.model.order.Order.OrderDirection.BUY)
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);

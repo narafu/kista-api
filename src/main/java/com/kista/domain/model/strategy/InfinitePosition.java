@@ -11,9 +11,11 @@ public record InfinitePosition(
         BigDecimal prevClosePrice,     // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
         int divisionCount              // 분할 수 (20/30/40) — totalAssets ÷ divisionCount = unitAmount
 ) {
-    private static final int MONEY_SCALE = 2;           // 금액·가격·회차 반올림 자리수 (센트 단위)
+    private static final int MONEY_SCALE = 2;              // 금액·가격·회차 반올림 자리수 (센트 단위)
     // LOC/MOC 매도 시 전체 보유 수량의 1/4씩 분할 (4회전 완료 = 전량 매도)
-    private static final int SELL_QUARTER_DIVISOR = 4;
+    public static final int SELL_QUARTER_DIVISOR = 4;
+    // 미국 주식 호가단위 (센트) — LOC 매도 지정가 보정 등에 공통 사용
+    public static final BigDecimal TICK_SIZE = new BigDecimal("0.01");
 
     // --- 기본 도메인 속성 조회 ---
 
@@ -48,6 +50,16 @@ public record InfinitePosition(
     public double currentRound() {
         return holdings() == 0 ? 0.0
                 : purchaseAmount().divide(unitAmount(), MONEY_SCALE, HALF_UP).doubleValue();
+    }
+
+    // static 헬퍼: DB 저장값(CyclePosition)만으로 회차 계산 — KIS 실시간 조회 없이 StrategyDetail 조립 시 사용
+    public static double calcCurrentRound(BigDecimal avgPrice, int holdings, BigDecimal usdDeposit,
+                                          int divisionCount) {
+        if (divisionCount == 0 || holdings == 0 || avgPrice == null) return 0.0;
+        BigDecimal purchaseAmount = avgPrice.multiply(BigDecimal.valueOf(holdings));
+        BigDecimal unitAmount = usdDeposit.add(purchaseAmount)
+                .divide(BigDecimal.valueOf(divisionCount), MONEY_SCALE, HALF_UP);
+        return purchaseAmount.divide(unitAmount, MONEY_SCALE, HALF_UP).doubleValue();
     }
 
     public BigDecimal priceOffsetRate() {

@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -215,19 +214,10 @@ class StrategyService implements StrategyUseCase {
                 .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
                 .map(CyclePositionInfiniteDetail::isReverseMode)
                 .orElse(false);
-        Double currentRound = latestPos.map(pos -> calcCurrentRound(pos, divisionCount)).orElse(null);
+        Double currentRound = latestPos.map(pos -> InfinitePosition.calcCurrentRound(
+                pos.avgPrice(), pos.holdings(), pos.usdDeposit(), divisionCount == null ? 0 : divisionCount)).orElse(null);
         Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
         return new StrategyDetail(strategy, initialUsdDeposit, divisionCount, isReverseMode, currentRound, currentHoldings);
     }
 
-    // INFINITE 전략 회차 계산 — InfinitePosition.currentRound() 동일 로직, KIS 실시간 없이 DB 값만 사용
-    private Double calcCurrentRound(CyclePosition pos, Integer divisionCount) {
-        if (divisionCount == null || divisionCount == 0 || pos.holdings() == 0 || pos.avgPrice() == null) {
-            return 0.0;
-        }
-        BigDecimal purchaseAmount = pos.avgPrice().multiply(BigDecimal.valueOf(pos.holdings()));
-        BigDecimal unitAmount = pos.usdDeposit().add(purchaseAmount)
-                .divide(BigDecimal.valueOf(divisionCount), 2, RoundingMode.HALF_UP);
-        return purchaseAmount.divide(unitAmount, 2, RoundingMode.HALF_UP).doubleValue();
-    }
 }
