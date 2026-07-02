@@ -10,6 +10,7 @@ import com.kista.domain.model.broker.DailyTransactionSummary;
 import com.kista.domain.model.broker.MarginItem;
 import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
@@ -140,13 +141,17 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         // 1단계: 전략 타입별 capability 로드
         CycleOrderStrategy strategy = cycleStrategies.of(type);
 
-        // 2단계: PRIVACY 기준 매매표 조회 — 기준가 소스가 필요한 전략만 조회
-        PrivacyTradeBase privacyBase = strategy.requiresPrivacyBase()
-                ? privacyTradePort.findTodayTrade(LocalDate.now(TimeZones.KST)).orElse(null)
+        // 2단계: PRIVACY 기준 매매표 조회 — findCurrentBase()로 FIDA 선행 업로드(내일자 기준) 포함
+        PrivacyCurrentBase currentBase = strategy.requiresPrivacyBase()
+                ? privacyTradePort.findCurrentBase().orElse(null)
                 : null;
-        if (strategy.requiresPrivacyBase() && privacyBase == null) {
+        if (strategy.requiresPrivacyBase() && currentBase == null) {
             return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
         }
+        // minRequiredDeposit 인터페이스가 PrivacyTradeBase를 받지만 currentCycleStart만 사용 — 최소 래퍼로 전달
+        PrivacyTradeBase privacyBase = currentBase != null
+                ? new PrivacyTradeBase(null, null, 0, currentBase.currentCycleStart(), List.of())
+                : null;
 
         // 3단계: 현재가 + 기준가 결정 후 최소 시드 계산
         BigDecimal price = strategy.requiresPrivacyBase()

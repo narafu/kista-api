@@ -24,15 +24,17 @@ class SchedulerJobRunner {
         log.info("{} 시작 — ACTIVE 전략 {}개", name, contexts.size());
         try {
             action.accept(contexts);
+            log.info("{} 완료", name);
+            notifyPort.notifyInfo(name + " 완료");
         } catch (InterruptedException e) {
+            // 배포·재기동으로 인한 강제 종료 — PLANNED 주문 접수 미실행 가능성 관리자 알림
             Thread.currentThread().interrupt();
             log.warn("{} 인터럽트: {}", name, e.getMessage());
+            notifyPort.notifyError(e);
         } catch (Exception e) {
             log.error("{} 오류: {}", name, e.getMessage(), e);
             notifyPort.notifyError(e);
         }
-        log.info("{} 완료", name);
-        notifyPort.notifyInfo(name + " 완료");
     }
 
     @FunctionalInterface

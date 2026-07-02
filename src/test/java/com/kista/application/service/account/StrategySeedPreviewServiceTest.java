@@ -1,8 +1,9 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
@@ -22,7 +23,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,8 +86,8 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void privacy_no_base_returns_skip_reason() {
-        // given: 기준매매표 없음
-        when(privacyTradePort.findTodayTrade(any(LocalDate.class))).thenReturn(Optional.empty());
+        // given: 기준매매표 없음 — findCurrentBase()는 FIDA 선행 업로드 포함
+        when(privacyTradePort.findCurrentBase()).thenReturn(Optional.empty());
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
@@ -100,10 +100,9 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void privacy_with_base_returns_min_seed() {
-        // given: 기준매매표 있음, currentCycleStart = 5000.00
-        PrivacyTradeBase base = mock(PrivacyTradeBase.class);
-        when(base.currentCycleStart()).thenReturn(new BigDecimal("5000.00"));
-        when(privacyTradePort.findTodayTrade(any(LocalDate.class))).thenReturn(Optional.of(base));
+        // given: 기준매매표 있음 (FIDA 선행 업로드 포함), currentCycleStart = 5000.00
+        PrivacyCurrentBase base = new PrivacyCurrentBase(Ticker.SOXL, new BigDecimal("5000.00"), null);
+        when(privacyTradePort.findCurrentBase()).thenReturn(Optional.of(base));
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
