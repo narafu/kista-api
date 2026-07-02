@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -74,20 +73,16 @@ public class TossCandleApi implements TossCandlePort {
                     LocalDate date = OffsetDateTime.parse(c.timestamp()).toLocalDate();
                     return new TossCandle(
                             date,
-                            parseBd(c.openPrice()),
-                            parseBd(c.highPrice()),
-                            parseBd(c.lowPrice()),
-                            parseBd(c.closePrice()),
+                            TossResponseParser.parseBdOrZero(c.openPrice()),
+                            TossResponseParser.parseBdOrZero(c.highPrice()),
+                            TossResponseParser.parseBdOrZero(c.lowPrice()),
+                            TossResponseParser.parseBdOrZero(c.closePrice()),
                             c.volume() != null ? Long.parseLong(c.volume()) : 0L
                     );
                 })
                 // Toss 응답 순서가 최신순(내림차순)일 수 있음 — 캔들차트 라이브러리는 오름차순 필수
                 .sorted(Comparator.comparing(TossCandle::date))
                 .toList();
-    }
-
-    private BigDecimal parseBd(String value) {
-        return value != null && !value.isBlank() ? new BigDecimal(value) : BigDecimal.ZERO;
     }
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────

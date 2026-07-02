@@ -220,7 +220,7 @@ public class TossHoldingsApi implements TossAccountPort,
             return new SellableQuantity(ticker.name(), 0);
         }
         SellableQuantityResult result = wrapper.result();
-        int quantity = result.sellableQuantity() != null ? Integer.parseInt(result.sellableQuantity()) : 0;
+        int quantity = TossResponseParser.parseIntOrZero(result.sellableQuantity());
         log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }

@@ -41,9 +41,7 @@ class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetail
     }
 
     private StrategyInfiniteEntity toEntity(StrategyInfiniteDetail detail) {
-        StrategyInfiniteEntity entity = detail.strategyVersionId() != null
-                ? jpaRepository.findById(detail.strategyVersionId()).orElseGet(StrategyInfiniteEntity::new)
-                : new StrategyInfiniteEntity();
+        StrategyInfiniteEntity entity = PersistenceSupport.findOrCreate(detail.strategyVersionId(), jpaRepository, StrategyInfiniteEntity::new);
         entity.setStrategyVersionId(detail.strategyVersionId());
         entity.setDivisionCount(detail.divisionCount());
         return entity;

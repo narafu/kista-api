@@ -104,9 +104,7 @@ public class TossOrderApi implements TossOrderPort, TossExecutionPort {
                 if (filledQuantity <= 0) continue;
 
                 String priceStr = order.execution().averageFilledPrice();
-                BigDecimal price = (priceStr != null && !priceStr.isBlank())
-                        ? new BigDecimal(priceStr)
-                        : BigDecimal.ZERO;
+                BigDecimal price = TossResponseParser.parseBdOrZero(priceStr);
 
                 String amtStr = order.execution().filledAmount();
                 BigDecimal amountUsd = (amtStr != null && !amtStr.isBlank())

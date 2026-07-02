@@ -45,9 +45,7 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
     }
 
     private CyclePositionInfiniteEntity toEntity(CyclePositionInfiniteDetail detail) {
-        CyclePositionInfiniteEntity entity = detail.cyclePositionId() != null
-                ? jpaRepository.findById(detail.cyclePositionId()).orElseGet(CyclePositionInfiniteEntity::new)
-                : new CyclePositionInfiniteEntity();
+        CyclePositionInfiniteEntity entity = PersistenceSupport.findOrCreate(detail.cyclePositionId(), jpaRepository, CyclePositionInfiniteEntity::new);
         entity.setCyclePositionId(detail.cyclePositionId());
         entity.setReverseMode(detail.isReverseMode());
         return entity;

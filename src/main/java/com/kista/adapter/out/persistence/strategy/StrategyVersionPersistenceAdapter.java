@@ -58,9 +58,7 @@ class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
     }
 
     private StrategyVersionEntity toEntity(StrategyVersion version) {
-        StrategyVersionEntity entity = version.id() != null
-                ? jpaRepository.findById(version.id()).orElseGet(StrategyVersionEntity::new)
-                : new StrategyVersionEntity();
+        StrategyVersionEntity entity = PersistenceSupport.findOrCreate(version.id(), jpaRepository, StrategyVersionEntity::new);
         entity.setId(version.id());
         entity.setStrategyId(version.strategyId());
         entity.setVersionNo(version.versionNo());

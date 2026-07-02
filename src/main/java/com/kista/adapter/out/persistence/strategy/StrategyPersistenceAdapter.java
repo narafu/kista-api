@@ -91,9 +91,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     private StrategyEntity toEntity(Strategy s) {
-        StrategyEntity e = s.id() != null
-                ? jpaRepository.findById(s.id()).orElseGet(StrategyEntity::new)
-                : new StrategyEntity();
+        StrategyEntity e = PersistenceSupport.findOrCreate(s.id(), jpaRepository, StrategyEntity::new);
         e.setId(s.id()); // null이면 @GeneratedValue가 UUID 생성
         e.setAccountId(s.accountId());
         e.setType(s.type());
