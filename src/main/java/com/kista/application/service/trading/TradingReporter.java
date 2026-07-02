@@ -2,7 +2,7 @@ package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -41,7 +41,7 @@ class TradingReporter {
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CycleRotationService cycleRotationService;
-    private final LoadUserSettingsPort loadUserSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
+    private final UserSettingsPort userSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
 
     void recordAndNotify(LocalDate today, Strategy strategy, StrategyCycle currentCycle,
                          Account account, User user,
@@ -60,7 +60,7 @@ class TradingReporter {
 
         // TRADING_ALERT 알림 활성 여부 확인 후 발송 (기본값 true)
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
-        UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+        UserSettings settings = userSettingsPort.loadByUserId(user.id())
                 .orElse(UserSettings.defaultFor(user.id()));
         if (settings.isNotificationEnabled(NotificationType.TRADING_ALERT)) {
             userNotificationPort.notifyTradingReport(user, account, report);

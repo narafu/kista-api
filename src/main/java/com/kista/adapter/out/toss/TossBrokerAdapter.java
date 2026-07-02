@@ -2,7 +2,7 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
-import com.kista.domain.model.kis.*;
+import com.kista.domain.model.broker.*;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;

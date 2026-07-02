@@ -34,7 +34,7 @@ class StrategyService implements StrategyUseCase {
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
-    private final LoadUserSettingsPort loadUserSettingsPort;     // 잔고 검증 설정 조회 (user_settings)
+    private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
 
     @Override
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
@@ -53,7 +53,7 @@ class StrategyService implements StrategyUseCase {
 
         // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
         userPort.findByIdOrThrow(userId); // 사용자 존재 확인
-        UserSettings settings = loadUserSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        UserSettings settings = userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
         if (settings.balanceCheckEnabled() && cmd.initialUsdDeposit() != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (cmd.initialUsdDeposit().compareTo(freeCash) > 0) {

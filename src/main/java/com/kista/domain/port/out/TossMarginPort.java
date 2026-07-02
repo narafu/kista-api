@@ -1,7 +1,7 @@
 package com.kista.domain.port.out;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.broker.MarginItem;
 
 import java.math.BigDecimal;
 import java.util.List;

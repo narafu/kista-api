@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.kis.DailyTransaction;
-import com.kista.domain.model.kis.DailyTransactionResult;
-import com.kista.domain.model.kis.DailyTransactionSummary;
+import com.kista.domain.model.broker.DailyTransaction;
+import com.kista.domain.model.broker.DailyTransactionResult;
+import com.kista.domain.model.broker.DailyTransactionSummary;
 import com.kista.domain.model.order.Order.OrderDirection;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 

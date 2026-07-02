@@ -2,8 +2,7 @@ package com.kista.adapter.out.persistence.settings;
 
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.LoadUserSettingsPort;
-import com.kista.domain.port.out.SaveUserSettingsPort;
+import com.kista.domain.port.out.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +13,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
-public class UserSettingsPersistenceAdapter implements LoadUserSettingsPort, SaveUserSettingsPort {
+public class UserSettingsPersistenceAdapter implements UserSettingsPort {
 
     private final UserSettingsJpaRepository settingsRepo;
     private final UserNotificationPrefJpaRepository prefRepo;

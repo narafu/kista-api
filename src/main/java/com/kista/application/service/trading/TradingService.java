@@ -48,7 +48,7 @@ class TradingService {
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
     private final UserPort userPort;                           // ACTIVE 사용자 전체 조회 (장 알림용)
-    private final LoadUserSettingsPort loadUserSettingsPort;   // MARKET_ALERT 활성 여부 조회
+    private final UserSettingsPort userSettingsPort; // MARKET_ALERT 활성 여부 조회
 
     // planAndSaveOrders 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
@@ -335,7 +335,7 @@ class TradingService {
     // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
     private void notifyMarketEvent(NotificationType type, java.util.function.Consumer<User> notify) {
         userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
-            UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+            UserSettings settings = userSettingsPort.loadByUserId(user.id())
                     .orElse(UserSettings.defaultFor(user.id()));
             if (settings.isNotificationEnabled(type)) {
                 try {

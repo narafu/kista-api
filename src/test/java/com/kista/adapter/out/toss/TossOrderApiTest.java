@@ -1,7 +1,7 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.Order.OrderDirection;
 import com.kista.domain.model.strategy.Strategy.Ticker;

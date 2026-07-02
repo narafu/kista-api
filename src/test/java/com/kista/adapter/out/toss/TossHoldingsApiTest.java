@@ -1,8 +1,8 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.Currency;
-import com.kista.domain.model.kis.MarginItem;
+import com.kista.domain.model.broker.Currency;
+import com.kista.domain.model.broker.MarginItem;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.BeforeEach;

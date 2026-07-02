@@ -20,7 +20,8 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     auth/        ← RefreshToken(id, userId, tokenHash, userAgent, expiresAt, rotatedAt, createdAt),
                    TokenRefreshResult(userId, userRole, newRawRefreshToken),
                    InvalidRefreshTokenException (→ GlobalExceptionHandler 401)
-    kis/         ← KIS 응답 record (Execution, PresentBalanceResult, PeriodProfitResult, MarginItem, KisApiException, Currency, DailyTransaction* 등)
+    broker/      ← 브로커 공통 응답 record (Execution, PresentBalanceResult, MarginItem, Currency, DailyTransaction* — KIS·Toss 공용)
+    kis/         ← KisApiException (KIS 전용)
     toss/        ← TossApiException (→ GlobalExceptionHandler 503), TossAccountInfo, TossCandle, TossExchangeRate, TossMarketSession, TossStockInfo, TossCommissionRate
     market/      ← FearGreedSnapshot, FearGreedRating
     admin/       ← AdminAnomalies, AdminStats, AdminUserView, AuditLog, AppErrorLog

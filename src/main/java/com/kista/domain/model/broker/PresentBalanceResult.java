@@ -1,4 +1,4 @@
-package com.kista.domain.model.kis;
+package com.kista.domain.model.broker;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;

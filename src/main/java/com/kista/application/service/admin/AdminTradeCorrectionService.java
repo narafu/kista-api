@@ -4,7 +4,7 @@ import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
-import com.kista.domain.model.kis.Execution;
+import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;

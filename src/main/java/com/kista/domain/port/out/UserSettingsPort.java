@@ -4,6 +4,7 @@ import com.kista.domain.model.user.UserSettings;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface LoadUserSettingsPort {
+public interface UserSettingsPort {
     Optional<UserSettings> loadByUserId(UUID userId);
+    void save(UserSettings settings);
 }

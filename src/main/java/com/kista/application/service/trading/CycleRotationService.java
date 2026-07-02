@@ -38,7 +38,7 @@ class CycleRotationService {
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
     private final UserNotificationPort userNotificationPort;   // 사용자 알림 (재등록 완료)
     private final CycleOrderStrategies cycleStrategies;        // 전략 타입별 최소금액 정책
-    private final LoadUserSettingsPort loadUserSettingsPort;   // 잔고 검증 설정 조회 (user_settings)
+    private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
 
     void rotate(Strategy strategy, StrategyCycle currentCycle, Account account, User user,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
@@ -108,7 +108,7 @@ class CycleRotationService {
 
     // 잔고검증 설정에 따라 시드 결정 정책 선택
     private SeedResolutionPolicy resolvePolicy(User user, Account account, Strategy strategy) {
-        UserSettings settings = loadUserSettingsPort.loadByUserId(user.id())
+        UserSettings settings = userSettingsPort.loadByUserId(user.id())
                 .orElse(UserSettings.defaultFor(user.id())); // 미설정 시 기본값(검증 ON)
         if (!settings.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)

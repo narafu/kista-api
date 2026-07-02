@@ -1,4 +1,4 @@
-package com.kista.domain.model.kis;
+package com.kista.domain.model.broker;
 
 import java.util.List;
 
