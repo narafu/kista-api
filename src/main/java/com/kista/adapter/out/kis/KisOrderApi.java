@@ -97,10 +97,9 @@ public class KisOrderApi implements KisOrderPort {
         kisHttpClient.post(CANCEL_PATH, kisHttpClient.buildHeaders(CANCEL_TR_ID, account), body, Void.class);
     }
 
-    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KIS: accountNo에 접수유형 통합)
+    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KisHttpClient 공용 헬퍼 위임)
     private static String[] splitAccountNo(Account account) {
-        String[] parts = account.accountNo().split("-", 2);
-        return new String[]{ parts[0], parts.length > 1 ? parts[1] : "01" };
+        return KisHttpClient.splitAccountNo(account.accountNo());
     }
 
     private String resolveOrderDvsn(Order.OrderType type) {

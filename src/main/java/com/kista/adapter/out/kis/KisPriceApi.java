@@ -45,49 +45,21 @@ public class KisPriceApi implements KisPricePort {
         if (tickers.isEmpty()) return Map.of();
 
         // multprice 1회 호출 — prevClose 불필요하므로 getPriceSnapshots(+dailyprice ×n) 우회
-        MultiPriceResponse response = kisHttpClient.pricingGet(
-                MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
-                p -> {
-                    p.add("NREC", String.valueOf(tickers.size()));
-                    for (int i = 0; i < tickers.size(); i++) {
-                        Ticker ticker = tickers.get(i);
-                        String num = String.format("%02d", i + 1);
-                        p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
-                        p.add("SYMB_" + num, ticker.name());
-                    }
-                });
+        MultiPriceResponse response = fetchMultiPrice(tickers, account);
 
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-
         if (response != null && response.output2() != null) {
             for (MultiPriceResponse.Output2 item : response.output2()) {
                 if (item.symb() == null) continue;
-                var resolved = KisResponseParser.resolvePrice(item.last(), item.base());
-                if (resolved.isEmpty()) {
-                    log.warn("복수종목 현재가 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
-                    continue;
-                }
-                if (item.last() == null || item.last().isBlank()) {
-                    log.info("복수종목 현재가 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
-                }
+                Optional<BigDecimal> resolved = resolveItemPrice(item, "복수종목 현재가");
+                if (resolved.isEmpty()) continue;
                 Ticker.tryParse(item.symb()).ifPresent(t -> result.put(t, resolved.get()));
             }
         } else {
             log.warn("복수종목 현재가 응답 없음: output2 null");
         }
 
-        // 복수종목 응답에 없는 종목 → 단건 API fallback
-        for (Ticker ticker : tickers) {
-            if (!result.containsKey(ticker)) {
-                log.warn("복수종목 현재가 응답 누락 — 단건 API fallback 시도: ticker={}", ticker);
-                try {
-                    result.put(ticker, getPrice(ticker, account));
-                    log.info("단건 API fallback 성공: ticker={}", ticker);
-                } catch (Exception e) {
-                    log.warn("단건 API fallback도 실패: ticker={}", ticker);
-                }
-            }
-        }
+        fillMissingBySingleCall(tickers, result, "복수종목 현재가", t -> getPrice(t, account));
         return result;
     }
 
@@ -120,18 +92,7 @@ public class KisPriceApi implements KisPricePort {
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
         if (tickers.isEmpty()) return Map.of();
 
-        MultiPriceResponse response = kisHttpClient.pricingGet(
-                MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
-                p -> {
-                    p.add("NREC", String.valueOf(tickers.size()));
-                    for (int i = 0; i < tickers.size(); i++) {
-                        Ticker ticker = tickers.get(i);
-                        String num = String.format("%02d", i + 1);
-                        p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
-                        p.add("SYMB_" + num, ticker.name());
-                    }
-                });
-
+        MultiPriceResponse response = fetchMultiPrice(tickers, account);
         if (response == null || response.output2() == null) {
             log.warn("복수종목 스냅샷 응답 없음: output2 null");
             return Map.of();
@@ -140,14 +101,8 @@ public class KisPriceApi implements KisPricePort {
         Map<Ticker, PriceSnapshot> result = new LinkedHashMap<>();
         for (MultiPriceResponse.Output2 item : response.output2()) {
             if (item.symb() == null) continue;
-            var resolved = KisResponseParser.resolvePrice(item.last(), item.base());
-            if (resolved.isEmpty()) {
-                log.warn("복수종목 스냅샷 응답 항목 누락(last·base 모두 빈값): symb={}", item.symb());
-                continue;
-            }
-            if (item.last() == null || item.last().isBlank()) {
-                log.info("복수종목 스냅샷 — last 빈값, base 사용: symb={}, base={}", item.symb(), item.base());
-            }
+            Optional<BigDecimal> resolved = resolveItemPrice(item, "복수종목 스냅샷");
+            if (resolved.isEmpty()) continue;
             Ticker ticker = Ticker.tryParse(item.symb()).orElse(null);
             if (ticker == null) {
                 log.warn("복수종목 스냅샷 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
@@ -162,20 +117,51 @@ public class KisPriceApi implements KisPricePort {
             result.put(ticker, new PriceSnapshot(current, prevClose));
         }
 
-        // 복수종목 응답에 없는 종목 → 단건 API fallback
+        fillMissingBySingleCall(tickers, result, "복수종목 스냅샷", t -> getPriceSnapshot(t, account));
+        return result;
+    }
+
+    // multprice(HHDFS76220000) 1회 호출 — NREC + 종목별 EXCD_nn/SYMB_nn 파라미터 구성
+    private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, Account account) {
+        return kisHttpClient.pricingGet(
+                MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
+                p -> {
+                    p.add("NREC", String.valueOf(tickers.size()));
+                    for (int i = 0; i < tickers.size(); i++) {
+                        Ticker ticker = tickers.get(i);
+                        String num = String.format("%02d", i + 1);
+                        p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
+                        p.add("SYMB_" + num, ticker.name());
+                    }
+                });
+    }
+
+    // output2 항목의 현재가 파싱 — last 빈값 시 base fallback, 둘 다 빈값이면 warn 후 empty
+    private Optional<BigDecimal> resolveItemPrice(MultiPriceResponse.Output2 item, String label) {
+        Optional<BigDecimal> resolved = KisResponseParser.resolvePrice(item.last(), item.base());
+        if (resolved.isEmpty()) {
+            log.warn("{} 응답 항목 누락(last·base 모두 빈값): symb={}", label, item.symb());
+            return Optional.empty();
+        }
+        if (item.last() == null || item.last().isBlank()) {
+            log.info("{} — last 빈값, base 사용: symb={}, base={}", label, item.symb(), item.base());
+        }
+        return resolved;
+    }
+
+    // 복수종목 응답에 없는 종목을 단건 API로 보충 — 실패 종목은 결과에서 제외 (warn)
+    private <V> void fillMissingBySingleCall(List<Ticker> tickers, Map<Ticker, V> result, String label,
+                                             java.util.function.Function<Ticker, V> singleCall) {
         for (Ticker ticker : tickers) {
-            if (!result.containsKey(ticker)) {
-                log.warn("복수종목 스냅샷 응답 누락 — 단건 API fallback 시도: ticker={}", ticker);
-                try {
-                    PriceSnapshot snapshot = getPriceSnapshot(ticker, account);
-                    result.put(ticker, snapshot);
-                    log.info("단건 API fallback 성공: ticker={}, price={}", ticker, snapshot.current());
-                } catch (Exception e) {
-                    log.warn("단건 API fallback도 실패: ticker={}", ticker);
-                }
+            if (result.containsKey(ticker)) continue;
+            log.warn("{} 응답 누락 — 단건 API fallback 시도: ticker={}", label, ticker);
+            try {
+                result.put(ticker, singleCall.apply(ticker));
+                log.info("단건 API fallback 성공: ticker={}", ticker);
+            } catch (Exception e) {
+                log.warn("단건 API fallback도 실패: ticker={}", ticker);
             }
         }
-        return result;
     }
 
     // 가장 최근 확정 거래일의 일봉 종가 조회 (KIS price API의 base는 미국장 개장 전 하루 더 과거 종가일 수 있음)

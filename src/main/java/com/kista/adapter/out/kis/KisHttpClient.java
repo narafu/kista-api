@@ -43,6 +43,12 @@ public class KisHttpClient {
         return headers;
     }
 
+    // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 — 구분자 없으면 상품코드 "01" 기본
+    public static String[] splitAccountNo(String accountNo) {
+        String[] parts = accountNo.split("-", 2);
+        return new String[]{parts[0], parts.length > 1 ? parts[1] : "01"};
+    }
+
     public <T> T get(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder
                 .fromUriString(baseUrl + path)
@@ -62,10 +68,9 @@ public class KisHttpClient {
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
         HttpHeaders headers = buildHeaders(trId, account);
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        // accountNo = "74420614-01" → CANO = "74420614", ACNT_PRDT_CD = "01"
-        String[] parts = account.accountNo().split("-", 2);
+        String[] parts = splitAccountNo(account.accountNo());
         params.add("CANO", parts[0]);
-        params.add("ACNT_PRDT_CD", parts.length > 1 ? parts[1] : "01");
+        params.add("ACNT_PRDT_CD", parts[1]);
         extraParams.accept(params);
         return get(path, headers, params, responseType);
     }
