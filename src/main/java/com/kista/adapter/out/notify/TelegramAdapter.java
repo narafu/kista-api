@@ -29,7 +29,7 @@ public class TelegramAdapter implements NotifyPort {
 
     @Override
     public void notifyError(Exception e) {
-        send(String.format("<b>⚠️ 매매 오류 발생</b>%n%s", e.getMessage()));
+        send(String.format("<b>⚠️ 관리자 알림</b>%n%s", e.getMessage()));
     }
 
     @Override

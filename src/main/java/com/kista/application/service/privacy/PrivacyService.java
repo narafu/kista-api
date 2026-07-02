@@ -33,7 +33,7 @@ class PrivacyService implements PrivacyUseCase {
         );
         PrivacyTradeValidationReport report = validationService.inspect(kstCommand);
         if (report.hasBlockingIssues()) {
-            IllegalArgumentException exception = new IllegalArgumentException(report.summary());
+            IllegalArgumentException exception = new IllegalArgumentException("[FIDA] " + report.summary());
             notifyPort.notifyError(exception);
             throw exception;
         }

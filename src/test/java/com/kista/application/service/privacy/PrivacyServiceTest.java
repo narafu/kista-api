@@ -115,7 +115,10 @@ class PrivacyServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("EXPLICIT_SELL_EXCEEDS_HOLDINGS");
 
-        verify(notifyPort).notifyError(any(IllegalArgumentException.class));
+        verify(notifyPort).notifyError(argThat(ex ->
+                ex instanceof IllegalArgumentException
+                        && ex.getMessage().contains("[FIDA]")
+                        && ex.getMessage().contains("EXPLICIT_SELL_EXCEEDS_HOLDINGS")));
         verify(privacyTradePort, never()).saveBaseWithOrders(any());
     }
 }

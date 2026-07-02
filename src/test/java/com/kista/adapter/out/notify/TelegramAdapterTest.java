@@ -99,6 +99,8 @@ class TelegramAdapterTest {
         adapter.notifyError(ex);
 
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        assertThat(bodyCaptor.getValue().get("text")).contains("KIS API 호출 실패");
+        assertThat(bodyCaptor.getValue().get("text"))
+                .contains("⚠️ 관리자 알림")
+                .contains("KIS API 호출 실패");
     }
 }
