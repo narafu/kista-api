@@ -59,31 +59,8 @@ class CycleRotationService {
         if (balanceOpt.isEmpty()) return; // 증권사 조회 실패 — 내부에서 notifyError 완료
         BigDecimal actualBalance = balanceOpt.get();
 
-        BigDecimal targetSeed;
-        if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX) {
-            if (actualBalance.compareTo(maxSeed) >= 0) {
-                targetSeed = maxSeed;
-            } else if (actualBalance.compareTo(maintainSeed) >= 0) {
-                log.warn("[strategyId={}] MAX 잔고 부족 → MAINTAIN으로 강등: actual={}, max={}",
-                        strategy.id(), actualBalance, maxSeed);
-                targetSeed = maintainSeed;
-            } else {
-                // 실잔고가 maintainSeed에도 못 미침 → PAUSE
-                log.warn("[strategyId={}] MAINTAIN도 부족 → PAUSED: actual={}, maintain={}",
-                        strategy.id(), actualBalance, maintainSeed);
-                strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
-                return;
-            }
-        } else { // MAINTAIN
-            if (actualBalance.compareTo(maintainSeed) >= 0) {
-                targetSeed = maintainSeed;
-            } else {
-                log.warn("[strategyId={}] MAINTAIN 잔고 부족 → PAUSED: actual={}, maintain={}",
-                        strategy.id(), actualBalance, maintainSeed);
-                strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
-                return;
-            }
-        }
+        BigDecimal targetSeed = resolveTargetSeed(strategy, actualBalance, maintainSeed, maxSeed);
+        if (targetSeed == null) return; // maintainSeed도 부족 — PAUSED 처리 완료
 
         // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임
         int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
@@ -106,26 +83,37 @@ class CycleRotationService {
         userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
     }
 
+    // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환
+    private BigDecimal resolveTargetSeed(Strategy strategy, BigDecimal actualBalance,
+                                         BigDecimal maintainSeed, BigDecimal maxSeed) {
+        if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX && actualBalance.compareTo(maxSeed) >= 0) {
+            return maxSeed;
+        }
+        if (actualBalance.compareTo(maintainSeed) >= 0) {
+            if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX) {
+                log.warn("[strategyId={}] MAX 잔고 부족 → MAINTAIN으로 강등: actual={}, max={}",
+                        strategy.id(), actualBalance, maxSeed);
+            }
+            return maintainSeed;
+        }
+        // 실잔고가 maintainSeed에도 못 미침 → PAUSE
+        log.warn("[strategyId={}] MAINTAIN 잔고 부족 → PAUSED: actual={}, maintain={}",
+                strategy.id(), actualBalance, maintainSeed);
+        strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+        return null;
+    }
+
     // 잔고검증 설정에 따라 시드 결정 정책 선택
     private SeedResolutionPolicy resolvePolicy(User user, Account account, Strategy strategy) {
         UserSettings settings = userSettingsPort.loadByUserId(user.id())
                 .orElse(UserSettings.defaultFor(user.id())); // 미설정 시 기본값(검증 ON)
         if (!settings.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
-            return new SeedResolutionPolicy() {
-                @Override
-                public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
-                    return Optional.of(s.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed);
-                }
-            };
+            return (s, maintainSeed, maxSeed) ->
+                    Optional.of(s.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed);
         }
         // ON: 증권사 실잔고 조회
-        return new SeedResolutionPolicy() {
-            @Override
-            public Optional<BigDecimal> resolveAvailableBalance(Strategy s, BigDecimal maintainSeed, BigDecimal maxSeed) {
-                return Optional.ofNullable(fetchUsdBalance(s, account));
-            }
-        };
+        return (s, maintainSeed, maxSeed) -> Optional.ofNullable(fetchUsdBalance(s, account));
     }
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준

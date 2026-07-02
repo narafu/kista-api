@@ -1,6 +1,5 @@
 package com.kista.application.service.trading;
 
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.CyclePositionPort;
@@ -36,9 +35,10 @@ class CycleOrderComputer {
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
-    ComputeResult compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
-                          LocalDate tradeDate, StrategyCycle currentCycle,
-                          PrivacyTradeBase privacyBase, String label) {
+    // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
+    Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
+                                                   LocalDate tradeDate, StrategyCycle currentCycle,
+                                                   PrivacyTradeBase privacyBase, String label) {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
@@ -59,16 +59,9 @@ class CycleOrderComputer {
         }
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
-        Optional<CycleOrderStrategy.OrderPlan> planOpt = orderStrategy.plan(new CycleOrderStrategy.PlanContext(
+        return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
                 balance, strategy, divisionCount, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
                 starPointPrice, isReverseMode, isFirstReverseDay));
-
-        // 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
-        if (planOpt.isEmpty()) return ComputeResult.skipped();
-
-        CycleOrderStrategy.OrderPlan plan = planOpt.get();
-
-        return new ComputeResult(plan);
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균
@@ -82,34 +75,6 @@ class CycleOrderComputer {
         if (closingPrices.isEmpty()) return null;
         BigDecimal sum = closingPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
-    }
-
-    // 전략 계산 수행 — 전략 차원 skip이면 empty, 아니면 계산 결과 반환
-    Optional<ComputeResult> computeUnlessSkipped(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
-                                                 LocalDate tradeDate, StrategyCycle currentCycle,
-                                                 PrivacyTradeBase privacyBase, String label) {
-        ComputeResult result = compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, label);
-        if (result.isSkipped()) return Optional.empty();
-        return Optional.of(result);
-    }
-
-    // plan==null이면 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
-    record ComputeResult(CycleOrderStrategy.OrderPlan plan) {
-        static ComputeResult skipped() {
-            return new ComputeResult(null);
-        }
-
-        boolean isSkipped() {
-            return plan == null;
-        }
-
-        InfinitePosition position() {
-            return plan != null ? plan.position() : null;
-        }
-
-        List<Order> orders() {
-            return plan != null ? plan.orders() : List.of();
-        }
     }
 
     private Integer resolveDivisionCount(Strategy strategy, StrategyCycle currentCycle) {

@@ -11,6 +11,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -71,24 +72,24 @@ class ManualTradingService {
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        CycleOrderComputer.ComputeResult result = orderComputer.computeUnlessSkipped(
+        CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
                 .orElse(null);
-        if (result == null) return List.of(); // 전략 차원 skip 또는 잔고 유효성 실패
+        if (plan == null) return List.of(); // 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
 
         // live 잔고 1회 조회 — BUY 예수금·SELL 보유수량 모두 검사
         AccountBalance liveBalance = fetchLiveBalanceOrThrow(account, strategy);
 
         // 예수금 부족 체크: 신규 BUY 합계 > (live 잔고 - 타 전략 당일 PLANNED BUY 합계)
         BigDecimal otherBuyTotal = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
-        if (!liveBalance.hasSufficientDepositFor(result.orders(), otherBuyTotal)) {
+        if (!liveBalance.hasSufficientDepositFor(plan.orders(), otherBuyTotal)) {
             throw new ManualTradingException("예수금이 부족합니다");
         }
 
         // 보유수량 부족 체크: SELL 수량 합계 > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
-        checkSellableOrThrow(account, strategy, result.orders());
+        checkSellableOrThrow(account, strategy, plan.orders());
 
-        orderPlanner.savePlannedOrders(result.orders(), account, currentCycle.id());
+        orderPlanner.savePlannedOrders(plan.orders(), account, currentCycle.id());
 
         // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         placeAtOpenSellsIfMarketOpen(strategy, account, currentCycle.id(), today);

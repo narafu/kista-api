@@ -14,6 +14,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,14 +84,15 @@ class TradingPreviewService {
                 ? privacyTradePort.findTodayTrade(today).orElse(null)
                 : null;
 
-        CycleOrderComputer.ComputeResult result = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId);
+        CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId)
+                .orElse(null);
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
-        if (result.isSkipped()) {
+        if (plan == null) {
             return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
         }
 
-        return new NextOrdersPreview(today, result.position(), result.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
     }
 }
