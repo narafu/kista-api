@@ -77,6 +77,12 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         }
     }
 
+    @Override
+    public void invalidateToken(UUID accountId) {
+        // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
+        brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(KST).minusHours(1));
+    }
+
     // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
     private OffsetDateTime threshold() {
         return OffsetDateTime.now(KST).plusMinutes(1);

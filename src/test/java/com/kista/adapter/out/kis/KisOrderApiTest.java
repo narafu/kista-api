@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,11 +39,6 @@ class KisOrderApiTest {
             Account.Broker.KIS, null
     );
 
-    @BeforeEach
-    void setUp() {
-        when(kisHttpClient.buildHeaders(anyString(), any(Account.class))).thenReturn(new HttpHeaders());
-    }
-
     @Test
     @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 실제 가격 전달(지정가이므로 0 금지)")
     void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
@@ -54,13 +47,12 @@ class KisOrderApiTest {
                 10, locPrice, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(order, ACCOUNT);
 
-        verify(kisHttpClient).buildHeaders(eq("TTTT1002U"), eq(ACCOUNT));
-        verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
+        verify(kisHttpClient).post(eq("TTTT1002U"), anyString(), eq(ACCOUNT), bodyCaptor.capture(), any());
         assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"34\"");
         assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"25.50\"");
     }
@@ -72,12 +64,12 @@ class KisOrderApiTest {
                 5, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(order, ACCOUNT);
 
-        verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
+        verify(kisHttpClient).post(anyString(), anyString(), any(), bodyCaptor.capture(), any());
         assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"33\"");
         assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"0\"");
     }
@@ -90,12 +82,12 @@ class KisOrderApiTest {
                 3, limitPrice, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(order, ACCOUNT);
 
-        verify(kisHttpClient).post(anyString(), any(), bodyCaptor.capture(), any());
+        verify(kisHttpClient).post(anyString(), anyString(), any(), bodyCaptor.capture(), any());
         assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"00\"");
         assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"25.50\"");
     }
@@ -107,11 +99,11 @@ class KisOrderApiTest {
                 8, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
 
         api.place(order, ACCOUNT);
 
-        verify(kisHttpClient).buildHeaders(eq("TTTT1006U"), eq(ACCOUNT));
+        verify(kisHttpClient).post(eq("TTTT1006U"), anyString(), eq(ACCOUNT), any(), any());
     }
 
     @Test
@@ -121,7 +113,7 @@ class KisOrderApiTest {
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse response =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD123"));
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(response);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(response);
 
         Order result = api.place(order, ACCOUNT);
 
@@ -136,7 +128,7 @@ class KisOrderApiTest {
                 10, BigDecimal.ZERO, Order.OrderStatus.PLACED, null, null, null);
         KisOrderApi.OrderResponse errorResponse =
                 new KisOrderApi.OrderResponse("1", "EGW00202", "GW라우팅 중 오류가 발생했습니다.", null);
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(errorResponse);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(errorResponse);
 
         assertThatThrownBy(() -> api.place(order, ACCOUNT))
                 .isInstanceOf(KisApiException.class)
@@ -149,15 +141,15 @@ class KisOrderApiTest {
         Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), UUID.randomUUID(), TRADE_DATE, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
                 Order.OrderStatus.PLACED, "ORD_123", null, null);
-        when(kisHttpClient.post(anyString(), any(), any(), any())).thenReturn(null);
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(null);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.cancel(order, ACCOUNT);
 
-        verify(kisHttpClient).buildHeaders(eq("TTTT1004U"), eq(ACCOUNT));
         verify(kisHttpClient).post(
+                eq("TTTT1004U"),
                 eq("/uapi/overseas-stock/v1/trading/order-rvsecncl"),
-                any(), bodyCaptor.capture(), any());
+                eq(ACCOUNT), bodyCaptor.capture(), any());
         String body = bodyCaptor.getValue();
         assertThat(body).contains("\"RVSE_CNCL_DVSN_CD\": \"02\"");
         assertThat(body).contains("\"ORGN_ODNO\": \"ORD_123\"");
@@ -171,7 +163,7 @@ class KisOrderApiTest {
         Order order = new Order(UUID.randomUUID(), ACCOUNT.id(), UUID.randomUUID(), TRADE_DATE, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 10, new BigDecimal("25.50"),
                 Order.OrderStatus.PLACED, "ORD_456", null, null);
-        when(kisHttpClient.post(anyString(), any(), any(), any()))
+        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any()))
                 .thenThrow(new RuntimeException("KIS 오류"));
 
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
