@@ -78,7 +78,7 @@ adapter/out/
   kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 5개 Port 구현 — PortfolioPort/MarginPort/SellableQuantityPort/DailyTradePort/ExecutionPort)
   toss/          ← Toss API Adapter (TossHttpClient 공통 헤더 처리, TossConfig)
-                   TossAuthApi, TosCandleApi, TosHoldingsApi, TosOrderApi, TosPriceApi, TossCommissionsApi, TossMarketApi
+                   TossAuthApi, TossCandleApi, TossHoldingsApi, TossOrderApi, TossPriceApi, TossCommissionsApi, TossMarketApi
                    TossBrokerAdapter (BrokerAdapterPort + 공통 5개 + Toss 전용 5개 Port 구현)
   feargreed/     ← CnnFearGreedAdapter (CnnFearGreedPort 구현), CryptoFearGreedAdapter (CryptoFearGreedPort 구현)
   redis/         ← RedisBlacklistAdapter (BlacklistPort 구현 — userId/JTI 단위 JWT 블랙리스트, TTL 기반)

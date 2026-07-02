@@ -25,9 +25,9 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosHoldingsApi implements TosAccountPort,
+public class TossHoldingsApi implements TossAccountPort,
         TossExchangeRatePort,
-        TossPortfolioPort, TosMarginPort, TossSellableQuantityPort {
+        TossPortfolioPort, TossMarginPort, TossSellableQuantityPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -66,7 +66,7 @@ public class TosHoldingsApi implements TosAccountPort,
                 .orElse(new AccountBalance(0, null, usdDeposit));
     }
 
-    // ── TosMarginPort ──────────────────────────────────────────────────────────
+    // ── TossMarginPort ─────────────────────────────────────────────────────────
 
     @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
@@ -228,7 +228,7 @@ public class TosHoldingsApi implements TosAccountPort,
     // GET /api/v1/holdings 응답 래퍼 — {"result": {"items": [...], ...}}
     record HoldingsResponseWrapper(@JsonProperty("result") HoldingsResponse result) {}
 
-    // package-private — TosHoldingsApiTest에서 직접 생성하여 stub에 사용
+    // package-private — TossHoldingsApiTest에서 직접 생성하여 stub에 사용
     record HoldingsResponse(@JsonProperty("items") List<HoldingItem> items) {}
 
     record HoldingItem(

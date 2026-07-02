@@ -2,7 +2,7 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.toss.TossCandle;
-import com.kista.domain.port.out.TosCandlePort;
+import com.kista.domain.port.out.TossCandlePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,7 +23,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosCandleApi implements TosCandlePort {
+public class TossCandleApi implements TossCandlePort {
 
     private static final String CANDLES_PATH = "/api/v1/candles";
     // 일봉 기준 최대 요청 수 (주말 포함 여유분)

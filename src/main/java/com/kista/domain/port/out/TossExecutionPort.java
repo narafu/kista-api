@@ -7,6 +7,6 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import java.time.LocalDate;
 import java.util.List;
 
-public interface TosExecutionPort {
+public interface TossExecutionPort {
     List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account);
 }

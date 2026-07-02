@@ -6,8 +6,8 @@ import com.kista.domain.model.kis.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.TosExecutionPort;
-import com.kista.domain.port.out.TosOrderPort;
+import com.kista.domain.port.out.TossExecutionPort;
+import com.kista.domain.port.out.TossOrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -23,7 +23,7 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class TosOrderApi implements TosOrderPort, TosExecutionPort {
+public class TossOrderApi implements TossOrderPort, TossExecutionPort {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";
@@ -151,7 +151,7 @@ public class TosOrderApi implements TosOrderPort, TosExecutionPort {
         return type == Order.OrderType.MOC ? new BigDecimal("0.01") : price;
     }
 
-    // package-private — TosOrderApiTest에서 직접 생성하여 stub에 사용
+    // package-private — TossOrderApiTest에서 직접 생성하여 stub에 사용
     record OrderResponseWrapper(
         @JsonProperty("result") OrderResponse result  // Toss API 공통 {"result": {...}} 래퍼
     ) {}

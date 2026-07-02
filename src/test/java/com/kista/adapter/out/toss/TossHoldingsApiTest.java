@@ -21,11 +21,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TosHoldingsApi 단위 테스트")
-class TosHoldingsApiTest {
+@DisplayName("TossHoldingsApi 단위 테스트")
+class TossHoldingsApiTest {
 
     @Mock TossHttpClient tossHttpClient;
-    TosHoldingsApi tosHoldingsApi;
+    TossHoldingsApi tossHoldingsApi;
 
     static final Account ACCOUNT = new Account(
         UUID.randomUUID(), UUID.randomUUID(), "테스트",
@@ -34,7 +34,7 @@ class TosHoldingsApiTest {
 
     @BeforeEach
     void setUp() {
-        tosHoldingsApi = new TosHoldingsApi(tossHttpClient);
+        tossHoldingsApi = new TossHoldingsApi(tossHttpClient);
     }
 
     // exchange-rate API는 getCommon 사용 — 개별 테스트에서 직접 stub
@@ -43,13 +43,13 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("보유 종목 있음: 정상 AccountBalance 반환")
     void getBalance_holdingFound_returnsBalance() {
-        var item = new TosHoldingsApi.HoldingItem("SOXL", "5", "20.00", "22.00");
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
-            .thenReturn(new TosHoldingsApi.HoldingsResponseWrapper(new TosHoldingsApi.HoldingsResponse(List.of(item))));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
-            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
+        var item = new TossHoldingsApi.HoldingItem("SOXL", "5", "20.00", "22.00");
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TossHoldingsApi.HoldingsResponseWrapper.class)))
+            .thenReturn(new TossHoldingsApi.HoldingsResponseWrapper(new TossHoldingsApi.HoldingsResponse(List.of(item))));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TossHoldingsApi.BuyingPowerWrapper(new TossHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
 
-        AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        AccountBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(5);
         assertThat(balance.avgPrice()).isEqualByComparingTo("20.00");
@@ -59,12 +59,12 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("보유 종목 없음: holdings=0, avgPrice=null")
     void getBalance_noHolding_returnsZeroBalance() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
-            .thenReturn(new TosHoldingsApi.HoldingsResponseWrapper(new TosHoldingsApi.HoldingsResponse(List.of())));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
-            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("500.00", "USD")));
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TossHoldingsApi.HoldingsResponseWrapper.class)))
+            .thenReturn(new TossHoldingsApi.HoldingsResponseWrapper(new TossHoldingsApi.HoldingsResponse(List.of())));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TossHoldingsApi.BuyingPowerWrapper(new TossHoldingsApi.BuyableAmountResponse("500.00", "USD")));
 
-        AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        AccountBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(0);
         assertThat(balance.avgPrice()).isNull();
@@ -74,12 +74,12 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("null 응답: holdings=0, usdDeposit=0")
     void getBalance_nullResponse_returnsZeroBalance() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TosHoldingsApi.HoldingsResponseWrapper.class)))
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), eq(TossHoldingsApi.HoldingsResponseWrapper.class)))
             .thenReturn(null);
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
             .thenReturn(null);
 
-        AccountBalance balance = tosHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        AccountBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(0);
         assertThat(balance.usdDeposit()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -88,10 +88,10 @@ class TosHoldingsApiTest {
     @Test
     @DisplayName("getUsdBuyableAmount: 정상 금액 반환")
     void getUsdBuyableAmount_returnsAmount() {
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
-            .thenReturn(new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse("1234.56", "USD")));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
+            .thenReturn(new TossHoldingsApi.BuyingPowerWrapper(new TossHoldingsApi.BuyableAmountResponse("1234.56", "USD")));
 
-        BigDecimal amount = tosHoldingsApi.getUsdBuyableAmount(ACCOUNT);
+        BigDecimal amount = tossHoldingsApi.getUsdBuyableAmount(ACCOUNT);
 
         assertThat(amount).isEqualByComparingTo("1234.56");
     }
@@ -100,19 +100,19 @@ class TosHoldingsApiTest {
     @DisplayName("getMargin: USD·KRW 통화별 2건 반환 (통합 아님)")
     void getMargin_returnsUsdAndKrwSeparately() {
         stubNoAccountHeader();
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
             .thenAnswer(inv -> {
                 @SuppressWarnings("unchecked")
                 org.springframework.util.MultiValueMap<String, String> params =
                     (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossHoldingsApi.BuyingPowerWrapper(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
             });
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
-            .thenReturn(new TosHoldingsApi.ExchangeRateWrapper(new TosHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TossHoldingsApi.ExchangeRateWrapper.class)))
+            .thenReturn(new TossHoldingsApi.ExchangeRateWrapper(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
 
-        List<MarginItem> items = tosHoldingsApi.getMargin(ACCOUNT);
+        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
 
         // 통합 아님 — USD·KRW 원본 금액 각각 반환
         assertThat(items).hasSize(2);
@@ -129,19 +129,19 @@ class TosHoldingsApiTest {
     @DisplayName("getMargin: 환율 조회 실패 시 USD·KRW 금액은 원본 반환")
     void getMargin_exchangeRateZero_returnsOriginalAmounts() {
         stubNoAccountHeader();
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TosHoldingsApi.BuyingPowerWrapper.class)))
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), eq(TossHoldingsApi.BuyingPowerWrapper.class)))
             .thenAnswer(inv -> {
                 @SuppressWarnings("unchecked")
                 org.springframework.util.MultiValueMap<String, String> params =
                     (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "50000";
-                return new TosHoldingsApi.BuyingPowerWrapper(new TosHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossHoldingsApi.BuyingPowerWrapper(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
             });
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TosHoldingsApi.ExchangeRateWrapper.class)))
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), eq(TossHoldingsApi.ExchangeRateWrapper.class)))
             .thenReturn(null);
 
-        List<MarginItem> items = tosHoldingsApi.getMargin(ACCOUNT);
+        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
 
         assertThat(items).hasSize(2);
         assertThat(items.get(0).currency()).isEqualTo(Currency.USD);

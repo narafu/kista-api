@@ -5,8 +5,8 @@ import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.model.toss.TossStockInfo;
-import com.kista.domain.port.out.TosCandlePort;
-import com.kista.domain.port.out.TosPricePort;
+import com.kista.domain.port.out.TossCandlePort;
+import com.kista.domain.port.out.TossPricePort;
 import com.kista.domain.port.out.TossStockInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TosPriceApi implements TosPricePort, TossStockInfoPort {
+public class TossPriceApi implements TossPricePort, TossStockInfoPort {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
@@ -31,7 +31,7 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
-    private final TosCandlePort tosCandlePort;
+    private final TossCandlePort tossCandlePort;
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
@@ -78,7 +78,7 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
     // 일봉 최신 2개 조회 → 오름차순 [0]이 확정 전일종가, 실패 시 current fallback
     private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
         try {
-            List<TossCandle> candles = tosCandlePort.getLatestCandles(symbol, "1d", 2);
+            List<TossCandle> candles = tossCandlePort.getLatestCandles(symbol, "1d", 2);
             if (candles.size() >= 2) {
                 return candles.get(0).close();
             }
@@ -118,7 +118,7 @@ public class TosPriceApi implements TosPricePort, TossStockInfoPort {
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
-    // package-private — TosPriceApiTest에서 직접 생성하여 stub에 사용
+    // package-private — TossPriceApiTest에서 직접 생성하여 stub에 사용
     record PriceItem(
         @JsonProperty("symbol")    String symbol,    // 종목 코드 (예: SOXL)
         @JsonProperty("lastPrice") String lastPrice, // 현재가 (문자열 소수 형식)

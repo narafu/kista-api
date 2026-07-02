@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 // 공통 API — 개별 계좌 토큰 불필요, 관리자 자격증명으로 조회
-public interface TosPricePort {
+public interface TossPricePort {
     BigDecimal getPrice(Ticker ticker);
     Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers);
 

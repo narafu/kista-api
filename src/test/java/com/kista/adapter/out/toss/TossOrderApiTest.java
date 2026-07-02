@@ -27,11 +27,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TosOrderApi 단위 테스트")
-class TosOrderApiTest {
+@DisplayName("TossOrderApi 단위 테스트")
+class TossOrderApiTest {
 
     @Mock TossHttpClient tossHttpClient;
-    TosOrderApi tosOrderApi;
+    TossOrderApi tossOrderApi;
 
     static final Account ACCOUNT = new Account(
         UUID.randomUUID(), UUID.randomUUID(), "테스트",
@@ -40,27 +40,27 @@ class TosOrderApiTest {
 
     @BeforeEach
     void setUp() {
-        tosOrderApi = new TosOrderApi(tossHttpClient);
+        tossOrderApi = new TossOrderApi(tossHttpClient);
     }
 
     // Toss API 응답 {"result": {...}} 래퍼 헬퍼
-    private static TosOrderApi.OrderResponseWrapper wrap(String orderId) {
-        return new TosOrderApi.OrderResponseWrapper(new TosOrderApi.OrderResponse(orderId, null));
+    private static TossOrderApi.OrderResponseWrapper wrap(String orderId) {
+        return new TossOrderApi.OrderResponseWrapper(new TossOrderApi.OrderResponse(orderId, null));
     }
 
     // GET /api/v1/orders 응답 {"result": {...}} 래퍼 헬퍼
-    private static TosOrderApi.OrdersResponseWrapper wrapOrders(TosOrderApi.OrdersResponse response) {
-        return new TosOrderApi.OrdersResponseWrapper(response);
+    private static TossOrderApi.OrdersResponseWrapper wrapOrders(TossOrderApi.OrdersResponse response) {
+        return new TossOrderApi.OrdersResponseWrapper(response);
     }
 
     @Test
     @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, PLACED 상태 반환")
     void place_loc_mapsToLimitCls() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
             .thenReturn(wrap("toss-order-id"));
 
-        Order placed = tosOrderApi.place(order, ACCOUNT);
+        Order placed = tossOrderApi.place(order, ACCOUNT);
 
         // PLACED 상태, externalOrderId 설정 확인
         assertThat(placed.externalOrderId()).isEqualTo("toss-order-id");
@@ -79,10 +79,10 @@ class TosOrderApiTest {
     @DisplayName("MOC 주문 → timeInForce=CLS, price=0.01 (장마감 LIMIT 대체)")
     void place_moc_usesLimitClsWithMinPrice() {
         Order order = mocSellOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
             .thenReturn(wrap("toss-order-id-2"));
 
-        tosOrderApi.place(order, ACCOUNT);
+        tossOrderApi.place(order, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -96,10 +96,10 @@ class TosOrderApiTest {
     @DisplayName("LIMIT 주문 → timeInForce=DAY")
     void place_limit_mapsToLimitDay() {
         Order order = limitBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
             .thenReturn(wrap("toss-order-id-3"));
 
-        tosOrderApi.place(order, ACCOUNT);
+        tossOrderApi.place(order, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -111,10 +111,10 @@ class TosOrderApiTest {
     @DisplayName("응답 orderId null → TossApiException")
     void place_nullOrderId_throwsTossApiException() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TosOrderApi.OrderResponseWrapper.class)))
-            .thenReturn(new TosOrderApi.OrderResponseWrapper(new TosOrderApi.OrderResponse(null, null)));
+        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
+            .thenReturn(new TossOrderApi.OrderResponseWrapper(new TossOrderApi.OrderResponse(null, null)));
 
-        assertThatThrownBy(() -> tosOrderApi.place(order, ACCOUNT))
+        assertThatThrownBy(() -> tossOrderApi.place(order, ACCOUNT))
             .isInstanceOf(TossApiException.class);
     }
 
@@ -125,7 +125,7 @@ class TosOrderApiTest {
             Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLACED, "toss-oid-123", null, null);
 
-        tosOrderApi.cancel(order, ACCOUNT);
+        tossOrderApi.cancel(order, ACCOUNT);
 
         verify(tossHttpClient).delete(eq("/api/v1/orders/toss-oid-123"), any());
     }
@@ -133,17 +133,17 @@ class TosOrderApiTest {
     @Test
     @DisplayName("CLOSED 체결 → Execution 변환 (filledQuantity>0인 주문만)")
     void getExecutions_closed_convertsFilledOrders() {
-        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("3", "25.50", "76.50", null);
-        TosOrderApi.OrderItem item = new TosOrderApi.OrderItem("oid-1", "SOXL", "BUY", "FILLED", exec);
-        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(item), null, false);
-        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+        TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("3", "25.50", "76.50", null);
+        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-1", "SOXL", "BUY", "FILLED", exec);
+        TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
+        TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
         // CLOSED 먼저, OPEN 두 번째로 반환
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
-        List<Execution> executions = tosOrderApi.getExecutions(
+        List<Execution> executions = tossOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
 
         assertThat(executions).hasSize(1);
@@ -159,18 +159,18 @@ class TosOrderApiTest {
     @Test
     @DisplayName("filledQuantity=0 또는 null인 주문은 Execution에서 제외")
     void getExecutions_skipsUnfilledOrders() {
-        TosOrderApi.OrderExecutionItem noFill   = new TosOrderApi.OrderExecutionItem("0",  null, null, null);
-        TosOrderApi.OrderExecutionItem nullFill = new TosOrderApi.OrderExecutionItem(null, null, null, null);
-        TosOrderApi.OrderItem unfilledItem  = new TosOrderApi.OrderItem("oid-2", "SOXL", "BUY", "PENDING", noFill);
-        TosOrderApi.OrderItem nullFillItem  = new TosOrderApi.OrderItem("oid-3", "SOXL", "BUY", "PENDING", nullFill);
-        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
-        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+        TossOrderApi.OrderExecutionItem noFill   = new TossOrderApi.OrderExecutionItem("0",  null, null, null);
+        TossOrderApi.OrderExecutionItem nullFill = new TossOrderApi.OrderExecutionItem(null, null, null, null);
+        TossOrderApi.OrderItem unfilledItem  = new TossOrderApi.OrderItem("oid-2", "SOXL", "BUY", "PENDING", noFill);
+        TossOrderApi.OrderItem nullFillItem  = new TossOrderApi.OrderItem("oid-3", "SOXL", "BUY", "PENDING", nullFill);
+        TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
+        TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
-        List<Execution> result = tosOrderApi.getExecutions(
+        List<Execution> result = tossOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
 
         assertThat(result).isEmpty();
@@ -179,16 +179,16 @@ class TosOrderApiTest {
     @Test
     @DisplayName("OPEN 상태 부분 체결 → Execution 포함")
     void getExecutions_open_partialFilled_included() {
-        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("2", "30.00", "60.00", null);
-        TosOrderApi.OrderItem partial = new TosOrderApi.OrderItem("oid-4", "SOXL", "SELL", "PARTIAL_FILLED", exec);
-        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(), null, false);
-        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(partial), null, false);
+        TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("2", "30.00", "60.00", null);
+        TossOrderApi.OrderItem partial = new TossOrderApi.OrderItem("oid-4", "SOXL", "SELL", "PARTIAL_FILLED", exec);
+        TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(), null, false);
+        TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(partial), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
-        List<Execution> result = tosOrderApi.getExecutions(
+        List<Execution> result = tossOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
@@ -200,16 +200,16 @@ class TosOrderApiTest {
     @DisplayName("averageFilledPrice=null → price=ZERO, amountUsd는 명시값 우선")
     void getExecutions_nullPrice_fallbackAmount() {
         // amountUsd="50.00", price=null → price=BigDecimal.ZERO, amountUsd="50.00"(명시값 우선)
-        TosOrderApi.OrderExecutionItem exec = new TosOrderApi.OrderExecutionItem("2", null, "50.00", null);
-        TosOrderApi.OrderItem item = new TosOrderApi.OrderItem("oid-5", "SOXL", "BUY", "FILLED", exec);
-        TosOrderApi.OrdersResponse closedResp = new TosOrderApi.OrdersResponse(List.of(item), null, false);
-        TosOrderApi.OrdersResponse openResp   = new TosOrderApi.OrdersResponse(List.of(), null, false);
+        TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("2", null, "50.00", null);
+        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-5", "SOXL", "BUY", "FILLED", exec);
+        TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
+        TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TosOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
-        List<Execution> result = tosOrderApi.getExecutions(
+        List<Execution> result = tossOrderApi.getExecutions(
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);

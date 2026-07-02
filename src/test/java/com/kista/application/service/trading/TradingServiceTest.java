@@ -40,7 +40,7 @@ class TradingServiceTest {
     @Mock KisPricePort kisPricePort;
     @Mock KisOrderPort kisOrderPort;
     @Mock KisExecutionPort kisExecutionPort;
-    @Mock TosExecutionPort tosExecutionPort;
+    @Mock TossExecutionPort tossExecutionPort;
     @Mock InfiniteTradingStrategy infiniteStrategy;
     @Mock PrivacyTradingStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
@@ -56,10 +56,10 @@ class TradingServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
     @Mock KisMarginPort kisMarginPort;
-    @Mock TosMarginPort tosMarginPort;
+    @Mock TossMarginPort tossMarginPort;
     @Mock com.kista.domain.port.out.broker.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
     @Mock KisAccountPort kisAccountPort;
-    @Mock TosAccountPort tosAccountPort;
+    @Mock TossAccountPort tossAccountPort;
     @Mock LoadUserSettingsPort loadUserSettingsPort;
     @Mock UserPort userPort;
     TradingService service;
