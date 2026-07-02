@@ -1,10 +1,11 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.AdminManualTradeCorrectionRequest;
+import com.kista.adapter.in.web.dto.AdminOrderCorrectionRequest;
+import com.kista.adapter.in.web.dto.AdminOrderCorrectionResponse;
+import com.kista.adapter.in.web.dto.AdminTradeCorrectionResponse;
+import com.kista.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.admin.AdminOrderCorrectionCommand;
-import com.kista.domain.model.admin.AdminOrderCorrectionResult;
-import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
-import com.kista.domain.model.admin.AdminTradeCorrectionResult;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy;
@@ -14,9 +15,6 @@ import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -54,19 +51,7 @@ public class AdminTradeController {
     public List<AdminTradeResponse> listTrades(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        Map<UUID, Account> accountMap = adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(Account::id, Function.identity()));
-        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
-                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        List<Order> trades = adminQuery.listTrades(from, to);
-        Set<UUID> cycleIds = trades.stream()
-                .map(Order::strategyCycleId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
-        return trades.stream()
-                .map(t -> AdminTradeResponse.from(t, accountMap, userMap, strategyTypeMap))
-                .toList();
+        return toResponses(adminQuery.listTrades(from, to));
     }
 
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
@@ -74,20 +59,10 @@ public class AdminTradeController {
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        Map<UUID, Account> accountMap = adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(Account::id, Function.identity()));
-        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
-                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
-        List<Order> orders = adminQuery.listStrategyOrders(strategyId, tradeDate);
-        Set<UUID> cycleIds = orders.stream()
-                .map(Order::strategyCycleId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
-        return orders.stream()
+        List<Order> orders = adminQuery.listStrategyOrders(strategyId, tradeDate).stream()
                 .filter(order -> accountId.equals(order.accountId()))
-                .map(order -> AdminTradeResponse.from(order, accountMap, userMap, strategyTypeMap))
                 .toList();
+        return toResponses(orders);
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
@@ -95,8 +70,8 @@ public class AdminTradeController {
     public AdminTradeCorrectionResponse correctManualFills(
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid AdminManualTradeCorrectionRequest request) {
-        AdminTradeCorrectionResult result = adminTradeCorrection.correctManualFills(adminId, request.toCommand());
-        return AdminTradeCorrectionResponse.from(result);
+        return AdminTradeCorrectionResponse.from(
+                adminTradeCorrection.correctManualFills(adminId, request.toCommand()));
     }
 
     @PostMapping("/trades/order-corrections")
@@ -107,166 +82,29 @@ public class AdminTradeController {
                 adminOrderCorrection.correctOrder(adminId, request.toCommand()));
     }
 
-    // 거래 내역 응답 DTO — package-private record (같은 패키지 AdminAnomaliesController에서 재사용 가능)
-    record AdminTradeResponse(
-            UUID id,
-            UUID userId,
-            String ownerNickname,    // 계좌 소유자 닉네임
-            String strategyType,     // INFINITE | PRIVACY (null 가능)
-            LocalDate tradeDate,
-            String ticker,
-            String direction,        // BUY | SELL
-            String orderType,        // LOC | MOC | LIMIT
-            String timing,           // AT_OPEN | AT_CLOSE
-            int quantity,
-            BigDecimal price,
-            String status,           // PLACED | FILLED | FAILED
-            String externalOrderId,
-            Integer filledQuantity,
-            BigDecimal filledPrice
-    ) {
-        static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap,
-                                       Map<UUID, AdminUserView> userMap,
-                                       Map<UUID, Strategy.Type> strategyTypeMap) {
-            // accountId → userId → nickname 순서로 역방향 조회
-            Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
-            UUID userId = account != null ? account.userId() : null;
-            AdminUserView user = userId != null ? userMap.get(userId) : null;
-            String nickname = user != null ? user.nickname() : "(알 수 없음)";
-            Strategy.Type strategyType = t.strategyCycleId() != null ? strategyTypeMap.get(t.strategyCycleId()) : null;
-            return new AdminTradeResponse(
-                    t.id(), userId, nickname,
-                    strategyType != null ? strategyType.name() : null,
-                    t.tradeDate(), t.ticker().name(),
-                    t.direction().name(), t.orderType().name(), t.timing().name(),
-                    t.quantity(), t.price(), t.status().name(),
-                    t.externalOrderId(), t.filledQuantity(), t.filledPrice());
-        }
+    // accountId → Account 전체 매핑 (N+1 방지용 일괄 조회)
+    private Map<UUID, Account> buildAccountMap() {
+        return adminQuery.listAccounts(null, null).stream()
+                .collect(Collectors.toMap(Account::id, Function.identity()));
     }
 
-    record AdminManualTradeCorrectionRequest(
-            @NotNull UUID userId,
-            @NotNull UUID accountId,
-            @NotNull UUID strategyId,
-            @NotEmpty List<@Valid FillRequest> fills
-    ) {
-        AdminManualTradeCorrectionCommand toCommand() {
-            return new AdminManualTradeCorrectionCommand(
-                    userId, accountId, strategyId,
-                    fills.stream().map(FillRequest::toCommand).toList()
-            );
-        }
-
-        record FillRequest(
-                @NotNull LocalDate tradeDateKst,
-                @NotNull String direction,
-                @NotNull @Positive Integer quantity,
-                @NotNull @Positive BigDecimal price,
-                String externalOrderId,
-                String memo
-        ) {
-            AdminManualTradeCorrectionCommand.Fill toCommand() {
-                return new AdminManualTradeCorrectionCommand.Fill(
-                        tradeDateKst,
-                        Order.OrderDirection.valueOf(direction),
-                        quantity,
-                        price,
-                        externalOrderId,
-                        memo
-                );
-            }
-        }
+    // userId → AdminUserView 전체 매핑 (N+1 방지용 일괄 조회)
+    private Map<UUID, AdminUserView> buildUserMap() {
+        return adminUser.listAll(null, null).stream()
+                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
     }
 
-    record AdminTradeCorrectionResponse(
-            UUID userId,
-            UUID accountId,
-            UUID strategyId,
-            int processedCount,
-            int finalHoldings,
-            BigDecimal finalAvgPrice,
-            BigDecimal finalUsdDeposit,
-            String strategyStatus,
-            boolean cycleEnded,
-            LocalDate cycleEndDate
-    ) {
-        static AdminTradeCorrectionResponse from(AdminTradeCorrectionResult result) {
-            return new AdminTradeCorrectionResponse(
-                    result.userId(),
-                    result.accountId(),
-                    result.strategyId(),
-                    result.processedCount(),
-                    result.finalHoldings(),
-                    result.finalAvgPrice(),
-                    result.finalUsdDeposit(),
-                    result.strategyStatus().name(),
-                    result.cycleEnded(),
-                    result.cycleEndDate()
-            );
-        }
-    }
-
-    record AdminOrderCorrectionRequest(
-            @NotNull UUID userId,
-            @NotNull UUID accountId,
-            @NotNull UUID strategyId,
-            @NotNull UUID orderId,
-            @NotNull String mode,
-            @NotNull LocalDate tradeDateKst,
-            String direction,
-            Integer quantity,
-            BigDecimal price,
-            String memo
-    ) {
-        AdminOrderCorrectionCommand toCommand() {
-            return new AdminOrderCorrectionCommand(
-                    userId,
-                    accountId,
-                    strategyId,
-                    orderId,
-                    AdminOrderCorrectionCommand.Mode.valueOf(mode),
-                    tradeDateKst,
-                    direction != null ? Order.OrderDirection.valueOf(direction) : null,
-                    quantity,
-                    price,
-                    memo
-            );
-        }
-    }
-
-    record AdminOrderCorrectionResponse(
-            UUID userId,
-            UUID accountId,
-            UUID strategyId,
-            UUID orderId,
-            String mode,
-            String originalStatus,
-            String resultingStatus,
-            String replacementExternalOrderId,
-            int finalHoldings,
-            BigDecimal finalAvgPrice,
-            BigDecimal finalUsdDeposit,
-            String strategyStatus,
-            boolean cycleEnded,
-            LocalDate cycleEndDate
-    ) {
-        static AdminOrderCorrectionResponse from(AdminOrderCorrectionResult result) {
-            return new AdminOrderCorrectionResponse(
-                    result.userId(),
-                    result.accountId(),
-                    result.strategyId(),
-                    result.orderId(),
-                    result.mode().name(),
-                    result.originalStatus().name(),
-                    result.resultingStatus().name(),
-                    result.replacementExternalOrderId(),
-                    result.finalHoldings(),
-                    result.finalAvgPrice(),
-                    result.finalUsdDeposit(),
-                    result.strategyStatus().name(),
-                    result.cycleEnded(),
-                    result.cycleEndDate()
-            );
-        }
+    // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
+    private List<AdminTradeResponse> toResponses(List<Order> orders) {
+        Map<UUID, Account> accountMap = buildAccountMap();
+        Map<UUID, AdminUserView> userMap = buildUserMap();
+        Set<UUID> cycleIds = orders.stream()
+                .map(Order::strategyCycleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, Strategy.Type> strategyTypeMap = adminQuery.getStrategyTypesByCycleIds(cycleIds);
+        return orders.stream()
+                .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategyTypeMap))
+                .toList();
     }
 }
