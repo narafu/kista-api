@@ -31,23 +31,15 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     public List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // PLANNED 상태인 오늘 계획 주문만 조회
-        return repository
-                .findByStrategyCycleIdAndTradeDateAndStatus(
-                        strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED)
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED));
     }
 
     @Override
     public List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
-        return repository
-                .findByStrategyCycleIdAndTradeDateAndStatus(
-                        strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED)
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED));
     }
 
     @Override
@@ -61,32 +53,21 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker) {
-        return repository
-                .findByTradeDateBetweenAndTicker(
-                        TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker)
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByTradeDateBetweenAndTicker(
+                TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker));
     }
 
     @Override
     public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
         // native query는 enum을 name() 문자열로 전달 — DB VARCHAR 컬럼과 매칭
-        return repository
-                .findByUserIdAndTradeDateBetweenAndTicker(
-                        userId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker.name())
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByUserIdAndTradeDateBetweenAndTicker(
+                userId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker.name()));
     }
 
     @Override
     public List<Order> findAll(LocalDate from, LocalDate to) {
-        return repository
-                .findByTradeDateBetweenOrderByTradeDateDesc(TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDesc(
+                TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));
     }
 
     @Override
@@ -114,13 +95,9 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
-        return repository
-                .findByStrategyCycleIdAndTradeDateAndStatusIn(
-                        strategyCycleId, TradeDateConverter.toUtc(tradeDate),
-                        List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED))
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate),
+                List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)));
     }
 
     @Override
@@ -131,22 +108,17 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
-        return repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
+        return toDomainList(repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
                 accountId,
                 TradeDateConverter.toUtc(from),
                 TradeDateConverter.toUtc(to),
-                List.of(Order.OrderStatus.FILLED, Order.OrderStatus.PARTIALLY_FILLED)
-        ).stream().map(this::toDomain).toList();
+                List.of(Order.OrderStatus.FILLED, Order.OrderStatus.PARTIALLY_FILLED)));
     }
 
     @Override
     public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
-        return repository
-                .findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
-                        strategyId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to))
-                .stream()
-                .map(this::toDomain)
-                .toList();
+        return toDomainList(repository.findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
+                strategyId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));
     }
 
     @Override
@@ -181,6 +153,11 @@ public class OrderPersistenceAdapter implements OrderPort {
             e.setFilledQuantity(filledQuantity);
             e.setFilledPrice(filledPrice);
         });
+    }
+
+    // 엔티티 목록 → 도메인 목록 일괄 변환
+    private List<Order> toDomainList(List<OrderEntity> entities) {
+        return entities.stream().map(this::toDomain).toList();
     }
 
     // 주문 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)

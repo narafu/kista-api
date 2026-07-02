@@ -46,21 +46,16 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyApproved(User user) {
-        if (!user.hasTelegramBot()) return;
-        telegramHttpClient.sendMessage(user.telegramChatId(), "✅ 가입이 승인되었습니다.", user.telegramBotToken());
+        sendIfLinked(user, "✅ 가입이 승인되었습니다.");
     }
 
     @Override
     public void notifyRejected(User user) {
-        if (!user.hasTelegramBot()) return;
-        telegramHttpClient.sendMessage(user.telegramChatId(), "❌ 가입 신청이 거절되었습니다.", user.telegramBotToken());
+        sendIfLinked(user, "❌ 가입 신청이 거절되었습니다.");
     }
 
     @Override
     public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
-        if (!user.hasTelegramBot()) {
-            return;
-        }
         String text = String.format(
                 "🔄 <b>사이클 종료</b> — %s%n"
                 + "[%s] %s 사이클이 완료되었습니다.%n"
@@ -68,14 +63,11 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
                 account.nickname(),
                 strategy.type().name(), strategy.ticker().name(),
                 strategy.cycleSeedType().name());
-        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+        sendIfLinked(user, text);
     }
 
     @Override
     public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
-        if (!user.hasTelegramBot()) {
-            return;
-        }
         String text = String.format(
                 "🚀 <b>새 사이클 시작</b> — %s%n"
                 + "[%s] %s 사이클이 시작되었습니다.%n"
@@ -83,53 +75,47 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
                 account.nickname(),
                 strategy.type().name(), strategy.ticker().name(),
                 initialUsdDeposit);
-        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+        sendIfLinked(user, text);
     }
 
     @Override
     public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
-        if (!user.hasTelegramBot()) {
-            return;
-        }
         String text = String.format(
                 "⚠️ <b>예수금 부족</b> — %s%n"
                 + "[%s] %s 장 마감 전 예수금 확인 바랍니다.",
                 account.nickname(), strategyType.name(), ticker.name());
-        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+        sendIfLinked(user, text);
     }
 
     @Override
     public void notifyTradingReport(User user, Account account, TradingReport r) {
-        if (!user.hasTelegramBot()) {
-            return;
-        }
         String text = String.format(
                 "<b>매매 결산[%s]</b> — %s%n"
                 + "[%s] %s 매수: $%.2f | 매도: $%.2f",
                 r.date(), account.nickname(),
                 r.strategyType().name(), r.ticker().name(),
                 r.totalBoughtUsd(), r.totalSoldUsd());
-        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+        sendIfLinked(user, text);
     }
 
     @Override
     public void notifyError(User user, Exception e) {
-        if (!user.hasTelegramBot()) {
-            return;
-        }
-        String text = String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage());
-        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
+        sendIfLinked(user, String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage()));
     }
 
     @Override
     public void notifyMarketOpen(User user) {
-        if (!user.hasTelegramBot()) return;
-        telegramHttpClient.sendMessage(user.telegramChatId(), "🟢 미국 장이 열렸습니다.", user.telegramBotToken());
+        sendIfLinked(user, "🟢 미국 장이 열렸습니다.");
     }
 
     @Override
     public void notifyMarketClose(User user) {
+        sendIfLinked(user, "🔴 미국 장이 마감되었습니다.");
+    }
+
+    // 사용자 봇 연결 시에만 발송 — 미연결 시 조용히 skip
+    private void sendIfLinked(User user, String text) {
         if (!user.hasTelegramBot()) return;
-        telegramHttpClient.sendMessage(user.telegramChatId(), "🔴 미국 장이 마감되었습니다.", user.telegramBotToken());
+        telegramHttpClient.sendMessage(user.telegramChatId(), text, user.telegramBotToken());
     }
 }
