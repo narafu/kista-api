@@ -17,7 +17,6 @@ import org.springframework.util.LinkedMultiValueMap;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -101,69 +100,27 @@ public class TossHoldingsApi implements TossAccountPort,
         BigDecimal krwDeposit = fetchBuyingPower(account, "KRW");
         BigDecimal rate = fetchUsdToKrwRate();
 
-        // 5. Ticker 파싱 성공·수량 > 0 항목만 Item 변환
-        List<PresentBalanceResult.Item> items = List.of();
+        // 5. Ticker 파싱 성공·수량 > 0 항목만 원시 보유값으로 추출 (계산은 도메인 위임)
+        List<PresentBalanceResult.TossHolding> holdings = List.of();
         if (holdingsResponse != null && holdingsResponse.items() != null) {
-            items = holdingsResponse.items().stream()
+            holdings = holdingsResponse.items().stream()
                     .filter(h -> h.lastPrice() != null && !h.lastPrice().isBlank())
                     .flatMap(h -> {
                         Optional<Ticker> tickerOpt = Ticker.tryParse(h.symbol());
                         if (tickerOpt.isEmpty()) return Stream.empty();
                         int quantity = Integer.parseInt(h.quantity());
                         if (quantity <= 0) return Stream.empty();
-                        BigDecimal lastPrice = new BigDecimal(h.lastPrice());
-                        BigDecimal avgPrice = new BigDecimal(h.averagePurchasePrice());
-                        BigDecimal evalAmountUsd = lastPrice.multiply(BigDecimal.valueOf(quantity))
-                                .setScale(2, RoundingMode.HALF_UP);
-                        BigDecimal profitLossUsd = lastPrice.subtract(avgPrice)
-                                .multiply(BigDecimal.valueOf(quantity))
-                                .setScale(2, RoundingMode.HALF_UP);
-                        BigDecimal profitRate = avgPrice.compareTo(BigDecimal.ZERO) > 0
-                                ? lastPrice.subtract(avgPrice)
-                                  .divide(avgPrice, 4, RoundingMode.HALF_UP)
-                                  .multiply(new BigDecimal("100"))
-                                  .setScale(2, RoundingMode.HALF_UP)
-                                : BigDecimal.ZERO;
-                        return Stream.of(new PresentBalanceResult.Item(
-                                tickerOpt.get(), quantity, avgPrice, lastPrice,
-                                evalAmountUsd, profitLossUsd, profitRate, "AMEX"
+                        return Stream.of(new PresentBalanceResult.TossHolding(
+                                tickerOpt.get(), quantity,
+                                new BigDecimal(h.averagePurchasePrice()),
+                                new BigDecimal(h.lastPrice())
                         ));
                     })
                     .toList();
         }
 
-        // 6. KRW 기준 합산
-        BigDecimal totalEvalUsd = items.stream().map(PresentBalanceResult.Item::evalAmountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalProfitUsd = items.stream().map(PresentBalanceResult.Item::profitLossUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalPurchaseUsd = items.stream()
-                .map(item -> item.avgPrice().multiply(BigDecimal.valueOf(item.holdings())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // totalAssetKrw = (포지션USD + USD예수금) × 환율 + KRW예수금
-        BigDecimal totalAssetKrw = rate.compareTo(BigDecimal.ZERO) > 0
-                ? totalEvalUsd.add(usdDeposit).multiply(rate).add(krwDeposit)
-                  .setScale(0, RoundingMode.HALF_UP)
-                : krwDeposit.setScale(0, RoundingMode.HALF_UP);
-        // totalEvalProfitKrw = 평가손익USD × 환율
-        BigDecimal totalEvalProfitKrw = rate.compareTo(BigDecimal.ZERO) > 0
-                ? totalProfitUsd.multiply(rate).setScale(0, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        // totalReturnRate = 평가손익KRW / 매입금액KRW × 100
-        BigDecimal totalPurchaseKrw = rate.compareTo(BigDecimal.ZERO) > 0
-                ? totalPurchaseUsd.multiply(rate).setScale(0, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalReturnRate = totalPurchaseKrw.compareTo(BigDecimal.ZERO) > 0
-                ? totalEvalProfitKrw.divide(totalPurchaseKrw, 4, RoundingMode.HALF_UP)
-                  .multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-
-        BigDecimal krwAsUsd = rate.compareTo(BigDecimal.ZERO) > 0
-                ? krwDeposit.divide(rate, 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalUsdDeposit = usdDeposit.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
-        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, totalUsdDeposit, rate);
+        // 6. KRW 환산·총자산·수익률 집계는 도메인 팩토리에 위임
+        return PresentBalanceResult.aggregateToss(holdings, usdDeposit, krwDeposit, rate);
     }
 
     // currency 파라미터로 매수가능금액 단건 조회
