@@ -71,21 +71,25 @@ class OrderCancelServiceTest {
     // --- cancelByCycle ---
 
     @Test
-    @DisplayName("cancelByCycle: 오늘 PLACED 주문 모두 취소 성공 → CancelResult(n, 0)")
+    @DisplayName("cancelByCycle: 오늘 PLANNED 삭제 + PLACED 취소 성공 → CancelResult(n, 0)")
     void cancelByCycle_allSuccess() {
+        Order plannedOrder = plannedOrder(UUID.randomUUID());
         Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(plannedOrder));
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
-        assertThat(result.cancelledCount()).isEqualTo(2);
+        assertThat(result.cancelledCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(0);
+        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
         verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount));
         verify(orderPort, times(2)).markCancelled(any());
     }
@@ -114,11 +118,13 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelByCycle: PLACED 주문 없으면 CancelResult(0, 0)")
+    @DisplayName("cancelByCycle: PLANNED·PLACED 주문 없으면 CancelResult(0, 0)")
     void cancelByCycle_noPlacedOrders() {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of());
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of());
 
@@ -154,6 +160,19 @@ class OrderCancelServiceTest {
 
         verify(brokerPort).cancel(order, ownedAccount);
         verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: PLANNED 주문은 증권사 취소 없이 DB 취소만 수행")
+    void cancelOrder_planned_success() {
+        Order order = plannedOrder(orderId);
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(orderPort).markCancelled(orderId);
+        verifyNoInteractions(brokerPort);
     }
 
     @Test
@@ -197,5 +216,11 @@ class OrderCancelServiceTest {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLACED, externalOrderId, null, null);
+    }
+
+    private Order plannedOrder(UUID id) {
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                Order.OrderStatus.PLANNED, null, null, null);
     }
 }

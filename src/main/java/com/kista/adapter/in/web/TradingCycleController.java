@@ -114,8 +114,8 @@ public class TradingCycleController {
         return ExecuteOrdersResponse.from(tradingExecution.executeManually(id, userId));
     }
 
-    // 오늘 수동 실행으로 PLACED된 사이클 주문 전체 취소 (best-effort)
-    @Operation(summary = "수동 실행 주문 취소 (오늘 PLACED 주문 전체)")
+    // 오늘 등록된 사이클 주문 전체 취소 — PLANNED 삭제 + PLACED 증권사 취소 (best-effort)
+    @Operation(summary = "수동 실행 주문 취소 (오늘 PLANNED + PLACED 주문 전체)")
     @DeleteMapping("/api/trading-cycles/{id}/execute")
     public CancelOrdersResponse cancelExecute(
             @PathVariable UUID id,
