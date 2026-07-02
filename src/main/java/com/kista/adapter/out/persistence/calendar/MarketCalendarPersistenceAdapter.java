@@ -2,7 +2,6 @@ package com.kista.adapter.out.persistence.calendar;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.port.out.MarketCalendarPort;
-import com.kista.domain.port.out.MarketHolidayQueryPort;
 import com.kista.domain.port.out.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +15,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, MarketHolidayStorePort, MarketHolidayQueryPort {
+public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, MarketHolidayStorePort {
 
     private final UsMarketHolidayJpaRepository holidayRepository;
 
