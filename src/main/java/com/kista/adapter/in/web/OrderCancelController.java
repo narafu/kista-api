@@ -20,7 +20,7 @@ public class OrderCancelController {
 
     private final TradingExecutionUseCase tradingExecution;
 
-    // 특정 주문 1건 취소 — PLACED 상태 주문만 가능, 그 외 상태면 OrderCancelException→409
+    // 특정 주문 1건 취소 — PLANNED는 DB 취소, PLACED는 증권사 취소 후 DB 취소, 그 외 상태는 409
     @Operation(summary = "개별 주문 취소")
     @DeleteMapping("/api/orders/{orderId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

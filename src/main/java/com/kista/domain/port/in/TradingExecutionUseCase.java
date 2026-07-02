@@ -25,7 +25,7 @@ public interface TradingExecutionUseCase {
     void executeBatchNow(List<BatchContext> contexts) throws InterruptedException;
     // 수동 실행 (INFINITE 전용)
     List<Order> executeManually(UUID strategyId, UUID requesterId);
-    // 전략 주문 전체 취소 (오늘 PLACED, best-effort)
+    // 전략 주문 전체 취소 (오늘 PLANNED + PLACED, best-effort)
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId);
     // 특정 주문 1건 취소
     void cancelOrder(UUID orderId, UUID requesterId);

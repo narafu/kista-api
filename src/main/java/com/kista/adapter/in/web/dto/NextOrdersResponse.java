@@ -15,7 +15,7 @@ public record NextOrdersResponse(
         PositionSnapshot position,                    // PRIVACY/skip 시 null
         List<OrderItem> orders,
         NextOrdersPreview.SkipReason skipReason,      // 정상이면 null
-        List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED 주문
+        List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED·PLACED 주문
         BigDecimal otherStrategiesPlannedBuyUsd       // 계좌 내 타 전략 당일 PLANNED BUY 합계
 ) {
     public record PositionSnapshot(

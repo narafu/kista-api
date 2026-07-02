@@ -81,8 +81,8 @@ class OrderCancelControllerTest {
     }
 
     @Test
-    void cancelOrder_notPlaced_returns409() throws Exception {
-        doThrow(new OrderCancelException("PLACED 상태 주문만 취소 가능합니다"))
+    void cancelOrder_notCancellable_returns409() throws Exception {
+        doThrow(new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: FILLED"))
                 .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
