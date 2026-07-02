@@ -37,9 +37,7 @@ class UserServiceTest {
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock AdminBootstrapProperties bootstrapProps;
-    @Mock TelegramBotInfoPort telegramBotInfoPort;
     @Mock KakaoOAuthPort kakaoOAuthPort;
-    @Mock FcmDeviceTokenPort fcmDeviceTokenPort;
     @Mock BlacklistPort blacklistPort;
     @Mock RefreshTokenPort refreshTokenPort;
 
@@ -280,22 +278,6 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.deleteMe(id))
                 .isInstanceOf(NoSuchElementException.class);
-    }
-
-    @Test
-    @DisplayName("FCM 토큰 등록 시 fcmDeviceTokenPort.save 호출")
-    void registerFcmToken_delegatesToPort() {
-        UUID userId = UUID.randomUUID();
-        userService.registerFcmToken(userId, "token-abc", "WEB");
-        verify(fcmDeviceTokenPort).save(userId, "token-abc", "WEB");
-    }
-
-    @Test
-    @DisplayName("FCM 토큰 삭제 시 fcmDeviceTokenPort.delete 호출")
-    void unregisterFcmToken_delegatesToPort() {
-        UUID userId = UUID.randomUUID();
-        userService.unregisterFcmToken(userId, "token-abc");
-        verify(fcmDeviceTokenPort).delete(userId, "token-abc");
     }
 
     // ─── login() 시나리오 ──────────────────────────────────────────────

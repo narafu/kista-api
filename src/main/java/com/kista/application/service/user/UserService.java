@@ -3,7 +3,6 @@ package com.kista.application.service.user;
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +34,7 @@ class UserService implements UserUseCase {
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
     private final AdminBootstrapProperties bootstrapProps; // ADMIN seed 목록
-    private final TelegramBotInfoPort telegramBotInfoPort; // 봇 토큰 검증 + username 취득
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
-    private final FcmDeviceTokenPort fcmDeviceTokenPort;   // FCM 토큰 저장/삭제
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
 
@@ -157,45 +154,5 @@ class UserService implements UserUseCase {
         userPort.findByIdOrThrow(userId); // 존재 확인
         userCascadeDeleter.deleteCascade(userId);
         log.info("사용자 탈퇴: userId={}", userId);
-    }
-
-    @Override
-    public void updateTelegram(UUID userId, String botToken, String chatId) {
-        // botToken 유효성 검증 + username 취득 (실패 시 IllegalArgumentException)
-        String botUsername = telegramBotInfoPort.getUsername(botToken);
-        User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withTelegram(botToken, chatId, botUsername));
-        log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
-    }
-
-    @Override
-    public void removeTelegram(UUID userId) {
-        User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withTelegram(null, null, null));
-        log.info("텔레그램 설정 해제: userId={}", userId);
-    }
-
-    @Override
-    public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
-        User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withNotificationChannel(channel));
-        log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
-    }
-
-    @Override
-    public void updateNickname(UUID userId, String nickname) {
-        User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withNickname(nickname.strip()));
-        log.info("닉네임 변경: userId={}", userId);
-    }
-
-    @Override
-    public void registerFcmToken(UUID userId, String token, String platform) {
-        fcmDeviceTokenPort.save(userId, token, platform);
-    }
-
-    @Override
-    public void unregisterFcmToken(UUID userId, String token) {
-        fcmDeviceTokenPort.delete(userId, token);
     }
 }

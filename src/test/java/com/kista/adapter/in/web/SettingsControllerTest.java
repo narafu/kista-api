@@ -5,7 +5,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
-import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.port.in.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -38,7 +38,7 @@ class SettingsControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean UserUseCase userUseCase;
+    @MockitoBean UserProfileUseCase userProfileUseCase;
     @MockitoBean UpdateBalanceCheckUseCase updateBalanceCheckUseCase;
     @MockitoBean UpdateNotificationPrefUseCase updateNotificationPrefUseCase;
 
@@ -58,7 +58,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNoContent());
 
-        verify(userUseCase).updateTelegram(
+        verify(userProfileUseCase).updateTelegram(
                 eq(UUID.fromString(USER_ID)), eq("test-token"), eq("chat-123"));
     }
 
@@ -68,7 +68,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNoContent());
 
-        verify(userUseCase).removeTelegram(eq(UUID.fromString(USER_ID)));
+        verify(userProfileUseCase).removeTelegram(eq(UUID.fromString(USER_ID)));
     }
 
     @Test
@@ -90,7 +90,7 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"channel\":\"FCM\"}"))
                 .andExpect(status().isNoContent());
-        verify(userUseCase).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
+        verify(userProfileUseCase).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
     }
 
     @Test
@@ -110,7 +110,7 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"새닉네임\"}"))
                 .andExpect(status().isNoContent());
-        verify(userUseCase).updateNickname(eq(UUID.fromString(USER_ID)), eq("새닉네임"));
+        verify(userProfileUseCase).updateNickname(eq(UUID.fromString(USER_ID)), eq("새닉네임"));
     }
 
     @Test

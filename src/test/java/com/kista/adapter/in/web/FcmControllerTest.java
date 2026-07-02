@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.UserUseCase;
+import com.kista.domain.port.in.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -31,7 +31,7 @@ class FcmControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserUseCase userUseCase;
+    @MockitoBean UserProfileUseCase userProfileUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
 
@@ -45,7 +45,7 @@ class FcmControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"fcm-token-abc\",\"platform\":\"WEB\"}"))
                 .andExpect(status().isNoContent());
-        verify(userUseCase).registerFcmToken(eq(USER_ID), eq("fcm-token-abc"), eq("WEB"));
+        verify(userProfileUseCase).registerFcmToken(eq(USER_ID), eq("fcm-token-abc"), eq("WEB"));
     }
 
     @Test
@@ -54,6 +54,6 @@ class FcmControllerTest {
                         .with(csrf())
                         .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()))))
                 .andExpect(status().isNoContent());
-        verify(userUseCase).unregisterFcmToken(eq(USER_ID), eq("fcm-token-abc"));
+        verify(userProfileUseCase).unregisterFcmToken(eq(USER_ID), eq("fcm-token-abc"));
     }
 }
