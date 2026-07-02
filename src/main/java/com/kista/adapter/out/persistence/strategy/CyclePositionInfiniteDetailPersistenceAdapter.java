@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-public class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfiniteDetailPort {
+class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfiniteDetailPort {
 
     private final CyclePositionInfiniteJpaRepository jpaRepository;
 

@@ -12,7 +12,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-public class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
+class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
 
     private final StrategyInfiniteJpaRepository jpaRepository;
 

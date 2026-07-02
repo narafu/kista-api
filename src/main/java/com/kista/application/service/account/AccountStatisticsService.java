@@ -148,7 +148,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         if (strategy.requiresPrivacyBase() && currentBase == null) {
             return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
         }
-        // minRequiredDeposit 인터페이스가 PrivacyTradeBase를 받지만 currentCycleStart만 사용 — 최소 래퍼로 전달
+        // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — avgPrice 접근 없음
         PrivacyTradeBase privacyBase = currentBase != null
                 ? new PrivacyTradeBase(null, null, 0, currentBase.currentCycleStart(), List.of())
                 : null;

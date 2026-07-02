@@ -17,6 +17,6 @@ public interface AdminUserUseCase {
     void changeRole(UUID adminId, UUID targetUserId, User.UserRole role);
     void deleteUser(UUID adminId, UUID targetUserId);
 
-    // 단일 사용자 뷰 조회 — listStrategyOrders 전용 (전체 풀스캔 없이 단건 반환)
+    // 단일 사용자 뷰 조회 — listStrategyOrders 전용 (전체 조회 후 ID 필터)
     Optional<AdminUserView> findUser(UUID userId);
 }

@@ -1,6 +1,7 @@
 package com.kista.application.service.admin;
 
 import com.kista.application.service.user.UserCascadeDeleter;
+import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
@@ -14,6 +15,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,5 +124,28 @@ class AdminServiceTest {
         // cascade 삭제는 UserCascadeDeleter에 위임
         verify(userCascadeDeleter).deleteCascade(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
+    }
+
+    @Test
+    void findUser_존재하는_사용자ID로_조회시_반환한다() {
+        UUID targetId = UUID.randomUUID();
+        AdminUserView view = new AdminUserView(targetId, "테스트", User.UserStatus.ACTIVE, User.UserRole.USER, Instant.now());
+        when(adminUserViewPort.findAll()).thenReturn(List.of(view));
+
+        Optional<AdminUserView> result = adminService.findUser(targetId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(targetId);
+    }
+
+    @Test
+    void findUser_존재하지_않는_사용자ID로_조회시_empty를_반환한다() {
+        UUID otherId = UUID.randomUUID();
+        AdminUserView view = new AdminUserView(UUID.randomUUID(), "다른사용자", User.UserStatus.ACTIVE, User.UserRole.USER, Instant.now());
+        when(adminUserViewPort.findAll()).thenReturn(List.of(view));
+
+        Optional<AdminUserView> result = adminService.findUser(otherId);
+
+        assertThat(result).isEmpty();
     }
 }
