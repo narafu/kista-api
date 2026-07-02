@@ -23,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -68,34 +67,20 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
 
         for (int i = 0; i < command.fills().size(); i++) {
             AdminManualTradeCorrectionCommand.Fill fill = command.fills().get(i);
-            if (fill.direction() == Order.OrderDirection.SELL && fill.quantity() > balance.holdings()) {
-                throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
-            }
+            boolean isLastFill = i == command.fills().size() - 1;
 
-            // 수동 체결 1건을 FILLED 주문 이력으로 남긴다
-            manualOrders.add(Order.filledManual(account.id(), currentCycle.id(), fill.tradeDateKst(),
-                    strategy.ticker(), Order.OrderTiming.AT_CLOSE, fill.direction(),
-                    fill.quantity(), fill.price(), fill.externalOrderId()));
-
-            Execution execution = new Execution(
-                    fill.tradeDateKst(),
-                    strategy.ticker(),
-                    fill.direction(),
-                    fill.quantity(),
-                    fill.price(),
-                    fill.price().multiply(BigDecimal.valueOf(fill.quantity())),
-                    fill.externalOrderId()
-            );
-            balance = balance.applyExecutions(List.of(execution));
-            cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), balance, fill.price()));
+            // fill 1건 반영: 검증 → FILLED 주문 이력 → 잔고 재계산 → 포지션 스냅샷
+            validateSellQuantity(fill, balance);
+            manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
+            balance = applyFillAndSnapshot(fill, strategy, balance, currentCycle);
 
             // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정
             if (balance.holdings() == 0) {
-                if (i < command.fills().size() - 1) {
+                if (!isLastFill) {
                     throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다");
                 }
-                strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), fill.tradeDateKst());
-                updatedStrategy = strategyPort.save(updatedStrategy.withStatus(Strategy.Status.PAUSED));
+                updatedStrategy = AdminCycleCloser.closeIfExhausted(strategyCyclePort, strategyPort,
+                        updatedStrategy, currentCycle, balance, fill.tradeDateKst()).strategy();
                 cycleEnded = true;
             }
         }
@@ -109,6 +94,37 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                         "cycleEnded", cycleEnded
                 ));
 
+        return buildResult(user, account, strategy, command, balance, updatedStrategy, cycleEnded);
+    }
+
+    // SELL 수량이 현재 holdings를 초과하는지 검증
+    private static void validateSellQuantity(AdminManualTradeCorrectionCommand.Fill fill, AccountBalance balance) {
+        if (fill.direction() == Order.OrderDirection.SELL && fill.quantity() > balance.holdings()) {
+            throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
+        }
+    }
+
+    // 수동 체결 1건을 FILLED 주문 이력으로 변환
+    private static Order toManualOrder(AdminManualTradeCorrectionCommand.Fill fill, Account account,
+                                       StrategyCycle currentCycle, Strategy strategy) {
+        return Order.filledManual(account.id(), currentCycle.id(), fill.tradeDateKst(),
+                strategy.ticker(), Order.OrderTiming.AT_CLOSE, fill.direction(),
+                fill.quantity(), fill.price(), fill.externalOrderId());
+    }
+
+    // 체결 반영 후 잔고 재계산 + cycle_position 스냅샷 append
+    private AccountBalance applyFillAndSnapshot(AdminManualTradeCorrectionCommand.Fill fill, Strategy strategy,
+                                                AccountBalance balance, StrategyCycle currentCycle) {
+        Execution execution = Execution.ofManualFill(fill.tradeDateKst(), strategy.ticker(),
+                fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
+        AccountBalance updated = balance.applyExecutions(List.of(execution));
+        cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
+        return updated;
+    }
+
+    private AdminTradeCorrectionResult buildResult(User user, Account account, Strategy strategy,
+                                                   AdminManualTradeCorrectionCommand command, AccountBalance balance,
+                                                   Strategy updatedStrategy, boolean cycleEnded) {
         return new AdminTradeCorrectionResult(
                 user.id(),
                 account.id(),

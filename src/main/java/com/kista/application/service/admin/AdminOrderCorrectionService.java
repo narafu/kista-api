@@ -81,22 +81,8 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                         "newPrice", price.toPlainString(),
                         "newQuantity", quantity
                 )));
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.PLANNED,
-                null,
-                0,
-                null,
-                null,
-                strategy.status(),
-                false,
-                null
-        );
+        return AdminOrderCorrectionResult.simple(command, order.id(),
+                order.status(), Order.OrderStatus.PLANNED, null, strategy.status());
     }
 
     private AdminOrderCorrectionResult replacePlacedOrder(UUID adminId, AdminOrderCorrectionCommand command,
@@ -121,22 +107,8 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                         "replacementExternalOrderId", replacement.externalOrderId()
                 )));
 
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.PLACED,
-                replacement.externalOrderId(),
-                0,
-                null,
-                null,
-                strategy.status(),
-                false,
-                null
-        );
+        return AdminOrderCorrectionResult.simple(command, order.id(),
+                order.status(), Order.OrderStatus.PLACED, replacement.externalOrderId(), strategy.status());
     }
 
     private AdminOrderCorrectionResult correctFilledOrder(UUID adminId, AdminOrderCorrectionCommand command,
@@ -158,7 +130,8 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updatedBalance, price));
 
         // 4. holdings 소진 시 사이클 종료 처리
-        CycleEndResult cycleEnd = closeCycleIfExhausted(strategy, currentCycle, updatedBalance, correctionOrder.tradeDate());
+        AdminCycleCloser.CycleEndResult cycleEnd = AdminCycleCloser.closeIfExhausted(
+                strategyCyclePort, strategyPort, strategy, currentCycle, updatedBalance, correctionOrder.tradeDate());
 
         // 5. 주문 저장 + 감사 로그
         orderPort.saveAll(List.of(correctionOrder));
@@ -170,22 +143,9 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
                         "cycleEnded", cycleEnd.ended()
                 )));
 
-        return new AdminOrderCorrectionResult(
-                command.userId(),
-                command.accountId(),
-                command.strategyId(),
-                order.id(),
-                command.mode(),
-                order.status(),
-                Order.OrderStatus.FILLED,
-                null,
-                updatedBalance.holdings(),
-                updatedBalance.avgPrice(),
-                updatedBalance.usdDeposit(),
-                cycleEnd.strategy().status(),
-                cycleEnd.ended(),
-                cycleEnd.endDate()
-        );
+        return AdminOrderCorrectionResult.filled(command, order.id(), order.status(),
+                updatedBalance.holdings(), updatedBalance.avgPrice(), updatedBalance.usdDeposit(),
+                cycleEnd.strategy().status(), cycleEnd.ended(), cycleEnd.endDate());
     }
 
     // 체결 상태 검증 — FILLED_CORRECTION은 FILLED/PARTIALLY_FILLED만 허용
@@ -220,30 +180,10 @@ class AdminOrderCorrectionService implements AdminOrderCorrectionUseCase {
 
     // 보정 주문에서 체결 내역(Execution) 빌드 — applyExecutions에 전달용
     private static Execution toExecution(Order correctionOrder) {
-        return new Execution(
-                correctionOrder.tradeDate(),
-                correctionOrder.ticker(),
-                correctionOrder.direction(),
-                correctionOrder.quantity(),
-                correctionOrder.price(),
-                correctionOrder.price().multiply(BigDecimal.valueOf(correctionOrder.quantity())),
-                correctionOrder.externalOrderId()
-        );
+        return Execution.ofManualFill(correctionOrder.tradeDate(), correctionOrder.ticker(),
+                correctionOrder.direction(), correctionOrder.quantity(), correctionOrder.price(),
+                correctionOrder.externalOrderId());
     }
-
-    // holdings 소진(==0) 시 사이클 종료 + 전략 PAUSED 처리
-    private CycleEndResult closeCycleIfExhausted(Strategy strategy, StrategyCycle currentCycle,
-                                                  AccountBalance updatedBalance, LocalDate tradeDate) {
-        if (updatedBalance.holdings() == 0) {
-            strategyCyclePort.markEnded(currentCycle.id(), updatedBalance.usdDeposit(), tradeDate);
-            Strategy updated = strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
-            return new CycleEndResult(updated, true, tradeDate);
-        }
-        return new CycleEndResult(strategy, false, null);
-    }
-
-    // 사이클 종료 여부와 갱신된 전략 상태를 함께 반환하는 값 객체
-    record CycleEndResult(Strategy strategy, boolean ended, LocalDate endDate) {}
 
     private static void requireStatus(Order order, Order.OrderStatus expected, AdminOrderCorrectionCommand.Mode mode) {
         if (order.status() != expected) {
