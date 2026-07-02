@@ -1,17 +1,14 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
-import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
-import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
-import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.user.User;
+import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.NotifyPort;
+import com.kista.domain.port.out.PrivacyTradePort;
+import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,7 +17,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 // 미 정규장 개장 시 order 전량 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람
@@ -31,14 +27,13 @@ import java.util.List;
 public class TradingOpenScheduler {
 
     private final TradingExecutionUseCase useCase;
-    private final AccountPort accountPort;
     private final StrategyPort strategyPort;
-    private final StrategyCyclePort strategyCyclePort;
-    private final UserPort userPort;
-    private final NotifyPort notifyPort;
+    private final NotifyPort notifyPort;            // guardPrivacyStrategies 오류 알림
     private final SchedulerLockService schedulerLockService;
     private final PrivacyTradePort privacyTradePort;
     private final PrivacyTradeValidationUseCase validationService;
+    private final BatchContextFactory contextFactory;
+    private final SchedulerJobRunner jobRunner;
 
     @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
     public void run() throws InterruptedException {
@@ -47,61 +42,18 @@ public class TradingOpenScheduler {
 
     // 수동 트리거 — 개장 대기 없이 즉시 실행
     public void runNow() throws InterruptedException {
-        schedulerLockService.tryRun("trading-open", Duration.ofHours(2), () -> {
-            notifyPort.notifyInfo("장 개시 스케쥴러 수동 시작");
-            List<BatchContext> contexts = buildContexts();
-            log.info("장 개시 스케쥴러 수동 시작 — ACTIVE 전략 {}개", contexts.size());
-            try {
-                useCase.placeOpenOrdersNow(contexts);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("장 개시 스케쥴러 수동 인터럽트: {}", e.getMessage());
-            } catch (Exception e) {
-                log.error("장 개시 스케쥴러 수동 오류: {}", e.getMessage(), e);
-                notifyPort.notifyError(e);
-            }
-            log.info("장 개시 스케쥴러 수동 완료");
-            notifyPort.notifyInfo("장 개시 스케쥴러 수동 완료");
-        });
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        schedulerLockService.tryRun("trading-open", Duration.ofHours(2), () ->
+                jobRunner.run("장 개시 스케쥴러 수동",
+                        () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
+                        useCase::placeOpenOrdersNow));
     }
 
     private void runLocked() {
-        notifyPort.notifyInfo("장 개시 스케쥴러 시작");
-        List<BatchContext> contexts = buildContexts();
-        log.info("장 개시 스케쥴러 시작 — ACTIVE 전략 {}개", contexts.size());
-
-        try {
-            useCase.placeOpenOrders(contexts);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("장 개시 스케쥴러 인터럽트: {}", e.getMessage());
-        } catch (Exception e) {
-            log.error("장 개시 스케쥴러 오류: {}", e.getMessage(), e);
-            notifyPort.notifyError(e);
-        }
-
-        log.info("장 개시 스케쥴러 완료");
-        notifyPort.notifyInfo("장 개시 스케쥴러 완료");
-    }
-
-    // 모든 전략(INFINITE + PRIVACY) BatchContext 빌드 — 조회 실패한 전략은 skip
-    private List<BatchContext> buildContexts() {
-        List<Strategy> strategies = strategyPort.findAllActive();
         LocalDate today = LocalDate.now(TimeZones.KST);
-        strategies = guardPrivacyStrategies(strategies, today);
-        List<BatchContext> contexts = new ArrayList<>();
-        for (Strategy strategy : strategies) {
-            try {
-                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
-                Account account = accountPort.findByIdOrThrow(strategy.accountId());
-                User user = userPort.findByIdOrThrow(account.userId());
-                contexts.add(new BatchContext(strategy, currentCycle, account, user));
-            } catch (Exception e) {
-                log.error("[strategyId={}] 컨텍스트 조회 오류: {}", strategy.id(), e.getMessage(), e);
-                notifyPort.notifyError(e);
-            }
-        }
-        return contexts;
+        jobRunner.run("장 개시 스케쥴러",
+                () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
+                useCase::placeOpenOrders);
     }
 
     // PRIVACY 기준 매매표가 위험 패턴이면 그 실행에서만 주문 생성 skip + 관리자 알림
