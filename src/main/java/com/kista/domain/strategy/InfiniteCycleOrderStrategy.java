@@ -45,7 +45,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         // 리버스모드 분기 — cycle_position 최신 행의 isReverseMode가 true이면 리버스모드 전략 사용
-        if (ctx.isReverseMode()) {
+        if (ctx.infinite().isReverseMode()) {
             return planReverseMode(ctx);
         }
         return planNormalMode(ctx);
@@ -53,12 +53,13 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     // 일반 모드 — InfiniteStrategy 사용
     private Optional<OrderPlan> planNormalMode(PlanContext ctx) {
+        PlanContext.InfiniteInputs inputs = ctx.infinite();
         // 0회차(holdings==0)에서 전일종가 없으면 InfinitePosition 생성 자체가 불가
-        if (ctx.balance().holdings() == 0 && ctx.prevClosePrice() == null) {
+        if (ctx.balance().holdings() == 0 && inputs.prevClosePrice() == null) {
             throw new IllegalStateException("전일종가 조회 실패: " + ctx.strategy().ticker().name());
         }
-        int divisionCount = ctx.divisionCount() != null ? ctx.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
-        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), ctx.prevClosePrice(), divisionCount);
+        int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), inputs.prevClosePrice(), divisionCount);
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
@@ -69,12 +70,13 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     // 리버스모드 — 별지점 기준 매도/쿼터매수
     // isFirstReverseDay=true이면 첫날 MOC 즉시 청산, false이면 LOC 분할 매도 + 쿼터매수
     private Optional<OrderPlan> planReverseMode(PlanContext ctx) {
+        PlanContext.InfiniteInputs inputs = ctx.infinite();
         ReverseModePosition position = ReverseModePosition.of(
                 ctx.balance(),
                 ctx.strategy().ticker(),
-                ctx.divisionCount() != null ? ctx.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
-                ctx.starPointPrice(),
-                ctx.isFirstReverseDay()
+                inputs.divisionCount() != null ? inputs.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
+                inputs.starPointPrice(),
+                inputs.isFirstReverseDay()
         );
 
         List<Order> orders = position.isFirstDay()

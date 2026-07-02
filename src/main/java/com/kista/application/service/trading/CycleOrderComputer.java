@@ -58,10 +58,16 @@ class CycleOrderComputer {
             }
         }
 
+        // 전략 전용 입력을 각 묶음으로 조립 — 타입 무관하게 채울 수 있는 값은 채움 (구현체가 자기 묶음만 소비)
+        CycleOrderStrategy.PlanContext.InfiniteInputs infiniteInputs =
+                new CycleOrderStrategy.PlanContext.InfiniteInputs(
+                        divisionCount, prevClosePrice, starPointPrice, isReverseMode, isFirstReverseDay);
+        CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
+                new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase);
+
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, divisionCount, initialUsdDeposit, prevClosePrice, tradeDate, privacyBase, label,
-                starPointPrice, isReverseMode, isFirstReverseDay));
+                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs));
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균

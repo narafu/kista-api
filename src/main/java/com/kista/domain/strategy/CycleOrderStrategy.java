@@ -38,24 +38,38 @@ public interface CycleOrderStrategy {
     BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount);
 
     // 전략 계산 입력 — execute/preview 공통
+    // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy)으로 그룹핑 — 각 구현체는 자기 묶음만 소비
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
-    // initialUsdDeposit: 현재 StrategyCycle의 시작 시드 (PRIVACY에서 buildOrders 호출 시 필요)
-    // starPointPrice: 리버스모드 별지점 (직전 5거래일 종가 평균, 리버스모드 2일차+에서만 non-null)
-    // isReverseMode: 오늘의 리버스모드 여부 (cycle_position 최신 행에서 판단)
-    // isFirstReverseDay: 리버스모드 진입 첫날 여부 (직전 행이 일반모드였음)
     record PlanContext(
             AccountBalance balance,
             Strategy strategy,
-            Integer divisionCount,         // INFINITE 전략 버전 상세값, PRIVACY는 null
-            BigDecimal initialUsdDeposit,  // 현재 StrategyCycle.initialUsdDeposit (PRIVACY 전략 입력)
-            BigDecimal prevClosePrice,     // 전일종가 (INFINITE 0회차 진입 방향 판단용, PRIVACY는 null)
             LocalDate tradeDate,
-            PrivacyTradeBase privacyBase,  // INFINITE은 null 허용
             String label,
-            BigDecimal starPointPrice,     // 리버스모드 별지점 (null이면 첫날 또는 일반모드)
-            boolean isReverseMode,         // 오늘 리버스모드 여부
-            boolean isFirstReverseDay      // 리버스모드 진입 첫날 여부
+            InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY는 무시)
+            PrivacyInputs privacy     // PRIVACY 전용 입력 (INFINITE은 무시)
     ) {
+
+        // INFINITE 전략 전용 입력 묶음
+        // divisionCount: 전략 버전 상세값 (없으면 기본 분할 수)
+        // prevClosePrice: 전일종가 (0회차 진입 방향 판단용)
+        // starPointPrice: 리버스모드 별지점 (직전 5거래일 종가 평균, 리버스모드 2일차+에서만 non-null)
+        // isReverseMode: 오늘의 리버스모드 여부 (cycle_position 최신 행에서 판단)
+        // isFirstReverseDay: 리버스모드 진입 첫날 여부 (직전 행이 일반모드였음)
+        public record InfiniteInputs(
+                Integer divisionCount,
+                BigDecimal prevClosePrice,
+                BigDecimal starPointPrice,
+                boolean isReverseMode,
+                boolean isFirstReverseDay
+        ) {}
+
+        // PRIVACY 전략 전용 입력 묶음
+        // initialUsdDeposit: 현재 StrategyCycle의 시작 시드 (buildOrders 호출 시 필요)
+        // privacyBase: 당일 기준매매표 (미수신 시 null → 전략 차원 skip)
+        public record PrivacyInputs(
+                BigDecimal initialUsdDeposit,
+                PrivacyTradeBase privacyBase
+        ) {}
     }
 
     // 전략 계산 결과 — position은 INFINITE만 non-null (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존)
