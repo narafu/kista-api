@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface CyclePositionPort {
@@ -18,6 +19,16 @@ public interface CyclePositionPort {
 
     // 사이클 ID 기준 최신 N개 포지션 (리버스모드 별지점 계산용 — 최근 closing_price 추출)
     List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit);
+
+    // 사이클 ID 기준 최신 포지션 1건 — findLatestByCycleId(id, 1).stream().findFirst() 축약
+    default Optional<CyclePosition> findLatestOne(UUID cycleId) {
+        return findLatestByCycleId(cycleId, 1).stream().findFirst();
+    }
+
+    // 전략 ID 기준 최신 포지션 1건 — findLatestByStrategyId(id, 1).stream().findFirst() 축약
+    default Optional<CyclePosition> findLatestOneByStrategyId(UUID strategyId) {
+        return findLatestByStrategyId(strategyId, 1).stream().findFirst();
+    }
 
     // 계좌 ID 기준 이력 조회 (ticker 포함, 날짜 범위 필터)
     List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to);

@@ -198,8 +198,7 @@ class StrategyService implements StrategyUseCase {
         BigDecimal kisUsdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
-                .map(s -> cyclePositionPort.findLatestByStrategyId(s.id(), 1).stream()
-                        .findFirst()
+                .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
                         .map(CyclePosition::usdDeposit)
                         .orElse(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -213,8 +212,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalArgumentException("시드는 0보다 커야 합니다");
         }
         StrategyCycle cycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategyId);
-        CyclePosition latest = cyclePositionPort.findLatestByStrategyId(strategyId, 1).stream()
-                .findFirst()
+        CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 
         if (latest.holdings() != 0) {
@@ -236,8 +234,7 @@ class StrategyService implements StrategyUseCase {
                         .map(StrategyInfiniteDetail::divisionCount)
                         .orElse(Strategy.DEFAULT_DIVISION_COUNT)
                 : null;
-        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
-                .stream().findFirst();
+        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
         boolean isReverseMode = latestPos
                 .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
                 .map(CyclePositionInfiniteDetail::isReverseMode)

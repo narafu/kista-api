@@ -117,8 +117,7 @@ class CycleRotationService {
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준
     private BigDecimal calcLastPositionDeposit(Strategy strategy, StrategyCycle currentCycle) {
-        return cyclePositionPort.findLatestByStrategyId(strategy.id(), 1).stream()
-                .findFirst()
+        return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(CyclePosition::usdDeposit)
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }
