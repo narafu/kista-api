@@ -54,6 +54,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             WHERE a.user_id = :userId
               AND o.trade_date BETWEEN :from AND :to
               AND o.ticker = :ticker
+              AND a.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<OrderEntity> findByUserIdAndTradeDateBetweenAndTicker(
@@ -77,6 +78,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND o.trade_date BETWEEN :from AND :to
+              AND sc.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<OrderEntity> findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
@@ -89,6 +91,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             SELECT DISTINCT o.trade_date FROM orders o
             JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
+              AND sc.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);

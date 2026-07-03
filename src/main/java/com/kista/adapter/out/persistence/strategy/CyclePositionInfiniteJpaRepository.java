@@ -16,6 +16,7 @@ interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePosition
             JOIN cycle_position cp ON cpi.cycle_position_id = cp.id
             WHERE cp.strategy_cycle_id = :cycleId
               AND cp.deleted_at IS NULL
+              AND cpi.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionInfiniteEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(

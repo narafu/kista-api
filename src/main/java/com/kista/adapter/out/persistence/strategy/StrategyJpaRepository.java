@@ -29,6 +29,7 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
             FROM strategy_cycle sc
             JOIN strategy s ON sc.strategy_id = s.id
             WHERE sc.id IN :cycleIds
+              AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
             """, nativeQuery = true)
     List<CycleStrategyType> findStrategyTypesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
 
@@ -37,6 +38,7 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
             FROM strategy_cycle sc
             JOIN strategy s ON sc.strategy_id = s.id
             WHERE sc.id IN :cycleIds
+              AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
             """, nativeQuery = true)
     List<CycleStrategySummaryProjection> findStrategySummariesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
 

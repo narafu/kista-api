@@ -60,7 +60,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
             WHERE a.user_id = :userId
-              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
+              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId, Pageable pageable);
