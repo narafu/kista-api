@@ -12,6 +12,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.MarketCalendarPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -47,6 +48,7 @@ class AdminReorderServiceTest {
     @Mock AuditLogPort auditLogPort;
     @Mock BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
+    @Mock MarketCalendarPort marketCalendarPort;
 
     @InjectMocks AdminReorderService service;
 
@@ -180,6 +182,22 @@ class AdminReorderServiceTest {
         }
     }
 
+    // --- 휴장일 가드 ---
+
+    @Test
+    void reorder_onMarketHoliday_throwsIllegalArgument() {
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user());
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle()));
+        when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(plannedOrder()));
+        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+
+        assertThatThrownBy(() -> reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("휴장일");
+    }
+
     // --- 헬퍼 ---
 
     private AdminReorderResult reorder(AdminReorderCommand command, Instant now) {
@@ -192,6 +210,7 @@ class AdminReorderServiceTest {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle()));
         when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(order));
+        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
     }
 
     @SuppressWarnings("unchecked")

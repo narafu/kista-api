@@ -2,6 +2,7 @@ package com.kista.application.service.admin;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminReorderCommand;
 import com.kista.domain.model.admin.AdminReorderResult;
@@ -13,6 +14,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.MarketCalendarPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -47,6 +49,7 @@ class AdminReorderService implements AdminReorderUseCase {
     private final OrderPort orderPort;
     private final AuditLogPort auditLogPort;
     private final BrokerAdapterRegistry brokerAdapterRegistry;
+    private final MarketCalendarPort marketCalendarPort;
 
     @Override
     public AdminReorderResult reorder(UUID adminId, AdminReorderCommand command) {
@@ -81,6 +84,9 @@ class AdminReorderService implements AdminReorderUseCase {
         cancelIfNeeded(sourceOrder, account);
 
         // 2. 주문시점 가용성 서버 측 재검증 (UI disable 우회 방지)
+        if (!marketCalendarPort.isMarketOpen(LocalDate.now(TimeZones.KST))) {
+            throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다");
+        }
         DstInfo.ReorderTimingAvailability avail = dst.reorderTimingAvailabilityAt(now);
         boolean timingOk = switch (command.timing()) {
             case AT_OPEN -> avail.atOpen();

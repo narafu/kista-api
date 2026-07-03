@@ -6,6 +6,7 @@ import com.kista.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminUserView;
@@ -15,6 +16,7 @@ import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.domain.port.out.MarketCalendarPort;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ public class AdminTradeController {
     private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
     private final AdminReorderUseCase adminReorder;                 // 관리자 재주문
+    private final MarketCalendarPort marketCalendarPort;            // 휴장일 판정
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @GetMapping("/trades")
@@ -97,6 +100,9 @@ public class AdminTradeController {
     // 재주문 시점 가용성 조회 — UI 주문시점 셀렉터 disable 판단용
     @GetMapping("/trades/reorder-timing")
     public ReorderTimingAvailabilityResponse getReorderTiming() {
+        if (!marketCalendarPort.isMarketOpen(java.time.LocalDate.now(TimeZones.KST))) {
+            return new ReorderTimingAvailabilityResponse(false, false, false);
+        }
         return ReorderTimingAvailabilityResponse.from(DstInfo.calculate().reorderTimingAvailability());
     }
 

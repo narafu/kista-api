@@ -12,6 +12,7 @@ import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.domain.port.out.MarketCalendarPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -53,6 +54,7 @@ class AdminTradeControllerTest {
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AdminTradeCorrectionUseCase adminTradeCorrection;
     @MockitoBean AdminReorderUseCase adminReorder;
+    @MockitoBean MarketCalendarPort marketCalendarPort;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -225,13 +227,27 @@ class AdminTradeControllerTest {
     }
 
     @Test
-    void getReorderTiming_adminRole_returns200() throws Exception {
+    void getReorderTiming_adminRole_tradingDay_returnsTimingFlags() throws Exception {
+        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+
         mockMvc.perform(get("/api/admin/trades/reorder-timing")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.atOpen").isBoolean())
                 .andExpect(jsonPath("$.atClose").isBoolean())
                 .andExpect(jsonPath("$.immediate").isBoolean());
+    }
+
+    @Test
+    void getReorderTiming_adminRole_holiday_returnsAllFalse() throws Exception {
+        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/admin/trades/reorder-timing")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atOpen").value(false))
+                .andExpect(jsonPath("$.atClose").value(false))
+                .andExpect(jsonPath("$.immediate").value(false));
     }
 
     private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
