@@ -25,11 +25,12 @@ interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePosition
 
     @Modifying
     @Query(value = """
-            DELETE FROM cycle_position_infinite cpi
-            USING cycle_position cp, strategy_cycle sc
-            WHERE cpi.cycle_position_id = cp.id
-              AND cp.strategy_cycle_id = sc.id
-              AND sc.strategy_id = :strategyId
+            UPDATE cycle_position_infinite SET deleted_at = NOW()
+            WHERE cycle_position_id IN (
+                SELECT cp.id FROM cycle_position cp
+                WHERE cp.strategy_cycle_id IN (
+                    SELECT sc.id FROM strategy_cycle sc
+                    WHERE sc.strategy_id = :strategyId))
             """, nativeQuery = true)
-    void deleteByStrategyId(@Param("strategyId") UUID strategyId);
+    void softDeleteByStrategyId(@Param("strategyId") UUID strategyId);
 }
