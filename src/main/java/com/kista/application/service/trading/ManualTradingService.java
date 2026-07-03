@@ -139,8 +139,7 @@ class ManualTradingService {
     private void placeAtOpenSellsIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today) {
         DstInfo dst = DstInfo.calculate();
         if (strategy.isInfinite() && Instant.now().isAfter(dst.marketOpen())) {
-            List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(cycleId, today)
-                    .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+            List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today);
             if (!atOpenOrders.isEmpty()) {
                 log.info("[{}] 개장 후 수동 실행 — AT_OPEN 매도 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
                 orderExecutor.placeGiven(atOpenOrders, account);

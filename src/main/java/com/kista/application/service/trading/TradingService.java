@@ -310,8 +310,7 @@ class TradingService {
         }
 
         // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)
-        List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
-                .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(currentCycle.id(), tradeDate);
         if (atOpenOrders.isEmpty()) {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
             return;

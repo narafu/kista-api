@@ -118,6 +118,13 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // AT_OPEN + PLANNED 주문만 조회 — 개장 시 즉시 선접수 대상
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
+                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
+    }
+
+    @Override
     public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
         // PLANNED 상태 주문만 가격·수량 수정 허용
         mutate(orderId, e -> {

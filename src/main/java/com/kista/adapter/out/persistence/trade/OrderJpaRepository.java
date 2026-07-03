@@ -83,6 +83,10 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
+    // AT_OPEN 타이밍 PLANNED 주문 조회 (개장 스케쥴러·수동 실행 시 즉시 선접수용)
+    List<OrderEntity> findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
+            UUID strategyCycleId, LocalDate tradeDate, Order.OrderTiming timing, Order.OrderStatus status);
+
     // 전략 기준 distinct 거래일 목록 조회 — 관리자 주문 보정 거래일 드롭다운용
     @Query(value = """
             SELECT DISTINCT o.trade_date FROM orders o
