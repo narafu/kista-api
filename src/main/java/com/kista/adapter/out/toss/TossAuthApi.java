@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
-import com.kista.domain.port.out.TossConnectionTestPort;
 import com.kista.domain.port.out.TossTokenPort;
+import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,12 +25,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-// TossTokenPort + TossConnectionTestPort 통합 구현체
+// TossTokenPort + BrokerConnectionTestPort 통합 구현체
 // OAuth form-encoded 호출 — tossRestTemplate 직접 사용 (TossHttpClient 순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
+public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
 
     // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
     private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
@@ -101,13 +101,25 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         adminExpiresAt = OffsetDateTime.MIN;
     }
 
-    // ── TossConnectionTestPort ─────────────────────────────────────────────────
+    // ── BrokerConnectionTestPort ───────────────────────────────────────────────
 
     @Override
-    public String testAndFetchAccountSeq(String clientId, String clientSecret) {
-        // 토큰 발급 — accountId 미보유이므로 캐시 저장 없음
-        String token = issueOAuthToken(clientId, clientSecret).accessToken();
+    public Account.Broker supports() {
+        return Account.Broker.TOSS;
+    }
+
+    @Override
+    public String verifyAccount(String appKey, String secretKey, String accountNo) {
+        // Toss는 계좌번호(accountNo) 대신 clientId/secret으로 accountSeq를 조회해 검증
+        String token = issueOAuthToken(appKey, secretKey).accessToken();
         return fetchAccountSeq(token);
+    }
+
+    @Override
+    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
+        // Toss는 자격증명 단독 검증 엔드포인트가 없어 accounts 조회로 검증 (accountId 미사용 — 캐시 저장 없음)
+        String token = issueOAuthToken(appKey, secretKey).accessToken();
+        fetchAccountSeq(token);
     }
 
     // ── private helpers ────────────────────────────────────────────────────────

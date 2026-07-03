@@ -3,7 +3,6 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,8 +26,8 @@ public class AccountController {
 
     private final AccountUseCase accountUseCase;
 
-    // 연결 테스트 요청 DTO — accountId: 수정 시 전달하면 발급 토큰을 캐시에 저장, 등록 전 검증 시 null 허용
-    record TestConnectionRequest(String appKey, String appSecret, UUID accountId) {}
+    // 연결 테스트 요청 DTO — broker: null이면 KIS 기본값 적용, accountId: 수정 시 전달하면 발급 토큰을 캐시에 저장, 등록 전 검증 시 null 허용
+    record TestConnectionRequest(Account.Broker broker, String appKey, String appSecret, UUID accountId) {}
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")
@@ -51,13 +50,8 @@ public class AccountController {
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
-        // KIS만 계좌번호 실소유 검증 — Toss는 AccountService.register() 내 testAndFetchAccountSeq()에서 통합 처리
-        // toRegisterCommand()에서 74420614-01 → accountNo=74420614 분리 완료 → CANO 8자리만 전달
-        RegisterAccountCommand cmd = request.toRegisterCommand();
-        if (request.broker() == null || request.broker() == Account.Broker.KIS) {
-            accountUseCase.testAccountNo(cmd.appKey(), cmd.secretKey(), cmd.accountNo());
-        }
-        return AccountResponse.from(accountUseCase.register(userId, cmd));
+        // 자격증명+계좌 검증은 AccountService.register()가 증권사별로 통합 처리
+        return AccountResponse.from(accountUseCase.register(userId, request.toRegisterCommand()));
     }
 
     // 계좌 수정 (소유권 검증)
@@ -94,8 +88,8 @@ public class AccountController {
         accountUseCase.delete(id, userId);
     }
 
-    // KIS API 자격증명 연결 테스트 — 실패 시 InvalidKisKeyException → GlobalExceptionHandler → 422
-    @Operation(summary = "KIS API 연결 테스트", description = "appKey/appSecret으로 KIS OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
+    // 자격증명 연결 테스트 — 실패 시 InvalidKisKeyException → GlobalExceptionHandler → 422
+    @Operation(summary = "API 연결 테스트", description = "appKey/appSecret으로 OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "연결 성공"),
             @ApiResponse(responseCode = "422", description = "appKey 또는 appSecret이 유효하지 않음"),
@@ -105,7 +99,8 @@ public class AccountController {
     public void testConnection(
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
-        // 실패 시 Account.InvalidKisKeyException → GlobalExceptionHandler → 422
-        accountUseCase.test(request.appKey(), request.appSecret(), request.accountId());
+        // broker null이면 KIS 기본값 적용 — 실패 시 Account.InvalidKisKeyException → GlobalExceptionHandler → 422
+        accountUseCase.test(request.broker() != null ? request.broker() : Account.Broker.KIS,
+                request.appKey(), request.appSecret(), request.accountId());
     }
 }

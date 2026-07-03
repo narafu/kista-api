@@ -68,14 +68,14 @@ class AccountControllerTest {
         // void 메서드 — 기본 doNothing() stub, 성공 시 204 반환
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void testConnection_failure_returns422() throws Exception {
-        doThrow(new Account.InvalidKisKeyException()).when(accountUseCase).test(anyString(), anyString(), any());
+        doThrow(new Account.InvalidKisKeyException()).when(accountUseCase).test(any(), anyString(), anyString(), any());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,13 +88,13 @@ class AccountControllerTest {
     void testConnection_anonymous_returns401() throws Exception {
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void register_tossAccount_skipsAccountNoTest_returns201() throws Exception {
+    void register_tossAccount_returns201() throws Exception {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
@@ -107,14 +107,11 @@ class AccountControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("TOSS"));
-
-        // Toss 계좌는 testAccountNo() 미호출
-        verify(accountUseCase, never()).testAccountNo(anyString(), anyString(), anyString());
     }
 
     @Test
-    void register_kisAccount_callsAccountNoTest_returns201() throws Exception {
-        // KIS 계좌 등록: testAccountNo()에 전체 accountNo 전달, 내부에서 CANO 분리
+    void register_kisAccount_returns201() throws Exception {
+        // KIS 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "KIS계좌", "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null));
@@ -126,9 +123,6 @@ class AccountControllerTest {
                         .with(csrf()).with(authentication(mockAuth())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
-
-        // testAccountNo에 전체 계좌번호 전달 — 내부에서 split('-')으로 CANO 분리
-        verify(accountUseCase).testAccountNo("appKey", "appSecret", "74420614-01");
     }
 
     @Test

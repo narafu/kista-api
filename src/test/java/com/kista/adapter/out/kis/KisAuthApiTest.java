@@ -129,49 +129,49 @@ class KisAuthApiTest {
     }
 
     @Nested
-    @DisplayName("KisConnectionTestPort — test")
+    @DisplayName("BrokerConnectionTestPort — verifyCredentials")
     class ConnectionTests {
 
         @Test
         @DisplayName("KIS OAuth 2xx 응답 시 정상 완료 — accountId null이면 캐시 저장 생략")
-        void test_whenKisReturns2xx_completesWithoutCaching() {
+        void verifyCredentials_whenKisReturns2xx_completesWithoutCaching() {
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
 
-            assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", null));
+            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", null));
             verifyNoInteractions(brokerTokenCachePort);
         }
 
         @Test
         @DisplayName("accountId 있고 캐시 미스 시 KIS 호출 후 토큰 캐시 저장")
-        void test_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
+        void verifyCredentials_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
 
-            assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", ACCOUNT_ID));
+            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
             verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
         }
 
         @Test
         @DisplayName("accountId 있고 캐시 히트 시 KIS 호출 없이 정상 완료")
-        void test_whenAccountIdPresentAndCacheHit_completesWithoutKisCall() {
+        void verifyCredentials_whenAccountIdPresentAndCacheHit_completesWithoutKisCall() {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
 
-            assertThatNoException().isThrownBy(() -> api.test("appKey", "appSecret", ACCOUNT_ID));
+            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
             verifyNoInteractions(kisRestTemplate);
             verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
         }
 
         @Test
         @DisplayName("KIS OAuth 4xx 응답 시 InvalidKisKeyException throw")
-        void test_whenKisReturns4xx_throwsInvalidKisKeyException() {
+        void verifyCredentials_whenKisReturns4xx_throwsInvalidKisKeyException() {
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.UNAUTHORIZED, "Unauthorized",
                             HttpHeaders.EMPTY, new byte[]{}, null));
 
-            assertThatThrownBy(() -> api.test("badKey", "badSecret", null))
+            assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret", null))
                     .isInstanceOf(Account.InvalidKisKeyException.class);
         }
     }
