@@ -12,6 +12,7 @@ import com.kista.domain.model.toss.TossExchangeRate;
 import com.kista.domain.port.out.TossAccountPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 
@@ -39,9 +40,10 @@ public class TossHoldingsApi implements TossAccountPort {
 
     @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
-        // 보유 종목 조회 — 응답 {"result": {"items": [...]}} 래퍼 구조
-        HoldingsResponseWrapper wrapper = tossHttpClient.get(
-                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponseWrapper.class);
+        // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
+        TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<TossResult<HoldingsResponse>>() {});
         HoldingsResponse holdingsResponse = wrapper != null ? wrapper.result() : null;
 
         // 토스 API는 USD 예수금만 주문 가능 — KRW는 미국주식 주문에 자동환전 안 됨
@@ -86,9 +88,10 @@ public class TossHoldingsApi implements TossAccountPort {
     }
 
     public PresentBalanceResult getPresentBalance(Account account) {
-        // 1. 전체 보유 종목 조회 — 응답 {"result": {"items": [...]}} 래퍼 구조
-        HoldingsResponseWrapper holdingsWrapper = tossHttpClient.get(
-                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingsResponseWrapper.class);
+        // 1. 전체 보유 종목 조회 — TossResult<HoldingsResponse> 제네릭 래퍼 구조
+        TossResult<HoldingsResponse> holdingsWrapper = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<TossResult<HoldingsResponse>>() {});
         HoldingsResponse holdingsResponse = holdingsWrapper != null ? holdingsWrapper.result() : null;
         // 2~4. USD·KRW 예수금 및 환율 조회
         BigDecimal usdDeposit = fetchBuyingPower(account, "USD");
@@ -122,8 +125,9 @@ public class TossHoldingsApi implements TossAccountPort {
     private BigDecimal fetchBuyingPower(Account account, String currencyCode) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("currency", currencyCode);
-        BuyingPowerWrapper wrapper = tossHttpClient.get(
-                BUYING_POWER_PATH, account, params, BuyingPowerWrapper.class);
+        TossResult<BuyableAmountResponse> wrapper = tossHttpClient.get(
+                BUYING_POWER_PATH, account, params,
+                new ParameterizedTypeReference<TossResult<BuyableAmountResponse>>() {});
         if (wrapper == null || wrapper.result() == null || wrapper.result().cashBuyingPower() == null) {
             return BigDecimal.ZERO;
         }
@@ -142,8 +146,9 @@ public class TossHoldingsApi implements TossAccountPort {
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
         // 공통 API — 관리자 토큰 사용
-        ExchangeRateWrapper wrapper = tossHttpClient.getCommon(
-                EXCHANGE_RATE_PATH, params, ExchangeRateWrapper.class);
+        TossResult<ExchangeRateResult> wrapper = tossHttpClient.getCommon(
+                EXCHANGE_RATE_PATH, params,
+                new ParameterizedTypeReference<TossResult<ExchangeRateResult>>() {});
         if (wrapper == null || wrapper.result() == null) {
             return new TossExchangeRate(BigDecimal.ZERO, BigDecimal.ZERO);
         }
@@ -163,8 +168,9 @@ public class TossHoldingsApi implements TossAccountPort {
     private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
-        SellableQuantityWrapper wrapper = tossHttpClient.get(
-                SELLABLE_QUANTITY_PATH, account, params, SellableQuantityWrapper.class);
+        TossResult<SellableQuantityResult> wrapper = tossHttpClient.get(
+                SELLABLE_QUANTITY_PATH, account, params,
+                new ParameterizedTypeReference<TossResult<SellableQuantityResult>>() {});
         if (wrapper == null || wrapper.result() == null) {
             log.warn("Toss 판매 가능 수량 응답 없음: ticker={}, wrapper={}", ticker, wrapper);
             return new SellableQuantity(ticker.name(), 0);
@@ -174,9 +180,6 @@ public class TossHoldingsApi implements TossAccountPort {
         log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
-
-    // GET /api/v1/holdings 응답 래퍼 — {"result": {"items": [...], ...}}
-    record HoldingsResponseWrapper(@JsonProperty("result") HoldingsResponse result) {}
 
     // package-private — TossHoldingsApiTest에서 직접 생성하여 stub에 사용
     record HoldingsResponse(@JsonProperty("items") List<HoldingItem> items) {}
@@ -188,24 +191,15 @@ public class TossHoldingsApi implements TossAccountPort {
         @JsonProperty("lastPrice") String lastPrice                         // 현재가 (문자열, 정보성)
     ) {}
 
-    // GET /api/v1/buying-power 응답 래퍼 — {"result": {...}}
-    record BuyingPowerWrapper(@JsonProperty("result") BuyableAmountResponse result) {}
-
     record BuyableAmountResponse(
         @JsonProperty("cashBuyingPower") String cashBuyingPower, // 현금 기반 매수 가능 금액 (미수 미발생 기준)
         @JsonProperty("currency") String currency                // 통화 (예: USD)
     ) {}
 
-    // GET /api/v1/exchange-rate 응답 래퍼 — {"result": {...}}
-    record ExchangeRateWrapper(@JsonProperty("result") ExchangeRateResult result) {}
-
     record ExchangeRateResult(
         @JsonProperty("rate")    String rate,    // 매수 환율 (1 USD = ? KRW)
         @JsonProperty("midRate") String midRate  // 매매기준율
     ) {}
-
-    // GET /api/v1/sellable-quantity 응답 래퍼 — {"result": {"sellableQuantity": "100"}}
-    record SellableQuantityWrapper(@JsonProperty("result") SellableQuantityResult result) {}
 
     record SellableQuantityResult(
         @JsonProperty("sellableQuantity") String sellableQuantity  // 판매 가능 수량

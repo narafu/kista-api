@@ -6,6 +6,7 @@ import com.kista.domain.port.out.TossTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -51,6 +52,46 @@ public class TossHttpClient {
         return executeWithRetry(account, path, () -> tossRestTemplate.exchange(
                 baseUrl + path, HttpMethod.POST,
                 new HttpEntity<>(body, buildHeaders(account)), responseType
+        ).getBody());
+    }
+
+    // ParameterizedTypeReference 오버로드 — 제네릭 래퍼 타입(TossResult<T> 등) 역직렬화용
+
+    // 계좌 컨텍스트 API용 (ParameterizedTypeReference 버전)
+    public <T> T get(String path, Account account, MultiValueMap<String, String> params,
+                     ParameterizedTypeReference<T> typeRef) {
+        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        return executeWithRetry(account, path, () -> {
+            HttpHeaders headers = buildHeaders(account);
+            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+        });
+    }
+
+    // 계좌 헤더 불필요 API용 (ParameterizedTypeReference 버전)
+    public <T> T getNoAccountHeader(String path, Account account, MultiValueMap<String, String> params,
+                                    ParameterizedTypeReference<T> typeRef) {
+        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        return executeWithRetry(account, path, () -> {
+            HttpHeaders headers = buildHeadersNoAccount(account);
+            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+        });
+    }
+
+    // 공통 API용 (ParameterizedTypeReference 버전)
+    public <T> T getCommon(String path, MultiValueMap<String, String> params,
+                           ParameterizedTypeReference<T> typeRef) {
+        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        return executeCommon(path, () -> {
+            HttpHeaders headers = buildAdminHeaders();
+            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+        });
+    }
+
+    // POST 요청 (ParameterizedTypeReference 버전)
+    public <T> T post(String path, Account account, Object body, ParameterizedTypeReference<T> typeRef) {
+        return executeWithRetry(account, path, () -> tossRestTemplate.exchange(
+                baseUrl + path, HttpMethod.POST,
+                new HttpEntity<>(body, buildHeaders(account)), typeRef
         ).getBody());
     }
 

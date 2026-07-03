@@ -9,6 +9,7 @@ import com.kista.domain.port.out.TossTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -140,11 +141,11 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         try {
-            ResponseEntity<AccountsResponse> response = tossRestTemplate.exchange(
+            ResponseEntity<TossResult<List<AccountItem>>> response = tossRestTemplate.exchange(
                     tossBaseUrl + "/api/v1/accounts",
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    AccountsResponse.class);
+                    new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});
             List<AccountItem> accounts = response.getBody() == null ? null : response.getBody().result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
@@ -163,11 +164,6 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
     record TokenResponse(
         @JsonProperty("access_token") String accessToken,
         @JsonProperty("expires_in") long expiresIn    // 토큰 유효 초 (기본 86400)
-    ) {}
-
-    // GET /api/v1/accounts 응답 래퍼 — {"result":[...]}
-    record AccountsResponse(
-        @JsonProperty("result") List<AccountItem> result
     ) {}
 
     // package-private — TossAuthApiTest에서 직접 생성하여 stub에 사용

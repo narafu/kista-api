@@ -6,6 +6,7 @@ import com.kista.domain.model.toss.TossCommissionRate;
 import com.kista.domain.port.out.TossCommissionsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 
@@ -25,13 +26,14 @@ public class TossCommissionsApi implements TossCommissionsPort {
 
     @Override
     public List<TossCommissionRate> getCommissions(Account account) {
-        CommissionsResponse response = tossHttpClient.get(
-                COMMISSIONS_PATH, account, new LinkedMultiValueMap<>(), CommissionsResponse.class);
-        if (response == null || response.result() == null) {
+        TossResult<List<CommissionItem>> wrapper = tossHttpClient.get(
+                COMMISSIONS_PATH, account, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<TossResult<List<CommissionItem>>>() {});
+        if (wrapper == null || wrapper.result() == null) {
             log.warn("Toss 수수료율 응답 없음: accountId={}", account.id());
             return List.of();
         }
-        return response.result().stream()
+        return wrapper.result().stream()
                 .map(item -> new TossCommissionRate(
                         item.marketCountry(),
                         new BigDecimal(item.commissionRate()),
@@ -40,8 +42,6 @@ public class TossCommissionsApi implements TossCommissionsPort {
                 ))
                 .toList();
     }
-
-    record CommissionsResponse(@JsonProperty("result") List<CommissionItem> result) {}
 
     record CommissionItem(
             @JsonProperty("marketCountry")  String marketCountry,  // "KR" | "US"

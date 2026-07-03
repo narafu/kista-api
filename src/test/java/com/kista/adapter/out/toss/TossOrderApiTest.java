@@ -7,6 +7,7 @@ import com.kista.domain.model.order.Order.OrderDirection;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.core.ParameterizedTypeReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,21 +44,21 @@ class TossOrderApiTest {
         tossOrderApi = new TossOrderApi(tossHttpClient);
     }
 
-    // Toss API 응답 {"result": {...}} 래퍼 헬퍼
-    private static TossOrderApi.OrderResponseWrapper wrap(String orderId) {
-        return new TossOrderApi.OrderResponseWrapper(new TossOrderApi.OrderResponse(orderId, null));
+    // Toss API 응답 TossResult<OrderResponse> 래퍼 헬퍼
+    private static TossResult<TossOrderApi.OrderResponse> wrap(String orderId) {
+        return new TossResult<>(new TossOrderApi.OrderResponse(orderId, null));
     }
 
-    // GET /api/v1/orders 응답 {"result": {...}} 래퍼 헬퍼
-    private static TossOrderApi.OrdersResponseWrapper wrapOrders(TossOrderApi.OrdersResponse response) {
-        return new TossOrderApi.OrdersResponseWrapper(response);
+    // GET /api/v1/orders 응답 TossResult<OrdersResponse> 래퍼 헬퍼
+    private static TossResult<TossOrderApi.OrdersResponse> wrapOrders(TossOrderApi.OrdersResponse response) {
+        return new TossResult<>(response);
     }
 
     @Test
     @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, PLACED 상태 반환")
     void place_loc_mapsToLimitCls() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id"));
 
         Order placed = tossOrderApi.place(order, ACCOUNT);
@@ -69,7 +70,7 @@ class TossOrderApiTest {
         // 요청 body 검증
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any());
+        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
         Map<String, Object> body = captor.getValue();
         assertThat(body.get("orderType")).isEqualTo("LIMIT");
         assertThat(body.get("timeInForce")).isEqualTo("CLS");
@@ -79,14 +80,14 @@ class TossOrderApiTest {
     @DisplayName("MOC 주문 → timeInForce=CLS, price=0.01 (장마감 LIMIT 대체)")
     void place_moc_usesLimitClsWithMinPrice() {
         Order order = mocSellOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id-2"));
 
         tossOrderApi.place(order, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any());
+        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
         Map<String, Object> body = captor.getValue();
         assertThat(body.get("timeInForce")).isEqualTo("CLS");
         assertThat(body.get("price")).isEqualTo(new BigDecimal("0.01"));
@@ -96,14 +97,14 @@ class TossOrderApiTest {
     @DisplayName("LIMIT 주문 → timeInForce=DAY")
     void place_limit_mapsToLimitDay() {
         Order order = limitBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id-3"));
 
         tossOrderApi.place(order, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any());
+        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
         assertThat(captor.getValue().get("timeInForce")).isEqualTo("DAY");
     }
 
@@ -111,8 +112,8 @@ class TossOrderApiTest {
     @DisplayName("응답 orderId null → TossApiException")
     void place_nullOrderId_throwsTossApiException() {
         Order order = locBuyOrder();
-        when(tossHttpClient.post(anyString(), any(), any(), eq(TossOrderApi.OrderResponseWrapper.class)))
-            .thenReturn(new TossOrderApi.OrderResponseWrapper(new TossOrderApi.OrderResponse(null, null)));
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null, null)));
 
         assertThatThrownBy(() -> tossOrderApi.place(order, ACCOUNT))
             .isInstanceOf(TossApiException.class);
@@ -139,7 +140,7 @@ class TossOrderApiTest {
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
         // CLOSED 먼저, OPEN 두 번째로 반환
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
@@ -166,7 +167,7 @@ class TossOrderApiTest {
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
@@ -184,7 +185,7 @@ class TossOrderApiTest {
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(partial), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 
@@ -205,7 +206,7 @@ class TossOrderApiTest {
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
-        when(tossHttpClient.get(anyString(), any(), any(), eq(TossOrderApi.OrdersResponseWrapper.class)))
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrapOrders(closedResp))
             .thenReturn(wrapOrders(openResp));
 

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -126,8 +127,8 @@ class TossAuthApiTest {
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             // 계좌 목록 조회 stub
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(
+                    any(ParameterizedTypeReference.class)))
+                    .thenReturn(ResponseEntity.ok(new TossResult<>(
                             List.of(new TossAuthApi.AccountItem(42, "1234567890"))
                     )));
 
@@ -157,8 +158,8 @@ class TossAuthApiTest {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(List.of())));
+                    any(ParameterizedTypeReference.class)))
+                    .thenReturn(ResponseEntity.ok(new TossResult<>(List.of())));
 
             assertThatThrownBy(() -> api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET))
                     .isInstanceOf(Account.InvalidKisKeyException.class);
@@ -171,7 +172,7 @@ class TossAuthApiTest {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
+                    any(ParameterizedTypeReference.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.FORBIDDEN, "Forbidden",
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));

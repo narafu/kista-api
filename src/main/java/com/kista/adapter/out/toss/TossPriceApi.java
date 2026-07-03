@@ -7,6 +7,7 @@ import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.model.toss.TossStockInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -38,9 +39,9 @@ public class TossPriceApi {
         params.add("symbols", tickers.stream().map(Ticker::name).collect(Collectors.joining(",")));
 
         // 공통 API — 관리자 토큰 사용
-        PricesResponse response = tossHttpClient.getCommon(PRICES_PATH, params, PricesResponse.class);
-
-        List<PriceItem> items = response != null ? response.result() : null;
+        TossResult<List<PriceItem>> wrapper = tossHttpClient.getCommon(PRICES_PATH, params,
+                new ParameterizedTypeReference<TossResult<List<PriceItem>>>() {});
+        List<PriceItem> items = wrapper != null ? wrapper.result() : null;
 
         if (items == null) return Map.of();
 
@@ -90,9 +91,9 @@ public class TossPriceApi {
         params.add("symbols", ticker.name());
 
         // 공통 API — 관리자 토큰 사용
-        StocksResponse response = tossHttpClient.getCommon(STOCKS_PATH, params, StocksResponse.class);
-
-        List<StockItem> items = response != null ? response.result() : null;
+        TossResult<List<StockItem>> wrapper = tossHttpClient.getCommon(STOCKS_PATH, params,
+                new ParameterizedTypeReference<TossResult<List<StockItem>>>() {});
+        List<StockItem> items = wrapper != null ? wrapper.result() : null;
         if (items == null || items.isEmpty()) {
             log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
             return new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", "");
@@ -115,16 +116,6 @@ public class TossPriceApi {
         @JsonProperty("symbol")    String symbol,    // 종목 코드 (예: SOXL)
         @JsonProperty("lastPrice") String lastPrice, // 현재가 (문자열 소수 형식)
         @JsonProperty("currency")  String currency   // 통화 (예: USD)
-    ) {}
-
-    // Toss API 공통 래퍼: {"result": [...]}
-    record PricesResponse(
-        @JsonProperty("result") List<PriceItem> result
-    ) {}
-
-    // GET /api/v1/stocks 응답 래퍼: {"result": [...]} (복수 반환)
-    record StocksResponse(
-        @JsonProperty("result") List<StockItem> result
     ) {}
 
     // stocks API 응답 — 가격 정보 없음 (name/market/currency 등 기본 정보만)

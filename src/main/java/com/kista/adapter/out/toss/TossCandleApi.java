@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.toss.TossCandle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -56,14 +57,15 @@ public class TossCandleApi {
         params.add("before",   beforeParam);
 
         // 공통 API — 관리자 토큰 사용
-        CandlesResponse response = tossHttpClient.getCommon(CANDLES_PATH, params, CandlesResponse.class);
-
-        if (response == null || response.result() == null || response.result().candles() == null) {
+        TossResult<CandlesResult> wrapper = tossHttpClient.getCommon(CANDLES_PATH, params,
+                new ParameterizedTypeReference<TossResult<CandlesResult>>() {});
+        CandlesResult candlesResult = wrapper != null ? wrapper.result() : null;
+        if (candlesResult == null || candlesResult.candles() == null) {
             log.warn("Toss 캔들 응답 없음: symbol={}, interval={}", symbol, interval);
             return List.of();
         }
 
-        return response.result().candles().stream()
+        return candlesResult.candles().stream()
                 .filter(c -> c.timestamp() != null)
                 .map(c -> {
                     // timestamp(ISO8601 UTC) → LocalDate
@@ -85,10 +87,6 @@ public class TossCandleApi {
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
     // package-private — 테스트에서 직접 생성
-    record CandlesResponse(
-        @JsonProperty("result") CandlesResult result
-    ) {}
-
     record CandlesResult(
         @JsonProperty("candles") List<CandleItem> candles,
         @JsonProperty("nextBefore") String nextBefore
