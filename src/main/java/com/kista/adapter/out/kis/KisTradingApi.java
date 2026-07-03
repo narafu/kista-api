@@ -8,7 +8,6 @@ import com.kista.domain.model.broker.*;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.KisAccountPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisTradingApi implements KisAccountPort {
+public class KisTradingApi {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
@@ -42,9 +41,8 @@ public class KisTradingApi implements KisAccountPort {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    // ── KisAccountPort ─────────────────────────────────────────────────────────
+    // ── getBalance() ─────────────────────────────────────────────────────────
 
-    @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
@@ -100,7 +98,7 @@ public class KisTradingApi implements KisAccountPort {
     // ── MarginPort.getUsdBuyableAmount() ──────────────────────────────────────
 
     public BigDecimal getUsdBuyableAmount(Account account) {
-        // getMargin()은 MarginPort 구현 — KisAccountPort.getBalance()에서도 사용
+        // getMargin()은 MarginPort 구현 — getBalance()에서도 사용
         return getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()

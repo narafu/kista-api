@@ -6,7 +6,6 @@ import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.TossOrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -24,14 +23,13 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class TossOrderApi implements TossOrderPort {
+public class TossOrderApi {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";
 
     private final TossHttpClient tossHttpClient;
 
-    @Override
     public Order place(Order order, Account account) {
         // Toss는 MARKET 주문 미지원 — MOC도 LIMIT+CLS로 대체
         Map<String, Object> body = new LinkedHashMap<>();
@@ -56,7 +54,6 @@ public class TossOrderApi implements TossOrderPort {
         return order.withPlaced(resp.orderId());
     }
 
-    @Override
     public void cancel(Order order, Account account) {
         // DELETE /api/v1/orders/{externalOrderId}
         tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);

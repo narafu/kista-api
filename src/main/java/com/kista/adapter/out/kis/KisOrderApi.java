@@ -4,14 +4,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.port.out.KisOrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 
 @Component
 @RequiredArgsConstructor
-public class KisOrderApi implements KisOrderPort {
+public class KisOrderApi {
 
     private static final String PATH        = "/uapi/overseas-stock/v1/trading/order";
     private static final String CANCEL_PATH = "/uapi/overseas-stock/v1/trading/order-rvsecncl";
@@ -22,7 +21,6 @@ public class KisOrderApi implements KisOrderPort {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    @Override
     public Order place(Order order, Account account) {
         String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
         String[] acctParts = splitAccountNo(account);
@@ -68,7 +66,6 @@ public class KisOrderApi implements KisOrderPort {
         return order.withPlaced(odno);
     }
 
-    @Override
     public void cancel(Order order, Account account) {
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];

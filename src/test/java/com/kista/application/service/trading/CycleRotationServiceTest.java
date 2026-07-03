@@ -66,8 +66,8 @@ class CycleRotationServiceTest {
     @BeforeEach
     void setUp() {
         // userSettingsPort — 잔고검증 기본값(ON) 반환: 증권사 실잔고 경로로 진행
-        when(userSettingsPort.loadByUserId(any()))
-                .thenReturn(Optional.of(UserSettings.defaultFor(USER.id())));
+        when(userSettingsPort.findOrDefault(any()))
+                .thenReturn(UserSettings.defaultFor(USER.id()));
 
         ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
@@ -144,7 +144,7 @@ class CycleRotationServiceTest {
 
         when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("2000.00"));
-        when(cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)).thenReturn(List.of(lastPosition));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(lastPosition));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 

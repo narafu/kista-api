@@ -44,7 +44,7 @@ class ManualTradingServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock KisAccountPort kisAccountPort;     // LiveBalancePort 위임 대상
+    @Mock LiveBalancePort liveBalancePort;   // LiveBalancePort 직접 mock
     @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
@@ -92,11 +92,8 @@ class ManualTradingServiceTest {
         // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)
         doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(Account.class), eq(BrokerPricePort.class));
 
-        // LiveBalancePort → kisAccountPort 위임 (기존 스텁 유지)
-        LiveBalancePort brokerLiveBalancePort = mock(LiveBalancePort.class);
-        lenient().when(brokerLiveBalancePort.getLiveBalance(any(), any()))
-                .thenAnswer(inv -> kisAccountPort.getBalance(inv.getArgument(0), inv.getArgument(1)));
-        doReturn(brokerLiveBalancePort).when(brokerAdapterRegistry).require(any(Account.class), eq(LiveBalancePort.class));
+        // LiveBalancePort: 필드 mock 직접 연결
+        doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(Account.class), eq(LiveBalancePort.class));
 
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry);
         service = new ManualTradingService(
@@ -138,7 +135,7 @@ class ManualTradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
         // live holdings=10, sellable=10 < SELL 15주
-        when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
@@ -162,7 +159,7 @@ class ManualTradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate));
         // live 잔고 충분: usdDeposit=$10,000 > BUY $20
-        when(kisAccountPort.getBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of()); // AT_OPEN 없음(BUY뿐) — 개장 후에만 호출되므로 lenient

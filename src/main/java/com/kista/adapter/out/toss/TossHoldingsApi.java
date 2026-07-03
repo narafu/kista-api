@@ -9,7 +9,6 @@ import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.port.out.TossAccountPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -25,7 +24,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossHoldingsApi implements TossAccountPort {
+public class TossHoldingsApi {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -38,7 +37,6 @@ public class TossHoldingsApi implements TossAccountPort {
 
     private final TossHttpClient tossHttpClient;
 
-    @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
         // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
         TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
