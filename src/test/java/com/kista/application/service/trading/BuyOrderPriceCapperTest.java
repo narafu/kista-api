@@ -22,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 // BUY PLANNED 가격이 currentPrice × 1.10 초과 시 InfiniteStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
@@ -64,7 +65,7 @@ class BuyOrderPriceCapperTest {
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
         verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
-        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -77,7 +78,7 @@ class BuyOrderPriceCapperTest {
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
         verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
-        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -94,7 +95,7 @@ class BuyOrderPriceCapperTest {
 
         verify(infiniteStrategy).buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(buyOrders), capCaptor.capture());
         assertThat(capCaptor.getValue()).isEqualByComparingTo("55.00");
-        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         assertThat(ordersCaptor.getValue()).isEqualTo(capped);
     }
@@ -108,7 +109,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
-        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPort).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -121,7 +122,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
 
-        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -133,7 +134,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
 
-        verify(orderPort, never()).deletePlannedBuyByCycleAndDate(any(), any());
+        verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -146,7 +147,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("30.00"));
 
-        verify(orderPort).deletePlannedBuyByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null (40.00, 28.00 두 건)
         ArgumentCaptor<List<Order>> captor = ArgumentCaptor.forClass(List.class);
         verify(orderPlanner).savePlannedOrders(captor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = captor.getValue();

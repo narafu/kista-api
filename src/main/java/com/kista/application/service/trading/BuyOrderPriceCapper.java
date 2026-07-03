@@ -47,7 +47,7 @@ class BuyOrderPriceCapper {
                 (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
     }
 
-    // 공통 cap 적용 골격: PLANNED BUY 조회 → cap 초과 확인 → 보정 함수 적용 → 재저장
+    // 공통 cap 적용 골격: PLANNED BUY 조회 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
     private void applyCapIfNeeded(String prefix, LocalDate today, Account account, UUID strategyCycleId,
                                   BigDecimal currentPrice,
                                   BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
@@ -62,8 +62,8 @@ class BuyOrderPriceCapper {
 
         List<Order> newBuys = correctFn.apply(buyOrders, cap);
 
-        // 기존 BUY PLANNED 삭제 → 보정된 BUY 재저장
-        orderPort.deletePlannedBuyByCycleAndDate(strategyCycleId, today);
+        // 기존 BUY PLANNED CANCELLED 처리 → 보정된 BUY 재저장
+        buyOrders.forEach(o -> orderPort.markCancelled(o.id()));
         if (newBuys.isEmpty()) {
             log.warn("[{}] {}보정 후 BUY 주문 없음 — 매수 제외", account.nickname(), prefix);
             return;

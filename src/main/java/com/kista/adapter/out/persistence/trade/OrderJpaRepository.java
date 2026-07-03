@@ -20,10 +20,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     void deleteAllByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, Order.OrderStatus status);
 
-    // BUY PLANNED만 삭제 (가격 보정 시 재저장 준비)
-    void deleteAllByStrategyCycleIdAndTradeDateAndStatusAndDirection(
-            UUID strategyCycleId, LocalDate tradeDate, Order.OrderStatus status, Order.OrderDirection direction);
-
     // PLANNED 또는 PLACED 조회 (스케쥴러 재계산 skip 판정)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatusIn(
             UUID strategyCycleId, LocalDate tradeDate, List<Order.OrderStatus> statuses);

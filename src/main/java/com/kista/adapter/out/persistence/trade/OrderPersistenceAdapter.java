@@ -84,15 +84,6 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    @Transactional
-    public void deletePlannedBuyByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // 가격 보정 시 BUY PLANNED만 삭제 — SELL PLANNED와 PLACED는 보존
-        repository.deleteAllByStrategyCycleIdAndTradeDateAndStatusAndDirection(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate),
-                Order.OrderStatus.PLANNED, Order.OrderDirection.BUY);
-    }
-
-    @Override
     public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
