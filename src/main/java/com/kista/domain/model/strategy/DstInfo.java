@@ -115,6 +115,29 @@ public record DstInfo(
         return new DstInfo(isDst, past, past, atKst(now.toLocalDate(), marketOpenTime(isDst)));
     }
 
+    // 재주문 시점 가용성 (현재 시각 기준) — 주문시점 셀렉터 disable 판단 SSOT
+    public record ReorderTimingAvailability(
+            boolean atOpen,     // AT_OPEN 접수 가능 — 개장 전에만
+            boolean atClose,    // AT_CLOSE 접수 가능 — 마감 전에만
+            boolean immediate   // 즉시 접수 가능 — 정규장 중에만 (개장 후 && 마감 전)
+    ) {}
+
+    public ReorderTimingAvailability reorderTimingAvailability() {
+        return reorderTimingAvailabilityAt(Instant.now());
+    }
+
+    // 시각 직접 지정 (테스트 주입용)
+    // BLOCKED 시간대(장마감~프리마켓 전, 주말): 전부 불가
+    // DIRECT 시간대: beforeOpen이면 AT_OPEN/AT_CLOSE 가능, afterOpen이면 AT_CLOSE/IMMEDIATE 가능
+    public ReorderTimingAvailability reorderTimingAvailabilityAt(Instant now) {
+        ZonedDateTime nowKst = now.atZone(KST);
+        if (sessionAt(nowKst.getDayOfWeek(), nowKst.toLocalTime()) == MarketSession.BLOCKED) {
+            return new ReorderTimingAvailability(false, false, false);
+        }
+        boolean beforeOpen = now.isBefore(marketOpen);
+        return new ReorderTimingAvailability(beforeOpen, true, !beforeOpen);
+    }
+
     // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose/marketOpen은 정상 계산
     public static DstInfo immediate() {
         ZonedDateTime now = ZonedDateTime.now(KST);

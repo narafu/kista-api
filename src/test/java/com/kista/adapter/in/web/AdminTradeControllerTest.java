@@ -3,12 +3,12 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.domain.model.admin.AdminReorderResult;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
-import com.kista.domain.model.admin.AdminOrderCorrectionResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
-import com.kista.domain.port.in.AdminOrderCorrectionUseCase;
+import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
@@ -52,7 +52,7 @@ class AdminTradeControllerTest {
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AdminTradeCorrectionUseCase adminTradeCorrection;
-    @MockitoBean AdminOrderCorrectionUseCase adminOrderCorrection;
+    @MockitoBean AdminReorderUseCase adminReorder;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -190,45 +190,48 @@ class AdminTradeControllerTest {
     }
 
     @Test
-    void correctOrder_adminRole_returns200() throws Exception {
+    void reorder_adminRole_returns200() throws Exception {
         String body = """
                 {
                   "userId": "00000000-0000-0000-0000-000000000010",
                   "accountId": "00000000-0000-0000-0000-000000000020",
                   "strategyId": "00000000-0000-0000-0000-000000000030",
                   "orderId": "00000000-0000-0000-0000-000000000050",
-                  "mode": "PLANNED_EDIT",
+                  "timing": "AT_CLOSE",
                   "tradeDateKst": "2026-07-01",
                   "quantity": 3,
                   "price": 250.00,
-                  "memo": "price fix"
+                  "memo": "reorder memo"
                 }
                 """;
-        when(adminOrderCorrection.correctOrder(org.mockito.ArgumentMatchers.eq(ADMIN_UUID), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new AdminOrderCorrectionResult(
+        when(adminReorder.reorder(org.mockito.ArgumentMatchers.eq(ADMIN_UUID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AdminReorderResult(
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         UUID.fromString("00000000-0000-0000-0000-000000000020"),
                         UUID.fromString("00000000-0000-0000-0000-000000000030"),
                         UUID.fromString("00000000-0000-0000-0000-000000000050"),
-                        com.kista.domain.model.admin.AdminOrderCorrectionCommand.Mode.PLANNED_EDIT,
                         Order.OrderStatus.PLANNED,
                         Order.OrderStatus.PLANNED,
-                        null,
-                        0,
-                        null,
-                        new java.math.BigDecimal("6989.00"),
-                        Strategy.Status.ACTIVE,
-                        false,
                         null
                 ));
 
-        mockMvc.perform(post("/api/admin/trades/order-corrections")
+        mockMvc.perform(post("/api/admin/trades/reorders")
                         .with(csrf())
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN")))
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mode").value("PLANNED_EDIT"));
+                .andExpect(jsonPath("$.resultingStatus").value("PLANNED"));
+    }
+
+    @Test
+    void getReorderTiming_adminRole_returns200() throws Exception {
+        mockMvc.perform(get("/api/admin/trades/reorder-timing")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.atOpen").isBoolean())
+                .andExpect(jsonPath("$.atClose").isBoolean())
+                .andExpect(jsonPath("$.immediate").isBoolean());
     }
 
     private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {

@@ -1,16 +1,18 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminManualTradeCorrectionRequest;
-import com.kista.adapter.in.web.dto.AdminOrderCorrectionRequest;
-import com.kista.adapter.in.web.dto.AdminOrderCorrectionResponse;
+import com.kista.adapter.in.web.dto.AdminReorderRequest;
+import com.kista.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.adapter.in.web.dto.AdminTradeResponse;
+import com.kista.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.in.AdminQueryUseCase;
-import com.kista.domain.port.in.AdminOrderCorrectionUseCase;
+import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,7 +47,7 @@ public class AdminTradeController {
     private final AdminQueryUseCase adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
     private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
-    private final AdminOrderCorrectionUseCase adminOrderCorrection; // 관리자 주문 보정
+    private final AdminReorderUseCase adminReorder;                 // 관리자 재주문
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @GetMapping("/trades")
@@ -92,12 +94,17 @@ public class AdminTradeController {
                 adminTradeCorrection.correctManualFills(adminId, request.toCommand()));
     }
 
-    @PostMapping("/trades/order-corrections")
-    public AdminOrderCorrectionResponse correctOrder(
+    // 재주문 시점 가용성 조회 — UI 주문시점 셀렉터 disable 판단용
+    @GetMapping("/trades/reorder-timing")
+    public ReorderTimingAvailabilityResponse getReorderTiming() {
+        return ReorderTimingAvailabilityResponse.from(DstInfo.calculate().reorderTimingAvailability());
+    }
+
+    @PostMapping("/trades/reorders")
+    public AdminReorderResponse reorder(
             @AuthenticationPrincipal UUID adminId,
-            @RequestBody @Valid AdminOrderCorrectionRequest request) {
-        return AdminOrderCorrectionResponse.from(
-                adminOrderCorrection.correctOrder(adminId, request.toCommand()));
+            @RequestBody @Valid AdminReorderRequest request) {
+        return AdminReorderResponse.from(adminReorder.reorder(adminId, request.toCommand()));
     }
 
     // accountId → Account 전체 매핑 (N+1 방지용 일괄 조회)

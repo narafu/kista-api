@@ -29,8 +29,9 @@ public record Order(
     }
 
     public enum OrderTiming {
-        AT_CLOSE,  // 마감 배치(04:30 KST)에 접수 — 기본값
-        AT_OPEN    // 개장 시점(22:30 KST)에 선접수
+        AT_CLOSE,   // 마감 배치(04:30 KST)에 접수 — 기본값
+        AT_OPEN,    // 개장 시점(22:30 KST)에 선접수
+        IMMEDIATE   // 관리자 재주문 즉시 접수 (정규장 중에만 사용)
     }
 
     public enum OrderDirection {
@@ -99,5 +100,20 @@ public record Order(
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
                 orderType, timing, direction, quantity, newPrice,
                 OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 관리자 재주문용 PLANNED 신규 주문 — 원본에서 계좌·사이클·종목·주문유형 승계, direction/price/timing 명시 재정의
+    public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
+                                int quantity, BigDecimal price, OrderTiming timing) {
+        return new Order(null, source.accountId(), source.strategyCycleId(), tradeDate,
+                source.ticker(), source.orderType(), timing, direction, quantity, price,
+                OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 즉시 접수 실패 시 FAILED 주문으로 변환 — id·접수번호·체결 정보 초기화
+    public Order withFailed() {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, quantity, price,
+                OrderStatus.FAILED, null, null, null);
     }
 }
