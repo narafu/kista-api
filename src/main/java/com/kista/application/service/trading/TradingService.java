@@ -334,8 +334,7 @@ class TradingService {
     // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
     private void notifyMarketEvent(NotificationType type, java.util.function.Consumer<User> notify) {
         userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
-            UserSettings settings = userSettingsPort.loadByUserId(user.id())
-                    .orElse(UserSettings.defaultFor(user.id()));
+            UserSettings settings = userSettingsPort.findOrDefault(user.id());
             if (settings.isNotificationEnabled(type)) {
                 try {
                     notify.accept(user);

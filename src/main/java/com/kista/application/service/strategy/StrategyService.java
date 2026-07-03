@@ -73,7 +73,7 @@ class StrategyService implements StrategyUseCase {
     // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
     private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit) {
         userPort.findByIdOrThrow(userId); // 사용자 존재 확인
-        UserSettings settings = userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        UserSettings settings = userSettingsPort.findOrDefault(userId);
         if (settings.balanceCheckEnabled() && initialUsdDeposit != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (initialUsdDeposit.compareTo(freeCash) > 0) {

@@ -29,7 +29,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
     @Override
     public UserSettings getByUserId(UUID userId) {
         // 저장된 설정이 없으면 기본값 반환 (balanceCheckEnabled=true, 빈 알림 prefs)
-        return userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        return userSettingsPort.findOrDefault(userId);
     }
 
     @Override

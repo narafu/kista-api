@@ -61,8 +61,7 @@ class TradingReporter {
 
         // TRADING_ALERT 알림 활성 여부 확인 후 발송 (기본값 true)
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
-        UserSettings settings = userSettingsPort.loadByUserId(user.id())
-                .orElse(UserSettings.defaultFor(user.id()));
+        UserSettings settings = userSettingsPort.findOrDefault(user.id());
         if (settings.isNotificationEnabled(NotificationType.TRADING_ALERT)) {
             userNotificationPort.notifyTradingReport(user, account, report);
             log.info("[{}] 리포트 발송 완료", account.nickname());
