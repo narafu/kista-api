@@ -43,12 +43,7 @@ class TokenService implements TokenUseCase {
     public String issueRefreshToken(UUID userId, String userAgent) {
         // 동일 기기(User-Agent) 기존 RT 교체 — 따닥 로그인 고아 토큰 방지, 다른 기기 세션은 유지
         refreshTokenPort.deleteByUserIdAndUserAgent(userId, userAgent);
-        String rawToken = generateRawToken();
-        refreshTokenPort.save(new RefreshToken(
-                null, userId, sha256Hex(rawToken), userAgent,
-                Instant.now().plus(RT_TTL), null, null
-        ));
-        return rawToken;
+        return issueNewRt(userId, userAgent);
     }
 
     /**
@@ -141,10 +136,8 @@ class TokenService implements TokenUseCase {
 
     private String issueNewRt(UUID userId, String userAgent) {
         String newRaw = generateRawToken();
-        refreshTokenPort.save(new RefreshToken(
-                null, userId, sha256Hex(newRaw), userAgent,
-                Instant.now().plus(RT_TTL), null, null
-        ));
+        // RefreshToken.issue() — id·rotatedAt·createdAt은 DB가 채움
+        refreshTokenPort.save(RefreshToken.issue(userId, sha256Hex(newRaw), userAgent, Instant.now().plus(RT_TTL)));
         return newRaw;
     }
 
