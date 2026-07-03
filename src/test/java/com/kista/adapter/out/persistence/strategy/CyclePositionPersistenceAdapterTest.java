@@ -128,7 +128,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         cyclePositionInfiniteDetailAdapter.deleteByStrategyId(strategy.id());
 
         Integer detailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id IN (?, ?)",
+                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id IN (?, ?) AND deleted_at IS NULL",
                 Integer.class,
                 older.id(), newer.id());
         Integer positionRows = jdbcTemplate.queryForObject(
