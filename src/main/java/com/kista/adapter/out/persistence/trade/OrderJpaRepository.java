@@ -27,9 +27,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // 기간+종목 필터 (대시보드용)
     List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 
-    // 기간 전체 (관리자용)
-    List<OrderEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
-
     // 관리자 거래내역 — 최신순
     List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDesc(LocalDate from, LocalDate to);
 
