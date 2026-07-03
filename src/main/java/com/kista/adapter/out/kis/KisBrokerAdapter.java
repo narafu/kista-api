@@ -6,7 +6,6 @@ import com.kista.domain.model.broker.*;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.KisOrderPort;
 import com.kista.domain.port.out.broker.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
