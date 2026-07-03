@@ -6,7 +6,6 @@ import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.TossExecutionPort;
 import com.kista.domain.port.out.TossOrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,7 +23,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class TossOrderApi implements TossOrderPort, TossExecutionPort {
+public class TossOrderApi implements TossOrderPort {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";
@@ -61,7 +60,6 @@ public class TossOrderApi implements TossOrderPort, TossExecutionPort {
         tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
     }
 
-    @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
         List<Execution> result = new ArrayList<>();

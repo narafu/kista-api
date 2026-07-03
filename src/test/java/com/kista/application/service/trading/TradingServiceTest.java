@@ -37,10 +37,9 @@ import static org.mockito.Mockito.*;
 class TradingServiceTest {
 
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock KisPricePort kisPricePort;
+    @Mock BrokerPricePort kisPricePort;  // BrokerPricePort 직접 mock (KisPricePort 삭제됨)
     @Mock KisOrderPort kisOrderPort;
-    @Mock KisExecutionPort kisExecutionPort;
-    @Mock TossExecutionPort tossExecutionPort;
+    @Mock ExecutionPort kisExecutionPort; // ExecutionPort 직접 mock (KisExecutionPort 삭제됨)
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock PrivacyStrategy privacyStrategy;
     @Mock NotifyPort notifyPort;
@@ -55,8 +54,6 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock KisMarginPort kisMarginPort;
-    @Mock TossMarginPort tossMarginPort;
     @Mock com.kista.domain.port.out.broker.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
     @Mock KisAccountPort kisAccountPort;
     @Mock TossAccountPort tossAccountPort;
@@ -123,16 +120,11 @@ class TradingServiceTest {
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
                 cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, userSettingsPort);
-        // 브로커 포트 → KIS 포트 위임 레지스트리 구성 (기존 kis*Port 스텁·검증 유지)
+        // 브로커 포트 레지스트리 — 각 mock을 직접 연결 (KisPricePort/KisExecutionPort 삭제로 단순화)
         BrokerAdapterRegistry tradingRegistry = mock(BrokerAdapterRegistry.class);
 
-        // BrokerPricePort → kisPricePort 위임
-        BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
-        lenient().when(brokerPricePort.getPrices(any(), any())).thenAnswer(inv -> kisPricePort.getPrices(inv.getArgument(0), inv.getArgument(1)));
-        lenient().when(brokerPricePort.getPriceSnapshots(any(), any())).thenAnswer(inv -> kisPricePort.getPriceSnapshots(inv.getArgument(0), inv.getArgument(1)));
-        lenient().when(brokerPricePort.getPrice(any(), any())).thenAnswer(inv -> kisPricePort.getPrice(inv.getArgument(0), inv.getArgument(1)));
-        lenient().when(brokerPricePort.getPriceSnapshot(any(), any())).thenAnswer(inv -> kisPricePort.getPriceSnapshot(inv.getArgument(0), inv.getArgument(1)));
-        lenient().doReturn(brokerPricePort).when(tradingRegistry).require(any(Account.class), eq(BrokerPricePort.class));
+        // BrokerPricePort: kisPricePort 직접 연결 (위임 레이어 제거)
+        lenient().doReturn(kisPricePort).when(tradingRegistry).require(any(Account.class), eq(BrokerPricePort.class));
 
         // BrokerOrderCorrectionPort → kisOrderPort 위임
         BrokerOrderCorrectionPort brokerOrderPort = mock(BrokerOrderCorrectionPort.class);
@@ -140,11 +132,8 @@ class TradingServiceTest {
         lenient().doAnswer(inv -> { kisOrderPort.cancel(inv.getArgument(0), inv.getArgument(1)); return null; }).when(brokerOrderPort).cancel(any(), any());
         lenient().doReturn(brokerOrderPort).when(tradingRegistry).require(any(Account.class), eq(BrokerOrderCorrectionPort.class));
 
-        // ExecutionPort → kisExecutionPort 위임 (KIS 계좌 기준 테스트)
-        ExecutionPort brokerExecutionPort = mock(ExecutionPort.class);
-        lenient().when(brokerExecutionPort.getExecutions(any(), any(), any(), any())).thenAnswer(inv ->
-                kisExecutionPort.getExecutions(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2), inv.getArgument(3)));
-        lenient().doReturn(brokerExecutionPort).when(tradingRegistry).require(any(Account.class), eq(ExecutionPort.class));
+        // ExecutionPort: kisExecutionPort 직접 연결 (위임 레이어 제거)
+        lenient().doReturn(kisExecutionPort).when(tradingRegistry).require(any(Account.class), eq(ExecutionPort.class));
 
         // LiveBalancePort → kisAccountPort 위임
         LiveBalancePort brokerLiveBalancePort = mock(LiveBalancePort.class);

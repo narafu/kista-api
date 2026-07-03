@@ -9,7 +9,7 @@ import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossExchangeRate;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.TossAccountPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,9 +24,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossHoldingsApi implements TossAccountPort,
-        TossExchangeRatePort,
-        TossPortfolioPort, TossMarginPort, TossSellableQuantityPort {
+public class TossHoldingsApi implements TossAccountPort {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";
@@ -67,13 +65,11 @@ public class TossHoldingsApi implements TossAccountPort,
 
     // ── TossMarginPort ─────────────────────────────────────────────────────────
 
-    @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
         return fetchBuyingPower(account, "USD");
     }
 
     // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
-    @Override
     public List<MarginItem> getMargin(Account account) {
         // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
         BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
@@ -89,7 +85,6 @@ public class TossHoldingsApi implements TossAccountPort,
         );
     }
 
-    @Override
     public PresentBalanceResult getPresentBalance(Account account) {
         // 1. 전체 보유 종목 조회 — 응답 {"result": {"items": [...]}} 래퍼 구조
         HoldingsResponseWrapper holdingsWrapper = tossHttpClient.get(
@@ -142,7 +137,6 @@ public class TossHoldingsApi implements TossAccountPort,
 
     // ── TossExchangeRatePort ───────────────────────────────────────────────────
 
-    @Override
     public TossExchangeRate getExchangeRate() {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
@@ -161,7 +155,6 @@ public class TossHoldingsApi implements TossAccountPort,
 
     // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
-    @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         return fetchSellableQuantity(ticker, account);
     }

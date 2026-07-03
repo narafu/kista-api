@@ -2,7 +2,6 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.toss.TossCandle;
-import com.kista.domain.port.out.TossCandlePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossCandleApi implements TossCandlePort {
+public class TossCandleApi {
 
     private static final String CANDLES_PATH = "/api/v1/candles";
     // 일봉 기준 최대 요청 수 (주말 포함 여유분)
@@ -30,7 +29,6 @@ public class TossCandleApi implements TossCandlePort {
 
     private final TossHttpClient tossHttpClient;
 
-    @Override
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
         // before = to 다음날 00:00 UTC (to 당일 봉 포함)
         String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
@@ -43,7 +41,6 @@ public class TossCandleApi implements TossCandlePort {
         return candles.stream().filter(c -> !c.date().isBefore(from)).toList();
     }
 
-    @Override
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
         int clamped = Math.max(1, Math.min(count, MAX_COUNT));
         // before = 내일 00:00 UTC (오늘 봉까지 포함) — 토스 1회 호출 최대치(count)만큼 최신 캔들 그대로 사용

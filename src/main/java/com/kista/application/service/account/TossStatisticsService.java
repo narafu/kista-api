@@ -44,7 +44,7 @@ class TossStatisticsService implements TossStatisticsUseCase {
     public List<TossMarketSession> getMarketCalendar(UUID accountId, UUID requesterId,
                                                      LocalDate from, LocalDate to) {
         Account account = requireAccount(accountId, requesterId);
-        return registry.require(account, MarketCalendarPort.class).getMarketCalendar(from, to);
+        return registry.require(account, BrokerMarketCalendarPort.class).getMarketCalendar(from, to);
     }
 
     @Override

@@ -40,7 +40,7 @@ class ManualTradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock UserPort userPort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock KisPricePort kisPricePort;         // BrokerPricePort 위임 대상
+    @Mock BrokerPricePort kisPricePort;      // BrokerPricePort 직접 mock (KisPricePort 삭제됨)
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -89,13 +89,8 @@ class ManualTradingServiceTest {
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
-        // BrokerPricePort → kisPricePort 위임 (기존 스텁 유지)
-        BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
-        lenient().when(brokerPricePort.getPriceSnapshots(any(), any()))
-                .thenAnswer(inv -> kisPricePort.getPriceSnapshots(inv.getArgument(0), inv.getArgument(1)));
-        lenient().when(brokerPricePort.getPrice(any(), any()))
-                .thenAnswer(inv -> kisPricePort.getPrice(inv.getArgument(0), inv.getArgument(1)));
-        doReturn(brokerPricePort).when(brokerAdapterRegistry).require(any(Account.class), eq(BrokerPricePort.class));
+        // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)
+        doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(Account.class), eq(BrokerPricePort.class));
 
         // LiveBalancePort → kisAccountPort 위임 (기존 스텁 유지)
         LiveBalancePort brokerLiveBalancePort = mock(LiveBalancePort.class);

@@ -5,9 +5,6 @@ import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
 import com.kista.domain.model.toss.TossStockInfo;
-import com.kista.domain.port.out.TossCandlePort;
-import com.kista.domain.port.out.TossPricePort;
-import com.kista.domain.port.out.TossStockInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossPriceApi implements TossPricePort, TossStockInfoPort {
+public class TossPriceApi {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
@@ -31,9 +28,8 @@ public class TossPriceApi implements TossPricePort, TossStockInfoPort {
     private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
-    private final TossCandlePort tossCandlePort;
+    private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
 
-    @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
@@ -55,19 +51,16 @@ public class TossPriceApi implements TossPricePort, TossStockInfoPort {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    @Override
     public BigDecimal getPrice(Ticker ticker) {
         // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일
         return getPrices(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
     }
 
-    @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker) {
         BigDecimal price = getPrice(ticker);
         return new PriceSnapshot(price, fetchPrevClose(ticker.name(), price));
     }
 
-    @Override
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers) {
         return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
@@ -78,7 +71,7 @@ public class TossPriceApi implements TossPricePort, TossStockInfoPort {
     // 일봉 최신 2개 조회 → 오름차순 [0]이 확정 전일종가, 실패 시 current fallback
     private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
         try {
-            List<TossCandle> candles = tossCandlePort.getLatestCandles(symbol, "1d", 2);
+            List<TossCandle> candles = tossCandleApi.getLatestCandles(symbol, "1d", 2);
             if (candles.size() >= 2) {
                 return candles.get(0).close();
             }
@@ -91,7 +84,6 @@ public class TossPriceApi implements TossPricePort, TossStockInfoPort {
 
     // ── TossStockInfoPort ──────────────────────────────────────────────────────
 
-    @Override
     public TossStockInfo getStockInfo(Ticker ticker) {
         // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();

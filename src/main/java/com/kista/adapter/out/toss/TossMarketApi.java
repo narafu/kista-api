@@ -5,8 +5,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossMarketSession;
 import com.kista.domain.model.toss.TossMarketSession.SessionHours;
-import com.kista.domain.port.out.TossAccountListPort;
-import com.kista.domain.port.out.TossMarketCalendarPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,7 +25,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPort {
+public class TossMarketApi {
 
     private static final String MARKET_CALENDAR_PATH = "/api/v1/market-calendar/US";
     private static final String ACCOUNTS_PATH = "/api/v1/accounts";
@@ -38,7 +36,6 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── TossMarketCalendarPort ─────────────────────────────────────────────────
 
-    @Override
     public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
         long days = from.until(to).getDays() + 1;
         if (days > MAX_RANGE_DAYS) {
@@ -84,7 +81,6 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── TossAccountListPort ────────────────────────────────────────────────────
 
-    @Override
     public List<TossAccountInfo> getAccountList(Account account) {
         AccountsResponse response = tossHttpClient.getNoAccountHeader(
                 ACCOUNTS_PATH, account, new LinkedMultiValueMap<>(), AccountsResponse.class);

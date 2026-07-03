@@ -8,7 +8,7 @@ import com.kista.domain.model.broker.*;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.KisAccountPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,9 +22,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisTradingApi implements KisAccountPort,
-        KisExecutionPort,
-        KisPortfolioPort, KisMarginPort, KisSellableQuantityPort {
+public class KisTradingApi implements KisAccountPort {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
@@ -77,7 +75,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── MarginPort.getMargin() ────────────────────────────────────────────────
 
-    @Override
     public List<MarginItem> getMargin(Account account) {
         MarginResponse response = kisHttpClient.tradingGet(
                 MARGIN_TR_ID, MARGIN_PATH, account, MarginResponse.class, p -> {});
@@ -102,7 +99,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── MarginPort.getUsdBuyableAmount() ──────────────────────────────────────
 
-    @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
         // getMargin()은 MarginPort 구현 — KisAccountPort.getBalance()에서도 사용
         return getMargin(account).stream()
@@ -114,7 +110,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── PortfolioPort.getPresentBalance() ─────────────────────────────────────
 
-    @Override
     public PresentBalanceResult getPresentBalance(Account account) {
         PortfolioResponse response = kisHttpClient.tradingGet(
                 PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,
@@ -154,7 +149,6 @@ public class KisTradingApi implements KisAccountPort,
     // ── SellableQuantityPort.getSellableQuantity() ────────────────────────────
 
     // TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
-    @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         int quantity = fetchHolding(account, ticker).quantity();
         log.info("KIS 판매 가능 수량: ticker={}, quantity={}", ticker, quantity);
@@ -163,7 +157,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────
 
-    @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         ExecutionListResponse response = kisHttpClient.tradingGet(
                 EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
