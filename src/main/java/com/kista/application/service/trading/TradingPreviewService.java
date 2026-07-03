@@ -80,9 +80,7 @@ class TradingPreviewService {
             prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
                     () -> registry.require(account, BrokerPricePort.class).getPriceSnapshot(strategy.ticker(), account).prevClose());
         }
-        PrivacyTradeBase privacyBase = orderStrategy.requiresPrivacyBase()
-                ? privacyTradePort.findTodayTrade(today).orElse(null)
-                : null;
+        PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId, null)

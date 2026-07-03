@@ -68,9 +68,7 @@ class ManualTradingService {
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // PRIVACY는 당일 기준매매표 조회, INFINITE는 null (PlanContext에서 무시됨)
-        PrivacyTradeBase privacyBase = strategy.isPrivacy()
-                ? privacyTradePort.findTodayTrade(today).orElse(null)
-                : null;
+        PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), null)
