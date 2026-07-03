@@ -17,6 +17,7 @@ interface StrategyInfiniteJpaRepository extends JpaRepository<StrategyInfiniteEn
             WHERE sv.strategy_id = :strategyId
               AND sv.deleted_at IS NULL
               AND siv.deleted_at IS NULL
+            ORDER BY siv.created_at DESC
             LIMIT 1
             """, nativeQuery = true)
     Optional<StrategyInfiniteEntity> findActiveByStrategyId(@Param("strategyId") UUID strategyId);
