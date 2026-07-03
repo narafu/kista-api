@@ -194,7 +194,7 @@ class TradingService {
         }
 
         // 3. 전략 계산 → live 잔고 검증 → PLANNED 저장 (skip·부족 시 null)
-        CycleOrderStrategy.OrderPlan plan = computeValidateAndSave(ctx, balance, prevClosePrice, today, privacyBase)
+        CycleOrderStrategy.OrderPlan plan = computeValidateAndSave(ctx, balance, prevClosePrice, today, privacyBase, price)
                 .orElse(null);
         if (plan == null) return null;
 
@@ -207,10 +207,10 @@ class TradingService {
     // 전략 계산 → live 잔고 검증 → PLANNED 저장 — 마감·개장 스케쥴러 공통 골격
     // empty = 전략 차원 skip(PRIVACY 기준 미수신 등) 또는 live 잔고 부족(사용자 알림 발송됨)
     private Optional<CycleOrderStrategy.OrderPlan> computeValidateAndSave(BatchContext ctx, AccountBalance balance,
-            BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase) {
+            BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase, BigDecimal currentPrice) {
         Account account = ctx.account();
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(
-                balance, ctx.strategy(), prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname());
+                balance, ctx.strategy(), prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), currentPrice);
         if (planOpt.isEmpty()) {
             log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
             return Optional.empty();
@@ -233,7 +233,7 @@ class TradingService {
         if (strategy.isInfinite()) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
             InfinitePosition recalcPos = orderComputer.compute(
-                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname())
+                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname(), price)
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
             return new CycleState(ctx, balance, recalcPos, price, null);
         }
@@ -303,9 +303,10 @@ class TradingService {
 
             PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
             BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
+            BigDecimal currentPrice = priceSnapshot != null ? priceSnapshot.current() : null;
 
             // 전략 계산 → live 잔고 검증 → PLANNED 저장 (마감 스케쥴러와 공통 골격)
-            if (computeValidateAndSave(ctx, balance, prevClosePrice, tradeDate, privacyBase).isEmpty()) return;
+            if (computeValidateAndSave(ctx, balance, prevClosePrice, tradeDate, privacyBase, currentPrice).isEmpty()) return;
         }
 
         // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)

@@ -73,7 +73,7 @@ class ManualTradingService {
                 : null;
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname())
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), null)
                 .orElse(null);
         if (plan == null) return List.of(); // 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
 

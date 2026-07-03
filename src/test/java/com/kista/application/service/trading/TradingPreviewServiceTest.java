@@ -170,7 +170,7 @@ class TradingPreviewServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
         when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
-        when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
+        when(privacyStrategy.buildOrders(any(), any(), any(), any())).thenReturn(List.of(buyOrder));
 
         NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
 

@@ -32,12 +32,22 @@ class BuyOrderPriceCapper {
     private final TradingOrderPlanner orderPlanner;
     private final InfiniteStrategy infiniteStrategy;
 
-    // PRIVACY 전용: position 없이 단순 가격 캡만 적용 (수량 유지)
+    // PRIVACY 전용: cap 초과 주문만 CANCELLED → cap 가격으로 재저장 (cap 이하 주문은 그대로 유지)
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
-        applyCapIfNeeded("PRIVACY ", today, account, strategyCycleId, currentPrice,
-                (orders, cap) -> orders.stream()
-                        .map(o -> o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
-                        .toList());
+        List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
+                .stream().filter(o -> o.direction() == BUY).toList();
+        if (buyOrders.isEmpty()) return;
+
+        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        List<Order> exceeding = buyOrders.stream().filter(o -> o.price().compareTo(cap) > 0).toList();
+        if (exceeding.isEmpty()) return;
+
+        log.info("[{}] PRIVACY BUY 가격 보정 필요 — cap={}, 초과 주문: {}", account.nickname(), cap, describeOrders(exceeding));
+        // cap 초과 주문만 CANCELLED 처리 → cap 가격으로 재저장
+        exceeding.forEach(o -> orderPort.markCancelled(o.id()));
+        List<Order> corrected = exceeding.stream().map(o -> o.withPrice(cap)).toList();
+        orderPlanner.savePlannedOrders(corrected, account, strategyCycleId);
+        log.info("[{}] PRIVACY BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describeOrders(corrected));
     }
 
     // INFINITE 전용: position 기반 수량 재산정 + 보정 주문 포함

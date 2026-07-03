@@ -66,9 +66,11 @@ public interface CycleOrderStrategy {
         // PRIVACY 전략 전용 입력 묶음
         // initialUsdDeposit: 현재 StrategyCycle의 시작 시드 (buildOrders 호출 시 필요)
         // privacyBase: 당일 기준매매표 (미수신 시 null → 전략 차원 skip)
+        // currentPrice: 스케쥴러 시작 시점 현재가 (allocateRemainingBudget 분모 산출용 — preview/수동실행 시 null)
         public record PrivacyInputs(
                 BigDecimal initialUsdDeposit,
-                PrivacyTradeBase privacyBase
+                PrivacyTradeBase privacyBase,
+                BigDecimal currentPrice
         ) {}
     }
 

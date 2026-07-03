@@ -25,7 +25,8 @@ import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 public class PrivacyStrategy {
 
     // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
-    public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
+    // currentPrice: allocateRemainingBudget 분모 산출용 — null 허용 (null이면 최저가만 사용)
+    public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase, BigDecimal currentPrice) {
         // initialUsdDeposit ÷ currentCycleStart = 배수 (소수 둘째자리 내림)
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
             throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
@@ -61,7 +62,7 @@ public class PrivacyStrategy {
         }
 
         // 배수 적용 후 잔여 매수금을 최저가 BUY에 추가 배분
-        allocateRemainingBudget(buyEntries, totalBuyAmount, multiple);
+        allocateRemainingBudget(buyEntries, totalBuyAmount, multiple, currentPrice);
 
         // 기준표 목표 보유량과 현재 잔량의 차이로 BUY 가감
         int target = applyMultiple(privacyTradeBase.holdings(), multiple);
@@ -104,7 +105,9 @@ public class PrivacyStrategy {
     }
 
     // 배수 적용 후 소수점 버림으로 생긴 잔여 매수금을 최저가 BUY에 추가 수량으로 배분
-    private void allocateRemainingBudget(List<BuyEntry> buyEntries, BigDecimal totalBuyAmount, BigDecimal multiple) {
+    // 분모: MIN(currentPrice, 최저가) — 현재가가 최저가보다 낮으면 현재가 기준으로 추가 수량 산출
+    private void allocateRemainingBudget(List<BuyEntry> buyEntries, BigDecimal totalBuyAmount, BigDecimal multiple,
+                                         BigDecimal currentPrice) {
         if (buyEntries.isEmpty() || totalBuyAmount.signum() <= 0) return;
 
         // 목표 매수금 = 기준표 원본 매수금 합계 × 배수
@@ -119,15 +122,18 @@ public class PrivacyStrategy {
         BigDecimal remaining = targetBuyAmount.subtract(usedAmount);
         if (remaining.signum() <= 0) return;
 
-        // 최저가 BUY 엔트리에 floor(잔여금 / 최저가) 만큼 추가 수량 배분
+        // 최저가 BUY 엔트리에 floor(잔여금 / divisor) 만큼 추가 수량 배분
+        // divisor = MIN(currentPrice, 최저가) — 현재가가 낮을 때 더 많은 수량 확보
         BuyEntry lowest = buyEntries.stream()
                 .min(Comparator.comparing(e -> e.price))
                 .orElseThrow();
-        int additionalQty = remaining.divide(lowest.price, 0, RoundingMode.DOWN).intValue();
+        BigDecimal divisor = (currentPrice != null && currentPrice.compareTo(lowest.price) < 0)
+                ? currentPrice : lowest.price;
+        int additionalQty = remaining.divide(divisor, 0, RoundingMode.DOWN).intValue();
         if (additionalQty <= 0) return;
 
-        log.info("[PRIVACY] 잔여 매수금 배분: targetBuyAmount={}, usedAmount={}, remaining={}, lowestPrice={}, additionalQty={}",
-                targetBuyAmount, usedAmount, remaining, lowest.price, additionalQty);
+        log.info("[PRIVACY] 잔여 매수금 배분: targetBuyAmount={}, usedAmount={}, remaining={}, divisor={}, additionalQty={}",
+                targetBuyAmount, usedAmount, remaining, divisor, additionalQty);
         lowest.quantity += additionalQty;
     }
 

@@ -141,22 +141,20 @@ class BuyOrderPriceCapperTest {
     @Test
     @SuppressWarnings("unchecked")
     void capPrivacyIfNeeded_buysExceedCap_capsToCurrentPriceX110KeepingQuantity() {
-        // currentPrice=30, cap=33.00 — FIDA 가격 40.00이 cap 초과 → 33.00으로 보정, 수량 유지
+        // currentPrice=30, cap=33.00 — FIDA 가격 40.00만 cap 초과, 28.00은 cap 이하라 그대로 유지
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("40.00", 5), buy("28.00", 3)));
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("30.00"));
 
-        verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null (40.00, 28.00 두 건)
+        // cap 초과 주문(40.00) 1건만 CANCELLED, cap 이하(28.00)는 건드리지 않음
+        verify(orderPort, times(1)).markCancelled(isNull());
         ArgumentCaptor<List<Order>> captor = ArgumentCaptor.forClass(List.class);
         verify(orderPlanner).savePlannedOrders(captor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = captor.getValue();
-        // 40.00 → 33.00으로 보정, 수량 5 유지
-        assertThat(saved).hasSize(2);
+        // 40.00 → 33.00으로 보정, 수량 5 유지 (1건만 재저장)
+        assertThat(saved).hasSize(1);
         assertThat(saved.get(0).price()).isEqualByComparingTo("33.00");
         assertThat(saved.get(0).quantity()).isEqualTo(5);
-        // 28.00은 cap 이하이므로 그대로
-        assertThat(saved.get(1).price()).isEqualByComparingTo("28.00");
-        assertThat(saved.get(1).quantity()).isEqualTo(3);
     }
 }

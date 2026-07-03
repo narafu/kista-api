@@ -37,7 +37,7 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
             return Optional.empty();
         }
         // initialUsdDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
-        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyBase());
+        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyBase(), inputs.currentPrice());
         return Optional.of(new OrderPlan(null, orders));
     }
 

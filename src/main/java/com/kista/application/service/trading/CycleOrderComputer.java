@@ -35,10 +35,11 @@ class CycleOrderComputer {
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
+    // currentPrice: PRIVACY allocateRemainingBudget 분모 산출용 — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
-                                                   PrivacyTradeBase privacyBase, String label) {
+                                                   PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice) {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
@@ -63,7 +64,7 @@ class CycleOrderComputer {
                 new CycleOrderStrategy.PlanContext.InfiniteInputs(
                         divisionCount, prevClosePrice, starPointPrice, isReverseMode, isFirstReverseDay);
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
-                new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase);
+                new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase, currentPrice);
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(

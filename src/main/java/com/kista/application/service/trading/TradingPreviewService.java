@@ -85,7 +85,7 @@ class TradingPreviewService {
                 : null;
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId)
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId, null)
                 .orElse(null);
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
