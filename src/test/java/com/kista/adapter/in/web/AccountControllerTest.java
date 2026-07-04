@@ -75,7 +75,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_failure_returns422() throws Exception {
-        doThrow(new Account.InvalidKisKeyException()).when(accountUseCase).test(any(), anyString(), anyString(), any());
+        doThrow(new Account.InvalidBrokerKeyException()).when(accountUseCase).test(any(), anyString(), anyString(), any());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)

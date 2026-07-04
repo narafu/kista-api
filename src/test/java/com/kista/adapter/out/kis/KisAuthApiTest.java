@@ -164,15 +164,15 @@ class KisAuthApiTest {
         }
 
         @Test
-        @DisplayName("KIS OAuth 4xx 응답 시 InvalidKisKeyException throw")
-        void verifyCredentials_whenKisReturns4xx_throwsInvalidKisKeyException() {
+        @DisplayName("KIS OAuth 4xx 응답 시 InvalidBrokerKeyException throw")
+        void verifyCredentials_whenKisReturns4xx_throwsInvalidBrokerKeyException() {
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.UNAUTHORIZED, "Unauthorized",
                             HttpHeaders.EMPTY, new byte[]{}, null));
 
             assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret", null))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
     }
 }

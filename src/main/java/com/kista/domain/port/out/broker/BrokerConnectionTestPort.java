@@ -11,9 +11,9 @@ public interface BrokerConnectionTestPort {
     Account.Broker supports();
 
     // 자격증명 검증 (OAuth 토큰 발급 시도). accountId null 허용(등록 전 사전검증, 캐시 저장 생략).
-    // 실패 시 Account.InvalidKisKeyException
+    // 실패 시 Account.InvalidBrokerKeyException
     void verifyCredentials(String appKey, String secretKey, UUID accountId);
 
-    // 자격증명+계좌 검증 후 brokerAccountCode 반환 (KIS: null, Toss: accountSeq). 실패 시 Account.InvalidKisKeyException
+    // 자격증명+계좌 검증 후 brokerAccountCode 반환 (KIS: null, Toss: accountSeq). 실패 시 Account.InvalidBrokerKeyException
     String verifyAccount(String appKey, String secretKey, String accountNo);
 }

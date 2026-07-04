@@ -85,8 +85,8 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("REST 오류 시 Account.InvalidKisKeyException throw")
-        void getToken_restClientException_throwsInvalidKisKeyException() {
+        @DisplayName("REST 오류 시 Account.InvalidBrokerKeyException throw")
+        void getToken_restClientException_throwsInvalidBrokerKeyException() {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
                     .thenReturn(Optional.empty());
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
@@ -95,7 +95,7 @@ class TossAuthApiTest {
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
             assertThatThrownBy(() -> api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
@@ -140,21 +140,21 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("OAuth 인증 실패 시 Account.InvalidKisKeyException throw")
-        void verifyAccount_authFails_throwsInvalidKisKeyException() {
+        @DisplayName("OAuth 인증 실패 시 Account.InvalidBrokerKeyException throw")
+        void verifyAccount_authFails_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.UNAUTHORIZED, "Unauthorized",
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
-        @DisplayName("계좌 목록 비어있으면 Account.InvalidKisKeyException throw")
+        @DisplayName("계좌 목록 비어있으면 Account.InvalidBrokerKeyException throw")
         @SuppressWarnings("unchecked")
-        void verifyAccount_emptyAccounts_throwsInvalidKisKeyException() {
+        void verifyAccount_emptyAccounts_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
@@ -162,13 +162,13 @@ class TossAuthApiTest {
                     .thenReturn(ResponseEntity.ok(new TossResult<>(List.of())));
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
-        @DisplayName("계좌 조회 REST 오류 시 Account.InvalidKisKeyException throw")
+        @DisplayName("계좌 조회 REST 오류 시 Account.InvalidBrokerKeyException throw")
         @SuppressWarnings("unchecked")
-        void verifyAccount_accountsFetchFails_throwsInvalidKisKeyException() {
+        void verifyAccount_accountsFetchFails_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
@@ -178,7 +178,7 @@ class TossAuthApiTest {
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
     }
 }

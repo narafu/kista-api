@@ -22,6 +22,6 @@ public interface AccountUseCase {
     void delete(UUID accountId, UUID requesterId);
 
     // --- 증권사 연결 테스트 ---
-    // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). 실패 시 Account.InvalidKisKeyException throw
+    // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). 실패 시 Account.InvalidBrokerKeyException throw
     void test(Account.Broker broker, String appKey, String appSecret, UUID accountId);
 }

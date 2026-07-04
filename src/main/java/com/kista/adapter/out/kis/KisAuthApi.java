@@ -68,8 +68,8 @@ public class KisAuthApi implements BrokerConnectionTestPort {
             // 발급된 토큰을 account_id 기준으로 DB에 upsert
             brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
             return response.accessToken();
-        } catch (Account.InvalidKisKeyException e) {
-            throw e; // KIS 키 검증 실패는 그대로 전파
+        } catch (Account.InvalidBrokerKeyException e) {
+            throw e; // 증권사 키 검증 실패는 그대로 전파
         } catch (Exception e) {
             throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
         }
@@ -117,7 +117,7 @@ public class KisAuthApi implements BrokerConnectionTestPort {
             throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 
@@ -139,7 +139,7 @@ public class KisAuthApi implements BrokerConnectionTestPort {
                 throw kisKeyException(e, "계좌번호 검증 중 토큰 발급");
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
         }
 
@@ -160,23 +160,23 @@ public class KisAuthApi implements BrokerConnectionTestPort {
             if (response == null || !"0".equals(response.rtCd())) {
                 // rt_cd != "0" = 계좌번호 불일치 또는 KIS 오류 → 422
                 log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
         } catch (RestClientException e) {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
         return null; // KIS: brokerAccountCode 없음 (accountNo에 통합)
     }
 
-    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidKisKeyException
+    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidBrokerKeyException
     private RuntimeException kisKeyException(HttpStatusCodeException e, String context) {
         if (e.getResponseBodyAsString().contains("EGW00133")) {
             log.debug("{} rate limit (EGW00133)", context);
             return new Account.KisRateLimitException();
         }
         log.debug("{} 실패: {}", context, e.getMessage());
-        return new Account.InvalidKisKeyException();
+        return new Account.InvalidBrokerKeyException();
     }
 
     // KIS OAuth 토큰 발급 — getToken/verifyCredentials/verifyAccount 공용
@@ -194,7 +194,7 @@ public class KisAuthApi implements BrokerConnectionTestPort {
                 new HttpEntity<>(body, headers),
                 TokenResponse.class
         ).getBody();
-        if (response == null) throw new Account.InvalidKisKeyException();
+        if (response == null) throw new Account.InvalidBrokerKeyException();
         return response;
     }
 

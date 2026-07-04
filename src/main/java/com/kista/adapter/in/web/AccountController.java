@@ -88,7 +88,7 @@ public class AccountController {
         accountUseCase.delete(id, userId);
     }
 
-    // 자격증명 연결 테스트 — 실패 시 InvalidKisKeyException → GlobalExceptionHandler → 422
+    // 자격증명 연결 테스트 — 실패 시 InvalidBrokerKeyException → GlobalExceptionHandler → 422
     @Operation(summary = "API 연결 테스트", description = "appKey/appSecret으로 OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "연결 성공"),
@@ -99,7 +99,7 @@ public class AccountController {
     public void testConnection(
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
-        // broker null이면 KIS 기본값 적용 — 실패 시 Account.InvalidKisKeyException → GlobalExceptionHandler → 422
+        // broker null이면 KIS 기본값 적용 — 실패 시 Account.InvalidBrokerKeyException → GlobalExceptionHandler → 422
         accountUseCase.test(request.broker() != null ? request.broker() : Account.Broker.KIS,
                 request.appKey(), request.appSecret(), request.accountId());
     }

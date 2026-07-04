@@ -134,12 +134,12 @@ public class TossAuthApi implements BrokerConnectionTestPort {
                     new HttpEntity<>(body, headers),
                     TokenResponse.class);
             if (response.getBody() == null || response.getBody().accessToken() == null) {
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
             return response.getBody();
         } catch (RestClientException e) {
             log.warn("Toss OAuth 토큰 발급 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 
@@ -156,12 +156,12 @@ public class TossAuthApi implements BrokerConnectionTestPort {
             List<AccountItem> accounts = response.getBody() == null ? null : response.getBody().result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
             return String.valueOf(accounts.get(0).accountSeq());
         } catch (RestClientException e) {
             log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 

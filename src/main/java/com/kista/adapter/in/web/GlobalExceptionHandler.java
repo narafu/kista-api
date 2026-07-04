@@ -52,10 +52,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).headers(headers).body(detail);
     }
 
-    @ExceptionHandler(Account.InvalidKisKeyException.class)
-    public ProblemDetail handleInvalidKisKey(Account.InvalidKisKeyException ex) {
+    @ExceptionHandler(Account.InvalidBrokerKeyException.class)
+    public ProblemDetail handleInvalidBrokerKey(Account.InvalidBrokerKeyException ex) {
+        // 증권사 자격증명 검증 실패 (KIS/Toss 공통) → 422 UNPROCESSABLE_ENTITY
         saveErrorLog(ex);
-        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid KIS Credentials", ex.getMessage());
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ex.getMessage());
     }
 
     @ExceptionHandler(Account.KisRateLimitException.class)

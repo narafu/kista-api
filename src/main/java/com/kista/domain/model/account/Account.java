@@ -40,8 +40,9 @@ public record Account(
         }
     }
 
-    public static class InvalidKisKeyException extends RuntimeException {
-        public InvalidKisKeyException() { super("KIS API 키가 유효하지 않습니다"); }
+    // 증권사 자격증명(appKey/secretKey)이 유효하지 않을 때 — GlobalExceptionHandler 422 매핑
+    public static class InvalidBrokerKeyException extends RuntimeException {
+        public InvalidBrokerKeyException() { super("증권사 API 키가 유효하지 않습니다"); }
     }
 
     // KIS EGW00133 — 1분당 토큰 발급 1회 제한 초과
