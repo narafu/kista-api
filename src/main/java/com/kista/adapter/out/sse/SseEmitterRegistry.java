@@ -1,10 +1,14 @@
 package com.kista.adapter.out.sse;
 
+import com.kista.application.event.UserApprovedEvent;
+import com.kista.application.event.UserRejectedEvent;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -43,5 +47,15 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
     @Override
     public void notifyTrade(UUID userId, TradeEvent event) {
         tradeSseEmitterRegistry.send(userId, event);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUserApproved(UserApprovedEvent event) {
+        notifyStatusChange(event.user().id(), User.UserStatus.ACTIVE);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUserRejected(UserRejectedEvent event) {
+        notifyStatusChange(event.user().id(), User.UserStatus.REJECTED);
     }
 }

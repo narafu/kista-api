@@ -2,6 +2,9 @@ package com.kista.application.service.user;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
+import com.kista.application.event.UserApprovedEvent;
+import com.kista.application.event.UserRejectedEvent;
+import com.kista.application.event.UserReappliedEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
@@ -96,7 +99,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("REJECTED 상태 사용자 재신청 시 PENDING 전환 + 관리자 재알림")
+    @DisplayName("REJECTED 상태 사용자 재신청 시 PENDING 전환 + 이벤트 발행 (직접 알림 호출 없음)")
     void reapply_rejected_user_sets_pending_and_notifies() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
@@ -106,7 +109,8 @@ class UserServiceTest {
 
         verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
-        verify(notificationPort).notifyNewUser(any());
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any());
     }
 
     @Test
@@ -122,7 +126,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 알림")
+    @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 이벤트 발행")
     void reapply_pending_after_1h_succeeds() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(
@@ -133,7 +137,8 @@ class UserServiceTest {
 
         verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
-        verify(notificationPort).notifyNewUser(any());
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any());
     }
 
     @Test
@@ -187,7 +192,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("승인 시 ACTIVE 전환 + 승인 알림")
+    @DisplayName("승인 시 ACTIVE 전환 + 이벤트 발행 (직접 알림 호출 없음)")
     void approve_sets_active_and_notifies() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
@@ -196,11 +201,12 @@ class UserServiceTest {
         userService.approve(userId);
 
         verify(userPort).save(argThat(u -> u.status() == User.UserStatus.ACTIVE));
-        verify(notificationPort).notifyApproved(any());
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(notificationPort, never()).notifyApproved(any());
     }
 
     @Test
-    @DisplayName("거절 시 REJECTED 전환 + 거절 알림")
+    @DisplayName("거절 시 REJECTED 전환 + 이벤트 발행 (직접 알림 호출 없음)")
     void reject_sets_rejected_and_notifies() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
@@ -209,7 +215,8 @@ class UserServiceTest {
         userService.reject(userId);
 
         verify(userPort).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
-        verify(notificationPort).notifyRejected(any());
+        verify(eventPublisher).publishEvent(any(UserRejectedEvent.class));
+        verify(notificationPort, never()).notifyRejected(any());
     }
 
     @Test

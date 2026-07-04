@@ -1,6 +1,9 @@
 package com.kista.adapter.out.notify;
 
 import com.kista.application.event.NewUserRegisteredEvent;
+import com.kista.application.event.UserApprovedEvent;
+import com.kista.application.event.UserRejectedEvent;
+import com.kista.application.event.UserReappliedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
@@ -29,6 +32,21 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         if (event.user().status() == User.UserStatus.ACTIVE) {
             return; // 관리자 시드 등 이미 승인된 사용자는 알림 불필요
         }
+        notifyNewUser(event.user());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUserApproved(UserApprovedEvent event) {
+        notifyApproved(event.user());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUserRejected(UserRejectedEvent event) {
+        notifyRejected(event.user());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUserReapplied(UserReappliedEvent event) {
         notifyNewUser(event.user());
     }
 

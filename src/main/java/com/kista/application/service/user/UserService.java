@@ -2,6 +2,9 @@ package com.kista.application.service.user;
 
 import com.kista.application.config.AdminBootstrapProperties;
 import com.kista.application.event.NewUserRegisteredEvent;
+import com.kista.application.event.UserApprovedEvent;
+import com.kista.application.event.UserRejectedEvent;
+import com.kista.application.event.UserReappliedEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.*;
@@ -10,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -30,8 +34,6 @@ class UserService implements UserUseCase {
 
     private final UserPort userPort;
     private final UserCascadeDeleter userCascadeDeleter;
-    private final UserNotificationPort notificationPort;
-    private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
     private final AdminBootstrapProperties bootstrapProps; // ADMIN seed 목록
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
@@ -58,6 +60,7 @@ class UserService implements UserUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // OAuth HTTP 호출 + 신규 사용자 저장 — 트랜잭션 불필요 (단건 저장은 JPA auto-commit)
     public User login(String code, String redirectUri) {
         // 인가 코드를 카카오 액세스 토큰으로 교환
         String kakaoAccessToken = kakaoOAuthPort.exchangeCodeForToken(code, redirectUri);
@@ -106,8 +109,8 @@ class UserService implements UserUseCase {
         User updated = user.withStatus(User.UserStatus.ACTIVE);
         userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
-        notificationPort.notifyApproved(updated);
-        realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.ACTIVE);
+        // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
+        eventPublisher.publishEvent(new UserApprovedEvent(updated));
     }
 
     @Override
@@ -117,8 +120,8 @@ class UserService implements UserUseCase {
         User updated = user.withStatus(User.UserStatus.REJECTED, Instant.now());
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
-        notificationPort.notifyRejected(updated);
-        realtimeNotificationPort.notifyStatusChange(userId, User.UserStatus.REJECTED);
+        // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
+        eventPublisher.publishEvent(new UserRejectedEvent(updated));
         blacklistPort.add(userId, REJECT_BLACKLIST_TTL); // 거절 즉시 AT 차단
         refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
@@ -139,7 +142,8 @@ class UserService implements UserUseCase {
         User updated = user.withStatus(User.UserStatus.PENDING, now);
         userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
-        notificationPort.notifyNewUser(updated);
+        // 커밋 성공 후 관리자 알림 — 롤백 시 알림 미발송
+        eventPublisher.publishEvent(new UserReappliedEvent(updated));
     }
 
     // 쿨다운 미경과 시 CooldownException 발생 — PENDING/REJECTED 공통 판정
