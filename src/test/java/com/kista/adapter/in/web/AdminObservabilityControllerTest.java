@@ -43,7 +43,7 @@ class AdminObservabilityControllerTest {
     @MockitoBean BlacklistUseCase blacklistUseCase;
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
-    @MockitoBean AppErrorLogPort appErrorLogPort;
+    @MockitoBean AppErrorLogPort appErrorLogPort; // GlobalExceptionHandler 의존성
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -92,7 +92,7 @@ class AdminObservabilityControllerTest {
                 UUID.randomUUID(), "KisApiException", "KIS 오류", "stack...",
                 Map.of("caller", "TradingService"), Instant.now()
         );
-        when(appErrorLogPort.findRecent(100)).thenReturn(List.of(log));
+        when(adminQuery.listErrorLogs(100)).thenReturn(List.of(log));
 
         mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
@@ -102,7 +102,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void listErrorLogs_customLimit_passedToPort() throws Exception {
-        when(appErrorLogPort.findRecent(50)).thenReturn(List.of());
+        when(adminQuery.listErrorLogs(50)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/errors?limit=50")
                         .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))

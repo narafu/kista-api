@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AccountRequest;
 import com.kista.adapter.in.web.dto.AccountResponse;
+import com.kista.adapter.in.web.dto.TestConnectionRequest;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.in.AccountUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,9 +26,6 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountUseCase accountUseCase;
-
-    // 연결 테스트 요청 DTO — broker: null이면 KIS 기본값 적용, accountId: 수정 시 전달하면 발급 토큰을 캐시에 저장, 등록 전 검증 시 null 허용
-    record TestConnectionRequest(Account.Broker broker, String appKey, String appSecret, UUID accountId) {}
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")

@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.KakaoCallbackRequest;
 import com.kista.adapter.in.web.dto.KakaoLoginResponse;
 import com.kista.adapter.in.web.dto.RefreshResponse;
 import com.kista.adapter.in.web.dto.UserResponse;
@@ -12,7 +13,6 @@ import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -46,12 +46,6 @@ public class AuthController {
     private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
     private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse.balanceCheckEnabled 조회용
 
-    record KakaoCallbackRequest(
-            @Schema(description = "카카오 OAuth 인가 코드", example = "xxxxxxxxxxxxxxxxxxxxxxxx")
-            String code,
-            @Schema(description = "카카오 리다이렉트 URI", example = "https://example.com/oauth/kakao")
-            String redirectUri
-    ) {} // 카카오 인가 코드 + 리다이렉트 URI
 
     // 카카오 OAuth 인가 코드로 로그인 — AT(body) + RT(HttpOnly 쿠키) 발급
     @Operation(summary = "카카오 로그인", description = "카카오 OAuth 인가 코드로 로그인. 신규 사용자는 PENDING 상태로 가입 후 관리자 승인 대기.")

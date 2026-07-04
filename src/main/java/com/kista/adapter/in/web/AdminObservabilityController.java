@@ -6,11 +6,9 @@ import com.kista.adapter.in.web.dto.AuditLogResponse;
 import com.kista.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
-import com.kista.domain.port.out.AppErrorLogPort;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -37,7 +35,6 @@ public class AdminObservabilityController {
 
     private final AdminQueryUseCase adminQuery;
     private final AdminUserUseCase adminUser;
-    private final AppErrorLogPort appErrorLogPort;
 
     // 감사 로그 — 관리자 액션 기록
     @GetMapping("/audit")
@@ -59,11 +56,11 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         int safeLimit = Math.min(limit, MAX_LIMIT);
         if (from == null && to == null) {
-            return appErrorLogPort.findRecent(safeLimit).stream().map(ErrorLogResponse::from).toList();
+            return adminQuery.listErrorLogs(safeLimit).stream().map(ErrorLogResponse::from).toList();
         }
         Instant fromInstant = from != null ? from.atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.EPOCH;
         Instant toInstant   = to   != null ? to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.now();
-        return appErrorLogPort.findRecent(safeLimit, fromInstant, toInstant).stream()
+        return adminQuery.listErrorLogs(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();
     }
@@ -72,7 +69,7 @@ public class AdminObservabilityController {
     @DeleteMapping("/errors/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void softDeleteErrorLog(@PathVariable UUID id) {
-        appErrorLogPort.softDelete(id);
+        adminQuery.deleteErrorLog(id);
     }
 
     // 이상 징후 — 일시정지·비활성 계좌

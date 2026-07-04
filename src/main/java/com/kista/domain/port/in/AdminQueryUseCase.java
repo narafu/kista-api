@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBaseView;
@@ -45,4 +46,9 @@ public interface AdminQueryUseCase {
 
     // 단일 계좌 조회 — listStrategyOrders 전용 (전체 풀스캔 불필요)
     Optional<Account> findAccount(UUID accountId);
+
+    // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용
+    List<AppErrorLog> listErrorLogs(int limit);
+    List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to);
+    void deleteErrorLog(UUID id);
 }
