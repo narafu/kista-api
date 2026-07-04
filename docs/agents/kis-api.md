@@ -9,13 +9,11 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
 - `KisHttpClient.buildHeaders(String trId, Account account)` — Account 계좌별 자격증명으로 헤더 구성
-- `KisTokenPort.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`kis_tokens` PK = account_id UUID)
-- 토큰 관리는 `KisTokenAdapter`만 담당; `findValidToken(accountId, now.plusMinutes(1))` — 만료 1분 전부터 재발급 (경계값 EGW00123 방지)
-- **`KisTokenAdapter`는 `KisHttpClient` 미사용** — `RestTemplate`+`KisProperties` 직접 주입 (`KisHttpClient`→`KisTokenPort`→`KisTokenAdapter` 순환 방지)
-- **토큰 발급 우회 경로 주의** — `/oauth2/tokenP`를 직접 호출하는 두 곳: `KisConnectionTestAdapter.test()` / `KisTokenAdapter.testToken()`. 두 곳 모두 `accountId` 파라미터 필수, 성공 시 `kisTokenCachePort.saveToken()` 저장 (누락 시 KIS에서 "접속요청 발행" 알림 매번 발생)
-- `testToken(accountId, appKey, appSecret)` — `AccountService.update()` 호출, 발급 토큰을 캐시 저장 → 직후 API 호출 재발급 방지
-- `KisConnectionTestPort.test(appKey, appSecret, UUID accountId)` — accountId=null이면 캐시 저장 생략 (등록 전 사전 검증), accountId 있으면 저장
-- `KisTokenAdapter.getToken()` — accountId별 `ReentrantLock` + double-check locking으로 동시 요청 경합 차단 (대시보드 동시 호출 시 N번 발급 방지)
+- `KisAuthApi.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`broker_tokens` PK = account_id UUID). `KisHttpClient`가 **구체 타입으로 직접 주입**받음 (KisTokenPort 삭제됨 — 어댑터 패키지 내부 협력)
+- 토큰 관리는 `KisAuthApi`만 담당; 만료 1분 전부터 재발급 (경계값 EGW00123 방지), `DoubleCheckedTokenCache`로 동시 요청 경합 차단
+- **`KisAuthApi`는 `KisHttpClient` 빈 미주입** — `RestTemplate` 직접 사용 (순환 의존 방지, 정적 헬퍼 `splitAccountNo`/`buildHeaders`만 참조)
+- `BrokerConnectionTestPort` 구현 (`verifyCredentials`/`verifyAccount`): `verifyCredentials(appKey, secretKey, accountId)` — accountId=null이면 캐시 저장 생략(등록 전 사전 검증), 성공 토큰은 90초 단기 캐시(EGW00133 회피)
+- `verifyAccount(appKey, secretKey, accountNo)` — TTTC2101R로 계좌 실소유 검증 후 `null` 반환 (KIS는 brokerAccountCode 없음), 실패 시 `Account.InvalidBrokerKeyException`
 - 모든 KIS 포트 인터페이스에 `Account account` 파라미터 (V2) — `getBalance(Account)`, `place(Order, Account)`, `isMarketOpen(LocalDate, Account)` 등
 - KIS 포트 인터페이스에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
@@ -27,7 +25,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   2. **LOC 주문에 가격 "0" 전송**: LOC(장마감지정가)는 실제 limit price 필수. `"0"` 전송 시 "$0 이하 체결" 불가 조건으로 판단해 거부 (과거 `formatPrice(LOC,price)="0"` 버그, 수정 완료)
   3. **주문 body를 Map(compact JSON)으로 전송**: KIS GW는 raw JSON String 포맷만 허용 — `KisOrderAdapter.place()`는 `String.format()` 방식 사용 (LinkedHashMap → Jackson 직렬화 금지)
   - 재시도 로직 없음 — 원인 제거로만 해결
-- `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisTokenAdapter`)
+- `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
 - `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > KIS 실잔고(DB 이력과 불일치) 또는 매수 금액 > 실가용자금. 주문 계산 후 2-조건 체크(`totalBuyAmount > usdDeposit OR totalSellQuantity > holdings`)로 사전 감지 가능
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
