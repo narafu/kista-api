@@ -23,8 +23,8 @@ timeout = "10s"
 [deployment]
 strategy = "rolling"            # 배포 시 무중단을 보장하는 전략
 
-# 원래 사용하시던 VM 사양 그대로 명시 (정상 구동에 필수!)
+# Fly.io 2GB 실험: JVM heap 여유와 GC 압박 완화 목적
 [[vm]]
 cpu_kind = "shared"
 cpus = 1
-memory = "1gb"
+memory = "2gb"

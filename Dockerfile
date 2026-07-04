@@ -24,15 +24,14 @@ USER appuser
 
 COPY --from=builder /workspace/build/libs/app.jar app.jar
 
-# JVM 옵션: Fly.io 1GB 기준 메모리 분배
-# Heap 384m + Metaspace 256m + CodeCache 64m + OS/스택 ~100m ≈ 804m (1GB 이내)
-# Metaspace 256m: Spring Boot 3 + JPA/Hibernate + AOP 프록시 클래스 여유 확보
-# SerialGC: G1GC보다 메모리 오버헤드 낮음 — 저트래픽 스케쥴러 앱에 적합
-ENV JAVA_OPTS="-Xmx384m \
-               -Xms64m \
+# JVM 옵션: Fly.io 2GB 기준 메모리 분배
+# Heap 768m + Metaspace 256m + CodeCache 64m + OS/스택/네이티브 메모리 여유 확보
+# G1GC: 2GB 환경에서 SerialGC보다 지연시간 변동을 줄이기 위한 기본값
+ENV JAVA_OPTS="-Xmx768m \
+               -Xms128m \
                -XX:MaxMetaspaceSize=256m \
                -XX:ReservedCodeCacheSize=64m \
-               -XX:+UseSerialGC \
+               -XX:+UseG1GC \
                -XX:+UseContainerSupport \
                -Djava.security.egd=file:/dev/./urandom"
 
