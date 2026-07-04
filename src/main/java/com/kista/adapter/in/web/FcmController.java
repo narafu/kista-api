@@ -1,11 +1,11 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.FcmTokenRequest;
 import com.kista.domain.port.in.UserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,7 +21,7 @@ public class FcmController {
 
     private final UserProfileUseCase userProfileUseCase;
 
-    record FcmTokenRequest(@NotBlank String token, @NotBlank String platform) {} // FCM 토큰 등록 요청 body
+
 
     // FCM 디바이스 토큰 등록 (WEB | ANDROID | IOS)
     @Operation(summary = "FCM 토큰 등록", description = "body: {\"token\": \"...\", \"platform\": \"WEB\"}")

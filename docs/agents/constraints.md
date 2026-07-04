@@ -18,7 +18,7 @@
 ### GlobalExceptionHandler 자동 예외 처리
 - Controller에서 별도 catch/rethrow 불필요 — 아래 예외는 모두 `GlobalExceptionHandler`에서 자동 처리됨
 - `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `IllegalStateException` → 400, `PrivacyTradeConflictException` → 409
-- `SecurityException` → 403, `KisApiException` → 503, `TossApiException` → 503, `Account.InvalidKisKeyException` → 422
+- `SecurityException` → 403, `KisApiException` → 503, `TossApiException` → 503, `Account.InvalidBrokerKeyException` → 422
 - `ManualTradingException` / `OrderCancelException` → 409, `Account.DuplicateAccountException` → 409
 - `User.CooldownException` → 429(Retry-After 포함, 재신청 쿨다운), `Account.KisRateLimitException` → 429
 - `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
@@ -136,7 +136,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 
 ### Adapter 내부 중첩 타입 접근 제어자
 - 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
-- 예: `KisConnectionTestAdapter.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
+- 예: `KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### Lombok 패턴

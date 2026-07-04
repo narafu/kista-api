@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.web.dto.MarketSessionResponse;
 import com.kista.adapter.in.web.dto.TossCandleResponse;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.in.MarketUseCase;
@@ -60,8 +61,4 @@ public class MarketHolidayController {
         return TossCandleResponse.fromList(marketUseCase.getDailyCandles(ticker, count));
     }
 
-    record MarketSessionResponse(
-            @Schema(allowableValues = {"DIRECT", "BLOCKED"}) String session,
-            boolean isDst
-    ) {}
 }

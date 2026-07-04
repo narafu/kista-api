@@ -50,8 +50,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         Account account = accountPort.findByIdOrThrow(command.accountId());
         Strategy strategy = strategyPort.findByIdOrThrow(command.strategyId());
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
-        CyclePosition latest = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1).stream()
-                .findFirst()
+        CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
 
         // 선택 체인 무결성 검증 — 관리자 UI에서 user -> account -> strategy 순 선택을 강제하는 백엔드 가드

@@ -20,13 +20,6 @@ public record Strategy(
 ) {
     public static final int DEFAULT_DIVISION_COUNT = 20;
 
-    // 소유권 검증 — 불일치 시 SecurityException (GlobalExceptionHandler → 403)
-    public void verifyOwnedBy(UUID requesterId) {
-        if (!accountId.equals(requesterId)) {
-            throw new SecurityException("전략 소유자가 아닙니다.");
-        }
-    }
-
     // 상태만 교체 — 나머지 필드 보존
     public Strategy withStatus(Status newStatus) {
         return new Strategy(id, accountId, type, newStatus, ticker, cycleSeedType);

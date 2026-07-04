@@ -105,8 +105,7 @@ class CycleRotationService {
 
     // 잔고검증 설정에 따라 시드 결정 정책 선택
     private SeedResolutionPolicy resolvePolicy(User user, Account account, Strategy strategy) {
-        UserSettings settings = userSettingsPort.loadByUserId(user.id())
-                .orElse(UserSettings.defaultFor(user.id())); // 미설정 시 기본값(검증 ON)
+        UserSettings settings = userSettingsPort.findOrDefault(user.id()); // 미설정 시 기본값(검증 ON)
         if (!settings.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
             return (s, maintainSeed, maxSeed) ->
@@ -118,8 +117,7 @@ class CycleRotationService {
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준
     private BigDecimal calcLastPositionDeposit(Strategy strategy, StrategyCycle currentCycle) {
-        return cyclePositionPort.findLatestByStrategyId(strategy.id(), 1).stream()
-                .findFirst()
+        return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(CyclePosition::usdDeposit)
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }

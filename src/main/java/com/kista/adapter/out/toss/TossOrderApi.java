@@ -6,9 +6,8 @@ import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.TossExecutionPort;
-import com.kista.domain.port.out.TossOrderPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -24,14 +23,13 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class TossOrderApi implements TossOrderPort, TossExecutionPort {
+public class TossOrderApi {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";
 
     private final TossHttpClient tossHttpClient;
 
-    @Override
     public Order place(Order order, Account account) {
         // Toss는 MARKET 주문 미지원 — MOC도 LIMIT+CLS로 대체
         Map<String, Object> body = new LinkedHashMap<>();
@@ -42,26 +40,25 @@ public class TossOrderApi implements TossOrderPort, TossExecutionPort {
         body.put("quantity", order.quantity());
         body.put("price", resolvePrice(order.orderType(), order.price()));
 
-        // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} 래퍼 구조
-        OrderResponseWrapper wrapper = tossHttpClient.post(
-                ORDER_PATH, account, body, OrderResponseWrapper.class);
+        // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} — TossResult 언랩
+        OrderResponse resp = TossResponseParser.unwrap(
+                tossHttpClient.post(ORDER_PATH, account, body,
+                        new ParameterizedTypeReference<TossResult<OrderResponse>>() {}));
 
         // orderId 없으면 비즈니스 실패 처리
-        if (wrapper == null || wrapper.result() == null || wrapper.result().orderId() == null) {
+        if (resp.orderId() == null) {
             throw new TossApiException("Toss 주문 실패: 응답에 orderId 없음", null);
         }
 
         // id=null — KIS와 동일하게 호출자가 DB 저장(plan/markPlaced) 처리
-        return order.withPlaced(wrapper.result().orderId());
+        return order.withPlaced(resp.orderId());
     }
 
-    @Override
     public void cancel(Order order, Account account) {
         // DELETE /api/v1/orders/{externalOrderId}
         tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
     }
 
-    @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
         List<Execution> result = new ArrayList<>();
@@ -82,9 +79,10 @@ public class TossOrderApi implements TossOrderPort, TossExecutionPort {
         LocalDate queryFrom = from.minusDays(1);
 
         while (hasNext) {
-            // Toss 응답은 {"result": {...}} 래퍼 구조 — OrderResponseWrapper(POST)와 동일 패턴
+            // Toss 응답은 {"result": {...}} TossResult 제네릭 래퍼 구조
             MultiValueMap<String, String> params = buildOrderParams(status, queryFrom, to, ticker, cursor);
-            OrdersResponseWrapper wrapper = tossHttpClient.get(ORDER_PATH, account, params, OrdersResponseWrapper.class);
+            TossResult<OrdersResponse> wrapper = tossHttpClient.get(ORDER_PATH, account, params,
+                    new ParameterizedTypeReference<TossResult<OrdersResponse>>() {});
             OrdersResponse response = wrapper != null ? wrapper.result() : null;
             if (response == null || response.orders() == null) break;
 
@@ -168,18 +166,9 @@ public class TossOrderApi implements TossOrderPort, TossExecutionPort {
     }
 
     // package-private — TossOrderApiTest에서 직접 생성하여 stub에 사용
-    record OrderResponseWrapper(
-        @JsonProperty("result") OrderResponse result  // Toss API 공통 {"result": {...}} 래퍼
-    ) {}
-
     record OrderResponse(
         @JsonProperty("orderId") String orderId,
         @JsonProperty("clientOrderId") String clientOrderId
-    ) {}
-
-    // GET /api/v1/orders 응답 래퍼 — Toss API 공통 {"result": {...}} 구조
-    record OrdersResponseWrapper(
-        @JsonProperty("result") OrdersResponse result
     ) {}
 
     // GET /api/v1/orders 응답 — package-private으로 테스트에서 직접 생성 가능

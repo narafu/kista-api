@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
+import java.util.function.Consumer;
+
 @Primary
 @Component
 @RequiredArgsConstructor
@@ -24,57 +26,19 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     }
 
     // 사용자 알림 — notificationChannel에 따라 라우팅
-    @Override
-    public void notifyApproved(User user) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyApproved(user);
-        if (user.notificationChannel().includesFcm())      fcm.notifyApproved(user);
-    }
+    @Override public void notifyApproved(User user)                                                     { route(user, p -> p.notifyApproved(user)); }
+    @Override public void notifyRejected(User user)                                                     { route(user, p -> p.notifyRejected(user)); }
+    @Override public void notifyCycleCompleted(User user, Account account, Strategy strategy)           { route(user, p -> p.notifyCycleCompleted(user, account, strategy)); }
+    @Override public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal d) { route(user, p -> p.notifyNewCycleStarted(user, account, strategy, d)); }
+    @Override public void notifyTradingReport(User user, Account account, TradingReport report)         { route(user, p -> p.notifyTradingReport(user, account, report)); }
+    @Override public void notifyInsufficientBalance(User user, Account account, Strategy.Type t, Strategy.Ticker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
+    @Override public void notifyError(User user, Exception e)                                           { route(user, p -> p.notifyError(user, e)); }
+    @Override public void notifyMarketOpen(User user)                                                   { route(user, p -> p.notifyMarketOpen(user)); }
+    @Override public void notifyMarketClose(User user)                                                  { route(user, p -> p.notifyMarketClose(user)); }
 
-    @Override
-    public void notifyRejected(User user) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyRejected(user);
-        if (user.notificationChannel().includesFcm())      fcm.notifyRejected(user);
-    }
-
-    @Override
-    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyCycleCompleted(user, account, strategy);
-        if (user.notificationChannel().includesFcm())      fcm.notifyCycleCompleted(user, account, strategy);
-    }
-
-    @Override
-    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyNewCycleStarted(user, account, strategy, initialUsdDeposit);
-        if (user.notificationChannel().includesFcm())      fcm.notifyNewCycleStarted(user, account, strategy, initialUsdDeposit);
-    }
-
-    @Override
-    public void notifyTradingReport(User user, Account account, TradingReport report) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyTradingReport(user, account, report);
-        if (user.notificationChannel().includesFcm())      fcm.notifyTradingReport(user, account, report);
-    }
-
-    @Override
-    public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyInsufficientBalance(user, account, strategyType, ticker);
-        if (user.notificationChannel().includesFcm())      fcm.notifyInsufficientBalance(user, account, strategyType, ticker);
-    }
-
-    @Override
-    public void notifyError(User user, Exception e) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyError(user, e);
-        if (user.notificationChannel().includesFcm())      fcm.notifyError(user, e);
-    }
-
-    @Override
-    public void notifyMarketOpen(User user) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyMarketOpen(user);
-        if (user.notificationChannel().includesFcm())      fcm.notifyMarketOpen(user);
-    }
-
-    @Override
-    public void notifyMarketClose(User user) {
-        if (user.notificationChannel().includesTelegram()) telegram.notifyMarketClose(user);
-        if (user.notificationChannel().includesFcm())      fcm.notifyMarketClose(user);
+    // notificationChannel 기반 어댑터 라우팅 — Telegram/FCM 순서 고정
+    private void route(User user, Consumer<UserNotificationPort> action) {
+        if (user.notificationChannel().includesTelegram()) action.accept(telegram);
+        if (user.notificationChannel().includesFcm())      action.accept(fcm);
     }
 }

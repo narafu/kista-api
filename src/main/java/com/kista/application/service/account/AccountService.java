@@ -1,13 +1,13 @@
 package com.kista.application.service.account;
 
+import com.kista.application.service.broker.BrokerConnectionTesters;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.TossConnectionTestPort;
+import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,10 +27,10 @@ class AccountService implements AccountUseCase {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
-    private final KisConnectionTestPort connectionTestPort;   // KIS 자격증명 연결 테스트 포트
-    private final TossConnectionTestPort tossConnectionTestPort; // Toss 자격증명 연결 테스트 + accountSeq 조회
+    private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
     public Account register(UUID userId, RegisterAccountCommand cmd) {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
@@ -47,11 +47,9 @@ class AccountService implements AccountUseCase {
         // broker 미지정 시 KIS 기본값 적용
         Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
 
-        // TOSS: accountSeq를 brokerAccountCode로 저장 / KIS: accountNo에 통합됐으므로 null
-        String brokerAccountCode = switch (broker) {
-            case KIS -> null;
-            case TOSS -> tossConnectionTestPort.testAndFetchAccountSeq(cmd.appKey(), cmd.secretKey());
-        };
+        // 증권사별 자격증명+계좌 검증 — KIS는 accountNo 소유 검증 후 null, Toss는 accountSeq 반환
+        String brokerAccountCode = connectionTesters.of(broker)
+                .verifyAccount(cmd.appKey(), cmd.secretKey(), cmd.accountNo());
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
@@ -93,14 +91,8 @@ class AccountService implements AccountUseCase {
     }
 
     @Override
-    @Transactional(propagation = Propagation.NOT_SUPPORTED) // KIS 외부 API 호출 — 트랜잭션 불필요
-    public void test(String appKey, String appSecret, UUID accountId) {
-        connectionTestPort.test(appKey, appSecret, accountId);
-    }
-
-    @Override
-    @Transactional(propagation = Propagation.NOT_SUPPORTED) // KIS 외부 API 호출 — 트랜잭션 불필요
-    public void testAccountNo(String appKey, String appSecret, String accountNo) {
-        connectionTestPort.testAccountNo(appKey, appSecret, accountNo);
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
+    public void test(Account.Broker broker, String appKey, String appSecret, UUID accountId) {
+        connectionTesters.of(broker).verifyCredentials(appKey, appSecret, accountId);
     }
 }

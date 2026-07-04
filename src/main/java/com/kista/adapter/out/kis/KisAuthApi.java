@@ -6,8 +6,7 @@ import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.BrokerTokenCachePort;
-import com.kista.domain.port.out.KisConnectionTestPort;
-import com.kista.domain.port.out.KisTokenPort;
+import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,12 +30,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// KisTokenPort + KisConnectionTestPort 통합 구현체
+// BrokerConnectionTestPort 구현체 — getToken/invalidateToken은 KisHttpClient에 직접 주입되는 구체 메서드
 // OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
+public class KisAuthApi implements BrokerConnectionTestPort {
 
     private static final ZoneId KST = TimeZones.KST;
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
@@ -54,9 +53,8 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
-    // ── KisTokenPort ───────────────────────────────────────────────────────────
+    // ── 토큰 발급 / 무효화 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
-    @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
         return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
                 () -> fetchAndCacheToken(accountId, appKey, appSecret));
@@ -70,17 +68,16 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             // 발급된 토큰을 account_id 기준으로 DB에 upsert
             brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
             return response.accessToken();
-        } catch (Account.InvalidKisKeyException e) {
-            throw e; // KIS 키 검증 실패는 그대로 전파
+        } catch (Account.InvalidBrokerKeyException e) {
+            throw e; // 증권사 키 검증 실패는 그대로 전파
         } catch (Exception e) {
             throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
         }
     }
 
-    @Override
     public void invalidateToken(UUID accountId) {
         // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
-        brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(KST).minusHours(1));
+        brokerTokenCachePort.saveToken(accountId, BrokerTokenCachePort.INVALIDATED_TOKEN, OffsetDateTime.now(KST).minusHours(1));
     }
 
     // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
@@ -88,10 +85,15 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         return OffsetDateTime.now(KST).plusMinutes(1);
     }
 
-    // ── KisConnectionTestPort ──────────────────────────────────────────────────
+    // ── BrokerConnectionTestPort ───────────────────────────────────────────────
 
     @Override
-    public void test(String appKey, String appSecret, UUID accountId) {
+    public Account.Broker supports() {
+        return Account.Broker.KIS;
+    }
+
+    @Override
+    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
         // 유효 캐시 토큰이 있으면 재발급 없이 성공 — KIS 발급 알림 및 횟수 제한 방지
         if (accountId != null) {
             Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
@@ -102,7 +104,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
         }
         try {
             // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 영구 캐시, null이면 단기 캐시 저장
-            TokenResponse response = issueOAuthToken(appKey, appSecret);
+            TokenResponse response = issueOAuthToken(appKey, secretKey);
             if (accountId != null) {
                 // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
                 OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
@@ -115,12 +117,12 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 
     @Override
-    public void testAccountNo(String appKey, String appSecret, String accountNo) {
+    public String verifyAccount(String appKey, String secretKey, String accountNo) {
         // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
         String token;
         Instant now = Instant.now();
@@ -132,18 +134,18 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             // 만료된 항목 즉시 제거 — ConcurrentHashMap 누적 방지
             if (cached != null) tempTokenCache.remove(appKey, cached);
             try {
-                token = issueOAuthToken(appKey, appSecret).accessToken();
+                token = issueOAuthToken(appKey, secretKey).accessToken();
             } catch (HttpStatusCodeException e) {
                 throw kisKeyException(e, "계좌번호 검증 중 토큰 발급");
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
         }
 
         // 2단계: TTTC2101R 호출로 계좌번호 유효성 검증
         String[] parts = KisHttpClient.splitAccountNo(accountNo);
-        HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, appSecret, KisTradingApi.MARGIN_TR_ID);
+        HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, secretKey, KisTradingApi.MARGIN_TR_ID);
 
         String url = UriComponentsBuilder
                 .fromUriString(kisBaseUrl + KisTradingApi.MARGIN_PATH)
@@ -158,25 +160,26 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
             if (response == null || !"0".equals(response.rtCd())) {
                 // rt_cd != "0" = 계좌번호 불일치 또는 KIS 오류 → 422
                 log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
         } catch (RestClientException e) {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
+        return null; // KIS: brokerAccountCode 없음 (accountNo에 통합)
     }
 
-    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidKisKeyException
+    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidBrokerKeyException
     private RuntimeException kisKeyException(HttpStatusCodeException e, String context) {
         if (e.getResponseBodyAsString().contains("EGW00133")) {
             log.debug("{} rate limit (EGW00133)", context);
             return new Account.KisRateLimitException();
         }
         log.debug("{} 실패: {}", context, e.getMessage());
-        return new Account.InvalidKisKeyException();
+        return new Account.InvalidBrokerKeyException();
     }
 
-    // KIS OAuth 토큰 발급 — getToken/test/testAccountNo 공용
+    // KIS OAuth 토큰 발급 — getToken/verifyCredentials/verifyAccount 공용
     private TokenResponse issueOAuthToken(String appKey, String appSecret) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -191,7 +194,7 @@ public class KisAuthApi implements KisTokenPort, KisConnectionTestPort {
                 new HttpEntity<>(body, headers),
                 TokenResponse.class
         ).getBody();
-        if (response == null) throw new Account.InvalidKisKeyException();
+        if (response == null) throw new Account.InvalidBrokerKeyException();
         return response;
     }
 

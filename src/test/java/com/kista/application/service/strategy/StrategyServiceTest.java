@@ -5,6 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +182,7 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
-        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(latest));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
 
         assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
                 new UpdateStrategyCommand(null, new BigDecimal("5000"))))
@@ -201,7 +202,7 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
-        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(latest));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
         when(cyclePositionInfiniteDetailPort.findByCyclePositionId(latest.id())).thenReturn(Optional.empty());
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
@@ -296,11 +297,12 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
         when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
-        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(reservedPosition));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -327,11 +329,12 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser()); // balanceCheckEnabled=true
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
         when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
-        when(cyclePositionPort.findLatestByStrategyId(STRATEGY_ID, 1)).thenReturn(List.of(reservedPosition));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);

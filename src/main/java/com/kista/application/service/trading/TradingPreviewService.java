@@ -44,8 +44,7 @@ class TradingPreviewService {
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.findByIdOrThrow(strategy.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 현재 StrategyCycle — initialUsdDeposit 조회 (PRIVACY에서 필요)
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
@@ -80,9 +79,7 @@ class TradingPreviewService {
             prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
                     () -> registry.require(account, BrokerPricePort.class).getPriceSnapshot(strategy.ticker(), account).prevClose());
         }
-        PrivacyTradeBase privacyBase = orderStrategy.requiresPrivacyBase()
-                ? privacyTradePort.findTodayTrade(today).orElse(null)
-                : null;
+        PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId, null)

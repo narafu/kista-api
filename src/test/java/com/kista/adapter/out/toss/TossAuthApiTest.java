@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +49,7 @@ class TossAuthApiTest {
     }
 
     @Nested
-    @DisplayName("TossTokenPort — getToken")
+    @DisplayName("TossAuthApi — getToken")
     class TokenTests {
 
         @Test
@@ -84,8 +85,8 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("REST 오류 시 Account.InvalidKisKeyException throw")
-        void getToken_restClientException_throwsInvalidKisKeyException() {
+        @DisplayName("REST 오류 시 Account.InvalidBrokerKeyException throw")
+        void getToken_restClientException_throwsInvalidBrokerKeyException() {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
                     .thenReturn(Optional.empty());
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
@@ -94,7 +95,7 @@ class TossAuthApiTest {
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
             assertThatThrownBy(() -> api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
@@ -114,70 +115,70 @@ class TossAuthApiTest {
     }
 
     @Nested
-    @DisplayName("TossConnectionTestPort — testAndFetchAccountSeq")
+    @DisplayName("BrokerConnectionTestPort — verifyAccount")
     class ConnectionTestTests {
 
         @Test
         @DisplayName("정상 인증 및 계좌 조회 시 첫 번째 accountSeq 반환")
         @SuppressWarnings("unchecked")
-        void testAndFetchAccountSeq_success_returnsSeq() {
+        void verifyAccount_success_returnsSeq() {
             // OAuth 토큰 발급 stub
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             // 계좌 목록 조회 stub
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(
+                    any(ParameterizedTypeReference.class)))
+                    .thenReturn(ResponseEntity.ok(new TossResult<>(
                             List.of(new TossAuthApi.AccountItem(42, "1234567890"))
                     )));
 
-            String result = api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET);
+            String result = api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null);
 
             assertThat(result).isEqualTo("42");
-            // testAndFetchAccountSeq는 캐시 저장 없음 (accountId 미보유)
+            // verifyAccount는 캐시 저장 없음 (accountId 미보유)
             verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
         }
 
         @Test
-        @DisplayName("OAuth 인증 실패 시 Account.InvalidKisKeyException throw")
-        void testAndFetchAccountSeq_authFails_throwsInvalidKisKeyException() {
+        @DisplayName("OAuth 인증 실패 시 Account.InvalidBrokerKeyException throw")
+        void verifyAccount_authFails_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.UNAUTHORIZED, "Unauthorized",
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
-            assertThatThrownBy(() -> api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+            assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
-        @DisplayName("계좌 목록 비어있으면 Account.InvalidKisKeyException throw")
+        @DisplayName("계좌 목록 비어있으면 Account.InvalidBrokerKeyException throw")
         @SuppressWarnings("unchecked")
-        void testAndFetchAccountSeq_emptyAccounts_throwsInvalidKisKeyException() {
+        void verifyAccount_emptyAccounts_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new TossAuthApi.AccountsResponse(List.of())));
+                    any(ParameterizedTypeReference.class)))
+                    .thenReturn(ResponseEntity.ok(new TossResult<>(List.of())));
 
-            assertThatThrownBy(() -> api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+            assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
 
         @Test
-        @DisplayName("계좌 조회 REST 오류 시 Account.InvalidKisKeyException throw")
+        @DisplayName("계좌 조회 REST 오류 시 Account.InvalidBrokerKeyException throw")
         @SuppressWarnings("unchecked")
-        void testAndFetchAccountSeq_accountsFetchFails_throwsInvalidKisKeyException() {
+        void verifyAccount_accountsFetchFails_throwsInvalidBrokerKeyException() {
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("temp-token", 86400L)));
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(),
-                    eq(TossAuthApi.AccountsResponse.class)))
+                    any(ParameterizedTypeReference.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.FORBIDDEN, "Forbidden",
                             org.springframework.http.HttpHeaders.EMPTY, new byte[]{}, null));
 
-            assertThatThrownBy(() -> api.testAndFetchAccountSeq(CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidKisKeyException.class);
+            assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
+                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
         }
     }
 }

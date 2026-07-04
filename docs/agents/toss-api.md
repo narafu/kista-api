@@ -7,7 +7,7 @@
 ### 어댑터 구조
 
 - `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`에서 RestTemplate 빈 주입
-- API 클래스 7개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossCommissionsApi`, `TossMarketApi`
+- API 클래스 6개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossMarketApi`
 - `TossBrokerAdapter`: `BrokerAdapterPort` + 공통 5개 Port + Toss 전용 5개 Port 구현
   - Toss 전용: `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `MarketCalendarPort`, `BrokerAccountPort`
 

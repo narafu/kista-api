@@ -15,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,7 +34,7 @@ class UserSettingsServiceTest {
 
     @Test
     void getByUserId_returns_defaults_when_no_record() {
-        when(userSettingsPort.loadByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         UserSettings result = service.getByUserId(USER_ID);
         assertThat(result.balanceCheckEnabled()).isTrue();
         assertThat(result.isNotificationEnabled(NotificationType.TRADING_ALERT)).isTrue();
@@ -44,14 +43,14 @@ class UserSettingsServiceTest {
     @Test
     void getByUserId_returns_stored_settings() {
         UserSettings stored = new UserSettings(USER_ID, false, Map.of(NotificationType.TRADING_ALERT, false));
-        when(userSettingsPort.loadByUserId(USER_ID)).thenReturn(Optional.of(stored));
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(stored);
         assertThat(service.getByUserId(USER_ID)).isSameAs(stored);
     }
 
     @Test
     void updateNotificationPref_saves_updated_pref() {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of());
-        when(userSettingsPort.loadByUserId(USER_ID)).thenReturn(Optional.of(existing));
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.update(new UpdateNotificationPrefCommand(USER_ID, NotificationType.TRADING_ALERT, false));
 
@@ -62,7 +61,7 @@ class UserSettingsServiceTest {
     @Test
     void updateBalanceCheck_saves_updated_value() {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of());
-        when(userSettingsPort.loadByUserId(USER_ID)).thenReturn(Optional.of(existing));
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of());
 
         service.update(new UpdateBalanceCheckCommand(USER_ID, false));

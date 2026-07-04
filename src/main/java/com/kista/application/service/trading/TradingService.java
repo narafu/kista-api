@@ -7,10 +7,8 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserSettings;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.strategy.CycleOrderStrategy;
@@ -48,8 +46,7 @@ class TradingService {
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
-    private final UserPort userPort;                           // ACTIVE 사용자 전체 조회 (장 알림용)
-    private final UserSettingsPort userSettingsPort; // MARKET_ALERT 활성 여부 조회
+    private final MarketEventNotifier marketEventNotifier;    // 장 이벤트 알림 (개장·마감 사용자 알림)
 
     // planAndSaveOrders 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
@@ -107,7 +104,7 @@ class TradingService {
 
         // 공통 대기 — 마감 시각까지 (모든 전략이 공유하는 단 1회)
         waitFor("마감 시각", dst.waitUntilPostClose(), dst);
-        notifyMarketEvent(NotificationType.MARKET_ALERT, user -> userNotificationPort.notifyMarketClose(user));
+        marketEventNotifier.notifyMarketClose();
 
         // 장 마감 후 종가 일괄 조회
         Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, priceAccount);
@@ -186,22 +183,21 @@ class TradingService {
 
         // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (장 개시 스케쥴러 선행 또는 수동 주문 보존)
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
-        BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
         List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
         if (!todayOrders.isEmpty()) {
-            return buildCycleStateFromExistingOrders(ctx, balance, price, privacyBase, today, prevClosePrice, todayOrders.size());
+            return buildCycleStateFromExistingOrders(ctx, balance, priceSnapshot, privacyBase, today, todayOrders.size());
         }
 
         // 3. 전략 계산 → live 잔고 검증 → PLANNED 저장 (skip·부족 시 null)
+        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
         CycleOrderStrategy.OrderPlan plan = computeValidateAndSave(ctx, balance, prevClosePrice, today, privacyBase, price)
                 .orElse(null);
         if (plan == null) return null;
 
         // CycleState: INFINITE는 position, PRIVACY는 privacyBase — startPrice는 공통(둘 다 캡에 필요)
-        BigDecimal startPrice = price; // INFINITE: BuyOrderPriceCapper, PRIVACY: capPrivacyIfNeeded
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        return new CycleState(ctx, balance, plan.position(), startPrice, privacyBaseForState);
+        return new CycleState(ctx, balance, plan.position(), price, privacyBaseForState);
     }
 
     // 전략 계산 → live 잔고 검증 → PLANNED 저장 — 마감·개장 스케쥴러 공통 골격
@@ -226,12 +222,14 @@ class TradingService {
     // 오늘 PLANNED·PLACED 주문이 이미 있을 때 캡 보정을 위해 position만 재계산 (저장 없음)
     // INFINITE: position 재계산(skip이면 null), PRIVACY: privacyBase만 담아 반환
     private CycleState buildCycleStateFromExistingOrders(BatchContext ctx, AccountBalance balance,
-            BigDecimal price, PrivacyTradeBase privacyBase, LocalDate today, BigDecimal prevClosePrice, int existingCount) {
+            PriceSnapshot priceSnapshot, PrivacyTradeBase privacyBase, LocalDate today, int existingCount) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
+        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
         if (strategy.isInfinite()) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
+            BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
             InfinitePosition recalcPos = orderComputer.compute(
                     balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname(), price)
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
@@ -273,7 +271,7 @@ class TradingService {
 
         // 개장 시각까지 대기
         waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
-        notifyMarketEvent(NotificationType.MARKET_ALERT, user -> userNotificationPort.notifyMarketOpen(user));
+        marketEventNotifier.notifyMarketOpen();
 
         // 전략별: order 생성·저장 + INFINITE 매도 선접수
         for (BatchContext ctx : contexts) {
@@ -310,8 +308,7 @@ class TradingService {
         }
 
         // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)
-        List<Order> atOpenOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate)
-                .stream().filter(o -> o.timing() == Order.OrderTiming.AT_OPEN).toList();
+        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(currentCycle.id(), tradeDate);
         if (atOpenOrders.isEmpty()) {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
             return;
@@ -329,21 +326,6 @@ class TradingService {
             return true;
         }
         return false;
-    }
-
-    // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게 알림 발송
-    private void notifyMarketEvent(NotificationType type, java.util.function.Consumer<User> notify) {
-        userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
-            UserSettings settings = userSettingsPort.loadByUserId(user.id())
-                    .orElse(UserSettings.defaultFor(user.id()));
-            if (settings.isNotificationEnabled(type)) {
-                try {
-                    notify.accept(user);
-                } catch (Exception e) {
-                    log.warn("[userId={}] 장 알림 발송 실패: {}", user.id(), e.getMessage());
-                }
-            }
-        });
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그

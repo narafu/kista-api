@@ -27,9 +27,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // 기간+종목 필터 (대시보드용)
     List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 
-    // 기간 전체 (관리자용)
-    List<OrderEntity> findByTradeDateBetween(LocalDate from, LocalDate to);
-
     // 관리자 거래내역 — 최신순
     List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDesc(LocalDate from, LocalDate to);
 
@@ -54,6 +51,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             WHERE a.user_id = :userId
               AND o.trade_date BETWEEN :from AND :to
               AND o.ticker = :ticker
+              AND a.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<OrderEntity> findByUserIdAndTradeDateBetweenAndTicker(
@@ -77,6 +75,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND o.trade_date BETWEEN :from AND :to
+              AND sc.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<OrderEntity> findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
@@ -84,11 +83,16 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
+    // AT_OPEN 타이밍 PLANNED 주문 조회 (개장 스케쥴러·수동 실행 시 즉시 선접수용)
+    List<OrderEntity> findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
+            UUID strategyCycleId, LocalDate tradeDate, Order.OrderTiming timing, Order.OrderStatus status);
+
     // 전략 기준 distinct 거래일 목록 조회 — 관리자 주문 보정 거래일 드롭다운용
     @Query(value = """
             SELECT DISTINCT o.trade_date FROM orders o
             JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
+              AND sc.deleted_at IS NULL
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);

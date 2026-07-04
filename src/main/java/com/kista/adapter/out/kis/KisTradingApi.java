@@ -8,7 +8,6 @@ import com.kista.domain.model.broker.*;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,15 +21,13 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisTradingApi implements KisAccountPort,
-        KisExecutionPort,
-        KisPortfolioPort, KisMarginPort, KisSellableQuantityPort {
+public class KisTradingApi {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회
 
-    static final String MARGIN_PATH = "/uapi/overseas-stock/v1/trading/foreign-margin"; // KisAuthApi.testAccountNo 공용
-    static final String MARGIN_TR_ID = "TTTC2101R"; // 해외증거금 통화별조회 — KisAuthApi.testAccountNo 공용
+    static final String MARGIN_PATH = "/uapi/overseas-stock/v1/trading/foreign-margin"; // KisAuthApi.verifyAccount 공용
+    static final String MARGIN_TR_ID = "TTTC2101R"; // 해외증거금 통화별조회 — KisAuthApi.verifyAccount 공용
     private static final String TARGET_NATION = "미국";
 
     private static final String PORTFOLIO_PATH = "/uapi/overseas-stock/v1/trading/inquire-present-balance";
@@ -44,9 +41,8 @@ public class KisTradingApi implements KisAccountPort,
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    // ── KisAccountPort ─────────────────────────────────────────────────────────
+    // ── getBalance() ─────────────────────────────────────────────────────────
 
-    @Override
     public AccountBalance getBalance(Account account, Ticker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
@@ -77,7 +73,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── MarginPort.getMargin() ────────────────────────────────────────────────
 
-    @Override
     public List<MarginItem> getMargin(Account account) {
         MarginResponse response = kisHttpClient.tradingGet(
                 MARGIN_TR_ID, MARGIN_PATH, account, MarginResponse.class, p -> {});
@@ -102,9 +97,8 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── MarginPort.getUsdBuyableAmount() ──────────────────────────────────────
 
-    @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
-        // getMargin()은 MarginPort 구현 — KisAccountPort.getBalance()에서도 사용
+        // getMargin()은 MarginPort 구현 — getBalance()에서도 사용
         return getMargin(account).stream()
                 .filter(item -> Currency.USD == item.currency())
                 .findFirst()
@@ -114,7 +108,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── PortfolioPort.getPresentBalance() ─────────────────────────────────────
 
-    @Override
     public PresentBalanceResult getPresentBalance(Account account) {
         PortfolioResponse response = kisHttpClient.tradingGet(
                 PORTFOLIO_TR_ID, PORTFOLIO_PATH, account, PortfolioResponse.class,
@@ -154,7 +147,6 @@ public class KisTradingApi implements KisAccountPort,
     // ── SellableQuantityPort.getSellableQuantity() ────────────────────────────
 
     // TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
-    @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
         int quantity = fetchHolding(account, ticker).quantity();
         log.info("KIS 판매 가능 수량: ticker={}, quantity={}", ticker, quantity);
@@ -163,7 +155,6 @@ public class KisTradingApi implements KisAccountPort,
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────
 
-    @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         ExecutionListResponse response = kisHttpClient.tradingGet(
                 EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,

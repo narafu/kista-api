@@ -6,7 +6,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.KisPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisPriceApi implements KisPricePort {
+public class KisPriceApi {
 
     private static final String SINGLE_PATH  = "/uapi/overseas-price/v1/quotations/price";
     private static final String SINGLE_TR_ID = "HHDFS00000300";
@@ -34,13 +33,11 @@ public class KisPriceApi implements KisPricePort {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    @Override
     public BigDecimal getPrice(Ticker ticker, Account account) {
         // 현재가만 필요한 경우 — snapshot 조회 후 current 반환 (KIS API 호출 횟수 동일)
         return getPriceSnapshot(ticker, account).current();
     }
 
-    @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
         if (tickers.isEmpty()) return Map.of();
 
@@ -63,7 +60,6 @@ public class KisPriceApi implements KisPricePort {
         return result;
     }
 
-    @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
         String excd = exchangeRegistry.excd(ticker);
         PriceResponse response = kisHttpClient.pricingGet(
@@ -88,7 +84,6 @@ public class KisPriceApi implements KisPricePort {
         return new PriceSnapshot(current, prevClose);
     }
 
-    @Override
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
         if (tickers.isEmpty()) return Map.of();
 

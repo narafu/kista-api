@@ -53,7 +53,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/help"));
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
-        assertThat(captor.getValue()).contains("/status").contains("/history").contains("/run");
+        assertThat(captor.getValue()).contains("/status").contains("/history");
     }
 
     @Test
@@ -93,37 +93,13 @@ class TelegramBotServiceTest {
     }
 
     @Test
-    void run_command_transitions_to_awaiting_confirm() {
+    void run_command_returns_v2_info_immediately() {
         sut.handle(update("/run"));
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(apiClient).sendMessage(any(), captor.capture());
-        assertThat(captor.getValue()).contains("yes/no");
-    }
-
-    @Test
-    void run_confirm_yes_returns_v2_info_message() {
-        sut.handle(update("/run"));
-        reset(apiClient);
-
-        sut.handle(update("yes"));
-
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
-        // V2에서는 스케쥴러가 자동 처리 안내 메시지 확인
-        assertThat(captor.getValue()).contains("스케쥴러");
-    }
-
-    @Test
-    void run_confirm_no_cancels_and_returns_to_idle() {
-        sut.handle(update("/run"));
-        reset(apiClient);
-
-        sut.handle(update("no"));
-
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
-        assertThat(captor.getValue()).contains("취소");
+        // V2에서는 확인 절차 없이 스케쥴러 안내 메시지 즉시 반환
+        assertThat(captor.getValue()).contains("스케줄러");
     }
 
     @Test

@@ -2,9 +2,9 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.toss.TossCandle;
-import com.kista.domain.port.out.TossCandlePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -22,7 +22,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossCandleApi implements TossCandlePort {
+public class TossCandleApi {
 
     private static final String CANDLES_PATH = "/api/v1/candles";
     // 일봉 기준 최대 요청 수 (주말 포함 여유분)
@@ -30,7 +30,6 @@ public class TossCandleApi implements TossCandlePort {
 
     private final TossHttpClient tossHttpClient;
 
-    @Override
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
         // before = to 다음날 00:00 UTC (to 당일 봉 포함)
         String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
@@ -43,7 +42,6 @@ public class TossCandleApi implements TossCandlePort {
         return candles.stream().filter(c -> !c.date().isBefore(from)).toList();
     }
 
-    @Override
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
         int clamped = Math.max(1, Math.min(count, MAX_COUNT));
         // before = 내일 00:00 UTC (오늘 봉까지 포함) — 토스 1회 호출 최대치(count)만큼 최신 캔들 그대로 사용
@@ -59,14 +57,15 @@ public class TossCandleApi implements TossCandlePort {
         params.add("before",   beforeParam);
 
         // 공통 API — 관리자 토큰 사용
-        CandlesResponse response = tossHttpClient.getCommon(CANDLES_PATH, params, CandlesResponse.class);
-
-        if (response == null || response.result() == null || response.result().candles() == null) {
+        TossResult<CandlesResult> wrapper = tossHttpClient.getCommon(CANDLES_PATH, params,
+                new ParameterizedTypeReference<TossResult<CandlesResult>>() {});
+        CandlesResult candlesResult = wrapper != null ? wrapper.result() : null;
+        if (candlesResult == null || candlesResult.candles() == null) {
             log.warn("Toss 캔들 응답 없음: symbol={}, interval={}", symbol, interval);
             return List.of();
         }
 
-        return response.result().candles().stream()
+        return candlesResult.candles().stream()
                 .filter(c -> c.timestamp() != null)
                 .map(c -> {
                     // timestamp(ISO8601 UTC) → LocalDate
@@ -88,10 +87,6 @@ public class TossCandleApi implements TossCandlePort {
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
     // package-private — 테스트에서 직접 생성
-    record CandlesResponse(
-        @JsonProperty("result") CandlesResult result
-    ) {}
-
     record CandlesResult(
         @JsonProperty("candles") List<CandleItem> candles,
         @JsonProperty("nextBefore") String nextBefore

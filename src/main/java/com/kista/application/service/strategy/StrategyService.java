@@ -11,6 +11,7 @@ import com.kista.domain.port.out.broker.MarginPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ class StrategyService implements StrategyUseCase {
     private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증 HTTP 호출 포함 — 트랜잭션 없이 실행 (각 DB 저장은 JPA auto-commit)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
@@ -73,7 +75,7 @@ class StrategyService implements StrategyUseCase {
     // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
     private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit) {
         userPort.findByIdOrThrow(userId); // 사용자 존재 확인
-        UserSettings settings = userSettingsPort.loadByUserId(userId).orElse(UserSettings.defaultFor(userId));
+        UserSettings settings = userSettingsPort.findOrDefault(userId);
         if (settings.balanceCheckEnabled() && initialUsdDeposit != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (initialUsdDeposit.compareTo(freeCash) > 0) {
@@ -198,8 +200,7 @@ class StrategyService implements StrategyUseCase {
         BigDecimal kisUsdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
-                .map(s -> cyclePositionPort.findLatestByStrategyId(s.id(), 1).stream()
-                        .findFirst()
+                .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
                         .map(CyclePosition::usdDeposit)
                         .orElse(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -213,8 +214,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalArgumentException("시드는 0보다 커야 합니다");
         }
         StrategyCycle cycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategyId);
-        CyclePosition latest = cyclePositionPort.findLatestByStrategyId(strategyId, 1).stream()
-                .findFirst()
+        CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 
         if (latest.holdings() != 0) {
@@ -236,8 +236,7 @@ class StrategyService implements StrategyUseCase {
                         .map(StrategyInfiniteDetail::divisionCount)
                         .orElse(Strategy.DEFAULT_DIVISION_COUNT)
                 : null;
-        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestByStrategyId(strategy.id(), 1)
-                .stream().findFirst();
+        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
         boolean isReverseMode = latestPos
                 .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
                 .map(CyclePositionInfiniteDetail::isReverseMode)

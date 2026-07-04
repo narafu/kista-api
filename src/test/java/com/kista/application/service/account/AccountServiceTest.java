@@ -1,12 +1,12 @@
 package com.kista.application.service.account;
 
+import com.kista.application.service.broker.BrokerConnectionTesters;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.KisConnectionTestPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.TossConnectionTestPort;
+import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,8 +28,8 @@ class AccountServiceTest {
 
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
-    @Mock KisConnectionTestPort connectionTestPort;       // AccountService 생성자 주입 필수
-    @Mock TossConnectionTestPort tossConnectionTestPort; // Toss 계좌 등록 시 사용
+    @Mock BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
+    @Mock BrokerConnectionTestPort connectionTester;  // 라우터가 반환하는 실제 포트 mock
     @InjectMocks AccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -51,6 +51,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
+        when(connectionTesters.of(any())).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(null);
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
@@ -64,6 +66,7 @@ class AccountServiceTest {
         assertThat(result.id()).isNotNull();
         assertThat(result.broker()).isEqualTo(Account.Broker.KIS);
         verify(accountPort).save(any());
+        verify(connectionTester).verifyAccount("appKey", "appSecret", "74420614");
     }
 
     @Test
@@ -145,10 +148,11 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("Toss 계좌 등록: testAndFetchAccountSeq 호출 후 반환된 accountSeq 저장")
-    void register_tossAccount_callsTestAndFetchAndStoresSeq() {
+    @DisplayName("Toss 계좌 등록: verifyAccount 호출 후 반환된 accountSeq 저장")
+    void register_tossAccount_callsVerifyAccountAndStoresSeq() {
+        when(connectionTesters.of(any())).thenReturn(connectionTester);
         // Toss API 연결 성공 → accountSeq "42" 반환
-        when(tossConnectionTestPort.testAndFetchAccountSeq("cid", "csecret")).thenReturn("42");
+        when(connectionTester.verifyAccount("cid", "csecret", "12345678901")).thenReturn("42");
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -158,7 +162,7 @@ class AccountServiceTest {
 
         Account result = accountService.register(userId, cmd);
 
-        verify(tossConnectionTestPort).testAndFetchAccountSeq("cid", "csecret");
+        verify(connectionTester).verifyAccount("cid", "csecret", "12345678901");
         assertThat(result.brokerAccountCode()).isEqualTo("42"); // accountSeq 저장
         assertThat(result.broker()).isEqualTo(Account.Broker.TOSS);
         assertThat(result.accountNo()).isEqualTo("12345678901");
@@ -167,6 +171,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("broker null이면 KIS 기본값 적용")
     void register_nullBroker_defaultsToKis() {
+        when(connectionTesters.of(any())).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(null);
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -179,7 +185,8 @@ class AccountServiceTest {
         assertThat(result.broker()).isEqualTo(Account.Broker.KIS);
         assertThat(result.accountNo()).isEqualTo("74420614-01"); // 전체 형식 그대로 저장
         assertThat(result.brokerAccountCode()).isNull(); // KIS는 null (accountNo에 통합)
-        verify(tossConnectionTestPort, never()).testAndFetchAccountSeq(anyString(), anyString());
+        // KIS 라우터 경유 verifyAccount 호출 확인
+        verify(connectionTesters).of(Account.Broker.KIS);
     }
 
 }

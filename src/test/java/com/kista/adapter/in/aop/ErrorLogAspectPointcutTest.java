@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
+import org.junit.jupiter.api.BeforeEach;
+
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -48,6 +50,12 @@ class ErrorLogAspectPointcutTest {
 
     @Autowired NotifyPort notifyPort;
     @Autowired AppErrorLogPort appErrorLogPort;
+
+    @BeforeEach
+    void resetMocks() {
+        // 공유 Spring Context에서 doThrow stub이 다음 테스트에 남지 않도록 초기화
+        reset(appErrorLogPort);
+    }
 
     @Test
     void notifyError_호출_시_포인트컷이_매칭되어_DB에_저장된다() {

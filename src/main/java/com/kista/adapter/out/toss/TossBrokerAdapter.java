@@ -7,9 +7,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.*;
-import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.*;
-import com.kista.domain.port.out.broker.MarketCalendarPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,20 +25,13 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
         ExecutionPort,
         BrokerPricePort, LiveBalancePort,
         CandlePort, ExchangeRatePort, StockInfoPort,
-        MarketCalendarPort, BrokerAccountPort {
+        BrokerMarketCalendarPort, BrokerAccountPort {
 
-    private final TossPortfolioPort tossPortfolioPort;
-    private final TossMarginPort tossMarginPort;
-    private final TossSellableQuantityPort tossSellableQuantityPort;
-    private final TossExecutionPort tossExecutionPort;
-    private final TossCandlePort tossCandlePort;
-    private final TossExchangeRatePort tossExchangeRatePort;
-    private final TossStockInfoPort tossStockInfoPort;
-    private final TossMarketCalendarPort tossMarketCalendarPort;
-    private final TossAccountListPort tossAccountListPort;
-    private final TossOrderPort tossOrderPort;
-    private final TossPricePort tossPricePort;         // 현재가·스냅샷 조회 (공통 API — account 불필요)
-    private final TossAccountPort tossAccountPort;     // live 잔고 조회
+    private final TossHoldingsApi tossHoldingsApi;  // portfolio/margin/sellable/exchangeRate/account
+    private final TossOrderApi tossOrderApi;          // cancel/place/execution
+    private final TossPriceApi tossPriceApi;          // price/snapshot/stockInfo
+    private final TossMarketApi tossMarketApi;         // marketCalendar/accountList
+    private final TossCandleApi tossCandleApi;         // candle
 
     @Override
     public Account.Broker supports() {
@@ -51,96 +42,96 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
 
     @Override
     public PresentBalanceResult getPresentBalance(Account account) {
-        return tossPortfolioPort.getPresentBalance(account);
+        return tossHoldingsApi.getPresentBalance(account);
     }
 
     @Override
     public List<MarginItem> getMargin(Account account) {
-        return tossMarginPort.getMargin(account);
+        return tossHoldingsApi.getMargin(account);
     }
 
     @Override
     public BigDecimal getUsdBuyableAmount(Account account) {
-        return tossMarginPort.getUsdBuyableAmount(account);
+        return tossHoldingsApi.getUsdBuyableAmount(account);
     }
 
     @Override
     public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
-        return tossSellableQuantityPort.getSellableQuantity(ticker, account);
+        return tossHoldingsApi.getSellableQuantity(ticker, account);
     }
 
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
-        return tossExecutionPort.getExecutions(from, to, ticker, account);
+        return tossOrderApi.getExecutions(from, to, ticker, account);
     }
 
     @Override
     public void cancel(com.kista.domain.model.order.Order order, Account account) {
-        tossOrderPort.cancel(order, account);
+        tossOrderApi.cancel(order, account);
     }
 
     @Override
     public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
-        return tossOrderPort.place(order, account);
+        return tossOrderApi.place(order, account);
     }
 
     // --- Toss 전용 Capability ---
 
     @Override
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
-        return tossCandlePort.getCandles(symbol, interval, from, to);
+        return tossCandleApi.getCandles(symbol, interval, from, to);
     }
 
     @Override
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
-        return tossCandlePort.getLatestCandles(symbol, interval, count);
+        return tossCandleApi.getLatestCandles(symbol, interval, count);
     }
 
     @Override
     public TossExchangeRate getExchangeRate() {
-        return tossExchangeRatePort.getExchangeRate();
+        return tossHoldingsApi.getExchangeRate();
     }
 
     @Override
     public TossStockInfo getStockInfo(Ticker ticker) {
-        return tossStockInfoPort.getStockInfo(ticker);
+        return tossPriceApi.getStockInfo(ticker);
     }
 
     @Override
     public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
-        return tossMarketCalendarPort.getMarketCalendar(from, to);
+        return tossMarketApi.getMarketCalendar(from, to);
     }
 
     @Override
     public List<TossAccountInfo> getAccountList(Account account) {
-        return tossAccountListPort.getAccountList(account);
+        return tossMarketApi.getAccountList(account);
     }
 
     // --- BrokerPricePort (공통 API — account 불필요) ---
 
     @Override
     public BigDecimal getPrice(Ticker ticker, Account account) {
-        return tossPricePort.getPrice(ticker); // 공통 API — account 불필요
+        return tossPriceApi.getPrice(ticker); // 공통 API — account 불필요
     }
 
     @Override
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
-        return tossPricePort.getPrices(tickers); // 공통 API — account 불필요
+        return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
     }
 
     @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
-        return tossPricePort.getPriceSnapshot(ticker); // 공통 API — account 불필요
+        return tossPriceApi.getPriceSnapshot(ticker); // 공통 API — account 불필요
     }
 
     @Override
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
-        return tossPricePort.getPriceSnapshots(tickers); // 공통 API — account 불필요
+        return tossPriceApi.getPriceSnapshots(tickers); // 공통 API — account 불필요
     }
 
     @Override
     public AccountBalance getLiveBalance(Account account, Ticker ticker) {
-        return tossAccountPort.getBalance(account, ticker);
+        return tossHoldingsApi.getBalance(account, ticker);
     }
 
 }

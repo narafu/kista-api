@@ -2,7 +2,6 @@ package com.kista.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
-import com.kista.domain.port.out.KisTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,17 +26,17 @@ import java.util.function.Function;
 public class KisHttpClient {
 
     private final RestTemplate kisRestTemplate;
-    private final KisTokenPort kisTokenPort;
+    private final KisAuthApi kisAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${kis.base-url}")
     private final String baseUrl;
 
     // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
     public HttpHeaders buildHeaders(String trId, Account account) {
-        String token = kisTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
+        String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         return buildHeaders(token, account.appKey(), account.secretKey(), trId);
     }
 
-    // 토큰을 직접 보유한 호출부(KisAuthApi 등 KisTokenPort 미경유) 공용 헤더 빌더
+    // 토큰을 직접 보유한 호출부(KisAuthApi 등) 공용 헤더 빌더
     public static HttpHeaders buildHeaders(String token, String appKey, String appSecret, String trId) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + token);
@@ -102,7 +101,7 @@ public class KisHttpClient {
         } catch (HttpStatusCodeException e) {
             if (e.getStatusCode().value() == 401) {
                 log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
-                kisTokenPort.invalidateToken(account.id());
+                kisAuthApi.invalidateToken(account.id());
                 try {
                     // 무효화된 캐시 → buildHeaders가 신규 토큰을 재발급해 헤더 재구성
                     return call.apply(buildHeaders(trId, account));

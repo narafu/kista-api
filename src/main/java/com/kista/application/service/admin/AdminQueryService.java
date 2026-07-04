@@ -6,6 +6,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
+import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBaseView;
@@ -37,6 +38,7 @@ class AdminQueryService implements AdminQueryUseCase {
     private final AuditLogPort auditLogPort;
     private final StrategyPort strategyPort;
     private final PrivacyTradePort privacyTradePort;
+    private final AppErrorLogPort appErrorLogPort;
 
     @Override
     public AdminStats getStats() {
@@ -142,5 +144,21 @@ class AdminQueryService implements AdminQueryUseCase {
     public Optional<Account> findAccount(UUID accountId) {
         // 단일 계좌 조회 — 전체 계좌 풀스캔 없이 ID 기반 직접 조회
         return accountPort.findById(accountId);
+    }
+
+    @Override
+    public List<AppErrorLog> listErrorLogs(int limit) {
+        return appErrorLogPort.findRecent(limit);
+    }
+
+    @Override
+    public List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to) {
+        return appErrorLogPort.findRecent(limit, from, to);
+    }
+
+    @Override
+    @Transactional
+    public void deleteErrorLog(UUID id) {
+        appErrorLogPort.softDelete(id);
     }
 }

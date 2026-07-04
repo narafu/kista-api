@@ -98,9 +98,9 @@ class TradingPreviewServiceTest {
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(pricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
                 .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -119,9 +119,9 @@ class TradingPreviewServiceTest {
     @Test
     void preview_returnsSkipNoCycleHistory_whenNoHistory() {
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of());
+        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.empty());
 
         NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
 
@@ -140,10 +140,10 @@ class TradingPreviewServiceTest {
         StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
-        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(null); // 기준 없음 → NO_PRIVACY_BASE
 
         NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
 
@@ -166,10 +166,10 @@ class TradingPreviewServiceTest {
         StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
-        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(base);
         when(privacyStrategy.buildOrders(any(), any(), any(), any())).thenReturn(List.of(buyOrder));
 
         NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
@@ -184,7 +184,7 @@ class TradingPreviewServiceTest {
     void preview_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), otherId)).thenThrow(new SecurityException());
 
         assertThatThrownBy(() -> service.preview(CYCLE.id(), otherId))
                 .isInstanceOf(SecurityException.class);

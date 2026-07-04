@@ -4,11 +4,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
-import com.kista.domain.port.out.TossConnectionTestPort;
-import com.kista.domain.port.out.TossTokenPort;
+import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -24,12 +24,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-// TossTokenPort + TossConnectionTestPort 통합 구현체
+// BrokerConnectionTestPort 구현체 — getToken/getAdminToken/invalidate* 는 TossHttpClient에 직접 주입되는 구체 메서드
 // OAuth form-encoded 호출 — tossRestTemplate 직접 사용 (TossHttpClient 순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
+public class TossAuthApi implements BrokerConnectionTestPort {
 
     // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
     private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
@@ -47,9 +47,8 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
     @Value("${toss.admin-client-secret}")
     private final String adminClientSecret;     // 공통 API용 관리자 Toss client_secret
 
-    // ── TossTokenPort ──────────────────────────────────────────────────────────
+    // ── 토큰 발급 / 무효화 — TossHttpClient가 구체 타입으로 직접 주입 ──────────────
 
-    @Override
     public String getToken(UUID accountId, String clientId, String clientSecret) {
         return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
                 () -> fetchAndCacheToken(accountId, clientId, clientSecret));
@@ -69,15 +68,13 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         return OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5);
     }
 
-    @Override
     public void invalidateToken(UUID accountId) {
         // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
-        brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+        brokerTokenCachePort.saveToken(accountId, BrokerTokenCachePort.INVALIDATED_TOKEN, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
     }
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
 
-    @Override
     public String getAdminToken() {
         // 1차 조회 — 락 없이 빠른 경로
         if (adminExpiresAt.isAfter(threshold())) return adminAccessToken;
@@ -95,18 +92,29 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         }
     }
 
-    @Override
     public void invalidateAdminToken() {
         adminExpiresAt = OffsetDateTime.MIN;
     }
 
-    // ── TossConnectionTestPort ─────────────────────────────────────────────────
+    // ── BrokerConnectionTestPort ───────────────────────────────────────────────
 
     @Override
-    public String testAndFetchAccountSeq(String clientId, String clientSecret) {
-        // 토큰 발급 — accountId 미보유이므로 캐시 저장 없음
-        String token = issueOAuthToken(clientId, clientSecret).accessToken();
+    public Account.Broker supports() {
+        return Account.Broker.TOSS;
+    }
+
+    @Override
+    public String verifyAccount(String appKey, String secretKey, String accountNo) {
+        // Toss는 계좌번호(accountNo) 대신 clientId/secret으로 accountSeq를 조회해 검증
+        String token = issueOAuthToken(appKey, secretKey).accessToken();
         return fetchAccountSeq(token);
+    }
+
+    @Override
+    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
+        // Toss는 자격증명 단독 검증 엔드포인트가 없어 accounts 조회로 검증 (accountId 미사용 — 캐시 저장 없음)
+        String token = issueOAuthToken(appKey, secretKey).accessToken();
+        fetchAccountSeq(token);
     }
 
     // ── private helpers ────────────────────────────────────────────────────────
@@ -126,12 +134,12 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
                     new HttpEntity<>(body, headers),
                     TokenResponse.class);
             if (response.getBody() == null || response.getBody().accessToken() == null) {
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
             return response.getBody();
         } catch (RestClientException e) {
             log.warn("Toss OAuth 토큰 발급 실패: {}", e.getMessage());
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 
@@ -140,20 +148,20 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         try {
-            ResponseEntity<AccountsResponse> response = tossRestTemplate.exchange(
+            ResponseEntity<TossResult<List<AccountItem>>> response = tossRestTemplate.exchange(
                     tossBaseUrl + "/api/v1/accounts",
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    AccountsResponse.class);
+                    new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});
             List<AccountItem> accounts = response.getBody() == null ? null : response.getBody().result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
-                throw new Account.InvalidKisKeyException();
+                throw new Account.InvalidBrokerKeyException();
             }
             return String.valueOf(accounts.get(0).accountSeq());
         } catch (RestClientException e) {
             log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
-            throw new Account.InvalidKisKeyException();
+            throw new Account.InvalidBrokerKeyException();
         }
     }
 
@@ -163,11 +171,6 @@ public class TossAuthApi implements TossTokenPort, TossConnectionTestPort {
     record TokenResponse(
         @JsonProperty("access_token") String accessToken,
         @JsonProperty("expires_in") long expiresIn    // 토큰 유효 초 (기본 86400)
-    ) {}
-
-    // GET /api/v1/accounts 응답 래퍼 — {"result":[...]}
-    record AccountsResponse(
-        @JsonProperty("result") List<AccountItem> result
     ) {}
 
     // package-private — TossAuthApiTest에서 직접 생성하여 stub에 사용

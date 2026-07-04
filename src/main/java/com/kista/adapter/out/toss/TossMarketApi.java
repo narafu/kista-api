@@ -5,10 +5,9 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.toss.TossAccountInfo;
 import com.kista.domain.model.toss.TossMarketSession;
 import com.kista.domain.model.toss.TossMarketSession.SessionHours;
-import com.kista.domain.port.out.TossAccountListPort;
-import com.kista.domain.port.out.TossMarketCalendarPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -27,7 +26,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPort {
+public class TossMarketApi {
 
     private static final String MARKET_CALENDAR_PATH = "/api/v1/market-calendar/US";
     private static final String ACCOUNTS_PATH = "/api/v1/accounts";
@@ -38,7 +37,6 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── TossMarketCalendarPort ─────────────────────────────────────────────────
 
-    @Override
     public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
         long days = from.until(to).getDays() + 1;
         if (days > MAX_RANGE_DAYS) {
@@ -55,9 +53,10 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("date", date.toString()); // YYYY-MM-DD
 
-        // 공통 API — 관리자 토큰 사용, 응답 {"result": {"today": {...}}} 래퍼 구조
-        MarketCalendarResponseWrapper wrapper = tossHttpClient.getCommon(
-                MARKET_CALENDAR_PATH, params, MarketCalendarResponseWrapper.class);
+        // 공통 API — 관리자 토큰 사용, TossResult<MarketCalendarResponse> 제네릭 래퍼 구조
+        TossResult<MarketCalendarResponse> wrapper = tossHttpClient.getCommon(
+                MARKET_CALENDAR_PATH, params,
+                new ParameterizedTypeReference<TossResult<MarketCalendarResponse>>() {});
         MarketCalendarResponse response = wrapper != null ? wrapper.result() : null;
 
         if (response == null || response.today() == null) {
@@ -84,26 +83,21 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
 
     // ── TossAccountListPort ────────────────────────────────────────────────────
 
-    @Override
     public List<TossAccountInfo> getAccountList(Account account) {
-        AccountsResponse response = tossHttpClient.getNoAccountHeader(
-                ACCOUNTS_PATH, account, new LinkedMultiValueMap<>(), AccountsResponse.class);
-
-        if (response == null || response.result() == null) {
+        TossResult<List<AccountItem>> wrapper = tossHttpClient.getNoAccountHeader(
+                ACCOUNTS_PATH, account, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});
+        List<AccountItem> result = wrapper != null ? wrapper.result() : null;
+        if (result == null) {
             log.warn("Toss 계좌 목록 응답 없음");
             return List.of();
         }
-        return response.result().stream()
+        return result.stream()
                 .map(a -> new TossAccountInfo(a.accountSeq(), a.accountNo()))
                 .toList();
     }
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────
-
-    // GET /api/v1/market-calendar/US 응답 최상위 래퍼 — { "result": { today: {...} } }
-    record MarketCalendarResponseWrapper(
-        @JsonProperty("result") MarketCalendarResponse result
-    ) {}
 
     record MarketCalendarResponse(
         @JsonProperty("today") MarketDay today
@@ -119,11 +113,6 @@ public class TossMarketApi implements TossMarketCalendarPort, TossAccountListPor
     record SessionWindow(
         @JsonProperty("startTime") String startTime,  // ISO 8601
         @JsonProperty("endTime")   String endTime     // ISO 8601
-    ) {}
-
-    // GET /api/v1/accounts 응답 래퍼
-    record AccountsResponse(
-        @JsonProperty("result") List<AccountItem> result
     ) {}
 
     record AccountItem(
