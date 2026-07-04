@@ -98,7 +98,7 @@ class TradingPreviewServiceTest {
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
 
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(pricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
@@ -119,7 +119,7 @@ class TradingPreviewServiceTest {
     @Test
     void preview_returnsSkipNoCycleHistory_whenNoHistory() {
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.empty());
 
@@ -140,7 +140,7 @@ class TradingPreviewServiceTest {
         StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(null); // 기준 없음 → NO_PRIVACY_BASE
@@ -166,7 +166,7 @@ class TradingPreviewServiceTest {
         StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(base);
@@ -184,7 +184,7 @@ class TradingPreviewServiceTest {
     void preview_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), otherId)).thenThrow(new SecurityException());
 
         assertThatThrownBy(() -> service.preview(CYCLE.id(), otherId))
                 .isInstanceOf(SecurityException.class);

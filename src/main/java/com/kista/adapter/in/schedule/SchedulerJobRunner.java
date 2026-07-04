@@ -17,6 +17,20 @@ class SchedulerJobRunner {
 
     private final NotifyPort notifyPort;
 
+    // BatchContext 없이 단순 Runnable 작업 실행 — FearGreed·MarketCalendar 스케쥴러용
+    void run(String name, Runnable job) {
+        notifyPort.notifyInfo(name + " 시작");
+        log.info("{} 시작", name);
+        try {
+            job.run();
+        } catch (Exception e) {
+            log.error("{} 오류: {}", name, e.getMessage(), e);
+            notifyPort.notifyError(e);
+        }
+        log.info("{} 완료", name);
+        notifyPort.notifyInfo(name + " 완료");
+    }
+
     // name: 스케쥴러 표시명 (e.g., "장 개시 스케쥴러", "마감 매매 스케쥴러 수동")
     void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) {
         notifyPort.notifyInfo(name + " 시작");

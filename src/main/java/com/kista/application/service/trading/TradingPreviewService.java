@@ -44,8 +44,7 @@ class TradingPreviewService {
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.findByIdOrThrow(strategy.accountId());
-        account.verifyOwnedBy(requesterId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 현재 StrategyCycle — initialUsdDeposit 조회 (PRIVACY에서 필요)
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())

@@ -15,7 +15,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -27,9 +26,6 @@ class TelegramBotService {
     private final TelegramApiClient apiClient;
     private final PortfolioUseCase portfolioUseCase;
     private final UserUseCase userUseCase;
-    // 채팅 ID별 FSM 상태 (ConcurrentHashMap: 웹훅 동시 수신 대비)
-    private final ConcurrentHashMap<Long, BotState> stateMap = new ConcurrentHashMap<>();
-
     void handle(TelegramUpdate update) {
         // 인라인 버튼 클릭(callback_query) 처리 — message가 null이므로 별도 분기 필수
         if (update.callbackQuery() != null) {
@@ -45,11 +41,7 @@ class TelegramBotService {
             return;
         }
 
-        BotState state = stateMap.getOrDefault(chatId, BotState.IDLE);
-        String reply = switch (state) {
-            case IDLE -> handleIdle(chatId, text);
-            case AWAITING_RUN_CONFIRM -> handleRunConfirm(chatId, text);
-        };
+        String reply = handleIdle(text);
         if (reply != null) {
             apiClient.sendMessage(String.valueOf(chatId), reply);
         }
@@ -103,37 +95,18 @@ class TelegramBotService {
         }
     }
 
-    private String handleIdle(long chatId, String text) {
+    private String handleIdle(String text) {
         String cmd = text.split("\\s+")[0].toLowerCase();
         return switch (cmd) {
             case "/start", "/help" -> """
                     사용 가능한 명령어:
                     /status — 최신 포트폴리오 현황
-                    /history [days] — 거래 내역 (기본 7일)
-                    /run — 수동 매매 실행
-                    /cancel — 진행 중인 대화 취소""";
+                    /history [days] — 거래 내역 (기본 7일)""";
             case "/status" -> buildStatusMessage();
             case "/history" -> buildHistoryMessage(parseHistoryDays(text));
-            case "/run" -> {
-                stateMap.put(chatId, BotState.AWAITING_RUN_CONFIRM);
-                yield "정말 수동 매매를 실행할까요? (yes/no)";
-            }
+            // V2: 수동 실행은 스케줄러(화~토)가 자동 처리
+            case "/run" -> "V2에서는 스케줄러(화~토)가 자동 실행합니다. 계좌 전략은 앱에서 설정하세요.";
             default -> "알 수 없는 명령어입니다. /help 를 입력하세요.";
-        };
-    }
-
-    private String handleRunConfirm(long chatId, String text) {
-        return switch (text.toLowerCase()) {
-            case "yes" -> {
-                stateMap.put(chatId, BotState.IDLE);
-                // V2: 수동 실행은 스케쥴러가 자동 처리 — 계좌별 전략 API 사용 권장
-                yield "V2에서는 스케쥴러(화~토 07:00)가 자동 실행합니다. 계좌 전략은 앱에서 설정하세요.";
-            }
-            case "no", "/cancel" -> {
-                stateMap.put(chatId, BotState.IDLE);
-                yield "취소되었습니다.";
-            }
-            default -> "yes 또는 no 로 답해주세요.";
         };
     }
 

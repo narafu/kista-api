@@ -1,7 +1,6 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.port.in.FetchFearGreedUseCase;
-import com.kista.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,7 +18,7 @@ import java.time.Instant;
 public class FearGreedScheduler {
 
     private final FetchFearGreedUseCase fetchFearGreedUseCase;
-    private final NotifyPort notifyPort; // 스케쥴러 시작/종료 알림
+    private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
     @Scheduled(cron = "0 0 0,6,12,18 * * *", zone = "UTC") // UTC 00:00 / 06:00 / 12:00 / 18:00
@@ -28,16 +27,6 @@ public class FearGreedScheduler {
     }
 
     private void runLocked() {
-        notifyPort.notifyInfo("공포탐욕지수 수집 스케쥴러 시작");
-        Instant snapshotDate = Instant.now();
-        log.info("공포탐욕지수 수집 스케쥴러 시작 (snapshotDate={})", snapshotDate);
-        try {
-            fetchFearGreedUseCase.fetchAndSave(snapshotDate);
-        } catch (Exception e) {
-            log.error("공포탐욕지수 수집 실패: {}", e.getMessage(), e);
-            notifyPort.notifyError(e);
-        }
-        log.info("공포탐욕지수 수집 스케쥴러 완료");
-        notifyPort.notifyInfo("공포탐욕지수 수집 스케쥴러 완료");
+        jobRunner.run("공포탐욕지수 수집 스케쥴러", () -> fetchFearGreedUseCase.fetchAndSave(Instant.now()));
     }
 }
