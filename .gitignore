@@ -68,3 +68,4 @@ logs/
 # superpowers
 .superpowers/**
 docs/superpowers/**
+.claude/worktrees/
