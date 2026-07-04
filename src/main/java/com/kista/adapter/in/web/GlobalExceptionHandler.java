@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.format.DateTimeParseException;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @Slf4j
@@ -31,19 +32,56 @@ public class GlobalExceptionHandler {
 
     private final AppErrorLogPort appErrorLogPort;
 
-    // ── 4xx — 클라이언트 오류, DB 저장 없음 ─────────────────────────────────────
+    // status·title 쌍 튜플 — 테이블 값 타입
+    private record Mapping(HttpStatus status, String title) {}
 
-    @ExceptionHandler(InvalidRefreshTokenException.class)
-    public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
-        // refresh 인증 실패 — AuthController Swagger 401 명세와 실제 동작 일치
-        return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+    // 단순 status·title 매핑 테이블 — 신규 예외 추가 시 엔트리 1줄만 추가
+    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
+        Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
+        Map.entry(SecurityException.class,                         new Mapping(HttpStatus.FORBIDDEN,              "Access Denied")),
+        Map.entry(Account.InvalidBrokerKeyException.class,         new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
+        Map.entry(Account.KisRateLimitException.class,             new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
+        Map.entry(IllegalStateException.class,                     new Mapping(HttpStatus.BAD_REQUEST,            "Invalid State")),
+        Map.entry(NoSuchElementException.class,                    new Mapping(HttpStatus.NOT_FOUND,              "Resource Not Found")),
+        Map.entry(IllegalArgumentException.class,                  new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Request")),
+        Map.entry(MissingServletRequestParameterException.class,   new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
+        Map.entry(MethodArgumentTypeMismatchException.class,       new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
+        Map.entry(DateTimeParseException.class,                    new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Date Format")),
+        Map.entry(Account.DuplicateAccountException.class,         new Mapping(HttpStatus.CONFLICT,               "Conflict")),
+        Map.entry(ManualTradingException.class,                    new Mapping(HttpStatus.CONFLICT,               "Conflict")),
+        Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
+        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict"))
+    );
+
+    // MAPPINGS 테이블에 등록된 예외를 단일 핸들러로 처리 — 부가 로직 없는 단순 status·title 매핑만
+    @ExceptionHandler({
+        InvalidRefreshTokenException.class,
+        SecurityException.class,
+        Account.InvalidBrokerKeyException.class,
+        Account.KisRateLimitException.class,
+        IllegalStateException.class,
+        NoSuchElementException.class,
+        IllegalArgumentException.class,
+        MissingServletRequestParameterException.class,
+        MethodArgumentTypeMismatchException.class,
+        DateTimeParseException.class,
+        Account.DuplicateAccountException.class,
+        ManualTradingException.class,
+        OrderCancelException.class,
+        PrivacyTradeConflictException.class
+    })
+    public ProblemDetail handleMapped(Exception ex) {
+        // 클래스 계층 탐색 — 서브클래스가 전달돼도 상위 매핑으로 fallback
+        Mapping m = resolveMapping(ex);
+        if (m == null) {
+            // @ExceptionHandler 목록과 MAPPINGS가 불일치하면 내부 오류로 처리
+            log.error("예외 매핑 누락: {}", ex.getClass().getName(), ex);
+            return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage());
+        }
+        return problem(m.status(), m.title(), ex.getMessage());
     }
 
-    @ExceptionHandler(SecurityException.class)
-    public ProblemDetail handleForbidden(SecurityException ex) {
-        return problem(HttpStatus.FORBIDDEN, "Access Denied", ex.getMessage());
-    }
-
+    // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지
     @ExceptionHandler(User.CooldownException.class)
     public ResponseEntity<ProblemDetail> handleCooldown(User.CooldownException ex) {
         // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
@@ -54,27 +92,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).headers(headers).body(detail);
     }
 
-    @ExceptionHandler(Account.InvalidBrokerKeyException.class)
-    public ProblemDetail handleInvalidBrokerKey(Account.InvalidBrokerKeyException ex) {
-        // 증권사 자격증명 검증 실패 (KIS/Toss 공통) → 422 UNPROCESSABLE_ENTITY
-        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ex.getMessage());
-    }
-
-    @ExceptionHandler(Account.KisRateLimitException.class)
-    public ProblemDetail handleKisRateLimit(Account.KisRateLimitException ex) {
-        return problem(HttpStatus.TOO_MANY_REQUESTS, "KIS Rate Limit", ex.getMessage());
-    }
-
-    @ExceptionHandler(IllegalStateException.class)
-    public ProblemDetail handleIllegalState(IllegalStateException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid State", ex.getMessage());
-    }
-
-    @ExceptionHandler(NoSuchElementException.class)
-    public ProblemDetail handleNotFound(NoSuchElementException ex) {
-        return problem(HttpStatus.NOT_FOUND, "Resource Not Found", ex.getMessage());
-    }
-
+    // 필드 오류 메시지 집계 — 부가 로직 있으므로 개별 유지
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
@@ -82,27 +100,6 @@ public class GlobalExceptionHandler {
                 .toList()
                 .toString();
         return problem(HttpStatus.BAD_REQUEST, "Validation Failed", message);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage());
-    }
-
-    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
-    public ProblemDetail handleMissingParam(Exception ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
-    }
-
-    @ExceptionHandler(DateTimeParseException.class)
-    public ProblemDetail handleDateTimeParse(DateTimeParseException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid Date Format", ex.getMessage());
-    }
-
-    @ExceptionHandler({Account.DuplicateAccountException.class, ManualTradingException.class,
-                       OrderCancelException.class, PrivacyTradeConflictException.class})
-    public ProblemDetail handleConflict(RuntimeException ex) {
-        return problem(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
     }
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
@@ -142,5 +139,17 @@ public class GlobalExceptionHandler {
         } catch (Exception saveEx) {
             log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
         }
+    }
+
+    // 클래스 계층 탐색 — 서브클래스 예외도 상위 매핑으로 처리 가능
+    private static Mapping resolveMapping(Exception ex) {
+        Class<?> cls = ex.getClass();
+        while (cls != null && Exception.class.isAssignableFrom(cls)) {
+            @SuppressWarnings("unchecked")
+            Mapping m = MAPPINGS.get((Class<? extends Exception>) cls);
+            if (m != null) return m;
+            cls = cls.getSuperclass();
+        }
+        return null;
     }
 }
