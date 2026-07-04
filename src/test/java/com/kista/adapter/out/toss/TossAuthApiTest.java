@@ -49,7 +49,7 @@ class TossAuthApiTest {
     }
 
     @Nested
-    @DisplayName("TossTokenPort — getToken")
+    @DisplayName("TossAuthApi — getToken")
     class TokenTests {
 
         @Test

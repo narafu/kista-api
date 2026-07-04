@@ -2,7 +2,6 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.TossTokenPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class TossHttpClient {
 
     private final RestTemplate tossRestTemplate;
-    private final TossTokenPort tossTokenPort;
+    private final TossAuthApi tossAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${toss.base-url}")
     private final String baseUrl;
 
@@ -121,13 +120,13 @@ public class TossHttpClient {
     private <T> T executeWithRetry(Account account, String path, java.util.function.Supplier<T> call) {
         return execute401Retry(call, () -> {
             log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
-            tossTokenPort.invalidateToken(account.id());
+            tossAuthApi.invalidateToken(account.id());
         });
     }
 
     // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만
     private HttpHeaders buildAdminHeaders() {
-        String token = tossTokenPort.getAdminToken();
+        String token = tossAuthApi.getAdminToken();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -138,7 +137,7 @@ public class TossHttpClient {
     private <T> T executeCommon(String path, java.util.function.Supplier<T> call) {
         return execute401Retry(call, () -> {
             log.warn("Toss 관리자 토큰 401 — 무효화 후 재시도: path={}", path);
-            tossTokenPort.invalidateAdminToken();
+            tossAuthApi.invalidateAdminToken();
         });
     }
 
@@ -163,7 +162,7 @@ public class TossHttpClient {
 
     // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.brokerAccountCode에 accountSeq가 저장됨
     private HttpHeaders buildHeaders(Account account) {
-        String token = tossTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
+        String token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.set("X-Tossinvest-Account", account.brokerAccountCode());
@@ -174,7 +173,7 @@ public class TossHttpClient {
     // 계좌 헤더 미포함 — 시세 조회·환율 등 계좌 컨텍스트 불필요 API용
     private HttpHeaders buildHeadersNoAccount(Account account) {
         // appKey/secretKey 필드를 Toss clientId/clientSecret으로 재사용
-        String token = tossTokenPort.getToken(account.id(), account.appKey(), account.secretKey());
+        String token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(MediaType.APPLICATION_JSON);

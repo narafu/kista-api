@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
-import com.kista.domain.port.out.TossTokenPort;
 import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +24,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-// TossTokenPort + BrokerConnectionTestPort 통합 구현체
+// BrokerConnectionTestPort 구현체 — getToken/getAdminToken/invalidate* 는 TossHttpClient에 직접 주입되는 구체 메서드
 // OAuth form-encoded 호출 — tossRestTemplate 직접 사용 (TossHttpClient 순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
+public class TossAuthApi implements BrokerConnectionTestPort {
 
     // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
     private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
@@ -48,9 +47,8 @@ public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
     @Value("${toss.admin-client-secret}")
     private final String adminClientSecret;     // 공통 API용 관리자 Toss client_secret
 
-    // ── TossTokenPort ──────────────────────────────────────────────────────────
+    // ── 토큰 발급 / 무효화 — TossHttpClient가 구체 타입으로 직접 주입 ──────────────
 
-    @Override
     public String getToken(UUID accountId, String clientId, String clientSecret) {
         return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
                 () -> fetchAndCacheToken(accountId, clientId, clientSecret));
@@ -70,7 +68,6 @@ public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
         return OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5);
     }
 
-    @Override
     public void invalidateToken(UUID accountId) {
         // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
         brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
@@ -78,7 +75,6 @@ public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
 
-    @Override
     public String getAdminToken() {
         // 1차 조회 — 락 없이 빠른 경로
         if (adminExpiresAt.isAfter(threshold())) return adminAccessToken;
@@ -96,7 +92,6 @@ public class TossAuthApi implements TossTokenPort, BrokerConnectionTestPort {
         }
     }
 
-    @Override
     public void invalidateAdminToken() {
         adminExpiresAt = OffsetDateTime.MIN;
     }

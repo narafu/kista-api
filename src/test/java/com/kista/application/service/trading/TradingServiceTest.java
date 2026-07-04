@@ -166,12 +166,14 @@ class TradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
         lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(any()))
                 .thenAnswer(invocation -> Optional.of(new StrategyInfiniteDetail(invocation.getArgument(0), 20)));
+        // MarketEventNotifier — UserPort/UserSettingsPort/UserNotificationPort를 직접 주입해 생성
+        MarketEventNotifier marketEventNotifier = new MarketEventNotifier(userPort, userSettingsPort, userNotificationPort);
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, tradingRegistry, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
-                userPort, userSettingsPort);
+                marketEventNotifier);
     }
 
     @Test

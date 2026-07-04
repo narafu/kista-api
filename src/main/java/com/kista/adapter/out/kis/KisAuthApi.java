@@ -6,7 +6,6 @@ import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.port.out.BrokerTokenCachePort;
-import com.kista.domain.port.out.KisTokenPort;
 import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +30,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// KisTokenPort + BrokerConnectionTestPort 통합 구현체
+// BrokerConnectionTestPort 구현체 — getToken/invalidateToken은 KisHttpClient에 직접 주입되는 구체 메서드
 // OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisAuthApi implements KisTokenPort, BrokerConnectionTestPort {
+public class KisAuthApi implements BrokerConnectionTestPort {
 
     private static final ZoneId KST = TimeZones.KST;
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
@@ -54,9 +53,8 @@ public class KisAuthApi implements KisTokenPort, BrokerConnectionTestPort {
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
-    // ── KisTokenPort ───────────────────────────────────────────────────────────
+    // ── 토큰 발급 / 무효화 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
-    @Override
     public String getToken(UUID accountId, String appKey, String appSecret) {
         return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
                 () -> fetchAndCacheToken(accountId, appKey, appSecret));
@@ -77,7 +75,6 @@ public class KisAuthApi implements KisTokenPort, BrokerConnectionTestPort {
         }
     }
 
-    @Override
     public void invalidateToken(UUID accountId) {
         // 과거 만료 시각으로 덮어써서 다음 getToken() 호출 시 강제 재발급
         brokerTokenCachePort.saveToken(accountId, "EXPIRED", OffsetDateTime.now(KST).minusHours(1));

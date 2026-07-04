@@ -43,7 +43,7 @@ class KisAuthApiTest {
     }
 
     @Nested
-    @DisplayName("KisTokenPort — getToken")
+    @DisplayName("KisAuthApi — getToken")
     class TokenTests {
 
         @Test
