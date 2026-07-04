@@ -63,4 +63,4 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 ### record 필드 수정 시 주의
 - 필드에 들어가는 string 값을 grep하면 테스트에서 임의 값(예: `"preOpen"`, `"correction"`)을 쓰는 케이스를 누락할 수 있음 → string 값 grep보다 `compileTestJava`로 검증하는 것이 신뢰성 높음
-- `KisOrderAdapterTest`는 `Order` 객체를 생성자로 직접 생성 — `Order` record 변경 시 반드시 확인
+- `KisOrderApiTest`는 `Order` 객체를 생성자로 직접 생성 — `Order` record 변경 시 반드시 확인
