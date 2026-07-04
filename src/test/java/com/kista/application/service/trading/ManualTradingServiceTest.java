@@ -114,7 +114,7 @@ class ManualTradingServiceTest {
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(CYCLE));
         lenient().when(userPort.findByIdOrThrow(ACCOUNT.userId())).thenReturn(USER);
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
-        lenient().when(cyclePositionPort.findLatestByStrategyId(STRATEGY.id(), 1)).thenReturn(List.of(HISTORY));
+        lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(HISTORY));
         lenient().when(cyclePositionPort.findLatestByCycleId(eq(CYCLE.id()), anyInt())).thenReturn(List.of(HISTORY));
         lenient().when(cyclePositionInfiniteDetailPort.findLatestByCycleId(eq(CYCLE.id()), anyInt())).thenReturn(List.of());
         lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID))

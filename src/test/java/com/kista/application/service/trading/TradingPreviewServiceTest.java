@@ -100,7 +100,7 @@ class TradingPreviewServiceTest {
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
+        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(pricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
                 .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -121,7 +121,7 @@ class TradingPreviewServiceTest {
         when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestByStrategyId(CYCLE.id(), 1)).thenReturn(List.of());
+        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.empty());
 
         NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
 
@@ -142,8 +142,8 @@ class TradingPreviewServiceTest {
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
-        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(null); // 기준 없음 → NO_PRIVACY_BASE
 
         NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
 
@@ -168,8 +168,8 @@ class TradingPreviewServiceTest {
         when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
         when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
-        when(cycleHistoryPort.findLatestByStrategyId(privacyCycle.id(), 1)).thenReturn(List.of(NORMAL_HISTORY));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(base);
         when(privacyStrategy.buildOrders(any(), any(), any(), any())).thenReturn(List.of(buyOrder));
 
         NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
