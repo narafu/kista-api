@@ -40,6 +40,7 @@ application/
     trading/     ← TradingExecutionFacade(TradingExecutionUseCase 구현 Facade — preview/executeManually/cancelOrder/cancelByCycle/execute/executeBatch 단일 진입점),
                    TradingService(배치·단건 실행 코어), ManualTradingService(수동 실행), TradingPreviewService(미리보기 전용, @Transactional readOnly),
                    OrderCancelService(주문 취소), CycleRotationService(사이클 종료 후 cycleSeedType 기반 재등록),
+                   MarketEventNotifier(장 개시·마감 알림 — TradingService에서 분리, UserPort+UserSettingsPort+UserNotificationPort 조합)
                    TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/BrokerAccountRouter (helper, package-private)
                    BrokerAccountRouter: getLiveBalance/getUsdDeposit/getSellableQuantity — BrokerAdapterRegistry 경유 브로커별 잔고·판매가능수량 라우팅 (KIS: TTTS3012R fetchHolding 재사용 / Toss: /api/v1/sellable-quantity)
     account/     ← AccountService, AccountStatisticsService, TossStatisticsService
@@ -50,15 +51,16 @@ application/
     portfolio/   ← PortfolioService
     market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
     privacy/     ← PrivacyService
-    admin/       ← AdminService, AdminQueryService, AdminStrategyService, AdminCycleCloser (holdings 소진 시 사이클 종료 helper), AdminSelectionChain, AdminOrderCorrectionService, AdminTradeCorrectionService
+    admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함 — AdminObservabilityController 전용 포트 의존 제거), AdminStrategyService, AdminCycleCloser (holdings 소진 시 사이클 종료 helper), AdminSelectionChain, AdminOrderCorrectionService, AdminTradeCorrectionService
     auth/        ← BlacklistService (JWT 블랙리스트), TokenService (RT 발급/갱신/폐기)
+  event/         ← UserApprovedEvent, UserRejectedEvent, UserReappliedEvent — @TransactionalEventListener용 도메인 이벤트 (application 레이어)
 
 adapter/in/
   schedule/      ← TradingOpenScheduler (월~금 22:00 KST — 전략 전체 order 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람)
                    TradingCloseScheduler (화~토 04:00 KST — 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 03:00 KST — 만료 RT 삭제, 03:05 KST — grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
-                   BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리)
+                   BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
   web/           ← REST Controller + DTO
                     AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`), DashboardController (DB기반 사이클 이력), StatisticsController (KIS 전용 live 잔고/수익/가격), TossStatisticsController (Toss 전용 live 5개 엔드포인트, /api/accounts/{accountId}/*), FearGreedController (CNN·크립토 공포탐욕지수, GET /api/market/fear-greed), MetaController (enum SSOT /api/meta 번들만, Cache 1h — StrategyTypeMeta에 capability 7필드: code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), Admin*Controller (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminObservabilityController (/api/admin/logs/ — 감사로그+앱에러로그 조회, DELETE /errors/{id} 앱에러로그 소프트 삭제), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
@@ -75,7 +77,7 @@ adapter/in/
 
 adapter/out/
   broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 double-checked locking 토큰 캐시 헬퍼 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급)
-  kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리 + executeWithRetry: 401 시 KisTokenPort.invalidateToken 후 1회 재시도, RestClientException → KisApiException 래핑)
+  kis/           ← KIS API Adapter (KisHttpClient 공통 헤더 처리 + executeWithRetry: 401 시 invalidateToken(BrokerTokenCachePort.INVALIDATED_TOKEN 센티널) 후 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 5개 Port 구현 — PortfolioPort/MarginPort/SellableQuantityPort/DailyTradePort/ExecutionPort)
   toss/          ← Toss API Adapter (TossHttpClient 공통 헤더 처리, TossConfig)
                    TossAuthApi, TossCandleApi, TossHoldingsApi, TossOrderApi, TossPriceApi, TossCommissionsApi, TossMarketApi
