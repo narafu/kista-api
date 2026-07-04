@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
     // status·title 쌍 튜플 — 테이블 값 타입
     private record Mapping(HttpStatus status, String title) {}
 
-    // 단순 status·title 매핑 테이블 — 신규 예외 추가 시 엔트리 1줄만 추가
+    // 단순 status·title 매핑 테이블 — 엔트리 1줄 추가만으로 신규 예외 확장 (catch-all이 테이블 조회 통합)
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
         Map.entry(SecurityException.class,                         new Mapping(HttpStatus.FORBIDDEN,              "Access Denied")),
@@ -52,34 +52,6 @@ public class GlobalExceptionHandler {
         Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict"))
     );
-
-    // MAPPINGS 테이블에 등록된 예외를 단일 핸들러로 처리 — 부가 로직 없는 단순 status·title 매핑만
-    @ExceptionHandler({
-        InvalidRefreshTokenException.class,
-        SecurityException.class,
-        Account.InvalidBrokerKeyException.class,
-        Account.KisRateLimitException.class,
-        IllegalStateException.class,
-        NoSuchElementException.class,
-        IllegalArgumentException.class,
-        MissingServletRequestParameterException.class,
-        MethodArgumentTypeMismatchException.class,
-        DateTimeParseException.class,
-        Account.DuplicateAccountException.class,
-        ManualTradingException.class,
-        OrderCancelException.class,
-        PrivacyTradeConflictException.class
-    })
-    public ProblemDetail handleMapped(Exception ex) {
-        // 클래스 계층 탐색 — 서브클래스가 전달돼도 상위 매핑으로 fallback
-        Mapping m = resolveMapping(ex);
-        if (m == null) {
-            // @ExceptionHandler 목록과 MAPPINGS가 불일치하면 내부 오류로 처리
-            log.error("예외 매핑 누락: {}", ex.getClass().getName(), ex);
-            return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage());
-        }
-        return problem(m.status(), m.title(), ex.getMessage());
-    }
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지
     @ExceptionHandler(User.CooldownException.class)
@@ -118,8 +90,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Toss API Error", ex.getMessage());
     }
 
+    // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(saveErrorLog 없음) / 없으면 500 처리
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnexpected(Exception ex) {
+    public ProblemDetail handleAll(Exception ex) {
+        // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용
+        Mapping m = resolveMapping(ex);
+        if (m != null) {
+            // 4xx 예외: saveErrorLog 없이 응답 — 기존 handleMapped 동작 보존
+            return problem(m.status(), m.title(), ex.getMessage());
+        }
+        // 매핑 없는 미처리 예외 — saveErrorLog + log.error + 500
         saveErrorLog(ex);
         log.error("미처리 예외 발생: {}", ex.getMessage(), ex);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "예기치 않은 오류가 발생했습니다");
