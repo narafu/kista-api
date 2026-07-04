@@ -137,10 +137,13 @@ class TradingServiceTest {
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort);
+        // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
+        CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
+                cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCyclePort, rotationService, userNotificationPort);
         TradingReporter reporter = new TradingReporter(
                 tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
-                cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, userSettingsPort);
+                userSettingsPort, positionPersistor);
         // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT), any()))

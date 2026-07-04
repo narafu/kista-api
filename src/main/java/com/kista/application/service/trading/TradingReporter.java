@@ -26,22 +26,18 @@ import java.util.stream.Collectors;
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 
-// 체결 조회 + 사이클 포지션 저장 + 텔레그램·SSE 알림 + 연속 정책 처리
+// 체결 조회 + 알림 발송 (포지션 저장은 CyclePositionPersistor에 위임)
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class TradingReporter {
 
     private final BrokerAdapterRegistry registry;
-    private final OrderPort orderPort;
-    private final UserNotificationPort userNotificationPort;
-    private final RealtimeNotificationPort realtimeNotificationPort;
-    private final CyclePositionPort cyclePositionPort;
-    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
-    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final StrategyCyclePort strategyCyclePort;
-    private final CycleRotationService cycleRotationService;
-    private final UserSettingsPort userSettingsPort; // TRADING_ALERT 알림 활성 여부 조회
+    private final OrderPort orderPort;                              // 주문 체결 상태 갱신
+    private final UserNotificationPort userNotificationPort;        // 리포트 알림 발송
+    private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
+    private final UserSettingsPort userSettingsPort;                // TRADING_ALERT 알림 활성 여부 조회
+    private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
@@ -54,7 +50,7 @@ class TradingReporter {
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         AccountBalance postBalance = balance.applyExecutions(executions);
-        saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
+        cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
@@ -76,63 +72,6 @@ class TradingReporter {
             realtimeNotificationPort.notifyTrade(user.id(), event);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
-    }
-
-    // execute() 종료 시 1건 적재, holdings==0이면 사이클 rotation 정책 처리
-    private void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
-                                   BigDecimal price, PrivacyTradeBase privacyBase) {
-        Strategy strategy = ctx.strategy();
-        StrategyCycle currentCycle = ctx.currentCycle();
-        // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
-        boolean newReverseMode = false;
-        if (strategy.isInfinite()) {
-            newReverseMode = computeNewReverseMode(currentCycle, strategy, balance, price);
-        }
-
-        // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
-        List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
-        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.get(0).holdings() > 0;
-
-        CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        CyclePosition savedPosition = cyclePositionPort.save(position);
-        if (strategy.isInfinite()) {
-            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), newReverseMode));
-        }
-        log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
-
-        // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
-        // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
-        if (position.holdings() == 0 && prevHadHoldings) {
-            // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
-            strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
-            log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
-            userNotificationPort.notifyCycleCompleted(ctx.user(), ctx.account(), strategy);
-            cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
-        }
-    }
-
-    // 체결 후 포지션 기반 리버스모드 상태 머신
-    // 직전 행 is_reverse_mode → 진입/유지/종료 판정
-    private boolean computeNewReverseMode(StrategyCycle currentCycle, Strategy strategy,
-                                           AccountBalance balance, BigDecimal closingPrice) {
-        List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 1);
-        boolean prevReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
-        int divisionCount = strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
-                .map(StrategyInfiniteDetail::divisionCount)
-                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
-
-        // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
-        InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, divisionCount);
-        boolean nextReverseMode = ip.nextReverseMode(prevReverseMode);
-
-        if (!prevReverseMode && nextReverseMode) {
-            log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
-                    strategy.id(), ip.unitAmount(), balance.usdDeposit());
-        } else if (prevReverseMode && !nextReverseMode) {
-            log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
-                    strategy.id(), closingPrice, balance.avgPrice());
-        }
-        return nextReverseMode;
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
