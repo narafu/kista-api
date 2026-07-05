@@ -5,6 +5,7 @@ import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -42,8 +43,10 @@ class MetaControllerTest {
     void setUp() {
         var infinite = new InfiniteCycleOrderStrategy(null, null);
         var privacy = new PrivacyCycleOrderStrategy(null);
+        var vr = new VrCycleOrderStrategy(null);
         when(cycleStrategies.of(Strategy.Type.INFINITE)).thenReturn(infinite);
         when(cycleStrategies.of(Strategy.Type.PRIVACY)).thenReturn(privacy);
+        when(cycleStrategies.of(Strategy.Type.VR)).thenReturn(vr);
     }
 
     private UsernamePasswordAuthenticationToken mockAuth() {

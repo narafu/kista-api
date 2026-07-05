@@ -38,6 +38,10 @@ public record Strategy(
         return type == Type.PRIVACY;
     }
 
+    public boolean isVr() {
+        return type == Type.VR;
+    }
+
     public boolean isActive() {
         return status == Status.ACTIVE;
     }
@@ -50,22 +54,25 @@ public record Strategy(
     @RequiredArgsConstructor
     public enum Type {
         INFINITE("무한매수법"), // 모든 Ticker 지원
-        PRIVACY("Fanding P전략"); // SOXL 전용
+        PRIVACY("Fanding P전략"), // SOXL 전용
+        VR("밸류리밸런싱"); // TQQQ 전용 — 밸류 기반 리밸런싱
 
         private final String description; // 전략 설명
 
-        // INFINITE: 전체 Ticker, PRIVACY: SOXL 단일 — Ticker 추가 시 자동 반영
+        // INFINITE: 전체 Ticker, PRIVACY: SOXL 단일, VR: TQQQ 단일
         public Set<Ticker> availableTickers() {
             return switch (this) {
                 case PRIVACY -> EnumSet.of(Ticker.SOXL);
+                case VR -> EnumSet.of(Ticker.TQQQ);
                 case INFINITE -> EnumSet.allOf(Ticker.class);
             };
         }
 
-        // ticker 결정 규칙: PRIVACY는 SOXL 강제, 그 외는 요청값 우선 → fallback 순
+        // ticker 결정 규칙: PRIVACY는 SOXL 강제, VR은 TQQQ 강제, 그 외는 요청값 우선 → fallback 순
         public Ticker resolveTicker(Ticker requested, Ticker fallback) {
             return switch (this) {
                 case PRIVACY -> Ticker.SOXL;
+                case VR -> Ticker.TQQQ;
                 case INFINITE -> requested != null ? requested : fallback;
             };
         }

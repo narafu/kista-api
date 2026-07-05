@@ -37,16 +37,20 @@ public interface CycleOrderStrategy {
     // 사이클 재등록 최소금액 — null이면 가드 미적용
     BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount);
 
+    // holdings=0(전량 청산) 시 사이클 종료 여부 — VR만 false(사이클 유지), 나머지 true(종료)
+    default boolean endsCycleOnLiquidation() { return true; }
+
     // 전략 계산 입력 — execute/preview 공통
-    // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy)으로 그룹핑 — 각 구현체는 자기 묶음만 소비
+    // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy/vr)으로 그룹핑 — 각 구현체는 자기 묶음만 소비
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
     record PlanContext(
             AccountBalance balance,
             Strategy strategy,
             LocalDate tradeDate,
             String label,
-            InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY는 무시)
-            PrivacyInputs privacy     // PRIVACY 전용 입력 (INFINITE은 무시)
+            InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY·VR은 무시)
+            PrivacyInputs privacy,    // PRIVACY 전용 입력 (INFINITE·VR은 무시)
+            VrInputs vr               // VR 전용 입력 (INFINITE·PRIVACY는 무시)
     ) {
 
         // INFINITE 전략 전용 입력 묶음
@@ -71,6 +75,18 @@ public interface CycleOrderStrategy {
                 BigDecimal initialUsdDeposit,
                 PrivacyTradeBase privacyBase,
                 BigDecimal currentPrice
+        ) {}
+
+        // VR 전략 전용 입력 묶음
+        // value: 현재 V값 (사이클 시작 시 StrategyCycleVrDetail.value 스냅샷에서 로드)
+        // bandWidth: 밴드 폭 % (StrategyVrDetail.bandWidth)
+        // poolLimit: pool 상한 금액 (StrategyCycleVrDetail.poolLimit 스냅샷)
+        // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
+        public record VrInputs(
+                BigDecimal value,
+                BigDecimal bandWidth,
+                BigDecimal poolLimit,
+                BigDecimal poolUsed
         ) {}
     }
 

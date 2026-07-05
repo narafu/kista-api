@@ -67,8 +67,9 @@ class CycleOrderComputer {
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase, currentPrice);
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
+        // VrInputs: Task 3에서 VR 사이클 상세 조회 후 채울 예정 — 현재 null(VR 전략 등록 가드로 도달 불가)
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs));
+                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs, null));
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균

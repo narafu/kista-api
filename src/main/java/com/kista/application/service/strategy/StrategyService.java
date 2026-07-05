@@ -40,6 +40,11 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증 HTTP 호출 포함 — 트랜잭션 없이 실행 (각 DB 저장은 JPA auto-commit)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
+        // VR 전략 등록은 Task 3에서 지원 예정 — 현재는 임시 차단 // Task 3에서 제거
+        if (cmd.type() == Strategy.Type.VR) {
+            throw new IllegalArgumentException("VR 전략 등록은 아직 지원되지 않습니다");
+        }
+
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
         // PRIVACY는 SOXL 강제, INFINITE는 요청값 우선 → fallback
