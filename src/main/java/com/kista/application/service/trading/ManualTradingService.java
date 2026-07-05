@@ -89,8 +89,8 @@ class ManualTradingService {
 
         orderPlanner.savePlannedOrders(plan.orders(), account, currentCycle.id());
 
-        // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
-        placeAtOpenSellsIfMarketOpen(strategy, account, currentCycle.id(), today);
+        // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today);
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -135,13 +135,15 @@ class ManualTradingService {
         }
     }
 
-    // 개장 이후 수동 실행 시 INFINITE AT_OPEN 매도 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
-    private void placeAtOpenSellsIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today) {
+    // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
+    // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수
+    // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today) {
         DstInfo dst = DstInfo.calculate();
-        if (strategy.isInfinite() && Instant.now().isAfter(dst.marketOpen())) {
+        if (Instant.now().isAfter(dst.marketOpen())) {
             List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today);
             if (!atOpenOrders.isEmpty()) {
-                log.info("[{}] 개장 후 수동 실행 — AT_OPEN 매도 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
+                log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
                 orderExecutor.placeGiven(atOpenOrders, account);
             }
         }

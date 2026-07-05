@@ -5,6 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
@@ -50,6 +51,14 @@ class TradingOrderExecutorTest {
     static final InfinitePosition POSITION = new InfinitePosition(
             new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
+    // 전략 타입별 상수 — placeOrders 호출 시 캡 분기 결정에 사용
+    static final Strategy INFINITE_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
+            Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+    static final Strategy PRIVACY_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
+            Strategy.Type.PRIVACY, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+    static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
+            Strategy.Type.VR, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+
     @BeforeEach
     void setUp() {
         // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
@@ -79,7 +88,7 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-001"));
 
-        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, INFINITE_STRATEGY);
 
         verify(buyOrderPriceCapper).capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
         assertThat(result).hasSize(1);
@@ -97,25 +106,40 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-002"));
 
-        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION);
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, INFINITE_STRATEGY);
 
         verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("position이 없으면 INFINITE 보정 생략 — PRIVACY 캡으로 대체")
-    void placeOrders_withoutPosition_skipsInfiniteCapping() {
+    @DisplayName("PRIVACY + position 없음 → INFINITE 보정 생략 후 PRIVACY 캡 적용")
+    void placeOrders_privacyWithoutPosition_appliesPrivacyCap() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-003"));
 
-        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null);
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, PRIVACY_STRATEGY);
 
         // INFINITE 보정(capIfNeeded)은 호출되지 않음
         verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
-        // PRIVACY 캡(capPrivacyIfNeeded)은 currentPrice가 있을 때 호출됨
+        // PRIVACY 캡(capPrivacyIfNeeded)은 PRIVACY 전략일 때 호출됨
         verify(buyOrderPriceCapper).capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE);
+    }
+
+    @Test
+    @DisplayName("VR + position 없음 → post-hoc 캡 미적용 (buildOrders에서 자체 처리)")
+    void placeOrders_vrWithoutPosition_skipsBothCaps() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-VR-001"));
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_STRATEGY);
+
+        // VR은 buildOrders 단계에서 캡 적용 — 두 post-hoc 캡 모두 미호출
+        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper, never()).capPrivacyIfNeeded(any(), any(), any(), any());
     }
 
     @Test
@@ -123,7 +147,7 @@ class TradingOrderExecutorTest {
     void placeOrders_noPlannedOrders_returnsEmpty() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, INFINITE_STRATEGY);
 
         assertThat(result).isEmpty();
         verify(brokerPort, never()).place(any(), any());
@@ -140,7 +164,7 @@ class TradingOrderExecutorTest {
         when(brokerPort.place(order1, ACCOUNT)).thenReturn(kisResponse("KIS-101"));
         when(brokerPort.place(order2, ACCOUNT)).thenReturn(kisResponse("KIS-102"));
 
-        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, INFINITE_STRATEGY);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(id1);

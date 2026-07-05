@@ -82,11 +82,13 @@ public interface CycleOrderStrategy {
         // bandWidth: 밴드 폭 % (StrategyVrDetail.bandWidth)
         // poolLimit: pool 상한 금액 (StrategyCycleVrDetail.poolLimit 스냅샷)
         // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
+        // currentPrice: 스케쥴러 시작 시점 현재가 — 가격 캡(×1.10) 적용용, null이면 캡 미적용
         public record VrInputs(
                 BigDecimal value,
                 BigDecimal bandWidth,
                 BigDecimal poolLimit,
-                BigDecimal poolUsed
+                BigDecimal poolUsed,
+                BigDecimal currentPrice
         ) {}
     }
 

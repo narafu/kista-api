@@ -4,6 +4,7 @@ import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
@@ -37,12 +38,13 @@ class TradingOrderExecutor {
     }
 
     // INFINITE: position 있을 때만 capIfNeeded / PRIVACY: position 없어도 currentPrice 있으면 capPrivacyIfNeeded
+    // VR: 가격 캡은 buildOrders 단계에서 이미 적용 — post-hoc 캡 불필요 (strategy.isPrivacy() 가드로 제외)
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
-                            BigDecimal currentPrice, InfinitePosition position) {
+                            BigDecimal currentPrice, InfinitePosition position, Strategy strategy) {
         if (currentPrice != null && position != null) {
             buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
-        } else if (currentPrice != null) {
-            // PRIVACY: InfinitePosition 없이 단순 가격 캡 적용
+        } else if (currentPrice != null && strategy.isPrivacy()) {
+            // PRIVACY만: InfinitePosition 없이 단순 가격 캡 적용 (VR은 buildOrders에서 자체 처리)
             buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
         }
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);

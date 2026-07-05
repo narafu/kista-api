@@ -12,6 +12,8 @@ import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.domain.port.out.StrategyCycleVrPort;
+import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,8 @@ class ManualTradingServiceTest {
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
     @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
+    @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
+    @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
 
     ManualTradingService service;
 
@@ -86,7 +90,8 @@ class ManualTradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(
-                cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
+                cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCycleVrPort, strategyVrDetailPort, orderPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
         // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)

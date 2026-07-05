@@ -52,8 +52,8 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
                 inputs.poolUsed()
         );
         Strategy.Ticker ticker = ctx.strategy().ticker(); // 거래 종목 (strategy에서 결정)
-        // currentPrice는 Task 3에서 VrInputs에 추가 예정 — 현재는 null(캡 미적용)
-        List<Order> orders = vrStrategy.buildOrders(position, ticker, null, ctx.tradeDate());
+        // inputs.currentPrice(): 스케쥴러 시작 시점 현재가 — null이면 캡 미적용(수동 실행·preview)
+        List<Order> orders = vrStrategy.buildOrders(position, ticker, inputs.currentPrice(), ctx.tradeDate());
         log.info("[{}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
                 ctx.label(), position.holdings(), position.value(),
                 position.lowerBand(), position.upperBand(), orders.size());

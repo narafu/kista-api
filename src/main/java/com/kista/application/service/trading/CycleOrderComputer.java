@@ -4,7 +4,10 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.CyclePositionInfiniteDetailPort;
+import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyInfiniteDetailPort;
+import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +35,9 @@ class CycleOrderComputer {
     private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
+    private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimit)
+    private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
+    private final OrderPort orderPort;                       // VR poolUsed 조회용
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
@@ -66,10 +72,21 @@ class CycleOrderComputer {
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase, currentPrice);
 
+        // VR 전략 전용 입력 조립 — 사이클·버전 상세를 DB에서 조회, 미존재 시 데이터 무결성 오류로 fail-fast
+        CycleOrderStrategy.PlanContext.VrInputs vrInputs = null;
+        if (strategy.isVr()) {
+            StrategyCycleVrDetail cycleVr = strategyCycleVrPort.findByCycleId(currentCycle.id())
+                    .orElseThrow(() -> new IllegalStateException("VR 사이클 상세 없음: cycleId=" + currentCycle.id()));
+            StrategyVrDetail vrDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
+                    .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: versionId=" + currentCycle.strategyVersionId()));
+            BigDecimal poolUsed = orderPort.sumFilledBuyAmountByCycleId(currentCycle.id());
+            vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
+                    cycleVr.value(), vrDetail.bandWidth(), cycleVr.poolLimit(), poolUsed, currentPrice);
+        }
+
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
-        // VrInputs: Task 3에서 VR 사이클 상세 조회 후 채울 예정 — 현재 null(VR 전략 등록 가드로 도달 불가)
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs, null));
+                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs, vrInputs));
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균

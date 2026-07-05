@@ -10,6 +10,8 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.domain.port.out.StrategyCycleVrPort;
+import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,8 @@ class TradingPreviewServiceTest {
     @Mock PrivacyStrategy privacyStrategy;
     @Mock OrderPort orderPort;
     @Mock NotifyPort notifyPort;
+    @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
+    @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
 
     TradingPreviewService service;
 
@@ -80,7 +84,8 @@ class TradingPreviewServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(
-                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
+                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCycleVrPort, strategyVrDetailPort, orderPort);
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, registry, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);

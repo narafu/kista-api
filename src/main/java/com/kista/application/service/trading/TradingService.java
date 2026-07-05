@@ -132,7 +132,7 @@ class TradingService {
             runSafely("증권사 접수", state.ctx(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
-                        state.startPrice(), state.position());
+                        state.startPrice(), state.position(), state.ctx().strategy());
                 // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
                 // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
                 Set<UUID> mainOrderIds = mainOrders.stream()
@@ -236,7 +236,9 @@ class TradingService {
             return new CycleState(ctx, balance, recalcPos, price, null);
         }
         // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
-        return new CycleState(ctx, balance, null, price, privacyBase);
+        // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
+        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
+        return new CycleState(ctx, balance, null, price, privacyBaseForState);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)

@@ -15,6 +15,8 @@ import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.port.out.broker.ExecutionPort;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.port.out.StrategyCycleVrPort;
+import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +60,8 @@ class TradingServiceTest {
     @Mock LiveBalancePort liveBalancePort;
     @Mock UserSettingsPort userSettingsPort;
     @Mock UserPort userPort;
+    @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
+    @Mock StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 조회 (CycleOrderComputer용)
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -111,7 +115,8 @@ class TradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         CycleOrderComputer orderComputer = new CycleOrderComputer(
-                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort);
+                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCycleVrPort, strategyVrDetailPort, orderPort);
         // CycleRotationService: BrokerAdapterRegistry.require(account, MarginPort) → kisMarginPort로 위임
         BrokerAdapterRegistry marginRegistry = mock(BrokerAdapterRegistry.class);
         lenient().when(marginRegistry.require(any(Account.class),
