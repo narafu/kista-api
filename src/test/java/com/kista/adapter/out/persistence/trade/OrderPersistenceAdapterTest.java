@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class OrderPersistenceAdapterTest {
@@ -109,5 +110,37 @@ class OrderPersistenceAdapterTest {
         assertThatThrownBy(() -> adapter.markPlaced(orderId, "ORD-001"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(orderId.toString());
+    }
+
+    @Test
+    void sumFilledBuyAmountByCycleId_returnsSumFromRepository() {
+        // FILLED/PARTIALLY_FILLED BUY 합산 — repository 위임 검증
+        BigDecimal expected = new BigDecimal("1234.56");
+        when(repository.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID)).thenReturn(expected);
+
+        BigDecimal result = adapter.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID);
+
+        assertThat(result).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    void sumFilledBuyAmountByCycleId_returnsZeroWhenNoFilledOrders() {
+        // COALESCE 결과로 repository가 0 반환 — adapter도 ZERO 반환
+        when(repository.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID))
+                .thenReturn(BigDecimal.ZERO);
+
+        BigDecimal result = adapter.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void sumFilledBuyAmountByCycleId_returnsZeroWhenRepositoryReturnsNull() {
+        // null 방어 — COALESCE가 있어도 BigDecimal null 가능성 대비
+        when(repository.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID)).thenReturn(null);
+
+        BigDecimal result = adapter.sumFilledBuyAmountByCycleId(STRATEGY_CYCLE_ID);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

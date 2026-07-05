@@ -66,4 +66,7 @@ public interface OrderPort {
 
     // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러·수동 실행 선접수용)
     List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
+
+    // 사이클 기준 FILLED/PARTIALLY_FILLED BUY 체결금액 합계 (VR 전략 누적 매수금 계산용)
+    BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId);
 }

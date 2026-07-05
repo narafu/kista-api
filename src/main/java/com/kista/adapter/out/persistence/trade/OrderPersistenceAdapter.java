@@ -125,6 +125,13 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId) {
+        // FILLED/PARTIALLY_FILLED BUY 체결금액 합계 — 결과 없으면 ZERO (COALESCE 보장)
+        BigDecimal result = repository.sumFilledBuyAmountByCycleId(strategyCycleId);
+        return result != null ? result : BigDecimal.ZERO;
+    }
+
+    @Override
     public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
         // PLANNED 상태 주문만 가격·수량 수정 허용
         mutate(orderId, e -> {

@@ -96,4 +96,15 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             ORDER BY o.trade_date DESC
             """, nativeQuery = true)
     List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);
+
+    // 사이클 기준 FILLED/PARTIALLY_FILLED BUY 체결금액 합계 (VR 전략 누적 매수금 계산용)
+    // orders 테이블은 soft-delete 없음 — deleted_at 조건 불필요
+    @Query(value = """
+            SELECT COALESCE(SUM(filled_quantity * filled_price), 0)
+            FROM orders
+            WHERE strategy_cycle_id = :strategyCycleId
+              AND direction = 'BUY'
+              AND status IN ('FILLED', 'PARTIALLY_FILLED')
+            """, nativeQuery = true)
+    BigDecimal sumFilledBuyAmountByCycleId(@Param("strategyCycleId") UUID strategyCycleId);
 }
