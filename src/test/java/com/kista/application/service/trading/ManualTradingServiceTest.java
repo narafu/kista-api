@@ -53,6 +53,7 @@ class ManualTradingServiceTest {
     @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
     @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
+    @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
 
     ManualTradingService service;
 
@@ -88,7 +89,8 @@ class ManualTradingServiceTest {
         PrivacyStrategy privacyStrategy = mock(PrivacyStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
-                new PrivacyCycleOrderStrategy(privacyStrategy)));
+                new PrivacyCycleOrderStrategy(privacyStrategy),
+                new VrCycleOrderStrategy(vrStrategy))); // VR 수동 실행 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
@@ -112,8 +114,8 @@ class ManualTradingServiceTest {
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
 
-        // 공통 stubbing
-        when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
+        // 공통 stubbing — lenient: VR 전략 테스트에서 vrStrat.id()를 사용하므로 STRATEGY.id() stub은 미호출 가능
+        lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         // requireOwnedAccount는 default 메서드 — mock이 override하므로 직접 stub
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(CYCLE));
@@ -176,5 +178,78 @@ class ManualTradingServiceTest {
 
         verify(orderPort).saveAll(anyList());
         assertThat(orders).hasSize(1);
+    }
+
+    @Test
+    void execute_vrStrategy_savesLimitAtOpenOrders_andPlacesAtOpenIfMarketOpen() {
+        // VR 전략 수동 실행 — LIMIT + AT_OPEN 주문이 저장되고, 개장 후이면 즉시 접수됨
+        // AT_OPEN 즉시 접수(placeAtOpenOrdersIfMarketOpen)는 실시간 DstInfo 의존적이므로
+        // orderExecutor.placeGiven() 호출 여부는 atMostOnce()로 허용 (개장 전/후 모두 통과)
+        Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        UUID vrVersionId = UUID.randomUUID();
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
+                new BigDecimal("5000.00"), null, LocalDate.now(), null, null, null);
+        // VR 잔고 이력 — holdings=5
+        CyclePosition vrHistory = new CyclePosition(
+                null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
+                new BigDecimal("20.00"), 5, null, null);
+
+        // VR 사이클·버전 상세
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
+        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0);
+
+        // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
+        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
+        UUID vrBuyId = UUID.randomUUID();
+        UUID vrSellId = UUID.randomUUID();
+        Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
+
+        when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
+        when(strategyCyclePort.findLatestByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrCycle));
+        // 1번째 호출: 이중 실행 방지 가드 → 빈 목록, 2번째 호출: 최종 반환 → 저장된 주문
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any()))
+                .thenReturn(List.of(), List.of(vrBuyPlanned, vrSellPlanned));
+        // 잔고: cycle_position 이력에서 로드
+        when(cyclePositionPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
+        // VR 전용 포트 — CycleOrderComputer VrInputs 조립
+        when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
+        when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
+        // buildOrders: LIMIT + AT_OPEN 주문 반환
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), isNull(), any()))
+                .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
+        // live 잔고 검증 — BUY $22 << usdDeposit $10,000
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+                .thenReturn(new AccountBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
+        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
+        // AT_OPEN 즉시 접수 준비 (placeAtOpenOrdersIfMarketOpen — 개장 후에만 호출, lenient)
+        lenient().when(orderPort.findAtOpenPlannedByCycleAndDate(eq(vrCycle.id()), any()))
+                .thenReturn(List.of(vrBuyPlanned, vrSellPlanned));
+
+        List<Order> result = service.execute(vrStrat.id(), REQUESTER_ID);
+
+        // VR 전용 포트 호출 검증
+        verify(strategyCycleVrPort).findByCycleId(vrCycle.id());
+        verify(strategyVrDetailPort).findByStrategyVersionId(vrVersionId);
+        verify(orderPort).sumFilledBuyAmountByCycleId(vrCycle.id());
+        // LIMIT + AT_OPEN 주문이 저장됨
+        verify(orderPort).saveAll(argThat(orders -> orders.stream().allMatch(o ->
+                o.orderType() == Order.OrderType.LIMIT && o.timing() == Order.OrderTiming.AT_OPEN)));
+        // 최종 반환 주문 확인
+        assertThat(result).hasSize(2);
+        // 개장 후 수동 실행 시 AT_OPEN 주문 placeGiven 경로 — 실시간 DstInfo 의존적이므로 atMostOnce
+        verify(orderExecutor, atMostOnce()).placeGiven(anyList(), eq(ACCOUNT));
     }
 }

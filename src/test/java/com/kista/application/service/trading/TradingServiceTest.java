@@ -62,6 +62,7 @@ class TradingServiceTest {
     @Mock UserPort userPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
     @Mock StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 조회 (CycleOrderComputer용)
+    @Mock VrStrategy vrStrategy; // VR 전략 주문 생성 mock (VrCycleOrderStrategy 조립용)
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -113,7 +114,8 @@ class TradingServiceTest {
         ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
-                new PrivacyCycleOrderStrategy(privacyStrategy)));
+                new PrivacyCycleOrderStrategy(privacyStrategy),
+                new VrCycleOrderStrategy(vrStrategy))); // VR 전략 추가 — VR executeBatch 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
@@ -729,6 +731,81 @@ class TradingServiceTest {
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(userNotificationPort, never()).notifyCycleCompleted(any(), any(), any());
         verify(strategyCyclePort, never()).save(any()); // 새 사이클 재등록도 없음
+    }
+
+    // ── VR 전략 executeBatch 테스트 ──────────────────────────────────────────────
+
+    @Test
+    void executeBatch_vrStrategy_createsLimitAtOpenOrdersAndCallsVrPorts() throws InterruptedException {
+        // VR 전략 + 사이클 픽스처 (STRATEGY/STRATEGY_CYCLE은 INFINITE 전용이므로 별도 생성)
+        Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        UUID vrVersionId = UUID.randomUUID();
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
+                new BigDecimal("5000.00"), null, LocalDate.now(), null, null, null);
+        // VR 잔고 이력 — holdings=5, usdDeposit=$5000 (live 잔고 검증 통과용)
+        CyclePosition vrHistory = new CyclePosition(
+                null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
+                new BigDecimal("20.00"), 5, null, null);
+
+        // VR 사이클·버전 상세 — CycleOrderComputer에서 VrInputs 조립 시 조회됨
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
+        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0);
+
+        // VR buildOrders 결과: LIMIT + AT_OPEN 주문만 반환 (매수 1주 + 매도 1주)
+        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
+        UUID vrBuyId = UUID.randomUUID();
+        UUID vrSellId = UUID.randomUUID();
+        Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
+        Order vrBuyPlaced = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                1, new BigDecimal("22.00"), Order.OrderStatus.PLACED, "ORD-VR-BUY", null, null);
+        Order vrSellPlaced = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                1, new BigDecimal("25.00"), Order.OrderStatus.PLACED, "ORD-VR-SELL", null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        // 잔고: VR도 cycle_position DB 이력에서 로드 (TradingBalanceLoader.loadBalanceOrThrow)
+        when(cycleHistoryPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any())).thenReturn(List.of());
+        // VR 전용 포트 — CycleOrderComputer가 VrInputs 조립 시 호출
+        when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
+        when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
+        // buildOrders: VR 전략은 LIMIT + AT_OPEN 주문만 반환
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any()))
+                .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
+        // 장 마감 접수 단계: PLANNED → 증권사 접수
+        when(orderPort.findPlannedByCycleAndDate(eq(vrCycle.id()), any()))
+                .thenReturn(List.of(vrBuyPlanned, vrSellPlanned));
+        when(brokerOrderPort.place(any(), eq(ACCOUNT))).thenReturn(vrBuyPlaced, vrSellPlaced);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(vrStrat, vrCycle, ACCOUNT, USER)), PAST_DST);
+
+        // VR 전용 포트 호출 검증 — CycleOrderComputer가 VrInputs를 올바르게 조립했음을 확인
+        verify(strategyCycleVrPort).findByCycleId(vrCycle.id());
+        verify(strategyVrDetailPort).findByStrategyVersionId(vrVersionId);
+        verify(orderPort).sumFilledBuyAmountByCycleId(vrCycle.id());
+        // PLANNED 저장: 전체 주문이 LIMIT + AT_OPEN 타입인지 검증 (LOC/MOC 없음)
+        verify(orderPort).saveAll(argThat(orders -> orders.stream().allMatch(o ->
+                o.orderType() == Order.OrderType.LIMIT && o.timing() == Order.OrderTiming.AT_OPEN)));
+        // VR only 배치 — PRIVACY 기준매매표 조회가 발생하지 않아야 함
+        verify(privacyTradePort, never()).findTodayTrade(any());
     }
 
     @Test

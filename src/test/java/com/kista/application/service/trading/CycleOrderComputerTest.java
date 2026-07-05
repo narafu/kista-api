@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -145,6 +147,50 @@ class CycleOrderComputerTest {
         verify(strategyCycleVrPort, never()).findByCycleId(any());
         verify(strategyVrDetailPort, never()).findByStrategyVersionId(any());
         verify(orderPort, never()).sumFilledBuyAmountByCycleId(any());
+    }
+
+    // ── plan() 경유 가격 캡 통합 검증 (real VrStrategy) ──────────────────────────
+
+    @Test
+    @DisplayName("VR plan() 경유 가격 캡 통합 — rung 단가가 currentPrice×1.10 초과 시 cap으로 클램프")
+    void compute_vrStrategy_currentPriceCap_clampedViaPlanPath() {
+        // 실제 VrStrategy + VrCycleOrderStrategy 조립 (mock stub 없음)
+        // Task 1의 VrStrategyTypeTest가 buildOrders 레벨 캡을 검증; 여기서는 plan() 경유 currentPrice 전달 경로 검증
+        VrStrategy realVrStrategy = new VrStrategy();
+        VrCycleOrderStrategy realVrCycleStrategy = new VrCycleOrderStrategy(realVrStrategy);
+        CycleOrderStrategies realCycleStrategies = new CycleOrderStrategies(List.of(realVrCycleStrategy));
+        CycleOrderComputer realComputer = new CycleOrderComputer(
+                realCycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
+
+        // 가격 캡 트리거 픽스처:
+        // holdings=1, value=10000, bandWidth=15% → lowerBand=8500
+        // buyPrice(m=1) = 8500/1 = 8500
+        // currentPrice=700 → cap = 700×1.10 = 770.00
+        // 8500 > 770 → 캡 적용으로 모든 BUY 주문 가격 ≤ 770.00 이어야 함
+        BigDecimal currentPrice = new BigDecimal("700.00");
+        BigDecimal cap = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, RoundingMode.HALF_UP); // 770.00
+        AccountBalance balance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00"));
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                VR_CYCLE.id(), new BigDecimal("10000.00"), 10, new BigDecimal("5000.00"));
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0);
+
+        when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
+        when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(BigDecimal.ZERO);
+
+        Optional<CycleOrderStrategy.OrderPlan> planOpt = realComputer.compute(
+                balance, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "캡테스트", currentPrice);
+
+        assertThat(planOpt).isPresent();
+        List<Order> buyOrders = planOpt.get().orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .toList();
+        // holdings=1이므로 매수 주문이 생성됨
+        assertThat(buyOrders).isNotEmpty();
+        // 모든 BUY 주문 가격이 cap(770.00) 이하여야 함 — 캡이 plan()→buildOrders() 경로로 정상 전달됨을 검증
+        assertThat(buyOrders).allMatch(o -> o.price().compareTo(cap) <= 0,
+                "매수 주문 가격이 cap(" + cap + ")을 초과하면 안 됨 — currentPrice가 buildOrders까지 전달되지 않은 것");
     }
 
     @Test
