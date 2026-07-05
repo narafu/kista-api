@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,7 +46,7 @@ class StrategyServiceTest {
     @Mock LiveBalancePort liveBalancePort;                  // VR live 잔고 조회
     @Mock UserSettingsPort userSettingsPort;
 
-    @InjectMocks StrategyService strategyService;
+    private StrategyService strategyService;
 
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID  = UUID.randomUUID();
@@ -75,6 +74,19 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
+        VrStrategyLifecycle vrStrategyLifecycle = new VrStrategyLifecycle(strategyVrDetailPort, strategyCycleVrPort);
+        strategyService = new StrategyService(
+                strategyPort,
+                strategyVersionPort,
+                strategyInfiniteDetailPort,
+                vrStrategyLifecycle,
+                strategyCyclePort,
+                cyclePositionPort,
+                cyclePositionInfiniteDetailPort,
+                accountPort,
+                userPort,
+                registry,
+                userSettingsPort);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenAnswer(invocation -> Optional.of(new StrategyVersion(
                         STRATEGY_VERSION_ID, invocation.getArgument(0), 1, null, null)));
@@ -408,10 +420,9 @@ class StrategyServiceTest {
                 d.intervalWeeks() == 4
                         && d.bandWidth().compareTo(new BigDecimal("15.00")) == 0
                         && d.recurringAmount() == 0));
-        // StrategyCycleVrDetail poolLimit 검증 — 2000 × 0.50 = 1000.00
         verify(strategyCycleVrPort).save(argThat(cv ->
                 cv.poolLimit().compareTo(new BigDecimal("1000.00")) == 0
-                        && cv.gradient() == 10)); // recurringAmount=0 → gradient=10
+                        && cv.gradient() == 10));
         // 응답 VrSummary 검증
         assertThat(result.vr()).isNotNull();
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
@@ -449,8 +460,6 @@ class StrategyServiceTest {
         when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
         when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
                 .thenReturn(new AccountBalance(0, null, new BigDecimal("1000")));
-        when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
         // holdings=0이어도 예외 없이 등록 성공
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -458,6 +467,44 @@ class StrategyServiceTest {
         // vrInitialSnapshot이 holdings=0으로 저장되는지 검증
         verify(cyclePositionPort).save(argThat(p ->
                 p.strategyCycleId().equals(vrCycleId) && p.holdings() == 0 && p.avgPrice() == null));
+    }
+
+    @Test
+    @DisplayName("VR register() recurringAmount null이면 0으로 저장한다")
+    void register_vr_nullRecurringAmount_defaultsToZero() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                new BigDecimal("3000"), 4, new BigDecimal("15.00"), null);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("2000"), null, null, 0, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("2000")));
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
+        verify(strategyCycleVrPort).save(argThat(cv ->
+                cv.poolLimit().compareTo(new BigDecimal("1000.00")) == 0
+                        && cv.gradient() == 10));
+        assertThat(result.vr().recurringAmount()).isZero();
     }
 
     @Test
@@ -542,11 +589,8 @@ class StrategyServiceTest {
         when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
         when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
                 .thenReturn(new AccountBalance(0, null, new BigDecimal("1000")));
-        when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // poolLimit = 1000 × 0.75 = 750.00, gradient = 10 (recurringAmount > 0)
         verify(strategyCycleVrPort).save(argThat(cv ->
                 cv.poolLimit().compareTo(new BigDecimal("750.00")) == 0
                         && cv.gradient() == 10));

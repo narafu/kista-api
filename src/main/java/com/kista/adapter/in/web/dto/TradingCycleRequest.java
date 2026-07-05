@@ -32,7 +32,8 @@ public record TradingCycleRequest(
     public RegisterStrategyCommand toRegisterCommand() {
         return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType,
                 divisionCount != null ? divisionCount : 20,
-                initialValue, intervalWeeks, bandWidth, recurringAmount);
+                initialValue, intervalWeeks, bandWidth,
+                recurringAmount != null ? recurringAmount : 0);
     }
 
     public UpdateStrategyCommand toUpdateCommand() {
