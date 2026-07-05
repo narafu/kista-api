@@ -28,14 +28,16 @@
 - `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
 - `StrategyVersion` record 필드 5개: `id, strategyId, versionNo, createdAt, deletedAt` — 전략 설정 이력 부모
 - `StrategyInfiniteDetail` record 필드 2개: `strategyVersionId, divisionCount`
+- `StrategyVrDetail` record 필드 4개: `strategyVersionId, intervalWeeks, bandWidth, recurringAmount` — gradient()/poolLimitRate() 계산 메서드 제공
 - `StrategyCycle` record 필드 9개: `id, strategyId, strategyVersionId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 실행된 사이클과 적용 버전 고정값
 - `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 공통 포지션 스냅샷
 - `CyclePositionInfiniteDetail` record 필드 2개: `cyclePositionId, isReverseMode`
+- `StrategyCycleVrDetail` record 필드 4개: `strategyCycleId, value, gradient, poolLimit` — 사이클 시작 시 VR 파라미터 스냅샷
 - `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, Integer divisionCount, boolean isReverseMode, Double currentRound, Integer currentHoldings` — 최신 사이클/활성 버전/최신 포지션을 합쳐 응답 조립 (`StrategyService.toDetail()`)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
-- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액) — 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
-- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`)
+- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액); VR에서는 사이클 시작 pool(예수금) — 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
+- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`); **VR 전략은 NONE 강제** — 롤오버가 자체 사이클 교체 담당
 
 ### 잔고검증 토글 (UserSettings.balanceCheckEnabled)
 - `UserSettings` aggregate(`domain/model/user/UserSettings.java`) — `User` record 아님
@@ -77,6 +79,7 @@
 - import: `import com.kista.domain.model.strategy.Strategy.Ticker;`
 - MAGX/USD/TQQQ/SOXL — KIS 거래소 코드는 `KisExchangeRegistry`(adapter/out/kis)가 관리, 새 종목 추가 시 양쪽 갱신 필수
 - PRIVACY 전략: `Strategy.Ticker.SOXL` 강제 (`Strategy.Type.resolveTicker()`)
+- VR 전략: `Strategy.Ticker.TQQQ` 강제 (`Strategy.Type.resolveTicker()`)
 - ticker는 `Account` 아닌 `strategy.ticker()` — 매매 시 strategy에서 참조
 
 
@@ -107,6 +110,22 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < 10 / currentRound ≥ 10과 동치)
 - **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+priceOffsetRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
+
+### VR 공식 (변경 금지 — 단위 테스트로 검증)
+```
+lowerBand = V × (1 − bandWidth/100)  (scale=2, HALF_UP)
+upperBand = V × (1 + bandWidth/100)  (scale=2, HALF_UP)
+buyPrice(m)  = lowerBand ÷ (holdings + m − 1)  (scale=2, HALF_UP, m=1..20, divisor<1이면 skip)
+sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
+
+V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10)
+     평가금 = holdings × 종가
+```
+- gradient G: `recurringAmount < 0` → 20(인출), 그 외 → 10 (`StrategyVrDetail.gradient()`)
+- poolLimitRate: `recurringAmount > 0` → 0.75, `== 0` → 0.50, `< 0` → 0.25 (`StrategyVrDetail.poolLimitRate()`)
+- 가격 캡: `buyPrice > currentPrice × 1.10` 이면 cap 가격으로 교체 — scale=2 HALF_UP
+- rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
+- V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림
 
 ### KIS 계좌번호 DB 저장 방식
 - 계좌번호는 `accounts.account_no` (AES-256 암호화) + `accounts.broker_account_code` (KIS: null, TOSS: accountSeq) 저장
