@@ -111,6 +111,37 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findActiveByStrategyId_skipsDeletedVersion() {
+        // v2가 soft-delete(deleted_at 설정)된 경우 v1 VR 상세를 반환하는지 검증
+        // sv.deleted_at IS NULL 필터 제거 회귀를 잡는 케이스
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyVersion v1 = strategyVersionAdapter.save(
+                new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyVersion v2 = strategyVersionAdapter.save(
+                new StrategyVersion(null, strategy.id(), 2, null, null));
+
+        vrDetailAdapter.save(new StrategyVrDetail(v1.id(), 4, new BigDecimal("10.00"), 100));
+        vrDetailAdapter.save(new StrategyVrDetail(v2.id(), 8, new BigDecimal("20.00"), 200));
+
+        // JPA flush 후 v2 soft-delete 직접 적용 (adapter 메서드는 active 전체 삭제라 v1도 포함됨)
+        entityManager.flush();
+        jdbcTemplate.update("UPDATE strategy_version SET deleted_at = now() WHERE id = ?", v2.id());
+        entityManager.clear(); // L1 캐시 비움 — 이후 native 쿼리가 DB 최신 상태 반영
+
+        // deleted_at IS NULL 필터 → v2 제외, v1 VR 상세 반환
+        Optional<StrategyVrDetail> result = vrDetailAdapter.findActiveByStrategyId(strategy.id());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().strategyVersionId()).isEqualTo(v1.id());
+        assertThat(result.get().intervalWeeks()).isEqualTo(4);
+        assertThat(result.get().bandWidth()).isEqualByComparingTo(new BigDecimal("10.00"));
+        assertThat(result.get().recurringAmount()).isEqualTo(100);
+    }
+
+    @Test
     void findActiveByStrategyId_returnsEmptyIfNoStrategy() {
         // 존재하지 않는 전략 ID → Optional.empty
         Optional<StrategyVrDetail> result = vrDetailAdapter.findActiveByStrategyId(UUID.randomUUID());
