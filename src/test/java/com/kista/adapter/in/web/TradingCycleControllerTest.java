@@ -305,6 +305,7 @@ class TradingCycleControllerTest {
                                 """))
                 .andExpect(status().isCreated())         // 201
                 .andExpect(jsonPath("$.type").value("VR"))
+                .andExpect(jsonPath("$.divisionCount").value((Integer) null))  // VR은 divisionCount=null
                 .andExpect(jsonPath("$.vr").exists())
                 .andExpect(jsonPath("$.vr.poolLimit").value(1000.00))
                 .andExpect(jsonPath("$.vr.intervalWeeks").value(4));

@@ -396,13 +396,13 @@ class StrategyServiceTest {
         when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
                 .thenReturn(new AccountBalance(0, null, new BigDecimal("2000")));
         when(strategyCycleVrPort.save(any(StrategyCycleVrDetail.class))).thenReturn(savedCycleVr);
-        when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(savedCycleVr));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // cycleSeedType NONE 강제 검증
+        // cycleSeedType NONE 강제 + VR → TQQQ 강제 검증
         verify(strategyPort).save(argThat(s ->
-                s.type() == Strategy.Type.VR && s.cycleSeedType() == Strategy.CycleSeedType.NONE));
+                s.type() == Strategy.Type.VR && s.ticker() == Strategy.Ticker.TQQQ
+                        && s.cycleSeedType() == Strategy.CycleSeedType.NONE));
         // StrategyVrDetail 저장 검증
         verify(strategyVrDetailPort).save(argThat(d ->
                 d.intervalWeeks() == 4

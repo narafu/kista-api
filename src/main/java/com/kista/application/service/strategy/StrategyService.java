@@ -75,7 +75,7 @@ class StrategyService implements StrategyUseCase {
         }
 
         // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
-        StrategyCycle cycle = saveInitialCycleAndPosition(
+        InitialCycleResult initialResult = saveInitialCycleAndPosition(
                 persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
                 liveBalance, persisted.vrDetail(), cmd.initialValue());
 
@@ -83,11 +83,11 @@ class StrategyService implements StrategyUseCase {
 
         // VR 응답 조립 — VrSummary
         if (persisted.strategy().isVr()) {
-            StrategyDetail.VrSummary vrSummary = buildVrSummary(persisted.vrDetail(), cycle);
+            StrategyDetail.VrSummary vrSummary = buildVrSummary(persisted.vrDetail(), initialResult.cycleVr());
             int initialHoldings = liveBalance != null ? liveBalance.holdings() : 0;
-            return new StrategyDetail(persisted.strategy(), cycle.startAmount(), null, false, null, initialHoldings, vrSummary);
+            return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), null, false, null, initialHoldings, vrSummary);
         }
-        return new StrategyDetail(persisted.strategy(), cycle.startAmount(), divisionCount, false, 0.0, 0, null);
+        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), divisionCount, false, 0.0, 0, null);
     }
 
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
@@ -148,7 +148,7 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-    private StrategyCycle saveInitialCycleAndPosition(
+    private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             AccountBalance liveBalance, StrategyVrDetail vrDetail, BigDecimal initialValue) {
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, initialUsdDeposit));
@@ -156,35 +156,39 @@ class StrategyService implements StrategyUseCase {
             // 초기 스냅샷: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
             CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
+            return new InitialCycleResult(cycle, null);
         } else if (saved.isVr()) {
             // poolLimit = pool × poolLimitRate, scale=2 HALF_UP
             BigDecimal poolLimit = initialUsdDeposit
                     .multiply(vrDetail.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);
-            strategyCycleVrPort.save(
+            // save 반환값을 직접 보관 — 재조회 없이 buildVrSummary에 전달
+            StrategyCycleVrDetail savedCycleVr = strategyCycleVrPort.save(
                     new StrategyCycleVrDetail(cycle.id(), initialValue, vrDetail.gradient(), poolLimit));
             int holdings = liveBalance != null ? liveBalance.holdings() : 0;
             BigDecimal avgPrice = liveBalance != null ? liveBalance.avgPrice() : null;
             cyclePositionPort.save(CyclePosition.vrInitialSnapshot(cycle.id(), initialUsdDeposit, holdings, avgPrice));
+            return new InitialCycleResult(cycle, savedCycleVr);
         } else {
             // PRIVACY: 초기 스냅샷, 보유 없음
             cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
+            return new InitialCycleResult(cycle, null);
         }
-        return cycle;
     }
 
-    // VrSummary 조립 — vrDetail + 사이클 VR 상세 합산
-    private StrategyDetail.VrSummary buildVrSummary(StrategyVrDetail vrDetail, StrategyCycle cycle) {
-        if (vrDetail == null) return null;
-        return strategyCycleVrPort.findByCycleId(cycle.id())
-                .map(cycleVr -> new StrategyDetail.VrSummary(
-                        cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
-                        vrDetail.recurringAmount(), cycleVr.poolLimit(), cycleVr.gradient()))
-                .orElse(null);
+    // VrSummary 조립 — vrDetail + 저장된 사이클 VR 상세 합산 (재조회 없이 save 반환값 직접 사용)
+    private StrategyDetail.VrSummary buildVrSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr) {
+        if (vrDetail == null || cycleVr == null) return null;
+        return new StrategyDetail.VrSummary(
+                cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
+                vrDetail.recurringAmount(), cycleVr.poolLimit(), cycleVr.gradient());
     }
 
     // 전략 저장 후 버전 ID + VR 상세를 함께 전달하기 위한 내부 전달 객체
     private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version, StrategyVrDetail vrDetail) {}
+
+    // 초기 사이클·포지션 저장 결과 — cycle + VR 전용 cycleVr (VR 외 전략은 null)
+    private record InitialCycleResult(StrategyCycle cycle, StrategyCycleVrDetail cycleVr) {}
 
     @Override
     public void delete(UUID strategyId, UUID requesterId) {
