@@ -7,6 +7,7 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -29,28 +31,30 @@ class StrategyService implements StrategyUseCase {
     private final StrategyPort strategyPort;
     private final StrategyVersionPort strategyVersionPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
+    private final StrategyVrDetailPort strategyVrDetailPort;        // VR 버전 상세
+    private final StrategyCycleVrPort strategyCycleVrPort;          // VR 사이클 상세
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
-    private final BrokerAdapterRegistry registry;                // 등록 시점 가용 시드 검증 — MarginPort 경유
-    private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
+    private final BrokerAdapterRegistry registry;                   // 등록 시점 가용 시드 검증 — MarginPort / LiveBalancePort 경유
+    private final UserSettingsPort userSettingsPort;                // 잔고 검증 설정 조회 (user_settings)
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증 HTTP 호출 포함 — 트랜잭션 없이 실행 (각 DB 저장은 JPA auto-commit)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
-        // VR 전략 등록은 Task 3에서 지원 예정 — 현재는 임시 차단 // Task 3에서 제거
-        if (cmd.type() == Strategy.Type.VR) {
-            throw new IllegalArgumentException("VR 전략 등록은 아직 지원되지 않습니다");
-        }
-
         Account account = accountPort.requireOwnedAccount(accountId, userId);
 
-        // PRIVACY는 SOXL 강제, INFINITE는 요청값 우선 → fallback
-        Strategy.CycleSeedType seedType = cmd.cycleSeedType() != null
-                ? cmd.cycleSeedType()
-                : Strategy.CycleSeedType.NONE;
+        // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리)
+        if (cmd.type() == Strategy.Type.VR) {
+            validateVrCommand(cmd);
+        }
+
+        // PRIVACY는 SOXL 강제, VR은 TQQQ 강제, INFINITE는 요청값 우선 → fallback
+        Strategy.CycleSeedType seedType = cmd.type() == Strategy.Type.VR
+                ? Strategy.CycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
+                : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : Strategy.CycleSeedType.NONE);
         Strategy.Ticker resolvedTicker = cmd.type().resolveTicker(cmd.ticker(), Strategy.Ticker.SOXL);
 
         // 종목 중복 + 잔고 검증
@@ -59,15 +63,47 @@ class StrategyService implements StrategyUseCase {
 
         int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
 
-        // 전략·버전·상세 저장 (strategy → strategy_versions → strategy_infinite_details)
-        var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount);
+        // 전략·버전·상세 저장 (strategy → strategy_versions → 전략별 detail)
+        var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
+                cmd.intervalWeeks(), cmd.bandWidth(), cmd.recurringAmount());
 
-        // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → cycle_position_infinite_details)
+        // VR: 브로커 live 잔고 조회 (NOT_SUPPORTED 트랜잭션 — HTTP 호출 허용)
+        AccountBalance liveBalance = null;
+        if (persisted.strategy().isVr()) {
+            liveBalance = registry.require(account, LiveBalancePort.class)
+                    .getLiveBalance(account, persisted.strategy().ticker());
+        }
+
+        // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
         StrategyCycle cycle = saveInitialCycleAndPosition(
-                persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit());
+                persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
+                liveBalance, persisted.vrDetail(), cmd.initialValue());
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
-        return new StrategyDetail(persisted.strategy(), cycle.startAmount(), divisionCount, false, 0.0, 0);
+
+        // VR 응답 조립 — VrSummary
+        if (persisted.strategy().isVr()) {
+            StrategyDetail.VrSummary vrSummary = buildVrSummary(persisted.vrDetail(), cycle);
+            int initialHoldings = liveBalance != null ? liveBalance.holdings() : 0;
+            return new StrategyDetail(persisted.strategy(), cycle.startAmount(), null, false, null, initialHoldings, vrSummary);
+        }
+        return new StrategyDetail(persisted.strategy(), cycle.startAmount(), divisionCount, false, 0.0, 0, null);
+    }
+
+    // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
+    private void validateVrCommand(RegisterStrategyCommand cmd) {
+        if (cmd.intervalWeeks() == null || cmd.intervalWeeks() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
+        }
+        if (cmd.bandWidth() == null || cmd.bandWidth().signum() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 밴드 폭(bandWidth)은 0보다 커야 합니다");
+        }
+        if (cmd.initialValue() == null || cmd.initialValue().signum() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 V값(initialValue)은 0보다 커야 합니다");
+        }
+        if (cmd.initialUsdDeposit() == null || cmd.initialUsdDeposit().signum() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 예수금(initialUsdDeposit)은 0보다 커야 합니다");
+        }
     }
 
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
@@ -90,35 +126,65 @@ class StrategyService implements StrategyUseCase {
         }
     }
 
-    // strategy → strategy_versions → strategy_infinite_details 순 저장
+    // strategy → strategy_versions → 전략 타입별 detail 순 저장
     private SavedStrategyAndVersion saveStrategyWithVersion(
             UUID accountId, Strategy.Type type, Strategy.Ticker ticker,
-            Strategy.CycleSeedType seedType, int divisionCount) {
+            Strategy.CycleSeedType seedType, int divisionCount,
+            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
         Strategy strategy = new Strategy(null, accountId, type, Strategy.Status.ACTIVE, ticker, seedType);
         Strategy saved = strategyPort.save(strategy);
         StrategyVersion version = strategyVersionPort.save(
                 new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
         );
+        StrategyVrDetail vrDetail = null;
         if (saved.isInfinite()) {
             strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), divisionCount));
+        } else if (saved.isVr()) {
+            // intervalWeeks/recurringAmount는 validateVrCommand에서 null 검사 완료
+            vrDetail = strategyVrDetailPort.save(
+                    new StrategyVrDetail(version.id(), intervalWeeks, bandWidth, recurringAmount));
         }
-        return new SavedStrategyAndVersion(saved, version);
+        return new SavedStrategyAndVersion(saved, version, vrDetail);
     }
 
-    // strategy_cycles → cycle_positions → cycle_position_infinite_details 순 저장
+    // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
     private StrategyCycle saveInitialCycleAndPosition(
-            Strategy saved, UUID versionId, BigDecimal initialUsdDeposit) {
+            Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
+            AccountBalance liveBalance, StrategyVrDetail vrDetail, BigDecimal initialValue) {
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, initialUsdDeposit));
-        // 초기 스냅샷 저장: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
-        CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
         if (saved.isInfinite()) {
+            // 초기 스냅샷: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
+            CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
+        } else if (saved.isVr()) {
+            // poolLimit = pool × poolLimitRate, scale=2 HALF_UP
+            BigDecimal poolLimit = initialUsdDeposit
+                    .multiply(vrDetail.poolLimitRate())
+                    .setScale(2, RoundingMode.HALF_UP);
+            strategyCycleVrPort.save(
+                    new StrategyCycleVrDetail(cycle.id(), initialValue, vrDetail.gradient(), poolLimit));
+            int holdings = liveBalance != null ? liveBalance.holdings() : 0;
+            BigDecimal avgPrice = liveBalance != null ? liveBalance.avgPrice() : null;
+            cyclePositionPort.save(CyclePosition.vrInitialSnapshot(cycle.id(), initialUsdDeposit, holdings, avgPrice));
+        } else {
+            // PRIVACY: 초기 스냅샷, 보유 없음
+            cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
         }
         return cycle;
     }
 
-    // 전략 저장 후 버전 ID를 함께 전달하기 위한 내부 전달 객체
-    private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version) {}
+    // VrSummary 조립 — vrDetail + 사이클 VR 상세 합산
+    private StrategyDetail.VrSummary buildVrSummary(StrategyVrDetail vrDetail, StrategyCycle cycle) {
+        if (vrDetail == null) return null;
+        return strategyCycleVrPort.findByCycleId(cycle.id())
+                .map(cycleVr -> new StrategyDetail.VrSummary(
+                        cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
+                        vrDetail.recurringAmount(), cycleVr.poolLimit(), cycleVr.gradient()))
+                .orElse(null);
+    }
+
+    // 전략 저장 후 버전 ID + VR 상세를 함께 전달하기 위한 내부 전달 객체
+    private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version, StrategyVrDetail vrDetail) {}
 
     @Override
     public void delete(UUID strategyId, UUID requesterId) {
@@ -235,21 +301,42 @@ class StrategyService implements StrategyUseCase {
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
+
         Integer divisionCount = strategy.isInfinite()
                 ? strategyVersionPort.findActiveByStrategyId(strategy.id())
                         .flatMap(version -> strategyInfiniteDetailPort.findByStrategyVersionId(version.id()))
                         .map(StrategyInfiniteDetail::divisionCount)
                         .orElse(Strategy.DEFAULT_DIVISION_COUNT)
                 : null;
+
         Optional<CyclePosition> latestPos = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
+
         boolean isReverseMode = latestPos
                 .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
                 .map(CyclePositionInfiniteDetail::isReverseMode)
                 .orElse(false);
-        Double currentRound = latestPos.map(pos -> InfinitePosition.calcCurrentRound(
-                pos.avgPrice(), pos.holdings(), pos.usdDeposit(), divisionCount == null ? 0 : divisionCount)).orElse(null);
+
+        // VR은 currentRound 없음 — INFINITE만 계산
+        Double currentRound = strategy.isVr() ? null :
+                latestPos.map(pos -> InfinitePosition.calcCurrentRound(
+                        pos.avgPrice(), pos.holdings(), pos.usdDeposit(),
+                        divisionCount == null ? 0 : divisionCount)).orElse(null);
+
         Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
-        return new StrategyDetail(strategy, initialUsdDeposit, divisionCount, isReverseMode, currentRound, currentHoldings);
+
+        // VR 전략: StrategyVrDetail + StrategyCycleVrDetail 합산 → VrSummary
+        StrategyDetail.VrSummary vrSummary = null;
+        if (strategy.isVr()) {
+            vrSummary = strategyVrDetailPort.findActiveByStrategyId(strategy.id())
+                    .flatMap(vrDetail -> latestCycle
+                            .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id()))
+                            .map(cycleVr -> new StrategyDetail.VrSummary(
+                                    cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
+                                    vrDetail.recurringAmount(), cycleVr.poolLimit(), cycleVr.gradient())))
+                    .orElse(null);
+        }
+
+        return new StrategyDetail(strategy, initialUsdDeposit, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
     }
 
 }

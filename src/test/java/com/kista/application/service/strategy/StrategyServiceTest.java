@@ -7,6 +7,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +35,8 @@ class StrategyServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
+    @Mock StrategyVrDetailPort strategyVrDetailPort;       // VR 버전 상세 포트
+    @Mock StrategyCycleVrPort strategyCycleVrPort;         // VR 사이클 상세 포트
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -41,6 +44,7 @@ class StrategyServiceTest {
     @Mock UserPort userPort;
     @Mock BrokerAdapterRegistry registry;
     @Mock MarginPort marginPort;
+    @Mock LiveBalancePort liveBalancePort;                  // VR live 잔고 조회
     @Mock UserSettingsPort userSettingsPort;
 
     @InjectMocks StrategyService strategyService;
@@ -91,6 +95,10 @@ class StrategyServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(cyclePositionInfiniteDetailPort.findByCyclePositionId(any())).thenReturn(Optional.empty());
         lenient().when(cyclePositionInfiniteDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(strategyVrDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(strategyCycleVrPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(strategyCycleVrPort.findByCycleId(any())).thenReturn(Optional.empty());
+        lenient().when(strategyVrDetailPort.findActiveByStrategyId(any())).thenReturn(Optional.empty());
     }
 
     private Account ownerAccount() {
@@ -274,7 +282,8 @@ class StrategyServiceTest {
     @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
     void register_duplicateTicker_throws() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20);
+                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(true);
@@ -290,7 +299,8 @@ class StrategyServiceTest {
     void register_seedExceedsFreeCash_throws() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 600 > 500
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20);
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20,
+                null, null, null, null);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
@@ -315,7 +325,8 @@ class StrategyServiceTest {
     void register_uniqueTickerWithinFreeCash_succeeds() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 500 == 500 → 허용
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 40);
+                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 40,
+                null, null, null, null);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
@@ -347,5 +358,233 @@ class StrategyServiceTest {
                 p.strategyCycleId().equals(savedCycle.id())
                         && p.usdDeposit().compareTo(new BigDecimal("500")) == 0
                         && p.closingPrice() == null));
+    }
+
+    // --- VR register() ---
+
+    @Test
+    @DisplayName("VR register() 성공 — StrategyVrDetail·StrategyCycleVrDetail 저장, poolLimit 계산, cycleSeedType NONE 강제")
+    void register_vr_success_savesVrDetailsAndPoolLimit() {
+        // 예수금 2000, poolLimitRate=0.50(recurringAmount=0) → poolLimit = 1000.00
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                new BigDecimal("3000"), 4, new BigDecimal("15.00"), 0);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("2000"), null, null, 0, null, null);
+        StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
+                vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("1000.00"));
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        // VR 잔고 조회 — holdings=0 (신규 진입)
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("2000")));
+        when(strategyCycleVrPort.save(any(StrategyCycleVrDetail.class))).thenReturn(savedCycleVr);
+        when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(savedCycleVr));
+
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        // cycleSeedType NONE 강제 검증
+        verify(strategyPort).save(argThat(s ->
+                s.type() == Strategy.Type.VR && s.cycleSeedType() == Strategy.CycleSeedType.NONE));
+        // StrategyVrDetail 저장 검증
+        verify(strategyVrDetailPort).save(argThat(d ->
+                d.intervalWeeks() == 4
+                        && d.bandWidth().compareTo(new BigDecimal("15.00")) == 0
+                        && d.recurringAmount() == 0));
+        // StrategyCycleVrDetail poolLimit 검증 — 2000 × 0.50 = 1000.00
+        verify(strategyCycleVrPort).save(argThat(cv ->
+                cv.poolLimit().compareTo(new BigDecimal("1000.00")) == 0
+                        && cv.gradient() == 10)); // recurringAmount=0 → gradient=10
+        // 응답 VrSummary 검증
+        assertThat(result.vr()).isNotNull();
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.divisionCount()).isNull();  // VR은 divisionCount 없음
+        assertThat(result.currentRound()).isNull();    // VR은 currentRound 없음
+    }
+
+    @Test
+    @DisplayName("VR register() holdings=0 허용 — 신규 진입 시 초기 포지션 저장")
+    void register_vr_holdingsZero_allowed() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                new BigDecimal("2000"), 2, new BigDecimal("10.00"), 0);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("1000"), null, null, 0, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("3000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        // live 잔고 holdings=0 (신규 진입)
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000")));
+        when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // holdings=0이어도 예외 없이 등록 성공
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        assertThat(result.currentHoldings()).isEqualTo(0);
+        // vrInitialSnapshot이 holdings=0으로 저장되는지 검증
+        verify(cyclePositionPort).save(argThat(p ->
+                p.strategyCycleId().equals(vrCycleId) && p.holdings() == 0 && p.avgPrice() == null));
+    }
+
+    @Test
+    @DisplayName("VR register() intervalWeeks null이면 IllegalArgumentException 발생")
+    void register_vr_missingIntervalWeeks_throws() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                new BigDecimal("3000"), null, new BigDecimal("15.00"), 0);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("intervalWeeks");
+    }
+
+    @Test
+    @DisplayName("VR register() bandWidth null이면 IllegalArgumentException 발생")
+    void register_vr_missingBandWidth_throws() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                new BigDecimal("3000"), 4, null, 0);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bandWidth");
+    }
+
+    @Test
+    @DisplayName("VR register() initialValue null이면 IllegalArgumentException 발생")
+    void register_vr_missingInitialValue_throws() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                null, 4, new BigDecimal("15.00"), 0);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("initialValue");
+    }
+
+    @Test
+    @DisplayName("VR register() initialUsdDeposit null이면 IllegalArgumentException 발생")
+    void register_vr_missingPool_throws() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, null, null, 20,
+                new BigDecimal("3000"), 4, new BigDecimal("15.00"), 0);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("initialUsdDeposit");
+    }
+
+    @Test
+    @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=0.75")
+    void register_vr_poolLimitRate_withDeposit() {
+        // recurringAmount=100(입금) → poolLimitRate=0.75 → poolLimit = 1000 × 0.75 = 750.00
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                new BigDecimal("2000"), 4, new BigDecimal("15.00"), 100);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("1000"), null, null, 0, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("3000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000")));
+        when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        // poolLimit = 1000 × 0.75 = 750.00, gradient = 10 (recurringAmount > 0)
+        verify(strategyCycleVrPort).save(argThat(cv ->
+                cv.poolLimit().compareTo(new BigDecimal("750.00")) == 0
+                        && cv.gradient() == 10));
+    }
+
+    @Test
+    @DisplayName("toDetail() VR 전략 — VrSummary 조립, divisionCount=null, currentRound=null")
+    void toDetail_vr_assemblesVrSummary() {
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        UUID vrVersionId = UUID.randomUUID();
+        Strategy vrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
+                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+        CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("2000"), null, null, 0, null, null);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0);
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("1000.00"));
+
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
+        when(cyclePositionPort.findLatestOneByStrategyId(vrStrategyId)).thenReturn(Optional.of(latestPos));
+        when(strategyVrDetailPort.findActiveByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrDetail));
+        when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(cycleVr));
+
+        List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
+
+        assertThat(result).hasSize(1);
+        StrategyDetail detail = result.get(0);
+        assertThat(detail.divisionCount()).isNull();
+        assertThat(detail.currentRound()).isNull();
+        assertThat(detail.vr()).isNotNull();
+        assertThat(detail.vr().intervalWeeks()).isEqualTo(4);
+        assertThat(detail.vr().bandWidth()).isEqualByComparingTo("15.00");
+        assertThat(detail.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(detail.vr().gradient()).isEqualTo(10);
     }
 }

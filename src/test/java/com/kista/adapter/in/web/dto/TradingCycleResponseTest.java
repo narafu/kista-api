@@ -16,7 +16,7 @@ class TradingCycleResponseTest {
         Strategy strategy = new Strategy(
                 UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), 20, false, null, 0);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), 20, false, null, 0, null);
 
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 

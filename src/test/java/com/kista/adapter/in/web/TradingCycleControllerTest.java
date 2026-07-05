@@ -189,7 +189,7 @@ class TradingCycleControllerTest {
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), 20, false, null, 0);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), 20, false, null, 0, null);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
@@ -225,7 +225,7 @@ class TradingCycleControllerTest {
                         com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
                         com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
                         com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE),
-                new java.math.BigDecimal("1000"), 20, false, null, 0);
+                new java.math.BigDecimal("1000"), 20, false, null, 0, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(mockAuth())))
@@ -276,5 +276,37 @@ class TradingCycleControllerTest {
         mockMvc.perform(get("/api/accounts/{accountId}/strategy-seed-preview", ACCOUNT_ID)
                         .param("type", "INFINITE").param("ticker", "SOXL").param("divisionCount", "20"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void register_vr_returns201_withVrField() throws Exception {
+        // VR 전략 등록 201 응답 + vr 필드 포함 검증
+        Strategy vrStrategy = new com.kista.domain.model.strategy.Strategy(
+                UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
+                new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
+                new BigDecimal("1000.00"), 10);
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), null, false, null, 0, vrSummary);
+        when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(mockAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "VR",
+                                  "initialUsdDeposit": 2000.00,
+                                  "initialValue": 3000.00,
+                                  "intervalWeeks": 4,
+                                  "bandWidth": 15.00,
+                                  "recurringAmount": 0
+                                }
+                                """))
+                .andExpect(status().isCreated())         // 201
+                .andExpect(jsonPath("$.type").value("VR"))
+                .andExpect(jsonPath("$.vr").exists())
+                .andExpect(jsonPath("$.vr.poolLimit").value(1000.00))
+                .andExpect(jsonPath("$.vr.intervalWeeks").value(4));
     }
 }
