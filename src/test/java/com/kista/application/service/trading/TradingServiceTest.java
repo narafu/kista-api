@@ -145,9 +145,10 @@ class TradingServiceTest {
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
+        VrCycleRolloverService vrRolloverService = mock(VrCycleRolloverService.class); // VR 롤오버 mock
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, userNotificationPort);
+                strategyCyclePort, rotationService, userNotificationPort, cycleStrategies, vrRolloverService);
         TradingReporter reporter = new TradingReporter(
                 tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
                 userSettingsPort, positionPersistor);

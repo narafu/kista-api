@@ -3,6 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.*;
+import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,8 @@ class CyclePositionPersistor {
     private final StrategyCyclePort strategyCyclePort;                          // 사이클 종료 기록
     private final CycleRotationService cycleRotationService;                    // 사이클 종료 후 연속 정책 실행
     private final UserNotificationPort userNotificationPort;                    // 사이클 완료 알림
+    private final CycleOrderStrategies cycleOrderStrategies;                    // 전략 타입별 capability 조회
+    private final VrCycleRolloverService vrCycleRolloverService;                // VR N주 롤오버
 
     // execute() 종료 시 포지션 1건 적재, holdings==0이면 사이클 rotation 정책 처리
     void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
@@ -48,12 +51,19 @@ class CyclePositionPersistor {
 
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
         // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
-        if (position.holdings() == 0 && prevHadHoldings) {
+        // endsCycleOnLiquidation()=false인 전략(VR)은 holdings=0에 사이클 종료 미발동
+        if (position.holdings() == 0 && prevHadHoldings
+                && cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation()) {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
             userNotificationPort.notifyCycleCompleted(ctx.user(), ctx.account(), strategy);
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
+        }
+
+        // VR 전략: 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op)
+        if (strategy.isVr()) {
+            vrCycleRolloverService.rollIfDue(ctx, balance, price, today);
         }
     }
 
