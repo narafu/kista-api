@@ -123,9 +123,17 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 ```
 - gradient G: `recurringAmount < 0` → 20(인출), 그 외 → 10 (`StrategyVrDetail.gradient()`)
 - poolLimitRate: `recurringAmount > 0` → 0.75, `== 0` → 0.50, `< 0` → 0.25 (`StrategyVrDetail.poolLimitRate()`)
+- 등록 검증: `initialValue`, `initialUsdDeposit`, `recurringAmount` null은 0으로 취급
+- 적립식(`recurringAmount > 0`): 초기 V와 초기 시드가 모두 0이어도 등록 가능
+- 거치식/인출식(`recurringAmount <= 0`): `initialValue + initialUsdDeposit > 0` 필수
+- 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수
+- 첫 사이클 poolLimit: (`initialValue` + `initialUsdDeposit`) × `poolLimitRate()`; 이후 롤오버 poolLimit은 기존처럼 USD pool × `poolLimitRate()`
+- 첫 사이클 bootstrap: V만 있으면 poolLimit LOC+AT_CLOSE 분할매도, pool만 있으면 poolLimit LOC+AT_CLOSE 분할매수, 적립식 V=0/pool=0이면 due date 당일 recurringAmount LOC+AT_CLOSE 매수
+- bootstrap LOC 가격: 매수 `currentPrice × 1.10`, 매도 `currentPrice × 0.90`; 주문 수량은 예산/가격 내림 정수
 - 가격 캡: `buyPrice > currentPrice × 1.10` 이면 cap 가격으로 교체 — scale=2 HALF_UP
 - rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림
+- 단, 적립식 bootstrap 매수 실패(`recurringAmount>0`, 기존 V=0, holdings=0)는 V=0 새 사이클로 롤오버해 다음 due date에 다시 recurringAmount LOC 매수를 시도
 
 ### KIS 계좌번호 DB 저장 방식
 - 계좌번호는 `accounts.account_no` (AES-256 암호화) + `accounts.broker_account_code` (KIS: null, TOSS: accountSeq) 저장
