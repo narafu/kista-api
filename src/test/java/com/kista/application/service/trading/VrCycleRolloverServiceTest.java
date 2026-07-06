@@ -234,6 +234,28 @@ class VrCycleRolloverServiceTest {
     }
 
     @Test
+    @DisplayName("적립식 bootstrap 매수 실패로 V가 0이면 새 사이클도 V=0으로 이어간다")
+    void rollIfDue_recurringBootstrapFailed_rollsWithZeroValue() {
+        StrategyCycleVrDetail zeroCycleVr = new StrategyCycleVrDetail(
+                CYCLE_ID, BigDecimal.ZERO, 10, BigDecimal.ZERO);
+        StrategyVrDetail depositDetail = new StrategyVrDetail(
+                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200);
+        AccountBalance postBalance = new AccountBalance(0, null, BigDecimal.ZERO);
+        LocalDate today = CYCLE_START.plusWeeks(2);
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(zeroCycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(depositDetail));
+
+        service.rollIfDue(ctx, postBalance, CLOSING_PRICE, today);
+
+        verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(BigDecimal.ZERO), eq(today));
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(postBalance), eq(CLOSING_PRICE),
+                eq(BigDecimal.ZERO.setScale(2)), eq(10), eq(BigDecimal.ZERO.setScale(2)));
+        verify(userNotificationPort, never()).notifyError(eq(USER), any(IllegalStateException.class));
+    }
+
+    @Test
     @DisplayName("closingPrice null — 롤오버 skip, markEnded 미호출, 관리자 알림")
     void nullClosingPrice_skipWithNotify() {
         LocalDate today = CYCLE_START.plusWeeks(4);

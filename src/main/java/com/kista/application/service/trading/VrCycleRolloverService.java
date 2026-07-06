@@ -71,10 +71,16 @@ class VrCycleRolloverService {
                 detail.recurringAmount(),
                 evaluation
         );
+        boolean recurringBootstrapWithoutValue = detail.recurringAmount() > 0
+                && cycleVr.value().signum() == 0
+                && postBalance.holdings() == 0;
+        if (recurringBootstrapWithoutValue) {
+            newValue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
         log.info("[strategyId={}] VR 롤오버 V′ 계산: value={} → newValue={}", strategy.id(), cycleVr.value(), newValue);
 
         // V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 사용자에게 설정 조정 유도 알림
-        if (newValue.compareTo(BigDecimal.ZERO) <= 0) {
+        if (newValue.compareTo(BigDecimal.ZERO) <= 0 && !recurringBootstrapWithoutValue) {
             log.warn("[strategyId={}] VR 롤오버 보류 — V′≤0 (newValue={})", strategy.id(), newValue);
             notifyPort.notifyError(new IllegalStateException(
                     "VR V′≤0 — 롤오버 보류: strategyId=" + strategy.id() + " newValue=" + newValue));
