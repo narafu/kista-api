@@ -26,7 +26,7 @@ This is a Java 21 Spring Boot API using hexagonal architecture. Application entr
 - `src/main/java/com/kista/application`: use case implementations and orchestration services.
 - `src/main/java/com/kista/adapter/in`: REST controllers, schedulers, Telegram webhook, and security filters.
 - `src/main/java/com/kista/adapter/out`: persistence, broker APIs, notifications, Redis, crypto, and external service adapters.
-- `src/main/resources/db/migration`: Flyway migrations named like `V13__fix_column_type.sql`.
+- `src/main/resources/db/migration`: Flyway migrations named like `V18__add_vr_strategy_details.sql`.
 - `src/test/java`: unit, slice, architecture, and integration tests. Test support lives in `src/test/java/com/kista/support`.
 
 ## Build, Test, and Development Commands

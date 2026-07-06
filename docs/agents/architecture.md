@@ -3,6 +3,11 @@
 Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의존성을 강제 검증**한다 (`HexagonalArchitectureTest`).
 
 ```
+common/          ← 공통 유틸리티 (Spring/JPA 독립)
+  CycleLookups   — 활성 StrategyCycle 조회 헬퍼 (requireLatestCycle — IllegalStateException 400)
+  TimeZones      — KST/UTC ZoneId 상수
+  TradeDateConverter — toUtc(KST)/toKst(UTC) ±1일 변환 (→ constraints.md "tradeDate 변환 정책")
+
 domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금지
   model/         ← 불변 값 객체 (record 사용), 어그리게이트별 서브패키지
     user/        ← User (nested enums: UserRole, UserStatus, NotificationChannel + nested CooldownException), FcmDeviceToken,
@@ -68,7 +73,9 @@ adapter/in/
                    TradingCloseScheduler (화~토 04:00 KST — 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 03:00 KST — 만료 RT 삭제, 03:05 KST — grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
+                   FearGreedScheduler (UTC 06:00/18:00 12시간 주기 — CNN·크립토 공포탐욕지수 수집·저장)
                    BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
+                   SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task), 모든 스케쥴러가 사용; @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
   web/           ← REST Controller + DTO
                     AuthController (카카오/JWT/승인/탈퇴/SSE), AccountController (계좌CRUD+연결테스트), TradingCycleController (사이클CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`), DashboardController (DB기반 사이클 이력), StatisticsController (KIS 전용 live 잔고/수익/가격), TossStatisticsController (Toss 전용 live 5개 엔드포인트, /api/accounts/{accountId}/*), FearGreedController (CNN·크립토 공포탐욕지수, GET /api/market/fear-greed), MetaController (enum SSOT /api/meta 번들만, Cache 1h — StrategyTypeMeta에 capability 7필드: code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts), OrderCancelController, MarketHolidayController (휴장일/세션 DIRECT|BLOCKED), FidaOrderController (/api/internal/**, X-Internal-Token), SettingsController (텔레그램+알림채널), FcmController, TradeStreamController (SSE), Admin*Controller (Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade — /api/admin/**), AdminObservabilityController (/api/admin/logs/ — 감사로그+앱에러로그 조회, DELETE /errors/{id} 앱에러로그 소프트 삭제), AdminPingController (/api/admin/_ping), DevAuthController (local전용)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
