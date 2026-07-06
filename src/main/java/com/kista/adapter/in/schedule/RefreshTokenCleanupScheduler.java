@@ -20,8 +20,8 @@ public class RefreshTokenCleanupScheduler {
     private final NotifyPort notifyPort; // 스케쥴러 시작/종료 알림
     private final SchedulerLockService schedulerLockService;
 
-    // 매일 03:00 KST — 만료된 RT 일괄 삭제
-    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    // 매일 04:00 KST — 만료된 RT 일괄 삭제
+    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void cleanupExpiredTokens() throws InterruptedException {
         schedulerLockService.tryRun("refresh-token-expired-cleanup", Duration.ofMinutes(30), this::cleanupExpiredTokensLocked);
     }
