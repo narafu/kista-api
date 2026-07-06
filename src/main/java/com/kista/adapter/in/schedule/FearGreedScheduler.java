@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 
-// UTC 12시간마다(06:00 / 18:00) 크립토·CNN 공포탐욕지수 수집 및 저장
+// KST 00:00 / 06:30 / 10:00 크립토·CNN 공포탐욕지수 수집 및 저장
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -21,9 +21,11 @@ public class FearGreedScheduler {
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 0 6,18 * * *", zone = "UTC") // UTC 06:00 / 18:00
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul") // KST 00:00
+    @Scheduled(cron = "0 30 6 * * *", zone = "Asia/Seoul") // KST 06:30
+    @Scheduled(cron = "0 0 10 * * *", zone = "Asia/Seoul") // KST 10:00
     public void run() throws InterruptedException {
-        schedulerLockService.tryRun("fear-greed-12hourly", Duration.ofMinutes(30), this::runLocked);
+        schedulerLockService.tryRun("fear-greed", Duration.ofMinutes(30), this::runLocked);
     }
 
     private void runLocked() {
