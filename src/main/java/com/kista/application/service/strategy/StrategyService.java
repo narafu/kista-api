@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -97,12 +98,28 @@ class StrategyService implements StrategyUseCase {
         if (cmd.bandWidth() == null || cmd.bandWidth().signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭(bandWidth)은 0보다 커야 합니다");
         }
-        if (cmd.initialValue() == null || cmd.initialValue().signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 V값(initialValue)은 0보다 커야 합니다");
+        BigDecimal initialValue = normalizeMoney(cmd.initialValue());
+        BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
+        int recurringAmount = cmd.recurringAmount() != null ? cmd.recurringAmount() : 0;
+        BigDecimal initialAssets = initialValue.add(initialUsdDeposit);
+
+        if (recurringAmount <= 0 && initialAssets.signum() <= 0) {
+            throw new IllegalArgumentException("VR 거치식/인출식은 초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");
         }
-        if (cmd.initialUsdDeposit() == null || cmd.initialUsdDeposit().signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 예수금(initialUsdDeposit)은 0보다 커야 합니다");
+        if (recurringAmount < 0) {
+            BigDecimal required = BigDecimal.valueOf(Math.abs((long) recurringAmount))
+                    .multiply(BigDecimal.valueOf(100))
+                    .multiply(BigDecimal.valueOf(4))
+                    .divide(BigDecimal.valueOf(cmd.intervalWeeks()), 2, RoundingMode.HALF_UP);
+            if (initialAssets.compareTo(required) < 0) {
+                throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 " + required + " 이상이어야 합니다");
+            }
         }
+    }
+
+    // VR 금액 입력 null은 사용자가 0을 입력한 것과 동일하게 취급
+    private BigDecimal normalizeMoney(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
@@ -148,22 +165,24 @@ class StrategyService implements StrategyUseCase {
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             AccountBalance liveBalance, StrategyVrDetail vrDetail, BigDecimal initialValue) {
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, initialUsdDeposit));
+        BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
+        BigDecimal normalizedInitialValue = normalizeMoney(initialValue);
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, normalizedInitialUsdDeposit));
         if (saved.isInfinite()) {
             // 초기 스냅샷: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
-            CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
+            CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
             return new InitialCycleResult(cycle, null);
         } else if (saved.isVr()) {
             StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
-                    cycle.id(), initialUsdDeposit, initialValue, vrDetail);
+                    cycle.id(), normalizedInitialUsdDeposit, normalizedInitialValue, vrDetail);
             int holdings = liveBalance != null ? liveBalance.holdings() : 0;
             BigDecimal avgPrice = liveBalance != null ? liveBalance.avgPrice() : null;
-            cyclePositionPort.save(CyclePosition.vrInitialSnapshot(cycle.id(), initialUsdDeposit, holdings, avgPrice));
+            cyclePositionPort.save(CyclePosition.vrInitialSnapshot(cycle.id(), normalizedInitialUsdDeposit, holdings, avgPrice));
             return new InitialCycleResult(cycle, savedCycleVr);
         } else {
             // PRIVACY: 초기 스냅샷, 보유 없음
-            cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), initialUsdDeposit));
+            cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
             return new InitialCycleResult(cycle, null);
         }
     }

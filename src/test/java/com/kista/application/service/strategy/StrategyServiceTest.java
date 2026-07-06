@@ -377,7 +377,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 성공 — StrategyVrDetail·StrategyCycleVrDetail 저장, poolLimit 계산, cycleSeedType NONE 강제")
     void register_vr_success_savesVrDetailsAndPoolLimit() {
-        // 예수금 2000, poolLimitRate=0.50(recurringAmount=0) → poolLimit = 1000.00
+        // 초기 자산 5000(예수금 2000 + V 3000), poolLimitRate=0.50(recurringAmount=0) → poolLimit = 2500.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
                 new BigDecimal("3000"), 4, new BigDecimal("15.00"), 0);
@@ -391,7 +391,7 @@ class StrategyServiceTest {
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, 0, null, null);
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
-                vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("1000.00"));
+                vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("2500.00"));
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
@@ -421,11 +421,11 @@ class StrategyServiceTest {
                         && d.bandWidth().compareTo(new BigDecimal("15.00")) == 0
                         && d.recurringAmount() == 0));
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimit().compareTo(new BigDecimal("1000.00")) == 0
+                cv.poolLimit().compareTo(new BigDecimal("2500.00")) == 0
                         && cv.gradient() == 10));
         // 응답 VrSummary 검증
         assertThat(result.vr()).isNotNull();
-        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("2500.00");
         assertThat(result.divisionCount()).isNull();  // VR은 divisionCount 없음
         assertThat(result.currentRound()).isNull();    // VR은 currentRound 없음
     }
@@ -470,6 +470,80 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("VR 적립식은 초기 V와 초기 시드가 모두 0이어도 등록 가능")
+    void register_vr_recurringDeposit_allowsZeroInitialValueAndSeed() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                BigDecimal.ZERO, 2, new BigDecimal("15.00"), 200);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
+        CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                BigDecimal.ZERO, null, null, 0, null, null);
+        StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
+                vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.00"));
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, BigDecimal.ZERO));
+        when(strategyCycleVrPort.save(any(StrategyCycleVrDetail.class))).thenReturn(savedCycleVr);
+
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        assertThat(result.vr()).isNotNull();
+        assertThat(result.vr().value()).isEqualByComparingTo("0");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    @DisplayName("VR 거치식과 인출식은 초기 V와 초기 시드가 모두 0이면 등록 불가")
+    void register_vr_nonDeposit_requiresInitialValueOrSeed() {
+        RegisterStrategyCommand hold = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                BigDecimal.ZERO, 2, new BigDecimal("15.00"), 0);
+        RegisterStrategyCommand withdraw = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                BigDecimal.ZERO, 2, new BigDecimal("15.00"), -100);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, hold))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, withdraw))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");
+    }
+
+    @Test
+    @DisplayName("VR 인출식은 초기 자산이 월 인출액의 100배 이상이어야 등록 가능")
+    void register_vr_withdrawal_requiresMinimumInitialAssets() {
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                new BigDecimal("1000"), 2, new BigDecimal("15.00"), -100);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("인출식 VR 전략의 초기 자산");
+    }
+
+    @Test
     @DisplayName("VR register() recurringAmount null이면 0으로 저장한다")
     void register_vr_nullRecurringAmount_defaultsToZero() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
@@ -502,7 +576,7 @@ class StrategyServiceTest {
 
         verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimit().compareTo(new BigDecimal("1000.00")) == 0
+                cv.poolLimit().compareTo(new BigDecimal("2500.00")) == 0
                         && cv.gradient() == 10));
         assertThat(result.vr().recurringAmount()).isZero();
     }
@@ -534,35 +608,73 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("VR register() initialValue null이면 IllegalArgumentException 발생")
-    void register_vr_missingInitialValue_throws() {
+    @DisplayName("VR register() 적립식 initialValue null이면 0으로 정규화한다")
+    void register_vr_recurringDeposit_nullInitialValue_defaultsToZero() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
-                null, 4, new BigDecimal("15.00"), 0);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                null, 4, new BigDecimal("15.00"), 200);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("initialValue");
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, BigDecimal.ZERO));
+
+        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
-    @DisplayName("VR register() initialUsdDeposit null이면 IllegalArgumentException 발생")
-    void register_vr_missingPool_throws() {
+    @DisplayName("VR register() 적립식 initialUsdDeposit null이면 0으로 정규화한다")
+    void register_vr_recurringDeposit_nullPool_defaultsToZero() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, null, null, 20,
-                new BigDecimal("3000"), 4, new BigDecimal("15.00"), 0);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+                BigDecimal.ZERO, 4, new BigDecimal("15.00"), 200);
+        Account account = ownerAccount();
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("initialUsdDeposit");
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(cyclePositionPort.save(any(CyclePosition.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+        when(liveBalancePort.getLiveBalance(account, Strategy.Ticker.TQQQ))
+                .thenReturn(new AccountBalance(0, null, BigDecimal.ZERO));
+
+        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        verify(strategyCycleVrPort).save(argThat(cv -> cv.poolLimit().compareTo(new BigDecimal("0.00")) == 0));
+        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
     @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=0.75")
     void register_vr_poolLimitRate_withDeposit() {
-        // recurringAmount=100(입금) → poolLimitRate=0.75 → poolLimit = 1000 × 0.75 = 750.00
+        // recurringAmount=100(입금) → poolLimitRate=0.75 → poolLimit = (1000 + 2000) × 0.75 = 2250.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
                 new BigDecimal("2000"), 4, new BigDecimal("15.00"), 100);
@@ -592,7 +704,7 @@ class StrategyServiceTest {
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimit().compareTo(new BigDecimal("750.00")) == 0
+                cv.poolLimit().compareTo(new BigDecimal("2250.00")) == 0
                         && cv.gradient() == 10));
     }
 

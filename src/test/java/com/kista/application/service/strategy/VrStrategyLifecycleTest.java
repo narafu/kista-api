@@ -57,8 +57,21 @@ class VrStrategyLifecycleTest {
                 cycleId, new BigDecimal("1000"), new BigDecimal("3000"), vrDetail);
 
         assertThat(result.strategyCycleId()).isEqualTo(cycleId);
-        assertThat(result.poolLimit()).isEqualByComparingTo("750.00");
+        assertThat(result.poolLimit()).isEqualByComparingTo("3000.00");
         assertThat(result.gradient()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("saveInitialCycleDetail() 첫 사이클 poolLimit은 초기 V와 초기 시드 합계 기준")
+    void saveInitialCycleDetail_usesInitialValuePlusSeedForFirstPoolLimit() {
+        UUID cycleId = UUID.randomUUID();
+        StrategyVrDetail vrDetail = new StrategyVrDetail(UUID.randomUUID(), 4, new BigDecimal("15.00"), 0);
+        when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        StrategyCycleVrDetail result = vrStrategyLifecycle.saveInitialCycleDetail(
+                cycleId, BigDecimal.ZERO, new BigDecimal("10000"), vrDetail);
+
+        assertThat(result.poolLimit()).isEqualByComparingTo("5000.00");
     }
 
     @Test

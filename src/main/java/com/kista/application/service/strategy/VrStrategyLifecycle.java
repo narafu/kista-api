@@ -31,11 +31,14 @@ class VrStrategyLifecycle {
 
     StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialUsdDeposit,
                                                  BigDecimal initialValue, StrategyVrDetail vrDetail) {
-        BigDecimal poolLimit = initialUsdDeposit
+        BigDecimal initialPool = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
+        BigDecimal initialV = initialValue != null ? initialValue : BigDecimal.ZERO;
+        BigDecimal initialAssets = initialPool.add(initialV);
+        BigDecimal poolLimit = initialAssets
                 .multiply(vrDetail.poolLimitRate())
                 .setScale(2, RoundingMode.HALF_UP);
         return strategyCycleVrPort.save(
-                new StrategyCycleVrDetail(cycleId, initialValue, vrDetail.gradient(), poolLimit));
+                new StrategyCycleVrDetail(cycleId, initialV, vrDetail.gradient(), poolLimit));
     }
 
     Optional<StrategyDetail.VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle) {
