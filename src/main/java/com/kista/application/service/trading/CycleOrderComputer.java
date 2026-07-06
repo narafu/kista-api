@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.CyclePositionInfiniteDetailPort;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyInfiniteDetailPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
@@ -35,6 +36,7 @@ class CycleOrderComputer {
     private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
+    private final StrategyCyclePort strategyCyclePort;            // VR 최초 사이클 판정용
     private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimit)
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
@@ -122,10 +124,13 @@ class CycleOrderComputer {
                 .orElse(Strategy.DEFAULT_DIVISION_COUNT);
     }
 
-    // 명시 컬럼이 없으므로 진행 중 사이클의 초기 position snapshot만 있으면 첫 사이클로 간주
+    // 명시 컬럼이 없으므로 전략의 최초 등록 사이클 id와 현재 사이클 id를 비교
     private boolean isFirstOpenCycle(StrategyCycle currentCycle) {
         if (currentCycle == null || currentCycle.endDate() != null) return false;
-        List<CyclePosition> recentPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 2);
-        return recentPositions != null && recentPositions.size() <= 1;
+        Optional<StrategyCycle> firstCycle = strategyCyclePort.findFirstByStrategyId(currentCycle.strategyId());
+        if (firstCycle == null) return false;
+        return firstCycle
+                .map(cycle -> cycle.id().equals(currentCycle.id()))
+                .orElse(false);
     }
 }

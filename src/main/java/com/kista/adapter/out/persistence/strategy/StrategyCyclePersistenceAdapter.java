@@ -31,6 +31,13 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public Optional<StrategyCycle> findFirstByStrategyId(UUID strategyId) {
+        // @SQLRestriction 적용 — deleted_at IS NULL 중 createdAt 가장 오래된 1건
+        return jpaRepository.findTop1ByStrategyIdOrderByCreatedAtAsc(strategyId)
+                .map(this::toDomain);
+    }
+
+    @Override
     public void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate) {
         // 사이클 종료 기록: load-set-save 패턴 (OrderPersistenceAdapter.markFilled와 동일)
         StrategyCycleEntity e = jpaRepository.findById(cycleId)

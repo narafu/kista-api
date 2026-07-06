@@ -87,7 +87,7 @@ class TradingPreviewServiceTest {
         lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
+                strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, registry, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);

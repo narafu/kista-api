@@ -95,7 +95,7 @@ class ManualTradingServiceTest {
         lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
+                strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
         // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)

@@ -13,6 +13,9 @@ public interface StrategyCyclePort {
     // 전략의 현재 사이클 — deleted_at IS NULL 중 createdAt 최신 1건
     Optional<StrategyCycle> findLatestByStrategyId(UUID strategyId);
 
+    // 전략의 최초 사이클 — VR 첫 등록 bootstrap 판정에 사용
+    Optional<StrategyCycle> findFirstByStrategyId(UUID strategyId);
+
     // 사이클 종료 기록 — holdings=0 청산 시 종료금액·종료일자 저장
     void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate);
 

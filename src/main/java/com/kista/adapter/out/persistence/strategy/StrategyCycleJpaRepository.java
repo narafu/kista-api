@@ -14,6 +14,9 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
     // 전략의 현재 사이클 — deleted_at IS NULL(@SQLRestriction) 중 createdAt 최신 1건
     Optional<StrategyCycleEntity> findTop1ByStrategyIdOrderByCreatedAtDesc(UUID strategyId);
 
+    // 전략의 최초 사이클 — deleted_at IS NULL(@SQLRestriction) 중 createdAt 가장 오래된 1건
+    Optional<StrategyCycleEntity> findTop1ByStrategyIdOrderByCreatedAtAsc(UUID strategyId);
+
     @Modifying
     @Query("UPDATE StrategyCycleEntity sc SET sc.deletedAt = :now WHERE sc.strategyId = :strategyId AND sc.deletedAt IS NULL")
     void softDeleteByStrategyId(@Param("strategyId") UUID strategyId, @Param("now") Instant now);
