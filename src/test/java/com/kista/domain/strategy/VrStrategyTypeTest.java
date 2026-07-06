@@ -13,7 +13,9 @@ import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 import static com.kista.domain.model.order.Order.OrderTiming.AT_OPEN;
+import static com.kista.domain.model.order.Order.OrderType.LOC;
 import static com.kista.domain.model.order.Order.OrderType.LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,13 +32,88 @@ class VrStrategyTypeTest {
     private VrPosition pos(int holdings, BigDecimal pool, BigDecimal value, BigDecimal bandWidth,
                            BigDecimal poolLimit) {
         AccountBalance balance = new AccountBalance(holdings, holdings > 0 ? new BigDecimal("100") : null, pool);
-        return new VrPosition(balance, value, bandWidth, poolLimit, BigDecimal.ZERO);
+        return new VrPosition(balance, value, bandWidth, poolLimit, BigDecimal.ZERO,
+                false, false, 1, 0);
     }
 
     private VrPosition pos(int holdings, BigDecimal pool, BigDecimal value, BigDecimal bandWidth,
                            BigDecimal poolLimit, BigDecimal poolUsed) {
         AccountBalance balance = new AccountBalance(holdings, holdings > 0 ? new BigDecimal("100") : null, pool);
-        return new VrPosition(balance, value, bandWidth, poolLimit, poolUsed);
+        return new VrPosition(balance, value, bandWidth, poolLimit, poolUsed,
+                false, false, 1, 0);
+    }
+
+    // ── 첫 사이클 bootstrap ───────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("첫 사이클 V만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매도한다")
+    void firstCycle_valueOnly_sellsPoolLimitAcrossRemainingDays() {
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("100"), BigDecimal.ZERO);
+        VrPosition position = new VrPosition(
+                balance, new BigDecimal("10000"), new BigDecimal("15.00"),
+                new BigDecimal("5000.00"), BigDecimal.ZERO,
+                true, false, 10, 0);
+
+        List<Order> sells = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
+                .stream().filter(o -> o.direction() == SELL).toList();
+
+        assertThat(sells).hasSize(1);
+        assertThat(sells.getFirst().orderType()).isEqualTo(LOC);
+        assertThat(sells.getFirst().timing()).isEqualTo(AT_CLOSE);
+        assertThat(sells.getFirst().price()).isEqualByComparingTo("90.00");
+        assertThat(sells.getFirst().quantity()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("첫 사이클 시드만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매수한다")
+    void firstCycle_seedOnly_buysPoolLimitAcrossRemainingDays() {
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                new BigDecimal("5000.00"), BigDecimal.ZERO,
+                true, false, 10, 0);
+
+        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
+        assertThat(buys.getFirst().timing()).isEqualTo(AT_CLOSE);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("110.00");
+        assertThat(buys.getFirst().quantity()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("적립식 첫 사이클은 due date 당일에 recurringAmount만큼 LOC 매수한다")
+    void firstCycle_recurringOnly_dueDate_buysRecurringAmount() {
+        AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                BigDecimal.ZERO, BigDecimal.ZERO,
+                true, true, 1, 200);
+
+        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
+        assertThat(buys.getFirst().timing()).isEqualTo(AT_CLOSE);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("110.00");
+        assertThat(buys.getFirst().quantity()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("적립식 첫 사이클은 due date 전에는 주문을 만들지 않는다")
+    void firstCycle_recurringOnly_beforeDueDate_noOrders() {
+        AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                BigDecimal.ZERO, BigDecimal.ZERO,
+                true, false, 5, 200);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+
+        assertThat(orders).isEmpty();
     }
 
     // ── 전 주문 타입 검증 ──────────────────────────────────────────────────────

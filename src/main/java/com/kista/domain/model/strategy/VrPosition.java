@@ -10,9 +10,20 @@ public record VrPosition(
         BigDecimal value,        // 현재 V값 (실력 기준선)
         BigDecimal bandWidth,    // 밴드 폭 (% 단위, 예: 15.00 = 15%)
         BigDecimal poolLimit,    // 이 사이클에서 사용 가능한 pool 상한 (USD)
-        BigDecimal poolUsed      // 이미 사용한 pool 누적 금액 (USD)
+        BigDecimal poolUsed,     // 이미 사용한 pool 누적 금액 (USD)
+        boolean firstCycle,      // 첫 사이클 bootstrap 주문 여부
+        boolean cycleDue,        // 현재 거래일이 사이클 종료일 도달 이후인지 여부
+        int remainingTradingDays,// 오늘부터 종료일까지 남은 거래일 수
+        int recurringAmount      // 주기당 입출금액 (양수=적립, 0=거치, 음수=인출)
 ) {
     private static final int MONEY_SCALE = 2; // 금액·가격 반올림 자리수
+
+    public VrPosition {
+        value = value != null ? value : BigDecimal.ZERO;
+        poolLimit = poolLimit != null ? poolLimit : BigDecimal.ZERO;
+        poolUsed = poolUsed != null ? poolUsed : BigDecimal.ZERO;
+        remainingTradingDays = Math.max(remainingTradingDays, 1);
+    }
 
     // --- 기본 조회 ---
 

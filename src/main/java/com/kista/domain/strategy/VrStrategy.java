@@ -12,7 +12,9 @@ import java.util.List;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 import static com.kista.domain.model.order.Order.OrderDirection.SELL;
+import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 import static com.kista.domain.model.order.Order.OrderTiming.AT_OPEN;
+import static com.kista.domain.model.order.Order.OrderType.LOC;
 import static com.kista.domain.model.order.Order.OrderType.LIMIT;
 import static java.math.RoundingMode.HALF_UP;
 
@@ -28,10 +30,52 @@ public class VrStrategy {
     // currentPrice: null이면 가격 캡 미적용
     public List<Order> buildOrders(VrPosition position, Strategy.Ticker ticker,
                                    BigDecimal currentPrice, LocalDate tradeDate) {
+        if (position.firstCycle()) {
+            List<Order> bootstrapOrders = buildBootstrapOrders(position, ticker, currentPrice, tradeDate);
+            if (bootstrapOrders != null) return bootstrapOrders;
+        }
+
         List<Order> orders = new ArrayList<>();
         orders.addAll(buildBuyOrders(position, ticker, currentPrice, tradeDate));
         orders.addAll(buildSellOrders(position, ticker, tradeDate));
         return orders;
+    }
+
+    // 첫 사이클 bootstrap — 기존 보유/현금 상태를 LOC 분할 주문으로 poolLimit에 맞춤
+    private List<Order> buildBootstrapOrders(VrPosition position, Strategy.Ticker ticker,
+                                             BigDecimal currentPrice, LocalDate tradeDate) {
+        if (currentPrice == null || currentPrice.signum() <= 0) return List.of();
+
+        boolean hasValue = position.value().signum() > 0;
+        boolean hasPool = position.pool().signum() > 0;
+
+        if (hasValue && !hasPool) {
+            BigDecimal price = currentPrice.multiply(new BigDecimal("0.90")).setScale(2, HALF_UP);
+            return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
+                    price, ticker, tradeDate, SELL);
+        }
+        if (!hasValue && hasPool) {
+            BigDecimal price = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
+            return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
+                    price, ticker, tradeDate, BUY);
+        }
+        if (!hasValue && !hasPool && position.recurringAmount() > 0) {
+            if (!position.cycleDue()) return List.of();
+            BigDecimal price = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
+            return buildDailyLocOrder(BigDecimal.valueOf(position.recurringAmount()), 1,
+                    price, ticker, tradeDate, BUY);
+        }
+        return null;
+    }
+
+    // LOC 예산을 남은 거래일로 나눈 뒤 정수 주식 수로 주문 생성
+    private List<Order> buildDailyLocOrder(BigDecimal totalBudget, int remainingTradingDays,
+                                           BigDecimal price, Strategy.Ticker ticker,
+                                           LocalDate tradeDate, Order.OrderDirection direction) {
+        BigDecimal dailyBudget = totalBudget.divide(BigDecimal.valueOf(Math.max(remainingTradingDays, 1)), 2, HALF_UP);
+        int quantity = dailyBudget.divide(price, 0, java.math.RoundingMode.DOWN).intValue();
+        if (quantity <= 0) return List.of();
+        return List.of(Order.planned(tradeDate, ticker, LOC, direction, quantity, price, AT_CLOSE));
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
