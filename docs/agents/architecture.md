@@ -71,9 +71,9 @@ application/
 adapter/in/
   schedule/      ← TradingOpenScheduler (월~금 22:00 KST — 전략 전체 order 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람)
                    TradingCloseScheduler (화~토 04:00 KST — 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
-                   RefreshTokenCleanupScheduler (매일 03:00 KST — 만료 RT 삭제, 03:05 KST — grace 초과 회전 RT 삭제)
+                   RefreshTokenCleanupScheduler (매일 04:00 KST — 만료 RT 삭제, 03:05 KST — grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화)
-                   FearGreedScheduler (UTC 06:00/18:00 12시간 주기 — CNN·크립토 공포탐욕지수 수집·저장)
+                   FearGreedScheduler (KST 00:00/06:30/10:00 — CNN·크립토 공포탐욕지수 수집·저장)
                    BatchContextFactory (전략 목록 → BatchContext 목록 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner (스케쥴러 공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
                    SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task), 모든 스케쥴러가 사용; @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
   web/           ← REST Controller + DTO
