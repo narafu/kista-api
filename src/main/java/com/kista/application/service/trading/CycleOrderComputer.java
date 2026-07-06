@@ -38,6 +38,7 @@ class CycleOrderComputer {
     private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimit)
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
+    private final TradingDayCounter tradingDayCounter;       // VR 첫 사이클 분할 거래일 계산
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
@@ -80,8 +81,13 @@ class CycleOrderComputer {
             StrategyVrDetail vrDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                     .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: versionId=" + currentCycle.strategyVersionId()));
             BigDecimal poolUsed = orderPort.sumFilledBuyAmountByCycleId(currentCycle.id());
+            LocalDate dueDate = currentCycle.startDate().plusWeeks(vrDetail.intervalWeeks());
+            boolean firstCycle = isFirstOpenCycle(currentCycle);
+            boolean cycleDue = !tradeDate.isBefore(dueDate);
+            int remainingTradingDays = tradingDayCounter.countOpenDaysInclusive(tradeDate, dueDate);
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
-                    cycleVr.value(), vrDetail.bandWidth(), cycleVr.poolLimit(), poolUsed, currentPrice);
+                    cycleVr.value(), vrDetail.bandWidth(), cycleVr.poolLimit(), poolUsed, currentPrice,
+                    firstCycle, cycleDue, remainingTradingDays, vrDetail.recurringAmount());
         }
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
@@ -114,5 +120,12 @@ class CycleOrderComputer {
         return strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
                 .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+    }
+
+    // 명시 컬럼이 없으므로 진행 중 사이클의 초기 position snapshot만 있으면 첫 사이클로 간주
+    private boolean isFirstOpenCycle(StrategyCycle currentCycle) {
+        if (currentCycle == null || currentCycle.endDate() != null) return false;
+        List<CyclePosition> recentPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 2);
+        return recentPositions != null && recentPositions.size() <= 1;
     }
 }

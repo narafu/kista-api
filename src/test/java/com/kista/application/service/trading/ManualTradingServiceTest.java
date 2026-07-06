@@ -53,6 +53,7 @@ class ManualTradingServiceTest {
     @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
     @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
+    @Mock MarketCalendarPort marketCalendarPort; // VR 첫 사이클 거래일 계산용
     @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
 
     ManualTradingService service;
@@ -91,9 +92,10 @@ class ManualTradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy),
                 new VrCycleOrderStrategy(vrStrategy))); // VR 수동 실행 테스트용
+        lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
         // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)

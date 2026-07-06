@@ -50,10 +50,10 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
                 inputs.bandWidth(),
                 inputs.poolLimit(),
                 inputs.poolUsed(),
-                false,
-                false,
-                1,
-                0
+                inputs.firstCycle(),
+                inputs.cycleDue(),
+                inputs.remainingTradingDays(),
+                inputs.recurringAmount()
         );
         Strategy.Ticker ticker = ctx.strategy().ticker(); // 거래 종목 (strategy에서 결정)
         // inputs.currentPrice(): 스케쥴러 시작 시점 현재가 — null이면 캡 미적용(수동 실행·preview)

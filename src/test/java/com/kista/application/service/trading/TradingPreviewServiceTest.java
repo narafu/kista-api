@@ -49,6 +49,7 @@ class TradingPreviewServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
+    @Mock MarketCalendarPort marketCalendarPort; // VR 첫 사이클 거래일 계산용
 
     TradingPreviewService service;
 
@@ -83,9 +84,10 @@ class TradingPreviewServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
+        lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
         service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, registry, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);

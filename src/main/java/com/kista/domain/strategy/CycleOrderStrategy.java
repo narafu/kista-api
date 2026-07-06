@@ -83,12 +83,17 @@ public interface CycleOrderStrategy {
         // poolLimit: pool 상한 금액 (StrategyCycleVrDetail.poolLimit 스냅샷)
         // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
         // currentPrice: 스케쥴러 시작 시점 현재가 — 가격 캡(×1.10) 적용용, null이면 캡 미적용
+        // firstCycle/cycleDue/remainingTradingDays/recurringAmount: 첫 사이클 LOC bootstrap 제어값
         public record VrInputs(
                 BigDecimal value,
                 BigDecimal bandWidth,
                 BigDecimal poolLimit,
                 BigDecimal poolUsed,
-                BigDecimal currentPrice
+                BigDecimal currentPrice,
+                boolean firstCycle,
+                boolean cycleDue,
+                int remainingTradingDays,
+                int recurringAmount
         ) {}
     }
 
