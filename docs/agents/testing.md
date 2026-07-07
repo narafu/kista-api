@@ -1,5 +1,9 @@
 ## 테스트
 
+### 네이밍·구성
+- 단위 테스트 `*Test`, 통합 테스트 `*IT` + Docker 필요 테스트는 `@Tag("integration")` (`./gradlew integration`으로 실행)
+- 테스트 지원 코드는 `src/test/java/com/kista/support`
+
 ### static 필드 forward reference 주의
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
 

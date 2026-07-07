@@ -8,6 +8,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 ## 코드 철학
 
 - 반복 코드보다 재사용성·가독성·최신 문법을 우선
+- 4-space 들여쓰기, 불변 값은 record, 생성자 주입, 가능하면 package-private
 - 코드 철학에 맞지 않는 코드·어색한 위치의 클래스를 발견하면 개선/리팩토링 제안
 - **보일러플레이트 즉시 수정**: 반복 생성자 호출, 중복 null guard, `with*()` 대체 가능 코드 발견 시 제안 없이 즉시 수정
 
@@ -18,14 +19,9 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - 생성 성공(201): `Location` 헤더에 신규 리소스 URI 포함
 - 상태 전이 행위 예외: `/pause`, `/resume` — PATCH + 서브 리소스 경로 허용
 
-## 빠른 시작
+## 환경 설정
 
-```bash
-./gradlew bootRun --args='--spring.profiles.active=local'  # 로컬 실행
-./gradlew test                                              # 전체 테스트
-./gradlew compileJava                                       # 컴파일 검증
-docker compose up -d postgres                               # DB만 기동
-```
+빌드·실행·테스트 명령어는 `docs/agents/commands.md`(자동 로드) 참고.
 
 필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`)
 
@@ -44,12 +40,10 @@ docker compose up -d postgres                               # DB만 기동
 - `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
 - 커밋 전 `git config user.name` / `git config user.email` 확인 — 올바른 author: `narafu <narafu@kakao.com>`
 
-@AGENTS.md
 @docs/agents/commands.md
 @docs/agents/architecture.md
 @docs/agents/constraints.md
 @docs/agents/testing.md
-@docs/agents/workflow.md
 
 ## 운영 도구
 
@@ -57,6 +51,7 @@ docker compose up -d postgres                               # DB만 기동
 - **DB 작업**: supabase-cli — `supabase db query --linked` (상세 명령어 → `docs/agents/docker-infra.md`)
 
 ## 참고 문서 (필요시 Read)
+- **매매·스케쥴러·주문 로직 작업 시 필수 Read**: `docs/agents/workflow.md` — 스케쥴러 실행 흐름, MarketSession(DIRECT|BLOCKED), BuyOrderPriceCapper 보정 주문, orders/cycle_position 기록 테이블 구분
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
 - Docker/배포/인프라 작업: `docs/agents/docker-infra.md`
