@@ -21,9 +21,7 @@ public class FearGreedScheduler {
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul") // KST 00:00
-    @Scheduled(cron = "0 30 6 * * *", zone = "Asia/Seoul") // KST 06:30
-    @Scheduled(cron = "0 0 10 * * *", zone = "Asia/Seoul") // KST 10:00
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul") // KST 매시 정각
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("fear-greed", Duration.ofMinutes(30), this::runLocked);
     }
