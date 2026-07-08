@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence.trade;
 
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,9 +22,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // PLANNED 또는 PLACED 조회 (스케쥴러 재계산 skip 판정)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatusIn(
             UUID strategyCycleId, LocalDate tradeDate, List<Order.OrderStatus> statuses);
-
-    // 기간+종목 필터 (대시보드용)
-    List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 
     // 관리자 거래내역 — 최신순 (동일 trade_date 내 created_at DESC 2차 정렬)
     @Query(value = """
@@ -80,10 +76,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             @Param("statuses") List<String> statuses);
-
-    // 전략 사이클 기준 기간 내 주문 전체 조회 — 최신순
-    List<OrderEntity> findByStrategyCycleIdAndTradeDateBetweenOrderByTradeDateDesc(
-            UUID strategyCycleId, LocalDate from, LocalDate to);
 
     // 전략 기준 기간 내 주문 전체 조회 — strategy_cycle 경유 JOIN
     @Query(value = """

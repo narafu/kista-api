@@ -22,9 +22,6 @@ public interface OrderPort {
     // 증권사 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록
     void markPlaced(UUID orderId, String externalOrderId);
 
-    // 기간+종목 필터 조회 (대시보드·텔레그램 이력 조회용)
-    List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker);
-
     // 사용자 스코프 기간+종목 조회 (대시보드 — 본인 데이터만)
     List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker);
 

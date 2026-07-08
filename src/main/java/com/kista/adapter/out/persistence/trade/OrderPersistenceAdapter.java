@@ -52,12 +52,6 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public List<Order> findBy(LocalDate from, LocalDate to, Ticker ticker) {
-        return toDomainList(repository.findByTradeDateBetweenAndTicker(
-                TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker));
-    }
-
-    @Override
     public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
         // native query는 enum을 name() 문자열로 전달 — DB VARCHAR 컬럼과 매칭
         return toDomainList(repository.findByUserIdAndTradeDateBetweenAndTicker(
