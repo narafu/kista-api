@@ -92,7 +92,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             WHERE sc.strategy_id = :strategyId
               AND o.trade_date BETWEEN :from AND :to
               AND sc.deleted_at IS NULL
-            ORDER BY o.trade_date DESC
+            ORDER BY o.trade_date DESC, o.created_at DESC
             """, nativeQuery = true)
     List<OrderEntity> findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
             @Param("strategyId") UUID strategyId,
