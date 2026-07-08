@@ -66,7 +66,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findAll(LocalDate from, LocalDate to) {
-        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDesc(
+        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(
                 TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));
     }
 
@@ -103,7 +103,7 @@ public class OrderPersistenceAdapter implements OrderPort {
                 accountId,
                 TradeDateConverter.toUtc(from),
                 TradeDateConverter.toUtc(to),
-                List.of(Order.OrderStatus.FILLED, Order.OrderStatus.PARTIALLY_FILLED)));
+                List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
     }
 
     @Override

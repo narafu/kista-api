@@ -27,8 +27,15 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // 기간+종목 필터 (대시보드용)
     List<OrderEntity> findByTradeDateBetweenAndTicker(LocalDate from, LocalDate to, Ticker ticker);
 
-    // 관리자 거래내역 — 최신순
-    List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDesc(LocalDate from, LocalDate to);
+    // 관리자 거래내역 — 최신순 (동일 trade_date 내 created_at DESC 2차 정렬)
+    @Query(value = """
+            SELECT * FROM orders
+            WHERE trade_date BETWEEN :from AND :to
+            ORDER BY trade_date DESC, created_at DESC
+            """, nativeQuery = true)
+    List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 
     // 계좌·날짜 기준 PLANNED BUY 합계 (수동 실행 예수금 체크용)
     // 주의: 'PLANNED'/'BUY'는 Order.OrderStatus/OrderDirection enum name() 값 — enum 이름 변경 시 이 쿼리도 수정 필요
@@ -52,7 +59,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
               AND o.trade_date BETWEEN :from AND :to
               AND o.ticker = :ticker
               AND a.deleted_at IS NULL
-            ORDER BY o.trade_date DESC
+            ORDER BY o.trade_date DESC, o.created_at DESC
             """, nativeQuery = true)
     List<OrderEntity> findByUserIdAndTradeDateBetweenAndTicker(
             @Param("userId") UUID userId,
@@ -60,10 +67,19 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("to") LocalDate to,
             @Param("ticker") String ticker);
 
-    // 계좌·날짜범위·상태 복합 조건 조회 (daily-trades DB 전환용)
+    // 계좌·날짜범위·상태 복합 조건 조회 (daily-trades DB 전환용) — 최신순
+    @Query(value = """
+            SELECT * FROM orders
+            WHERE account_id = :accountId
+              AND trade_date BETWEEN :from AND :to
+              AND status IN :statuses
+            ORDER BY trade_date DESC, created_at DESC
+            """, nativeQuery = true)
     List<OrderEntity> findByAccountIdAndTradeDateBetweenAndStatusIn(
-            UUID accountId, LocalDate from, LocalDate to,
-            List<Order.OrderStatus> statuses);
+            @Param("accountId") UUID accountId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("statuses") List<String> statuses);
 
     // 전략 사이클 기준 기간 내 주문 전체 조회 — 최신순
     List<OrderEntity> findByStrategyCycleIdAndTradeDateBetweenOrderByTradeDateDesc(
