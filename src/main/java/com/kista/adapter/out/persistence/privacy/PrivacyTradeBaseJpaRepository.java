@@ -15,10 +15,6 @@ interface PrivacyTradeBaseJpaRepository extends JpaRepository<PrivacyTradeBaseEn
 
     Optional<PrivacyTradeBaseEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
 
-    // trade_date >= today인 행 중 가장 미래 거래일의 SOXL 기준가 조회
-    Optional<PrivacyTradeBaseEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(
-            LocalDate today, Ticker ticker);
-
     // N+1 방지: 주문(orders)을 join fetch, DISTINCT로 기준 매매표 중복 제거, 거래일 내림차순
     @Query("SELECT DISTINCT b FROM PrivacyTradeBaseEntity b LEFT JOIN FETCH b.orders "
             + "WHERE b.tradeDate >= :fromUtc ORDER BY b.tradeDate DESC")

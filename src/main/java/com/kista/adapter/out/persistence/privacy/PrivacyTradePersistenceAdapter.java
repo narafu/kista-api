@@ -118,7 +118,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         // trade_date(UTC) >= 오늘(UTC)인 행 중 가장 미래 SOXL 기준가 조회
         LocalDate todayUtc = TradeDateConverter.toUtc(LocalDate.now(TimeZones.KST)); // KST now → UTC
         return baseRepository
-                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateDesc(todayUtc, Ticker.SOXL)
+                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(todayUtc, Ticker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
                         TradeDateConverter.toKst(e.getTradeDate()))); // UTC DB → KST 도메인
     }
