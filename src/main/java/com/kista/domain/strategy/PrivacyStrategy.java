@@ -24,15 +24,13 @@ import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 @Component
 public class PrivacyStrategy {
 
-    private static final BigDecimal MIN_MULTIPLE = new BigDecimal("0.50");
-
     // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
     public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
             throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
         }
         BigDecimal start = privacyTradeBase.currentCycleStart();
-        BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR).max(MIN_MULTIPLE);
+        BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
         log.info("[PRIVACY] 배수 산출: initialUsdDeposit={}, currentCycleStart={}, multiple={}", initialUsdDeposit, start, multiple);
 
         List<BuyEntry> buyEntries = new ArrayList<>();

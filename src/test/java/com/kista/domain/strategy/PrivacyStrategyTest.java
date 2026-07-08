@@ -204,28 +204,6 @@ class PrivacyStrategyTest {
     }
 
     @Test
-    @DisplayName("최소 배수 보정 — 현재 기준 매매표 대비 시드가 0.5배 미만이어도 0.5배로 주문")
-    void minimumMultipleApplied() {
-        // 운영 재현: 6989 / 14349.81 = 0.48 이지만 PRIVACY 최소시드 정책은 currentCycleStart / 2
-        BigDecimal initialUsdDeposit = new BigDecimal("6989.00");
-        PrivacyTradeBase base = new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("198.29"), 6,
-                new BigDecimal("14349.81"),
-                List.of(
-                        new PrivacyTrade(DATE, TICKER, LIMIT, BUY, 5, new BigDecimal("198.06")),
-                        new PrivacyTrade(DATE, TICKER, LIMIT, BUY, 5, new BigDecimal("194.46"))
-                ));
-
-        List<Order> orders = strategy.buildOrders(balance(3), initialUsdDeposit, base, null);
-
-        List<Order> buys = buyOrders(orders);
-        assertThat(buys).hasSize(2);
-        Order highBuy = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("198.06")) == 0).findFirst().orElseThrow();
-        Order lowBuy = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("194.46")) == 0).findFirst().orElseThrow();
-        assertThat(highBuy.quantity()).isEqualTo(2);
-        assertThat(lowBuy.quantity()).isEqualTo(3);
-    }
-
-    @Test
     @DisplayName("배수 0.3 — 실수 수량 0.3, diff 보정 후에도 floor 결과 0 → BUY 없음")
     void multipleSmallFloorResultsInZero() {
         // BUY: $500×1, multiple=0.3 → 실수 수량 0.3
