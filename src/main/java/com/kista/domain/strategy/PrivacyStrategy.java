@@ -94,11 +94,39 @@ public class PrivacyStrategy {
     // 명시 SELL + null SELL("잔량 전부") 합산하여 Order 리스트 반환
     private List<Order> buildSellOrders(List<PrivacyTrade> explicit, PrivacyTrade nullTemplate,
                                         AccountBalance balance, BigDecimal multiple) {
-        // 명시 SELL은 multiple만 적용 — balance cap 없음 (브로커가 실제 보유량으로 판단)
-        List<Order> result = explicit.stream()
-                .map(t -> Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL,
-                        applyMultiple(t.quantity(), multiple), t.price(), AT_CLOSE))
+        // 명시 SELL — 버림 전 실수 수량 보존 (fraction 보정을 위해)
+        List<BigDecimal> rawQtys = explicit.stream()
+                .map(t -> BigDecimal.valueOf(t.quantity()).multiply(multiple))
                 .toList();
+
+        List<Order> result = new ArrayList<>();
+        for (int i = 0; i < explicit.size(); i++) {
+            PrivacyTrade t = explicit.get(i);
+            int qty = rawQtys.get(i).setScale(0, RoundingMode.DOWN).intValue();
+            result.add(Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL, qty, t.price(), AT_CLOSE));
+        }
+
+        // null SELL 없는 경우만 fraction 보정 — null SELL이 있으면 remaining이 자동 흡수
+        if (nullTemplate == null && !result.isEmpty()) {
+            BigDecimal totalFraction = rawQtys.stream()
+                    .map(q -> q.subtract(q.setScale(0, RoundingMode.DOWN)))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            int bonus = totalFraction.setScale(0, RoundingMode.DOWN).intValue();
+            if (bonus > 0) {
+                // 가장 높은 가격 SELL에 보너스 추가 (높은 가격이 먼저 체결 — BUY는 낮은 가격)
+                int maxIdx = 0;
+                for (int i = 1; i < result.size(); i++) {
+                    if (result.get(i).price().compareTo(result.get(maxIdx).price()) > 0) {
+                        maxIdx = i;
+                    }
+                }
+                Order max = result.get(maxIdx);
+                result.set(maxIdx, Order.planned(
+                        max.tradeDate(), max.ticker(), max.orderType(), SELL,
+                        max.quantity() + bonus, max.price(), AT_CLOSE));
+                log.info("[PRIVACY] SELL 버림 보정: totalFraction={}, bonus={}", totalFraction, bonus);
+            }
+        }
 
         if (nullTemplate == null) return result;
 
@@ -110,10 +138,9 @@ public class PrivacyStrategy {
                     balance.holdings(), sumExplicit);
             return result;
         }
-        List<Order> withNull = new ArrayList<>(result);
-        withNull.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
+        result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
                 nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
-        return withNull;
+        return result;
     }
 
     private void adjustBuyQuantities(List<BuyEntry> buyEntries, BigDecimal diff) {
@@ -137,14 +164,6 @@ public class PrivacyStrategy {
                 remaining = remaining.subtract(take);
             }
         }
-    }
-
-    // 기준 매매표 수량에 multiple 비율을 곱해 실제 주문 수량 산출 (소수점 버림)
-    private static int applyMultiple(int quantity, BigDecimal multiple) {
-        return BigDecimal.valueOf(quantity)
-                .multiply(multiple)
-                .setScale(0, RoundingMode.DOWN)
-                .intValue();
     }
 
     // BUY 주문 quantity 조정을 위한 가변 컨테이너 (record 불가 — quantity 변경 필요)
