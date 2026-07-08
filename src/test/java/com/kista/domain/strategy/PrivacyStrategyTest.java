@@ -149,10 +149,11 @@ class PrivacyStrategyTest {
     // ── 소수점 배수 수량 계산 ───────────────────────────────────────────────
 
     @Test
-    @DisplayName("배수 0.5 — 버림을 Order 생성 직전에만 적용, 중간 버림 없음")
+    @DisplayName("배수 0.5 — totalFraction=1.0 → 작은 매수에 보너스 +1")
     void multipleHalfFloorOnlyAtOrderCreation() {
         // BUY: $298.8×3, $279.02×3, multiple=0.5
-        // 실수 수량: 1.5, 1.5 → target=3.0, balance=3 → diff=0 → floor: 1, 1
+        // 실수 수량: 1.5, 1.5 → floor: 1, 1 → fraction: 0.5, 0.5 → totalFraction=1.0 → bonus=1
+        // 작은 매수(279.02$): 1.5 + 1 = 2.5 → floor=2
         BigDecimal initialUsdDeposit = new BigDecimal("500"); // 500/1000 = 0.50
         PrivacyTradeBase base = base(6, List.of(
                 buy(3, "298.8"),
@@ -165,7 +166,41 @@ class PrivacyStrategyTest {
         Order highBuy = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("298.8")) == 0).findFirst().orElseThrow();
         Order lowBuy  = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("279.02")) == 0).findFirst().orElseThrow();
         assertThat(highBuy.quantity()).isEqualTo(1);
-        assertThat(lowBuy.quantity()).isEqualTo(1);
+        assertThat(lowBuy.quantity()).isEqualTo(2); // 버림 보정 +1
+    }
+
+    @Test
+    @DisplayName("BUY 3개 — totalFraction≥2 → 작은 매수에 보너스 +2")
+    void fractionBonusTwoWithThreeBuys() {
+        // BUY: $10×7, $9×7, $8×7, multiple=0.99
+        // 실수: 6.93, 6.93, 6.93 → floor: 6, 6, 6 → fraction: 0.93×3=2.79 → bonus=2
+        // 작은 매수(8$): 6.93+2=8.93 → floor=8
+        BigDecimal initialUsdDeposit = new BigDecimal("990"); // 990/1000 = 0.99
+        PrivacyTradeBase base = base(21, List.of(buy(7, "10"), buy(7, "9"), buy(7, "8")));
+        List<Order> orders = strategy.buildOrders(balance(21), initialUsdDeposit, base);
+
+        List<Order> buys = buyOrders(orders);
+        assertThat(buys).hasSize(3);
+        Order smallestBuy = buys.stream().filter(o -> o.price().compareTo(new BigDecimal("8")) == 0).findFirst().orElseThrow();
+        assertThat(smallestBuy.quantity()).isEqualTo(8); // 6 + bonus 2
+        assertThat(buys.stream().filter(o -> o.price().compareTo(new BigDecimal("10")) == 0).findFirst().orElseThrow().quantity()).isEqualTo(6);
+        assertThat(buys.stream().filter(o -> o.price().compareTo(new BigDecimal("9")) == 0).findFirst().orElseThrow().quantity()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("totalFraction<1 — bonus=0 → 버림 보정 없음")
+    void fractionBonusZeroWhenFractionLessThanOne() {
+        // BUY: $10×5, $9×3, multiple=1.1
+        // 실수: 5.5, 3.3 → fraction: 0.5+0.3=0.8 → bonus=0 → floor: 5, 3 그대로
+        // diff=0: base.holdings(10) × 1.1 = 11 = balance(11)
+        BigDecimal initialUsdDeposit = new BigDecimal("1100"); // 1100/1000 = 1.10
+        PrivacyTradeBase base = base(10, List.of(buy(5, "10"), buy(3, "9")));
+        List<Order> orders = strategy.buildOrders(balance(11), initialUsdDeposit, base);
+
+        List<Order> buys = buyOrders(orders);
+        assertThat(buys).hasSize(2);
+        assertThat(buys.stream().filter(o -> o.price().compareTo(new BigDecimal("10")) == 0).findFirst().orElseThrow().quantity()).isEqualTo(5);
+        assertThat(buys.stream().filter(o -> o.price().compareTo(new BigDecimal("9")) == 0).findFirst().orElseThrow().quantity()).isEqualTo(3);
     }
 
     @Test

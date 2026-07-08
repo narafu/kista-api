@@ -67,6 +67,20 @@ public class PrivacyStrategy {
         log.info("[PRIVACY] 보유 보정: target={}, current={}, diff={}", target, balance.holdings(), diff);
         adjustBuyQuantities(buyEntries, diff);
 
+        // 버린 소수점 합산 → 정수 보너스를 작은 매수(가장 낮은 가격)에 보정
+        BigDecimal totalFraction = buyEntries.stream()
+                .map(e -> e.quantity.subtract(e.quantity.setScale(0, RoundingMode.DOWN)))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        int bonus = totalFraction.setScale(0, RoundingMode.DOWN).intValue();
+        if (bonus > 0) {
+            buyEntries.stream()
+                    .min(Comparator.comparing(e -> e.price))
+                    .ifPresent(smallest -> {
+                        smallest.quantity = smallest.quantity.add(BigDecimal.valueOf(bonus));
+                        log.info("[PRIVACY] 버림 보정: totalFraction={}, bonus={}", totalFraction, bonus);
+                    });
+        }
+
         // BUY (버림 후 quantity>0만) + SELL 합쳐 반환
         List<Order> buyOrders = new ArrayList<>();
         for (BuyEntry e : buyEntries) {
