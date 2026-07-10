@@ -36,7 +36,7 @@ public class TradingCloseScheduler {
                         useCase::executeBatchNow));
     }
 
-    private void runLocked() {
+    private void runLocked() throws InterruptedException {
         // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
         jobRunner.run("마감 매매 스케쥴러",
                 () -> contextFactory.buildAll(strategyPort.findAllActive()),

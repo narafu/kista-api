@@ -23,16 +23,16 @@ class SchedulerJobRunner {
         log.info("{} 시작", name);
         try {
             job.run();
+            log.info("{} 완료", name);
+            notifyPort.notifyInfo(name + " 완료");
         } catch (Exception e) {
             log.error("{} 오류: {}", name, e.getMessage(), e);
             notifyPort.notifyError(e);
         }
-        log.info("{} 완료", name);
-        notifyPort.notifyInfo(name + " 완료");
     }
 
     // name: 스케쥴러 표시명 (e.g., "장 개시 스케쥴러", "마감 매매 스케쥴러 수동")
-    void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) {
+    void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) throws InterruptedException {
         notifyPort.notifyInfo(name + " 시작");
         List<BatchContext> contexts = contextSupplier.get();
         log.info("{} 시작 — ACTIVE 전략 {}개", name, contexts.size());
@@ -41,10 +41,11 @@ class SchedulerJobRunner {
             log.info("{} 완료", name);
             notifyPort.notifyInfo(name + " 완료");
         } catch (InterruptedException e) {
-            // 배포·재기동으로 인한 강제 종료 — PLANNED 주문 접수 미실행 가능성 관리자 알림
+            // 배포·재기동 강제 종료 — 알림 후 rethrow해 SchedulerLockService가 락을 즉시 해제하도록 함
+            // (삼키면 tryRun이 성공으로 간주 → 락 2~3h 잔류 → 관리자 runNow 재실행 불가)
             log.warn("{} 인터럽트: {}", name, e.getMessage());
-            notifyPort.notifyError(e);  // interrupt() 복원 전에 IO 완료
-            Thread.currentThread().interrupt();
+            notifyPort.notifyError(e); // rethrow 전에 IO 완료
+            throw e;
         } catch (Exception e) {
             log.error("{} 오류: {}", name, e.getMessage(), e);
             notifyPort.notifyError(e);

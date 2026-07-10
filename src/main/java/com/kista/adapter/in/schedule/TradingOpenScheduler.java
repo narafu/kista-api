@@ -49,7 +49,7 @@ public class TradingOpenScheduler {
                         useCase::placeOpenOrdersNow));
     }
 
-    private void runLocked() {
+    private void runLocked() throws InterruptedException {
         LocalDate today = LocalDate.now(TimeZones.KST);
         jobRunner.run("장 개시 스케쥴러",
                 () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
