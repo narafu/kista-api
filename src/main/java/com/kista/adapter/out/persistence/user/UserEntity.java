@@ -25,8 +25,8 @@ class UserEntity extends BaseAuditEntity {
     @Column(columnDefinition = "UUID")
     private UUID id; // 카카오 OAuth UID — DB가 아닌 앱에서 할당
 
-    @Column(name = "kakao_id", nullable = false, unique = true, length = 50)
-    private String kakaoId;
+    @Column(name = "kakao_id", nullable = false, length = 50)
+    private String kakaoId; // 유니크 제약은 DB의 uq_users_kakao_id_active(활성 row 한정 partial index)가 담당
 
     @Column(length = 100)
     private String nickname;
