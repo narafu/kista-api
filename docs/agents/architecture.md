@@ -62,8 +62,8 @@ application/
   event/         ← UserApproved/UserRejected/UserReappliedEvent — @TransactionalEventListener용 도메인 이벤트 (application 레이어)
 
 adapter/in/
-  schedule/      ← TradingOpenScheduler (월~금 22:00 KST — 전략 전체 order 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람)
-                   TradingCloseScheduler (화~토 04:00 KST — 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
+  schedule/      ← TradingOpenScheduler (월~금 22:30 KST — 전략 전체 order 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람)
+                   TradingCloseScheduler (화~토 04:30 KST — DST 장마감 30분 전, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 04:00 KST 만료 RT 삭제 / 03:05 KST grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화), FearGreedScheduler (KST 00:00/06:30/10:00 — CNN·크립토 공포탐욕지수)
                    BatchContextFactory (전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError)
@@ -145,7 +145,7 @@ adapter/out/
 ### TDA 전략 패턴 (InfiniteStrategy)
 - `TradingService.execute()` 잔고 조회: KIS API 아님 → `findRecentByCycleId(cycleId, 1)` 최신 이력에서 `AccountBalance` 구성 (이력 없으면 `IllegalStateException`)
 - PRIVACY execute() null guard: `snapshot=null` → `saveAndNotify`에서 `snapshot != null` 조건 가드 유지 필수
-- **`preview()` today 오프셋**: 스케쥴러는 KST 04:00 실행 → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴 (미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남)
+- **`preview()` today 오프셋**: 날짜 경계는 KST 04:00 (DstInfo.SCHEDULER_RUN_TIME) → `preview()`의 `today`는 `LocalTime.now().isBefore(4,0) ? today : today+1` 패턴 (미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남)
 - **`INSUFFICIENT_BALANCE` skip 시 position 포함**: `shouldSkip(price)` true여도 `InfinitePosition`을 Result에 포함 — 프론트에서 단위금액·현재가·부족 금액 표시 목적
 
 ### CycleOrderStrategy Capability 패턴
