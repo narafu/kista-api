@@ -76,8 +76,6 @@ class TradingReporter {
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
     private void markFilledOrders(List<Order> mainOrders, List<Execution> executions) {
-        if (executions.isEmpty()) return;
-
         // externalOrderId → 체결 목록 그룹핑 (1:N 체결 허용)
         Map<String, List<Execution>> byOrderId = executions.stream()
                 .filter(e -> e.externalOrderId() != null && !e.externalOrderId().isBlank())

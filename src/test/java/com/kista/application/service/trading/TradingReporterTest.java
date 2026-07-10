@@ -119,14 +119,15 @@ class TradingReporterTest {
     }
 
     @Test
-    void 체결이_전혀_없으면_주문_상태를_변경하지_않는다() {
-        // 현재 동작: executions가 비면 조기 반환 — PLACED 주문이 CANCELLED되지 않고 잔류 (동작 고정)
-        List<Order> orders = List.of(placedOrder(UUID.randomUUID(), "E1", 5));
+    void 체결이_전혀_없어도_미체결_PLACED_주문은_CANCELLED_처리된다() {
+        // 버그 수정: executions가 비어도 PLACED 주문은 미체결로 간주해 CANCELLED 처리해야 함
+        UUID orderId = UUID.randomUUID();
+        List<Order> orders = List.of(placedOrder(orderId, "E1", 5));
         when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT)).thenReturn(List.of());
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, orders, null);
 
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort).markCancelled(orderId);
         verify(orderPort, never()).markFilled(any(), anyInt(), any(), any());
     }
 
