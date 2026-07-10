@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,10 +69,15 @@ class TradingCloseSchedulerTest {
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(notifyPort);
         scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner);
 
-        lenient().doAnswer(invocation -> {
+        lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
-            task.run();
-            return true;
+            try {
+                task.run();
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
         }).when(schedulerLockService).tryRun(any(), any(), any());
     }
 
@@ -107,9 +114,16 @@ class TradingCloseSchedulerTest {
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
         when(contextFactory.buildAll(any())).thenReturn(List.of(context));
-        doThrow(new InterruptedException("interrupted")).when(useCase).executeBatch(any());
+        doAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("interrupted");
+        }).when(useCase).executeBatch(anyList());
 
-        scheduler.run();
+        try {
+            scheduler.run();
+        } catch (InterruptedException e) {
+            // 인터럽트 플래그 복원 확인
+        }
 
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
         Thread.interrupted(); // 플래그 초기화

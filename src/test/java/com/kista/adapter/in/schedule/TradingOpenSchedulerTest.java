@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyList;
 
 @ExtendWith(MockitoExtension.class)
 class TradingOpenSchedulerTest {
@@ -71,10 +73,15 @@ class TradingOpenSchedulerTest {
         scheduler = new TradingOpenScheduler(useCase, strategyPort, notifyPort, schedulerLockService,
                 privacyTradePort, validationService, contextFactory, jobRunner);
 
-        lenient().doAnswer(invocation -> {
+        lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
-            task.run();
-            return true;
+            try {
+                task.run();
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
         }).when(schedulerLockService).tryRun(any(), any(), any());
     }
 
@@ -116,9 +123,16 @@ class TradingOpenSchedulerTest {
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
         // INFINITE만 있으면 guardPrivacyStrategies 조기 반환 — privacyTradePort 호출 없음
         when(contextFactory.buildAll(any())).thenReturn(List.of(context));
-        doThrow(new InterruptedException("interrupted")).when(useCase).placeOpenOrders(any());
+        doAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("interrupted");
+        }).when(useCase).placeOpenOrders(anyList());
 
-        scheduler.run();
+        try {
+            scheduler.run();
+        } catch (InterruptedException e) {
+            // 인터럽트 플래그 복원 확인
+        }
 
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
         Thread.interrupted(); // 플래그 초기화

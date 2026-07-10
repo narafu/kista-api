@@ -1,36 +1,42 @@
-## Task 2: PRIVACY 기준매매표 조회 중복 제거 — 구현 결과
+# Task 2: Fly 배포를 전체 테스트 게이트에 연결 — 실행 보고
 
-### 발견한 중복 패턴
+## 상태
+**DONE**
 
-`findTodayTrade` 호출 현황 (총 4곳):
-1. `ManualTradingService.java:71-73` — `strategy.isPrivacy() ? findTodayTrade(today).orElse(null) : null` ← 교체 대상
-2. `TradingPreviewService.java:83-85` — `orderStrategy.requiresPrivacyBase() ? findTodayTrade(today).orElse(null) : null` ← 교체 대상
-3. `TradingService.java:92-96` — `hasPrivacy ? findTodayTrade(today).orElse(null) : null` (배치, 유지)
-4. `TradingService.java:268-272` — `hasPrivacy ? findTodayTrade(tradeDate).orElse(null) : null` (배치, 유지)
+## 커밋
+- Hash: `803566fb`
+- Message: `ci: 배포 전 전체 테스트 게이트 — verify job에 PostgreSQL + 전체 테스트 추가`
 
-brief에서 "5곳"으로 언급한 것은 `isPrivacy()` 호출 수(5곳)이며,
-실제 `findTodayTrade` 조건부 호출 패턴은 4곳. TradingService 배치 2곳은
-전략 전체를 1회 DB 조회로 커버하는 구조이므로 별도 메서드 적용 시 오히려 비효율 (변경 안 함).
+## 실행 내역
 
-또한 brief의 `findTodayTrade(strategy.ticker(), today)` 시그니처는 실제 구현과 달랐음.
-실제: `findTodayTrade(LocalDate today)` → `Optional<PrivacyTradeBase>`. 이에 맞춰 수정.
+### Step 1: fly-deploy.yml verify job 교체 ✓
+- 기존: `Compile & Architecture Test` (compile + ArchUnit만)
+- 변경: `Full Test Suite` (PostgreSQL 서비스 포함, 전체 테스트 실행)
+- 변경점:
+  - `services.postgres` 추가 (postgres:17, health check 포함)
+  - compile/ArchUnit 스텝 제거
+  - `./gradlew test --no-daemon` 단일 스텝 추가 (ArchUnit 포함)
+  - `SPRING_PROFILES_ACTIVE: test` 환경변수 설정
 
-### 변경한 파일
+### Step 2: ci.yml 트리거 블록 변경 ✓
+- 기존: `push: [main]` + `pull_request: [main]` 병렬 실행
+- 변경: `pull_request: [main]` 전용 (push 시 이중 실행 방지)
+- `push: branches: [main]` 완전 제거
 
-1. `src/main/java/com/kista/domain/port/out/PrivacyTradePort.java`
-   - `import com.kista.domain.model.strategy.Strategy` 추가
-   - `findBaseIfPrivacy(Strategy strategy, LocalDate today)` default 메서드 추가
+### Step 3: YAML 문법 검증 ✓
+- Tool: `npx --yes yaml-lint`
+- Result: ✔ YAML Lint successful (모두 통과)
 
-2. `src/main/java/com/kista/application/service/trading/ManualTradingService.java`
-   - 3줄 → 1줄로 단순화
+### Step 4: 커밋 ✓
+- `git add .github/workflows/fly-deploy.yml .github/workflows/ci.yml`
+- Conventional Commit + Co-Authored-By 포함
+- Author: narafu <narafu@kakao.com> (확인됨)
 
-3. `src/main/java/com/kista/application/service/trading/TradingPreviewService.java`
-   - 3줄 → 1줄로 단순화 (조건 `requiresPrivacyBase()`은 `strategy.isPrivacy()`와 동치)
+## 검증 결과
+- fly-deploy.yml: verify job PostgreSQL 서비스 + 전체 테스트 (ArchUnit 포함)
+- ci.yml: PR 전용 트리거, push 이중 실행 제거
+- YAML 문법: 모두 valid
 
-### compileJava 결과
-
-BUILD SUCCESSFUL (경고 0)
-
-### 커밋 해시
-
-2efea18c
+## 주의사항
+- push는 사용자 요청 시에만 (현재 진행 X)
+- Step 5 (push 후 `gh run list` 확인)는 사용자가 수행
