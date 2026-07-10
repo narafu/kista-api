@@ -6,8 +6,22 @@ on:
 
 jobs:
   verify:
-    name: Compile & Architecture Test
+    name: Full Test Suite
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: kistadb
+          POSTGRES_USER: kista
+          POSTGRES_PASSWORD: kista
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -15,10 +29,14 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'gradle'
-      - name: Compile
-        run: ./gradlew compileJava compileTestJava --no-daemon
-      - name: ArchUnit
-        run: ./gradlew test --tests 'com.kista.architecture.*' --no-daemon
+      - name: Create test database
+        run: psql -h localhost -U kista -d kistadb -c "CREATE DATABASE kistadb_test OWNER kista;"
+        env:
+          PGPASSWORD: kista
+      - name: Run all tests (ArchUnit 포함)
+        run: ./gradlew test --no-daemon
+        env:
+          SPRING_PROFILES_ACTIVE: test
 
   deploy:
     name: Deploy to Fly.io
