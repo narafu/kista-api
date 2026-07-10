@@ -22,17 +22,17 @@
 
 ---
 
-## 🔓 열린 질문 (사용자 답변 필요 — 답 없으면 각 항목의 기본값으로 진행)
+## ✅ 결정 사항 (사용자 확정 — 2026-07-09)
 
-1. **`qodana.yaml` 삭제 여부** — CI 워크플로에는 미연동. IntelliJ에서 로컬 Qodana 분석에 쓰고 있다면 유지해야 함. *기본값: Task 6에서 삭제하지 않고 보류 (shrimp 관련만 삭제).*
+1. **`qodana.yaml` 삭제 확정** — Task 6에서 shrimp 잔재와 함께 삭제.
 
-2. **[의심 버그] 체결이 0건인 날 PLACED 주문이 CANCELLED 처리되지 않음** — `TradingReporter.markFilledOrders()`는 `executions.isEmpty()`면 조기 반환한다. 체결이 1건이라도 있으면 미체결 주문을 CANCELLED로 마킹하지만, 전량 미체결(체결 0건)이면 모든 주문이 PLACED로 영구 잔류한다. 의도된 동작인가? *기본값: 동작 변경하지 않고 Task 4에서 현재 동작을 테스트로 고정만 함. 버그라면 별도 지시 필요.*
+2. **[버그 확정] 체결이 0건인 날 PLACED 주문이 CANCELLED 처리되지 않음** — `TradingReporter.markFilledOrders()`의 `executions.isEmpty()` 조기 반환이 원인. 사용자가 버그로 확정 → **Task 4에서 수정** (조기 반환 제거, 체결 0건이어도 미체결 PLACED 주문 전부 CANCELLED 처리).
 
-3. **`ci.yml`을 PR 전용으로 좁히기** — Task 2에서 fly-deploy.yml verify job이 전체 테스트를 수행하게 되면 push 시 CI가 이중 실행됨. *기본값: ci.yml을 `on: pull_request`로 변경 (Task 2에 포함).*
+3. **`ci.yml`을 PR 전용으로 전환 확정** — fly-deploy verify job이 전체 테스트를 수행하므로 push 시 이중 실행 방지 (Task 2에 포함).
 
-4. **배포 시간대 가드 방식** — 매매 시간대에 push하면 배포를 (A) 실패시키고 수동 재실행 유도 vs (B) 시간대가 끝날 때까지 대기. *기본값: (A) 실패 + `workflow_dispatch` force 입력으로 강제 배포 우회 (Task 3 기준).*
+4. **배포 시간대 가드는 실패(fail) 방식 확정** — `workflow_dispatch` force 입력으로만 우회 (Task 3 기준).
 
-5. **검토했으나 계획에서 제외한 항목 (동의 확인)** — `static/index.html` 흔적 대시보드(무해·소형), Prometheus/Grafana 로컬 스택(문서 참조 중), 32개 아웃바운드 포트(의도된 헥사고날 설계). 모두 유지. 이견 있으면 지시.
+5. **유지 확정** — `static/index.html`, Prometheus/Grafana 로컬 스택, 아웃바운드 포트 구조는 변경하지 않음.
 
 ---
 
