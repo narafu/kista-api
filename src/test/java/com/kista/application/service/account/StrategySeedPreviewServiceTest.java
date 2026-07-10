@@ -86,8 +86,8 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void privacy_no_base_returns_skip_reason() {
-        // given: 기준매매표 없음 — findCurrentBase()는 FIDA 선행 업로드 포함
-        when(privacyTradePort.findCurrentBase()).thenReturn(Optional.empty());
+        // given: 기준매매표 없음
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.empty());
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
@@ -100,9 +100,9 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void privacy_with_base_returns_min_seed() {
-        // given: 기준매매표 있음 (FIDA 선행 업로드 포함), currentCycleStart = 5000.00
+        // given: 기준매매표 있음, currentCycleStart = 5000.00
         PrivacyCurrentBase base = new PrivacyCurrentBase(Ticker.SOXL, new BigDecimal("5000.00"), null);
-        when(privacyTradePort.findCurrentBase()).thenReturn(Optional.of(base));
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(base));
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);

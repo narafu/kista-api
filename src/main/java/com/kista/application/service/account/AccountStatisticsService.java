@@ -141,9 +141,9 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         // 1단계: 전략 타입별 capability 로드
         CycleOrderStrategy strategy = cycleStrategies.of(type);
 
-        // 2단계: PRIVACY 기준 매매표 조회 — findCurrentBase()로 FIDA 선행 업로드(내일자 기준) 포함
+        // 2단계: PRIVACY 기준 매매표 조회 — 미리보기는 전일 DB trade_date를 잡지 않도록 스케쥴러 조회와 분리
         PrivacyCurrentBase currentBase = strategy.requiresPrivacyBase()
-                ? privacyTradePort.findCurrentBase().orElse(null)
+                ? privacyTradePort.findSeedPreviewBase().orElse(null)
                 : null;
         if (strategy.requiresPrivacyBase() && currentBase == null) {
             return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");

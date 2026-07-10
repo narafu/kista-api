@@ -12,8 +12,13 @@ public interface PrivacyTradePort {
     // 동일 (tradeDate, ticker)가 이미 존재하면 비교 후 일치 시 created=false, 불일치 시 PrivacyTradeConflictException
     PrivacyTradeSaveResult saveBaseWithOrders(FidaOrderCommand command);
 
-    // trade_date >= 오늘인 행 중 가장 미래 거래일의 기준가 반환 (없으면 empty)
-    Optional<PrivacyCurrentBase> findCurrentBase();
+    // 전략 등록/수정 미리보기용 기준가 조회 — 현재 KST 일자 이후의 기준표만 사용
+    Optional<PrivacyCurrentBase> findSeedPreviewBase();
+
+    // 기존 호출부 호환용. 신규 코드는 용도에 맞는 findSeedPreviewBase/findTodayTrade를 직접 사용한다.
+    default Optional<PrivacyCurrentBase> findCurrentBase() {
+        return findSeedPreviewBase();
+    }
 
     // 당일 기준 매매표 조회 — 미수신 일자면 empty
     Optional<PrivacyTradeBase> findTodayTrade(LocalDate today);
