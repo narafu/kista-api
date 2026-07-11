@@ -7,6 +7,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.out.HeartbeatPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyPort;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class TradingCloseSchedulerTest {
     @Mock SchedulerLockService schedulerLockService;
     @Mock BatchContextFactory contextFactory;
     @Mock NotifyPort notifyPort;
+    @Mock HeartbeatPort heartbeatPort;
 
     TradingCloseScheduler scheduler;
 
@@ -67,7 +69,7 @@ class TradingCloseSchedulerTest {
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(notifyPort);
-        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner);
+        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
@@ -95,6 +97,7 @@ class TradingCloseSchedulerTest {
         scheduler.run();
 
         verify(useCase).executeBatch(List.of(context));
+        verify(heartbeatPort).pingClose();
     }
 
     @Test
@@ -105,6 +108,7 @@ class TradingCloseSchedulerTest {
         scheduler.run();
 
         verify(useCase).executeBatch(List.of());
+        verify(heartbeatPort).pingClose();
     }
 
     @Test
@@ -127,6 +131,7 @@ class TradingCloseSchedulerTest {
 
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
         Thread.interrupted(); // 플래그 초기화
+        verify(heartbeatPort, never()).pingClose(); // 인터럽트 시 핑 도달 안 함
     }
 
     @Test
@@ -142,6 +147,7 @@ class TradingCloseSchedulerTest {
         scheduler.run();
 
         verify(notifyPort).notifyError(ex);
+        verify(heartbeatPort).pingClose(); // jobRunner가 RuntimeException을 삼키므로 runLocked는 정상 종료 — 핑 도달
     }
 
     @Test
@@ -150,6 +156,6 @@ class TradingCloseSchedulerTest {
 
         scheduler.run();
 
-        verifyNoInteractions(strategyPort, contextFactory, useCase, notifyPort);
+        verifyNoInteractions(strategyPort, contextFactory, useCase, notifyPort, heartbeatPort);
     }
 }

@@ -2,6 +2,7 @@ package com.kista.adapter.in.schedule;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.out.HeartbeatPort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class TradingCloseScheduler {
     private final SchedulerLockService schedulerLockService;
     private final BatchContextFactory contextFactory;
     private final SchedulerJobRunner jobRunner;
+    private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
 
     @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 waitUntilOrderTime 60분 대기)
     public void run() throws InterruptedException {
@@ -41,5 +43,6 @@ public class TradingCloseScheduler {
         jobRunner.run("마감 매매 스케쥴러",
                 () -> contextFactory.buildAll(strategyPort.findAllActive()),
                 useCase::executeBatch);
+        heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
     }
 }

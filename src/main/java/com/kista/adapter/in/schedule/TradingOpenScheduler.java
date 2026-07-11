@@ -6,6 +6,7 @@ import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.out.HeartbeatPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -34,6 +35,7 @@ public class TradingOpenScheduler {
     private final PrivacyTradeValidationUseCase validationService;
     private final BatchContextFactory contextFactory;
     private final SchedulerJobRunner jobRunner;
+    private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
 
     @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
     public void run() throws InterruptedException {
@@ -54,6 +56,7 @@ public class TradingOpenScheduler {
         jobRunner.run("장 개시 스케쥴러",
                 () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
                 useCase::placeOpenOrders);
+        heartbeatPort.pingOpen(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
     }
 
     // PRIVACY 기준 매매표가 위험 패턴이면 그 실행에서만 주문 생성 skip + 관리자 알림
