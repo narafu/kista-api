@@ -18,7 +18,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,6 +28,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -55,17 +55,12 @@ class TradingCycleControllerTest {
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
 
-    // JwtAuthFilter와 동일하게 principal을 UUID로 설정
-    private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
-    }
-
     @Test
     void executeManually_success_returns200WithOrders() throws Exception {
         when(tradingExecution.executeManually(any(), any())).thenReturn(List.of());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk()) // 200
                 .andExpect(jsonPath("$.orders").isArray());
     }
@@ -83,7 +78,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden()); // 403
     }
 
@@ -93,7 +88,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isBadRequest()); // 400
     }
 
@@ -103,7 +98,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isConflict()); // 409
     }
 
@@ -113,7 +108,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNotFound()); // 404 — GlobalExceptionHandler 처리
     }
 
@@ -123,7 +118,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isServiceUnavailable()); // 503
     }
 
@@ -133,7 +128,7 @@ class TradingCycleControllerTest {
                 .thenReturn(new CancelResult(2, 1));
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cancelledCount").value(2))
                 .andExpect(jsonPath("$.failedCount").value(1));
@@ -145,7 +140,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).cancelByCycle(any(), any());
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden());
     }
 
@@ -155,7 +150,7 @@ class TradingCycleControllerTest {
                 .when(tradingExecution).cancelByCycle(any(), any());
 
         mockMvc.perform(delete("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNotFound());
     }
 
@@ -167,7 +162,7 @@ class TradingCycleControllerTest {
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
                         .param("from", "2024-01-01").param("to", "2024-12-31")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.hasMore").value(false));
@@ -180,7 +175,7 @@ class TradingCycleControllerTest {
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
     }
@@ -193,7 +188,7 @@ class TradingCycleControllerTest {
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth()))
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":5000.00}
@@ -208,7 +203,7 @@ class TradingCycleControllerTest {
                 .when(tradingCycle).update(eq(CYCLE_ID), any(), any());
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
-                        .with(csrf()).with(authentication(mockAuth()))
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":100.00}
@@ -228,7 +223,7 @@ class TradingCycleControllerTest {
                 new java.math.BigDecimal("1000"), 20, false, null, 0, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
-        mockMvc.perform(get("/api/trading-cycles").with(authentication(mockAuth())))
+        mockMvc.perform(get("/api/trading-cycles").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(CYCLE_ID.toString()))
                 .andExpect(jsonPath("$[0].status").value("ACTIVE"));
@@ -249,7 +244,7 @@ class TradingCycleControllerTest {
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
                         .param("from", "2024-01-01").param("to", "2024-12-31")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasMore").value(true))
                 .andExpect(jsonPath("$.nextCursor").value("2024-06-01T00:00:00Z"));
@@ -264,7 +259,7 @@ class TradingCycleControllerTest {
 
         mockMvc.perform(get("/api/accounts/{accountId}/strategy-seed-preview", ACCOUNT_ID)
                         .param("type", "INFINITE").param("ticker", "SOXL").param("divisionCount", "20")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.minSeed").value(1320.00))
                 .andExpect(jsonPath("$.basePrice").value(30.00))
@@ -291,7 +286,7 @@ class TradingCycleControllerTest {
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
-                        .with(csrf()).with(authentication(mockAuth()))
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

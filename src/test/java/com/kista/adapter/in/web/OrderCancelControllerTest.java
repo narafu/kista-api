@@ -8,15 +8,14 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -38,18 +37,13 @@ class OrderCancelControllerTest {
     @MockitoBean TradingExecutionUseCase tradingExecution;
 
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
-    private static final UUID USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
-
-    private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
-    }
 
     @Test
     void cancelOrder_success_returns204() throws Exception {
         doNothing().when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isNoContent()); // 204
     }
 
@@ -66,7 +60,7 @@ class OrderCancelControllerTest {
                 .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isForbidden()); // 403
     }
 
@@ -76,7 +70,7 @@ class OrderCancelControllerTest {
                 .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isNotFound()); // 404
     }
 
@@ -86,7 +80,7 @@ class OrderCancelControllerTest {
                 .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isConflict()); // 409
     }
 }

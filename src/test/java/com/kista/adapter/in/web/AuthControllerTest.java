@@ -17,8 +17,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -26,10 +24,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
@@ -67,11 +65,6 @@ class AuthControllerTest {
                 ResponseCookie.from("refresh_token", "").maxAge(0).build());
     }
 
-    private Authentication auth() {
-        // @AuthenticationPrincipal UUID 바인딩을 위해 principal을 UUID로 설정
-        return new UsernamePasswordAuthenticationToken(USER_ID, null, List.of());
-    }
-
     @Test
     @DisplayName("쿨다운 중 재신청 시 429 Too Many Requests 반환")
     void reapply_cooldown_returns_429() throws Exception {
@@ -80,7 +73,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/approval-requests")
                         .with(csrf())
-                        .with(authentication(auth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -89,7 +82,7 @@ class AuthControllerTest {
     void deleteMe_authenticated_returns204() throws Exception {
         mockMvc.perform(delete("/api/auth/me")
                         .with(csrf())
-                        .with(authentication(auth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
         verify(userUseCase).deleteMe(USER_ID); // UseCase 실제 호출 검증
@@ -102,7 +95,7 @@ class AuthControllerTest {
 
         mockMvc.perform(delete("/api/auth/me")
                         .with(csrf())
-                        .with(authentication(auth())))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNotFound());
     }
 
@@ -134,7 +127,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/logout")
                         .with(csrf())
-                        .with(authentication(auth()))
+                        .with(authentication(userToken(USER_ID)))
                         .header("Authorization", "Bearer test-at")
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", rawRt)))
                 .andExpect(status().isNoContent());
@@ -157,7 +150,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/logout")
                         .with(csrf())
-                        .with(authentication(auth()))
+                        .with(authentication(userToken(USER_ID)))
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", rawRt)))
                 .andExpect(status().isNoContent());
 

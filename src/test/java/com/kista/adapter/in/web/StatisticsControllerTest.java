@@ -10,7 +10,6 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -40,12 +40,7 @@ class StatisticsControllerTest {
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountStatisticsUseCase accountStatistics;
 
-    private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
-
-    private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
-    }
 
     @Test
     void portfolio_returns_200_with_result() throws Exception {
@@ -57,7 +52,7 @@ class StatisticsControllerTest {
                 .thenReturn(result);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/portfolio")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.totalAssetUsd").value(1000.00));
     }
@@ -72,7 +67,7 @@ class StatisticsControllerTest {
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ", "SOXL")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prices[0].ticker").value("TQQQ"))
                 .andExpect(jsonPath("$.prices[0].price").value(120.50))
@@ -83,7 +78,7 @@ class StatisticsControllerTest {
     @Test
     void prices_returns_400_when_tickers_empty() throws Exception {
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -94,7 +89,7 @@ class StatisticsControllerTest {
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isForbidden());
     }
 
@@ -105,7 +100,7 @@ class StatisticsControllerTest {
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isServiceUnavailable());
     }
 

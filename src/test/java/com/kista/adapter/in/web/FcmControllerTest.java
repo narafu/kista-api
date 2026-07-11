@@ -8,14 +8,13 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -41,7 +40,7 @@ class FcmControllerTest {
     void registerToken_returns204() throws Exception {
         mockMvc.perform(post("/api/fcm/tokens")
                         .with(csrf())
-                        .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of())))
+                        .with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"fcm-token-abc\",\"platform\":\"WEB\"}"))
                 .andExpect(status().isNoContent());
@@ -52,7 +51,7 @@ class FcmControllerTest {
     void unregisterToken_returns204() throws Exception {
         mockMvc.perform(delete("/api/fcm/tokens/fcm-token-abc")
                         .with(csrf())
-                        .with(authentication(new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()))))
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
         verify(userProfileUseCase).unregisterFcmToken(eq(USER_ID), eq("fcm-token-abc"));
     }

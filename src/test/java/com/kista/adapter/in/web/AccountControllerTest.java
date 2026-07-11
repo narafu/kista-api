@@ -10,7 +10,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -42,17 +42,12 @@ class AccountControllerTest {
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
-    // JwtAuthFilter와 동일하게 principal을 UUID로 설정
-    private UsernamePasswordAuthenticationToken mockAuth() {
-        return new UsernamePasswordAuthenticationToken(UUID.fromString(USER_ID), null, List.of());
-    }
-
     @Test
     void list_accounts_returns_200() throws Exception {
         when(accountUseCase.listByUser(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/accounts")
-                        .with(authentication(mockAuth())))
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
@@ -69,7 +64,7 @@ class AccountControllerTest {
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
     }
 
@@ -80,7 +75,7 @@ class AccountControllerTest {
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appKey\":\"wrongkey\",\"appSecret\":\"wrongsecret\"}")
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isUnprocessableEntity());
     }
 
@@ -104,7 +99,7 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"131-01-001931\"," +
                                 "\"appKey\":\"cid\",\"secretKey\":\"csecret\",\"broker\":\"TOSS\"}")
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("TOSS"));
     }
@@ -120,7 +115,7 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
     }
@@ -132,7 +127,7 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"계좌\",\"accountNo\":\"123456789\"," +
                                 "\"appKey\":\"key\",\"secretKey\":\"secret\"}")
-                        .with(csrf()).with(authentication(mockAuth())))
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isBadRequest());
     }
 }
