@@ -37,6 +37,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Tag(name = "Admin", description = "관리자 API")
@@ -115,7 +116,7 @@ public class AdminTradeController {
     // accountId → Account 전체 매핑 (N+1 방지용 일괄 조회)
     private Map<UUID, Account> buildAccountMap() {
         return adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(Account::id, java.util.function.Function.identity()));
+                .collect(Collectors.toMap(Account::id, Function.identity()));
     }
 
     // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
