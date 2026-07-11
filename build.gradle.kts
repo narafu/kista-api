@@ -35,12 +35,6 @@ dependencies {
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.postgresql)
 
-    // Querydsl JPA (Jakarta EE 10 호환)
-    implementation("${libs.querydsl.jpa.get()}:jakarta")
-    annotationProcessor("${libs.querydsl.apt.get()}:jakarta")
-    annotationProcessor("jakarta.annotation:jakarta.annotation-api")
-    annotationProcessor("jakarta.persistence:jakarta.persistence-api")
-
     // Redis (Upstash 블랙리스트 + 캐시)
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
@@ -77,21 +71,6 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
-}
-
-// Querydsl Q-class 생성 디렉토리 설정
-val querydslDir = layout.buildDirectory.dir("generated/querydsl")
-
-sourceSets {
-    main {
-        java {
-            srcDir(querydslDir)
-        }
-    }
-}
-
-tasks.withType<JavaCompile> {
-    options.generatedSourceOutputDirectory = querydslDir.get().asFile
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
