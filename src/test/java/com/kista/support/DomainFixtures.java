@@ -17,8 +17,8 @@ public final class DomainFixtures {
                 null, null, null, null, channel);
     }
 
-    // 기본 ACTIVE 사용자 (알림채널 TELEGRAM 기본값 — 스케쥴러 테스트용)
-    public static User activeUser(UUID id) {
+    // 스케쥴러 테스트용 — 알림채널 TELEGRAM 고정 (도메인 실제 기본값은 User.DEFAULT_CHANNEL=NONE, 혼동 방지용으로 이름에 명시)
+    public static User activeUserWithTelegram(UUID id) {
         return activeUser(id, NotificationChannel.TELEGRAM);
     }
 

@@ -59,7 +59,7 @@ class TradingCloseSchedulerTest {
     }
 
     private User mockUser() {
-        return DomainFixtures.activeUser(USER_ID);
+        return DomainFixtures.activeUserWithTelegram(USER_ID);
     }
 
     @BeforeEach
