@@ -64,7 +64,7 @@ public class AdminTradeController {
     public List<LocalDate> listStrategyTradeDates(
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId) {
-        return adminQuery.listStrategyTradeDates(strategyId);
+        return adminQuery.listStrategyTradeDates(accountId, strategyId);
     }
 
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")

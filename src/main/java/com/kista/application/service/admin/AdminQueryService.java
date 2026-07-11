@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -136,7 +137,12 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public List<LocalDate> listStrategyTradeDates(UUID strategyId) {
+    public List<LocalDate> listStrategyTradeDates(UUID accountId, UUID strategyId) {
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId); // 없으면 NoSuchElementException → 404
+        // 경로 계층 정합성 검증 — 다른 계좌의 전략 조회 차단
+        if (!strategy.accountId().equals(accountId)) {
+            throw new NoSuchElementException("전략이 해당 계좌에 속하지 않습니다");
+        }
         return orderPort.findTradeDatesByStrategyId(strategyId);
     }
 
