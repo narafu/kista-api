@@ -1,6 +1,5 @@
 package com.kista.adapter.out.persistence.strategy;
 
-import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
