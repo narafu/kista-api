@@ -34,6 +34,15 @@ class BatchContextFactory {
         for (Strategy strategy : strategies) {
             try {
                 StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+                // 종료된 사이클 재선택 차단 — rotation 실패(잔고 조회 오류 등) 시 새 사이클 없이 종료 사이클만 남는 좀비 상태
+                if (currentCycle.endDate() != null) {
+                    IllegalStateException zombie = new IllegalStateException(
+                            "[좀비 사이클] 최신 사이클이 이미 종료됨(endDate=" + currentCycle.endDate()
+                                    + ") — rotation 실패 추정, 전략 확인 후 수동 재등록 필요: strategyId=" + strategy.id());
+                    log.error(zombie.getMessage());
+                    notifyPort.notifyError(zombie);
+                    continue;
+                }
                 Account account = accountPort.findByIdOrThrow(strategy.accountId());
                 User user = userPort.findByIdOrThrow(account.userId());
                 contexts.add(new BatchContext(strategy, currentCycle, account, user));

@@ -48,6 +48,12 @@ class BatchContextFactoryTest {
                 null, LocalDate.now(), null, Instant.now(), null);
     }
 
+    private StrategyCycle mockEndedCycle(UUID strategyId) {
+        // mockCycle과 동일 패턴 + endAmount/endDate 채움 — 종료된 사이클
+        return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
+                new BigDecimal("1100.00"), LocalDate.now().minusDays(7), LocalDate.now().minusDays(1), Instant.now(), null);
+    }
+
     private Account mockAccount(UUID accountId) {
         return new Account(accountId, USER_ID, "테스트계좌",
                 "74420614", "key", "secret", null, Account.Broker.KIS, null);
@@ -102,5 +108,19 @@ class BatchContextFactoryTest {
         verify(notifyPort).notifyError(ex);
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().strategy()).isEqualTo(strategy2);
+    }
+
+    @Test
+    void buildAll_latestCycleAlreadyEnded_skipsAndNotifiesAdmin() {
+        // rotation 실패로 새 사이클이 없는 좀비 상태 — 종료 사이클에 주문이 나가면 안 됨
+        Strategy strategy = mockStrategy(ACCOUNT_ID);
+        when(strategyCyclePort.findLatestByStrategyId(strategy.id()))
+                .thenReturn(Optional.of(mockEndedCycle(strategy.id())));
+
+        List<BatchContext> result = factory.buildAll(List.of(strategy));
+
+        assertThat(result).isEmpty();
+        verify(notifyPort).notifyError(any(IllegalStateException.class));
+        verifyNoInteractions(accountPort); // 종료 사이클이면 계좌 조회 전에 중단
     }
 }
