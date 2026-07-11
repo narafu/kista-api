@@ -38,8 +38,8 @@ public class AdminObservabilityController {
     public List<AuditLogResponse> listAuditLogs(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        Instant fromInstant = from != null ? from.atStartOfDay().toInstant(ZoneOffset.UTC) : null;
-        Instant toInstant   = to   != null ? to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+        Instant fromInstant = toInstantOrDefault(from, 0, null);
+        Instant toInstant   = toInstantOrDefault(to, 1, null);
         return adminQuery.listAuditLogs(fromInstant, toInstant).stream()
                 .map(AuditLogResponse::from)
                 .toList();
@@ -55,11 +55,17 @@ public class AdminObservabilityController {
         if (from == null && to == null) {
             return adminQuery.listErrorLogs(safeLimit).stream().map(ErrorLogResponse::from).toList();
         }
-        Instant fromInstant = from != null ? from.atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.EPOCH;
-        Instant toInstant   = to   != null ? to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) : Instant.now();
+        Instant fromInstant = toInstantOrDefault(from, 0, Instant.EPOCH);
+        Instant toInstant   = toInstantOrDefault(to, 1, Instant.now());
         return adminQuery.listErrorLogs(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();
+    }
+
+    // LocalDate(KST 기준 조회 파라미터) → Instant(UTC) 변환 — null이면 defaultValue 반환
+    // dayOffset: from=0(당일 자정), to=1(다음날 자정 — 당일 포함을 위한 상한 exclusive)
+    private static Instant toInstantOrDefault(LocalDate date, int dayOffset, Instant defaultValue) {
+        return date != null ? date.plusDays(dayOffset).atStartOfDay().toInstant(ZoneOffset.UTC) : defaultValue;
     }
 
     // 오류 로그 소프트 삭제 — 조치 완료 처리

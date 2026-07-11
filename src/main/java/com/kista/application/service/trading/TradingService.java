@@ -60,6 +60,14 @@ class TradingService {
     // 증권사 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
 
+    // 배치 시작 시점 가격·기준표 조회 결과 — executeBatch/placeOpenOrders 공통 (조회 대상 날짜만 다름)
+    private record PriceContext(
+            List<Ticker> cycleTickers,
+            Account priceAccount,
+            Map<Ticker, PriceSnapshot> startPriceSnapshots,
+            PrivacyTradeBase privacyBase
+    ) {}
+
     void execute(Strategy strategy, Account account, User user) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
@@ -79,21 +87,11 @@ class TradingService {
         // 시장 개장 여부 확인 (1회) — 모든 전략 공통, 가격 조회 전 조기 반환
         if (!isMarketOpen(today)) return;
 
-        // 시작 시점 현재가 + 전일종가 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
-        List<Ticker> cycleTickers = contexts.stream()
-                .map(c -> c.strategy().ticker())
-                .distinct().toList();
-        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
-        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
-
-        // 기준 매매표 조회 (PRIVACY)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
-        PrivacyTradeBase privacyBase = hasPrivacy
-                ? privacyTradePort.findTodayTrade(today).orElse(null)
-                : null;
+        // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
+        PriceContext priceCtx = loadPriceContext(contexts, today);
 
         // planAndSaveOrders — 전략별: 잔고 로드 + PLANNED 주문 생성·저장 (이미 존재하면 skip)
-        List<CycleState> states = planAll(contexts, startPriceSnapshots, privacyBase, today);
+        List<CycleState> states = planAll(contexts, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
         if (states.isEmpty()) return;
 
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
@@ -107,7 +105,7 @@ class TradingService {
         marketEventNotifier.notifyMarketClose();
 
         // 장 마감 후 종가 일괄 조회
-        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(cycleTickers, priceAccount);
+        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(priceCtx.cycleTickers(), priceCtx.priceAccount());
 
         // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
         reportAll(placedStates, closingPrices, today);
@@ -260,16 +258,8 @@ class TradingService {
 
         if (!isMarketOpen(tradeDate)) return;
 
-        // 가격 스냅샷 일괄 조회 (개장 전 현시점)
-        List<Ticker> cycleTickers = contexts.stream().map(c -> c.strategy().ticker()).distinct().toList();
-        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
-        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
-
-        // PRIVACY 기준 매매표 조회 (내일 기준 — FIDA가 미리 송신했을 경우)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
-        PrivacyTradeBase privacyBase = hasPrivacy
-                ? privacyTradePort.findTodayTrade(tradeDate).orElse(null)
-                : null;
+        // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
+        PriceContext priceCtx = loadPriceContext(contexts, tradeDate);
 
         // 개장 시각까지 대기
         waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
@@ -278,7 +268,7 @@ class TradingService {
         // 전략별: order 생성·저장 + INFINITE 매도 선접수
         for (BatchContext ctx : contexts) {
             runSafely("개장 order+매도접수", ctx, () -> {
-                planSaveAndPlaceSells(ctx, startPriceSnapshots, privacyBase, tradeDate);
+                planSaveAndPlaceSells(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), tradeDate);
                 return null;
             });
         }
@@ -352,6 +342,24 @@ class TradingService {
                 .filter(a -> a.broker() == Account.Broker.TOSS)
                 .findFirst()
                 .orElseGet(() -> contexts.getFirst().account());
+    }
+
+    // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 — executeBatch/placeOpenOrders 공통
+    // date: executeBatch는 today(당일), placeOpenOrders는 tradeDate(익일 US 거래일)
+    private PriceContext loadPriceContext(List<BatchContext> contexts, LocalDate date) {
+        List<Ticker> cycleTickers = contexts.stream()
+                .map(c -> c.strategy().ticker())
+                .distinct().toList();
+        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
+        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
+
+        // 기준 매매표 조회 (PRIVACY)
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
+        PrivacyTradeBase privacyBase = hasPrivacy
+                ? privacyTradePort.findTodayTrade(date).orElse(null)
+                : null;
+
+        return new PriceContext(cycleTickers, priceAccount, startPriceSnapshots, privacyBase);
     }
 
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환
