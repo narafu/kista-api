@@ -144,3 +144,21 @@ docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
 # docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases, fear_greed_snapshots;"
 ```
+
+## 백업/복구 런북
+
+### DB 백업 (Supabase 운영)
+- Supabase 자동 백업: 대시보드 → Database → Backups에서 플랜별 보존 기간 확인 (Free: 없음, Pro: 일 1회 7일 보존)
+- 수동 백업: `supabase db dump --linked -f backup-$(date +%Y%m%d).sql` — 중요 스키마 변경(마이그레이션 배포) 직전 필수 실행
+- 백업 파일은 레포 밖 안전한 위치에 보관 (git 커밋 금지 — 사용자 데이터 포함)
+
+### 복구
+1. 신규/기존 프로젝트에 복원: `psql "$DB_URL" < backup-YYYYMMDD.sql`
+2. 복원 후 `flyway_schema_history` 최신 버전이 배포 코드의 마이그레이션 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패
+3. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
+
+### 키 백업 (분실 시 복구 불가 — DB 백업과 별도 보관 필수)
+- `AES_ENCRYPTION_KEY` — 분실 시 accounts의 암호화 컬럼(계좌번호·API 키) 전체 복호화 불가 → 사용자 재등록 필요
+- `JWT_SIGNING_KEY` — 분실 시 전체 사용자 재로그인 (치명적이지 않음)
+- 확인: `fly secrets list -a kista-api` (값은 안 보임 — 원본을 별도 보관해야 함)
+```
