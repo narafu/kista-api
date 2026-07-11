@@ -7,6 +7,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.RefreshTokenPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -197,8 +198,6 @@ class TokenServiceTest {
     }
 
     private User mockUser() {
-        return new User(USER_ID, "kakaoId", "닉네임",
-                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null,
-                User.NotificationChannel.FCM);
+        return DomainFixtures.activeUser(USER_ID, User.NotificationChannel.FCM);
     }
 }

@@ -4,8 +4,8 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,14 +51,9 @@ class VrCycleRolloverServiceTest {
     // 10주 보유, 평단가=45.00
     static final AccountBalance POST_BALANCE = new AccountBalance(10, new BigDecimal("45.00"), USD_DEPOSIT);
 
-    static final Account ACCOUNT = new Account(
-            ACCOUNT_ID, USER_ID, "VR계좌",
-            "74420614", "key", "secret", null,
-            Account.Broker.KIS, null);
+    static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
 
-    static final User USER = new User(USER_ID, "kakao-1", "홍길동",
-            User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM);
+    static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
 
     // 테스트 기준일: 2026-06-01 (기준, 실제 today는 각 테스트에서 지정)
     static final LocalDate CYCLE_START = LocalDate.of(2026, 6, 1);

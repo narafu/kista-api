@@ -11,13 +11,13 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserSettingsPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,11 +47,7 @@ class TradingReporterTest {
     static final LocalDate TODAY = LocalDate.of(2026, 7, 9);
     static final BigDecimal CLOSE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", null,
-            Account.Broker.KIS, null
-    );
+    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
@@ -60,10 +56,7 @@ class TradingReporterTest {
             UUID.randomUUID(), STRATEGY.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, TODAY, null, null, null
     );
-    static final User USER = new User(
-            ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM
-    );
+    static final User USER = DomainFixtures.activeUserWithTelegram(ACCOUNT.userId());
     static final BatchContext CTX = new BatchContext(STRATEGY, CYCLE, ACCOUNT, USER);
     static final AccountBalance BALANCE = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 

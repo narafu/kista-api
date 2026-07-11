@@ -1,10 +1,10 @@
 package com.kista.application.service.user;
 
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import com.kista.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,8 +30,7 @@ class UserProfileServiceTest {
     @InjectMocks UserProfileService userProfileService;
 
     private User user(UUID id) {
-        return new User(id, "kakao-123", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.NONE);
+        return DomainFixtures.activeUser(id, User.NotificationChannel.NONE);
     }
 
     @Test
@@ -67,9 +66,9 @@ class UserProfileServiceTest {
         when(userPort.findByIdOrThrow(userId)).thenReturn(user(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        userProfileService.updateNotificationChannel(userId, NotificationChannel.FCM);
+        userProfileService.updateNotificationChannel(userId, User.NotificationChannel.FCM);
 
-        verify(userPort).save(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+        verify(userPort).save(argThat(u -> u.notificationChannel() == User.NotificationChannel.FCM));
     }
 
     @Test

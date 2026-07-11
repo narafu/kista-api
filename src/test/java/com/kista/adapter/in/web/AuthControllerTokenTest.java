@@ -8,6 +8,7 @@ import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -161,8 +162,6 @@ class AuthControllerTokenTest {
     }
 
     private User stubUser(UUID id) {
-        return new User(id, "kakaoId", "닉네임",
-                User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, User.NotificationChannel.FCM);
+        return DomainFixtures.activeUser(id, User.NotificationChannel.FCM);
     }
 }

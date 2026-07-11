@@ -8,7 +8,6 @@ import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.CyclePositionPort;
@@ -16,6 +15,7 @@ import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -60,8 +60,7 @@ class AdminTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
-        User user = new User(USER_ID, "kakao", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        User user = DomainFixtures.activeUserWithTelegram(USER_ID);
         Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
                 Strategy.Ticker.SOXL, Strategy.CycleSeedType.MAX);
@@ -99,8 +98,7 @@ class AdminTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
-        User user = new User(USER_ID, "kakao", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        User user = DomainFixtures.activeUserWithTelegram(USER_ID);
         Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
                 Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);

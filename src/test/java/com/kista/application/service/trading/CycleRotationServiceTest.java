@@ -9,11 +9,11 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
 import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,14 +54,9 @@ class CycleRotationServiceTest {
     static final BigDecimal PRICE = new BigDecimal("22.00");
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
-    static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", null,
-            Account.Broker.KIS, null);
+    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
-    static final User USER = new User(ACCOUNT.userId(), "kakao-1", "홍길동",
-            User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM);
+    static final User USER = DomainFixtures.activeUserWithTelegram(ACCOUNT.userId());
 
     @BeforeEach
     void setUp() {

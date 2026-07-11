@@ -13,6 +13,7 @@ import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,8 +59,7 @@ class OrderCancelServiceTest {
 
     @BeforeEach
     void setUp() {
-        ownedAccount = new Account(accountId, requesterId, "테스트계좌",
-                "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null);
+        ownedAccount = DomainFixtures.kisAccount(accountId, requesterId);
         cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),

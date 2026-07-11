@@ -6,6 +6,7 @@ import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -67,6 +68,14 @@ class DevAuthControllerTest {
             User.NotificationChannel.TELEGRAM
     );
 
+    @BeforeEach
+    void setUp() {
+        // devToken/devAdminToken 공통 stub — RT 발급 + 쿠키 설정 + AT 만료시간 (issue() 반환값만 테스트별 상이)
+        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
+        when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
+        when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
+    }
+
     @Test
     void devApprove_returns_200() throws Exception {
         doNothing().when(userUseCase).approve(DEV_USER_ID);
@@ -80,10 +89,7 @@ class DevAuthControllerTest {
     void devToken_returns_token() throws Exception {
         when(userUseCase.register(any(), any(), any())).thenReturn(MOCK_USER);
         doNothing().when(userUseCase).approve(any());
-        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
-        when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
         when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
-        when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
 
         mockMvc.perform(post("/api/auth/dev-token")
                         .with(csrf()))
@@ -94,10 +100,7 @@ class DevAuthControllerTest {
     @Test
     void devAdminToken_returns_token() throws Exception {
         when(userPort.findById(any())).thenReturn(Optional.of(MOCK_ADMIN_USER));
-        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
-        when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
         when(jwtIssuerService.issue(any(), any())).thenReturn("admin-tok");
-        when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
 
         mockMvc.perform(post("/api/auth/dev-admin-token")
                         .with(csrf()))

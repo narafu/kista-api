@@ -4,9 +4,9 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,12 +49,9 @@ class CyclePositionPersistorTest {
     static final LocalDate TODAY = LocalDate.of(2026, 6, 29);
     static final BigDecimal PRICE = new BigDecimal("50.00");
 
-    static final Account ACCOUNT = new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-            "74420614", "key", "secret", null, Account.Broker.KIS, null);
+    static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
 
-    static final User USER = new User(USER_ID, "kakao-1", "홍길동",
-            User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM);
+    static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
 
     private StrategyCycle cycle(UUID strategyId) {
         return new StrategyCycle(CYCLE_ID, strategyId, VERSION_ID,

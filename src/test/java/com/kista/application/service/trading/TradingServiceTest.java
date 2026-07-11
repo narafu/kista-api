@@ -7,7 +7,6 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
@@ -18,6 +17,7 @@ import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,11 +72,7 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", null,
-            Account.Broker.KIS, null
-    );
+    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
     static final Strategy STRATEGY = new Strategy(
@@ -96,10 +92,7 @@ class TradingServiceTest {
     static final CyclePosition LOW_HISTORY = new CyclePosition(
             null, STRATEGY_CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null, null);
 
-    static final User USER = new User(
-            ACCOUNT.userId(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.TELEGRAM
-    );
+    static final User USER = DomainFixtures.activeUserWithTelegram(ACCOUNT.userId());
 
     @BeforeEach
     void setUp() {

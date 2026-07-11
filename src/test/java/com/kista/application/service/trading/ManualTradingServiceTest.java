@@ -7,7 +7,6 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.port.out.broker.LiveBalancePort;
@@ -15,6 +14,7 @@ import com.kista.domain.port.out.broker.SellableQuantityPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,10 +59,7 @@ class ManualTradingServiceTest {
     ManualTradingService service;
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
-    static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), REQUESTER_ID, "테스트계좌",
-            "74420614", "key", "secret", null, Account.Broker.KIS, null
-    );
+    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
@@ -72,10 +69,7 @@ class ManualTradingServiceTest {
             UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null,
             LocalDate.now(), null, null, null
     );
-    static final User USER = new User(
-            REQUESTER_ID, "kakao-1", "테스터", User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null, NotificationChannel.NONE
-    );
+    static final User USER = DomainFixtures.activeUser(REQUESTER_ID, User.NotificationChannel.NONE);
     // DB 잔고 이력 — cycle_position 기반 (TradingBalanceLoader가 읽음)
     static final CyclePosition HISTORY = new CyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),

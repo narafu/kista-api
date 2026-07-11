@@ -4,11 +4,11 @@ import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -114,14 +114,11 @@ class StrategyServiceTest {
     }
 
     private Account ownerAccount() {
-        return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-                "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null);
+        return DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
     }
 
     private User activeUser() {
-        return new User(USER_ID, "kakao123", "테스터",
-                User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        return DomainFixtures.activeUserWithTelegram(USER_ID);
     }
 
     @Test

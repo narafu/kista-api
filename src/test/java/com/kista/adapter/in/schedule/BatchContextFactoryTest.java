@@ -5,11 +5,11 @@ import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -55,13 +55,11 @@ class BatchContextFactoryTest {
     }
 
     private Account mockAccount(UUID accountId) {
-        return new Account(accountId, USER_ID, "테스트계좌",
-                "74420614", "key", "secret", null, Account.Broker.KIS, null);
+        return DomainFixtures.kisAccount(accountId, USER_ID);
     }
 
     private User mockUser() {
-        return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        return DomainFixtures.activeUserWithTelegram(USER_ID);
     }
 
     @Test
