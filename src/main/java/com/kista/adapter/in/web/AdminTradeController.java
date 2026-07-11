@@ -37,7 +37,6 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Tag(name = "Admin", description = "관리자 API")
@@ -116,19 +115,13 @@ public class AdminTradeController {
     // accountId → Account 전체 매핑 (N+1 방지용 일괄 조회)
     private Map<UUID, Account> buildAccountMap() {
         return adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(Account::id, Function.identity()));
-    }
-
-    // userId → AdminUserView 전체 매핑 (N+1 방지용 일괄 조회)
-    private Map<UUID, AdminUserView> buildUserMap() {
-        return adminUser.listAll(null, null).stream()
-                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
+                .collect(Collectors.toMap(Account::id, java.util.function.Function.identity()));
     }
 
     // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
     private List<AdminTradeResponse> toResponses(List<Order> orders) {
         Map<UUID, Account> accountMap = buildAccountMap();
-        Map<UUID, AdminUserView> userMap = buildUserMap();
+        Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
         Set<UUID> cycleIds = orders.stream()
                 .map(Order::strategyCycleId)
                 .filter(Objects::nonNull)

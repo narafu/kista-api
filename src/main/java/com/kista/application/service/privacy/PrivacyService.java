@@ -8,8 +8,10 @@ import com.kista.domain.port.in.PrivacyUseCase;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class PrivacyService implements PrivacyUseCase {
@@ -33,6 +35,7 @@ class PrivacyService implements PrivacyUseCase {
         );
         PrivacyTradeValidationReport report = validationService.inspect(kstCommand);
         if (report.hasBlockingIssues()) {
+            log.error("[FIDA] 기준 매매표 저장 차단: {}", report.summary());
             IllegalArgumentException exception = new IllegalArgumentException("[FIDA] " + report.summary());
             notifyPort.notifyError(exception);
             throw exception;

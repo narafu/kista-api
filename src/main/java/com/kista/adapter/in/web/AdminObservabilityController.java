@@ -22,7 +22,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Tag(name = "Admin", description = "관리자 API")
@@ -79,8 +78,7 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays, from, to);
-        Map<UUID, AdminUserView> userMap = adminUser.listAll(null, null).stream()
-                .collect(Collectors.toMap(AdminUserView::id, Function.identity()));
+        Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
 
         List<AdminAccountItem> paused = anomalies.pausedAccounts().stream()
                 .map(a -> AdminAccountItem.from(a, userMap))

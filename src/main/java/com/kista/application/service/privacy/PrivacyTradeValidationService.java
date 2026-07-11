@@ -12,7 +12,7 @@ import java.util.List;
 
 // PRIVACY 기준 매매표 방어 규칙 — FIDA 저장 시 경고/차단, 장전 전 자동 가드에 공통 사용
 @Service
-public class PrivacyTradeValidationService implements PrivacyTradeValidationUseCase {
+class PrivacyTradeValidationService implements PrivacyTradeValidationUseCase {
 
     public PrivacyTradeValidationReport inspect(FidaOrderCommand command) {
         return inspect(command.holdings(), command.orders().stream()
