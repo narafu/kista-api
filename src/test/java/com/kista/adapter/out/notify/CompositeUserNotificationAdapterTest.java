@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,12 +34,7 @@ class CompositeUserNotificationAdapterTest {
 
     // 테스트용 User 생성 헬퍼
     static User userWith(NotificationChannel channel) {
-        return new User(
-                UUID.randomUUID(), "kakaoId", "nickname",
-                User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null,
-                null,
-                channel);
+        return DomainFixtures.activeUser(UUID.randomUUID(), channel);
     }
 
     // 테스트용 TradingReport 생성 헬퍼

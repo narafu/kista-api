@@ -7,11 +7,11 @@ import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.domain.port.out.HeartbeatPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +49,7 @@ class TradingOpenSchedulerTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
     private Account mockAccount(UUID accountId) {
-        return new Account(accountId, USER_ID, "테스트계좌",
-                "74420614", "key", "secret", null, Account.Broker.KIS, null);
+        return DomainFixtures.kisAccount(accountId, USER_ID);
     }
 
     private Strategy mockStrategy(UUID accountId, Strategy.Type type) {
@@ -64,8 +63,7 @@ class TradingOpenSchedulerTest {
     }
 
     private User mockUser() {
-        return new User(USER_ID, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        return DomainFixtures.activeUser(USER_ID);
     }
 
     @BeforeEach

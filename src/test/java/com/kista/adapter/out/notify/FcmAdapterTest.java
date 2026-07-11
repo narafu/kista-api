@@ -4,6 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,8 +27,7 @@ class FcmAdapterTest {
     FcmAdapter adapter;
 
     static User user(UUID id) {
-        return new User(id, "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.FCM);
+        return DomainFixtures.activeUser(id, NotificationChannel.FCM);
     }
 
     @BeforeEach

@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,8 +37,7 @@ class TelegramUserNotificationAdapterTest {
 
     @Test
     void notifyTradingReport_withUserBot_sendsToUserChatId() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                "user-bot-token", "user-chat-789", null, null, NotificationChannel.TELEGRAM);
+        User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789");
         Account account = mock(Account.class);
         when(account.nickname()).thenReturn("SOXL계좌");
 
@@ -48,8 +48,7 @@ class TelegramUserNotificationAdapterTest {
 
     @Test
     void notifyTradingReport_noUserBot_skips() {
-        User user = new User(UUID.randomUUID(), "kakao-1", "홍길동", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.TELEGRAM);
         Account account = mock(Account.class);
 
         adapter.notifyTradingReport(user, account, buildTestReport());
