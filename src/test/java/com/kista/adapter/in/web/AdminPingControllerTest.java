@@ -10,15 +10,13 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,21 +48,16 @@ class AdminPingControllerTest {
     @Test
     void ping_userToken_returns403() throws Exception {
         mockMvc.perform(get("/api/admin/_ping")
-                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                        .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void ping_adminToken_returns200() throws Exception {
         mockMvc.perform(get("/api/admin/_ping")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.adminId").value(ADMIN_UUID.toString()));
-    }
-
-    private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
-        return new UsernamePasswordAuthenticationToken(uuid, null,
-                List.of(new SimpleGrantedAuthority(role)));
     }
 }
