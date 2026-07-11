@@ -20,7 +20,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossHttpClient {
+class TossHttpClient {
 
     private final RestTemplate tossRestTemplate;
     private final TossAuthApi tossAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입

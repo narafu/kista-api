@@ -22,7 +22,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossCandleApi {
+class TossCandleApi {
 
     private static final String CANDLES_PATH = "/api/v1/candles";
     // 일봉 기준 최대 요청 수 (주말 포함 여유분)

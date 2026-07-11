@@ -21,7 +21,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisTradingApi {
+class KisTradingApi {
 
     private static final String BALANCE_PATH  = "/uapi/overseas-stock/v1/trading/inquire-balance";
     private static final String BALANCE_TR_ID = "TTTS3012R"; // 해외주식 잔고 조회

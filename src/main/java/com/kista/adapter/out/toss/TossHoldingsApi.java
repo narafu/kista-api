@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossHoldingsApi {
+class TossHoldingsApi {
 
     // Toss 보유주식 API 경로
     private static final String HOLDINGS_PATH = "/api/v1/holdings";

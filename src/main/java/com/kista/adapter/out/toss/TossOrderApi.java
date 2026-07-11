@@ -23,7 +23,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class TossOrderApi {
+class TossOrderApi {
 
     // Toss 주문 API 경로
     private static final String ORDER_PATH = "/api/v1/orders";

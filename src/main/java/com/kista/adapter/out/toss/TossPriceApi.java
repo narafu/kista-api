@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossPriceApi {
+class TossPriceApi {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";

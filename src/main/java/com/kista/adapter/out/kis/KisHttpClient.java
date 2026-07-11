@@ -23,7 +23,7 @@ import java.util.function.Function;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisHttpClient {
+class KisHttpClient {
 
     private final RestTemplate kisRestTemplate;
     private final KisAuthApi kisAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입

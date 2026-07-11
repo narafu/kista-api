@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisAuthApi implements BrokerConnectionTestPort {
+class KisAuthApi implements BrokerConnectionTestPort {
 
     private static final ZoneId KST = TimeZones.KST;
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =

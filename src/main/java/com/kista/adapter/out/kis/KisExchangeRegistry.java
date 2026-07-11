@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
 // Ticker → KIS 거래소 코드 매핑 (어댑터 디테일 — 도메인 격리)
 // OVRS_EXCG_CD: 주문/체결/잔고 API용 (4자리), EXCD: 시세 API용 (3자리)
 @Component
-public class KisExchangeRegistry {
+class KisExchangeRegistry {
 
     private static final String DEFAULT_US_EXCHANGE = "NASD"; // 잔고/일별거래/기간손익 "미국 전체" 조회용
 

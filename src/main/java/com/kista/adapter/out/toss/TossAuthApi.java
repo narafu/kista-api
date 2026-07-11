@@ -27,7 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossAuthApi implements BrokerConnectionTestPort {
+class TossAuthApi implements BrokerConnectionTestPort {
 
     // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
     private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();

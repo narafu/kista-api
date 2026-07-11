@@ -21,7 +21,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KisPriceApi {
+class KisPriceApi {
 
     private static final String SINGLE_PATH  = "/uapi/overseas-price/v1/quotations/price";
     private static final String SINGLE_TR_ID = "HHDFS00000300";

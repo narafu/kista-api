@@ -26,7 +26,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TossMarketApi {
+class TossMarketApi {
 
     private static final String MARKET_CALENDAR_PATH = "/api/v1/market-calendar/US";
     private static final String ACCOUNTS_PATH = "/api/v1/accounts";

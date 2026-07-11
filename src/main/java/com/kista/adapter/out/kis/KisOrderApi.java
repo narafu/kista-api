@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class KisOrderApi {
+class KisOrderApi {
 
     private static final String PATH        = "/uapi/overseas-stock/v1/trading/order";
     private static final String CANCEL_PATH = "/uapi/overseas-stock/v1/trading/order-rvsecncl";
