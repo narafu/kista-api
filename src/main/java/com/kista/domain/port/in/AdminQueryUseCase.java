@@ -39,7 +39,8 @@ public interface AdminQueryUseCase {
     Map<UUID, List<Strategy>> listStrategiesByAccountIds(Set<UUID> accountIds);
 
     // 선택한 전략의 특정 거래일 주문 목록 조회
-    List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate);
+    // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException
+    List<Order> listStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate);
 
     // 선택한 전략의 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
     // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException

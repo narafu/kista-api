@@ -112,7 +112,7 @@ class AdminTradeControllerTest {
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));
-        when(adminQuery.listStrategyOrders(strategyId, LocalDate.of(2026, 7, 1))).thenReturn(List.of(
+        when(adminQuery.listStrategyOrders(accountId, strategyId, LocalDate.of(2026, 7, 1))).thenReturn(List.of(
                 new Order(
                         UUID.fromString("00000000-0000-0000-0000-000000000050"),
                         accountId,
@@ -147,6 +147,21 @@ class AdminTradeControllerTest {
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].direction").value("SELL"))
                 .andExpect(jsonPath("$[0].price").value(267.37));
+    }
+
+    @Test
+    void listStrategyOrders_다른_계좌의_전략이면_404() throws Exception {
+        UUID wrongAccountId = UUID.randomUUID();
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
+        // 서비스가 accountId 불일치 시 NoSuchElementException을 던지도록 stub — GlobalExceptionHandler가 404로 매핑
+        when(adminQuery.listStrategyOrders(wrongAccountId, strategyId, LocalDate.of(2026, 7, 1)))
+                .thenThrow(new java.util.NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
+
+        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders",
+                        wrongAccountId, strategyId)
+                        .param("tradeDate", "2026-07-01")
+                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

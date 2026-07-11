@@ -72,7 +72,7 @@ public class AdminTradeController {
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        List<Order> orders = adminQuery.listStrategyOrders(strategyId, tradeDate).stream()
+        List<Order> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
                 .filter(order -> accountId.equals(order.accountId()))
                 .toList();
         if (orders.isEmpty()) return List.of();

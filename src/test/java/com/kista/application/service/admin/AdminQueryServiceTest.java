@@ -58,14 +58,33 @@ class AdminQueryServiceTest {
     }
 
     @Test
-    void listStrategyOrders_전략과_거래일로_주문을_조회한다() {
+    void listStrategyOrders_계좌ID가_일치하면_전략과_거래일로_주문을_조회한다() {
+        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
         LocalDate tradeDate = LocalDate.of(2026, 7, 1);
+        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
         when(orderPort.findByStrategyId(strategyId, tradeDate, tradeDate)).thenReturn(List.of());
 
-        service.listStrategyOrders(strategyId, tradeDate);
+        service.listStrategyOrders(accountId, strategyId, tradeDate);
 
         verify(orderPort).findByStrategyId(strategyId, tradeDate, tradeDate);
+    }
+
+    @Test
+    void listStrategyOrders_다른_계좌의_전략이면_예외() {
+        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
+        UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
+        LocalDate tradeDate = LocalDate.of(2026, 7, 1);
+        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+
+        // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException
+        assertThatThrownBy(() -> service.listStrategyOrders(otherAccountId, strategyId, tradeDate))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test

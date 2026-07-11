@@ -132,7 +132,12 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public List<Order> listStrategyOrders(UUID strategyId, LocalDate tradeDate) {
+    public List<Order> listStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate) {
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId); // 없으면 NoSuchElementException → 404
+        // 경로 계층 정합성 검증 — 다른 계좌의 전략 조회 차단
+        if (!strategy.accountId().equals(accountId)) {
+            throw new NoSuchElementException("전략이 해당 계좌에 속하지 않습니다");
+        }
         return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate);
     }
 
