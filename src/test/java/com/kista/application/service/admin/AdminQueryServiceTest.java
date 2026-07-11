@@ -2,6 +2,7 @@ package com.kista.application.service.admin;
 
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,10 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +66,34 @@ class AdminQueryServiceTest {
         service.listStrategyOrders(strategyId, tradeDate);
 
         verify(orderPort).findByStrategyId(strategyId, tradeDate, tradeDate);
+    }
+
+    @Test
+    void listStrategyTradeDates_계좌ID가_일치하면_거래일_목록을_반환한다() {
+        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
+        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(orderPort.findTradeDatesByStrategyId(strategyId)).thenReturn(List.of(LocalDate.of(2026, 7, 1)));
+
+        List<LocalDate> result = service.listStrategyTradeDates(accountId, strategyId);
+
+        assertThat(result).containsExactly(LocalDate.of(2026, 7, 1));
+    }
+
+    @Test
+    void listStrategyTradeDates_다른_계좌의_전략이면_예외() {
+        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
+        UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
+        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+
+        // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException
+        assertThatThrownBy(() -> service.listStrategyTradeDates(otherAccountId, strategyId))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
