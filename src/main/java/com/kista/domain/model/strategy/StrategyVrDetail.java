@@ -11,6 +11,11 @@ public record StrategyVrDetail(
         int recurringAmount     // 주기당 추가 예수금 (USD, 음수=인출, 0=없음)
 ) {
 
+    // constraints.md "VR 공식" poolLimitRate SSOT
+    private static final BigDecimal POOL_LIMIT_RATE_SAVING = new BigDecimal("0.75");   // 적립식 (recurringAmount > 0)
+    private static final BigDecimal POOL_LIMIT_RATE_HOLD = new BigDecimal("0.50");     // 거치식 (== 0)
+    private static final BigDecimal POOL_LIMIT_RATE_WITHDRAW = new BigDecimal("0.25"); // 인출식 (< 0)
+
     // gradient(G): 실력공식 경사 계수 — 인출(음수) 시 고난도(G=20), 그 외 기본(G=10)
     public int gradient() {
         return recurringAmount < 0 ? 20 : 10;
@@ -19,8 +24,8 @@ public record StrategyVrDetail(
     // poolLimitRate: 사용 가능한 pool 상한 비율 — 입금/출금 방향에 따라 3단계
     // 입금(+): 높은 한도(75%), 없음(0): 기본(50%), 인출(-): 낮은 한도(25%)
     public BigDecimal poolLimitRate() {
-        if (recurringAmount > 0) return new BigDecimal("0.75");
-        if (recurringAmount == 0) return new BigDecimal("0.50");
-        return new BigDecimal("0.25");
+        if (recurringAmount > 0) return POOL_LIMIT_RATE_SAVING;
+        if (recurringAmount == 0) return POOL_LIMIT_RATE_HOLD;
+        return POOL_LIMIT_RATE_WITHDRAW;
     }
 }
