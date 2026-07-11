@@ -14,8 +14,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -57,7 +56,7 @@ class AdminAccountControllerTest {
     @Test
     void listAccounts_userRole_returns403() throws Exception {
         mockMvc.perform(get("/api/admin/accounts")
-                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                        .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isForbidden());
     }
 
@@ -67,7 +66,7 @@ class AdminAccountControllerTest {
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/accounts")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
@@ -80,7 +79,7 @@ class AdminAccountControllerTest {
                         Strategy.Ticker.SOXL, Strategy.CycleSeedType.MAX)));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies", accountId)
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("PRIVACY"))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"));
@@ -93,7 +92,7 @@ class AdminAccountControllerTest {
         doNothing().when(adminStrategy).pauseStrategy(ADMIN_UUID, accountId, strategyId);
 
         mockMvc.perform(patch("/api/admin/accounts/{accountId}/strategies/{strategyId}/status", accountId, strategyId)
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN")))
+                        .with(authentication(adminToken(ADMIN_UUID)))
                         .contentType("application/json")
                         .content("{\"status\":\"PAUSED\"}"))
                 .andExpect(status().isNoContent());
@@ -106,14 +105,9 @@ class AdminAccountControllerTest {
         doNothing().when(adminStrategy).resumeStrategy(ADMIN_UUID, accountId, strategyId);
 
         mockMvc.perform(patch("/api/admin/accounts/{accountId}/strategies/{strategyId}/status", accountId, strategyId)
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN")))
+                        .with(authentication(adminToken(ADMIN_UUID)))
                         .contentType("application/json")
                         .content("{\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isNoContent());
-    }
-
-    private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
-        return new UsernamePasswordAuthenticationToken(uuid, null,
-                List.of(new SimpleGrantedAuthority(role)));
     }
 }

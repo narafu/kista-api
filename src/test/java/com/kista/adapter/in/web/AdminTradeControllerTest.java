@@ -19,8 +19,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +29,7 @@ import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -68,7 +67,7 @@ class AdminTradeControllerTest {
     @Test
     void listTrades_userRole_returns403() throws Exception {
         mockMvc.perform(get("/api/admin/trades")
-                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                        .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isForbidden());
     }
 
@@ -79,7 +78,7 @@ class AdminTradeControllerTest {
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/trades")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
@@ -138,7 +137,7 @@ class AdminTradeControllerTest {
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
                         .param("tradeDate", "2026-07-01")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].accountId").value(accountId.toString()))
                 .andExpect(jsonPath("$[0].strategyId").value(strategyId.toString()))
@@ -160,7 +159,7 @@ class AdminTradeControllerTest {
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders",
                         wrongAccountId, strategyId)
                         .param("tradeDate", "2026-07-01")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNotFound());
     }
 
@@ -173,7 +172,7 @@ class AdminTradeControllerTest {
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",
                         accountId, strategyId)
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value("2026-07-01"));
     }
@@ -188,7 +187,7 @@ class AdminTradeControllerTest {
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",
                         wrongAccountId, strategyId)
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNotFound());
     }
 
@@ -226,7 +225,7 @@ class AdminTradeControllerTest {
 
         mockMvc.perform(post("/api/admin/trades/manual-fills")
                         .with(csrf())
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN")))
+                        .with(authentication(adminToken(ADMIN_UUID)))
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isOk());
@@ -262,7 +261,7 @@ class AdminTradeControllerTest {
 
         mockMvc.perform(post("/api/admin/trades/reorders")
                         .with(csrf())
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN")))
+                        .with(authentication(adminToken(ADMIN_UUID)))
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isOk())
@@ -274,7 +273,7 @@ class AdminTradeControllerTest {
         when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
 
         mockMvc.perform(get("/api/admin/trades/reorder-timing")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.atOpen").isBoolean())
                 .andExpect(jsonPath("$.atClose").isBoolean())
@@ -286,15 +285,10 @@ class AdminTradeControllerTest {
         when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
 
         mockMvc.perform(get("/api/admin/trades/reorder-timing")
-                        .with(authentication(token(ADMIN_UUID, "ROLE_ADMIN"))))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.atOpen").value(false))
                 .andExpect(jsonPath("$.atClose").value(false))
                 .andExpect(jsonPath("$.immediate").value(false));
-    }
-
-    private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
-        return new UsernamePasswordAuthenticationToken(uuid, null,
-                List.of(new SimpleGrantedAuthority(role)));
     }
 }

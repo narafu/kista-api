@@ -12,15 +12,13 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,10 +43,7 @@ class AdminDashboardControllerTest {
     void getStats_withAdminToken_returns200() throws Exception {
         when(adminQuery.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
 
-        var adminToken = new UsernamePasswordAuthenticationToken(ADMIN_UUID, null,
-                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-
-        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(adminToken)))
+        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalUsers").value(10))
                 .andExpect(jsonPath("$.pendingCount").value(3))
@@ -57,9 +52,7 @@ class AdminDashboardControllerTest {
 
     @Test
     void getStats_withUserToken_returns403() throws Exception {
-        var userToken = new UsernamePasswordAuthenticationToken(UUID.randomUUID(), null,
-                List.of(new SimpleGrantedAuthority("ROLE_USER")));
-        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(userToken)))
+        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(userTokenWithRole(UUID.randomUUID()))))
                 .andExpect(status().isForbidden());
     }
 }

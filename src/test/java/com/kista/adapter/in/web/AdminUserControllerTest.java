@@ -15,8 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -48,12 +47,6 @@ class AdminUserControllerTest {
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-    // ADMIN 권한 토큰 생성 헬퍼
-    private UsernamePasswordAuthenticationToken adminToken() {
-        return new UsernamePasswordAuthenticationToken(ADMIN_UUID, null,
-                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-    }
-
     // 테스트용 샘플 AdminUserView 생성
     private AdminUserView sampleUser(UUID id) {
         return new AdminUserView(id, "테스트유저", User.UserStatus.PENDING, User.UserRole.USER, Instant.now());
@@ -64,7 +57,7 @@ class AdminUserControllerTest {
         UUID userId = UUID.randomUUID();
         when(adminUser.listAll(null, null)).thenReturn(List.of(sampleUser(userId)));
 
-        mockMvc.perform(get("/api/admin/users").with(authentication(adminToken())))
+        mockMvc.perform(get("/api/admin/users").with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("PENDING"));
     }
@@ -72,9 +65,7 @@ class AdminUserControllerTest {
     @Test
     void listUsers_withUserToken_returns403() throws Exception {
         // USER 권한으로 /api/admin/** 접근 시 403 반환
-        var userToken = new UsernamePasswordAuthenticationToken(UUID.randomUUID(), null,
-                List.of(new SimpleGrantedAuthority("ROLE_USER")));
-        mockMvc.perform(get("/api/admin/users").with(authentication(userToken)))
+        mockMvc.perform(get("/api/admin/users").with(authentication(userTokenWithRole(UUID.randomUUID()))))
                 .andExpect(status().isForbidden());
     }
 
@@ -85,7 +76,7 @@ class AdminUserControllerTest {
         mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"ACTIVE\"}")
-                        .with(authentication(adminToken())))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNoContent());
     }
 
@@ -96,7 +87,7 @@ class AdminUserControllerTest {
         mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"REJECTED\"}")
-                        .with(authentication(adminToken())))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNoContent());
     }
 
@@ -107,7 +98,7 @@ class AdminUserControllerTest {
         mockMvc.perform(patch("/api/admin/users/{id}/role", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"ADMIN\"}")
-                        .with(authentication(adminToken())))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNoContent());
     }
 
@@ -116,7 +107,7 @@ class AdminUserControllerTest {
         doNothing().when(adminUser).deleteUser(any(), any());
 
         mockMvc.perform(delete("/api/admin/users/{id}", UUID.randomUUID())
-                        .with(authentication(adminToken())))
+                        .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isNoContent());
     }
 }

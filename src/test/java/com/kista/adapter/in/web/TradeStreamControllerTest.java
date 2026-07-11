@@ -11,16 +11,14 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.List;
 import java.util.UUID;
 
+import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -41,11 +39,6 @@ class TradeStreamControllerTest {
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    private static UsernamePasswordAuthenticationToken token(UUID uuid, String role) {
-        return new UsernamePasswordAuthenticationToken(uuid, null,
-                List.of(new SimpleGrantedAuthority(role)));
-    }
-
     @Test
     void stream_anonymous_returns_401() throws Exception {
         mockMvc.perform(get("/api/trades/stream"))
@@ -58,7 +51,7 @@ class TradeStreamControllerTest {
 
         // SseEmitter는 MockMvc 내에서 비동기 result를 즉시 설정하지 않으므로 상태코드만 검증
         mockMvc.perform(get("/api/trades/stream")
-                        .with(authentication(token(USER_UUID, "ROLE_USER"))))
+                        .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isOk());
     }
 }
