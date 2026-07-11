@@ -58,9 +58,6 @@ public interface OrderPort {
     // 전략 기준 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
     List<LocalDate> findTradeDatesByStrategyId(UUID strategyId);
 
-    // PLANNED 주문의 가격/수량 직접 보정
-    void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity);
-
     // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러·수동 실행 선접수용)
     List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 

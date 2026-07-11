@@ -36,14 +36,4 @@ public interface StrategyPort {
 
     // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
     boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker);
-
-    // ACTIVE 전략 ticker 우선, 없으면 첫 번째 전략 ticker 반환 — 없으면 empty
-    default Optional<Strategy.Ticker> findActiveTicker(UUID accountId) {
-        List<Strategy> strategies = findByAccountId(accountId);
-        return strategies.stream()
-                .filter(s -> s.isActive())
-                .findFirst()
-                .or(() -> strategies.stream().findFirst())
-                .map(Strategy::ticker);
-    }
 }

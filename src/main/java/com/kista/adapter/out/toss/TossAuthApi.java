@@ -19,9 +19,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 // BrokerConnectionTestPort 구현체 — getToken/getAdminToken/invalidate* 는 TossHttpClient에 직접 주입되는 구체 메서드

@@ -20,7 +20,5 @@ public interface StrategyVersionPort {
 
     int nextVersionNo(UUID strategyId);
 
-    void closeActiveVersion(UUID strategyId);
-
     void deleteByStrategyId(UUID strategyId);
 }

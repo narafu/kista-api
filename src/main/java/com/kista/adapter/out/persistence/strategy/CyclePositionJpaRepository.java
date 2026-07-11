@@ -47,12 +47,6 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용 (@SQLRestriction 적용)
     List<CyclePositionEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    // 날짜 범위 이력 전체 — 차트용 시계열 (@SQLRestriction 적용)
-    @Query("SELECT cp FROM CyclePositionEntity cp " +
-           "WHERE cp.createdAt >= :from AND cp.createdAt < :to " +
-           "ORDER BY cp.createdAt DESC")
-    List<CyclePositionEntity> findBetweenDates(@Param("from") Instant from, @Param("to") Instant to);
-
     // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만, native)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp

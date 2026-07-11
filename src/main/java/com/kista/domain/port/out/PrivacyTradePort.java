@@ -15,11 +15,6 @@ public interface PrivacyTradePort {
     // 전략 등록/수정 미리보기용 기준가 조회 — 현재 KST 일자 이후의 기준표만 사용
     Optional<PrivacyCurrentBase> findSeedPreviewBase();
 
-    // 기존 호출부 호환용. 신규 코드는 용도에 맞는 findSeedPreviewBase/findTodayTrade를 직접 사용한다.
-    default Optional<PrivacyCurrentBase> findCurrentBase() {
-        return findSeedPreviewBase();
-    }
-
     // 당일 기준 매매표 조회 — 미수신 일자면 empty
     Optional<PrivacyTradeBase> findTodayTrade(LocalDate today);
 

@@ -48,13 +48,6 @@ class UserService implements UserUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public User getByKakaoId(String kakaoId) {
-        return userPort.findByKakaoId(kakaoId)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoId));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public java.util.Optional<UUID> findUserIdByTelegramChatId(String chatId) {
         return userPort.findByTelegramChatId(chatId).map(User::id);
     }

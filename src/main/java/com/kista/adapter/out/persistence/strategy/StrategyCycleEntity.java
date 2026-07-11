@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
-import com.kista.domain.model.strategy.StrategyCycle;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

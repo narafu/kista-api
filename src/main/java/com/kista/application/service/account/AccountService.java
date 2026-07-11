@@ -7,7 +7,6 @@ import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

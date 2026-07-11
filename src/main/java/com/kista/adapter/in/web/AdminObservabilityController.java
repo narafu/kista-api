@@ -6,7 +6,6 @@ import com.kista.adapter.in.web.dto.AuditLogResponse;
 import com.kista.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.tags.Tag;

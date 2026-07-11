@@ -34,11 +34,6 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
     }
 
     @Override
-    public boolean existsByDate(LocalDate date) {
-        return holidayRepository.existsByTradeDate(date);
-    }
-
-    @Override
     public long countByYear(int year) {
         return holidayRepository.countByYear(year);
     }

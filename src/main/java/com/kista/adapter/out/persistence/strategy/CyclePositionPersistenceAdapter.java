@@ -69,20 +69,8 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
-    public List<CyclePositionHistoryEntry> findRecentGlobal(int limit) {
-        return toEntries(positionRepo.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)));
-    }
-
-    @Override
     public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
         return toEntries(positionRepo.findRecentByUserId(userId, PageRequest.of(0, limit)));
-    }
-
-    @Override
-    public List<CyclePositionHistoryEntry> findBetween(LocalDate from, LocalDate to) {
-        Instant fromInstant = from.atStartOfDay(TimeZones.KST).toInstant();
-        Instant toInstant = to.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
-        return toEntries(positionRepo.findBetweenDates(fromInstant, toInstant));
     }
 
     @Override
@@ -111,12 +99,6 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         positionRepo.save(latest);
     }
 
-    @Override
-    public void softDeleteTodayByStrategyId(UUID strategyId, LocalDate kstDate) {
-        Instant dayStart = kstDate.atStartOfDay(TimeZones.KST).toInstant();
-        Instant dayEnd = kstDate.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
-        positionRepo.softDeleteByStrategyIdAndDate(strategyId, dayStart, dayEnd, Instant.now());
-    }
 
     @Override
     public void deleteByStrategyId(UUID strategyId) {

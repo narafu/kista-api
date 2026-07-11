@@ -126,18 +126,6 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public void updatePlannedOrder(UUID orderId, BigDecimal price, int quantity) {
-        // PLANNED 상태 주문만 가격·수량 수정 허용
-        mutate(orderId, e -> {
-            if (e.getStatus() != Order.OrderStatus.PLANNED) {
-                throw new IllegalStateException("PLANNED 주문만 수정할 수 있습니다: " + orderId);
-            }
-            e.setPrice(price);
-            e.setQuantity(quantity);
-        });
-    }
-
-    @Override
     public void markCancelled(UUID orderId) {
         // 명시적 save로 CANCELLED 상태 기록
         mutate(orderId, e -> e.setStatus(Order.OrderStatus.CANCELLED));
