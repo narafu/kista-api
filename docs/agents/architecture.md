@@ -46,7 +46,7 @@ application/
                    TradingService(배치·단건 실행 코어), ManualTradingService(수동 실행), TradingPreviewService(미리보기 전용, @Transactional readOnly),
                    OrderCancelService(주문 취소), CycleRotationService(사이클 종료 후 cycleSeedType 기반 재등록),
                    MarketEventNotifier(장 개시·마감 알림 — UserPort+UserSettingsPort+UserNotificationPort 조합)
-                   package-private helper: TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer
+                   package-private helper: TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/CycleSnapshotCreator/SeedResolutionPolicy/TradingDayCounter
                    BrokerAccountRouter: getLiveBalance/getUsdDeposit/getSellableQuantity — BrokerAdapterRegistry 경유 브로커별 라우팅 (KIS: TTTS3012R fetchHolding 재사용 / Toss: /api/v1/sellable-quantity)
                    CyclePositionPersistor: 포지션 스냅샷 저장 + 사이클 종료·rotation + VrCycleRolloverService.rollIfDue() 호출 (VR 예외 → "VR 전략 패턴")
     account/     ← AccountService, AccountStatisticsService, TossStatisticsService, BrokerStatisticsRouter(package-private — 브로커별 통계 라우팅)
@@ -57,7 +57,7 @@ application/
     portfolio/   ← PortfolioService
     market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
     privacy/     ← PrivacyService
-    admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함), AdminStrategyService, AdminCycleCloser(holdings 소진 시 사이클 종료), AdminSelectionChain, AdminOrderCorrectionService, AdminTradeCorrectionService
+    admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함), AdminStrategyService, AdminCycleCloser(holdings 소진 시 사이클 종료), AdminSelectionChain, AdminReorderService, AdminTradeCorrectionService
     auth/        ← BlacklistService (JWT 블랙리스트), TokenService (RT 발급/갱신/폐기)
   event/         ← UserApproved/UserRejected/UserReappliedEvent — @TransactionalEventListener용 도메인 이벤트 (application 레이어)
 
