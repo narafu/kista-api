@@ -174,4 +174,37 @@ class TradingOrderExecutorTest {
         verify(orderPort).markPlaced(id1, "KIS-101");
         verify(orderPort).markPlaced(id2, "KIS-102");
     }
+
+    @Test
+    @DisplayName("markPlaced 1차 실패 시 1회 재시도 후 성공하면 정상 처리")
+    void placeOrders_markPlacedFailsOnce_retriesAndSucceeds() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-201"));
+        doThrow(new RuntimeException("일시적 DB 오류")).doNothing()
+                .when(orderPort).markPlaced(orderId, "KIS-201");
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, INFINITE_STRATEGY);
+
+        verify(orderPort, times(2)).markPlaced(orderId, "KIS-201");
+        assertThat(result).hasSize(1); // 재시도 성공 → placed 목록 포함
+        verify(notifyPort, never()).notifyError(any());
+    }
+
+    @Test
+    @DisplayName("markPlaced 재시도도 실패하면 DB 불일치 알림 발송")
+    void placeOrders_markPlacedFailsTwice_notifiesInconsistency() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-202"));
+        doThrow(new RuntimeException("DB down")).when(orderPort).markPlaced(orderId, "KIS-202");
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, INFINITE_STRATEGY);
+
+        verify(orderPort, times(2)).markPlaced(orderId, "KIS-202");
+        assertThat(result).isEmpty();
+        verify(notifyPort).notifyError(any(IllegalStateException.class));
+    }
 }

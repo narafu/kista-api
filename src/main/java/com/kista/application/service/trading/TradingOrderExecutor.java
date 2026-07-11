@@ -67,9 +67,9 @@ class TradingOrderExecutor {
                 orderPort.markFailed(p.id()); // 접수 실패 → FAILED
                 continue;
             }
-            // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태
+            // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태 (1회 재시도로 창 축소)
             try {
-                orderPort.markPlaced(p.id(), placedOrder.externalOrderId());
+                markPlacedWithRetry(p.id(), placedOrder.externalOrderId());
                 placed.add(p.withPlaced(placedOrder.externalOrderId()));
             } catch (Exception e) {
                 log.error("[{}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
@@ -79,5 +79,20 @@ class TradingOrderExecutor {
             }
         }
         return placed;
+    }
+
+    // 일시적 DB 오류 흡수 — 1초 후 1회 재시도, 2차 실패는 호출측으로 전파
+    private void markPlacedWithRetry(UUID orderId, String externalOrderId) {
+        try {
+            orderPort.markPlaced(orderId, externalOrderId);
+        } catch (Exception first) {
+            log.warn("markPlaced 1차 실패 — 1초 후 재시도: {}", first.getMessage());
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            orderPort.markPlaced(orderId, externalOrderId);
+        }
     }
 }
