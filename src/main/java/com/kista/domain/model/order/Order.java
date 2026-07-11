@@ -82,12 +82,6 @@ public record Order(
                 quantity, price);
     }
 
-    // 취소 후 재접수용 PLANNED 사본 — 거래일·수량·가격 교체, id·접수번호·체결 정보 초기화
-    public Order replacementWith(LocalDate newTradeDate, int newQuantity, BigDecimal newPrice) {
-        return new Order(null, accountId, strategyCycleId, newTradeDate, ticker, orderType,
-                timing, direction, newQuantity, newPrice, OrderStatus.PLANNED, null, null, null);
-    }
-
     // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
     public Order withPlaced(String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,

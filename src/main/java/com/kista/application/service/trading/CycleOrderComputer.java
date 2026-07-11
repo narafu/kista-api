@@ -127,9 +127,7 @@ class CycleOrderComputer {
     // 명시 컬럼이 없으므로 전략의 최초 등록 사이클 id와 현재 사이클 id를 비교
     private boolean isFirstOpenCycle(StrategyCycle currentCycle) {
         if (currentCycle == null || currentCycle.endDate() != null) return false;
-        Optional<StrategyCycle> firstCycle = strategyCyclePort.findFirstByStrategyId(currentCycle.strategyId());
-        if (firstCycle == null) return false;
-        return firstCycle
+        return strategyCyclePort.findFirstByStrategyId(currentCycle.strategyId())
                 .map(cycle -> cycle.id().equals(currentCycle.id()))
                 .orElse(false);
     }

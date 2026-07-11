@@ -58,10 +58,6 @@ class AdminReorderService implements AdminReorderUseCase {
     }
 
     // 테스트 주입용 — DstInfo + 판정 시각 직접 지정
-    AdminReorderResult reorder(UUID adminId, AdminReorderCommand command, DstInfo dst) {
-        return reorder(adminId, command, dst, Instant.now());
-    }
-
     AdminReorderResult reorder(UUID adminId, AdminReorderCommand command, DstInfo dst, Instant now) {
         User user = userPort.findByIdOrThrow(command.userId());
         Account account = accountPort.findByIdOrThrow(command.accountId());
