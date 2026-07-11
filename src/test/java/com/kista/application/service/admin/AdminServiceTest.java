@@ -7,6 +7,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.UserPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,7 @@ class AdminServiceTest {
     @Mock UserCascadeDeleter userCascadeDeleter;
     @Mock UserUseCase userUseCase;
     @Mock AuditLogPort auditLogPort;
+    @Mock BlacklistPort blacklistPort;
 
     @InjectMocks AdminService adminService;
 
@@ -78,6 +81,8 @@ class AdminServiceTest {
         verify(userPort).save(captor.capture());
         assertThat(captor.getValue().role()).isEqualTo(User.UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
+        // role 변경 시각 기록 — JwtAuthFilter가 이전 발급 AT를 stale로 판정하는 기준
+        verify(blacklistPort).markRoleChanged(eq(targetId), any(Instant.class), any(Duration.class));
     }
 
     @Test

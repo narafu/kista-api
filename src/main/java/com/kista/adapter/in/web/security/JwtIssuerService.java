@@ -26,6 +26,7 @@ public class JwtIssuerService {
                 .id(UUID.randomUUID().toString()) // jti — 로그아웃 시 단일 AT 차단용
                 .subject(userId.toString())
                 .claim("role", role.name()) // 역할(USER/ADMIN) 클레임 — JwtAuthFilter에서 권한 추출
+                .issuedAt(new Date()) // iat — role 변경 시각과 비교해 stale AT 판정 (JwtAuthFilter)
                 .expiration(new Date(System.currentTimeMillis() + TokenConstants.AT_TTL.toMillis()))
                 .signWith(privateKey, Jwts.SIG.ES256)
                 .compact();

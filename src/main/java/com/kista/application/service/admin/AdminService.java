@@ -3,17 +3,20 @@ package com.kista.application.service.admin;
 import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.admin.AdminUserView;
+import com.kista.domain.model.auth.TokenConstants;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
+import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +34,7 @@ class AdminService implements AdminUserUseCase {
     private final UserCascadeDeleter userCascadeDeleter;
     private final UserUseCase userUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
+    private final BlacklistPort blacklistPort;           // role 변경 시 stale AT 무효화 기록
 
     @Override
     @Transactional(readOnly = true)
@@ -86,6 +90,8 @@ class AdminService implements AdminUserUseCase {
         }
         User user = userPort.findByIdOrThrow(targetUserId);
         userPort.save(user.withRole(role));
+        // 기존 AT 무효화 — 변경 시각 이전 발급 토큰은 JwtAuthFilter가 401 처리 (refresh로 새 role AT 발급)
+        blacklistPort.markRoleChanged(targetUserId, Instant.now(), TokenConstants.AT_TTL);
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,
                 Map.of("newRole", role.name()));
