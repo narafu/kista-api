@@ -110,4 +110,15 @@ class CompositeUserNotificationAdapterTest {
         verify(telegram).notifyRejected(user);
         verify(fcm).notifyRejected(user);
     }
+
+    @Test
+    void notifyBatchInterrupted_allChannel_routesToBoth() {
+        User user = userWith(NotificationChannel.ALL);
+        Account account = mock(Account.class);
+
+        composite.notifyBatchInterrupted(user, account);
+
+        verify(telegram).notifyBatchInterrupted(user, account);
+        verify(fcm).notifyBatchInterrupted(user, account);
+    }
 }

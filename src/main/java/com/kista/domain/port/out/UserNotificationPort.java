@@ -17,6 +17,7 @@ public interface UserNotificationPort {
                                BigDecimal initialUsdDeposit);                              // 사용자에게 새 사이클 시작 알림
     void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker); // 사용자에게 예수금 부족 알림
     void notifyError(User user, Exception e);                                              // 사용자에게 매매 오류 알림
+    void notifyBatchInterrupted(User user, Account account);                                  // 사용자에게 스케쥴러 인터럽트(배포·재기동) 알림
     void notifyMarketOpen(User user);                                                        // 사용자에게 장 개시 알림
     void notifyMarketClose(User user);                                                       // 사용자에게 장 마감 알림
 }

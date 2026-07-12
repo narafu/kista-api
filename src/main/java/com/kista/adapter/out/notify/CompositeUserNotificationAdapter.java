@@ -33,6 +33,7 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     @Override public void notifyTradingReport(User user, Account account, TradingReport report)         { route(user, p -> p.notifyTradingReport(user, account, report)); }
     @Override public void notifyInsufficientBalance(User user, Account account, Strategy.Type t, Strategy.Ticker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
     @Override public void notifyError(User user, Exception e)                                           { route(user, p -> p.notifyError(user, e)); }
+    @Override public void notifyBatchInterrupted(User user, Account account)                        { route(user, p -> p.notifyBatchInterrupted(user, account)); }
     @Override public void notifyMarketOpen(User user)                                                   { route(user, p -> p.notifyMarketOpen(user)); }
     @Override public void notifyMarketClose(User user)                                                  { route(user, p -> p.notifyMarketClose(user)); }
 

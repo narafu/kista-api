@@ -56,6 +56,17 @@ class TelegramUserNotificationAdapterTest {
         verify(restTemplate, never()).postForObject(any(), any(), any());
     }
 
+    @Test
+    void notifyBatchInterrupted_withUserBot_sendsToUserChatId() {
+        User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789");
+        Account account = mock(Account.class);
+        when(account.nickname()).thenReturn("SOXL계좌");
+
+        adapter.notifyBatchInterrupted(user, account);
+
+        verify(restTemplate).postForObject(contains("/botuser-bot-token/sendMessage"), any(), eq(String.class));
+    }
+
     // TradingReport 생성 헬퍼
     private TradingReport buildTestReport() {
         return new TradingReport(LocalDate.of(2024, 6, 15), Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("66.00"), new BigDecimal("35.00"));

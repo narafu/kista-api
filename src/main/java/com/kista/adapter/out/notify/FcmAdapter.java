@@ -75,6 +75,12 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyBatchInterrupted(User user, Account account) {
+        String body = String.format("[%s] 시스템 재배포로 오늘 매매가 일시 중단됐습니다.", account.nickname());
+        send(user.id(), "⏸️ 매매 일시 중단", body);
+    }
+
+    @Override
     public void notifyMarketOpen(User user) {
         send(user.id(), "KISTA 알림", "🟢 미국 장이 열렸습니다.");
     }

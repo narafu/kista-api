@@ -122,6 +122,15 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyBatchInterrupted(User user, Account account) {
+        String text = String.format(
+                "⏸️ <b>매매 일시 중단</b> — %s%n"
+                + "시스템 재배포로 오늘 매매가 일시 중단됐습니다. 잠시 후 자동 재시도되거나, 필요 시 관리자에게 문의해주세요.",
+                account.nickname());
+        sendIfLinked(user, text);
+    }
+
+    @Override
     public void notifyMarketOpen(User user) {
         sendIfLinked(user, "🟢 미국 장이 열렸습니다.");
     }
