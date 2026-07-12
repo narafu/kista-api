@@ -6,6 +6,7 @@ import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.TokenUseCase;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -54,19 +55,11 @@ class DevAuthControllerTest {
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-    private static final User MOCK_USER = new User(
-            DEV_USER_ID, "dev-test-user", "개발 테스트 유저",
-            User.UserStatus.ACTIVE, User.UserRole.USER,
-            null, null, null, null,
-            User.NotificationChannel.TELEGRAM
-    );
+    private static final User MOCK_USER =
+            DomainFixtures.userWithStatus(DEV_USER_ID, User.UserStatus.ACTIVE, User.UserRole.USER);
 
-    private static final User MOCK_ADMIN_USER = new User(
-            DEV_ADMIN_ID, "dev-admin", "dev-admin",
-            User.UserStatus.ACTIVE, User.UserRole.ADMIN,
-            null, null, null, null,
-            User.NotificationChannel.TELEGRAM
-    );
+    private static final User MOCK_ADMIN_USER =
+            DomainFixtures.userWithStatus(DEV_ADMIN_ID, User.UserStatus.ACTIVE, User.UserRole.ADMIN);
 
     @BeforeEach
     void setUp() {

@@ -8,6 +8,7 @@ import com.kista.application.event.UserReappliedEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.*;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,25 +49,21 @@ class UserServiceTest {
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
-        return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        return DomainFixtures.userWithStatus(id, User.UserStatus.PENDING, (Instant) null);
     }
 
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
-        return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null,
-                Instant.now().minus(25, ChronoUnit.HOURS), NotificationChannel.TELEGRAM);
+        return DomainFixtures.userWithStatus(id, User.UserStatus.REJECTED,
+                Instant.now().minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
+        return DomainFixtures.userWithStatus(id, User.UserStatus.PENDING, lastReappliedAt);
     }
 
     private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
-        return new User(id, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, lastReappliedAt, NotificationChannel.TELEGRAM);
+        return DomainFixtures.userWithStatus(id, User.UserStatus.REJECTED, lastReappliedAt);
     }
 
     @Test
@@ -168,8 +165,7 @@ class UserServiceTest {
     @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
     void reapply_rejected_null_lastReappliedAt_succeeds() {
         UUID userId = UUID.randomUUID();
-        User user = new User(userId, "kakao-123", "홍길동", User.UserStatus.REJECTED, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+        User user = DomainFixtures.userWithStatus(userId, User.UserStatus.REJECTED, (Instant) null);
         when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

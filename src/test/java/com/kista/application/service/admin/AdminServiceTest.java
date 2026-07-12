@@ -3,12 +3,12 @@ package com.kista.application.service.admin;
 import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AdminUserViewPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.BlacklistPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -41,13 +41,6 @@ class AdminServiceTest {
 
     @InjectMocks AdminService adminService;
 
-    // User 헬퍼: User record 필드 순서에 맞게 작성
-    // (id, kakaoId, nickname, status, role, telegramBotToken, telegramChatId, createdAt, updatedAt, lastReappliedAt)
-    private User user(UUID id, User.UserStatus status) {
-        return new User(id, "kakao-" + id, "테스트", status, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
-    }
-
     @Test
     void approveUser_delegatesAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
@@ -71,7 +64,7 @@ class AdminServiceTest {
     @Test
     void changeRole_updatesRoleAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        User existing = user(targetId, User.UserStatus.ACTIVE);
+        User existing = DomainFixtures.userWithStatus(targetId, User.UserStatus.ACTIVE);
         when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -107,7 +100,7 @@ class AdminServiceTest {
     @Test
     void changeRole_allowsDemotionWhenMultipleAdmins() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        User existing = user(targetId, User.UserStatus.ACTIVE);
+        User existing = DomainFixtures.userWithStatus(targetId, User.UserStatus.ACTIVE);
         when(userPort.countByRole(User.UserRole.ADMIN)).thenReturn(2L);
         when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -122,7 +115,7 @@ class AdminServiceTest {
     @Test
     void deleteUser_softDeletesCascadeAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userPort.findByIdOrThrow(targetId)).thenReturn(user(targetId, User.UserStatus.ACTIVE));
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(DomainFixtures.userWithStatus(targetId, User.UserStatus.ACTIVE));
 
         adminService.deleteUser(adminId, targetId);
 
