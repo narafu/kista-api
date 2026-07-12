@@ -16,6 +16,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 // 전략 목록 → BatchContext 목록 변환 — 조회 실패한 전략은 skip + notifyError
 @Slf4j
@@ -30,6 +34,12 @@ class BatchContextFactory {
 
     // 전략별 현재 사이클·계좌·사용자 조회 — 조회 실패한 전략은 skip + notifyError
     List<BatchContext> buildAll(List<Strategy> strategies) {
+        // 계좌·사용자는 전략 수만큼 개별 조회하지 않고 배치로 1회씩 조회해 N+1 제거
+        Map<UUID, Account> accountsById = accountPort.findAll().stream()
+                .collect(Collectors.toMap(Account::id, a -> a));
+        Map<UUID, User> usersById = userPort.findAll().stream()
+                .collect(Collectors.toMap(User::id, u -> u));
+
         List<BatchContext> contexts = new ArrayList<>();
         for (Strategy strategy : strategies) {
             try {
@@ -43,8 +53,14 @@ class BatchContextFactory {
                     notifyPort.notifyError(zombie);
                     continue;
                 }
-                Account account = accountPort.findByIdOrThrow(strategy.accountId());
-                User user = userPort.findByIdOrThrow(account.userId());
+                Account account = accountsById.get(strategy.accountId());
+                if (account == null) {
+                    throw new NoSuchElementException("계좌를 찾을 수 없습니다: " + strategy.accountId());
+                }
+                User user = usersById.get(account.userId());
+                if (user == null) {
+                    throw new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId());
+                }
                 contexts.add(new BatchContext(strategy, currentCycle, account, user));
             } catch (Exception e) {
                 log.error("[strategyId={}] 컨텍스트 조회 오류: {}", strategy.id(), e.getMessage(), e);

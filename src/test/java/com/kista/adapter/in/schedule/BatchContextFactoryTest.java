@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,8 +71,8 @@ class BatchContextFactoryTest {
         User user = mockUser();
 
         when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(cycle));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+        when(accountPort.findAll()).thenReturn(List.of(account));
+        when(userPort.findAll()).thenReturn(List.of(user));
 
         List<BatchContext> result = factory.buildAll(List.of(strategy));
 
@@ -80,13 +81,16 @@ class BatchContextFactoryTest {
 
     @Test
     void buildAll_emptyStrategies_returnsEmptyList() {
+        when(accountPort.findAll()).thenReturn(List.of());
+        when(userPort.findAll()).thenReturn(List.of());
+
         List<BatchContext> result = factory.buildAll(List.of());
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildAll_contextBuildFails_skipsFailedStrategyAndNotifiesAdmin() {
-        // strategy1 계좌 조회 실패 → skip + notifyError, strategy2는 포함
+        // strategy1 계좌를 배치 조회 결과에서 찾을 수 없음 → skip + notifyError, strategy2는 포함
         Strategy strategy1 = mockStrategy(ACCOUNT_ID);
         UUID accountId2 = UUID.randomUUID();
         Strategy strategy2 = mockStrategy(accountId2);
@@ -94,16 +98,15 @@ class BatchContextFactoryTest {
         Account account2 = mockAccount(accountId2);
         User user = mockUser();
 
-        RuntimeException ex = new RuntimeException("계좌 없음");
         when(strategyCyclePort.findLatestByStrategyId(strategy1.id())).thenReturn(Optional.of(mockCycle(strategy1.id())));
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenThrow(ex);
         when(strategyCyclePort.findLatestByStrategyId(strategy2.id())).thenReturn(Optional.of(cycle2));
-        when(accountPort.findByIdOrThrow(accountId2)).thenReturn(account2);
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
+        // account2만 배치 조회 결과에 포함 — strategy1의 ACCOUNT_ID는 조회되지 않아 NoSuchElementException 발생
+        when(accountPort.findAll()).thenReturn(List.of(account2));
+        when(userPort.findAll()).thenReturn(List.of(user));
 
         List<BatchContext> result = factory.buildAll(List.of(strategy1, strategy2));
 
-        verify(notifyPort).notifyError(ex);
+        verify(notifyPort).notifyError(any(NoSuchElementException.class));
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().strategy()).isEqualTo(strategy2);
     }
@@ -114,11 +117,12 @@ class BatchContextFactoryTest {
         Strategy strategy = mockStrategy(ACCOUNT_ID);
         when(strategyCyclePort.findLatestByStrategyId(strategy.id()))
                 .thenReturn(Optional.of(mockEndedCycle(strategy.id())));
+        when(accountPort.findAll()).thenReturn(List.of());
+        when(userPort.findAll()).thenReturn(List.of());
 
         List<BatchContext> result = factory.buildAll(List.of(strategy));
 
         assertThat(result).isEmpty();
         verify(notifyPort).notifyError(any(IllegalStateException.class));
-        verifyNoInteractions(accountPort); // 종료 사이클이면 계좌 조회 전에 중단
     }
 }
