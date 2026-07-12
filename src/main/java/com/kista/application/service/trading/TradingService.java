@@ -95,12 +95,19 @@ class TradingService {
         if (states.isEmpty()) return;
 
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
-        waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
+        // 이 시점 인터럽트 시 states(증권사 접수 전)는 전부 미처리 — 사용자 알림 대상
+        try {
+            waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
+        } catch (InterruptedException e) {
+            notifyBatchInterrupted(states.stream().map(CycleState::ctx).toList());
+            throw e;
+        }
 
         // 증권사 접수 — 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수
         List<CyclePlacedState> placedStates = placeAll(states, today);
 
         // 공통 대기 — 마감 시각까지 (모든 전략이 공유하는 단 1회)
+        // 이 시점 인터럽트는 사용자 알림 대상 아님 — placedStates는 이미 증권사 접수 완료, 체결 리포트만 지연됨
         waitFor("마감 시각", dst.waitUntilPostClose(), dst);
         marketEventNotifier.notifyMarketClose();
 
@@ -166,6 +173,17 @@ class TradingService {
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         return balance;
+    }
+
+    // 인터럽트 시점에 아직 증권사 접수가 안 된 전략들에게 알림 (증권사 접수 완료된 전략은 대상 아님)
+    private void notifyBatchInterrupted(List<BatchContext> contexts) {
+        contexts.forEach(ctx -> {
+            try {
+                userNotificationPort.notifyBatchInterrupted(ctx.user(), ctx.account());
+            } catch (Exception notifyEx) {
+                log.warn("[strategyId={}] 인터럽트 알림 발송 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
+            }
+        });
     }
 
     // planAndSaveOrders: 잔고 로드 + PLANNED 주문 생성·저장
@@ -261,8 +279,13 @@ class TradingService {
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         PriceContext priceCtx = loadPriceContext(contexts, tradeDate);
 
-        // 개장 시각까지 대기
-        waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
+        // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상
+        try {
+            waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
+        } catch (InterruptedException e) {
+            notifyBatchInterrupted(contexts);
+            throw e;
+        }
         marketEventNotifier.notifyMarketOpen();
 
         // 전략별: order 생성·저장 + INFINITE 매도 선접수

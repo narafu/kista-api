@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -472,6 +473,28 @@ class TradingServiceTest {
     }
 
     @Test
+    void placeOpenOrders_interruptedAtMarketOpenWait_notifiesAllContextUsersAndRethrows() {
+        // marketOpen을 살짝 미래로 설정 → waitUntilMarketOpen()이 양수 → Thread.sleep 실제 호출
+        DstInfo interruptingDst = new DstInfo(true,
+                Instant.now().minusSeconds(3600),
+                Instant.now().minusSeconds(1800),
+                Instant.now().plusMillis(300));
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+
+        Thread.currentThread().interrupt();
+
+        List<BatchContext> contexts = List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER));
+        assertThrows(InterruptedException.class, () -> service.placeOpenOrders(contexts, interruptingDst));
+
+        verify(userNotificationPort).notifyBatchInterrupted(USER, ACCOUNT);
+        // 대기 단계에서 인터럽트되므로 order 생성·접수 루프는 시작조차 하지 않아야 함
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
     void executeBatch_liveBalanceInsufficient_skipsOrderPlanAndNotifies() throws InterruptedException {
         // 마감 스케쥴러 plan 단계 — live 잔고 부족 시 PLANNED 저장 건너뜀
         BigDecimal prevClose = new BigDecimal("19.00");
@@ -601,6 +624,31 @@ class TradingServiceTest {
         verify(notifyPort).notifyError(ex);
         // strategy2는 정상 실행 → cycleHistoryPort.save 호출 확인
         verify(cycleHistoryPort, atLeastOnce()).save(any());
+    }
+
+    @Test
+    void executeBatch_interruptedAtOrderWait_notifiesPlannedUserAndRethrows() {
+        // orderAt을 살짝 미래로 설정 → waitUntilOrderTime()이 양수 → Thread.sleep 실제 호출
+        DstInfo interruptingDst = new DstInfo(true,
+                Instant.now().plusMillis(300),
+                Instant.now().minusSeconds(1800),
+                Instant.now().minusSeconds(7200));
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of());
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
+                .thenReturn(List.of()); // 오늘 주문 없음 → planAll이 신규 계산해 states에 담김
+
+        // waitFor 진입 시 Thread.sleep이 즉시 InterruptedException을 던지도록 인터럽트 플래그 선-설정
+        Thread.currentThread().interrupt();
+
+        List<BatchContext> contexts = List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER));
+        assertThrows(InterruptedException.class, () -> service.executeBatch(contexts, interruptingDst));
+
+        verify(userNotificationPort).notifyBatchInterrupted(USER, ACCOUNT);
     }
 
     @Test
