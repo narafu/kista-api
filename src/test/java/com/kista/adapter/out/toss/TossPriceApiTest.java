@@ -2,6 +2,7 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TossPriceApi 단위 테스트")
@@ -71,6 +75,25 @@ class TossPriceApiTest {
 
         assertThat(snapshot.current()).isEqualByComparingTo("25.50");
         assertThat(snapshot.prevClose()).isEqualByComparingTo(snapshot.current());
+    }
+
+    @Test
+    @DisplayName("같은 종목·같은 날짜 재조회 시 캔들 API 1회만 호출 (캐시 히트)")
+    void getPriceSnapshot_sameSymbolSameDay_callsCandleApiOnce() {
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrap(item));
+        List<TossCandle> candles = List.of(
+                new TossCandle(LocalDate.now(), new BigDecimal("24.00"), new BigDecimal("24.50"),
+                        new BigDecimal("23.50"), new BigDecimal("24.20"), 1000L),
+                new TossCandle(LocalDate.now().minusDays(1), new BigDecimal("23.00"), new BigDecimal("23.50"),
+                        new BigDecimal("22.50"), new BigDecimal("23.20"), 900L));
+        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+
+        tossPriceApi.getPriceSnapshot(Ticker.SOXL);
+        tossPriceApi.getPriceSnapshot(Ticker.SOXL);
+
+        verify(tossCandleApi, times(1)).getLatestCandles("SOXL", "1d", 2);
     }
 
     @Test

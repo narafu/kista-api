@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.adapter.out.broker.PrevCloseCache;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
@@ -32,6 +33,7 @@ class KisPriceApi {
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
+    private final PrevCloseCache prevCloseCache = new PrevCloseCache();
 
     public BigDecimal getPrice(Ticker ticker, Account account) {
         // 현재가만 필요한 경우 — snapshot 조회 후 current 반환 (KIS API 호출 횟수 동일)
@@ -159,8 +161,14 @@ class KisPriceApi {
         }
     }
 
-    // 가장 최근 확정 거래일의 일봉 종가 조회 (KIS price API의 base는 미국장 개장 전 하루 더 과거 종가일 수 있음)
+    // 가장 최근 확정 거래일의 일봉 종가 조회 — 같은 (ticker, KST 날짜) 재조회는 캐시 히트
     private Optional<BigDecimal> fetchLatestClose(Ticker ticker, String excd, Account account) {
+        return prevCloseCache.getOrFetch(ticker.name(), LocalDate.now(TimeZones.KST),
+                () -> fetchLatestCloseUncached(ticker, excd, account));
+    }
+
+    // KIS price API의 base는 미국장 개장 전 하루 더 과거 종가일 수 있음 — dailyprice로 확정 종가 조회
+    private Optional<BigDecimal> fetchLatestCloseUncached(Ticker ticker, String excd, Account account) {
         try {
             DailyPriceResponse response = kisHttpClient.pricingGet(
                     DAILY_TR_ID, DAILY_PATH, account, DailyPriceResponse.class,

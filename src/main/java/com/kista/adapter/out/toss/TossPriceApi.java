@@ -1,6 +1,8 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.adapter.out.broker.PrevCloseCache;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
@@ -13,8 +15,10 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -30,6 +34,7 @@ class TossPriceApi {
 
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
+    private final PrevCloseCache prevCloseCache = new PrevCloseCache();
 
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
         if (tickers.isEmpty()) return Map.of();
@@ -70,17 +75,23 @@ class TossPriceApi {
     }
 
     // 일봉 최신 2개 조회 → 오름차순 [0]이 확정 전일종가, 실패 시 current fallback
+    // 같은 (symbol, KST 날짜) 재조회는 캐시 히트 — 실패(empty)도 캐싱되어 같은 날 재시도하지 않음(허용된 트레이드오프)
     private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
+        return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST),
+                () -> fetchPrevCloseUncached(symbol)).orElse(fallback);
+    }
+
+    private Optional<BigDecimal> fetchPrevCloseUncached(String symbol) {
         try {
             List<TossCandle> candles = tossCandleApi.getLatestCandles(symbol, "1d", 2);
             if (candles.size() >= 2) {
-                return candles.get(0).close();
+                return Optional.of(candles.get(0).close());
             }
             log.warn("Toss 캔들 부족({}개), prevClose=current 사용: symbol={}", candles.size(), symbol);
         } catch (Exception e) {
             log.warn("Toss 전일종가 조회 실패, prevClose=current 사용: symbol={}, error={}", symbol, e.getMessage());
         }
-        return fallback;
+        return Optional.empty();
     }
 
     // ── TossStockInfoPort ──────────────────────────────────────────────────────
