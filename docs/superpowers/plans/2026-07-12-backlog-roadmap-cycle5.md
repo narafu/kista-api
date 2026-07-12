@@ -55,8 +55,8 @@
 
 1차 검토(2026-07-11) 당시 발견했으나 10-Task 수정 계획에는 넣지 않고 미룬 항목. 재확인 결과 전부 아직 미착수 상태다.
 
-1. **잔고 급변 안전장치(balance-spike safety guard)** — 코드베이스에 관련 구현 없음(재확인 완료). 계좌 잔고가 한 배치 사이클 사이에 비정상적으로 급변했을 때(브로커 API 오류로 잘못된 값을 받는 경우 등) 매매를 일시 중단하고 알림을 보내는 가드가 없다.
-2. **브로커 서킷브레이커** — 코드베이스에 관련 구현 없음(재확인 완료). KIS/Toss API가 연속 실패할 때 요청을 잠시 차단하는 회로차단기 패턴 부재.
+1. **잔고 급변 안전장치(balance-spike safety guard)** — 보류(브레인스토밍 중단, 2026-07-12). 코드베이스에 관련 구현 없음(재확인 완료) — 삽입 지점은 `TradingService.notifyIfInsufficientLiveBalance()` 근처(live 잔고와 직전 `cycle_position` 이력을 동시에 갖는 유일한 지점)로 조사 확인됨. **부분 결정 사항(다음에 재개 시 재사용)**: 감지 시 동작은 "알림만 발송, 주문은 그대로 진행"(주문 차단 아님), 급변 기준은 "비율 기준(예수금 또는 보유수량이 직전 대비 50% 이상 변동)". 서킷브레이커 설계 확정 전 중단됨 — 재개 시 이 두 결정부터 이어서 진행.
+2. **브로커 서킷브레이커** — 보류(브레인스토밍 중단, 2026-07-12). 코드베이스에 관련 구현 없음(재확인 완료) — 스코프는 "브로커 단위"(전략 단위 아님)가 아키텍처(`BrokerAdapterRegistry`가 이미 `Map<Broker, Port>` 구조)와 잘 맞는다고 조사됨. open 조건(시간창 내 연속 N회 실패 vs 단순 연속 실패)과 open 이후 동작(쿨다운+half-open vs 수동 복구) 질문까지 진행하다 중단 — 재개 시 이 두 질문부터 이어서 진행.
 3. **`CycleState` sealed interface** — 트랙 B 3번과 동일 항목. 원래 1차 검토에서 나온 항목인데 클린코드 관점(null 체크 감소)과 기능 관점(전략별 상태 안전성) 양쪽에 걸쳐 있어 두 트랙에 모두 기록해둔다 — 실행은 트랙 B 2번+3번 묶음에서 한 번만 하면 된다.
 4. **스케쥴러 인터럽트 시 사용자 알림** — ✅ **완료 (2026-07-12)**. `docs/superpowers/specs/2026-07-12-scheduler-interrupt-user-notification-design.md` 브레인스토밍 → `docs/superpowers/plans/2026-07-12-scheduler-interrupt-user-notification.md` 구현. `UserNotificationPort.notifyBatchInterrupted(User, Account)` 신설 + `TradingService.executeBatch()`/`placeOpenOrders()` 연동 (증권사 접수 전 미처리 전략의 사용자에게만 알림, "마감 시각" 대기는 이미 접수 완료라 의도적으로 제외). 커밋 `9474e55c..548660cd`, 최종 whole-branch 리뷰(opus) Ready to merge. 미푸시.
 5. **SaaS 상용화 갭(결제/구독/온보딩)** — 제품 전략 결정이 선행되는 별도 규모의 이니셔티브. 이번 로드맵에서는 "존재한다"는 사실만 기록하고 범위 산정은 하지 않는다(별도 세션에서 브레인스토밍 필요).
