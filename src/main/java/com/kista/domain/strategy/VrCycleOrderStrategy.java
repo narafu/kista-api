@@ -41,6 +41,9 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     public boolean endsCycleOnLiquidation() { return false; }
 
     @Override
+    public boolean requiresRolloverCheck() { return true; }
+
+    @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         PlanContext.VrInputs inputs = ctx.vr();
         // VrPosition 조립 — VrInputs + AccountBalance 결합

@@ -14,6 +14,9 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(infinite.requiresPrivacyBase()).isFalse();
         assertThat(infinite.requiresPrevClose()).isTrue();
         assertThat(infinite.endsCycleOnLiquidation()).isTrue(); // 기본값 true
+        assertThat(infinite.tracksReverseMode()).isTrue();
+        assertThat(infinite.requiresRolloverCheck()).isFalse(); // 기본값
+        assertThat(infinite.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.INFINITE_POSITION);
     }
 
     @Test
@@ -23,6 +26,9 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(privacy.availableDivisionCounts()).isEmpty();
         assertThat(privacy.requiresPrivacyBase()).isTrue();
         assertThat(privacy.endsCycleOnLiquidation()).isTrue(); // 기본값 true
+        assertThat(privacy.tracksReverseMode()).isFalse(); // 기본값
+        assertThat(privacy.requiresRolloverCheck()).isFalse(); // 기본값
+        assertThat(privacy.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE);
     }
 
     @Test
@@ -33,5 +39,8 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.requiresPrivacyBase()).isFalse();
         assertThat(vr.requiresPrevClose()).isFalse();
         assertThat(vr.endsCycleOnLiquidation()).isFalse(); // VR만 false — 전량 청산 후에도 사이클 유지
+        assertThat(vr.tracksReverseMode()).isFalse(); // 기본값
+        assertThat(vr.requiresRolloverCheck()).isTrue();
+        assertThat(vr.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.NONE); // 기본값
     }
 }

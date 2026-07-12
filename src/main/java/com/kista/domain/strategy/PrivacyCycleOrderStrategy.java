@@ -26,6 +26,9 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     public Strategy.Type cycleType() { return Strategy.Type.PRIVACY; }
 
     @Override
+    public PriceCapMode priceCapMode() { return PriceCapMode.PRIVACY_SIMPLE; }
+
+    @Override
     public boolean requiresPrivacyBase() { return true; }
 
     @Override

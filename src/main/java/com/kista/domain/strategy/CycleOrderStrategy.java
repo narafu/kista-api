@@ -40,6 +40,17 @@ public interface CycleOrderStrategy {
     // holdings=0(전량 청산) 시 사이클 종료 여부 — VR만 false(사이클 유지), 나머지 true(종료)
     default boolean endsCycleOnLiquidation() { return true; }
 
+    // 리버스모드(소진 후 모드) 상태를 cycle_position_infinite_detail에 저장할지 여부 (INFINITE만 true)
+    default boolean tracksReverseMode() { return false; }
+
+    // 포지션 저장 후 N주 롤오버 판정을 수행할지 여부 (VR만 true)
+    default boolean requiresRolloverCheck() { return false; }
+
+    // BUY 가격 사후 보정(post-hoc cap) 방식 — NONE: 미적용, INFINITE_POSITION: InfinitePosition 기반, PRIVACY_SIMPLE: 단순 가격 치환
+    // VR은 buildOrders 단계에서 이미 캡을 적용하므로 NONE(기본값)
+    enum PriceCapMode { NONE, INFINITE_POSITION, PRIVACY_SIMPLE }
+    default PriceCapMode priceCapMode() { return PriceCapMode.NONE; }
+
     // 전략 계산 입력 — execute/preview 공통
     // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy/vr)으로 그룹핑 — 각 구현체는 자기 묶음만 소비
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")

@@ -40,7 +40,13 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public boolean supportsReverseMode() { return true; }
 
     @Override
+    public boolean tracksReverseMode() { return true; }
+
+    @Override
     public List<Integer> availableDivisionCounts() { return List.of(20); }
+
+    @Override
+    public PriceCapMode priceCapMode() { return PriceCapMode.INFINITE_POSITION; }
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
