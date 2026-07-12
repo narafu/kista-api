@@ -59,9 +59,11 @@ class AdminReorderService implements AdminReorderUseCase {
 
     // 테스트 주입용 — DstInfo + 판정 시각 직접 지정
     AdminReorderResult reorder(UUID adminId, AdminReorderCommand command, DstInfo dst, Instant now) {
-        User user = userPort.findByIdOrThrow(command.userId());
-        Account account = accountPort.findByIdOrThrow(command.accountId());
-        Strategy strategy = strategyPort.findByIdOrThrow(command.strategyId());
+        AdminSelectionChain.Selection sel = AdminSelectionChain.resolveAndValidate(
+                userPort, accountPort, strategyPort, command.userId(), command.accountId(), command.strategyId());
+        User user = sel.user();
+        Account account = sel.account();
+        Strategy strategy = sel.strategy();
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         Order sourceOrder = orderPort.findById(command.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + command.orderId()));

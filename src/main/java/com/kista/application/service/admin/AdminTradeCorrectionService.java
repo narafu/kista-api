@@ -46,15 +46,14 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
 
     @Override
     public AdminTradeCorrectionResult correctManualFills(UUID adminId, AdminManualTradeCorrectionCommand command) {
-        User user = userPort.findByIdOrThrow(command.userId());
-        Account account = accountPort.findByIdOrThrow(command.accountId());
-        Strategy strategy = strategyPort.findByIdOrThrow(command.strategyId());
+        AdminSelectionChain.Selection sel = AdminSelectionChain.resolveAndValidate(
+                userPort, accountPort, strategyPort, command.userId(), command.accountId(), command.strategyId());
+        User user = sel.user();
+        Account account = sel.account();
+        Strategy strategy = sel.strategy();
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
-
-        // 선택 체인 무결성 검증 — 관리자 UI에서 user -> account -> strategy 순 선택을 강제하는 백엔드 가드
-        AdminSelectionChain.validate(user, account, strategy);
         if (currentCycle.endDate() != null) {
             throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다");
         }
