@@ -137,6 +137,15 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림
 - 단, 적립식 bootstrap 매수 실패(`recurringAmount>0`, 기존 V=0, holdings=0)는 V=0 새 사이클로 롤오버해 다음 due date에 다시 recurringAmount LOC 매수를 시도
 
+### 계좌번호 마스킹 (AccountNumberMasker)
+- `domain/model/account/AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
+- KIS(하이픈 1개)·TOSS(하이픈 2개) 포맷 모두 대응 — 하이픈 위치별 개별 마스킹을 DTO 3곳에 중복 구현하던 방식은 부분 노출 결함으로 폐기됨
+- 신규 DTO에서 계좌번호 마스킹이 필요하면 반드시 이 유틸을 재사용 — 개별 `substring`/`replace` 마스킹 로직 신규 작성 금지
+
+### 상태 종속 민감 필드 마스킹 패턴 (rejectReason 사례)
+- `User.rejectReason`(반려 사유, REJECTED 상태에서만 의미) — `UserResponse.from()`에서 `user.status() == REJECTED`일 때만 노출, 그 외 상태는 `null` 강제
+- 특정 상태에서만 유효한 민감 필드는 DB엔 그대로 보존하되, 응답 DTO의 `from()` 팩토리에서 상태 조건부로 마스킹 — 필드 자체를 지우지 않고 응답 시점에만 걸러내는 방식 재사용
+
 ### KIS 계좌번호 DB 저장 방식
 - 계좌번호는 `accounts.account_no` (AES-256 암호화) + `accounts.broker_account_code` (KIS: null, TOSS: accountSeq) 저장
 - KIS API 호출: `KisHttpClient.splitAccountNo(account.accountNo())` → `[CANO, ACNT_PRDT_CD]` — `-` 기준 분리, 구분자 없으면 `ACNT_PRDT_CD="01"` 기본값
