@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.account.AccountNumberMasker;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.strategy.Strategy;
 
@@ -18,10 +19,8 @@ public record AdminAccountResponse(
 ) {
     public static AdminAccountResponse from(Account a, AdminUserView user, List<Strategy> strategies) {
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
-        String masked = "****" + a.accountNo().substring(
-                Math.max(0, a.accountNo().length() - 4));
         return new AdminAccountResponse(
-                a.id(), a.userId(), nickname, masked,
+                a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()),
                 a.broker() != null ? a.broker().name() : null,
                 strategies.stream().map(AdminStrategyResponse::from).toList());
     }
