@@ -58,7 +58,7 @@
 1. **잔고 급변 안전장치(balance-spike safety guard)** — 코드베이스에 관련 구현 없음(재확인 완료). 계좌 잔고가 한 배치 사이클 사이에 비정상적으로 급변했을 때(브로커 API 오류로 잘못된 값을 받는 경우 등) 매매를 일시 중단하고 알림을 보내는 가드가 없다.
 2. **브로커 서킷브레이커** — 코드베이스에 관련 구현 없음(재확인 완료). KIS/Toss API가 연속 실패할 때 요청을 잠시 차단하는 회로차단기 패턴 부재.
 3. **`CycleState` sealed interface** — 트랙 B 3번과 동일 항목. 원래 1차 검토에서 나온 항목인데 클린코드 관점(null 체크 감소)과 기능 관점(전략별 상태 안전성) 양쪽에 걸쳐 있어 두 트랙에 모두 기록해둔다 — 실행은 트랙 B 2번+3번 묶음에서 한 번만 하면 된다.
-4. **스케쥴러 인터럽트 시 사용자 알림** — 재확인 결과 `SchedulerJobRunner.run()`은 `InterruptedException` 발생 시 `notifyPort.notifyError(e)`(관리자용 텔레그램 알림)만 호출하고, 실제 영향받은 사용자에게는 아무 알림이 가지 않는다(`MarketEventNotifier`는 장 개시·마감 알림 전용이라 이 경로와 무관함을 확인). 배포 중 재기동으로 배치가 중간에 끊기면 일부 사용자의 주문이 누락될 수 있는데 그 사용자들은 이를 알 방법이 없다.
+4. **스케쥴러 인터럽트 시 사용자 알림** — ✅ **완료 (2026-07-12)**. `docs/superpowers/specs/2026-07-12-scheduler-interrupt-user-notification-design.md` 브레인스토밍 → `docs/superpowers/plans/2026-07-12-scheduler-interrupt-user-notification.md` 구현. `UserNotificationPort.notifyBatchInterrupted(User, Account)` 신설 + `TradingService.executeBatch()`/`placeOpenOrders()` 연동 (증권사 접수 전 미처리 전략의 사용자에게만 알림, "마감 시각" 대기는 이미 접수 완료라 의도적으로 제외). 커밋 `9474e55c..548660cd`, 최종 whole-branch 리뷰(opus) Ready to merge. 미푸시.
 5. **SaaS 상용화 갭(결제/구독/온보딩)** — 제품 전략 결정이 선행되는 별도 규모의 이니셔티브. 이번 로드맵에서는 "존재한다"는 사실만 기록하고 범위 산정은 하지 않는다(별도 세션에서 브레인스토밍 필요).
 
 **권장 우선순위**: 4번(스케쥴러 인터럽트 사용자 알림)이 가장 작고 명확한 스코프이며 실제 사용자 피해(누락된 주문을 모르는 상태)와 직결되므로 트랙 C에서는 1순위로 제안. 1번(잔고 급변 가드)과 2번(서킷브레이커)은 둘 다 "브로커 API 신뢰성 저하 시 안전장치"라는 같은 문제의식이라 함께 설계하는 게 효율적 — 2순위로 묶어서 제안. 5번은 별도 이니셔티브라 순서 밖.
