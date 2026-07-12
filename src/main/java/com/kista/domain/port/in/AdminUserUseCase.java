@@ -13,7 +13,7 @@ public interface AdminUserUseCase {
     List<AdminUserView> listAll(LocalDate from, LocalDate to);        // null = 전체
     List<AdminUserView> listByStatus(User.UserStatus status, LocalDate from, LocalDate to);
     void approveUser(UUID adminId, UUID targetUserId);
-    void rejectUser(UUID adminId, UUID targetUserId);
+    void rejectUser(UUID adminId, UUID targetUserId, String reason);
     void changeRole(UUID adminId, UUID targetUserId, User.UserRole role);
     void deleteUser(UUID adminId, UUID targetUserId);
 

@@ -41,7 +41,7 @@ public final class DomainFixtures {
     public static User userWithStatus(UUID id, User.UserStatus status, User.UserRole role,
                                        NotificationChannel channel, Instant lastReappliedAt) {
         return new User(id, "kakao-1", "홍길동", status, role,
-                null, null, null, lastReappliedAt, channel);
+                null, null, null, null, lastReappliedAt, channel);
     }
 
     // 텔레그램 설정된 사용자 — 알림 어댑터 테스트용 (botUsername은 null 고정)

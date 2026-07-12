@@ -27,12 +27,16 @@ public record UserResponse(
         @Schema(description = "전략 등록·재등록 시 실잔고 검증 여부 (false=바이패스)", example = "true")
         boolean balanceCheckEnabled,
         @Schema(description = "알림 타입별 on/off (예: {\"TRADING_ALERT\": true})")
-        Map<String, Boolean> notificationPrefs
+        Map<String, Boolean> notificationPrefs,
+        @Schema(description = "반려 사유 (REJECTED 상태에서만 의미, null 가능)")
+        String rejectReason
 ) {
     public static UserResponse from(User user, UserSettings settings) {
         // notificationPrefs — enum key를 String으로 변환하여 JSON 직렬화
         Map<String, Boolean> prefs = settings.notificationPrefs().entrySet().stream()
                 .collect(Collectors.toMap(e -> e.getKey().name(), Map.Entry::getValue));
+        // REJECTED가 아니면 잔존 사유값을 노출하지 않도록 마스킹
+        String maskedRejectReason = user.status() == User.UserStatus.REJECTED ? user.rejectReason() : null;
         return new UserResponse(
                 user.id(),
                 user.nickname(),
@@ -42,7 +46,8 @@ public record UserResponse(
                 user.telegramBotUsername(),
                 user.notificationChannel(),
                 settings.balanceCheckEnabled(),
-                prefs
+                prefs,
+                maskedRejectReason
         );
     }
 }

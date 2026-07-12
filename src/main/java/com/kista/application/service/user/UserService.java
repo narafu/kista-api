@@ -87,7 +87,7 @@ class UserService implements UserUseCase {
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
             User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
-                    null, null, null, null, User.DEFAULT_CHANNEL);
+                    null, null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
@@ -107,10 +107,12 @@ class UserService implements UserUseCase {
     }
 
     @Override
-    public void reject(UUID userId) {
+    public void reject(UUID userId, String reason) {
         User user = userPort.findByIdOrThrow(userId);
-        // REJECTED 전환 + 24h 카운트다운 시작 (lastReappliedAt = now)
-        User updated = user.withStatus(User.UserStatus.REJECTED, Instant.now());
+        // reason 정규화: trim 후 blank -> null
+        String normalizedReason = (reason == null || reason.isBlank()) ? null : reason.trim();
+        // REJECTED 전환 + 사유 세팅 + 24h 카운트다운 시작 (lastReappliedAt = now)
+        User updated = user.withRejection(normalizedReason);
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송

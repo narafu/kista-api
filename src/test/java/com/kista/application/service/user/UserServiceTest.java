@@ -181,10 +181,36 @@ class UserServiceTest {
         when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        userService.reject(userId);
+        userService.reject(userId, null);
 
         verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.REJECTED && u.lastReappliedAt() != null));
+    }
+
+    @Test
+    @DisplayName("거절 시 reason 저장 (trim 적용)")
+    void reject_storesTrimmedReason() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, "  허위 정보 기재  ");
+
+        verify(userPort).save(argThat(u ->
+                u.status() == User.UserStatus.REJECTED && "허위 정보 기재".equals(u.rejectReason())));
+    }
+
+    @Test
+    @DisplayName("거절 시 reason blank -> null 정규화")
+    void reject_blankReason_normalizesToNull() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, "   ");
+
+        verify(userPort).save(argThat(u ->
+                u.status() == User.UserStatus.REJECTED && u.rejectReason() == null));
     }
 
     @Test
@@ -208,7 +234,7 @@ class UserServiceTest {
         when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        userService.reject(userId);
+        userService.reject(userId, null);
 
         verify(userPort).save(argThat(u -> u.status() == User.UserStatus.REJECTED));
         verify(eventPublisher).publishEvent(any(UserRejectedEvent.class));
@@ -222,7 +248,7 @@ class UserServiceTest {
         when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        userService.reject(userId);
+        userService.reject(userId, null);
 
         verify(blacklistPort).add(eq(userId), eq(Duration.ofMinutes(15)));
         verify(refreshTokenPort).deleteAllByUserId(userId);
@@ -327,7 +353,7 @@ class UserServiceTest {
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
         User existingUser = new User(existingId, kakaoId, "기존사용자", User.UserStatus.ACTIVE, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
         when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자"));
@@ -354,7 +380,7 @@ class UserServiceTest {
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
         User existingUser = new User(existingId, kakaoId, "경쟁사용자", User.UserStatus.PENDING, User.UserRole.USER,
-                null, null, null, null, NotificationChannel.TELEGRAM);
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
         when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자"));

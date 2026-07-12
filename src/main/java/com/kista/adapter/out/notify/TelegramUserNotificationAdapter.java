@@ -69,7 +69,11 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @Override
     public void notifyRejected(User user) {
-        sendIfLinked(user, "❌ 가입 신청이 거절되었습니다.");
+        String text = "❌ 가입 신청이 거절되었습니다.";
+        if (user.rejectReason() != null && !user.rejectReason().isBlank()) {
+            text += String.format("%n사유: %s", user.rejectReason());
+        }
+        sendIfLinked(user, text);
     }
 
     @Override

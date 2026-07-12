@@ -80,7 +80,7 @@ class TelegramBotService {
                 yield "✅ 승인 완료: " + targetUserId;
             }
             case "reject" -> {
-                userUseCase.reject(targetUserId);
+                userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
                 log.info("텔레그램 관리자 거절: targetUserId={}", targetUserId);
                 yield "❌ 거절 완료: " + targetUserId;
             }

@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -55,10 +56,23 @@ class AdminServiceTest {
     void rejectUser_delegatesAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
 
-        adminService.rejectUser(adminId, targetId);
+        adminService.rejectUser(adminId, targetId, null);
 
-        verify(userUseCase).reject(targetId);
+        verify(userUseCase).reject(targetId, null);
         verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), any());
+    }
+
+    @Test
+    void rejectUser_withReason_passesReasonToUseCaseAndAuditLog() {
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        String reason = "허위 정보 기재";
+
+        adminService.rejectUser(adminId, targetId, reason);
+
+        verify(userUseCase).reject(targetId, reason);
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), payloadCaptor.capture());
+        assertThat(payloadCaptor.getValue()).containsEntry("reason", reason);
     }
 
     @Test

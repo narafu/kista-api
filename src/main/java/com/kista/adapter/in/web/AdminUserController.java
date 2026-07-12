@@ -8,6 +8,7 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -45,11 +46,11 @@ public class AdminUserController {
     @PatchMapping("/{userId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStatus(@PathVariable UUID userId,
-                             @RequestBody AdminStatusRequest body,
+                             @Valid @RequestBody AdminStatusRequest body,
                              @AuthenticationPrincipal UUID adminId) {
         switch (body.status()) {
             case ACTIVE   -> adminUser.approveUser(adminId, userId);
-            case REJECTED -> adminUser.rejectUser(adminId, userId);
+            case REJECTED -> adminUser.rejectUser(adminId, userId, body.reason());
             default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
         }
     }

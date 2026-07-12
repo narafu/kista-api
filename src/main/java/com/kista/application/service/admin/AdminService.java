@@ -69,11 +69,11 @@ class AdminService implements AdminUserUseCase {
     }
 
     @Override
-    public void rejectUser(UUID adminId, UUID targetUserId) {
-        // UserUseCase 위임 (텔레그램 알림 + SSE 포함)
-        userUseCase.reject(targetUserId);
+    public void rejectUser(UUID adminId, UUID targetUserId, String reason) {
+        // UserUseCase 위임 (텔레그램 알림 + SSE 포함, reason 정규화는 UserService 책임)
+        userUseCase.reject(targetUserId, reason);
         log.info("관리자 사용자 거절: adminId={}, targetUserId={}", adminId, targetUserId);
-        auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, null);
+        auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, Map.of("reason", reason == null ? "" : reason));
     }
 
     @Override

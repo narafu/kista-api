@@ -48,6 +48,9 @@ class UserEntity extends BaseAuditEntity {
     @Column(name = "telegram_bot_username", length = 64)
     private String telegramBotUsername; // 평문 저장 (공개 정보)
 
+    @Column(name = "reject_reason")
+    private String rejectReason; // 반려 사유 (REJECTED 상태에서만 의미, null 가능)
+
     @Column(name = "last_reapplied_at")
     private Instant lastReappliedAt; // nullable — 쿨다운 기준 시각
 
@@ -68,6 +71,7 @@ class UserEntity extends BaseAuditEntity {
         e.telegramBotToken = user.telegramBotToken();
         e.telegramChatId = user.telegramChatId();
         e.telegramBotUsername = user.telegramBotUsername();
+        e.rejectReason = user.rejectReason();
         e.lastReappliedAt = user.lastReappliedAt();
         e.notificationChannel = user.notificationChannel();
         return e;
@@ -75,7 +79,7 @@ class UserEntity extends BaseAuditEntity {
 
     User toModel() {
         return new User(id, kakaoId, nickname, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, lastReappliedAt,
+                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason, lastReappliedAt,
                 notificationChannel);
     }
 }

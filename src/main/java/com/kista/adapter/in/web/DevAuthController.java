@@ -75,7 +75,7 @@ public class DevAuthController {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userPort.findById(DEV_ADMIN_UUID).orElseGet(() ->
                 userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
-                        null, null, null, null, User.DEFAULT_CHANNEL)));
+                        null, null, null, null, null, User.DEFAULT_CHANNEL)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != User.UserRole.ADMIN) {
             admin = userPort.save(admin.withStatus(User.UserStatus.ACTIVE).withRole(User.UserRole.ADMIN));

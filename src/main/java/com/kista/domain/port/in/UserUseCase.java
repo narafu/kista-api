@@ -17,7 +17,7 @@ public interface UserUseCase {
 
     // --- 승인 ---
     void approve(UUID userId);
-    void reject(UUID userId);
+    void reject(UUID userId, String reason); // reason은 optional (blank -> null 정규화는 구현체 책임)
     void reapply(UUID userId);
 
     // --- 탈퇴 ---

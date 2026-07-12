@@ -82,7 +82,7 @@ class AdminUserControllerTest {
 
     @Test
     void rejectUser_withAdminToken_returns204() throws Exception {
-        doNothing().when(adminUser).rejectUser(any(), any());
+        doNothing().when(adminUser).rejectUser(any(), any(), any());
 
         mockMvc.perform(patch("/api/admin/users/{id}/status", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
