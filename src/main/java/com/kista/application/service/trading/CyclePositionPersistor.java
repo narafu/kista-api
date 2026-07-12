@@ -34,7 +34,7 @@ class CyclePositionPersistor {
         StrategyCycle currentCycle = ctx.currentCycle();
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
         boolean newReverseMode = false;
-        if (strategy.isInfinite()) {
+        if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
             newReverseMode = computeNewReverseMode(currentCycle, strategy, balance, price);
         }
 
@@ -44,7 +44,7 @@ class CyclePositionPersistor {
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         CyclePosition savedPosition = cyclePositionPort.save(position);
-        if (strategy.isInfinite()) {
+        if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), newReverseMode));
         }
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
@@ -61,8 +61,8 @@ class CyclePositionPersistor {
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
         }
 
-        // VR 전략: 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op)
-        if (strategy.isVr()) {
+        // 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op)
+        if (cycleOrderStrategies.of(strategy.type()).requiresRolloverCheck()) {
             vrCycleRolloverService.rollIfDue(ctx, balance, price, today);
         }
     }

@@ -8,6 +8,8 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,6 +30,7 @@ class TradingOrderExecutor {
     private final BrokerAdapterRegistry registry;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final NotifyPort notifyPort;
+    private final CycleOrderStrategies cycleOrderStrategies;
 
     // 지정된 주문 목록만 증권사 접수 (장 개시 스케쥴러 매도 선접수용 — BUY 보정 없음)
     List<Order> placeGiven(List<Order> orders, Account account) {
@@ -37,15 +40,18 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // INFINITE: position 있을 때만 capIfNeeded / PRIVACY: position 없어도 currentPrice 있으면 capPrivacyIfNeeded
-    // VR: 가격 캡은 buildOrders 단계에서 이미 적용 — post-hoc 캡 불필요 (strategy.isPrivacy() 가드로 제외)
+    // capIfNeeded/capPrivacyIfNeeded 적용 여부는 전략의 priceCapMode()로 결정
+    // INFINITE_POSITION이어도 position이 null(재계산 skip 케이스)이면 캡 미적용 — 기존 동작 그대로
+    // VR: 가격 캡은 buildOrders 단계에서 이미 적용 — priceCapMode()가 NONE이라 post-hoc 캡 불필요
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position, Strategy strategy) {
-        if (currentPrice != null && position != null) {
-            buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
-        } else if (currentPrice != null && strategy.isPrivacy()) {
-            // PRIVACY만: InfinitePosition 없이 단순 가격 캡 적용 (VR은 buildOrders에서 자체 처리)
-            buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
+        if (currentPrice != null) {
+            CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
+            if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
+                buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
+            } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
+                buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
+            }
         }
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = placeEach(planned, account);

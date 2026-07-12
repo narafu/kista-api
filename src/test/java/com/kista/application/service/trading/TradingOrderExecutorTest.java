@@ -10,6 +10,10 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,12 @@ class TradingOrderExecutorTest {
     static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
             Strategy.Type.VR, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
+    // 실제 capability 구현체로 CycleOrderStrategies 조립 — priceCapMode() 실제 값 검증
+    static final CycleOrderStrategies CYCLE_STRATEGIES = new CycleOrderStrategies(List.of(
+            new InfiniteCycleOrderStrategy(null, null),
+            new PrivacyCycleOrderStrategy(null),
+            new VrCycleOrderStrategy(null)));
+
     @BeforeEach
     void setUp() {
         // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
@@ -66,7 +76,7 @@ class TradingOrderExecutorTest {
     }
 
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, registry, buyOrderPriceCapper, notifyPort);
+        return new TradingOrderExecutor(orderPort, registry, buyOrderPriceCapper, notifyPort, CYCLE_STRATEGIES);
     }
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
