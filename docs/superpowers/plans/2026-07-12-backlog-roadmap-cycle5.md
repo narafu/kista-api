@@ -45,9 +45,14 @@
 3. **`CycleState` sealed interface화** — **기각 (2026-07-12)**. 스펙 작성 단계에서 재검토한 결과, sealed interface로 나눠도 소비부(`placeAll`)에 새 `switch` 분기가 생길 뿐 분기 자체가 사라지지 않고, 오히려 현재의 "필드를 그대로 넘기고 받는 쪽이 null 체크"하는 단순함을 깨뜨린다고 판단해 명시적으로 기각. 재론 불필요.
 4. **React Query staleTime 정책 통일** — ✅ **완료 (2026-07-12, 전면 정책화 대신 소규모 수정 3건으로 축소)**. 조사 결과 대부분 훅이 이미 합리적인 값을 쓰고 있어 전면 리팩토링 불필요 — Fear&Greed(주석-실제값 불일치 정정, 30분→6시간), 시장휴일 캘린더(1시간→24시간), 체결이력(0→1분 추가) 3건만 수정. 계획 Task 4. 커밋 `726c08c`.
 5. **`CycleHistoryTable`의 12개 prop drilling 개선** — ✅ **완료 (2026-07-12)**. `StrategyOrderHistory` 패턴(자체 상태+자체 쿼리 소유, 부모는 식별자만 전달)을 적용해 prop 12개→4개로 축소, 두 부모(`StrategyTradesTab`/`TradesTab`)의 중복 보일러플레이트도 함께 제거. 계획 Task 5. 커밋 `d215c32`+`6afe0670`(1차 리뷰에서 발견된 ESLint `rules-of-hooks` 위반 즉시 수정 포함).
-6. **Null 체크 반복(105개 파일) → Optional/Null Object 패턴 전사 적용** — 미착수, 여전히 보류. 범위가 프로젝트 전역이라 장기 과제로 남겨둔다.
+6. **Null 체크 반복(105개 파일) → Optional/Null Object 패턴 전사 적용** — **완전 기각 (2026-07-12, 조사 완료)**. 브레인스토밍 재조사 결과 원래 전제 자체가 스캔 아티팩트였음을 확인:
+   - 프로젝트에 이미 확립된 컨벤션(포트 조회 결과·전략 skip 신호엔 `Optional<T>`, record 필드는 nullable 원시타입+주석)이 일관되게 지켜지고 있어 "record 필드를 Optional로" 방향 자체가 기존 컨벤션과 충돌하는 안티패턴.
+   - 105개 파일 대부분(60~70%)은 KIS/Toss 외부 API 응답 null 체크인데, 각 null 체크마다 사후 동작(기본값 반환/예외 발생/로그+빈컬렉션)이 전부 달라 공용 헬퍼로 묶으면 과잉 추상화(3차 사이클에서 기각한 "KisAuthApi/TossAuthApi catch 블록 공통화"와 동일한 이유로 재기각).
+   - 유력 후보였던 `CyclePosition.avgPrice()` 관련 null 체크도 전체 코드베이스에서 명시적 `== null`/`!= null` 검색 결과 0건(다른 타입(`AccountBalance` 등)이 같은 필드명을 우연히 공유해 최초 스캔이 뭉뚱그린 결과) — 유일하게 발견된 것은 `TelegramBotService`의 3줄짜리 삼항연산자 블록(다른 타입 `CyclePositionHistoryEntry` 대상)뿐이라 작업 가치 없음 판단.
+   - Null Object 패턴도 이미 `UserSettings.defaultFor()` 등으로 확립돼 있어 추가 필요성 낮음.
+   - 재론 불필요 — 백로그에서 완전히 제거.
 
-**트랙 B 최종 결론**: 6개 항목 중 4개 완료(1,2,4,5), 1개 기각(3), 1개 보류(6). 최종 whole-branch 리뷰(opus) Ready to merge — Critical/Important/Minor 0건. kista-api 커밋 `488fe936..28ca91fc`(3개), kista-ui 커밋 `ce2fc9f..6afe0670`(3개), 양 레포 전체 테스트/typecheck green, 미푸시.
+**트랙 B 최종 결론**: 6개 항목 중 4개 완료(1,2,4,5), 2개 기각(3,6). 최종 whole-branch 리뷰(opus) Ready to merge — Critical/Important/Minor 0건. kista-api 커밋 `488fe936..28ca91fc`(3개), kista-ui 커밋 `ce2fc9f..6afe0670`(3개), 양 레포 전체 테스트/typecheck green, 미푸시.
 
 ---
 
@@ -67,9 +72,10 @@
 
 ## 실행 계획
 
-1. **지금**: 트랙 A(Task 1, 2)를 5차 사이클로 즉시 실행 — superpowers:subagent-driven-development, api/ui 레포 간 병렬, 태스크별 리뷰어 + 최종 리뷰.
-2. **다음**: 트랙 B(2+3 묶음) 또는 트랙 C(4번)를 사용자가 고르면, 그 항목만 별도로 superpowers:brainstorming부터 다시 시작(설계 확정 → writing-plans → subagent-driven-development).
-3. 트랙 B/C의 나머지 항목은 이 문서에 우선순위와 함께 대기.
+1. **완료**: 트랙 A(Task 1, 2) — 5차 사이클로 실행 완료.
+2. **완료**: 트랙 B(1,2,4,5) — 브레인스토밍→계획→구현→리뷰 완료. 트랙 B(3,6)는 조사 후 기각.
+3. **완료**: 트랙 C(4) — 스케쥴러 인터럽트 사용자 알림, 풀사이클 완료.
+4. **남은 것**: 트랙 C(1+2, 잔고 급변 가드+서킷브레이커) — 브레인스토밍 중단 상태, 부분 결정 사항 보존됨(위 참고). 트랙 C(5, SaaS 상용화 갭) — 별도 이니셔티브로 미착수.
 
 ## Global Constraints (5차 사이클 트랙 A 적용)
 
