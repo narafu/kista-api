@@ -40,14 +40,14 @@
 
 아래 항목은 "즉시 구현 계획"이 아니라 다음에 다룰 때 브레인스토밍부터 다시 시작해야 하는 이유를 명시한다.
 
-1. **`TradingPriceFetcher` 가격 조회 캐싱/배치 재구성** — 매매 타이밍에 영향을 줄 수 있는 캐시 레이어를 스케쥴러 배치 실행 도중에 추가하는 것이라, "캐시 무효화 시점"과 "가격 재조회가 필요한 시점"의 경계를 먼저 설계로 확정해야 한다.
-2. **`CycleOrderStrategy`를 persistence/execution 레이어까지 확장** — `CyclePositionPersistor`/`TradingOrderExecutor`의 `isInfinite()/isPrivacy()/isVr()` 분기를 인터페이스 메서드로 옮기는 안. 3차 사이클에서 보류했던 "`domain/strategy` 3개 클래스(`InfiniteCycleOrderStrategy` 등) package-private 전환을 위한 테스트 인프라 리팩토링"과 사실상 같은 방향이므로 **하나로 묶어서** 다룰 것 — 인터페이스를 확장하면 테스트에서의 `new XxxCycleOrderStrategy(...)` 직접 생성 의존도 함께 정리될 가능성이 높다.
-3. **`CycleState` sealed interface화** — `TradingService.java:52`의 `private record CycleState(...)`가 `position`(INFINITE 전용)/`privacyBase`(PRIVACY 전용) 등 전략 타입별로만 채워지는 nullable 필드를 갖고 있다(재확인 완료). 2번 항목과 함께 검토하면 시너지가 크다 — `CycleOrderStrategy` 다형성 확장과 `CycleState`의 타입별 분리를 같은 설계 세션에서 다루는 게 효율적.
-4. **React Query staleTime 정책 통일** — 현재 hook마다 30초~30분으로 제각각인데, 이건 코드 문제가 아니라 "데이터 종류별로 얼마나 자주 갱신돼야 하는가"라는 제품 판단이 먼저 필요하다.
-5. **`CycleHistoryTable`의 12개 prop drilling 개선** — 상태 객체화든 context든, 이후 유사 테이블(예: `StrategyOrderHistory`가 3차·4차 걸쳐 반복 정리된 것처럼)에도 적용할 공통 패턴으로 만들지 이 컴포넌트만 국소적으로 고칠지 먼저 결정 필요.
-6. **Null 체크 반복(105개 파일) → Optional/Null Object 패턴 전사 적용** — 범위가 프로젝트 전역이라 장기 과제. 3번(`CycleState`)이 먼저 정리되면 이 항목의 실제 범위가 줄어들 수 있어 3번 이후로 순서를 미루는 게 합리적.
+1. **`TradingPriceFetcher` 가격 조회 캐싱/배치 재구성** — ✅ **완료 (2026-07-12, 재조사 후 축소 실행)**. 조사 결과 `TradingService`/`TradingPriceFetcher` 계층에는 중복 조회가 없음을 확인(원래 진단 오류) — 실제 비효율은 `KisPriceApi`/`TossPriceApi`의 전일종가(prevClose) 조회가 종목마다 개별 API 호출을 하는 구조였다. 하루(KST) 단위 `PrevCloseCache` 신설로 해결. 스펙 `docs/superpowers/specs/2026-07-12-cycle-order-strategy-capability-design.md`, 계획 `docs/superpowers/plans/2026-07-12-track-b-capability-cache-staletime-prop.md` Task 3. 커밋 `2ce28b86..28ca91fc`.
+2. **`CycleOrderStrategy`를 persistence/execution 레이어까지 확장** — ✅ **완료 (2026-07-12, 방향 수정 후 실행)**. 당초 "포트 역전"(domain에 새 포트 + application이 구현)으로 승인됐으나, 코드 재확인 결과 불필요함을 발견해 사용자 재확인 후 더 단순한 "capability 메서드 확장"(순수 값 반환, `endsCycleOnLiquidation()`과 동일 패턴)으로 방향 전환. `CyclePositionPersistor`/`TradingOrderExecutor`의 `isInfinite()/isPrivacy()/isVr()` 분기를 `tracksReverseMode()`/`requiresRolloverCheck()`/`priceCapMode()` 3개 capability 메서드로 대체 — domain→application 의존 없이 해소. 계획 Task 1+2. 커밋 `7ade3874..2ce28b86`.
+3. **`CycleState` sealed interface화** — **기각 (2026-07-12)**. 스펙 작성 단계에서 재검토한 결과, sealed interface로 나눠도 소비부(`placeAll`)에 새 `switch` 분기가 생길 뿐 분기 자체가 사라지지 않고, 오히려 현재의 "필드를 그대로 넘기고 받는 쪽이 null 체크"하는 단순함을 깨뜨린다고 판단해 명시적으로 기각. 재론 불필요.
+4. **React Query staleTime 정책 통일** — ✅ **완료 (2026-07-12, 전면 정책화 대신 소규모 수정 3건으로 축소)**. 조사 결과 대부분 훅이 이미 합리적인 값을 쓰고 있어 전면 리팩토링 불필요 — Fear&Greed(주석-실제값 불일치 정정, 30분→6시간), 시장휴일 캘린더(1시간→24시간), 체결이력(0→1분 추가) 3건만 수정. 계획 Task 4. 커밋 `726c08c`.
+5. **`CycleHistoryTable`의 12개 prop drilling 개선** — ✅ **완료 (2026-07-12)**. `StrategyOrderHistory` 패턴(자체 상태+자체 쿼리 소유, 부모는 식별자만 전달)을 적용해 prop 12개→4개로 축소, 두 부모(`StrategyTradesTab`/`TradesTab`)의 중복 보일러플레이트도 함께 제거. 계획 Task 5. 커밋 `d215c32`+`6afe0670`(1차 리뷰에서 발견된 ESLint `rules-of-hooks` 위반 즉시 수정 포함).
+6. **Null 체크 반복(105개 파일) → Optional/Null Object 패턴 전사 적용** — 미착수, 여전히 보류. 범위가 프로젝트 전역이라 장기 과제로 남겨둔다.
 
-**권장 순서**: 2번+3번을 묶어 다음 브레인스토밍 세션 1순위로 — 나머지(1, 4, 5, 6)보다 다른 이월 항목(6번)의 범위 축소 효과가 있고, 3차 사이클부터 이월된 항목이라 가장 오래 대기 중이다.
+**트랙 B 최종 결론**: 6개 항목 중 4개 완료(1,2,4,5), 1개 기각(3), 1개 보류(6). 최종 whole-branch 리뷰(opus) Ready to merge — Critical/Important/Minor 0건. kista-api 커밋 `488fe936..28ca91fc`(3개), kista-ui 커밋 `ce2fc9f..6afe0670`(3개), 양 레포 전체 테스트/typecheck green, 미푸시.
 
 ---
 
