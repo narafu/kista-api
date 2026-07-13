@@ -148,7 +148,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .toList();
     }
 
-    // 엔티티 → 조회 뷰 변환 (trade_date UTC → KST, 주문 정렬)
+    // 엔티티 → 조회 뷰 변환 (관리자 표시용 — trade_date 원본 그대로, KST 변환 안 함)
     private PrivacyTradeBaseView toView(PrivacyTradeBaseEntity e) {
         List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()
                 .sorted(BASE_ORDER_SORT)
@@ -157,7 +157,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .toList();
         return new PrivacyTradeBaseView(
                 e.getId(),
-                TradeDateConverter.toKst(e.getTradeDate()),  // UTC DB → KST 도메인
+                e.getTradeDate(),
                 e.getTicker().name(),
                 e.getCurrentCycleStart(),
                 e.getCurrentCycleRealizedPnl(),

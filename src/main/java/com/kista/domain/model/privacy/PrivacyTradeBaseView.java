@@ -8,7 +8,7 @@ import java.util.UUID;
 // 관리자 조회 전용 — 마스터(기준 매매표) + 주문 명세 묶음
 public record PrivacyTradeBaseView(
         UUID id,
-        LocalDate tradeDate,                 // KST 거래일
+        LocalDate tradeDate,                 // DB trade_date 원본 (KST 변환 없음)
         String ticker,                       // 종목 (SOXL)
         BigDecimal currentCycleStart,        // 기준가
         BigDecimal currentCycleRealizedPnl,  // 사이클 실현 수익($)
