@@ -54,7 +54,11 @@ class TokenService implements TokenUseCase {
      *   - grace 이내  → 동시 요청의 패자로 허용, 새 RT 발급
      *   - grace 초과  → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
      */
+    // grace 초과 시 revokeAllSessionsAndReject()가 deleteAllByUserId 후 InvalidRefreshTokenException을 던지는데,
+    // unchecked 예외가 전파되면 클래스 레벨 @Transactional 기본 롤백 규칙에 의해 방금 실행한 세션 폐기(delete)까지
+    // 롤백되어 재사용 공격 탐지가 무력화됨 — noRollbackFor로 폐기 커밋 보장
     @Override
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
         String hash = sha256Hex(rawRefreshToken);
         Instant now = Instant.now();
