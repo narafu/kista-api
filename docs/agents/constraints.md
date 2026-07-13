@@ -260,7 +260,8 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 도메인 `tradeDate`: **KST 일자** / DB `trade_date`: **UTC 일자(= US 거래일)** — KST 04:30 기준 ±1일 차이
 - 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일`
 - 적용 위치: `OrderPersistenceAdapter` 전체, `PrivacyTradePersistenceAdapter`의 `saveBaseWithOrders`/`findTodayTrade`/`findSeedPreviewBase`(매매 실행 로직 연동) — JPA `@Converter` 자동 적용 금지 (가시성)
-- **예외 — 어드민 표시용 `findBasesFromTradeDate`(toView)**: KST 변환 없이 `trade_date` 원본을 그대로 노출 — 어드민 화면에서 DB 값과 다른 날짜(±1일)로 보여 혼란을 유발해 표시 전용 경로만 변환 제외 (`PrivacyTradeBaseView.tradeDate`)
+- `privacy_trade_bases.release_date`: **발행일 원본** — DB 값을 KST 변환 없이 그대로 노출하고 API 응답도 `releaseDate` 필드 사용 (`PrivacyTradeBaseView.releaseDate`, `AdminPrivacyBaseResponse.releaseDate`)
+- **예외 — 어드민 표시용 `findBasesFromTradeDate`(toView)**: KST 변환 없이 `release_date` 원본을 그대로 노출 — 어드민 화면에서 DB 값과 다른 날짜(±1일)로 보여 혼란을 유발해 표시 전용 경로만 변환 제외
 - **Toss API 예외**: `TossOrderApi.fetchExecutions()` — Toss는 주문 접수일(KST) 기준으로 날짜 필터링. `toUtc()` 변환 없이 KST 날짜 전달. **주의**: 전날 저녁 선접수된 주문이 당일 장마감에 체결될 수 있어 `queryFrom = from - 1일`로 1일 앞당겨 조회 후, `filledAt(KST +09:00)` 기반 체결일이 요청 범위(from~to) 내인 것만 포함 (KIS는 US 거래일(UTC) 기준이라 변환 필요, Toss는 변환 시 전날 체결 조회 → 빈 결과)
 - FIDA 외부 입력(UTC) → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출
 - 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — `TradeDateConverter` 헬퍼 경유 필수

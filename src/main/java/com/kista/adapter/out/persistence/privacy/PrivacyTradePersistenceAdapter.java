@@ -148,7 +148,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .toList();
     }
 
-    // 엔티티 → 조회 뷰 변환 (관리자 표시용 — trade_date 원본 그대로, KST 변환 안 함)
+    // 엔티티 → 조회 뷰 변환 (관리자 표시용 — release_date 원본 그대로, KST 변환 안 함)
     private PrivacyTradeBaseView toView(PrivacyTradeBaseEntity e) {
         List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()
                 .sorted(BASE_ORDER_SORT)

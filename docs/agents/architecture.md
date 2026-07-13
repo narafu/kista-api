@@ -165,7 +165,7 @@ adapter/out/
 
 ### PRIVACY 전략 패턴 (기준 매매표)
 - `privacy_trade_bases` (`adapter/out/persistence/privacy/`, `PrivacyTradeBaseEntity`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음** (계좌별 아닌 시스템 공통 기준)
-  - `(trade_date, ticker)` UNIQUE 제약 (`uq_privacy_trade_bases_date_ticker`) — 하루에 종목당 기준 매매표 1건
+  - `(release_date, ticker)` UNIQUE 제약 (`uq_privacy_trade_bases_release_date_ticker`) — 하루에 종목당 기준 매매표 1건
   - `updated_at` 없음 — `BaseCreatedAtEntity` 상속 (`createdAt`만)
 - `privacy_trade_base_orders` (`PrivacyTradeBaseOrderEntity`): 기준 매매표 1행에 대한 계획 주문 세트 (direction/orderType/quantity/price)
   - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리

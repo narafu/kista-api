@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,5 +36,23 @@ class PrivacyTradePersistenceAdapterTest {
         assertThat(result).isPresent();
         assertThat(result.get().currentCycleStart()).isEqualByComparingTo("14467.67");
         verify(baseRepository).findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(todayKst, Ticker.SOXL);
+    }
+
+    @Test
+    void findBasesFromTradeDate_returns_release_date_without_kst_conversion() {
+        LocalDate dbReleaseDate = LocalDate.of(2026, 7, 1);
+        PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
+        base.setTradeDate(dbReleaseDate);
+        base.setTicker(Ticker.SOXL);
+        base.setCurrentCycleStart(new BigDecimal("28.50"));
+        base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
+
+        when(baseRepository.findBasesFromTradeDate(dbReleaseDate)).thenReturn(List.of(base));
+
+        var result = adapter.findBasesFromTradeDate(dbReleaseDate);
+
+        assertThat(result).singleElement()
+                .extracting(view -> view.releaseDate())
+                .isEqualTo(dbReleaseDate);
     }
 }

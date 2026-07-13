@@ -17,7 +17,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "privacy_trade_bases",
-    uniqueConstraints = @UniqueConstraint(name = "uq_privacy_trade_bases_date_ticker", columnNames = {"trade_date", "ticker"})
+    uniqueConstraints = @UniqueConstraint(name = "uq_privacy_trade_bases_release_date_ticker", columnNames = {"release_date", "ticker"})
 )
 @Getter
 @Setter(AccessLevel.PACKAGE)
@@ -29,7 +29,7 @@ class PrivacyTradeBaseEntity extends BaseCreatedAtEntity {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "trade_date", nullable = false)
+    @Column(name = "release_date", nullable = false)
     private LocalDate tradeDate;              // DB는 UTC(=US 거래일) 저장, FIDA 수신값 그대로 보존 — TradeDateConverter 경유
 
     @Enumerated(EnumType.STRING)

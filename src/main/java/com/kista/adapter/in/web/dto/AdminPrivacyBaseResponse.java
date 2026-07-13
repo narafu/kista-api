@@ -10,7 +10,7 @@ import java.util.UUID;
 // 관리자 PRIVACY 기준 매매표 응답 DTO — 마스터 + 주문 명세
 public record AdminPrivacyBaseResponse(
         UUID id,
-        LocalDate tradeDate,
+        LocalDate releaseDate,
         String ticker,
         BigDecimal currentCycleStart,
         BigDecimal currentCycleRealizedPnl,
@@ -20,7 +20,7 @@ public record AdminPrivacyBaseResponse(
 ) {
     public static AdminPrivacyBaseResponse from(PrivacyTradeBaseView v) {
         List<OrderLine> orders = v.orders().stream().map(OrderLine::from).toList();
-        return new AdminPrivacyBaseResponse(v.id(), v.tradeDate(), v.ticker(),
+        return new AdminPrivacyBaseResponse(v.id(), v.releaseDate(), v.ticker(),
                 v.currentCycleStart(), v.currentCycleRealizedPnl(), v.avgPrice(), v.holdings(), orders);
     }
 
