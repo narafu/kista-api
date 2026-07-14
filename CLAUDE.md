@@ -33,6 +33,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - 요청이 모호하면 가정하고 진행하지 말고 먼저 질문
 - **기존 오류 발견 시 즉시 수정**: 컴파일 오류·타입 오류·명백한 버그는 현재 작업과 무관해도 즉시 수정 (범위가 넓으면 먼저 언급)
 - **의심 사항 즉시 제보**: 버그·설계 이상·불일치가 의심되면 "확실하지 않지만 X가 이상해 보입니다" 형태로 바로 언급
+- **날짜 변환 정책**: DB `trade_date`는 UTC(US 거래일)이므로 도메인/API 반환 시 KST로 `+1일` 변환하고, `privacy_trade_bases.release_date`는 발행일 원본이므로 변환 없이 `releaseDate`로 그대로 반환 (`docs/agents/constraints.md` 참고)
 - **작업 완료 후 자동 커밋**: 요청된 작업 완료 시 스스로 커밋 생성
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
 

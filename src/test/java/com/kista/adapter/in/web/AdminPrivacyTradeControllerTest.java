@@ -68,6 +68,8 @@ class AdminPrivacyTradeControllerTest {
         mockMvc.perform(get("/api/admin/privacy-trade-bases?range=30")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].releaseDate").value("2026-06-10"))
+                .andExpect(jsonPath("$[0].tradeDate").doesNotExist())
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].orders[0].direction").value("BUY"));
         verify(adminQuery).listPrivacyBases(30);
