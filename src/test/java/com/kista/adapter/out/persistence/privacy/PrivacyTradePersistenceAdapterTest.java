@@ -55,4 +55,24 @@ class PrivacyTradePersistenceAdapterTest {
                 .extracting(view -> view.releaseDate())
                 .isEqualTo(dbReleaseDate);
     }
+
+    @Test
+    void findTodayTrade_uses_order_fetch_query() {
+        LocalDate todayKst = LocalDate.of(2026, 7, 15);
+        LocalDate dbTradeDate = LocalDate.of(2026, 7, 14);
+        PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
+        base.setTradeDate(dbTradeDate);
+        base.setTicker(Ticker.SOXL);
+        base.setCurrentCycleStart(new BigDecimal("28.50"));
+        base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
+        base.setHoldings(10);
+
+        when(baseRepository.findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(dbTradeDate, Ticker.SOXL))
+                .thenReturn(Optional.of(base));
+
+        var result = adapter.findTodayTrade(todayKst);
+
+        assertThat(result).isPresent();
+        verify(baseRepository).findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(dbTradeDate, Ticker.SOXL);
+    }
 }

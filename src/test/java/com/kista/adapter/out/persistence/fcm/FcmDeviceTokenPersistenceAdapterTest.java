@@ -3,6 +3,7 @@ package com.kista.adapter.out.persistence.fcm;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,7 +35,9 @@ class FcmDeviceTokenPersistenceAdapterTest {
 
         adapter.save(userId, "token-new", " web ");
 
-        verify(repository).deleteByUserIdAndPlatform(userId, "WEB");
+        InOrder inOrder = inOrder(repository);
+        inOrder.verify(repository).deleteByUserIdAndPlatform(userId, "WEB");
+        inOrder.verify(repository).flush();
         ArgumentCaptor<FcmDeviceTokenEntity> captor = ArgumentCaptor.forClass(FcmDeviceTokenEntity.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getPlatform()).isEqualTo("WEB");
