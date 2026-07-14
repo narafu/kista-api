@@ -1,6 +1,5 @@
 package com.kista.adapter.out.toss;
 
-import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
@@ -99,8 +98,8 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("장마감 후(BLOCKED)에는 최신 캔들이 이미 확정 종가이므로 그대로 사용")
-    void fetchPrevClose_afterMarketClose_usesLatestCandle() {
+    @DisplayName("정규장 미진행(장마감 후·프리마켓)에는 최신 캔들이 이미 확정 종가이므로 그대로 사용")
+    void fetchPrevClose_regularSessionInactive_usesLatestCandle() {
         // 최신 2개 캔들: [7/10(금) 종가 96.96, 7/13(월) 종가 89.2] — 7/13 세션은 이미 마감됨
         List<TossCandle> candles = List.of(
                 new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
@@ -109,15 +108,15 @@ class TossPriceApiTest {
                         new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
         when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", DstInfo.MarketSession.BLOCKED);
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", false);
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualByComparingTo("89.20");
     }
 
     @Test
-    @DisplayName("정규장 진행 중(DIRECT)에는 최신 캔들이 미확정일 수 있어 이전 캔들 사용")
-    void fetchPrevClose_duringMarketSession_usesPreviousCandle() {
+    @DisplayName("정규장 진행 중에는 최신 캔들이 미확정일 수 있어 이전 캔들 사용")
+    void fetchPrevClose_regularSessionActive_usesPreviousCandle() {
         List<TossCandle> candles = List.of(
                 new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
                         new BigDecimal("94.50"), new BigDecimal("96.96"), 1000L),
@@ -125,7 +124,7 @@ class TossPriceApiTest {
                         new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
         when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", DstInfo.MarketSession.DIRECT);
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", true);
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualByComparingTo("96.96");

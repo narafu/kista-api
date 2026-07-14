@@ -61,6 +61,20 @@ public record DstInfo(
         return marketCloseTime(isDst) + "~" + premarketStartTime(isDst);
     }
 
+    // 정규장(marketOpen~marketClose) 진행 중 여부 — DIRECT는 프리마켓+정규장을 모두 포함하므로
+    // "장중이라 당일 봉이 미확정일 수 있는" 구간은 그중 정규장 진행 중일 때뿐 (프리마켓은 이미 확정된 직전 종가 상태)
+    public boolean isRegularSessionActive() {
+        ZonedDateTime now = ZonedDateTime.now(KST);
+        return isRegularSessionActiveAt(now.getDayOfWeek(), now.toLocalTime());
+    }
+
+    // 시각 주입식 판단 — 테스트 및 isRegularSessionActive 공용
+    boolean isRegularSessionActiveAt(DayOfWeek day, LocalTime time) {
+        if (sessionAt(day, time) == MarketSession.BLOCKED) return false;
+        // marketOpen~자정~marketClose 래핑 구간만 정규장 진행 중 (그 외 DIRECT 구간은 프리마켓)
+        return !time.isBefore(marketOpenTime(isDst)) || time.isBefore(marketCloseTime(isDst));
+    }
+
     public Duration waitUntilOrderTime() {
         return Duration.between(Instant.now(), orderAt);
     }

@@ -132,4 +132,37 @@ class DstInfoTest {
             assertThat(NON_DST.sessionAt(day, time)).isEqualTo(BLOCKED);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // isRegularSessionActiveAt() — DIRECT(프리마켓+정규장) 중 실제 정규장 진행 여부
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("DST(서머타임) 정규장 진행 판단 — 정규장=[22:30,05:00) 래핑")
+    class DstRegularSessionTest {
+
+        @ParameterizedTest(name = "{0} {1} → 정규장 진행 중")
+        @CsvSource({
+            "MONDAY,   22:30",   // 개장 경계(포함)
+            "MONDAY,   23:59",   // 자정 직전
+            "TUESDAY,  00:00",   // 자정
+            "TUESDAY,  04:59",   // 마감 경계 직전
+        })
+        void active_dst(DayOfWeek day, LocalTime time) {
+            assertThat(DST.isRegularSessionActiveAt(day, time)).isTrue();
+        }
+
+        @ParameterizedTest(name = "{0} {1} → 정규장 미진행(프리마켓·장마감 후)")
+        @CsvSource({
+            "MONDAY,   17:00",   // 프리마켓 시작
+            "MONDAY,   20:00",   // 프리마켓 — 개장 전이라 최신 캔들은 이미 확정된 직전 종가
+            "MONDAY,   22:29",   // 개장 직전
+            "TUESDAY,  05:00",   // 마감 경계(포함)
+            "TUESDAY,  12:00",   // 장마감 후(BLOCKED)
+            "SATURDAY, 20:00",   // 주말
+        })
+        void inactive_dst(DayOfWeek day, LocalTime time) {
+            assertThat(DST.isRegularSessionActiveAt(day, time)).isFalse();
+        }
+    }
 }

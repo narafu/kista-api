@@ -14,10 +14,17 @@ public final class PrevCloseCache {
 
     private final ConcurrentMap<CacheKey, Optional<BigDecimal>> cache = new ConcurrentHashMap<>();
 
-    private record CacheKey(String symbol, LocalDate date) {}
+    // bucket: 같은 날짜라도 캐시를 분리해야 하는 상태 구분자 (기본 "") — Toss는 정규장 진행 중 여부로 분리해
+    // 정규장 종료로 확정 종가가 바뀌는 순간 캐시를 재사용하지 않도록 함
+    private record CacheKey(String symbol, LocalDate date, String bucket) {}
 
     // fetcher: 캐시 miss 시 실제 조회를 수행하는 함수 (실패 시 Optional.empty() 반환 관례)
     public Optional<BigDecimal> getOrFetch(String symbol, LocalDate date, Supplier<Optional<BigDecimal>> fetcher) {
-        return cache.computeIfAbsent(new CacheKey(symbol, date), k -> fetcher.get());
+        return getOrFetch(symbol, date, "", fetcher);
+    }
+
+    public Optional<BigDecimal> getOrFetch(String symbol, LocalDate date, String bucket,
+                                           Supplier<Optional<BigDecimal>> fetcher) {
+        return cache.computeIfAbsent(new CacheKey(symbol, date, bucket), k -> fetcher.get());
     }
 }
