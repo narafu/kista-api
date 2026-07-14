@@ -3,6 +3,7 @@ package com.kista.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.adapter.out.broker.PrevCloseCache;
 import com.kista.common.TimeZones;
+import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
@@ -74,18 +75,21 @@ class TossPriceApi {
                         e -> new PriceSnapshot(e.getValue(), fetchPrevClose(e.getKey().name(), e.getValue()))));
     }
 
-    // 일봉 최신 2개 조회 → 오름차순 [0]이 확정 전일종가, 실패 시 current fallback
+    // 일봉 최신 2개 조회 → 정규장 진행 중(DIRECT)이면 최신 캔들이 미확정일 수 있어 이전 캔들 사용,
+    // 장마감 후(BLOCKED)면 최신 캔들도 이미 확정된 종가이므로 그대로 사용 — 실패 시 current fallback
     // 같은 (symbol, KST 날짜) 재조회는 캐시 히트 — 실패(empty)도 캐싱되어 같은 날 재시도하지 않음(허용된 트레이드오프)
     private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
         return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST),
-                () -> fetchPrevCloseUncached(symbol)).orElse(fallback);
+                () -> fetchPrevCloseUncached(symbol, DstInfo.calculate().currentSession())).orElse(fallback);
     }
 
-    private Optional<BigDecimal> fetchPrevCloseUncached(String symbol) {
+    // package-private — 테스트에서 MarketSession 직접 주입 (DstInfo.calculate() 실시간 호출 우회)
+    Optional<BigDecimal> fetchPrevCloseUncached(String symbol, DstInfo.MarketSession session) {
         try {
             List<TossCandle> candles = tossCandleApi.getLatestCandles(symbol, "1d", 2);
             if (candles.size() >= 2) {
-                return Optional.of(candles.get(0).close());
+                int idx = session == DstInfo.MarketSession.BLOCKED ? candles.size() - 1 : candles.size() - 2;
+                return Optional.of(candles.get(idx).close());
             }
             log.warn("Toss 캔들 부족({}개), prevClose=current 사용: symbol={}", candles.size(), symbol);
         } catch (Exception e) {

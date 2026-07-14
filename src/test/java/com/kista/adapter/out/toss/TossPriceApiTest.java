@@ -1,5 +1,6 @@
 package com.kista.adapter.out.toss;
 
+import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossCandle;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,6 +96,39 @@ class TossPriceApiTest {
         tossPriceApi.getPriceSnapshot(Ticker.SOXL);
 
         verify(tossCandleApi, times(1)).getLatestCandles("SOXL", "1d", 2);
+    }
+
+    @Test
+    @DisplayName("장마감 후(BLOCKED)에는 최신 캔들이 이미 확정 종가이므로 그대로 사용")
+    void fetchPrevClose_afterMarketClose_usesLatestCandle() {
+        // 최신 2개 캔들: [7/10(금) 종가 96.96, 7/13(월) 종가 89.2] — 7/13 세션은 이미 마감됨
+        List<TossCandle> candles = List.of(
+                new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
+                        new BigDecimal("94.50"), new BigDecimal("96.96"), 1000L),
+                new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"), new BigDecimal("91.00"),
+                        new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
+        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", DstInfo.MarketSession.BLOCKED);
+
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualByComparingTo("89.20");
+    }
+
+    @Test
+    @DisplayName("정규장 진행 중(DIRECT)에는 최신 캔들이 미확정일 수 있어 이전 캔들 사용")
+    void fetchPrevClose_duringMarketSession_usesPreviousCandle() {
+        List<TossCandle> candles = List.of(
+                new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
+                        new BigDecimal("94.50"), new BigDecimal("96.96"), 1000L),
+                new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"), new BigDecimal("91.00"),
+                        new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
+        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", DstInfo.MarketSession.DIRECT);
+
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualByComparingTo("96.96");
     }
 
     @Test
