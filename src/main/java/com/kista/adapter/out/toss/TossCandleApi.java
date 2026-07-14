@@ -1,6 +1,7 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.toss.TossCandle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +45,8 @@ class TossCandleApi {
 
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
         int clamped = Math.max(1, Math.min(count, MAX_COUNT));
-        // before = 내일 00:00 UTC (오늘 봉까지 포함) — 토스 1회 호출 최대치(count)만큼 최신 캔들 그대로 사용
-        String beforeParam = LocalDate.now().plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
+        // before = 내일 00:00 UTC (오늘 봉까지 포함, "오늘"은 KST 기준) — 토스 1회 호출 최대치(count)만큼 최신 캔들 그대로 사용
+        String beforeParam = LocalDate.now(TimeZones.KST).plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
         return fetchCandles(symbol, interval, clamped, beforeParam);
     }
 

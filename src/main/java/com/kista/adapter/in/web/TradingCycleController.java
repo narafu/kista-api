@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
@@ -169,8 +170,8 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        LocalDate resolvedFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate resolvedTo = to != null ? to : LocalDate.now();
+        LocalDate resolvedFrom = from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
+        LocalDate resolvedTo = to != null ? to : LocalDate.now(TimeZones.KST);
         return StrategyOrdersResponse.from(
                 accountStatistics.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
     }
