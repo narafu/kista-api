@@ -11,14 +11,11 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("KisPriceApi 전일종가(prevClose) 산정 검증")
@@ -35,35 +32,12 @@ class KisPriceApiTest {
     );
 
     @Test
-    @DisplayName("일별시세(dailyprice) 종가가 있으면 base 대신 그 값을 prevClose로 사용")
-    void getPriceSnapshot_usesDailyPriceCloseAsPrevClose() {
+    @DisplayName("단건 조회 응답의 base 필드를 prevClose로 사용")
+    void getPriceSnapshot_usesBaseFieldAsPrevClose() {
         var priceResponse = new KisPriceApi.PriceResponse(
                 new KisPriceApi.PriceResponse.Output("73.72", "76.27"));
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
-
-        var dailyResponse = new KisPriceApi.DailyPriceResponse(
-                List.of(new KisPriceApi.DailyPriceResponse.Output2("73.72")));
-        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.DailyPriceResponse.class), any())).thenReturn(dailyResponse);
-
-        PriceSnapshot snapshot = api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
-
-        assertThat(snapshot.current()).isEqualByComparingTo("73.72");
-        assertThat(snapshot.prevClose()).isEqualByComparingTo("73.72");
-    }
-
-    @Test
-    @DisplayName("일별시세 조회 실패 시 base 필드로 fallback")
-    void getPriceSnapshot_fallsBackToBaseWhenDailyPriceFails() {
-        var priceResponse = new KisPriceApi.PriceResponse(
-                new KisPriceApi.PriceResponse.Output("73.72", "76.27"));
-        when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
-
-        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.DailyPriceResponse.class), any()))
-                .thenReturn(new KisPriceApi.DailyPriceResponse(List.of()));
 
         PriceSnapshot snapshot = api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
 
@@ -72,24 +46,16 @@ class KisPriceApiTest {
     }
 
     @Test
-    @DisplayName("같은 종목·같은 날짜 재조회 시 dailyprice API 1회만 호출 (캐시 히트)")
-    void getPriceSnapshot_sameTickerSameDay_callsDailyPriceOnce() {
+    @DisplayName("base 필드가 빈값이면 current로 fallback")
+    void getPriceSnapshot_fallsBackToCurrentWhenBaseBlank() {
         var priceResponse = new KisPriceApi.PriceResponse(
-                new KisPriceApi.PriceResponse.Output("73.72", "76.27"));
+                new KisPriceApi.PriceResponse.Output("73.72", ""));
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
 
-        var dailyResponse = new KisPriceApi.DailyPriceResponse(
-                List.of(new KisPriceApi.DailyPriceResponse.Output2("73.72")));
-        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.DailyPriceResponse.class), any())).thenReturn(dailyResponse);
+        PriceSnapshot snapshot = api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
 
-        api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
-        api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
-
-        verify(kisHttpClient, times(1)).pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.DailyPriceResponse.class), any());
-        verify(kisHttpClient, times(2)).pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
-                eq(KisPriceApi.PriceResponse.class), any()); // 현재가는 캐싱 대상 아님 — 매번 호출
+        assertThat(snapshot.current()).isEqualByComparingTo("73.72");
+        assertThat(snapshot.prevClose()).isEqualByComparingTo("73.72");
     }
 }
