@@ -1,8 +1,8 @@
 ## Docker / 인프라
 
-### JVM 기본 TimeZone (KST 고정)
-- Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()` 가 UTC 날짜 반환 → KIS 휴장 조회 오판 (공휴일 미감지)
-- 해결: `KistaApplication.main()` 첫 줄 `TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))` — `SpringApplication.run()` 보다 먼저 호출 필수
+### JVM 기본 TimeZone (호출부 명시, 전역 설정 금지)
+- Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()`/`LocalTime.now()`를 타임존 없이 호출하면 UTC 날짜 반환 → KST 09시 이전 "오늘" 오판
+- 해결 정책(`45758166`): `KistaApplication.main()`의 전역 `TimeZone.setDefault()` 의존 제거 — 모든 `LocalDate.now()`/`LocalTime.now()` 호출부에 `TimeZones.KST`(`com.kista.common.TimeZones`)를 명시. 신규 호출부 추가 시 반드시 `LocalDate.now(TimeZones.KST)` 형태 사용, `KistaApplication`에 전역 설정 재도입 금지
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
 - tradeDate(KST)↔trade_date(UTC=US 거래일) 변환 정책: `constraints.md`의 "tradeDate 변환 정책" 섹션 참고
 
