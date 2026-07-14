@@ -136,7 +136,7 @@ docker cp /tmp/fear_greed_snapshots.csv kista-api-postgres-1:/tmp/fear_greed_sna
 # 3. 로컬 DB에 임포트 (NULL 'NULL' 옵션 필수 — supabase CSV에서 NULL이 문자열 "NULL"로 출력됨)
 #    컬럼 순서는 CSV 헤더(SELECT * 순서)와 일치해야 함
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
-  "COPY privacy_trade_bases (id, trade_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+  "COPY privacy_trade_bases (id, release_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
   "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, price, quantity, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
 docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
