@@ -165,4 +165,33 @@ class DstInfoTest {
             assertThat(DST.isRegularSessionActiveAt(day, time)).isFalse();
         }
     }
+
+    @Nested
+    @DisplayName("비DST(동절기) 정규장 진행 판단 — 정규장=[23:30,06:00) 래핑")
+    class NonDstRegularSessionTest {
+
+        @ParameterizedTest(name = "{0} {1} → 정규장 진행 중")
+        @CsvSource({
+            "MONDAY,   23:30",   // 개장 경계(포함)
+            "MONDAY,   23:59",   // 자정 직전
+            "TUESDAY,  00:00",   // 자정
+            "TUESDAY,  05:59",   // 마감 경계 직전
+        })
+        void active_nondst(DayOfWeek day, LocalTime time) {
+            assertThat(NON_DST.isRegularSessionActiveAt(day, time)).isTrue();
+        }
+
+        @ParameterizedTest(name = "{0} {1} → 정규장 미진행(프리마켓·장마감 후)")
+        @CsvSource({
+            "MONDAY,   18:00",   // 프리마켓 시작
+            "MONDAY,   21:00",   // 프리마켓 — 개장 전이라 최신 캔들은 이미 확정된 직전 종가
+            "MONDAY,   23:29",   // 개장 직전
+            "TUESDAY,  06:00",   // 마감 경계(포함)
+            "TUESDAY,  12:00",   // 장마감 후(BLOCKED)
+            "SATURDAY, 20:00",   // 주말
+        })
+        void inactive_nondst(DayOfWeek day, LocalTime time) {
+            assertThat(NON_DST.isRegularSessionActiveAt(day, time)).isFalse();
+        }
+    }
 }
