@@ -75,6 +75,21 @@ public record DstInfo(
         return !time.isBefore(marketOpenTime(isDst)) || time.isBefore(marketCloseTime(isDst));
     }
 
+    // 가장 최근에 실제로 개장한 정규장의 개장 시각 — marketOpen 필드는 "오늘 날짜" 고정이라
+    // 자정~개장 전(00:00~marketOpen) 사이에 호출하면 실제로 진행 중인 세션(전날 저녁 개장)이 아닌
+    // 미래 시각(오늘 저녁 개장)을 가리키는 문제가 있음. nextTradeDate()의 날짜 롤백과 동일한 패턴.
+    public Instant lastSessionOpenInstant() {
+        return lastSessionOpenInstantAt(ZonedDateTime.now(KST));
+    }
+
+    // 시각 주입식 판단 — 테스트 및 lastSessionOpenInstant 공용
+    Instant lastSessionOpenInstantAt(ZonedDateTime nowKst) {
+        LocalDate date = nowKst.toLocalTime().isBefore(marketOpenTime(isDst))
+                ? nowKst.toLocalDate().minusDays(1)
+                : nowKst.toLocalDate();
+        return atKst(date, marketOpenTime(isDst));
+    }
+
     public Duration waitUntilOrderTime() {
         return Duration.between(Instant.now(), orderAt);
     }

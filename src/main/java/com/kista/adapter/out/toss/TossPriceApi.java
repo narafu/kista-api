@@ -16,6 +16,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -75,27 +76,30 @@ class TossPriceApi {
                         e -> new PriceSnapshot(e.getValue(), fetchPrevClose(e.getKey().name(), e.getValue()))));
     }
 
-    // 일봉 최신 2개 조회 → 정규장이 실제로 진행 중이면 최신 캔들이 미확정일 수 있어 이전 캔들 사용,
-    // 그 외(프리마켓·장마감 후 등 정규장 미진행)면 최신 캔들도 이미 확정된 종가이므로 그대로 사용 — 실패 시 current fallback
+    // count=1 + before로 확정 종가 캔들 1개만 조회 — 정규장 진행 중이면 진행 중인 봉을 배제하기 위해
+    // before를 가장 최근 개장 시각 직전으로, 그 외(프리마켓·장마감 후)는 지금 시각으로 잡음 — 실패 시 current fallback
     // 같은 (symbol, KST 날짜, 정규장 진행 여부) 재조회는 캐시 히트 — 정규장 진행 여부를 버킷으로 분리해
     // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
     // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
     private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
-        boolean regularSessionActive = DstInfo.calculate().isRegularSessionActive();
+        DstInfo dstInfo = DstInfo.calculate();
+        boolean regularSessionActive = dstInfo.isRegularSessionActive();
+        Instant before = regularSessionActive
+                ? dstInfo.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
+                : Instant.now();                                   // 이미 확정된 봉만 존재
         String bucket = regularSessionActive ? "ACTIVE" : "CLOSED";
         return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST), bucket,
-                () -> fetchPrevCloseUncached(symbol, regularSessionActive)).orElse(fallback);
+                () -> fetchPrevCloseUncached(symbol, before)).orElse(fallback);
     }
 
-    // package-private — 테스트에서 정규장 진행 여부 직접 주입 (DstInfo.calculate() 실시간 호출 우회)
-    Optional<BigDecimal> fetchPrevCloseUncached(String symbol, boolean regularSessionActive) {
+    // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate() 실시간 호출 우회)
+    Optional<BigDecimal> fetchPrevCloseUncached(String symbol, Instant before) {
         try {
-            List<TossCandle> candles = tossCandleApi.getLatestCandles(symbol, "1d", 2);
-            if (candles.size() >= 2) {
-                int idx = regularSessionActive ? candles.size() - 2 : candles.size() - 1;
-                return Optional.of(candles.get(idx).close());
+            Optional<TossCandle> candle = tossCandleApi.getCandleBefore(symbol, "1d", before);
+            if (candle.isPresent()) {
+                return Optional.of(candle.get().close());
             }
-            log.warn("Toss 캔들 부족({}개), prevClose=current 사용: symbol={}", candles.size(), symbol);
+            log.warn("Toss 캔들 없음, prevClose=current 사용: symbol={}", symbol);
         } catch (Exception e) {
             log.warn("Toss 전일종가 조회 실패, prevClose=current 사용: symbol={}, error={}", symbol, e.getMessage());
         }

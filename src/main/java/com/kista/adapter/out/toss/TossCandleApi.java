@@ -9,11 +9,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 // Toss 캔들 API 스펙 (openapi.json 검증):
 // - params: symbol(required), interval(1m|1d), count(1~200, default 100), before(ISO8601), adjusted(boolean)
@@ -46,6 +48,12 @@ class TossCandleApi {
         int clamped = Math.max(1, Math.min(count, MAX_COUNT));
         // before 미지정 시 Toss가 최신 봉부터 반환 — 별도 계산 불필요
         return fetchCandles(symbol, interval, clamped, null);
+    }
+
+    // before(exclusive 경계로 호출측에서 미리 보정된 시각) 이하 가장 최신 봉 1개만 조회 — 전일종가 확정 조회 전용
+    public Optional<TossCandle> getCandleBefore(String symbol, String interval, Instant before) {
+        List<TossCandle> candles = fetchCandles(symbol, interval, 1, before.toString());
+        return candles.isEmpty() ? Optional.empty() : Optional.of(candles.get(0));
     }
 
     private List<TossCandle> fetchCandles(String symbol, String interval, int count, String beforeParam) {

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -84,50 +85,37 @@ class TossPriceApiTest {
         var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
-        List<TossCandle> candles = List.of(
-                new TossCandle(LocalDate.now(), new BigDecimal("24.00"), new BigDecimal("24.50"),
-                        new BigDecimal("23.50"), new BigDecimal("24.20"), 1000L),
-                new TossCandle(LocalDate.now().minusDays(1), new BigDecimal("23.00"), new BigDecimal("23.50"),
-                        new BigDecimal("22.50"), new BigDecimal("23.20"), 900L));
-        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+        TossCandle candle = new TossCandle(LocalDate.now().minusDays(1), new BigDecimal("23.00"),
+                new BigDecimal("23.50"), new BigDecimal("22.50"), new BigDecimal("23.20"), 900L);
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
         tossPriceApi.getPriceSnapshot(Ticker.SOXL);
         tossPriceApi.getPriceSnapshot(Ticker.SOXL);
 
-        verify(tossCandleApi, times(1)).getLatestCandles("SOXL", "1d", 2);
+        verify(tossCandleApi, times(1)).getCandleBefore(eq("SOXL"), eq("1d"), any());
     }
 
     @Test
-    @DisplayName("정규장 미진행(장마감 후·프리마켓)에는 최신 캔들이 이미 확정 종가이므로 그대로 사용")
-    void fetchPrevClose_regularSessionInactive_usesLatestCandle() {
-        // 최신 2개 캔들: [7/10(금) 종가 96.96, 7/13(월) 종가 89.2] — 7/13 세션은 이미 마감됨
-        List<TossCandle> candles = List.of(
-                new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
-                        new BigDecimal("94.50"), new BigDecimal("96.96"), 1000L),
-                new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"), new BigDecimal("91.00"),
-                        new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
-        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+    @DisplayName("확정 종가 캔들이 있으면 그대로 prevClose로 사용")
+    void fetchPrevCloseUncached_returnsCandleClose() {
+        TossCandle candle = new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"),
+                new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", false);
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now());
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualByComparingTo("89.20");
     }
 
     @Test
-    @DisplayName("정규장 진행 중에는 최신 캔들이 미확정일 수 있어 이전 캔들 사용")
-    void fetchPrevClose_regularSessionActive_usesPreviousCandle() {
-        List<TossCandle> candles = List.of(
-                new TossCandle(LocalDate.of(2026, 7, 10), new BigDecimal("95.00"), new BigDecimal("97.50"),
-                        new BigDecimal("94.50"), new BigDecimal("96.96"), 1000L),
-                new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"), new BigDecimal("91.00"),
-                        new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L));
-        when(tossCandleApi.getLatestCandles("SOXL", "1d", 2)).thenReturn(candles);
+    @DisplayName("캔들이 없으면 empty 반환 (호출부에서 current로 fallback)")
+    void fetchPrevCloseUncached_noCandle_returnsEmpty() {
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", true);
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now());
 
-        assertThat(result).isPresent();
-        assertThat(result.get()).isEqualByComparingTo("96.96");
+        assertThat(result).isEmpty();
     }
 
     @Test

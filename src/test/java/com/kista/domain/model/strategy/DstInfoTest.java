@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -193,5 +194,37 @@ class DstInfoTest {
         void inactive_nondst(DayOfWeek day, LocalTime time) {
             assertThat(NON_DST.isRegularSessionActiveAt(day, time)).isFalse();
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // lastSessionOpenInstantAt() — marketOpen 필드(오늘 날짜 고정)와 달리 자정 넘는 구간도 정확해야 함
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("자정 이후~개장 전(00:00~22:30)에 호출하면 전날 저녁 개장 시각을 가리킴")
+    void lastSessionOpenInstant_beforeTonightsOpen_pointsToYesterdayEvening() {
+        // 화요일 02:00 KST — 월요일 22:30에 개장한 세션이 아직 진행 중인 시점
+        ZonedDateTime tuesday2am = ZonedDateTime.of(2024, 6, 18, 2, 0, 0, 0, KST);
+        DstInfo info = DstInfo.calculate(tuesday2am);
+
+        Instant lastOpen = info.lastSessionOpenInstantAt(tuesday2am);
+
+        ZonedDateTime openKst = lastOpen.atZone(KST);
+        assertThat(openKst.toLocalDate()).isEqualTo(LocalDate.of(2024, 6, 17)); // 월요일
+        assertThat(openKst.toLocalTime()).isEqualTo(LocalTime.of(22, 30));
+    }
+
+    @Test
+    @DisplayName("개장 이후~자정 전(22:30~24:00)에 호출하면 오늘 저녁 개장 시각을 가리킴")
+    void lastSessionOpenInstant_afterTonightsOpen_pointsToTonight() {
+        // 월요일 23:00 KST — 오늘 저녁 22:30에 막 개장한 시점
+        ZonedDateTime monday11pm = ZonedDateTime.of(2024, 6, 17, 23, 0, 0, 0, KST);
+        DstInfo info = DstInfo.calculate(monday11pm);
+
+        Instant lastOpen = info.lastSessionOpenInstantAt(monday11pm);
+
+        ZonedDateTime openKst = lastOpen.atZone(KST);
+        assertThat(openKst.toLocalDate()).isEqualTo(LocalDate.of(2024, 6, 17)); // 월요일(오늘)
+        assertThat(openKst.toLocalTime()).isEqualTo(LocalTime.of(22, 30));
     }
 }
