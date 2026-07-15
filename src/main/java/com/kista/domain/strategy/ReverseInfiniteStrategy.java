@@ -29,7 +29,8 @@ public class ReverseInfiniteStrategy {
             return List.of();
         }
         log.info("[리버스모드 첫날] MOC 매도 {}주", mocSellQuantity);
-        return List.of(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity, BigDecimal.ZERO));
+        return List.of(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity,
+                BigDecimal.ZERO, "REVERSE_INFINITE_MOC_SELL"));
     }
 
     // 두번째 날 이후: LOC 매도(별지점 위) + LOC 쿼터매수(별지점 아래)
@@ -39,7 +40,8 @@ public class ReverseInfiniteStrategy {
         // LOC 매도 — 별지점 위에서 (starPointPrice 가격으로 LOC)
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1 && position.starPointPrice() != null) {
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity, position.starPointPrice()));
+            orders.add(Order.planned(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
+                    position.starPointPrice(), "REVERSE_INFINITE_LOC_SELL"));
             log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQuantity, position.starPointPrice());
         }
 
@@ -47,7 +49,8 @@ public class ReverseInfiniteStrategy {
         int locBuyQuantity = position.calcLocBuyQuantity();
         if (locBuyQuantity >= 1 && position.starPointPrice() != null) {
             BigDecimal buyPrice = position.starPointPrice().subtract(InfinitePosition.TICK_SIZE);
-            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity, buyPrice));
+            orders.add(Order.planned(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity,
+                    buyPrice, "REVERSE_INFINITE_LOC_BUY"));
             log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQuantity, buyPrice);
         }
 

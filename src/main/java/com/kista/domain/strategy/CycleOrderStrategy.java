@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 // 전략 패턴 진입점 — TradingService/TradingPreviewService/CycleRotationService 의 switch(strategy.type()) 분기를 다형성으로 대체
 // 각 구현체는 cycleType()으로 자기 타입을 선언하며, 서비스는 Map<Strategy.Type, CycleOrderStrategy>로 주입받아 사용
@@ -50,6 +51,14 @@ public interface CycleOrderStrategy {
     // VR은 buildOrders 단계에서 이미 캡을 적용하므로 NONE(기본값)
     enum PriceCapMode { NONE, INFINITE_POSITION, PRIVACY_SIMPLE }
     default PriceCapMode priceCapMode() { return PriceCapMode.NONE; }
+
+    // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
+    default int allocationPriority() { return 100; }
+
+    // 기존 주문만으로 오늘 생성 가능한 주문 슬롯이 모두 점유됐는지 여부
+    default boolean canSkipOrderComputation(List<Order> existingOrders, Set<Order.OrderTiming> creatableTimings) {
+        return false;
+    }
 
     // 전략 계산 입력 — execute/preview 공통
     // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy/vr)으로 그룹핑 — 각 구현체는 자기 묶음만 소비

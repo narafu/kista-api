@@ -133,6 +133,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .map(entity -> {
                     LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
                     List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()
+                            .sorted(BASE_ORDER_SORT)
                             .map(p -> new PrivacyTradeBase.PrivacyTrade(
                                     kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()))
                             .toList();

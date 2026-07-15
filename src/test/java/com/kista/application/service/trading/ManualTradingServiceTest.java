@@ -149,6 +149,29 @@ class ManualTradingServiceTest {
     }
 
     @Test
+    void execute_existingReservedSellExceedsAvailable_rejects() {
+        Order sellOrder = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN,
+                Order.OrderDirection.SELL, 3, new BigDecimal("22.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(sellOrder));
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+                .thenReturn(new AccountBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
+        when(sellableQuantityPort.getSellableQuantity(any(), any()))
+                .thenReturn(new SellableQuantity("SOXL", 5));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                eq(ACCOUNT.id()), any(LocalDate.class), eq(Ticker.SOXL)))
+                .thenReturn(3);
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("보유 수량이 부족합니다");
+
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
     void execute_sufficientBalance_savesOrders() {
         // BUY 1주, live 충분(usdDeposit=$10,000, holdings=10) → saveAll 호출, 주문 반환
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.math.RoundingMode.HALF_UP;
 
@@ -47,6 +49,73 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public PriceCapMode priceCapMode() { return PriceCapMode.INFINITE_POSITION; }
+
+    @Override
+    public int allocationPriority() { return 1; }
+
+    @Override
+    public boolean canSkipOrderComputation(List<Order> existingOrders, Set<Order.OrderTiming> creatableTimings) {
+        List<Order> targetOrders = existingOrders.stream()
+                .filter(order -> creatableTimings.contains(order.timing()))
+                .toList();
+        // 리버스모드 여부는 계산 전에는 알 수 없으므로 legacy 주문은 양 방향이 모두 있어야만 전체 슬롯을 점유한다.
+        if (!targetOrders.isEmpty()
+                && targetOrders.stream().allMatch(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                && creatableTimings.stream().allMatch(timing -> targetOrders.stream()
+                        .anyMatch(order -> order.timing() == timing && order.direction() == Order.OrderDirection.BUY)
+                        && targetOrders.stream().anyMatch(order -> order.timing() == timing
+                                && order.direction() == Order.OrderDirection.SELL))) {
+            return true;
+        }
+
+        Set<ExistingLegSlot> concreteSlots = existingOrders.stream()
+                .filter(order -> creatableTimings.contains(order.timing()))
+                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .map(ExistingLegSlot::of)
+                .collect(Collectors.toSet());
+        if (concreteSlots.isEmpty()) return false;
+
+        boolean hasAtOpenTiming = creatableTimings.contains(Order.OrderTiming.AT_OPEN);
+        boolean hasAtCloseTiming = creatableTimings.contains(Order.OrderTiming.AT_CLOSE);
+        boolean atOpenComplete = !hasAtOpenTiming;
+
+        Set<String> atCloseLegs = existingOrders.stream()
+                .filter(order -> hasAtCloseTiming && order.timing() == Order.OrderTiming.AT_CLOSE)
+                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .filter(order -> order.direction() == Order.OrderDirection.BUY)
+                .map(Order::orderLeg)
+                .collect(Collectors.toSet());
+
+        boolean earlyComplete = atCloseLegs.contains("INFINITE_EARLY_AVG_BUY")
+                && atCloseLegs.contains("INFINITE_EARLY_REF_BUY");
+        boolean earlyMergedComplete = atCloseLegs.contains("INFINITE_EARLY_MERGED_BUY");
+        boolean lateComplete = atCloseLegs.contains("INFINITE_LATE_REF_BUY");
+        boolean correctionComplete = atCloseLegs.contains("INFINITE_CORRECTION_01")
+                && atCloseLegs.contains("INFINITE_CORRECTION_02")
+                && atCloseLegs.contains("INFINITE_CORRECTION_03")
+                && (earlyComplete || earlyMergedComplete || lateComplete);
+        boolean atCloseComplete = !hasAtCloseTiming
+                || correctionComplete
+                || (hasSlot(concreteSlots, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, "REVERSE_INFINITE_LOC_BUY")
+                        && hasSlot(concreteSlots, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, "REVERSE_INFINITE_LOC_SELL"));
+
+        return atOpenComplete && atCloseComplete;
+    }
+
+    private boolean hasSlot(Set<ExistingLegSlot> slots, Order.OrderTiming timing,
+                            Order.OrderDirection direction, String orderLeg) {
+        return slots.contains(new ExistingLegSlot(timing, direction, orderLeg));
+    }
+
+    private record ExistingLegSlot(
+            Order.OrderTiming timing,
+            Order.OrderDirection direction,
+            String orderLeg
+    ) {
+        static ExistingLegSlot of(Order order) {
+            return new ExistingLegSlot(order.timing(), order.direction(), order.orderLeg());
+        }
+    }
 
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {

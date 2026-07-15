@@ -1,5 +1,8 @@
 package com.kista.adapter.out.persistence.trade;
 
+import com.kista.common.TradeDateConverter;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,6 +62,20 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
                 otherCycleId, strategyId, strategyVersionId, new BigDecimal("2000.00"), LocalDate.now());
     }
 
+    @Test
+    void saveAll_persistsAndLoadsOrderLeg() {
+        Order order = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                        Order.OrderDirection.BUY, 1, new BigDecimal("22.00"))
+                .withLeg("INFINITE_EARLY_AVG_BUY");
+
+        adapter.saveAll(List.of(Order.plan(order, accountId, cycleId)));
+
+        List<Order> result = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now());
+
+        assertThat(result).singleElement()
+                .satisfies(saved -> assertThat(saved.orderLeg()).isEqualTo("INFINITE_EARLY_AVG_BUY"));
+    }
+
     // 주문 1건 직접 삽입 헬퍼
     private void insertOrder(UUID cId, String direction, String status,
                              Integer filledQuantity, BigDecimal filledPrice) {
@@ -66,11 +84,16 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
     private void insertOrderForAccount(UUID accId, UUID cId, String direction, String status,
                              Integer filledQuantity, BigDecimal filledPrice) {
+        insertOrderForAccount(accId, cId, LocalDate.now(), "SOXL", direction, status, filledQuantity, filledPrice);
+    }
+
+    private void insertOrderForAccount(UUID accId, UUID cId, LocalDate tradeDate, String ticker,
+                                       String direction, String status, Integer filledQuantity, BigDecimal filledPrice) {
         jdbcTemplate.update(
-                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, price, quantity, status, filled_quantity, filled_price, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accId, cId, LocalDate.now(), "SOXL", "LOC", "AT_CLOSE",
-                direction, new BigDecimal("22.00"), 5, status, filledQuantity, filledPrice);
+                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, filled_quantity, filled_price, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accId, cId, tradeDate, ticker, "LOC", "AT_CLOSE",
+                direction, Order.UNKNOWN_LEG, new BigDecimal("22.00"), 5, status, filledQuantity, filledPrice);
     }
 
     private void insertAccount(UUID accId, UUID ownerUserId, boolean deleted) {
@@ -98,6 +121,40 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         BigDecimal result = adapter.sumFilledBuyAmountByCycleId(cycleId);
 
         assertThat(result).isEqualByComparingTo(new BigDecimal("140.00"));
+    }
+
+    @Test
+    void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_sumsOnlyMatchingReservations() {
+        LocalDate databaseTradeDate = LocalDate.of(2026, 7, 14);
+        LocalDate domainTradeDate = TradeDateConverter.toKst(databaseTradeDate);
+        UUID otherAccountId = UUID.randomUUID();
+        insertAccount(otherAccountId, userId, false);
+
+        // 대상 계좌·거래일·종목의 PLANNED/PLACED SELL 수량만 예약분으로 합산한다.
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLANNED", null, null); // 5
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLACED", null, null);  // 5
+
+        // 각 필터를 실제 행으로 교차 검증한다.
+        insertOrderForAccount(otherAccountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLANNED", null, null); // 다른 계좌
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate.plusDays(1), "SOXL", "SELL", "PLACED", null, null); // 다른 날짜
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "TQQQ", "SELL", "PLANNED", null, null); // 다른 종목
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "FILLED", null, null); // 체결 완료
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "CANCELLED", null, null); // 취소됨
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "BUY", "PLANNED", null, null); // 다른 방향
+
+        int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                accountId, domainTradeDate, Ticker.SOXL);
+
+        assertThat(result).isEqualTo(10);
+    }
+
+    @Test
+    void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_returnsZeroWhenNoReservationMatches() {
+        // SQL COALESCE로 매칭 주문이 없어도 0을 반환한다
+        int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                accountId, LocalDate.now().plusDays(1), Ticker.TQQQ);
+
+        assertThat(result).isZero();
     }
 
     @Test

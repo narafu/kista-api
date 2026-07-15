@@ -13,25 +13,26 @@ public record AccountBalance(
         BigDecimal avgPrice,  // 평균 매입가 (holdings==0이면 null)
         BigDecimal usdDeposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
-    // 주문 유효성 검사: 총 매수금액 > 가용잔액 or 총 매도수량 > 보유수량이면 false
-    public boolean isOrderValid(List<Order> orders) {
-        BigDecimal totalBuyAmount = orders.stream()
+    // 주문 목록 중 BUY 합계 금액 — isOrderValid/hasSufficientDepositFor/TradingOrderBudgetAllocator 공용
+    public static BigDecimal buyTotal(List<Order> orders) {
+        return orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // 주문 유효성 검사: 총 매수금액 > 가용잔액 or 총 매도수량 > 보유수량이면 false
+    public boolean isOrderValid(List<Order> orders) {
         int totalSellQuantity = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
-        return totalBuyAmount.compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
+        return buyTotal(orders).compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
     }
 
     // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live usdDeposit − 타 전략 당일 PLANNED BUY 합계)
     // 배치 스케쥴러의 isOrderValid()와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
     public boolean hasSufficientDepositFor(List<Order> orders, BigDecimal otherStrategyBuyTotal) {
-        BigDecimal newBuyTotal = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal newBuyTotal = buyTotal(orders);
         if (newBuyTotal.compareTo(BigDecimal.ZERO) <= 0) return true; // BUY 없으면 통과
         BigDecimal available = usdDeposit().subtract(otherStrategyBuyTotal);
         return newBuyTotal.compareTo(available) <= 0;

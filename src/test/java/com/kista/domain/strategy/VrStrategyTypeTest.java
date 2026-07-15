@@ -54,14 +54,16 @@ class VrStrategyTypeTest {
                 new BigDecimal("5000.00"), BigDecimal.ZERO,
                 true, false, 10, 0);
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
-                .stream().filter(o -> o.direction() == SELL).toList();
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+        Order sell = orders.getFirst();
 
-        assertThat(sells).hasSize(1);
-        assertThat(sells.getFirst().orderType()).isEqualTo(LOC);
-        assertThat(sells.getFirst().timing()).isEqualTo(AT_CLOSE);
-        assertThat(sells.getFirst().price()).isEqualByComparingTo("90.00");
-        assertThat(sells.getFirst().quantity()).isEqualTo(5);
+        assertThat(orders).hasSize(1);
+        assertThat(sell.orderType()).isEqualTo(LOC);
+        assertThat(sell.timing()).isEqualTo(AT_CLOSE);
+        assertThat(sell.price()).isEqualByComparingTo("90.00");
+        assertThat(sell.quantity()).isEqualTo(5);
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("VR_SELL_01");
     }
 
     @Test
@@ -73,14 +75,16 @@ class VrStrategyTypeTest {
                 new BigDecimal("5000.00"), BigDecimal.ZERO,
                 true, false, 10, 0);
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
-                .stream().filter(o -> o.direction() == BUY).toList();
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+        Order buy = orders.getFirst();
 
-        assertThat(buys).hasSize(1);
-        assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
-        assertThat(buys.getFirst().timing()).isEqualTo(AT_CLOSE);
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("110.00");
-        assertThat(buys.getFirst().quantity()).isEqualTo(4);
+        assertThat(orders).hasSize(1);
+        assertThat(buy.orderType()).isEqualTo(LOC);
+        assertThat(buy.timing()).isEqualTo(AT_CLOSE);
+        assertThat(buy.price()).isEqualByComparingTo("110.00");
+        assertThat(buy.quantity()).isEqualTo(4);
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("VR_BUY_01");
     }
 
     @Test
@@ -179,6 +183,19 @@ class VrStrategyTypeTest {
         assertThat(buys.getFirst().price()).isEqualByComparingTo("1700.00");
     }
 
+    @Test
+    @DisplayName("매수 사다리의 병합 주문에는 생성 순서 leg를 부여한다")
+    void buyLadder_assignsSequentialLegs() {
+        VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("3200.00"));
+
+        List<Order> buyOrders = strategy.buildOrders(position, TQQQ, null, TODAY)
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        assertThat(buyOrders).extracting(Order::orderLeg)
+                .containsExactly("VR_BUY_01", "VR_BUY_02");
+    }
+
     // ── pool(예수금) 잔액 부족 시나리오 ────────────────────────────────────────
 
     @Test
@@ -223,6 +240,8 @@ class VrStrategyTypeTest {
         assertThat(sells.get(1).price()).isEqualByComparingTo("550.00");
         assertThat(sells.get(2).price()).isEqualByComparingTo("1100.00");
         assertThat(sells).allMatch(o -> o.quantity() == 1);
+        assertThat(sells).extracting(Order::orderLeg)
+                .containsExactly("VR_SELL_01", "VR_SELL_02", "VR_SELL_03");
 
         // 매수는 1주씩
         assertThat(buys).isNotEmpty();

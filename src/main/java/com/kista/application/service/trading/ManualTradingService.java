@@ -84,8 +84,8 @@ class ManualTradingService {
             throw new ManualTradingException("예수금이 부족합니다");
         }
 
-        // 보유수량 부족 체크: SELL 수량 합계 > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
-        checkSellableOrThrow(account, strategy, plan.orders());
+        // 보유수량 부족 체크: 기존 예약 SELL + 신규 SELL > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
+        checkSellableOrThrow(account, strategy, today, plan.orders());
 
         orderPlanner.savePlannedOrders(plan.orders(), account, currentCycle.id());
 
@@ -122,15 +122,17 @@ class ManualTradingService {
         }
     }
 
-    // SELL 수량 합계 > 판매가능수량이면 ManualTradingException
-    private void checkSellableOrThrow(Account account, Strategy strategy, List<Order> orders) {
+    // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
+    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
         int sellableQty = registry.require(account, SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account).quantity();
-        log.info("SELL 수량 검증: [{}] {} 계획={}주, 판매가능={}주",
-                account.nickname(), strategy.ticker().name(), newSellTotal, sellableQty);
-        if (newSellTotal > sellableQty) {
+        int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                account.id(), tradeDate, strategy.ticker());
+        log.info("SELL 수량 검증: [{}] {} 예약={}주, 신규={}주, 판매가능={}주",
+                account.nickname(), strategy.ticker().name(), reservedSellTotal, newSellTotal, sellableQty);
+        if (reservedSellTotal + newSellTotal > sellableQty) {
             throw new ManualTradingException("보유 수량이 부족합니다");
         }
     }

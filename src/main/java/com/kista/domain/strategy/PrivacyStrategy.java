@@ -87,8 +87,30 @@ public class PrivacyStrategy {
                 buyOrders.add(Order.planned(e.tradeDate, e.ticker, e.orderType, BUY, qty, e.price, AT_CLOSE));
             }
         }
-        List<Order> sellOrders = buildSellOrders(explicitSells, nullSellTemplate, balance, multiple);
+        buyOrders = assignSequentialLegs(sortOrdersForStableLegs(buyOrders), "PRIVACY_BUY");
+        List<Order> sellOrders = assignSequentialLegs(
+                sortOrdersForStableLegs(buildSellOrders(explicitSells, nullSellTemplate, balance, multiple)), "PRIVACY_SELL");
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
+    }
+
+    private List<Order> sortOrdersForStableLegs(List<Order> orders) {
+        return orders.stream()
+                .sorted(Comparator
+                        .comparing(Order::direction)
+                        .thenComparing((Order order) -> order.direction() == BUY
+                                ? order.price().negate()
+                                : order.price())
+                        .thenComparing(Order::orderType)
+                        .thenComparing(Order::quantity, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private List<Order> assignSequentialLegs(List<Order> orders, String prefix) {
+        List<Order> result = new ArrayList<>();
+        for (int i = 0; i < orders.size(); i++) {
+            result.add(orders.get(i).withLeg(Order.leg(prefix, i + 1)));
+        }
+        return result;
     }
 
     // 명시 SELL + null SELL("잔량 전부") 합산하여 Order 리스트 반환

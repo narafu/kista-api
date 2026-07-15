@@ -92,6 +92,15 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+            UUID accountId, LocalDate tradeDate, Ticker ticker) {
+        // KST 도메인 날짜를 UTC DB 거래일로 변환해 미체결 SELL 예약 수량을 합산한다
+        Long quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+                accountId, TradeDateConverter.toUtc(tradeDate), ticker.name());
+        return quantity != null ? Math.toIntExact(quantity) : 0;
+    }
+
+    @Override
     public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
                 accountId,
@@ -178,6 +187,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setOrderType(o.orderType());
         e.setTiming(o.timing());
         e.setDirection(o.direction());
+        e.setOrderLeg(o.orderLeg());
         e.setQuantity(o.quantity()); // quantity는 모든 저장 경로에서 non-null 보장 (Order.planned/withPrice 팩토리 int 파라미터)
         e.setPrice(o.price());
         e.setStatus(o.status());
@@ -190,7 +200,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     private Order toDomain(OrderEntity e) {
         return new Order(
                 e.getId(), e.getAccountId(), e.getStrategyCycleId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
-                e.getOrderType(), e.getTiming(), e.getDirection(), e.getQuantity(), e.getPrice(),
+                e.getOrderType(), e.getTiming(), e.getDirection(), e.getOrderLeg(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getExternalOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );
     }

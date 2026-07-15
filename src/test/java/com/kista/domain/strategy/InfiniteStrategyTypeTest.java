@@ -44,6 +44,9 @@ class InfiniteStrategyTypeTest {
                 && o.quantity() == 1 && o.price().compareTo(position.referencePrice()) == 0);
         assertThat(orders.get(2)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
         assertThat(orders.get(3)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8 && o.price().compareTo(position.targetPrice()) == 0);
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                        "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
         assertThat(orders).allMatch(o -> o.ticker() == Ticker.SOXL && o.tradeDate().equals(TODAY));
     }
 
@@ -80,6 +83,8 @@ class InfiniteStrategyTypeTest {
 
         assertThat(orders).hasSize(1);
         assertThat(orders.getFirst()).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 50); // 200/4
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_MOC_SELL");
     }
 
     @Test
@@ -96,6 +101,8 @@ class InfiniteStrategyTypeTest {
         assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY);
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 50); // 200/4
         assertThat(orders.get(2)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 150); // 200-50
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
     }
 
     @Test
@@ -164,6 +171,10 @@ class InfiniteStrategyTypeTest {
         return Order.planned(TODAY, Ticker.SOXL, LOC, BUY, quantity, new BigDecimal(price));
     }
 
+    private Order buy(String price, int quantity, String orderLeg) {
+        return Order.planned(TODAY, Ticker.SOXL, LOC, BUY, quantity, new BigDecimal(price), orderLeg);
+    }
+
     @Test
     @DisplayName("buildCappedBuyOrders 전반 2건, 캡 후 가격 상이: ①②+보정 3건 = 5건")
     void buildCappedBuyOrders_twoBuys_distinctCaps_recalculatesBoth() {
@@ -171,7 +182,9 @@ class InfiniteStrategyTypeTest {
         // qty1 = floor((1000/2) / 55) = 9 / qty2 = floor((1000-55×9) / 52) = floor(9.71) = 9
         // 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.62 — 각 1주 LOC
         InfinitePosition position = positionWithUnitAmount("20000");
-        List<Order> buyOrders = List.of(buy("60.00", 1), buy("52.00", 1));
+        List<Order> buyOrders = List.of(
+                buy("60.00", 1, "INFINITE_EARLY_AVG_BUY"),
+                buy("52.00", 1, "INFINITE_EARLY_REF_BUY"));
 
         List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
@@ -186,6 +199,9 @@ class InfiniteStrategyTypeTest {
         assertThat(result.get(3).price()).isEqualByComparingTo("50.00");
         assertThat(result.get(4).quantity()).isEqualTo(1);
         assertThat(result.get(4).price()).isEqualByComparingTo("47.62");
+        assertThat(result).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                        "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
     }
 
     @Test
@@ -194,7 +210,9 @@ class InfiniteStrategyTypeTest {
         // cap=55, buy①=70·buy②=60 모두 55로 캡 → 동일 가격이면 병합
         // qty1 = floor((1000/2) / 55) = 9 / qty2 = floor((1000-55×9) / 55) = floor(9.18) = 9 / merged = 18
         InfinitePosition position = positionWithUnitAmount("20000");
-        List<Order> buyOrders = List.of(buy("70.00", 1), buy("60.00", 1));
+        List<Order> buyOrders = List.of(
+                buy("70.00", 1, "INFINITE_EARLY_AVG_BUY"),
+                buy("60.00", 1, "INFINITE_EARLY_REF_BUY"));
 
         List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
@@ -205,6 +223,9 @@ class InfiniteStrategyTypeTest {
         assertThat(result.get(1).price()).isEqualByComparingTo("52.63");
         assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
         assertThat(result.get(3).price()).isEqualByComparingTo("47.62");
+        assertThat(result).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_EARLY_MERGED_BUY",
+                        "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
     }
 
     @Test

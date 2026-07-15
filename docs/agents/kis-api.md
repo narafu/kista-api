@@ -26,7 +26,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   3. **주문 body를 Map(compact JSON)으로 전송**: KIS GW는 raw JSON String 포맷만 허용 — `KisOrderApi.place()`는 `String.format()` 방식 사용 (LinkedHashMap → Jackson 직렬화 금지)
   - 재시도 로직 없음 — 원인 제거로만 해결
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
-- `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > KIS 실잔고(DB 이력과 불일치) 또는 매수 금액 > 실가용자금. 주문 계산 후 2-조건 체크(`totalBuyAmount > usdDeposit OR totalSellQuantity > holdings`)로 사전 감지 가능
+- `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 `TradingOrderBudgetAllocator`에서 BUY·SELL을 독립 검증하며, BUY는 cap·correction 반영 최종 총액과 기존 PLANNED 금액을, SELL은 계좌·거래일·종목별 기존 PLANNED/PLACED 예약 수량을 각각 반영한다. 수동 SELL도 기존 예약 수량과 신규 수량의 합을 검증한다.
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능
