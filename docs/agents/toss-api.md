@@ -26,3 +26,11 @@
 - KIS API와 필드명·인증 방식이 다르므로 혼용 주의
 - `TossApiException` → `GlobalExceptionHandler` 503 자동 처리
 - `Account.isToss()` 삭제됨 — `account.broker() == Account.Broker.TOSS` 직접 비교
+
+### 전일종가(prevClose) 조회 — TossPriceApi.fetchPrevClose()
+
+- `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
+- `before` 시각 계산이 핵심: `DstInfo.isRegularSessionActive()`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `DstInfo.lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 `Instant.now()`
+- **`DstInfo.marketOpen` 필드를 그대로 쓰면 안 됨**: 이 필드는 "오늘 날짜" 고정이라 자정~개장 전(00:00~22:30 KST) 사이 호출 시 실제 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킴 — `lastSessionOpenInstant()`가 `nextTradeDate()`와 같은 패턴으로 날짜 롤백 처리한 버전이므로 이걸 사용
+- `PrevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
+- 과거 이력: 최신 캔들 2개 중 배열 인덱스로 확정 종가를 추측하던 방식이 "장마감 후에도 최신 캔들을 미확정으로 오인" + "DIRECT가 프리마켓까지 포함해 그 구간도 stale" 버그 2건을 냈음 — `count=1`+`before` 방식으로 인덱스 추측 자체를 제거해 해결

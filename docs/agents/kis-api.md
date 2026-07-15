@@ -76,6 +76,11 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - KIS 거래소 코드 두 체계 혼용 주의: `OVRS_EXCG_CD` (주문·체결·잔고 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
 - `KisExchangeRegistry`(adapter/out/kis): `Ticker → (ovrsExcgCd, excd)` 매핑 전담 — TQQQ=NASD/NAS, SOXL/USD/MAGX=AMEX/AMS
 
+### 전일종가(prevClose) 조회 — KisPriceApi.getPriceSnapshot()/getPriceSnapshots()
+
+- 단건(`HHDFS00000300`)·복수종목(`HHDFS76220000`) 응답 모두 `base`(전일종가) 필드를 `last`(현재가)와 함께 반환 — **별도 API 호출 없이 `base` 필드를 그대로 prevClose로 사용** (빈값이면 current로 fallback)
+- 과거엔 "`base`는 장 시작 전엔 하루 더 과거 종가일 수 있다"는 결함 회피를 위해 종목별로 `dailyprice`(`HHDFS76240000`)를 별도 호출해 확정 종가를 재조회했으나, 정확도보다 단순성(종목당 API 호출 1회)을 택해 제거함 — 운영 중 이상 종가(개장 전 시간대)가 관측되면 이 트레이드오프부터 의심할 것
+
 ### KIS 응답 Ticker 필터링 패턴
 - 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> Ticker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`
 - `Ticker.tryParse`가 empty인 항목은 자동 제외 (silent drop) — 필요 시 `log.warn("KIS 응답 Ticker 외 종목 무시: {}", pdno)` 추가
