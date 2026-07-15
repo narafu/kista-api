@@ -21,6 +21,8 @@ public interface AccountStatisticsUseCase {
     PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId);
     List<MarginItem> getMargin(UUID accountId, UUID requesterId);
     DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
+    // 유저 스코프 일별 거래내역 조회 (대시보드 위젯용 — 보유 계좌 전체 합산, 1회 조회)
+    DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to);
     Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers);
     CycleHistoryPage getByAccount(UUID accountId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);
     CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to, Instant cursor, int size);

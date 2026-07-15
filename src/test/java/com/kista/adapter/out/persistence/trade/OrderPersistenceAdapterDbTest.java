@@ -23,13 +23,14 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired OrderPersistenceAdapter adapter;
 
+    private UUID userId;
     private UUID accountId;
     private UUID cycleId;    // 합산 대상 사이클
     private UUID otherCycleId; // 제외 대상 타 사이클
 
     @BeforeEach
     void setUp() {
-        UUID userId = UUID.randomUUID();
+        userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
         UUID strategyId = UUID.randomUUID();
         UUID strategyVersionId = UUID.randomUUID();
@@ -60,11 +61,25 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     // 주문 1건 직접 삽입 헬퍼
     private void insertOrder(UUID cId, String direction, String status,
                              Integer filledQuantity, BigDecimal filledPrice) {
+        insertOrderForAccount(accountId, cId, direction, status, filledQuantity, filledPrice);
+    }
+
+    private void insertOrderForAccount(UUID accId, UUID cId, String direction, String status,
+                             Integer filledQuantity, BigDecimal filledPrice) {
         jdbcTemplate.update(
                 "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, price, quantity, status, filled_quantity, filled_price, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, cId, LocalDate.now(), "SOXL", "LOC", "AT_CLOSE",
+                accId, cId, LocalDate.now(), "SOXL", "LOC", "AT_CLOSE",
                 direction, new BigDecimal("22.00"), 5, status, filledQuantity, filledPrice);
+    }
+
+    private void insertAccount(UUID accId, UUID ownerUserId, boolean deleted) {
+        String accountNo = accId.toString().replace("-", "").substring(0, 8);
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at, deleted_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)",
+                accId, ownerUserId, "테스트계좌-" + accId, "KIS", accountNo, "01", "key", "secret",
+                deleted ? java.sql.Timestamp.from(java.time.Instant.now()) : null);
     }
 
     @Test
@@ -83,5 +98,31 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         BigDecimal result = adapter.sumFilledBuyAmountByCycleId(cycleId);
 
         assertThat(result).isEqualByComparingTo(new BigDecimal("140.00"));
+    }
+
+    @Test
+    void findFilledByUser_aggregatesOwnedAccountsExcludingOtherUsersAndDeleted() {
+        UUID secondAccountId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID otherUserAccountId = UUID.randomUUID();
+        UUID deletedAccountId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
+        insertAccount(secondAccountId, userId, false);       // 동일 유저 2번째 계좌 — 포함
+        insertAccount(otherUserAccountId, otherUserId, false); // 타 유저 계좌 — 제외
+        insertAccount(deletedAccountId, userId, true);        // 소프트 삭제 계좌 — 제외
+
+        insertOrderForAccount(accountId, cycleId, "BUY", "FILLED", 5, new BigDecimal("10.00"));           // 포함 (50.00)
+        insertOrderForAccount(secondAccountId, cycleId, "SELL", "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 포함 (30.00)
+        insertOrderForAccount(accountId, cycleId, "BUY", "PLANNED", null, null);                          // 제외 (status 불일치)
+        insertOrderForAccount(otherUserAccountId, cycleId, "BUY", "FILLED", 10, new BigDecimal("30.00")); // 제외 (다른 유저)
+        insertOrderForAccount(deletedAccountId, cycleId, "BUY", "FILLED", 1, new BigDecimal("5.00"));     // 제외 (삭제된 계좌)
+
+        var result = adapter.findFilledByUser(userId, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(o -> o.accountId()).containsExactlyInAnyOrder(accountId, secondAccountId);
     }
 }

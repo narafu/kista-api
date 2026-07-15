@@ -63,6 +63,22 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("to") LocalDate to,
             @Param("ticker") String ticker);
 
+    // 유저 기준 기간+상태 복합 조건 조회 (account 경유 JOIN — 대시보드 배치 조회용, 계좌 구분 없이 전체 합산)
+    @Query(value = """
+            SELECT o.* FROM orders o
+            JOIN accounts a ON o.account_id = a.id
+            WHERE a.user_id = :userId
+              AND o.trade_date BETWEEN :from AND :to
+              AND o.status IN :statuses
+              AND a.deleted_at IS NULL
+            ORDER BY o.trade_date DESC, o.created_at DESC
+            """, nativeQuery = true)
+    List<OrderEntity> findByUserIdAndTradeDateBetweenAndStatusIn(
+            @Param("userId") UUID userId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("statuses") List<String> statuses);
+
     // 계좌·날짜범위·상태 복합 조건 조회 (daily-trades DB 전환용) — 최신순
     @Query(value = """
             SELECT * FROM orders

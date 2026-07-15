@@ -1,5 +1,7 @@
 package com.kista.adapter.in.web;
 
+import com.kista.domain.model.broker.DailyTransactionResult;
+import com.kista.domain.model.broker.DailyTransactionSummary;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
@@ -12,6 +14,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -78,5 +81,18 @@ class DashboardControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasMore").value(true))
                 .andExpect(jsonPath("$.nextCursor").value("2024-06-01T00:00:00Z"));
+    }
+
+    @Test
+    void dailyTrades_returns_user_scoped_result_without_account_path() throws Exception {
+        var result = new DailyTransactionResult(List.of(),
+                new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        when(accountStatistics.getDailyTransactionsForUser(any(), any(), any())).thenReturn(result);
+
+        mockMvc.perform(get("/api/daily-trades")
+                        .param("from", "2024-01-01").param("to", "2024-01-31")
+                        .with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray());
     }
 }

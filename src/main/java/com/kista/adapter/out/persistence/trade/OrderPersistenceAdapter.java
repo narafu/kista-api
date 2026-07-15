@@ -101,6 +101,15 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to) {
+        return toDomainList(repository.findByUserIdAndTradeDateBetweenAndStatusIn(
+                userId,
+                TradeDateConverter.toUtc(from),
+                TradeDateConverter.toUtc(to),
+                List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
+    }
+
+    @Override
     public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
                 strategyId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));

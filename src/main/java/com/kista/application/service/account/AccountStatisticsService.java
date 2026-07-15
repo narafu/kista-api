@@ -64,8 +64,15 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
         accountPort.requireOwnedAccount(accountId, requesterId);
-        List<Order> filled = orderPort.findFilledByAccount(accountId, from, to);
+        return toDailyTransactionResult(orderPort.findFilledByAccount(accountId, from, to));
+    }
 
+    @Override
+    public DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to) {
+        return toDailyTransactionResult(orderPort.findFilledByUser(requesterId, from, to));
+    }
+
+    private DailyTransactionResult toDailyTransactionResult(List<Order> filled) {
         List<DailyTransaction> items = filled.stream()
                 .filter(o -> o.filledQuantity() != null && o.filledQuantity() > 0)
                 .map(o -> {
