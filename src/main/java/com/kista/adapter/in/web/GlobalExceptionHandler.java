@@ -19,6 +19,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -53,6 +54,7 @@ public class GlobalExceptionHandler {
         Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         // SSE(TradeSseEmitterRegistry) 30분 타임아웃 등 정상 연결 종료 — 실제 장애 아님, saveErrorLog 생략
+        Map.entry(AsyncRequestNotUsableException.class,             new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Async Request Not Usable")),
         Map.entry(AsyncRequestTimeoutException.class,               new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Async Request Timeout"))
     );
 

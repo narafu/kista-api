@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -14,6 +15,9 @@ interface PrivacyTradeBaseJpaRepository extends JpaRepository<PrivacyTradeBaseEn
     Optional<PrivacyTradeBaseEntity> findByTradeDateAndTicker(LocalDate tradeDate, Ticker ticker);
 
     Optional<PrivacyTradeBaseEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
+
+    @EntityGraph(attributePaths = "orders")
+    Optional<PrivacyTradeBaseEntity> findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
 
     // N+1 방지: 주문(orders)을 join fetch, DISTINCT로 기준 매매표 중복 제거, 거래일 내림차순
     @Query("SELECT DISTINCT b FROM PrivacyTradeBaseEntity b LEFT JOIN FETCH b.orders "

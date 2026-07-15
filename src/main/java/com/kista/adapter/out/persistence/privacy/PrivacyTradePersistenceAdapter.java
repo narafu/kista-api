@@ -4,6 +4,7 @@ import com.kista.common.TimeZones;
 import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.*;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
@@ -127,7 +128,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Transactional(readOnly = true)
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
         // today는 KST 일자, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
-        return baseRepository.findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
+        return baseRepository.findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
                         TradeDateConverter.toUtc(today), Ticker.SOXL)
                 .map(entity -> {
                     LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
@@ -138,6 +139,12 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                     return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
                             entity.getCurrentCycleStart(), trades);
                 });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrivacyTradeBase findBaseIfPrivacy(Strategy strategy, LocalDate today) {
+        return strategy.isPrivacy() ? findTodayTrade(today).orElse(null) : null;
     }
 
     @Override
