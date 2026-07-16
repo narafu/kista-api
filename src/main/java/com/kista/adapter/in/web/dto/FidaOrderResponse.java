@@ -17,8 +17,24 @@ public record FidaOrderResponse(
         BigDecimal currentCycleRealizedPnl,
         BigDecimal avgPrice,
         int holdings,
-        List<Order> orders
+        List<OrderItem> orders
 ) {
+    public record OrderItem(
+            String direction,
+            String orderType,
+            Integer quantity,
+            BigDecimal price
+    ) {
+        static OrderItem from(Order order) {
+            return new OrderItem(
+                    order.direction().name(),
+                    order.orderType().name(),
+                    order.quantity(),
+                    order.price()
+            );
+        }
+    }
+
     public static FidaOrderResponse of(UUID id, FidaOrderCommand command) {
         return new FidaOrderResponse(
                 id,
@@ -28,7 +44,7 @@ public record FidaOrderResponse(
                 command.currentCycleRealizedPnl(),
                 command.avgPrice(),
                 command.holdings(),
-                command.orders()
+                command.orders() == null ? List.of() : command.orders().stream().map(OrderItem::from).toList()
         );
     }
 }

@@ -75,7 +75,8 @@ public class VrStrategy {
         BigDecimal dailyBudget = totalBudget.divide(BigDecimal.valueOf(Math.max(remainingTradingDays, 1)), 2, HALF_UP);
         int quantity = dailyBudget.divide(price, 0, java.math.RoundingMode.DOWN).intValue();
         if (quantity <= 0) return List.of();
-        return List.of(Order.planned(tradeDate, ticker, LOC, direction, quantity, price, AT_CLOSE));
+        return List.of(Order.planned(tradeDate, ticker, LOC, direction, quantity, price, AT_CLOSE,
+                Order.leg("VR_" + direction, 1)));
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
@@ -134,13 +135,15 @@ public class VrStrategy {
                 currentQty += o.quantity();
             } else {
                 // 가격 전환 시 이전 그룹 확정
-                merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN));
+                merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
+                        Order.leg("VR_BUY", merged.size() + 1)));
                 currentPrice = o.price();
                 currentQty = o.quantity();
             }
         }
         // 마지막 그룹 추가
-        merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN));
+        merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
+                Order.leg("VR_BUY", merged.size() + 1)));
         return merged;
     }
 
@@ -159,7 +162,8 @@ public class VrStrategy {
             int quantity = (position.holdings() > MAX_RUNGS && s == MAX_RUNGS)
                     ? position.holdings() - (MAX_RUNGS - 1)
                     : 1;
-            sells.add(Order.planned(tradeDate, ticker, LIMIT, SELL, quantity, price, AT_OPEN));
+            sells.add(Order.planned(tradeDate, ticker, LIMIT, SELL, quantity, price, AT_OPEN,
+                    Order.leg("VR_SELL", s)));
         }
         return sells;
     }

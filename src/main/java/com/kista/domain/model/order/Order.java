@@ -15,6 +15,7 @@ public record Order(
         OrderType orderType,             // 주문 유형 (LOC/MOC/LIMIT) — 증권사 실행 지시
         OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
         OrderDirection direction,        // 매수/매도 방향
+        String orderLeg,                 // 전략 주문 다리 식별자
         Integer quantity,                // 주문 수량(nullable)
         BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,              // 주문 상태
@@ -22,6 +23,20 @@ public record Order(
         Integer filledQuantity,          // 체결 수량 (null=미확인, 0=미체결)
         BigDecimal filledPrice           // 체결 가중평균가 (null=미체결)
 ) {
+    public static final String UNKNOWN_LEG = "UNKNOWN";
+
+    public Order(UUID id, UUID accountId, UUID strategyCycleId, LocalDate tradeDate, Ticker ticker,
+                 OrderType orderType, OrderTiming timing, OrderDirection direction,
+                 Integer quantity, BigDecimal price, OrderStatus status, String externalOrderId,
+                 Integer filledQuantity, BigDecimal filledPrice) {
+        this(id, accountId, strategyCycleId, tradeDate, ticker, orderType, timing, direction,
+                UNKNOWN_LEG, quantity, price, status, externalOrderId, filledQuantity, filledPrice);
+    }
+
+    public Order {
+        if (orderLeg == null || orderLeg.isBlank()) orderLeg = UNKNOWN_LEG;
+    }
+
     public enum OrderType {
         LOC,   // Limit On Close: 종가 지정가 주문
         MOC,   // Market On Close: 종가 시장가 주문
@@ -54,7 +69,7 @@ public record Order(
     // 전략 계산 결과(template)를 특정 계좌·사이클의 PLANNED 주문으로 변환 (timing 전파)
     public static Order plan(Order template, UUID accountId, UUID strategyCycleId) {
         return new Order(null, accountId, strategyCycleId, template.tradeDate(), template.ticker(),
-                template.orderType(), template.timing(), template.direction(), template.quantity(),
+                template.orderType(), template.timing(), template.direction(), template.orderLeg(), template.quantity(),
                 template.price(), OrderStatus.PLANNED, null, null, null);
 
     }
@@ -69,8 +84,22 @@ public record Order(
     public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
                                  OrderDirection direction, int quantity, BigDecimal price,
                                  OrderTiming timing) {
+        return planned(tradeDate, ticker, orderType, direction, quantity, price, timing, UNKNOWN_LEG);
+    }
+
+    // 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price,
+                                 String orderLeg) {
+        return planned(tradeDate, ticker, orderType, direction, quantity, price, OrderTiming.AT_CLOSE, orderLeg);
+    }
+
+    // 접수 시점과 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price,
+                                 OrderTiming timing, String orderLeg) {
         return new Order(null, null, null, tradeDate, ticker, orderType, timing, direction,
-                quantity, price, OrderStatus.PLANNED, null, null, null);
+                orderLeg, quantity, price, OrderStatus.PLANNED, null, null, null);
     }
 
     // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록
@@ -78,21 +107,21 @@ public record Order(
                                      Ticker ticker, OrderTiming timing, OrderDirection direction,
                                      int quantity, BigDecimal price, String externalOrderId) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
-                timing, direction, quantity, price, OrderStatus.FILLED, externalOrderId,
+                timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,
                 quantity, price);
     }
 
     // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
     public Order withPlaced(String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
-                orderType, timing, direction, quantity, price,
+                orderType, timing, direction, orderLeg, quantity, price,
                 OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     // 가격만 교체한 새 PLANNED 주문 — 보정 주문 재저장 시 기존 id·체결 정보 초기화
     public Order withPrice(BigDecimal newPrice) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
-                orderType, timing, direction, quantity, newPrice,
+                orderType, timing, direction, orderLeg, quantity, newPrice,
                 OrderStatus.PLANNED, null, null, null);
     }
 
@@ -100,14 +129,26 @@ public record Order(
     public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
                                 int quantity, BigDecimal price, OrderTiming timing) {
         return new Order(null, source.accountId(), source.strategyCycleId(), tradeDate,
-                source.ticker(), source.orderType(), timing, direction, quantity, price,
+                source.ticker(), source.orderType(), timing, direction, source.orderLeg(), quantity, price,
                 OrderStatus.PLANNED, null, null, null);
     }
 
     // 즉시 접수 실패 시 FAILED 주문으로 변환 — id·접수번호·체결 정보 초기화
     public Order withFailed() {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
-                orderType, timing, direction, quantity, price,
+                orderType, timing, direction, orderLeg, quantity, price,
                 OrderStatus.FAILED, null, null, null);
+    }
+
+    // 전략 주문 다리 식별자만 교체한 새 주문
+    public Order withLeg(String newLeg) {
+        return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, newLeg, quantity, price, status,
+                externalOrderId, filledQuantity, filledPrice);
+    }
+
+    public static String leg(String prefix, int index) {
+        if (index < 1) throw new IllegalArgumentException("order leg index must be positive: " + index);
+        return "%s_%02d".formatted(prefix, index);
     }
 }

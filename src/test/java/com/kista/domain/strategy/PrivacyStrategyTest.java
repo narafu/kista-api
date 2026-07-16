@@ -61,6 +61,32 @@ class PrivacyStrategyTest {
         assertThat(orders).hasSize(3);
         assertThat(buyOrders(orders)).extracting(Order::quantity).containsExactlyInAnyOrder(100, 80);
         assertThat(sellOrders(orders)).extracting(Order::quantity).containsExactly(50);
+        assertThat(buyOrders(orders)).extracting(Order::orderLeg)
+                .containsExactly("PRIVACY_BUY_01", "PRIVACY_BUY_02");
+        assertThat(sellOrders(orders)).extracting(Order::orderLeg)
+                .containsExactly("PRIVACY_SELL_01");
+    }
+
+    @Test
+    @DisplayName("입력 순서가 달라도 가격 정렬 기준으로 같은 leg를 부여")
+    void assignsStableLegsAfterSorting() {
+        PrivacyTradeBase base = base(240, List.of(
+                sell(20, "13"),
+                buy(80, "9"),
+                sell(10, "12"),
+                buy(100, "10")
+        ));
+
+        List<Order> orders = strategy.buildOrders(balance(240), INITIAL_USD_DEPOSIT, base);
+
+        assertThat(buyOrders(orders)).extracting(Order::price, Order::orderLeg)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("10"), "PRIVACY_BUY_01"),
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("9"), "PRIVACY_BUY_02"));
+        assertThat(sellOrders(orders)).extracting(Order::price, Order::orderLeg)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("12"), "PRIVACY_SELL_01"),
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("13"), "PRIVACY_SELL_02"));
     }
 
     @Test
@@ -250,6 +276,8 @@ class PrivacyStrategyTest {
 
         assertThat(sellOrders(orders)).hasSize(3);
         assertThat(sellOrders(orders)).extracting(Order::quantity).containsExactlyInAnyOrder(23, 22, 25);
+        assertThat(orders).extracting(Order::orderLeg)
+                .containsExactly("PRIVACY_SELL_01", "PRIVACY_SELL_02", "PRIVACY_SELL_03");
     }
 
     @Test

@@ -49,6 +49,9 @@ public interface OrderPort {
     // 계좌 기준 당일 PLANNED BUY 주문 합계 (수동 실행 예수금 체크 — 타 전략 점유분 차감용)
     BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
 
+    // 계좌·거래일·종목 기준 PLANNED/PLACED SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
+    int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(UUID accountId, LocalDate tradeDate, Ticker ticker);
+
     // 계좌 기준 FILLED/PARTIALLY_FILLED 주문 조회 (일별 거래내역 달력용)
     List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to);
 

@@ -42,6 +42,12 @@
   - Add `SellableQuantityPort` mock wiring.
   - Replace all-or-nothing insufficient balance expectations.
   - Add regression tests for partial saves and close-scheduler recovery.
+- Modify `src/main/java/com/kista/domain/port/out/OrderPort.java`
+  - Add account/date/ticker SELL reservation aggregation for PLANNED/PLACED orders.
+- Modify `src/main/java/com/kista/adapter/out/persistence/trade/OrderJpaRepository.java`
+  - Add the native `COALESCE(SUM(quantity))` SELL reservation query.
+- Modify `src/main/java/com/kista/adapter/out/persistence/trade/OrderPersistenceAdapter.java`
+  - Expose the reservation aggregation through the domain port with KST/UTC conversion.
 - Modify `docs/agents/workflow.md`
   - Document slot-based scheduler behavior and account-level BUY budget allocation.
 - Modify `docs/agents/architecture.md`
@@ -49,7 +55,7 @@
 - No changes expected in:
   - `src/main/java/com/kista/domain/strategy/*Strategy.java`
   - `src/main/java/com/kista/domain/model/order/Order.java`
-  - persistence repositories or Flyway migrations.
+  - Flyway migrations; existing order columns are sufficient.
 
 ---
 
@@ -1023,6 +1029,7 @@ Confirm:
 - Side effect coverage: The plan avoids the earlier bad side effect by letting close scheduler recover missing AT_CLOSE slots even when opposite-direction orders already exist.
 - Existing-order coverage: `compute()` returning empty no longer discards an existing-order state; a dedicated PRIVACY regression test verifies placement continues.
 - VR timing coverage: The plan explicitly prevents late AT_OPEN recovery.
+- SELL reservation coverage: SELL allocation includes existing PLANNED/PLACED reservations by account and ticker, then applies deterministic same-batch allocation before accepting new candidates.
 - Privacy coverage: The plan adds PRIVACY-specific regression tests so common behavior is proven beyond INFINITE.
 - Multi-account coverage: The plan adds an account-isolation test so one account's candidates cannot consume another account's budget.
 - Placeholder scan: No task uses TBD/TODO placeholders; each helper has concrete names and expected behavior.

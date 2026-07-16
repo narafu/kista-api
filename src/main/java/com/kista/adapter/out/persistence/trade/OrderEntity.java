@@ -50,6 +50,9 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 5)
     private Order.OrderDirection direction;
 
+    @Column(name = "order_leg", nullable = false, length = 50)
+    private String orderLeg = Order.UNKNOWN_LEG; // 전략 주문 다리 식별자
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 

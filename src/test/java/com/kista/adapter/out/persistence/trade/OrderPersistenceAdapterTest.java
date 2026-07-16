@@ -143,4 +143,17 @@ class OrderPersistenceAdapterTest {
 
         assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    @Test
+    void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_delegatesWithUtcTradeDate() {
+        // KST 도메인 날짜를 UTC DB 거래일로 변환해 PLANNED/PLACED SELL 예약 수량을 합산한다
+        LocalDate utcDate = TradeDateConverter.toUtc(TODAY);
+        when(repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+                ACCOUNT_ID, utcDate, Ticker.SOXL.name())).thenReturn(8L);
+
+        int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                ACCOUNT_ID, TODAY, Ticker.SOXL);
+
+        assertThat(result).isEqualTo(8);
+    }
 }

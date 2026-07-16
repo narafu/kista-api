@@ -46,7 +46,7 @@ class TradingOrderPlannerTest {
     @Test
     @DisplayName("템플릿을 PLANNED 상태 + 신규 PK + 계좌 FK로 변환해 일괄 저장")
     void savePlannedOrders_convertsTemplatesAndSavesAll() {
-        Order buyTemplate = template(Order.OrderDirection.BUY, "50.00", 10);
+        Order buyTemplate = template(Order.OrderDirection.BUY, "50.00", 10).withLeg("INFINITE_BUY_01");
         Order sellTemplate = template(Order.OrderDirection.SELL, "60.00", 5);
 
         new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(buyTemplate, sellTemplate), ACCOUNT, STRATEGY_CYCLE_ID);
@@ -62,6 +62,7 @@ class TradingOrderPlannerTest {
         assertThat(savedBuy.status()).isEqualTo(Order.OrderStatus.PLANNED);
         assertThat(savedBuy.externalOrderId()).isNull();
         assertThat(savedBuy.direction()).isEqualTo(Order.OrderDirection.BUY);
+        assertThat(savedBuy.orderLeg()).isEqualTo("INFINITE_BUY_01");
         assertThat(savedBuy.quantity()).isEqualTo(10);
         assertThat(savedBuy.price()).isEqualByComparingTo("50.00");
 

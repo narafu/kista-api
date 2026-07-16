@@ -1,6 +1,5 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -10,8 +9,8 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +19,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,15 +42,17 @@ class TradingService {
     private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼 — KIS·Toss 모두 DB 이력(cycle_position)
-    private final BrokerAdapterRegistry registry;             // live 잔고 검사 전용 (주문 저장 직전 유효성 확인)
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
     private final TradingOrderPlanner orderPlanner;            // PLANNED 주문 저장 헬퍼
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
     private final MarketEventNotifier marketEventNotifier;    // 장 이벤트 알림 (개장·마감 사용자 알림)
+    private final TradingOrderBudgetAllocator budgetAllocator; // 계좌별 BUY 예산·SELL 판매가능수량 배정
+    private final BuyOrderPriceCapper priceCapper;             // 신규 후보 BUY 가격 cap 계산 (영속화 없음)
+    private final CycleOrderStrategies cycleOrderStrategies;   // 전략별 BUY 가격 cap 방식 조회
 
-    // planAndSaveOrders 결과: 전략별 잔고·전략 계산 상태
+    // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
             BatchContext ctx,
             AccountBalance balance,
@@ -57,8 +61,32 @@ class TradingService {
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
-    // 증권사 접수 결과: planAndSaveOrders 상태 + 접수된 주문 목록
+    // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
+
+    // 중복 생성 방지 단위 — concrete leg는 timing·direction·leg 조합으로 점유한다
+    private record OrderSlot(Order.OrderTiming timing, Order.OrderDirection direction, String orderLeg) {
+        static OrderSlot of(Order order) {
+            return new OrderSlot(order.timing(), order.direction(), order.orderLeg());
+        }
+    }
+
+    // legacy UNKNOWN leg는 기존 timing·direction 전체 슬롯을 보수적으로 점유한다
+    private record LegacySlot(Order.OrderTiming timing, Order.OrderDirection direction) {
+        static LegacySlot of(Order order) {
+            return new LegacySlot(order.timing(), order.direction());
+        }
+    }
+
+    // 전략 계산 결과 중 신규 생성 가능한 주문만 allocator에 전달하기 위한 후보
+    private record CyclePlanCandidate(
+            CycleState state,
+            List<Order> creatableOrders,
+            boolean hasExistingOrders
+    ) {}
+
+    // 예산 배정 후 실제 저장된 컨텍스트만 다음 단계 진입 대상으로 사용한다
+    private record SaveAllocationResult(Set<BatchContext> savedContexts) {}
 
     // 배치 시작 시점 가격·기준표 조회 결과 — executeBatch/placeOpenOrders 공통 (조회 대상 날짜만 다름)
     private record PriceContext(
@@ -90,7 +118,7 @@ class TradingService {
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         PriceContext priceCtx = loadPriceContext(contexts, today);
 
-        // planAndSaveOrders — 전략별: 잔고 로드 + PLANNED 주문 생성·저장 (이미 존재하면 skip)
+        // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<CycleState> states = planAll(contexts, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
         if (states.isEmpty()) return;
 
@@ -118,16 +146,22 @@ class TradingService {
         reportAll(placedStates, closingPrices, today);
     }
 
-    // 전략별: 잔고 로드 + PLANNED 주문 생성·저장 (실패 사이클은 격리)
+    // 전략별 후보를 먼저 수집하고 계좌별 예산 배정 후 AT_CLOSE 주문만 저장
     private List<CycleState> planAll(List<BatchContext> contexts, Map<Ticker, PriceSnapshot> startPriceSnapshots,
                                       PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
-        List<CycleState> states = new ArrayList<>();
+        List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            runSafely("planAndSaveOrders", ctx,
-                    () -> planAndSaveOrders(ctx, startPriceSnapshots, privacyBase, today))
-                    .ifPresent(states::add);
+            runSafely("plan 후보 생성", ctx,
+                    () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, today,
+                            EnumSet.of(Order.OrderTiming.AT_CLOSE)))
+                    .ifPresent(candidates::add);
         }
-        return states;
+        SaveAllocationResult result = saveAllocatedOrders(candidates, today);
+        return candidates.stream()
+                .filter(candidate -> candidate.hasExistingOrders()
+                        || result.savedContexts().contains(candidate.state().ctx()))
+                .map(CyclePlanCandidate::state)
+                .toList();
     }
 
     // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리)
@@ -186,64 +220,84 @@ class TradingService {
         });
     }
 
-    // planAndSaveOrders: 잔고 로드 + PLANNED 주문 생성·저장
-    // 오늘 PLANNED 또는 PLACED가 이미 있으면 재계산 없이 그대로 반환 (수동 선행 주문 보존)
-    private CycleState planAndSaveOrders(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
-                                         PrivacyTradeBase privacyBase, LocalDate today) {
-        Strategy strategy = ctx.strategy();
-        StrategyCycle currentCycle = ctx.currentCycle();
-        Account account = ctx.account();
-
-        // 1. 잔고 로드
-        AccountBalance balance = loadBalance(strategy, account);
-
-        // 2. 오늘 PLANNED·PLACED가 이미 있으면 재계산 skip (장 개시 스케쥴러 선행 또는 수동 주문 보존)
-        PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-        List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
-        if (!todayOrders.isEmpty()) {
-            return buildCycleStateFromExistingOrders(ctx, balance, priceSnapshot, privacyBase, today, todayOrders.size());
-        }
-
-        // 3. 전략 계산 → live 잔고 검증 → PLANNED 저장 (skip·부족 시 null)
-        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
-        BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
-        CycleOrderStrategy.OrderPlan plan = computeValidateAndSave(ctx, balance, prevClosePrice, today, privacyBase, price)
-                .orElse(null);
-        if (plan == null) return null;
-
-        // CycleState: INFINITE는 position, PRIVACY는 privacyBase — startPrice는 공통(둘 다 캡에 필요)
-        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        return new CycleState(ctx, balance, plan.position(), price, privacyBaseForState);
+    // concrete leg는 동일 leg만, legacy UNKNOWN leg는 같은 timing·direction 전체를 중복 생성에서 제외한다
+    private List<Order> filterCreatableOrders(List<Order> plannedTemplates, List<Order> existingOrders,
+                                              Set<Order.OrderTiming> creatableTimings) {
+        Set<OrderSlot> existingConcreteSlots = existingOrders.stream()
+                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .map(OrderSlot::of)
+                .collect(Collectors.toSet());
+        Set<LegacySlot> existingLegacySlots = existingOrders.stream()
+                .filter(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .map(LegacySlot::of)
+                .collect(Collectors.toSet());
+        return plannedTemplates.stream()
+                .filter(order -> creatableTimings.contains(order.timing()))
+                .filter(order -> !existingLegacySlots.contains(LegacySlot.of(order)))
+                .filter(order -> !existingConcreteSlots.contains(OrderSlot.of(order)))
+                .toList();
     }
 
-    // 전략 계산 → live 잔고 검증 → PLANNED 저장 — 마감·개장 스케쥴러 공통 골격
-    // empty = 전략 차원 skip(PRIVACY 기준 미수신 등) 또는 live 잔고 부족(사용자 알림 발송됨)
-    private Optional<CycleOrderStrategy.OrderPlan> computeValidateAndSave(BatchContext ctx, AccountBalance balance,
-            BigDecimal prevClosePrice, LocalDate tradeDate, PrivacyTradeBase privacyBase, BigDecimal currentPrice) {
+    // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다
+    private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
+            Map<Ticker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
+            LocalDate tradeDate, Set<Order.OrderTiming> creatableTimings) {
+        Strategy strategy = ctx.strategy();
         Account account = ctx.account();
+        AccountBalance balance = loadBalance(strategy, account);
+        PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
+        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
+        List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate);
+        CycleOrderStrategy strategyHandler = cycleOrderStrategies.of(strategy.type());
+        if (!existingOrders.isEmpty()
+                && strategyHandler.canSkipOrderComputation(existingOrders, creatableTimings)) {
+            CycleState existingState = buildCycleStateFromExistingOrders(
+                    ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), false);
+            return new CyclePlanCandidate(existingState, List.of(), true);
+        }
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(
-                balance, ctx.strategy(), prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), currentPrice);
+                balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
         if (planOpt.isEmpty()) {
             log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
-            return Optional.empty();
+            if (existingOrders.isEmpty()) return null;
+            CycleState existingState = buildCycleStateFromExistingOrders(
+                    ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), true);
+            return new CyclePlanCandidate(existingState, List.of(), true);
         }
-        // live 잔고 검사 — 부족 시 알림 후 저장 건너뜀
-        if (notifyIfInsufficientLiveBalance(account, ctx.user(), ctx.strategy(), planOpt.get().orders())) {
-            return Optional.empty();
+
+        // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
+        List<Order> preparedOrders = priceCapper.prepareForAllocation(
+                planOpt.get().orders(), price, planOpt.get().position(),
+                cycleOrderStrategies.of(strategy.type()).priceCapMode(), tradeDate);
+        validateConcreteOrderLegs(strategy, preparedOrders);
+        List<Order> creatableOrders = filterCreatableOrders(
+                preparedOrders, existingOrders, creatableTimings);
+        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
+        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), price, privacyBaseForState);
+        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
+    }
+
+    private void validateConcreteOrderLegs(Strategy strategy, List<Order> orders) {
+        List<Order> unknownLegOrders = orders.stream()
+                .filter(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .toList();
+        if (!unknownLegOrders.isEmpty()) {
+            throw new IllegalStateException("전략 주문 leg 누락: strategyType="
+                    + strategy.type() + ", count=" + unknownLegOrders.size());
         }
-        orderPlanner.savePlannedOrders(planOpt.get().orders(), account, ctx.currentCycle().id());
-        return planOpt;
     }
 
     // 오늘 PLANNED·PLACED 주문이 이미 있을 때 캡 보정을 위해 position만 재계산 (저장 없음)
-    // INFINITE: position 재계산(skip이면 null), PRIVACY: privacyBase만 담아 반환
+    // INFINITE: 필요할 때만 position 재계산, PRIVACY: privacyBase만 담아 반환
     private CycleState buildCycleStateFromExistingOrders(BatchContext ctx, AccountBalance balance,
-            PriceSnapshot priceSnapshot, PrivacyTradeBase privacyBase, LocalDate today, int existingCount) {
+            PriceSnapshot priceSnapshot, PrivacyTradeBase privacyBase, LocalDate today, int existingCount,
+            boolean recalculateInfinitePosition) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
-        if (strategy.isInfinite()) {
+        if (strategy.isInfinite() && recalculateInfinitePosition) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
             BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
             InfinitePosition recalcPos = orderComputer.compute(
@@ -288,10 +342,25 @@ class TradingService {
         }
         marketEventNotifier.notifyMarketOpen();
 
-        // 전략별: order 생성·저장 + INFINITE 매도 선접수
+        // 후보를 모두 수집한 뒤 계좌별 BUY 예산을 배정하고 AT_OPEN 주문만 선접수
+        List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            runSafely("개장 order+매도접수", ctx, () -> {
-                planSaveAndPlaceSells(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), tradeDate);
+            runSafely("개장 order 후보 생성", ctx,
+                    () -> collectCycleCandidate(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(),
+                            tradeDate, EnumSet.allOf(Order.OrderTiming.class)))
+                    .ifPresent(candidates::add);
+        }
+
+        SaveAllocationResult result = saveAllocatedOrders(candidates, tradeDate);
+        Set<BatchContext> placeableContexts = candidates.stream()
+                .filter(candidate -> candidate.hasExistingOrders()
+                        || result.savedContexts().contains(candidate.state().ctx()))
+                .map(candidate -> candidate.state().ctx())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        for (BatchContext ctx : placeableContexts) {
+            runSafely("개장 AT_OPEN 접수", ctx, () -> {
+                placeAtOpenPlannedOrders(ctx.account(), ctx.currentCycle().id(), tradeDate);
                 return null;
             });
         }
@@ -299,48 +368,67 @@ class TradingService {
         log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
     }
 
-    // 장 개시 스케쥴러 전용: order 전체 저장 + 예수금 부족 시 사용자 알람 + INFINITE SELL 즉시 접수
-    private void planSaveAndPlaceSells(BatchContext ctx, Map<Ticker, PriceSnapshot> startPriceSnapshots,
-                                       PrivacyTradeBase privacyBase, LocalDate tradeDate) {
-        Strategy strategy = ctx.strategy();
-        StrategyCycle currentCycle = ctx.currentCycle();
-        Account account = ctx.account();
+    // allocator 승인 주문만 PLANNED 저장하고 BUY/SELL 거절 사이클에는 기존 잔고 부족 알림을 재사용한다
+    private SaveAllocationResult saveAllocatedOrders(List<CyclePlanCandidate> candidates, LocalDate tradeDate)
+            throws InterruptedException {
+        Map<UUID, List<TradingOrderBudgetAllocator.Candidate>> candidatesByAccount = new LinkedHashMap<>();
+        candidates.stream()
+                .filter(candidate -> !candidate.creatableOrders().isEmpty())
+                .map(candidate -> new TradingOrderBudgetAllocator.Candidate(
+                        candidate.state().ctx(), candidate.creatableOrders()))
+                .forEach(candidate -> candidatesByAccount
+                        .computeIfAbsent(candidate.ctx().account().id(), ignored -> new ArrayList<>())
+                        .add(candidate));
 
-        // 수동 '지금 주문' 등으로 당일 주문이 이미 있으면 신규 생성만 skip — AT_OPEN 선접수는 아래에서 항상 시도
-        List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), tradeDate);
-        if (!existingOrders.isEmpty()) {
-            log.info("[{}] 당일 주문 {}건 이미 존재 — order 생성 skip, 매도 선접수만 진행", account.nickname(), existingOrders.size());
-        } else {
-            // 잔고 로드
-            AccountBalance balance = loadBalance(strategy, account);
+        Set<BatchContext> savedContexts = new LinkedHashSet<>();
+        List<TradingOrderBudgetAllocator.Allocation> allocations = new ArrayList<>();
 
-            PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-            BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
-            BigDecimal currentPrice = priceSnapshot != null ? priceSnapshot.current() : null;
-
-            // 전략 계산 → live 잔고 검증 → PLANNED 저장 (마감 스케쥴러와 공통 골격)
-            if (computeValidateAndSave(ctx, balance, prevClosePrice, tradeDate, privacyBase, currentPrice).isEmpty()) return;
+        // 계좌별 예산 조회 실패가 다른 계좌의 주문 생성을 막지 않도록 격리한다.
+        for (List<TradingOrderBudgetAllocator.Candidate> accountCandidates : candidatesByAccount.values()) {
+            BatchContext firstContext = accountCandidates.getFirst().ctx();
+            Optional<TradingOrderBudgetAllocator.Allocation> allocation = runSafely("계좌 주문 예산 배정", firstContext,
+                    () -> budgetAllocator.allocate(accountCandidates, tradeDate));
+            if (allocation.isPresent()) {
+                allocations.add(allocation.get());
+            }
         }
 
-        // AT_OPEN 주문만 개장 시 즉시 선접수 (전략 타입과 무관, 기존 주문이든 신규 저장이든 동일 처리)
-        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(currentCycle.id(), tradeDate);
+        for (TradingOrderBudgetAllocator.Allocation allocation : allocations) {
+            for (TradingOrderBudgetAllocator.Candidate approved : allocation.approved()) {
+                Optional<BatchContext> saved = runSafely("계획 주문 저장", approved.ctx(), () -> {
+                    orderPlanner.savePlannedOrders(
+                            approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
+                    return approved.ctx();
+                });
+                if (saved.isPresent()) {
+                    savedContexts.add(saved.get());
+                }
+            }
+
+            Set<BatchContext> rejectedContexts = Stream.concat(
+                            allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
+                    .map(TradingOrderBudgetAllocator.Candidate::ctx)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            for (BatchContext ctx : rejectedContexts) {
+                runSafely("예수금 부족 알림", ctx, () -> {
+                        userNotificationPort.notifyInsufficientBalance(
+                                ctx.user(), ctx.account(), ctx.strategy().type(), ctx.strategy().ticker());
+                        return null;
+                    });
+            }
+        }
+
+        return new SaveAllocationResult(Set.copyOf(savedContexts));
+    }
+
+    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다
+    private void placeAtOpenPlannedOrders(Account account, UUID cycleId, LocalDate tradeDate) {
+        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, tradeDate);
         if (atOpenOrders.isEmpty()) {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
             return;
         }
         orderExecutor.placeGiven(atOpenOrders, account);
-    }
-
-    // live 잔고 부족 시 사용자 알림 발송 후 true 반환 — 호출부에서 저장 건너뜀 처리
-    private boolean notifyIfInsufficientLiveBalance(Account account, User user, Strategy strategy,
-                                                    List<Order> orders) {
-        AccountBalance live = registry.require(account, LiveBalancePort.class).getLiveBalance(account, strategy.ticker());
-        if (!live.isOrderValid(orders)) {
-            log.warn("[{}] live 잔고 부족 — 사용자 알림 발송 후 저장 건너뜀 (예수금 or 보유수량)", account.nickname());
-            userNotificationPort.notifyInsufficientBalance(user, account, strategy.type(), strategy.ticker());
-            return true;
-        }
-        return false;
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그
@@ -409,9 +497,21 @@ class TradingService {
             throw e; // InterruptedException은 삼키지 않음
         } catch (Exception e) {
             log.error("[strategyId={}] {} 오류: {}", ctx.strategy().id(), phase, e.getMessage(), e);
-            notifyPort.notifyError(e);
-            userNotificationPort.notifyError(ctx.user(), e);
+            notifyErrorSafely(ctx, e);
             return Optional.empty();
+        }
+    }
+
+    private void notifyErrorSafely(BatchContext ctx, Exception e) {
+        try {
+            notifyPort.notifyError(e);
+        } catch (Exception notifyEx) {
+            log.warn("[strategyId={}] 관리자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
+        }
+        try {
+            userNotificationPort.notifyError(ctx.user(), e);
+        } catch (Exception notifyEx) {
+            log.warn("[strategyId={}] 사용자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
         }
     }
 }

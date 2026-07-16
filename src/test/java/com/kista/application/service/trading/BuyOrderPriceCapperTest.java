@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,6 +57,99 @@ class BuyOrderPriceCapperTest {
     private Order buy(String price, int quantity) {
         return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+    }
+
+    private Order buy(String price, int quantity, String orderLeg) {
+        return Order.planned(TODAY, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
+                quantity, new BigDecimal(price), orderLeg);
+    }
+
+    private Order sell(String price, int quantity) {
+        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+    }
+
+    @Test
+    void prepareForAllocation_infiniteCap_returnsCappedBuysAndCorrectionsWithoutPersistence() {
+        Order originalBuy = buy("60.00", 1, "INFINITE_LATE_REF_BUY");
+        Order cappedBuy = buy("55.00", 9, "INFINITE_LATE_REF_BUY");
+        Order correction = buy("50.00", 1, "INFINITE_CORRECTION_01");
+        when(infiniteStrategy.buildCappedBuyOrders(
+                POSITION, TODAY, List.of(originalBuy), new BigDecimal("55.00")))
+                .thenReturn(List.of(cappedBuy, correction));
+
+        List<Order> prepared = capper().prepareForAllocation(
+                List.of(originalBuy), new BigDecimal("50.00"), POSITION,
+                CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, TODAY);
+
+        assertThat(prepared).containsExactly(cappedBuy, correction);
+        assertThat(prepared).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01");
+        verify(infiniteStrategy).buildCappedBuyOrders(
+                POSITION, TODAY, List.of(originalBuy), new BigDecimal("55.00"));
+        verifyNoInteractions(orderPort, orderPlanner);
+    }
+
+    @Test
+    void prepareForAllocation_privacyCap_changesOnlyExceedingBuyPrices() {
+        Order exceedingBuy = buy("40.00", 5);
+        Order sell = sell("45.00", 2);
+        Order withinCapBuy = buy("28.00", 3);
+
+        List<Order> prepared = capper().prepareForAllocation(
+                List.of(exceedingBuy, sell, withinCapBuy), new BigDecimal("30.00"), null,
+                CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, TODAY);
+
+        assertThat(prepared.get(0).price()).isEqualByComparingTo("33.00");
+        assertThat(prepared.get(0).quantity()).isEqualTo(5);
+        assertThat(prepared.get(1)).isSameAs(sell);
+        assertThat(prepared.get(2)).isSameAs(withinCapBuy);
+        verifyNoInteractions(orderPort, orderPlanner, infiniteStrategy);
+    }
+
+    @Test
+    void prepareForAllocation_preservesSellOrdersAndOriginalRelativeOrder() {
+        Order firstBuy = buy("60.00", 1);
+        Order firstSell = sell("70.00", 1);
+        Order secondBuy = buy("52.00", 1);
+        Order secondSell = sell("75.00", 2);
+        Order firstCappedBuy = buy("55.00", 9);
+        Order secondCappedBuy = buy("52.00", 9);
+        Order correction = buy("50.00", 1);
+        when(infiniteStrategy.buildCappedBuyOrders(
+                POSITION, TODAY, List.of(firstBuy, secondBuy), new BigDecimal("55.00")))
+                .thenReturn(List.of(firstCappedBuy, secondCappedBuy, correction));
+
+        List<Order> prepared = capper().prepareForAllocation(
+                List.of(firstBuy, firstSell, secondBuy, secondSell), new BigDecimal("50.00"), POSITION,
+                CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, TODAY);
+
+        assertThat(prepared).containsExactly(
+                firstCappedBuy, firstSell, secondCappedBuy, secondSell, correction);
+        verifyNoInteractions(orderPort, orderPlanner);
+    }
+
+    @Test
+    void prepareForAllocation_noCapReturnsOriginalOrders() {
+        List<Order> orders = List.of(buy("60.00", 1), sell("70.00", 1));
+
+        List<Order> prepared = capper().prepareForAllocation(
+                orders, new BigDecimal("50.00"), POSITION,
+                CycleOrderStrategy.PriceCapMode.NONE, TODAY);
+
+        assertThat(prepared).isSameAs(orders);
+        verifyNoInteractions(orderPort, orderPlanner, infiniteStrategy);
+    }
+
+    @Test
+    void prepareForAllocation_nullModeReturnsOriginalOrders() {
+        List<Order> orders = List.of(buy("60.00", 1), sell("70.00", 1));
+
+        List<Order> prepared = capper().prepareForAllocation(
+                orders, new BigDecimal("50.00"), POSITION, null, TODAY);
+
+        assertThat(prepared).isSameAs(orders);
+        verifyNoInteractions(orderPort, orderPlanner, infiniteStrategy);
     }
 
     @Test

@@ -17,6 +17,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(infinite.tracksReverseMode()).isTrue();
         assertThat(infinite.requiresRolloverCheck()).isFalse(); // 기본값
         assertThat(infinite.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.INFINITE_POSITION);
+        assertThat(infinite.allocationPriority()).isEqualTo(1);
     }
 
     @Test
@@ -29,6 +30,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(privacy.tracksReverseMode()).isFalse(); // 기본값
         assertThat(privacy.requiresRolloverCheck()).isFalse(); // 기본값
         assertThat(privacy.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE);
+        assertThat(privacy.allocationPriority()).isEqualTo(2);
     }
 
     @Test
@@ -42,5 +44,6 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.tracksReverseMode()).isFalse(); // 기본값
         assertThat(vr.requiresRolloverCheck()).isTrue();
         assertThat(vr.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.NONE); // 기본값
+        assertThat(vr.allocationPriority()).isZero();
     }
 }

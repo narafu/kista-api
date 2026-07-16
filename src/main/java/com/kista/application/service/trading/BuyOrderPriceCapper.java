@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -31,6 +33,43 @@ class BuyOrderPriceCapper {
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
     private final InfiniteStrategy infiniteStrategy;
+
+    // 신규 후보의 최종 BUY를 allocator 입력 전에 계산하며 영속화는 수행하지 않는다
+    List<Order> prepareForAllocation(List<Order> orders, BigDecimal currentPrice, InfinitePosition position,
+                                     CycleOrderStrategy.PriceCapMode mode, LocalDate tradeDate) {
+        if (mode == null || mode == CycleOrderStrategy.PriceCapMode.NONE || currentPrice == null) return orders;
+
+        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        List<Order> buyOrders = orders.stream().filter(order -> order.direction() == BUY).toList();
+        if (buyOrders.stream().noneMatch(order -> order.price().compareTo(cap) > 0)) return orders;
+
+        if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
+            return orders.stream()
+                    .map(order -> order.direction() == BUY && order.price().compareTo(cap) > 0
+                            ? order.withPrice(cap)
+                            : order)
+                    .toList();
+        }
+        if (position == null) return orders;
+
+        List<Order> cappedBuys = infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
+        return replaceBuysPreservingOrder(orders, cappedBuys);
+    }
+
+    // 재산정 BUY는 원래 BUY 슬롯을 채우고, 추가 correction BUY는 기존 상대 순서 뒤에 붙인다
+    private List<Order> replaceBuysPreservingOrder(List<Order> orders, List<Order> cappedBuys) {
+        List<Order> prepared = new ArrayList<>(orders.size() + cappedBuys.size());
+        int cappedBuyIndex = 0;
+        for (Order order : orders) {
+            if (order.direction() != BUY) {
+                prepared.add(order);
+            } else if (cappedBuyIndex < cappedBuys.size()) {
+                prepared.add(cappedBuys.get(cappedBuyIndex++));
+            }
+        }
+        prepared.addAll(cappedBuys.subList(cappedBuyIndex, cappedBuys.size()));
+        return List.copyOf(prepared);
+    }
 
     // PRIVACY 전용: cap 초과 주문만 CANCELLED → cap 가격으로 재저장 (cap 이하 주문은 그대로 유지)
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {

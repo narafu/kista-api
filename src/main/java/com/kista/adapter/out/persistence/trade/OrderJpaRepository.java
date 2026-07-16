@@ -47,6 +47,22 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("accountId") UUID accountId,
             @Param("tradeDate") LocalDate tradeDate);
 
+    // 계좌·거래일·종목 기준 미접수/접수 완료 SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
+    // PostgreSQL SUM(integer)는 bigint를 반환하므로 Long으로 수신한다
+    @Query(value = """
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM orders
+            WHERE account_id = :accountId
+              AND trade_date = :tradeDate
+              AND ticker = :ticker
+              AND direction = 'SELL'
+              AND status IN ('PLANNED', 'PLACED')
+            """, nativeQuery = true)
+    Long sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+            @Param("accountId") UUID accountId,
+            @Param("tradeDate") LocalDate tradeDate,
+            @Param("ticker") String ticker);
+
     // 사용자 기준 기간+종목 조회 (account 경유 JOIN — native)
     @Query(value = """
             SELECT o.* FROM orders o

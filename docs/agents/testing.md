@@ -8,7 +8,7 @@
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
 
 ### TradingService execute() 가격 주입 패턴
-- `execute(cycle, account, user, DstInfo)` — price=null로 전달 (lazy getPrice 없음)
+- `execute(strategy, account, user, DstInfo)` — price=null로 전달 (lazy getPrice 없음)
 - holdings=0 && price=null → `IllegalStateException("현재가 조회 실패")` — holdings=0 테스트는 `executeBatch` 경로 사용, `getPrices` stub으로 주입
 - `executeBatch(List, DstInfo)` package-private 오버로드 — DstInfo 직접 주입으로 sleep 우회
 
@@ -58,7 +58,15 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`
-- `TradingServiceTest`는 `when(tradingStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
+- `TradingServiceTest`는 `when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
+- `TradingService` 단위 테스트는 실제 `TradingOrderBudgetAllocator(tradingRegistry, orderPort, cycleOrderStrategies)`를 주입하고, `LiveBalancePort`·`SellableQuantityPort` 라우팅과 기존 BUY/SELL 예약량을 stub한다.
+- scheduler leg recovery 테스트는 `Order.withLeg(...)`로 concrete leg를 명시한다. legacy 호환 케이스는 `Order.UNKNOWN_LEG`를 사용하고, `UNKNOWN`은 `timing + direction` coarse 슬롯이라는 점을 검증한다.
+- INFINITE compute skip 테스트는 correction 포함 complete concrete leg와 partial concrete leg를 모두 둔다. complete는 `buildOrders(...)` 미호출, partial은 호출을 검증해 누락 leg 복구가 막히지 않게 한다. 개장 스케쥴러 회귀는 기존 `AT_CLOSE` BUY만 있을 때 `AT_OPEN` SELL 복구가 막히지 않는지도 검증한다. VR/PRIVACY는 variable ladder라 concrete compute skip을 가정하지 않는다.
+- cap 예산 회귀 테스트는 `buildCappedBuyOrders(...)`가 반환하는 base+correction BUY 총액이 원본 BUY보다 커지는 경우를 만들고, allocator가 최종 총액으로 BUY를 거절하는지 검증한다.
+- BUY/SELL 부분 승인 테스트는 저장된 주문의 방향뿐 아니라 원본 후보 내 상대 순서가 유지되는지도 검증한다.
+- 배치 실패 격리 테스트는 서로 다른 account의 context를 함께 전달하고 allocator 잔고 조회·`saveAll`·잔고 부족 알림을 각각 예외 처리해 성공 계좌의 저장·접수와 `NotifyPort.notifyError` 호출을 함께 검증한다.
+- 신규 양방향 거절 또는 저장 실패 시 기존 주문이 없는 사이클은 접수·포지션 저장·리포트가 호출되지 않아야 하며, 기존 PLANNED/PLACED 주문이 있는 사이클은 후속 처리를 유지해야 한다.
+- 수동 SELL 테스트는 `sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker` 예약량과 신규 SELL 합계가 판매가능수량을 넘는 경계를 stub한다.
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음
 
 ### JPA 엔티티 저장 패턴
