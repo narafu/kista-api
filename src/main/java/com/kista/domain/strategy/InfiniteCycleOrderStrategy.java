@@ -44,8 +44,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     @Override
     public boolean tracksReverseMode() { return true; }
 
+    // RuntimeSettings 기본 허용값(20/30/40)과 동기화 — 기본값은 20
     @Override
-    public List<Integer> availableDivisionCounts() { return List.of(20); }
+    public List<Integer> availableDivisionCounts() { return List.of(20, 30, 40); }
 
     @Override
     public PriceCapMode priceCapMode() { return PriceCapMode.INFINITE_POSITION; }

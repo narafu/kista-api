@@ -104,7 +104,7 @@
 averagePrice (holdings==0이면 prevClosePrice 전일종가)
 purchaseAmount = averagePrice × holdings
 totalAssets = usdDeposit + purchaseAmount
-unitAmount = totalAssets ÷ divisionCount  (scale=2, HALF_UP — 분모는 리터럴 20이 아닌 divisionCount; 런타임 기본 설정 허용값 20/30/40, capability 메타 availableDivisionCounts()는 [20]만 노출)
+unitAmount = totalAssets ÷ divisionCount  (scale=2, HALF_UP — 분모는 리터럴 20이 아닌 divisionCount; 허용값 20/30/40 — RuntimeSettings 기본값·capability 메타 availableDivisionCounts() 동기화됨, 기본값은 20)
 currentRound = holdings==0 ? 0.0 : purchaseAmount ÷ unitAmount  (double, 소수점 허용)
 priceOffsetRate = targetProfitRate × (1 - 2×currentRound/divisionCount)  (scale=2, HALF_UP)
 referencePrice = averagePrice × (1 + priceOffsetRate)  (scale=2, HALF_UP — LOC 주문 가격 기준)

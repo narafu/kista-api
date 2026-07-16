@@ -10,7 +10,7 @@ class CycleOrderStrategyCapabilityTest {
     void infinite_capabilities() {
         var infinite = new InfiniteCycleOrderStrategy(null, null);
         assertThat(infinite.supportsReverseMode()).isTrue();
-        assertThat(infinite.availableDivisionCounts()).containsExactly(20);
+        assertThat(infinite.availableDivisionCounts()).containsExactly(20, 30, 40);
         assertThat(infinite.requiresPrivacyBase()).isFalse();
         assertThat(infinite.requiresPrevClose()).isTrue();
         assertThat(infinite.endsCycleOnLiquidation()).isTrue(); // 기본값 true

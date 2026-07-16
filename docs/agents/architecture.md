@@ -164,7 +164,7 @@ adapter/out/
 - `CycleOrderStrategy` 인터페이스: 전략 타입별 동작을 캡슐화하는 다형성 계층
   - `requiresPrivacyBase()` — basePrice 소스가 기준 매매표인지 (PRIVACY=true, INFINITE/VR=false)
   - `requiresPrevClose()` — 전일 종가 필요 여부
-  - `availableDivisionCounts()` — 지원하는 분할 수 목록 (INFINITE=`[20]`, PRIVACY/VR=`[]`)
+  - `availableDivisionCounts()` — 지원하는 분할 수 목록 (INFINITE=`[20, 30, 40]`, PRIVACY/VR=`[]`)
   - `supportsReverseMode()` — 리버스모드 배지 지원 (INFINITE=true, PRIVACY/VR=false)
   - `endsCycleOnLiquidation()` — holdings=0(전량 청산) 시 사이클 종료 여부 (VR=false, INFINITE/PRIVACY=true)
   - `minRequiredDeposit(price, privacyBase, divisionCount)` — 최소 시드 계산 (SSOT, VR=null 미적용)

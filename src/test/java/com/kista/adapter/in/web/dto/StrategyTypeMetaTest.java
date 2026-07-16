@@ -28,7 +28,7 @@ class StrategyTypeMetaTest {
         assertThat(meta.requiresPrivacyBase()).isFalse();
         assertThat(meta.tickerFixed()).isFalse();        // INFINITE: availableTickers > 1
         assertThat(meta.supportsReverseMode()).isTrue();
-        assertThat(meta.divisionCounts()).containsExactly(20);
+        assertThat(meta.divisionCounts()).containsExactly(20, 30, 40);
     }
 
     @Test
