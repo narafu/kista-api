@@ -108,8 +108,8 @@ class TradingPreviewServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        when(pricePort.getPriceSnapshot(Ticker.SOXL, ACCOUNT))
-                .thenReturn(new PriceSnapshot(PRICE, new BigDecimal("21.00")));
+        when(pricePort.getPrevClose(Ticker.SOXL, ACCOUNT))
+                .thenReturn(new BigDecimal("21.00"));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(order));
 
@@ -135,7 +135,7 @@ class TradingPreviewServiceTest {
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
         assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
-        verify(pricePort, never()).getPriceSnapshot(any(), any());
+        verify(pricePort, never()).getPrevClose(any(), any());
     }
 
     @Test

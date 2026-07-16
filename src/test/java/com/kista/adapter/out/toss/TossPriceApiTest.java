@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -67,11 +68,12 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("PriceSnapshot: prevClose == current (Toss 전일종가 API 없음)")
-    void getPriceSnapshot_prevCloseEqualsCurrent() {
+    @DisplayName("PriceSnapshot: 캔들 조회 실패 시 prevClose가 current로 fallback")
+    void getPriceSnapshot_candleFails_prevCloseFallsBackToCurrent() {
         var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
 
         PriceSnapshot snapshot = tossPriceApi.getPriceSnapshot(Ticker.SOXL);
 
@@ -130,13 +132,14 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("복수 스냅샷: prevClose == current (Toss 전일종가 근사)")
-    void getPriceSnapshots_allPrevCloseEqualCurrent() {
+    @DisplayName("복수 스냅샷: 캔들 조회 실패한 종목은 prevClose가 current로 fallback")
+    void getPriceSnapshots_candleFails_prevCloseFallsBackToCurrent() {
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(
                 new TossPriceApi.PriceItem("SOXL", "25.50", "USD"),
                 new TossPriceApi.PriceItem("TQQQ", "50.00", "USD")
             ));
+        when(tossCandleApi.getCandleBefore(any(), eq("1d"), any())).thenReturn(Optional.empty());
 
         Map<Ticker, PriceSnapshot> snapshots = tossPriceApi.getPriceSnapshots(List.of(Ticker.SOXL, Ticker.TQQQ));
 
@@ -163,7 +166,7 @@ class TossPriceApiTest {
         Map<Ticker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(Ticker.SOXL));
 
         assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("89.20"));
-        verify(tossHttpClient, org.mockito.Mockito.never())
+        verify(tossHttpClient, never())
                 .getCommon(any(), any(), any(ParameterizedTypeReference.class));
     }
 
