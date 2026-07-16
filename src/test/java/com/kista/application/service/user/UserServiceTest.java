@@ -5,17 +5,21 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.application.event.UserApprovedEvent;
 import com.kista.application.event.UserRejectedEvent;
 import com.kista.application.event.UserReappliedEvent;
+import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Duration;
@@ -44,8 +48,16 @@ class UserServiceTest {
     @Mock KakaoOAuthPort kakaoOAuthPort;
     @Mock BlacklistPort blacklistPort;
     @Mock RefreshTokenPort refreshTokenPort;
+    @Mock RuntimeSettingsPort runtimeSettingsPort;
+    @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
 
     @InjectMocks UserService userService;
+
+    @BeforeEach
+    void setUpRuntimeSettings() {
+        lenient().when(runtimeSettingsPort.loadForUpdate()).thenReturn(RuntimeSettings.defaults());
+        lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
+    }
 
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
@@ -82,6 +94,21 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("승인 불필요 시 일반 신규 사용자를 ACTIVE로 등록")
+    void register_normalUser_whenApprovalNotRequired_returnsActiveUser() {
+        UUID uid = UUID.randomUUID();
+        when(runtimeSettingsPort.loadForUpdate()).thenReturn(settingsWithApprovalRequired(false));
+        when(userPort.findByKakaoId("kakao-active")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        User result = userService.register("kakao-active", "즉시가입", uid);
+
+        assertThat(result.role()).isEqualTo(User.UserRole.USER);
+        assertThat(result.status()).isEqualTo(User.UserStatus.ACTIVE);
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+    }
+
+    @Test
     @DisplayName("기존 사용자 등록 요청 시 기존 사용자 반환 (중복 저장 없음)")
     void register_existing_user_returns_without_saving() {
         UUID uid = UUID.randomUUID();
@@ -107,7 +134,54 @@ class UserServiceTest {
         verify(userPort).save(argThat(u ->
                 u.status() == User.UserStatus.PENDING && u.lastReappliedAt() != null));
         verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserApprovedEvent.class));
         verify(notificationPort, never()).notifyNewUser(any());
+    }
+
+    @Test
+    @DisplayName("승인 불필요 시 REJECTED 사용자는 재신청하면 ACTIVE 전환")
+    void reapply_rejected_whenApprovalNotRequired_setsActive() {
+        UUID userId = UUID.randomUUID();
+        when(runtimeSettingsPort.loadForUpdate()).thenReturn(settingsWithApprovalRequired(false));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u ->
+                u.status() == User.UserStatus.ACTIVE && u.lastReappliedAt() != null));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserReappliedEvent.class));
+    }
+
+    @Test
+    @DisplayName("승인 필요 시 REJECTED 사용자는 재신청하면 PENDING 전환")
+    void reapply_rejected_whenApprovalRequired_setsPending() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.PENDING));
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserApprovedEvent.class));
+    }
+
+    @Test
+    @DisplayName("승인 불필요 시 쿨다운 중인 PENDING 사용자도 재신청하면 ACTIVE 전환")
+    void reapply_pendingWithinCooldown_whenApprovalNotRequired_setsActive() {
+        UUID userId = UUID.randomUUID();
+        when(runtimeSettingsPort.loadForUpdate()).thenReturn(settingsWithApprovalRequired(false));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == User.UserStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserReappliedEvent.class));
     }
 
     @Test
@@ -340,6 +414,7 @@ class UserServiceTest {
         assertThat(result.status()).isEqualTo(User.UserStatus.PENDING);
         assertThat(result.role()).isEqualTo(User.UserRole.USER);
         verify(userPort).save(any()); // 신규 저장 1회
+        verify(userUseCaseProvider).getObject(); // 트랜잭션 프록시를 통해 register 호출
         verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
     }
 
@@ -397,5 +472,10 @@ class UserServiceTest {
         // then
         assertThat(result).isEqualTo(existingUser);
         verify(userPort, times(2)).findByKakaoId(kakaoId); // 1차(register내) + 2차(catch fallback)
+    }
+
+    private RuntimeSettings settingsWithApprovalRequired(boolean approvalRequired) {
+        RuntimeSettings defaults = RuntimeSettings.defaults();
+        return new RuntimeSettings(approvalRequired, defaults.brokers(), defaults.strategies());
     }
 }

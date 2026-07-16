@@ -18,6 +18,8 @@ import org.springframework.util.MultiValueMap;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -85,8 +87,8 @@ class TossPriceApi {
     public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
-        Map<Ticker, BigDecimal> result = new java.util.LinkedHashMap<>();
-        List<Ticker> needsFallback = new java.util.ArrayList<>();
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        List<Ticker> needsFallback = new ArrayList<>();
         for (Ticker ticker : tickers) {
             fetchPrevCloseCached(ticker.name())
                     .ifPresentOrElse(

@@ -77,7 +77,7 @@ class TradingPreviewService {
         BigDecimal prevClosePrice = null;
         if (orderStrategy.requiresPrevClose()) {
             prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
-                    () -> registry.require(account, BrokerPricePort.class).getPriceSnapshot(strategy.ticker(), account).prevClose());
+                    () -> registry.require(account, BrokerPricePort.class).getPrevClose(strategy.ticker(), account));
         }
         PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 

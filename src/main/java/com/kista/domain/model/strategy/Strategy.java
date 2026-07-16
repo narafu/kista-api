@@ -67,15 +67,6 @@ public record Strategy(
                 case INFINITE -> EnumSet.allOf(Ticker.class);
             };
         }
-
-        // ticker 결정 규칙: PRIVACY는 SOXL 강제, VR은 TQQQ 강제, 그 외는 요청값 우선 → fallback 순
-        public Ticker resolveTicker(Ticker requested, Ticker fallback) {
-            return switch (this) {
-                case PRIVACY -> Ticker.SOXL;
-                case VR -> Ticker.TQQQ;
-                case INFINITE -> requested != null ? requested : fallback;
-            };
-        }
     }
 
     @Getter

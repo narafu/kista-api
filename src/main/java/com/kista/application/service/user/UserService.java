@@ -10,6 +10,7 @@ import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,8 @@ class UserService implements UserUseCase {
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
+    private final RuntimeSettingsPort runtimeSettingsPort;  // 가입 승인 런타임 설정 조회
+    private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
 
     @Override
     @Transactional(readOnly = true)
@@ -63,7 +66,9 @@ class UserService implements UserUseCase {
         User user;
         try {
             // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
-            user = register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
+            // 외부 OAuth 호출이 끝난 뒤 프록시를 통해 가입 트랜잭션만 시작한다.
+            user = userUseCaseProvider.getObject()
+                    .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
         } catch (DataIntegrityViolationException e) {
             // 동시 가입 경쟁 조건 → 기존 사용자 직접 조회 (self-invocation 방지)
             log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());
@@ -85,7 +90,14 @@ class UserService implements UserUseCase {
             // ADMIN seed 여부에 따라 역할/상태 결정
             boolean isAdminSeed = bootstrapProps.isAdmin(kakaoId);
             User.UserRole role = isAdminSeed ? User.UserRole.ADMIN : User.UserRole.USER;
-            User.UserStatus status = isAdminSeed ? User.UserStatus.ACTIVE : User.UserStatus.PENDING;
+            // 관리자는 항상 활성화하고 일반 사용자는 현재 승인 설정에 따라 초기 상태를 결정한다.
+            // 잠금 조회 필수 — 관리자의 승인설정 OFF 전환(RuntimeSettingsService.updateSettings)과 같은 행을
+            // 잠가 직렬화해야, 전환 중 INSERT된 PENDING 사용자가 전환 시점의 일괄 활성화에서 누락되지 않는다
+            // (RuntimeSettingsApprovalConcurrencyIT로 검증됨). 처리량보다 "PENDING 누락 없음" 보장이 우선.
+            boolean approvalRequired = runtimeSettingsPort.loadForUpdate().approvalRequired();
+            User.UserStatus status = isAdminSeed || !approvalRequired
+                    ? User.UserStatus.ACTIVE
+                    : User.UserStatus.PENDING;
             User newUser = new User(userId, kakaoId, nickname, status, role,
                     null, null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
@@ -125,20 +137,30 @@ class UserService implements UserUseCase {
     public void reapply(UUID userId) {
         User user = userPort.findByIdOrThrow(userId);
         Instant now = Instant.now();
+        // register()와 동일한 이유로 잠금 조회 필수 — 관리자의 승인설정 전환과 직렬화한다.
+        boolean approvalRequired = runtimeSettingsPort.loadForUpdate().approvalRequired();
 
         // 상태별 쿨다운 검증
         switch (user.status()) {
-            case PENDING  -> requireCooldownPassed(user, PENDING_REAPPLY_COOLDOWN_HOURS, now);
+            case PENDING  -> {
+                // 승인 불필요 전환 직후 남아 있는 PENDING 사용자는 쿨다운 없이 즉시 활성화한다.
+                if (approvalRequired) requireCooldownPassed(user, PENDING_REAPPLY_COOLDOWN_HOURS, now);
+            }
             case REJECTED -> requireCooldownPassed(user, REJECTED_REAPPLY_COOLDOWN_HOURS, now);
             default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
         }
 
-        // PENDING 전환 + 재신청 시각 갱신
-        User updated = user.withStatus(User.UserStatus.PENDING, now);
+        // 승인 설정에 맞는 상태로 전환하고 기존 재신청 시각과 이벤트 흐름을 보존한다.
+        User.UserStatus status = approvalRequired ? User.UserStatus.PENDING : User.UserStatus.ACTIVE;
+        User updated = user.withStatus(status, now);
         userPort.save(updated);
         log.info("사용자 재신청: userId={}", userId);
-        // 커밋 성공 후 관리자 알림 — 롤백 시 알림 미발송
-        eventPublisher.publishEvent(new UserReappliedEvent(updated));
+        // 결과 상태에 맞춰 관리자 승인 요청 또는 사용자 승인 알림과 SSE를 한 번만 발행한다.
+        if (approvalRequired) {
+            eventPublisher.publishEvent(new UserReappliedEvent(updated));
+        } else {
+            eventPublisher.publishEvent(new UserApprovedEvent(updated));
+        }
     }
 
     // 쿨다운 미경과 시 CooldownException 발생 — PENDING/REJECTED 공통 판정

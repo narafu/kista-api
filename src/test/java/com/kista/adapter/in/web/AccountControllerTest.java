@@ -80,6 +80,19 @@ class AccountControllerTest {
     }
 
     @Test
+    void testConnection_disabledBroker_returns400() throws Exception {
+        // 서비스의 증권사 비활성 검증 예외는 사용자 입력 오류로 노출한다.
+        doThrow(new IllegalArgumentException("KIS 증권사 신규 계좌 등록이 비활성화되어 있습니다"))
+                .when(accountUseCase).test(any(), anyString(), anyString(), any());
+
+        mockMvc.perform(post("/api/accounts/connection-tests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void testConnection_anonymous_returns401() throws Exception {
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,6 +131,20 @@ class AccountControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.broker").value("KIS"));
+    }
+
+    @Test
+    void register_disabledBroker_returns400() throws Exception {
+        // 신규 계좌 등록도 연결 테스트와 동일한 사용자 입력 오류 응답을 사용한다.
+        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+                .thenThrow(new IllegalArgumentException("TOSS 증권사 신규 계좌 등록이 비활성화되어 있습니다"));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"131-01-001931\"," +
+                                "\"appKey\":\"cid\",\"secretKey\":\"csecret\",\"broker\":\"TOSS\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

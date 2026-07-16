@@ -3,12 +3,16 @@ package com.kista.application.service.strategy;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.strategy.StrategyCreationResolver;
+import com.kista.domain.strategy.StrategyCreationResolver.ResolvedCreation;
+import com.kista.domain.strategy.StrategyCreationResolvers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,32 +42,35 @@ class StrategyService implements StrategyUseCase {
     private final UserPort userPort;
     private final BrokerAdapterRegistry registry;                   // 등록 시점 가용 시드 검증 — MarginPort / LiveBalancePort 경유
     private final UserSettingsPort userSettingsPort;                // 잔고 검증 설정 조회 (user_settings)
+    private final RuntimeSettingsPort runtimeSettingsPort;          // 신규 전략 생성 허용값·기본값 조회
+    private final StrategyCreationResolvers creationResolvers;      // 전략 타입별 생성 필드 해석 라우터
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증 HTTP 호출 포함 — 트랜잭션 없이 실행 (각 DB 저장은 JPA auto-commit)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
+        ResolvedCreation resolved = resolveCreationSettings(cmd);
 
         // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리)
         if (cmd.type() == Strategy.Type.VR) {
-            validateVrCommand(cmd);
+            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount());
         }
 
-        // PRIVACY는 SOXL 강제, VR은 TQQQ 강제, INFINITE는 요청값 우선 → fallback
+        // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
         Strategy.CycleSeedType seedType = cmd.type() == Strategy.Type.VR
                 ? Strategy.CycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : Strategy.CycleSeedType.NONE);
-        Strategy.Ticker resolvedTicker = cmd.type().resolveTicker(cmd.ticker(), Strategy.Ticker.SOXL);
+        Strategy.Ticker resolvedTicker = resolved.ticker();
 
         // 종목 중복 + 잔고 검증
         validateUniqueTicker(accountId, resolvedTicker);
         validateBalanceIfRequired(account, accountId, userId, cmd.initialUsdDeposit());
 
-        int divisionCount = cmd.divisionCount() > 0 ? cmd.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        int divisionCount = resolved.divisionCount();
 
         // 전략·버전·상세 저장 (strategy → strategy_versions → 전략별 detail)
         var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
-                cmd.intervalWeeks(), cmd.bandWidth(), cmd.recurringAmount());
+                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount());
 
         // VR: 브로커 live 잔고 조회 (NOT_SUPPORTED 트랜잭션 — HTTP 호출 허용)
         AccountBalance liveBalance = null;
@@ -89,27 +96,38 @@ class StrategyService implements StrategyUseCase {
         return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), divisionCount, false, 0.0, 0, null);
     }
 
+    // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
+    // 전략 타입별 필드 해석은 CycleOrderStrategy와 동일한 capability 패턴(StrategyCreationResolvers)에 위임한다.
+    private ResolvedCreation resolveCreationSettings(RegisterStrategyCommand cmd) {
+        StrategyCreationSettings settings = runtimeSettingsPort.load().strategies().get(cmd.type());
+        if (!settings.enabled()) {
+            throw new IllegalArgumentException("비활성화된 전략 유형은 새로 등록할 수 없습니다: " + cmd.type());
+        }
+        return creationResolvers.of(cmd.type()).resolve(cmd, settings);
+    }
+
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
-    private void validateVrCommand(RegisterStrategyCommand cmd) {
-        if (cmd.intervalWeeks() == null || cmd.intervalWeeks() <= 0) {
+    private void validateVrCommand(RegisterStrategyCommand cmd, Integer intervalWeeks,
+                                   BigDecimal bandWidth, Integer recurringAmount) {
+        if (intervalWeeks == null || intervalWeeks <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
         }
-        if (cmd.bandWidth() == null || cmd.bandWidth().signum() <= 0) {
+        if (bandWidth == null || bandWidth.signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭(bandWidth)은 0보다 커야 합니다");
         }
         BigDecimal initialValue = normalizeMoney(cmd.initialValue());
         BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
-        int recurringAmount = cmd.recurringAmount() != null ? cmd.recurringAmount() : 0;
+        int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
         BigDecimal initialAssets = initialValue.add(initialUsdDeposit);
 
-        if (recurringAmount <= 0 && initialAssets.signum() <= 0) {
+        if (normalizedRecurringAmount <= 0 && initialAssets.signum() <= 0) {
             throw new IllegalArgumentException("VR 거치식/인출식은 초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");
         }
-        if (recurringAmount < 0) {
-            BigDecimal required = BigDecimal.valueOf(Math.abs((long) recurringAmount))
+        if (normalizedRecurringAmount < 0) {
+            BigDecimal required = BigDecimal.valueOf(Math.abs((long) normalizedRecurringAmount))
                     .multiply(BigDecimal.valueOf(100))
                     .multiply(BigDecimal.valueOf(4))
-                    .divide(BigDecimal.valueOf(cmd.intervalWeeks()), 2, RoundingMode.HALF_UP);
+                    .divide(BigDecimal.valueOf(intervalWeeks), 2, RoundingMode.HALF_UP);
             if (initialAssets.compareTo(required) < 0) {
                 throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 " + required + " 이상이어야 합니다");
             }
