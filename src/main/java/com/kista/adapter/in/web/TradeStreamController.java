@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.out.sse.TradeSseEmitterRegistry;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +22,7 @@ public class TradeStreamController {
     private final TradeSseEmitterRegistry tradeSseEmitterRegistry;
 
     // GET /api/trades/stream — 인증된 사용자의 매매 알림 스트림
+    @Operation(summary = "실시간 매매 알림 스트림 연결", description = "인증된 사용자의 SSE 연결을 등록해 주문 접수·체결 등 매매 이벤트를 실시간 수신합니다.")
     @GetMapping(value = "/stream", produces = "text/event-stream")
     public SseEmitter stream(@AuthenticationPrincipal UUID userId) {
         return tradeSseEmitterRegistry.connect(userId);

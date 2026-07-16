@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminPrivacyBaseResponse;
 import com.kista.domain.port.in.AdminQueryUseCase;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ public class AdminPrivacyTradeController {
     private final AdminQueryUseCase adminQuery;
 
     // PRIVACY 기준 매매표(master) + 주문 명세(detail) 목록 — range 미전달 시 전체, 최소 30
+    @Operation(summary = "PRIVACY 기준 매매표 목록 조회", description = "기준 매매표(master)와 주문 명세(detail) 목록을 반환합니다. range 미전달 시 전체 조회, 전달 시 최소 30 이상이어야 합니다.")
     @GetMapping
     public List<AdminPrivacyBaseResponse> listBases(@RequestParam(required = false) Integer range) {
         if (range != null && range < 30)

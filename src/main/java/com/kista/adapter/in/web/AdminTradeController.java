@@ -17,6 +17,7 @@ import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
 import com.kista.domain.port.out.MarketCalendarPort;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class AdminTradeController {
     private final MarketCalendarPort marketCalendarPort;            // 휴장일 판정
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
+    @Operation(summary = "전체 거래 내역 조회", description = "일괄 조회로 N+1을 방지합니다. from/to로 기간 필터링 가능합니다.")
     @GetMapping("/trades")
     public List<AdminTradeResponse> listTrades(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -60,6 +62,7 @@ public class AdminTradeController {
         return toResponses(adminQuery.listTrades(from, to));
     }
 
+    @Operation(summary = "전략별 거래일 목록 조회")
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/trade-dates")
     public List<LocalDate> listStrategyTradeDates(
             @PathVariable UUID accountId,
@@ -67,6 +70,7 @@ public class AdminTradeController {
         return adminQuery.listStrategyTradeDates(accountId, strategyId);
     }
 
+    @Operation(summary = "전략별 주문 목록 조회", description = "지정한 거래일(tradeDate)의 주문 목록을 반환합니다.")
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
     public List<AdminTradeResponse> listStrategyOrders(
             @PathVariable UUID accountId,
@@ -89,6 +93,7 @@ public class AdminTradeController {
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
+    @Operation(summary = "수동 체결 보정", description = "fills 배열 순서대로 여러 건을 원자적으로 반영합니다.")
     @PostMapping("/trades/manual-fills")
     public AdminTradeCorrectionResponse correctManualFills(
             @AuthenticationPrincipal UUID adminId,
@@ -98,6 +103,7 @@ public class AdminTradeController {
     }
 
     // 재주문 시점 가용성 조회 — UI 주문시점 셀렉터 disable 판단용
+    @Operation(summary = "재주문 시점 가용성 조회", description = "UI 주문시점 셀렉터의 disable 여부 판단에 사용합니다.")
     @GetMapping("/trades/reorder-timing")
     public ReorderTimingAvailabilityResponse getReorderTiming() {
         if (!marketCalendarPort.isMarketOpen(java.time.LocalDate.now(TimeZones.KST))) {
@@ -106,6 +112,7 @@ public class AdminTradeController {
         return ReorderTimingAvailabilityResponse.from(DstInfo.calculate().reorderTimingAvailability());
     }
 
+    @Operation(summary = "관리자 재주문")
     @PostMapping("/trades/reorders")
     public AdminReorderResponse reorder(
             @AuthenticationPrincipal UUID adminId,

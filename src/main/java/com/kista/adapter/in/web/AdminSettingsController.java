@@ -3,6 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.AdminSettingsRequest;
 import com.kista.adapter.in.web.dto.RuntimeSettingsResponse;
 import com.kista.domain.port.in.AdminSettingsUseCase;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +26,13 @@ public class AdminSettingsController {
 
     private final AdminSettingsUseCase adminSettingsUseCase; // 관리자 설정 조회·갱신 유스케이스
 
+    @Operation(summary = "런타임 설정 조회", description = "auth/brokers/strategies 전체 런타임 설정을 조회합니다.")
     @GetMapping
     public ResponseEntity<RuntimeSettingsResponse> getSettings() {
         return noStore(RuntimeSettingsResponse.from(adminSettingsUseCase.getSettings()));
     }
 
+    @Operation(summary = "런타임 설정 갱신", description = "요청 전체(auth/brokers/strategies)를 검증한 뒤 한 번에 교체합니다. 부분 갱신은 지원하지 않습니다.")
     @PutMapping
     public ResponseEntity<RuntimeSettingsResponse> updateSettings(
             @AuthenticationPrincipal UUID adminId,

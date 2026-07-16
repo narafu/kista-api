@@ -8,6 +8,7 @@ import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,6 +35,7 @@ public class AdminObservabilityController {
     private final AdminUserUseCase adminUser;
 
     // 감사 로그 — 관리자 액션 기록
+    @Operation(summary = "감사 로그 조회", description = "관리자 액션 기록을 기간별로 조회합니다.")
     @GetMapping("/audit")
     public List<AuditLogResponse> listAuditLogs(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -46,6 +48,7 @@ public class AdminObservabilityController {
     }
 
     // 오류 로그 — 서버 예외 기록
+    @Operation(summary = "오류 로그 조회", description = "서버 예외 기록을 조회합니다. limit/기간 필터링이 가능합니다.")
     @GetMapping("/errors")
     public List<ErrorLogResponse> listErrorLogs(
             @RequestParam(defaultValue = "100") int limit,
@@ -69,6 +72,7 @@ public class AdminObservabilityController {
     }
 
     // 오류 로그 소프트 삭제 — 조치 완료 처리
+    @Operation(summary = "오류 로그 소프트 삭제", description = "조치 완료 처리를 위해 오류 로그를 소프트 삭제합니다.")
     @DeleteMapping("/errors/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void softDeleteErrorLog(@PathVariable UUID id) {
@@ -76,6 +80,7 @@ public class AdminObservabilityController {
     }
 
     // 이상 징후 — 일시정지·비활성 계좌
+    @Operation(summary = "이상 징후 조회", description = "일시정지·비활성 계좌 목록을 반환합니다.")
     @GetMapping("/anomalies")
     public AnomaliesResponse getAnomalies(
             @RequestParam(defaultValue = "7") int inactiveDays,

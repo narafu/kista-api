@@ -9,6 +9,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AdminQueryUseCase;
 import com.kista.domain.port.in.AdminStrategyUseCase;
 import com.kista.domain.port.in.AdminUserUseCase;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,6 +41,7 @@ public class AdminAccountController {
     private final AdminUserUseCase adminUser;    // ownerNickname 조회용 사용자 목록
     private final AdminStrategyUseCase adminStrategy; // 관리자 전략 상태 변경
 
+    @Operation(summary = "계좌 목록 조회", description = "소유자 닉네임과 전략 목록을 포함해 계좌 목록을 반환합니다. from/to로 기간 필터링 가능합니다.")
     @GetMapping
     public List<AdminAccountResponse> listAccounts(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -54,6 +56,7 @@ public class AdminAccountController {
     }
 
     // 계좌 선택 이후 전략 선택 드롭다운용 목록
+    @Operation(summary = "계좌 전략 목록 조회", description = "계좌 선택 이후 전략 선택 드롭다운용 목록을 반환합니다.")
     @GetMapping("/{accountId}/strategies")
     public List<AdminStrategyResponse> listStrategies(@PathVariable UUID accountId) {
         return adminQuery.listStrategies(accountId).stream()
@@ -61,6 +64,7 @@ public class AdminAccountController {
                 .toList();
     }
 
+    @Operation(summary = "전략 상태 변경", description = "status: ACTIVE(재개), PAUSED(일시정지)")
     @PatchMapping("/{accountId}/strategies/{strategyId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStrategyStatus(

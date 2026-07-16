@@ -2,6 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.adapter.in.schedule.TradingOpenScheduler;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ public class AdminSchedulerController {
     private TradingCloseScheduler closeScheduler;
 
     // 개장 스케쥴러 수동 트리거 — 개장 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
+    @Operation(summary = "개장 스케쥴러 수동 트리거", description = "개장 대기 없이 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
     @PostMapping("/open")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerOpen() {
@@ -42,6 +44,7 @@ public class AdminSchedulerController {
     }
 
     // 마감 스케쥴러 수동 트리거 — 주문 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
+    @Operation(summary = "마감 스케쥴러 수동 트리거", description = "주문 대기 없이 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
     @PostMapping("/close")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerClose() {
