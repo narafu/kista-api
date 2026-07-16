@@ -45,3 +45,8 @@ jobs:
         run: ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
+
+      - name: Run integration tests
+        run: ./gradlew integration
+        env:
+          SPRING_PROFILES_ACTIVE: test
