@@ -8,7 +8,7 @@ public record RegisterStrategyCommand(
         Strategy.Ticker ticker,                      // null이면 전략 기본값
         BigDecimal initialUsdDeposit,                // null 허용 (선택 입력), VR에서는 예수금(초기 pool)으로 재사용
         Strategy.CycleSeedType cycleSeedType,        // null이면 NONE으로 처리
-        int divisionCount,                           // 분할 수 (20/30/40), 기본 20
+        int divisionCount,                           // 분할 수 (20/30/40), 0은 미입력 sentinel로 런타임 기본값 적용
         // VR 전략 전용 필드 (비VR 경로는 null)
         BigDecimal initialValue,                     // 주식 평가금 — 초기 V값 (VR 전용)
         Integer intervalWeeks,                       // 리밸런싱 주기 (주 단위, 1 이상, VR 전용)

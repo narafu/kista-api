@@ -179,7 +179,7 @@ Frontend candidates in `../kista-ui`:
 - Create domain model and persistence adapter for loading/saving settings.
 - Add default values that preserve current production behavior.
 
-- [ ] **Step 1: Create migration**
+- [x] **Step 1: Create migration**
 
 Latest applied migration is `V22__reorder_privacy_trade_base_release_date.sql` — this must be `V23__create_admin_runtime_settings.sql` (re-check `ls src/main/resources/db/migration` at implementation time in case other work has landed first; invoke the `flyway-migration` skill).
 
@@ -210,7 +210,7 @@ Seed one row with the default runtime settings:
 - VR band width default `15`.
 - VR interval weeks default `2`.
 
-- [ ] **Step 2: Create domain settings model**
+- [x] **Step 2: Create domain settings model**
 
 Model settings as typed records/classes instead of passing raw maps through application services.
 
@@ -221,7 +221,7 @@ Required behavior:
 - Strategy field settings validate `defaultValue` is included in `allowedValues`.
 - Non-customizable fields require exactly one allowed default or must reject non-default input explicitly.
 
-- [ ] **Step 3: Create persistence adapter**
+- [x] **Step 3: Create persistence adapter**
 
 Implement load/save through `RuntimeSettingsPort`.
 
@@ -240,7 +240,7 @@ Expected methods:
 - Create `AdminSettingsController`.
 - Add DTOs in the existing web DTO package style.
 
-- [ ] **Step 1: Add public runtime config API**
+- [x] **Step 1: Add public runtime config API**
 
 Implement:
 
@@ -249,7 +249,7 @@ Implement:
 - Add `Cache-Control: no-store`.
 - Do not include admin-only metadata unless explicitly needed by UI.
 
-- [ ] **Step 2: Add admin settings API**
+- [x] **Step 2: Add admin settings API**
 
 Implement:
 
@@ -274,7 +274,7 @@ Behavior:
 - Modify `UserService` and related signup/approval request services.
 - Add focused tests around signup and approval state transitions.
 
-- [ ] **Step 1: Apply setting on signup**
+- [x] **Step 1: Apply setting on signup**
 
 Behavior:
 
@@ -282,7 +282,7 @@ Behavior:
 - If `approvalRequired=false`, create or transition new eligible signup users as `ACTIVE`.
 - Preserve deleted-user and rejected-user rejoin policies already present in the service.
 
-- [ ] **Step 2: Apply setting update side effect**
+- [x] **Step 2: Apply setting update side effect**
 
 When admin changes `approvalRequired` from true to false:
 
@@ -292,7 +292,7 @@ When admin changes `approvalRequired` from true to false:
 - Leave `REJECTED` users unchanged.
 - Avoid duplicate approval request side effects.
 
-- [ ] **Step 3: Apply setting to reapply flow**
+- [x] **Step 3: Apply setting to reapply flow**
 
 `UserService.reapply()` currently always transitions `PENDING`→`PENDING` (with cooldown) or `REJECTED`→`PENDING` regardless of any setting. Modify it so that:
 
@@ -311,7 +311,7 @@ When admin changes `approvalRequired` from true to false:
 - Modify account controller validation if controller currently owns broker checks.
 - Add service/controller tests.
 
-- [ ] **Step 1: Block disabled broker registration**
+- [x] **Step 1: Block disabled broker registration**
 
 Behavior:
 
@@ -319,11 +319,11 @@ Behavior:
 - If `brokers.TOSS.enabled=false`, reject new Toss account registration.
 - Return a user-safe validation error, not a generic server error.
 
-- [ ] **Step 2: Block disabled broker connection tests**
+- [x] **Step 2: Block disabled broker connection tests**
 
 Connection test APIs must use the same broker enablement policy as registration.
 
-- [ ] **Step 3: Preserve existing accounts**
+- [x] **Step 3: Preserve existing accounts**
 
 Do not add broker enablement checks to:
 
@@ -343,7 +343,7 @@ Do not add broker enablement checks to:
 - Add helper/service for applying strategy creation settings.
 - Add tests for every strategy type and field.
 
-- [ ] **Step 1: Block disabled strategy creation**
+- [x] **Step 1: Block disabled strategy creation**
 
 Behavior:
 
@@ -352,7 +352,7 @@ Behavior:
 - If `strategies.VR.enabled=false`, reject new VR strategy creation.
 - Existing strategy edit and scheduler flows must not check this flag.
 
-- [ ] **Step 2: Apply field defaults**
+- [x] **Step 2: Apply field defaults**
 
 When strategy creation omits a field:
 
@@ -360,7 +360,7 @@ When strategy creation omits a field:
 - Preserve current fixed ticker policy for PRIVACY and VR.
 - Preserve current VR default semantics for hold mode.
 
-- [ ] **Step 3: Validate allowed values**
+- [x] **Step 3: Validate allowed values**
 
 Reject request values outside configured `allowedValues`.
 
@@ -374,7 +374,7 @@ Specific rules:
 - VR band width must be one of configured band widths.
 - VR interval weeks must be one of configured interval weeks.
 
-- [ ] **Step 4: Enforce non-customizable fields**
+- [x] **Step 4: Enforce non-customizable fields**
 
 If a field is non-customizable:
 
@@ -393,7 +393,7 @@ Notes:
 
 **Repository:** `../kista-ui`
 
-- [ ] **Step 1: Add runtime config client**
+- [x] **Step 1: Add runtime config client**
 
 Create a React Query hook for `/api/runtime-config`.
 
@@ -403,7 +403,7 @@ Expected behavior:
 - Use short or zero stale time, or explicitly refetch on page focus where appropriate.
 - Treat runtime config as no-store dynamic data.
 
-- [ ] **Step 2: Update account registration UI**
+- [x] **Step 2: Update account registration UI**
 
 Behavior:
 
@@ -411,7 +411,7 @@ Behavior:
 - If all brokers are disabled, show a clear unavailable-state message.
 - Prevent continuing without an enabled broker.
 
-- [ ] **Step 3: Update strategy creation UI**
+- [x] **Step 3: Update strategy creation UI**
 
 Behavior:
 
@@ -422,7 +422,7 @@ Behavior:
 - Remove hardcoded VR band width and interval week options from the form.
 - Hide or lock non-customizable fields.
 
-- [ ] **Step 4: Update approval-related UI copy**
+- [x] **Step 4: Update approval-related UI copy**
 
 Behavior:
 
@@ -435,7 +435,7 @@ Behavior:
 
 **Repository:** `../kista-ui`
 
-- [ ] **Step 1: Add admin settings page**
+- [x] **Step 1: Add admin settings page**
 
 Create a page under the existing admin route structure.
 
@@ -448,7 +448,7 @@ Sections:
 - PRIVACY fixed ticker display.
 - VR field settings.
 
-- [ ] **Step 2: Add validation before save**
+- [x] **Step 2: Add validation before save**
 
 UI should prevent clearly invalid payloads:
 
@@ -458,7 +458,7 @@ UI should prevent clearly invalid payloads:
 
 Backend remains the final source of truth.
 
-- [ ] **Step 3: Add save/reset behavior**
+- [x] **Step 3: Add save/reset behavior**
 
 Behavior:
 
@@ -473,34 +473,34 @@ Behavior:
 
 Backend verification:
 
-- [ ] Runtime settings migration applies.
-- [ ] Runtime settings defaults load when DB row exists.
-- [ ] `/api/runtime-config` returns no-store response.
-- [ ] Admin settings API rejects invalid payloads.
-- [ ] Approval-off signup creates/keeps eligible users active.
-- [ ] Approval true-to-false update activates pending users only.
-- [ ] `REJECTED` user calling `reapply()` while `approvalRequired=false` becomes `ACTIVE` (not `PENDING`).
-- [ ] `REJECTED` user calling `reapply()` while `approvalRequired=true` still becomes `PENDING` (unchanged behavior).
-- [ ] INFINITE strategy creation with `divisionCount=30` or `40` still succeeds with default runtime-config seed (regression guard for the "preserve current production behavior" constraint).
-- [ ] Disabled broker registration is rejected.
-- [ ] Disabled broker connection test is rejected.
-- [ ] Existing account operations do not check broker enabled flags.
-- [ ] Disabled strategy creation is rejected.
-- [ ] Existing strategy edit does not check strategy enabled flags.
-- [ ] Strategy creation applies defaults and rejects disallowed values.
-- [ ] Non-customizable fields reject explicit non-default values.
+- [x] Runtime settings migration applies.
+- [x] Runtime settings defaults load when DB row exists.
+- [x] `/api/runtime-config` returns no-store response.
+- [x] Admin settings API rejects invalid payloads.
+- [x] Approval-off signup creates/keeps eligible users active.
+- [x] Approval true-to-false update activates pending users only.
+- [x] `REJECTED` user calling `reapply()` while `approvalRequired=false` becomes `ACTIVE` (not `PENDING`).
+- [x] `REJECTED` user calling `reapply()` while `approvalRequired=true` still becomes `PENDING` (unchanged behavior).
+- [x] INFINITE strategy creation with `divisionCount=30` or `40` still succeeds with default runtime-config seed (regression guard for the "preserve current production behavior" constraint).
+- [x] Disabled broker registration is rejected.
+- [x] Disabled broker connection test is rejected.
+- [x] Existing account operations do not check broker enabled flags.
+- [x] Disabled strategy creation is rejected.
+- [x] Existing strategy edit does not check strategy enabled flags.
+- [x] Strategy creation applies defaults and rejects disallowed values.
+- [x] Non-customizable fields reject explicit non-default values.
 
 Frontend verification:
 
-- [ ] Account registration hides disabled brokers.
-- [ ] Account registration handles all-brokers-disabled state.
-- [ ] Strategy creation hides disabled strategy types.
-- [ ] Strategy creation handles all-strategies-disabled state.
-- [ ] Strategy creation uses runtime division count options.
-- [ ] Strategy creation uses runtime VR band width and interval options.
-- [ ] Non-customizable fields are hidden or locked.
-- [ ] Approval-related messages disappear when approval is off.
-- [ ] Admin settings page saves and refetches settings.
+- [x] Account registration hides disabled brokers.
+- [x] Account registration handles all-brokers-disabled state.
+- [x] Strategy creation hides disabled strategy types.
+- [x] Strategy creation handles all-strategies-disabled state.
+- [x] Strategy creation uses runtime division count options.
+- [x] Strategy creation uses runtime VR band width and interval options.
+- [x] Non-customizable fields are hidden or locked.
+- [x] Approval-related messages disappear when approval is off.
+- [x] Admin settings page saves and refetches settings.
 
 Recommended commands:
 

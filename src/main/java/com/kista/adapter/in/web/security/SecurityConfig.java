@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/market/**").permitAll() // 비인증 대시보드용 공개 엔드포인트
                         .requestMatchers(HttpMethod.GET, "/api/meta").permitAll() // enum SSOT — 레이아웃 로드 시 인증 불필요
+                        .requestMatchers(HttpMethod.GET, "/api/runtime-config").permitAll() // 동적 가입·생성 설정 — 로그인 전 조회 허용
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()

@@ -3,11 +3,19 @@ package com.kista.application.service.strategy;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.settings.RecurringMode;
+import com.kista.domain.model.settings.RuntimeSettings;
+import com.kista.domain.model.settings.StrategyCreationSettings;
+import com.kista.domain.model.settings.StrategyFieldSettings;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.domain.strategy.InfiniteCreationResolver;
+import com.kista.domain.strategy.PrivacyCreationResolver;
+import com.kista.domain.strategy.StrategyCreationResolvers;
+import com.kista.domain.strategy.VrCreationResolver;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +54,7 @@ class StrategyServiceTest {
     @Mock MarginPort marginPort;
     @Mock LiveBalancePort liveBalancePort;                  // VR live 잔고 조회
     @Mock UserSettingsPort userSettingsPort;
+    @Mock RuntimeSettingsPort runtimeSettingsPort;          // 신규 전략 생성 설정 조회
 
     private StrategyService strategyService;
 
@@ -86,7 +96,11 @@ class StrategyServiceTest {
                 accountPort,
                 userPort,
                 registry,
-                userSettingsPort);
+                userSettingsPort,
+                runtimeSettingsPort,
+                new StrategyCreationResolvers(List.of(
+                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())));
+        lenient().when(runtimeSettingsPort.load()).thenReturn(RuntimeSettings.defaults());
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenAnswer(invocation -> Optional.of(new StrategyVersion(
                         STRATEGY_VERSION_ID, invocation.getArgument(0), 1, null, null)));
@@ -119,6 +133,54 @@ class StrategyServiceTest {
 
     private User activeUser() {
         return DomainFixtures.activeUserWithTelegram(USER_ID);
+    }
+
+    private RuntimeSettings settingsWith(Strategy.Type type, StrategyCreationSettings replacement) {
+        RuntimeSettings defaults = RuntimeSettings.defaults();
+        EnumMap<Strategy.Type, StrategyCreationSettings> strategies = new EnumMap<>(defaults.strategies());
+        strategies.put(type, replacement);
+        return new RuntimeSettings(defaults.approvalRequired(), defaults.brokers(), strategies);
+    }
+
+    private StrategyCreationSettings disabledSettings(Strategy.Type type) {
+        StrategyCreationSettings current = RuntimeSettings.defaults().strategies().get(type);
+        return new StrategyCreationSettings(false, current.ticker(), current.divisionCount(),
+                current.recurringMode(), current.bandWidth(), current.intervalWeeks());
+    }
+
+    private Strategy.Ticker defaultTicker(Strategy.Type type) {
+        return RuntimeSettings.defaults().strategies().get(type).ticker().defaultValue();
+    }
+
+    private RegisterStrategyCommand commandFor(Strategy.Type type, Strategy.Ticker ticker, int divisionCount,
+                                                Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
+        return new RegisterStrategyCommand(type, ticker, null, null, divisionCount,
+                new BigDecimal("1000000"), intervalWeeks, bandWidth, recurringAmount);
+    }
+
+    private void stubSuccessfulRegistration(Strategy.Type type, Strategy.Ticker ticker) {
+        Account account = ownerAccount();
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, Strategy.Status.ACTIVE, ticker,
+                Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(strategyPort.save(any())).thenReturn(saved);
+        when(strategyCyclePort.save(any())).thenReturn(cycle);
+        when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        if (type == Strategy.Type.VR) {
+            when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+            when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("1000000"));
+            when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+            when(registry.require(account, LiveBalancePort.class)).thenReturn(liveBalancePort);
+            when(liveBalancePort.getLiveBalance(account, ticker))
+                    .thenReturn(new AccountBalance(0, null, new BigDecimal("1000")));
+        }
     }
 
     @Test
@@ -286,6 +348,213 @@ class StrategyServiceTest {
     }
 
     // --- register() ---
+
+    @Test
+    @DisplayName("register()는 비활성화된 각 전략 유형의 신규 생성을 거부한다")
+    void register_disabledStrategyType_throws() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        for (Strategy.Type type : Strategy.Type.values()) {
+            when(runtimeSettingsPort.load()).thenReturn(settingsWith(type, disabledSettings(type)));
+            RegisterStrategyCommand cmd = commandFor(type, defaultTicker(type), 20, 2, new BigDecimal("15"), 0);
+
+            assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("비활성화");
+        }
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 생략한 ticker와 divisionCount에 런타임 기본값을 적용한다")
+    void register_infinite_appliesOmittedDefaults() {
+        stubSuccessfulRegistration(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ);
+        StrategyCreationSettings customized = new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(Strategy.Ticker.SOXL, Strategy.Ticker.TQQQ), Strategy.Ticker.TQQQ),
+                new StrategyFieldSettings<>(true, List.of(30, 40), 30), null, null, null);
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, customized));
+
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, null, 0, null, null, null));
+
+        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(result.divisionCount()).isEqualTo(30);
+        verify(strategyInfiniteDetailPort).save(argThat(detail -> detail.divisionCount() == 30));
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 ticker와 divisionCount 허용 목록 밖의 값을 거부한다")
+    void register_infinite_rejectsDisallowedFields() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings infinite = RuntimeSettings.defaults().strategies().get(Strategy.Type.INFINITE);
+        StrategyCreationSettings restricted = new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL),
+                infinite.divisionCount(), null, null, null);
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, restricted));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.MAGX, 20, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 25, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("INFINITE 고정 ticker와 divisionCount는 명시적 기본값만 허용한다")
+    void register_infinite_nonCustomizableFields_allowDefaultRejectOther() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings fixed = new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(false, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL),
+                new StrategyFieldSettings<>(false, List.of(30), 30), null, null, null);
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, fixed));
+        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 30, null, null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 해당 종목");
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, 30, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 40, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 기본 설정의 divisionCount 30과 40을 계속 허용한다")
+    void register_infinite_preservesDivisionCountThirtyAndForty() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+
+        for (int divisionCount : List.of(30, 40)) {
+            assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                    commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, divisionCount, null, null, null)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("이미 해당 종목");
+        }
+    }
+
+    @Test
+    @DisplayName("PRIVACY와 VR register()는 고정 ticker와 다른 명시 입력을 거부한다")
+    void register_fixedTickerTypes_rejectExplicitNonDefault() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.PRIVACY, Strategy.Ticker.TQQQ, 20, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, Strategy.Ticker.SOXL, 20, 2, new BigDecimal("15"), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("VR register()는 생략한 ticker, recurring mode, bandWidth, intervalWeeks 기본값을 적용한다")
+    void register_vr_appliesOmittedDefaults() {
+        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
+                new RegisterStrategyCommand(Strategy.Type.VR, null, new BigDecimal("1000"), null, 0,
+                        null, null, null, null));
+
+        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        verify(strategyVrDetailPort).save(argThat(detail -> detail.intervalWeeks() == 2
+                && detail.bandWidth().compareTo(new BigDecimal("15")) == 0
+                && detail.recurringAmount() == 0));
+    }
+
+    @Test
+    @DisplayName("VR register()는 bandWidth와 intervalWeeks 허용 목록 밖의 값을 거부한다")
+    void register_vr_rejectsDisallowedBandWidthAndInterval() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("12"), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 3, new BigDecimal("15"), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("VR 고정 bandWidth와 intervalWeeks는 명시적 기본값만 허용한다")
+    void register_vr_nonCustomizableBandAndInterval_allowDefaultRejectOther() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings fixed = new StrategyCreationSettings(true, vr.ticker(), null, vr.recurringMode(),
+                new StrategyFieldSettings<>(false, List.of(new BigDecimal("15")), new BigDecimal("15")),
+                new StrategyFieldSettings<>(false, List.of(2), 2));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, fixed));
+        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 0, 2, new BigDecimal("15"), 0)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 해당 종목");
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 0, 2, new BigDecimal("10"), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 0, 4, new BigDecimal("15"), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("VR recurringMode 허용 목록은 recurringAmount 부호로 검증하고 금액 크기는 제한하지 않는다")
+    void register_vr_validatesRecurringModeBySignOnly() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings depositOnly = new StrategyCreationSettings(true, vr.ticker(), null,
+                new StrategyFieldSettings<>(true, List.of(RecurringMode.DEPOSIT), RecurringMode.DEPOSIT),
+                vr.bandWidth(), vr.intervalWeeks());
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, depositOnly));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), -999)))
+                .isInstanceOf(IllegalArgumentException.class);
+        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 999)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 해당 종목");
+    }
+
+    @Test
+    @DisplayName("VR recurringMode가 고정이면 생략/0은 허용하고 명시적 nonzero는 거부한다")
+    void register_vr_nonCustomizableRecurringMode_forcesHold() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings holdOnly = new StrategyCreationSettings(true, vr.ticker(), null,
+                new StrategyFieldSettings<>(false, List.of(RecurringMode.HOLD), RecurringMode.HOLD),
+                vr.bandWidth(), vr.intervalWeeks());
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, holdOnly));
+        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), null)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 0)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("update()는 신규 생성 설정을 조회하지 않는다")
+    void update_doesNotLoadCreationSettings() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
+
+        strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, null));
+
+        verifyNoInteractions(runtimeSettingsPort);
+    }
 
     @Test
     @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
@@ -576,32 +845,6 @@ class StrategyServiceTest {
                 cv.poolLimit().compareTo(new BigDecimal("2500.00")) == 0
                         && cv.gradient() == 10));
         assertThat(result.vr().recurringAmount()).isZero();
-    }
-
-    @Test
-    @DisplayName("VR register() intervalWeeks null이면 IllegalArgumentException 발생")
-    void register_vr_missingIntervalWeeks_throws() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
-                new BigDecimal("3000"), null, new BigDecimal("15.00"), 0);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("intervalWeeks");
-    }
-
-    @Test
-    @DisplayName("VR register() bandWidth null이면 IllegalArgumentException 발생")
-    void register_vr_missingBandWidth_throws() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
-                new BigDecimal("3000"), 4, null, 0);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("bandWidth");
     }
 
     @Test

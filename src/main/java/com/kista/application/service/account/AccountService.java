@@ -6,6 +6,7 @@ import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.domain.port.in.AccountUseCase;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.RuntimeSettingsPort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,15 @@ class AccountService implements AccountUseCase {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
+    private final RuntimeSettingsPort runtimeSettingsPort; // 증권사 신규 등록 허용 설정 조회
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
     public Account register(UUID userId, RegisterAccountCommand cmd) {
+        // broker 미지정 시 KIS 기본값 적용 후 신규 등록 정책을 확인한다.
+        Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
+        requireBrokerEnabled(broker);
+
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
@@ -43,9 +49,6 @@ class AccountService implements AccountUseCase {
                 .filter(a -> a.accountNo().equals(cmd.accountNo()))
                 .findAny()
                 .ifPresent(a -> { throw new Account.DuplicateAccountException(cmd.accountNo()); });
-        // broker 미지정 시 KIS 기본값 적용
-        Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
-
         // 증권사별 자격증명+계좌 검증 — KIS는 accountNo 소유 검증 후 null, Toss는 accountSeq 반환
         String brokerAccountCode = connectionTesters.of(broker)
                 .verifyAccount(cmd.appKey(), cmd.secretKey(), cmd.accountNo());
@@ -92,6 +95,14 @@ class AccountService implements AccountUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Account.Broker broker, String appKey, String appSecret, UUID accountId) {
+        requireBrokerEnabled(broker);
         connectionTesters.of(broker).verifyCredentials(appKey, appSecret, accountId);
+    }
+
+    private void requireBrokerEnabled(Account.Broker broker) {
+        // 연결 검증 전에 차단해 비활성 증권사 자격증명이 외부 API로 전달되지 않게 한다.
+        if (!runtimeSettingsPort.load().brokers().get(broker).enabled()) {
+            throw new IllegalArgumentException(broker + " 증권사 신규 계좌 등록이 비활성화되어 있습니다");
+        }
     }
 }

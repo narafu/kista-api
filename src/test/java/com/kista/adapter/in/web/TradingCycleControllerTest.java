@@ -6,6 +6,7 @@ import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyDetail;
+import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -304,5 +306,25 @@ class TradingCycleControllerTest {
                 .andExpect(jsonPath("$.vr").exists())
                 .andExpect(jsonPath("$.vr.poolLimit").value(1000.00))
                 .andExpect(jsonPath("$.vr.intervalWeeks").value(4));
+    }
+
+    @Test
+    void register_omittedDivisionCount_passesRuntimeDefaultSentinel() throws Exception {
+        Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, 30, false, 0.0, 0, null);
+        when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"INFINITE","ticker":"SOXL"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.divisionCount").value(30));
+
+        verify(tradingCycle).register(eq(USER_ID), eq(ACCOUNT_ID),
+                argThat((RegisterStrategyCommand command) -> command.divisionCount() == 0));
     }
 }

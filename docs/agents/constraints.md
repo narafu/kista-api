@@ -79,8 +79,7 @@
 ### Ticker enum (Strategy.Ticker nested enum)
 - import: `import com.kista.domain.model.strategy.Strategy.Ticker;`
 - MAGX/USD/TQQQ/SOXL — KIS 거래소 코드는 `KisExchangeRegistry`(adapter/out/kis)가 관리, 새 종목 추가 시 양쪽 갱신 필수
-- PRIVACY 전략: `Strategy.Ticker.SOXL` 강제 (`Strategy.Type.resolveTicker()`)
-- VR 전략: `Strategy.Ticker.TQQQ` 강제 (`Strategy.Type.resolveTicker()`)
+- PRIVACY·VR 신규 등록 ticker는 `StrategyCreationSettings.ticker()`의 고정값 정책으로 결정되며, 다른 명시 입력은 거부한다 (기본값: PRIVACY=SOXL, VR=TQQQ)
 - ticker는 `Account` 아닌 `strategy.ticker()` — 매매 시 strategy에서 참조
 
 
@@ -255,6 +254,15 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - ADMIN seed: `ADMIN_KAKAO_IDS` 환경변수 (쉼표 구분) — 로그인 시 idempotent promote
 - `/api/admin/**` → `hasRole("ADMIN")`, `audit_logs`에 관리자 액션 영구 기록
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 발급
+
+### 런타임 설정 API 규칙
+- `GET /api/runtime-config` → 로그인 전 UI가 가입·계좌·전략 생성 정책을 조회하는 공개 엔드포인트. 동적 설정이므로 `Cache-Control: no-store` 유지
+- `GET|PUT /api/admin/settings` → ADMIN 전용. PUT은 auth/brokers/strategies 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API로 취급하지 않음. 조회·갱신 응답 모두 `Cache-Control: no-store` 유지
+- `brokers.<broker>.enabled=false`이면 해당 증권사의 신규 계좌 등록과 연결 테스트를 외부 API 호출 전에 400으로 차단. 기존 계좌의 조회·수정·매매는 영향받지 않음
+- `StrategyService.register()`는 신규 전략에만 `strategies.<type>` 생성 정책을 적용: `enabled=false`면 400으로 차단하고, ticker·INFINITE divisionCount·VR recurringMode/bandWidth/intervalWeeks의 생략 기본값과 허용/고정값을 검증. 기존 전략 수정·실행에는 소급 적용하지 않음
+- `RegisterStrategyCommand.divisionCount=0`은 INFINITE 신규 등록의 미입력 sentinel이며 런타임 기본값으로 치환. VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
+- 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
+- `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
 
 ### tradeDate 변환 정책 (KST 코드 ↔ UTC=US 거래일 DB)
 - 도메인 `tradeDate`: **KST 일자** / DB `trade_date`: **UTC 일자(= US 거래일)** — KST 04:30 기준 ±1일 차이
