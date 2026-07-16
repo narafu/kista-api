@@ -14,7 +14,6 @@ import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
@@ -114,13 +113,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("전일종가 조회", () -> {
-            Map<Ticker, PriceSnapshot> snapshots =
-                    registry.require(account, BrokerPricePort.class).getPriceSnapshots(tickers, account);
-            Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-            snapshots.forEach((ticker, snapshot) -> result.put(ticker, snapshot.prevClose()));
-            return result;
-        });
+        return BrokerCallGuard.wrap("전일종가 조회",
+                () -> registry.require(account, BrokerPricePort.class).getPrevCloses(tickers, account));
     }
 
     @Override
@@ -172,7 +166,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : registry.require(account, BrokerPricePort.class).getPriceSnapshot(ticker, account).prevClose();
+                : registry.require(account, BrokerPricePort.class).getPrevClose(ticker, account);
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyBase.currentCycleStart()
                 : price;

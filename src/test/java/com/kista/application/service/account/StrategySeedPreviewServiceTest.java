@@ -2,7 +2,6 @@ package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
@@ -34,6 +33,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,9 +73,9 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void infinite_uses_prev_close_not_current() {
-        // given: 현재가 96.96, 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함
-        when(pricePort.getPriceSnapshot(Strategy.Ticker.SOXL, mockAccount))
-                .thenReturn(new PriceSnapshot(new BigDecimal("96.96"), new BigDecimal("89.20")));
+        // given: 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함 (현재가 API 미사용)
+        when(pricePort.getPrevClose(Strategy.Ticker.SOXL, mockAccount))
+                .thenReturn(new BigDecimal("89.20"));
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 20);
@@ -84,6 +85,9 @@ class StrategySeedPreviewServiceTest {
         assertThat(result.minSeed()).isEqualByComparingTo("3568.00");
         assertThat(result.skipReason()).isNull();
         assertThat(result.ticker()).isEqualTo("SOXL");
+        // prevClose 전용 API만 호출 — 현재가 API(Toss라면 별도 호출) 낭비 없음
+        verify(pricePort, never()).getPrice(any(), any());
+        verify(pricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
@@ -117,14 +121,16 @@ class StrategySeedPreviewServiceTest {
 
     @Test
     void getPrices_returns_prev_close_not_current() {
-        // given: 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함
-        when(pricePort.getPriceSnapshots(List.of(Strategy.Ticker.SOXL), mockAccount))
-                .thenReturn(Map.of(Strategy.Ticker.SOXL, new PriceSnapshot(new BigDecimal("96.96"), new BigDecimal("89.20"))));
+        // given: 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함 (현재가 API 미사용)
+        when(pricePort.getPrevCloses(List.of(Strategy.Ticker.SOXL), mockAccount))
+                .thenReturn(Map.of(Strategy.Ticker.SOXL, new BigDecimal("89.20")));
 
         // when
         var result = service.getPrices(accountId, userId, List.of(Strategy.Ticker.SOXL));
 
         // then
         assertThat(result.get(Strategy.Ticker.SOXL)).isEqualByComparingTo("89.20");
+        verify(pricePort, never()).getPrices(any(), any());
+        verify(pricePort, never()).getPriceSnapshots(any(), any());
     }
 }

@@ -27,7 +27,17 @@
 - `TossApiException` → `GlobalExceptionHandler` 503 자동 처리
 - `Account.isToss()` 삭제됨 — `account.broker() == Account.Broker.TOSS` 직접 비교
 
-### 전일종가(prevClose) 조회 — TossPriceApi.fetchPrevClose()
+### 가격 조회 API 3분리 — TossPriceApi
+
+Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 분리된 HTTP 호출**이므로, 필요한 값만 조회하도록 메서드를 3그룹으로 분리했다 (KIS는 한 응답에 둘 다 묶여 있어 이 구분이 무의미 — `kis-api.md` 참고):
+
+- `getPrice`/`getPrices` — 현재가만, `/api/v1/prices` 1회 호출
+- `getPrevClose`/`getPrevCloses` — 전일종가만, 캔들 API만 호출(**현재가 API 미호출**). 캔들 조회 실패 종목만 현재가로 fallback(별도 배치 호출)
+- `getPriceSnapshot`/`getPriceSnapshots` — 현재가+전일종가 둘 다 필요할 때만 사용하는 조합(위 두 API를 순차 호출) — "기본으로 쓰는 API"가 아니라 소수 케이스 전용
+
+**소비처 선택 기준**: 실제 주문가 예측/계산(전략 생성 기준가, 다음 주문 미리보기, 매매 실행 시작가)은 `getPrevClose(s)`만 필요 — `getPriceSnapshot`을 쓰면 쓰지도 않는 현재가 API 호출이 낭비된다.
+
+### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 
 - `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
 - `before` 시각 계산이 핵심: `DstInfo.isRegularSessionActive()`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `DstInfo.lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 `Instant.now()`

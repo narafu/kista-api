@@ -152,4 +152,32 @@ class TossPriceApiTest {
 
         assertThat(result).isEmpty();
     }
+
+    @Test
+    @DisplayName("getPrevCloses: 캔들 API만 호출, 현재가 API(/api/v1/prices)는 호출하지 않음")
+    void getPrevCloses_callsOnlyCandleApi_notCurrentPriceApi() {
+        TossCandle candle = new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"),
+                new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
+
+        Map<Ticker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(Ticker.SOXL));
+
+        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("89.20"));
+        verify(tossHttpClient, org.mockito.Mockito.never())
+                .getCommon(any(), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    @DisplayName("getPrevCloses: 캔들 조회 실패 종목만 현재가 API로 fallback")
+    void getPrevCloses_fallsBackToCurrentPriceOnlyForFailedCandle() {
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrap(item));
+
+        Map<Ticker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(Ticker.SOXL));
+
+        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("25.50"));
+        verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class));
+    }
 }

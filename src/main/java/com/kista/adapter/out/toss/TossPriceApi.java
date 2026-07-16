@@ -66,22 +66,46 @@ class TossPriceApi {
 
     public PriceSnapshot getPriceSnapshot(Ticker ticker) {
         BigDecimal price = getPrice(ticker);
-        return new PriceSnapshot(price, fetchPrevClose(ticker.name(), price));
+        return new PriceSnapshot(price, fetchPrevCloseCached(ticker.name()).orElse(price));
     }
 
     public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers) {
         return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        e -> new PriceSnapshot(e.getValue(), fetchPrevClose(e.getKey().name(), e.getValue()))));
+                        e -> new PriceSnapshot(e.getValue(), fetchPrevCloseCached(e.getKey().name()).orElse(e.getValue()))));
+    }
+
+    // 전일종가만 필요한 경우 — 현재가 API(/api/v1/prices) 미호출, 캔들 API만 호출
+    // 캔들 조회가 실패한 종목만 현재가로 fallback (드문 경우라 별도 배치 호출로 보충)
+    public BigDecimal getPrevClose(Ticker ticker) {
+        return getPrevCloses(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
+    }
+
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers) {
+        if (tickers.isEmpty()) return Map.of();
+
+        Map<Ticker, BigDecimal> result = new java.util.LinkedHashMap<>();
+        List<Ticker> needsFallback = new java.util.ArrayList<>();
+        for (Ticker ticker : tickers) {
+            fetchPrevCloseCached(ticker.name())
+                    .ifPresentOrElse(
+                            prevClose -> result.put(ticker, prevClose),
+                            () -> needsFallback.add(ticker));
+        }
+        if (!needsFallback.isEmpty()) {
+            log.warn("전일종가 캔들 조회 실패 종목 — 현재가로 fallback: tickers={}", needsFallback);
+            result.putAll(getPrices(needsFallback));
+        }
+        return result;
     }
 
     // count=1 + before로 확정 종가 캔들 1개만 조회 — 정규장 진행 중이면 진행 중인 봉을 배제하기 위해
-    // before를 가장 최근 개장 시각 직전으로, 그 외(프리마켓·장마감 후)는 지금 시각으로 잡음 — 실패 시 current fallback
+    // before를 가장 최근 개장 시각 직전으로, 그 외(프리마켓·장마감 후)는 지금 시각으로 잡음
     // 같은 (symbol, KST 날짜, 정규장 진행 여부) 재조회는 캐시 히트 — 정규장 진행 여부를 버킷으로 분리해
     // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
     // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
-    private BigDecimal fetchPrevClose(String symbol, BigDecimal fallback) {
+    private Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
         DstInfo dstInfo = DstInfo.calculate();
         boolean regularSessionActive = dstInfo.isRegularSessionActive();
         Instant before = regularSessionActive
@@ -89,7 +113,7 @@ class TossPriceApi {
                 : Instant.now();                                   // 이미 확정된 봉만 존재
         String bucket = regularSessionActive ? "ACTIVE" : "CLOSED";
         return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST), bucket,
-                () -> fetchPrevCloseUncached(symbol, before)).orElse(fallback);
+                () -> fetchPrevCloseUncached(symbol, before));
     }
 
     // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate() 실시간 호출 우회)

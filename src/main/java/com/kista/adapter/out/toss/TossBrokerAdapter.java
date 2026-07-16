@@ -130,6 +130,16 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
+    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+        return tossPriceApi.getPrevClose(ticker); // 공통 API — account 불필요
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+        return tossPriceApi.getPrevCloses(tickers); // 공통 API — account 불필요
+    }
+
+    @Override
     public AccountBalance getLiveBalance(Account account, Ticker ticker) {
         return tossHoldingsApi.getBalance(account, ticker);
     }

@@ -108,6 +108,17 @@ class KisPriceApi {
         return result;
     }
 
+    // KIS는 base(전일종가)가 현재가 응답에 묶여 있어 별도 API 없음 — snapshot 재사용 (호출 횟수 절감 없음)
+    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+        return getPriceSnapshot(ticker, account).prevClose();
+    }
+
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        getPriceSnapshots(tickers, account).forEach((ticker, snapshot) -> result.put(ticker, snapshot.prevClose()));
+        return result;
+    }
+
     // multprice(HHDFS76220000) 1회 호출 — NREC + 종목별 EXCD_nn/SYMB_nn 파라미터 구성
     private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, Account account) {
         return kisHttpClient.pricingGet(

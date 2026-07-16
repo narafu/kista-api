@@ -103,6 +103,16 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
+    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+        return kisPriceApi.getPrevClose(ticker, account);
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+        return kisPriceApi.getPrevCloses(tickers, account);
+    }
+
+    @Override
     public AccountBalance getLiveBalance(Account account, Ticker ticker) {
         return kisTradingApi.getBalance(account, ticker);
     }
