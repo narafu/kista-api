@@ -115,7 +115,7 @@ public record DstInfo(
                 atKst(date, marketOpenTime(isDst)));
     }
 
-    // 스케쥴러는 KST 04:00 실행 — 04:00 이후면 당일이 US 거래일이므로 오늘, 04:00 전이면 아직 전날
+    // 매매일 경계 기준 시각 — 실제 스케쥴러 cron은 04:30이지만 날짜 경계는 04:00 고정; 04:00 이후면 당일이 US 거래일, 이전이면 아직 전날
     private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 0);
 
     // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케쥴러와 동일 로직 SSOT

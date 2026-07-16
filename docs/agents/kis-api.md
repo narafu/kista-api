@@ -40,7 +40,6 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 ### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
 - `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`, `Map<Ticker,BigDecimal>` 응답(**전일종가**, current 아님 — 전략 생성 화면 최소 시드 기준가와 통일), `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
 - `GET /api/accounts/{accountId}/margin` — `StatisticsController`, `List<MarginItem>` 응답, USD 예수금은 `currency=="USD"` 행의 `integratedOrderableAmount`
-- `GET /api/privacy-trades/base/latest` — `PrivacyTradeController`, trade_date>=오늘 중 가장 미래 SOXL 기준가(`currentCycleStart`), 없으면 404
 - `GET /api/market/holidays?year=YYYY&month=MM` — `MarketHolidayController`, 해당 월 미국 시장 휴장일 날짜 목록(`List<String>`, ISO 형식), JWT 인증 필요
 
 ### 잔고 조회 주의사항 (TTTC2101R)

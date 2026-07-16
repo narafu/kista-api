@@ -35,7 +35,7 @@ This is a Java 21 Spring Boot API using hexagonal architecture. Application entr
 - `./gradlew bootJar`: build `app.jar`.
 - `./gradlew compileJava`: compile production code and generated QueryDSL sources.
 - `./gradlew test`: run JUnit 5 tests excluding `@Tag("integration")`.
-- `./gradlew integration`: run Testcontainers/PostgreSQL integration tests; start Docker first with `docker compose up -d postgres`.
+- `./gradlew integration`: run `@Tag("integration")` tests against the local docker-compose PostgreSQL (`localhost:5432/kistadb_test`, not Testcontainers); start it first with `docker compose up -d postgres`.
 - `./gradlew test --tests 'com.kista.architecture.*'`: run ArchUnit layer rules.
 
 ## Coding Style & Naming Conventions
@@ -44,7 +44,7 @@ Use 4-space indentation and existing Java package patterns. Prefer records for i
 
 ## Testing Guidelines
 
-Tests use JUnit 5, Spring Boot Test, Mockito, ArchUnit, and Testcontainers. Name unit tests `*Test` and integration tests `*IT`; tag Docker-backed tests with `@Tag("integration")`. For `@WebMvcTest`, include CSRF on POST requests and mock authentication with a `UUID` principal instead of `@WithMockUser`.
+Tests use JUnit 5, Spring Boot Test, Mockito, and ArchUnit; integration tests connect to the local docker-compose PostgreSQL. Name unit tests `*Test` and integration tests `*IT`; tag Docker-backed tests with `@Tag("integration")`. For `@WebMvcTest`, include CSRF on POST requests and mock authentication with a `UUID` principal instead of `@WithMockUser`.
 
 ## Commit & Pull Request Guidelines
 

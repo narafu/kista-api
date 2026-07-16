@@ -34,7 +34,7 @@
 - `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 공통 포지션 스냅샷
 - `CyclePositionInfiniteDetail` record 필드 2개: `cyclePositionId, isReverseMode`
 - `StrategyCycleVrDetail` record 필드 4개: `strategyCycleId, value, gradient, poolLimit` — 사이클 시작 시 VR 파라미터 스냅샷
-- `StrategyDetail` record: `Strategy strategy, BigDecimal initialUsdDeposit, Integer divisionCount, boolean isReverseMode, Double currentRound, Integer currentHoldings` — 최신 사이클/활성 버전/최신 포지션을 합쳐 응답 조립 (`StrategyService.toDetail()`)
+- `StrategyDetail` record 필드 7개: `Strategy strategy, BigDecimal initialUsdDeposit, Integer divisionCount, boolean isReverseMode, Double currentRound, Integer currentHoldings, VrSummary vr` — 최신 사이클/활성 버전/최신 포지션을 합쳐 응답 조립 (`StrategyService.toDetail()`), `VrSummary`는 nested record (VR 외 타입은 null)
 - `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
 - `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액); VR에서는 사이클 시작 pool(예수금) — 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
@@ -45,20 +45,11 @@
 - ON이면 `StrategyService` 시드 등록/수정 시 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
 - 설정 미존재 시 `UserSettings.defaultFor(userId)` — `balanceCheckEnabled=true`, 빈 notificationPrefs
 
-### 스케쥴러 주문 예산 배정
-- `orders.order_leg`는 스케쥴러 내부 leg 식별자다. 신규 전략 생성 주문은 non-blank concrete leg를 가져야 하며, 과거/legacy 행은 `UNKNOWN`으로 유지한다. 이 값은 브로커 API payload에 포함하지 않는다.
-- `TradingService`는 신규 전략 주문 후보에 `UNKNOWN` leg가 남아 있으면 PLANNED 저장 전에 `IllegalStateException`으로 거절한다.
-- 슬롯 중복 판단은 concrete leg 기준 `timing + direction + orderLeg`다. `UNKNOWN` legacy 행은 정확한 leg를 추론하지 않고 기존 호환을 위해 `timing + direction` coarse 점유로만 처리한다.
-- INFINITE는 correction까지 포함된 complete concrete leg 조합에서만 compute skip 가능하다. 리버스 `AT_CLOSE`는 `REVERSE_INFINITE_LOC_BUY` BUY 슬롯과 `REVERSE_INFINITE_LOC_SELL` SELL 슬롯이 모두 있어야 complete로 본다. partial concrete leg는 누락 leg 복구를 위해 반드시 compute한다. `AT_OPEN`도 생성 대상이면 SELL leg 누락 가능성을 보수적으로 판단한다. VR/PRIVACY concrete compute skip은 사다리 길이가 variable이라 비활성화한다.
-- `TradingOrderBudgetAllocator`는 BUY·SELL을 독립 승인한다 — 한 방향의 잔고 부족으로 반대 방향 주문을 함께 폐기하지 않는다.
-- BUY와 SELL 모두 계좌별 `CycleOrderStrategy.allocationPriority()`에 따른 `VR → INFINITE → PRIVACY` 우선순위를 따른다. BUY는 같은 전략 타입에서 총 매수금액이 작은 사이클 우선, SELL은 같은 전략 타입에서 필요 매도수량이 작은 사이클 우선이며 동률이면 strategyId, cycleId 오름차순으로 결정한다.
-- BUY는 allocator 호출 전에 가격 cap·수량 재산정·correction 주문 생성을 끝내고 그 최종 총액으로 배정하며 사이클 내 BUY 주문은 all-or-nothing이다. 기존 당일 PLANNED BUY 금액도 예산에서 차감한다.
-- SELL은 계좌·거래일·종목별 판매가능수량에서 기존 PLANNED/PLACED 예약 수량을 차감한 뒤 같은 배치 후보를 순차 배정한다.
-- BUY/SELL 승인 결과를 병합할 때 승인된 방향만 남기고 원본 후보의 주문 순서를 보존한다.
-- 신규 BUY·SELL이 모두 거절되거나 PLANNED 저장이 실패한 사이클은 기존 주문이 없을 때 접수·리포트 대상에서 제외한다. 기존 PLANNED/PLACED 주문이 있으면 신규 거절·저장 실패와 무관하게 후속 처리를 유지한다.
-- 계좌별 allocator 조회 실패, 사이클별 PLANNED 저장 실패, 잔고 부족 알림 실패는 `notifyError` 후 해당 범위만 제외하며 다른 계좌·사이클로 전파하지 않는다.
-- 수동 매매 SELL 검증도 계좌·거래일·종목별 기존 PLANNED/PLACED 예약 수량과 신규 SELL 수량의 합을 판매가능수량과 비교한다.
-- `V24__add_order_leg_and_order_indexes.sql`은 `orders.order_leg`와 scheduler/reservation 조회용 orders 인덱스를 추가한다. 후속 orders 쿼리 변경 시 해당 인덱스 prefix와 조회 조건을 함께 확인한다. (admin-runtime-settings 브랜치와의 V23 번호 충돌로 V24로 병합 시 재번호됨)
+### 스케쥴러 주문 예산 배정 (상세 규칙 SSOT → workflow.md)
+- 예산 배정 우선순위·compute skip·실패 격리·수동 SELL 검증 등 실행 규칙 전체는 `docs/agents/workflow.md`가 SSOT — 매매·스케쥴러·주문 로직 작업 시 필수 Read
+- `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 `TradingService`가 PLANNED 저장 전 `IllegalStateException`으로 거절), legacy 행은 `UNKNOWN` 유지, 브로커 API payload에 미포함
+- 슬롯 점유 판단: concrete leg는 `timing + direction + orderLeg`, `UNKNOWN` legacy 행은 `timing + direction` coarse
+- `V24__add_order_leg_and_order_indexes.sql`이 `orders.order_leg`와 scheduler/reservation 조회용 인덱스를 추가 — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인 (V23 번호 충돌로 병합 시 V24로 재번호됨)
 
 ### MetaController (enum SSOT)
 - `GET /api/meta` — `MetaBundle` 단일 번들 (strategyTypes/tickers/brokers/strategyStatuses/cycleSeedTypes)
@@ -113,15 +104,15 @@
 averagePrice (holdings==0이면 prevClosePrice 전일종가)
 purchaseAmount = averagePrice × holdings
 totalAssets = usdDeposit + purchaseAmount
-unitAmount = totalAssets ÷ 20  (scale=2, HALF_UP)
+unitAmount = totalAssets ÷ divisionCount  (scale=2, HALF_UP — 분모는 리터럴 20이 아닌 divisionCount, 현재 허용값은 20뿐)
 currentRound = holdings==0 ? 0.0 : purchaseAmount ÷ unitAmount  (double, 소수점 허용)
-priceOffsetRate = targetProfitRate × (1 - 2×currentRound/20)  (scale=2, HALF_UP)
+priceOffsetRate = targetProfitRate × (1 - 2×currentRound/divisionCount)  (scale=2, HALF_UP)
 referencePrice = averagePrice × (1 + priceOffsetRate)  (scale=2, HALF_UP — LOC 주문 가격 기준)
 targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 ```
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
 - `currentRound`는 floor 없이 소수점 허용
-- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < 10 / currentRound ≥ 10과 동치)
+- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < divisionCount/2 여부와 동치)
 - **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+priceOffsetRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
 
