@@ -88,7 +88,7 @@ adapter/in/
 
 adapter/out/
   broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급)
-                   PrevCloseCache (전일종가 캐시 — 종목+거래일(KST) 단위 하루 내 재조회 방지, KIS/Toss 공용)
+                   PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
   kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 invalidateToken(INVALIDATED_TOKEN 센티널) 후 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
   toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
