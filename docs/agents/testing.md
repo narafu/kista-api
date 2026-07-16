@@ -32,6 +32,7 @@
 
 ### Mockito 병렬 테스트 주의
 - `@WebMvcTest` 클래스에 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — 병렬 실행 시 mock이 다른 테스트에 오염됨
+- `DataJpaTestBase` 상속(DB 직결) 테스트도 `@Execution(ExecutionMode.SAME_THREAD)` 필수 — JUnit 병렬 모드에서 `Cannot start new transaction without ending existing transaction` 발생
 - `ArgumentCaptor<Map>` (raw) + `any()` — concurrent 모드에서 오작동 → `ArgumentCaptor.forClass(Map.class)` + `@SuppressWarnings("unchecked")` 사용
 - `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건 (LOC매수×2 + LOC매도 + 지정가매도)
 
