@@ -38,7 +38,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - 국내주식 API는 UPPERCASE — 혼동 주의, `@JsonProperty` 값 반드시 소문자로
 
 ### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
-- `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`, `Map<Ticker,BigDecimal>` 응답, `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
+- `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`, `Map<Ticker,BigDecimal>` 응답(**전일종가**, current 아님 — 전략 생성 화면 최소 시드 기준가와 통일), `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
 - `GET /api/accounts/{accountId}/margin` — `StatisticsController`, `List<MarginItem>` 응답, USD 예수금은 `currency=="USD"` 행의 `integratedOrderableAmount`
 - `GET /api/privacy-trades/base/latest` — `PrivacyTradeController`, trade_date>=오늘 중 가장 미래 SOXL 기준가(`currentCycleStart`), 없으면 404
 - `GET /api/market/holidays?year=YYYY&month=MM` — `MarketHolidayController`, 해당 월 미국 시장 휴장일 날짜 목록(`List<String>`, ISO 형식), JWT 인증 필요
@@ -80,6 +80,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 - 단건(`HHDFS00000300`)·복수종목(`HHDFS76220000`) 응답 모두 `base`(전일종가) 필드를 `last`(현재가)와 함께 반환 — **별도 API 호출 없이 `base` 필드를 그대로 prevClose로 사용** (빈값이면 current로 fallback)
 - 과거엔 "`base`는 장 시작 전엔 하루 더 과거 종가일 수 있다"는 결함 회피를 위해 종목별로 `dailyprice`(`HHDFS76240000`)를 별도 호출해 확정 종가를 재조회했으나, 정확도보다 단순성(종목당 API 호출 1회)을 택해 제거함 — 운영 중 이상 종가(개장 전 시간대)가 관측되면 이 트레이드오프부터 의심할 것
+- **전략 생성 화면과 실제 매매의 기준가 통일**: `AccountStatisticsService.getPrices()`(`GET /prices` 티커 목록)와 `strategySeedPreview()`(최소 시드 미리보기) 모두 `getPriceSnapshot(s)().prevClose()`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
 
 ### KIS 응답 Ticker 필터링 패턴
 - 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> Ticker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`

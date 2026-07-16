@@ -2,6 +2,7 @@ package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -69,17 +71,17 @@ class StrategySeedPreviewServiceTest {
     }
 
     @Test
-    void infinite_uses_current_price() {
-        // given: 현재가 30.00, divisionCount=20
-        when(pricePort.getPrice(Strategy.Ticker.SOXL, mockAccount))
-                .thenReturn(new BigDecimal("30.00"));
+    void infinite_uses_prev_close_not_current() {
+        // given: 현재가 96.96, 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함
+        when(pricePort.getPriceSnapshot(Strategy.Ticker.SOXL, mockAccount))
+                .thenReturn(new PriceSnapshot(new BigDecimal("96.96"), new BigDecimal("89.20")));
 
         // when
         var result = service.strategySeedPreview(accountId, userId, Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 20);
 
-        // then: minSeed = 30.00 * (20 * 2.0) = 1200.00
-        assertThat(result.basePrice()).isEqualByComparingTo("30.00");
-        assertThat(result.minSeed()).isEqualByComparingTo("1200.00");
+        // then: minSeed = 89.20 * (20 * 2.0) = 3568.00
+        assertThat(result.basePrice()).isEqualByComparingTo("89.20");
+        assertThat(result.minSeed()).isEqualByComparingTo("3568.00");
         assertThat(result.skipReason()).isNull();
         assertThat(result.ticker()).isEqualTo("SOXL");
     }
@@ -111,5 +113,18 @@ class StrategySeedPreviewServiceTest {
         assertThat(result.basePrice()).isEqualByComparingTo("5000.00");
         assertThat(result.minSeed()).isEqualByComparingTo("2500.00");
         assertThat(result.skipReason()).isNull();
+    }
+
+    @Test
+    void getPrices_returns_prev_close_not_current() {
+        // given: 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함
+        when(pricePort.getPriceSnapshots(List.of(Strategy.Ticker.SOXL), mockAccount))
+                .thenReturn(Map.of(Strategy.Ticker.SOXL, new PriceSnapshot(new BigDecimal("96.96"), new BigDecimal("89.20"))));
+
+        // when
+        var result = service.getPrices(accountId, userId, List.of(Strategy.Ticker.SOXL));
+
+        // then
+        assertThat(result.get(Strategy.Ticker.SOXL)).isEqualByComparingTo("89.20");
     }
 }

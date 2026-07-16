@@ -14,6 +14,7 @@ import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
@@ -108,10 +109,18 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
     }
 
+    // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일
+    // (currentPrice로 보여주면 등록 시점마다 미묘하게 다른 값이 최소 시드 기준으로 오인될 수 있음)
     @Override
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("현재가 조회", () -> registry.require(account, BrokerPricePort.class).getPrices(tickers, account));
+        return BrokerCallGuard.wrap("전일종가 조회", () -> {
+            Map<Ticker, PriceSnapshot> snapshots =
+                    registry.require(account, BrokerPricePort.class).getPriceSnapshots(tickers, account);
+            Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+            snapshots.forEach((ticker, snapshot) -> result.put(ticker, snapshot.prevClose()));
+            return result;
+        });
     }
 
     @Override
@@ -160,10 +169,10 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 ? new PrivacyTradeBase(null, null, 0, currentBase.currentCycleStart(), List.of())
                 : null;
 
-        // 3단계: 현재가 + 기준가 결정 후 최소 시드 계산
+        // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : registry.require(account, BrokerPricePort.class).getPrice(ticker, account);
+                : registry.require(account, BrokerPricePort.class).getPriceSnapshot(ticker, account).prevClose();
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyBase.currentCycleStart()
                 : price;

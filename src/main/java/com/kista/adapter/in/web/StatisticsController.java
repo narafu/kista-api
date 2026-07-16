@@ -80,10 +80,10 @@ public class StatisticsController {
         return DailyTransactionResponse.from(accountStatistics.getDailyTransactions(accountId, userId, from, to));
     }
 
-    // 복수 종목 현재가 조회 (HHDFS76410000)
+    // 복수 종목 전일종가 조회 — 전략 생성 화면 최소 시드 기준가와 동일 소스로 통일 (전략 등록 후 실제 첫 주문도 holdings=0이면 전일종가 사용)
     @Operation(
-            summary = "복수 종목 현재가 조회",
-            description = "KIS API HHDFS76410000 — 최대 10개 종목의 현재가를 단일 호출로 조회. tickers는 TQQQ/SOXL/USD 중 1~10개."
+            summary = "복수 종목 전일종가 조회",
+            description = "최대 10개 종목의 전일종가를 단일 호출로 조회 (전략 생성 시 최소 시드 산정 기준). tickers는 TQQQ/SOXL/USD 중 1~10개."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
