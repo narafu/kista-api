@@ -127,7 +127,7 @@ class TradingExecutionFacadeTest {
     void preview_delegates() {
         UUID strategyId = UUID.randomUUID();
         UUID requesterId = UUID.randomUUID();
-        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO);
+        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null);
         when(tradingPreviewService.preview(strategyId, requesterId)).thenReturn(preview);
 
         NextOrdersPreview result = facade.preview(strategyId, requesterId);

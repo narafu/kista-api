@@ -68,7 +68,7 @@ class TradingPreviewService {
         // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
         if (load.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd, null);
         }
         AccountBalance balance = load.balance();
 
@@ -87,9 +87,9 @@ class TradingPreviewService {
 
         // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
         if (plan == null) {
-            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, otherStrategiesPlannedBuyUsd, null);
         }
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd, null);
     }
 }
