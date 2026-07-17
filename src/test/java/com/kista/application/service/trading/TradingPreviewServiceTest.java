@@ -99,6 +99,34 @@ class TradingPreviewServiceTest {
     }
 
     @Test
+    void preview_propagatesNonZeroOtherStrategiesPlannedBuyUsd_toSimulator() {
+        // 이 전략의 사이클에 이미 존재하는 당일 PLANNED BUY (수량 5 @ 10.00 = 50.00)
+        Order existingBuyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 5, new BigDecimal("10.00"));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingBuyOrder));
+        // 계좌 전체 당일 PLANNED BUY 합계 300.00 (타 전략분 포함)
+        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any()))
+                .thenReturn(new BigDecimal("300.00"));
+
+        Order newBuyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 2, new BigDecimal("20.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(newBuyOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        BuyCompetitionPreview competition = new BuyCompetitionPreview(
+                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of());
+        // 300.00(계좌 전체) - 50.00(이 전략분) = 250.00(타 전략분)이 그대로 전파되는지 검증
+        when(competitionSimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), eq(List.of(newBuyOrder)), any(), eq(new BigDecimal("250.00"))))
+                .thenReturn(competition);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.competition()).isSameAs(competition);
+        verify(competitionSimulator).simulate(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), eq(List.of(newBuyOrder)), any(), eq(new BigDecimal("250.00")));
+    }
+
+    @Test
     void preview_returnsSkip_whenPlanBuilderSkips() {
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null, SkipReason.NO_CYCLE_HISTORY));

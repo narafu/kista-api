@@ -3,7 +3,6 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
-import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
