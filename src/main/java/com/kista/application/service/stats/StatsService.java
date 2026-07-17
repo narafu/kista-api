@@ -74,9 +74,9 @@ class StatsService implements UserStatsUseCase {
             throw new IllegalArgumentException("지원하지 않는 벤치마크 심볼: " + benchmarkSymbol);
         }
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
-        Instant fromInstant = from != null
-                ? from.atStartOfDay(ZoneOffset.UTC).minus(1, ChronoUnit.DAYS).toInstant() // KST 변환 여유
-                : Instant.EPOCH;
+        // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
+        // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
+        Instant fromInstant = Instant.EPOCH;
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
 
         List<CycleView> cycles = loadCycles(userId);
@@ -142,10 +142,16 @@ class StatsService implements UserStatsUseCase {
             long wins = closed.stream().filter(v -> v.realizedPnl().signum() > 0).count();
             winRate = BigDecimal.valueOf(wins)
                     .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
-            avgReturnRate = closed.stream()
-                    .map(v -> v.realizedPnl().divide(v.cycle().startAmount(), 6, RoundingMode.HALF_UP))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add)
-                    .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
+            // startAmount=0인 사이클(VR 적립식 등)은 수익률 계산에서 제외 — 0으로 나눌 수 없음
+            List<CycleView> returnable = closed.stream()
+                    .filter(v -> v.cycle().startAmount().signum() != 0)
+                    .toList();
+            if (!returnable.isEmpty()) {
+                avgReturnRate = returnable.stream()
+                        .map(v -> v.realizedPnl().divide(v.cycle().startAmount(), 6, RoundingMode.HALF_UP))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .divide(BigDecimal.valueOf(returnable.size()), 4, RoundingMode.HALF_UP);
+            }
             long totalDays = closed.stream()
                     .mapToLong(v -> ChronoUnit.DAYS.between(v.cycle().startDate(), v.cycle().endDate()))
                     .sum();
@@ -198,8 +204,8 @@ class StatsService implements UserStatsUseCase {
     // 결손 구간 lazy backfill 후 KST 변환해 반환 — 피드 실패는 저장분으로 폴백
     private List<IndexPrice> loadBenchmark(String symbol, LocalDate fromKst, LocalDate toKst) {
         // KST 표시일 → 미국 거래일 (−1일)
-        LocalDate fromUs = fromKst.minusDays(1);
-        LocalDate toUs = toKst.minusDays(1);
+        LocalDate fromUs = TradeDateConverter.toUtc(fromKst);
+        LocalDate toUs = TradeDateConverter.toUtc(toKst);
         try {
             LocalDate fetchFrom = indexPricePort.findMaxTradeDate(symbol)
                     .map(max -> max.plusDays(1)).orElse(fromUs);
@@ -234,7 +240,8 @@ class StatsService implements UserStatsUseCase {
         BigDecimal endAmount = v.closed() ? c.endAmount()
                 : cyclePositionPort.findLatestOne(c.id()).map(StatsService::assetOf).orElse(null);
         BigDecimal pnl = endAmount != null ? endAmount.subtract(c.startAmount()) : null;
-        BigDecimal returnRate = pnl != null
+        // startAmount=0인 사이클(VR 적립식 등)은 수익률이 정의되지 않음 — 0으로 나눌 수 없음
+        BigDecimal returnRate = (pnl != null && c.startAmount().signum() != 0)
                 ? pnl.divide(c.startAmount(), 4, RoundingMode.HALF_UP) : null;
         LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
         return new CyclePerformance(c.id(), v.strategy().type(), v.strategy().ticker(),

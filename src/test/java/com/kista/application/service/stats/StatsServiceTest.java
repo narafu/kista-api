@@ -61,6 +61,18 @@ class StatsServiceTest {
                 Instant.parse(startDate + "T00:00:00Z"), null);
     }
 
+    private static StrategyCycle activeCycle(String start, String startDate) {
+        return new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
+                new BigDecimal(start), null, LocalDate.parse(startDate), null,
+                Instant.parse(startDate + "T00:00:00Z"), null);
+    }
+
+    // holdings=0 스냅샷 — 자산 = usdDeposit
+    private static CyclePosition depositSnapshot(UUID cycleId, String deposit, String createdAt) {
+        return new CyclePosition(UUID.randomUUID(), cycleId, new BigDecimal(deposit),
+                null, null, 0, Instant.parse(createdAt), null);
+    }
+
     @Test
     void 종료_사이클_실현손익과_승률을_집계한다() {
         stubUserWithStrategy();
@@ -157,5 +169,91 @@ class StatsServiceTest {
         assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.parse("2026-02-01")); // 최신순
         assertThat(page.hasMore()).isTrue();
         assertThat(page.nextCursor()).isEqualTo(c2.createdAt());
+    }
+
+    @Test
+    void startAmount가_0인_종료_사이클은_수익률을_null로_처리한다() {
+        stubUserWithStrategy();
+        // VR 적립식: startAmount=0 사이클이 정상 존재 (등록·롤오버 종료 모두 가능)
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("0.00", "500.00", "2026-01-01", "2026-01-31")));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+
+        StrategyTypeStats stats = summary.byType().get(0);
+        assertThat(stats.closedCycleCount()).isEqualTo(1);
+        assertThat(stats.winRate()).isEqualByComparingTo("1"); // 승률·실현손익은 전체 closed 기준 유지
+        assertThat(stats.avgReturnRate()).isNull(); // 0-start만 있으면 평균 수익률 없음
+        assertThat(stats.realizedPnl()).isEqualByComparingTo("500.00");
+
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
+
+        assertThat(page.items().get(0).pnl()).isEqualByComparingTo("500.00");
+        assertThat(page.items().get(0).returnRate()).isNull();
+    }
+
+    @Test
+    void 사이클_성과_목록은_커서_이후_항목만_반환한다() {
+        stubUserWithStrategy();
+        StrategyCycle c1 = closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31");
+        StrategyCycle c2 = closedCycle("1000.00", "1200.00", "2026-02-01", "2026-02-28");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
+
+        // 1페이지 마지막 커서(c2.createdAt) 이후 → createdAt < cursor인 c1만
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, c2.createdAt(), 10);
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().get(0).cycleId()).isEqualTo(c1.id());
+        assertThat(page.hasMore()).isFalse();
+        assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void equity_curve는_스냅샷이_없는_날_직전_스냅샷을_carry_forward한다() {
+        stubUserWithStrategy();
+        StrategyCycle a = activeCycle("1000.00", "2026-06-01");
+        StrategyCycle b = activeCycle("2000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(a, b));
+        // A는 KST 06-01·06-02 스냅샷, B는 06-01만 → 06-02 포인트에 B의 06-01 값이 carry-forward
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+                depositSnapshot(a.id(), "1000.00", "2026-06-01T01:00:00Z"),
+                depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
+                depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
+        when(indexPricePort.findMaxTradeDate("SPY")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
+
+        EquityCurve curve = statsService.getEquityCurve(
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "SPY");
+
+        assertThat(curve.points()).hasSize(2);
+        assertThat(curve.points().get(1).date()).isEqualTo(LocalDate.parse("2026-06-02"));
+        // A 06-02(1100) + B 06-01 carry-forward(2000)
+        assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("3100.00");
+        assertThat(curve.points().get(1).principal()).isEqualByComparingTo("3000.00");
+    }
+
+    @Test
+    void equity_curve는_종료일이_지난_사이클을_자산과_원금에서_제외한다() {
+        stubUserWithStrategy();
+        StrategyCycle ended = closedCycle("1000.00", "1200.00", "2026-05-01", "2026-06-01");
+        StrategyCycle active = activeCycle("500.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(ended, active));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+                depositSnapshot(ended.id(), "1200.00", "2026-06-01T01:00:00Z"),
+                depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
+                depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));
+        when(indexPricePort.findMaxTradeDate("SPY")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
+
+        EquityCurve curve = statsService.getEquityCurve(
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "SPY");
+
+        assertThat(curve.points()).hasSize(2);
+        // 06-01: 종료 사이클 포함 (endDate 당일까지 유효)
+        assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1700.00");
+        assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1500.00");
+        // 06-02: endDate(06-01) 경과 → 종료 사이클 제외
+        assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("550.00");
+        assertThat(curve.points().get(1).principal()).isEqualByComparingTo("500.00");
     }
 }
