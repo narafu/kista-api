@@ -1,18 +1,19 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerPricePort;
-import com.kista.domain.port.out.StrategyCycleVrPort;
-import com.kista.domain.port.out.StrategyVrDetailPort;
-import com.kista.domain.strategy.*;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,178 +30,100 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TradingPreviewServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock StrategyPort cyclePort;
+    @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
-    @Mock BrokerAdapterRegistry registry;  // BrokerPricePort 조회 경유
-    @Mock BrokerPricePort pricePort;       // registry.require(account, BrokerPricePort.class) 반환값
-    @Mock PrivacyTradePort privacyTradePort;
-    @Mock CyclePositionPort cycleHistoryPort;
-    @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
-    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock InfiniteStrategy infiniteStrategy;
-    @Mock PrivacyStrategy privacyStrategy;
     @Mock OrderPort orderPort;
-    @Mock NotifyPort notifyPort;
-    @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
-    @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
-    @Mock MarketCalendarPort marketCalendarPort; // VR 첫 사이클 거래일 계산용
+    @Mock StrategyOrderPlanBuilder planBuilder;
+    @Mock TradingBuyCompetitionSimulator competitionSimulator;
 
     TradingPreviewService service;
 
-    static final BigDecimal PRICE = new BigDecimal("22.00");
+    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
-    static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "key", "secret", null,
-            Account.Broker.KIS, null
-    );
-
-    static final Strategy CYCLE = new Strategy(
+    static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
-    );
-    static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), CYCLE.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
-
-    static final UUID CYCLE_ID = STRATEGY_CYCLE.id(); // CyclePosition은 strategyCycleId 참조
-
-    static final CyclePosition NORMAL_HISTORY = new CyclePosition(
-            null, CYCLE_ID, new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null);
-    static final CyclePosition FRESH_HISTORY = new CyclePosition(
-            null, CYCLE_ID, new BigDecimal("1000.00"), null, null, 0, null, null);
+            UUID.randomUUID(), STRATEGY.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
     @BeforeEach
     void setUp() {
-        TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
-        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
-        CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
-                new PrivacyCycleOrderStrategy(privacyStrategy)));
-        lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
-        CycleOrderComputer orderComputer = new CycleOrderComputer(
-                cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
-        // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
-        service = new TradingPreviewService(accountPort, cyclePort, strategyCyclePort, orderPort, registry, privacyTradePort, balanceLoader, orderComputer, cycleStrategies);
-        // 예외 경로 테스트에서는 이 stub이 호출되지 않으므로 lenient 처리
-        lenient().when(orderPort.findPlannedByCycleAndDate(any(), any())).thenReturn(List.of());
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, competitionSimulator);
+        lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
+        lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
+        lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(any(), any())).thenReturn(List.of());
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
-        lenient().when(cyclePositionInfiniteDetailPort.findLatestByCycleId(any(), anyInt())).thenReturn(List.of());
-        lenient().when(strategyInfiniteDetailPort.findByStrategyVersionId(any())).thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
-        lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any())).thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
     }
 
     @Test
-    void preview_returnsResult_whenHistoryExistsAndInfinite() {
-        Order order = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, null, null, null);
+    void preview_returnsOrdersWithoutCompetition_whenPlanHasNoBuyOrders() {
+        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
-        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
-        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        when(pricePort.getPrevClose(Ticker.SOXL, ACCOUNT))
-                .thenReturn(new BigDecimal("21.00"));
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(order));
-
-        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
-        assertThat(result.position()).isNotNull();
-        assertThat(result.position().ticker()).isEqualTo(Ticker.SOXL);
         assertThat(result.orders()).hasSize(1);
-        // preview는 DB 저장 없음
-        verify(orderPort, never()).saveAll(any());
+        assertThat(result.competition()).isNull();
+        verify(competitionSimulator, never()).simulate(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void preview_returnsSkipNoCycleHistory_whenNoHistory() {
-        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
-        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
-        when(strategyCyclePort.findLatestByStrategyId(CYCLE.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
-        when(cycleHistoryPort.findLatestOneByStrategyId(CYCLE.id())).thenReturn(Optional.empty());
+    void preview_callsCompetitionSimulator_whenPlanHasBuyOrders() {
+        Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buyOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        BuyCompetitionPreview competition = new BuyCompetitionPreview(
+                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of());
+        when(competitionSimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), eq(List.of(buyOrder)), any(), eq(BigDecimal.ZERO)))
+                .thenReturn(competition);
 
-        NextOrdersPreview result = service.preview(CYCLE.id(), ACCOUNT.userId());
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.competition()).isSameAs(competition);
+    }
+
+    @Test
+    void preview_returnsSkip_whenPlanBuilderSkips() {
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null, SkipReason.NO_CYCLE_HISTORY));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
-        assertThat(result.position()).isNull();
         assertThat(result.orders()).isEmpty();
-        verify(pricePort, never()).getPrevClose(any(), any());
-    }
-
-    @Test
-    void preview_returnsSkipNoPrivacyBase_whenPrivacyAndNoBase() {
-        Strategy privacyCycle = new Strategy(
-                UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-
-        StrategyCycle privacyCycleCycle = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
-
-        when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
-        when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle));
-        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(null); // 기준 없음 → NO_PRIVACY_BASE
-
-        NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
-
-        assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
-        assertThat(result.position()).isNull();
-        assertThat(result.orders()).isEmpty();
-    }
-
-    @Test
-    void preview_returnsOrders_whenPrivacyAndBaseExists() {
-        Strategy privacyCycle = new Strategy(
-                UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        PrivacyTradeBase base = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("18.00"), List.of());
-        Order buyOrder = new Order(null, ACCOUNT.id(), null, LocalDate.now(), Ticker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, new BigDecimal("19.00"),
-                Order.OrderStatus.PLANNED, null, null, null);
-
-        StrategyCycle privacyCycleCycle2 = new StrategyCycle(UUID.randomUUID(), privacyCycle.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
-
-        when(cyclePort.findByIdOrThrow(privacyCycle.id())).thenReturn(privacyCycle);
-        when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
-        when(strategyCyclePort.findLatestByStrategyId(privacyCycle.id())).thenReturn(Optional.of(privacyCycleCycle2));
-        when(cycleHistoryPort.findLatestOneByStrategyId(privacyCycle.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        when(privacyTradePort.findBaseIfPrivacy(any(), any())).thenReturn(base);
-        when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buyOrder));
-
-        NextOrdersPreview result = service.preview(privacyCycle.id(), ACCOUNT.userId());
-
-        assertThat(result.skipReason()).isNull();
-        assertThat(result.position()).isNull(); // PRIVACY는 InfinitePosition 없음
-        assertThat(result.orders()).hasSize(1);
-        verify(orderPort, never()).saveAll(any()); // DB INSERT 없음
+        assertThat(result.competition()).isNull();
+        verify(competitionSimulator, never()).simulate(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void preview_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
-        when(cyclePort.findByIdOrThrow(CYCLE.id())).thenReturn(CYCLE);
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), otherId)).thenThrow(new SecurityException());
 
-        assertThatThrownBy(() -> service.preview(CYCLE.id(), otherId))
+        assertThatThrownBy(() -> service.preview(STRATEGY.id(), otherId))
                 .isInstanceOf(SecurityException.class);
     }
 
     @Test
     void preview_throwsNoSuchElementException_whenStrategyNotFound() {
         UUID unknownId = UUID.randomUUID();
-        when(cyclePort.findByIdOrThrow(unknownId))
+        when(strategyPort.findByIdOrThrow(unknownId))
                 .thenThrow(new NoSuchElementException("전략 없음: " + unknownId));
 
         assertThatThrownBy(() -> service.preview(unknownId, ACCOUNT.userId()))
