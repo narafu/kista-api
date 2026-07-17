@@ -49,6 +49,6 @@ public class StatsController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CyclePerformancePageResponse.from(
-                userStats.getCyclePerformances(userId, type, cursorInstant, Math.min(size, 200)));
+                userStats.getCyclePerformances(userId, type, cursorInstant, Math.clamp(size, 1, 200)));
     }
 }
