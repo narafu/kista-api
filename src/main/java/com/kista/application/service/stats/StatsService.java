@@ -1,0 +1,248 @@
+package com.kista.application.service.stats;
+
+import com.kista.common.TimeZones;
+import com.kista.common.TradeDateConverter;
+import com.kista.domain.model.stats.*;
+import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.port.in.UserStatsUseCase;
+import com.kista.domain.port.out.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+class StatsService implements UserStatsUseCase {
+
+    private static final Set<String> BENCHMARK_SYMBOLS = Set.of("SPY", "QQQ");
+
+    private final AccountPort accountPort;
+    private final StrategyPort strategyPort;
+    private final StrategyCyclePort strategyCyclePort;
+    private final CyclePositionPort cyclePositionPort;
+    private final IndexPricePort indexPricePort;
+    private final IndexPriceFeedPort indexPriceFeedPort;
+
+    // 사이클 + 소속 전략 조인 뷰
+    private record CycleView(StrategyCycle cycle, Strategy strategy) {
+        boolean closed() {
+            return cycle.endAmount() != null && cycle.endDate() != null;
+        }
+
+        BigDecimal realizedPnl() {
+            return cycle.endAmount().subtract(cycle.startAmount());
+        }
+    }
+
+    @Override
+    public StatsSummary getSummary(UUID userId) {
+        List<CycleView> cycles = loadCycles(userId);
+        Map<UUID, BigDecimal> unrealizedByCycle = unrealizedByCycle(cycles);
+
+        Map<Strategy.Type, List<CycleView>> byType = cycles.stream()
+                .collect(Collectors.groupingBy(v -> v.strategy().type(),
+                        () -> new EnumMap<>(Strategy.Type.class), Collectors.toList()));
+
+        List<StrategyTypeStats> typeStats = byType.entrySet().stream()
+                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle))
+                .toList();
+
+        BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
+        BigDecimal totalUnrealized = sum(typeStats.stream().map(StrategyTypeStats::unrealizedPnl));
+        BigDecimal activePrincipal = sum(cycles.stream()
+                .filter(v -> !v.closed()).map(v -> v.cycle().startAmount()));
+
+        return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats);
+    }
+
+    @Override
+    public EquityCurve getEquityCurve(UUID userId, LocalDate from, LocalDate to, String benchmarkSymbol) {
+        if (!BENCHMARK_SYMBOLS.contains(benchmarkSymbol)) {
+            throw new IllegalArgumentException("지원하지 않는 벤치마크 심볼: " + benchmarkSymbol);
+        }
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        Instant fromInstant = from != null
+                ? from.atStartOfDay(ZoneOffset.UTC).minus(1, ChronoUnit.DAYS).toInstant() // KST 변환 여유
+                : Instant.EPOCH;
+        Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+
+        List<CycleView> cycles = loadCycles(userId);
+        List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant);
+        List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
+        List<IndexPrice> benchmark = loadBenchmark(benchmarkSymbol,
+                points.isEmpty() ? effectiveTo : points.get(0).date(), effectiveTo);
+        return new EquityCurve(points, benchmark);
+    }
+
+    @Override
+    public CyclePerformancePage getCyclePerformances(UUID userId, Strategy.Type type,
+                                                     Instant cursor, int size) {
+        List<CycleView> filtered = loadCycles(userId).stream()
+                .filter(v -> type == null || v.strategy().type() == type)
+                .sorted(Comparator.comparing((CycleView v) -> v.cycle().createdAt()).reversed())
+                .filter(v -> cursor == null || v.cycle().createdAt().isBefore(cursor))
+                .toList();
+
+        boolean hasMore = filtered.size() > size;
+        List<CycleView> pageItems = hasMore ? filtered.subList(0, size) : filtered;
+        List<CyclePerformance> items = pageItems.stream().map(this::toPerformance).toList();
+        Instant nextCursor = hasMore ? pageItems.get(pageItems.size() - 1).cycle().createdAt() : null;
+        return new CyclePerformancePage(items, nextCursor, hasMore);
+    }
+
+    // ── private 헬퍼 ─────────────────────────────────────────────────────────
+
+    private List<CycleView> loadCycles(UUID userId) {
+        Map<UUID, Strategy> strategies = accountPort.findByUserId(userId).stream()
+                .flatMap(a -> strategyPort.findByAccountId(a.id()).stream())
+                .collect(Collectors.toMap(Strategy::id, Function.identity()));
+        if (strategies.isEmpty()) return List.of();
+        return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()
+                .map(c -> new CycleView(c, strategies.get(c.strategyId())))
+                .toList();
+    }
+
+    // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 − startAmount (스냅샷 없으면 제외)
+    private Map<UUID, BigDecimal> unrealizedByCycle(List<CycleView> cycles) {
+        Map<UUID, BigDecimal> result = new HashMap<>();
+        for (CycleView v : cycles) {
+            if (v.closed()) continue;
+            cyclePositionPort.findLatestOne(v.cycle().id()).ifPresent(pos ->
+                    result.put(v.cycle().id(), assetOf(pos).subtract(v.cycle().startAmount())));
+        }
+        return result;
+    }
+
+    private StrategyTypeStats toTypeStats(Strategy.Type type, List<CycleView> views,
+                                          Map<UUID, BigDecimal> unrealizedByCycle) {
+        List<CycleView> closed = views.stream().filter(CycleView::closed).toList();
+        List<CycleView> active = views.stream().filter(v -> !v.closed()).toList();
+
+        BigDecimal realizedPnl = sum(closed.stream().map(CycleView::realizedPnl));
+        BigDecimal unrealizedPnl = sum(active.stream()
+                .map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO)));
+
+        BigDecimal winRate = null;
+        BigDecimal avgReturnRate = null;
+        BigDecimal avgDurationDays = null;
+        if (!closed.isEmpty()) {
+            long wins = closed.stream().filter(v -> v.realizedPnl().signum() > 0).count();
+            winRate = BigDecimal.valueOf(wins)
+                    .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
+            avgReturnRate = closed.stream()
+                    .map(v -> v.realizedPnl().divide(v.cycle().startAmount(), 6, RoundingMode.HALF_UP))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
+            long totalDays = closed.stream()
+                    .mapToLong(v -> ChronoUnit.DAYS.between(v.cycle().startDate(), v.cycle().endDate()))
+                    .sum();
+            avgDurationDays = BigDecimal.valueOf(totalDays)
+                    .divide(BigDecimal.valueOf(closed.size()), 1, RoundingMode.HALF_UP);
+        }
+        return new StrategyTypeStats(type, closed.size(), active.size(),
+                winRate, avgReturnRate, avgDurationDays, realizedPnl, unrealizedPnl);
+    }
+
+    // 날짜(KST)별 사이클 최신 스냅샷 carry-forward 합산.
+    // 사이클 종료일 이후에는 해당 사이클을 자산·원금에서 제외한다.
+    private List<EquityPoint> buildPoints(List<CycleView> cycles, List<CyclePosition> positions,
+                                          LocalDate from, LocalDate to) {
+        Map<UUID, CycleView> cycleById = cycles.stream()
+                .collect(Collectors.toMap(v -> v.cycle().id(), Function.identity()));
+
+        // positions는 created_at 오름차순 — 날짜별로 사이클당 마지막 스냅샷이 남는다
+        TreeMap<LocalDate, Map<UUID, CyclePosition>> byDate = new TreeMap<>();
+        for (CyclePosition pos : positions) {
+            LocalDate date = pos.createdAt().atZone(TimeZones.KST).toLocalDate();
+            byDate.computeIfAbsent(date, d -> new HashMap<>()).put(pos.strategyCycleId(), pos);
+        }
+
+        Map<UUID, CyclePosition> latest = new HashMap<>(); // carry-forward 상태
+        List<EquityPoint> points = new ArrayList<>();
+        for (var entry : byDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            latest.putAll(entry.getValue());
+            if (from != null && date.isBefore(from)) continue;
+            if (date.isAfter(to)) break;
+
+            BigDecimal asset = BigDecimal.ZERO;
+            BigDecimal principal = BigDecimal.ZERO;
+            for (var posEntry : latest.entrySet()) {
+                CycleView view = cycleById.get(posEntry.getKey());
+                if (view == null) continue;
+                LocalDate endDate = view.cycle().endDate();
+                if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
+                asset = asset.add(assetOf(posEntry.getValue()));
+                principal = principal.add(view.cycle().startAmount());
+            }
+            points.add(new EquityPoint(date,
+                    asset.setScale(2, RoundingMode.HALF_UP),
+                    principal.setScale(2, RoundingMode.HALF_UP)));
+        }
+        return points;
+    }
+
+    // 결손 구간 lazy backfill 후 KST 변환해 반환 — 피드 실패는 저장분으로 폴백
+    private List<IndexPrice> loadBenchmark(String symbol, LocalDate fromKst, LocalDate toKst) {
+        // KST 표시일 → 미국 거래일 (−1일)
+        LocalDate fromUs = fromKst.minusDays(1);
+        LocalDate toUs = toKst.minusDays(1);
+        try {
+            LocalDate fetchFrom = indexPricePort.findMaxTradeDate(symbol)
+                    .map(max -> max.plusDays(1)).orElse(fromUs);
+            if (fetchFrom.isAfter(fromUs)) {
+                // 저장 구간 앞쪽 결손(최초 조회가 과거로 확장된 경우)도 채운다
+                List<IndexPrice> stored = indexPricePort.findBySymbolAndRange(symbol, fromUs, toUs);
+                if (!stored.isEmpty() && stored.get(0).tradeDate().isAfter(fromUs)) {
+                    indexPricePort.saveAll(indexPriceFeedPort.fetchDailyCloses(
+                            symbol, fromUs, stored.get(0).tradeDate().minusDays(1)));
+                }
+            }
+            if (!fetchFrom.isAfter(toUs)) {
+                indexPricePort.saveAll(indexPriceFeedPort.fetchDailyCloses(symbol, fetchFrom, toUs));
+            }
+        } catch (Exception e) {
+            log.warn("벤치마크 {} backfill 실패 — 저장분으로 응답: {}", symbol, e.getMessage());
+        }
+        return indexPricePort.findBySymbolAndRange(symbol, fromUs, toUs).stream()
+                .map(p -> new IndexPrice(p.symbol(), TradeDateConverter.toKst(p.tradeDate()), p.close()))
+                .toList();
+    }
+
+    private static BigDecimal assetOf(CyclePosition pos) {
+        BigDecimal unitPrice = pos.closingPrice() != null ? pos.closingPrice()
+                : pos.avgPrice() != null ? pos.avgPrice() : BigDecimal.ZERO;
+        return pos.usdDeposit().add(unitPrice.multiply(BigDecimal.valueOf(pos.holdings())))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private CyclePerformance toPerformance(CycleView v) {
+        StrategyCycle c = v.cycle();
+        BigDecimal endAmount = v.closed() ? c.endAmount()
+                : cyclePositionPort.findLatestOne(c.id()).map(StatsService::assetOf).orElse(null);
+        BigDecimal pnl = endAmount != null ? endAmount.subtract(c.startAmount()) : null;
+        BigDecimal returnRate = pnl != null
+                ? pnl.divide(c.startAmount(), 4, RoundingMode.HALF_UP) : null;
+        LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
+        return new CyclePerformance(c.id(), v.strategy().type(), v.strategy().ticker(),
+                c.startDate(), c.endDate(), c.startAmount(), endAmount, pnl, returnRate,
+                (int) ChronoUnit.DAYS.between(c.startDate(), durationEnd), v.closed(), c.createdAt());
+    }
+
+    private static BigDecimal sum(java.util.stream.Stream<BigDecimal> stream) {
+        return stream.reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+    }
+}
