@@ -77,6 +77,10 @@ class TradingBuyCompetitionSimulator {
                 StrategyOrderPlanBuilder.PlanResult result =
                         planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
                 if (result.isSkip()) {
+                    // NO_CYCLE_HISTORY/NO_PRIVACY_BASE 모두 야간 배치의 실제 동작을 확정할 수 없어
+                    // 예외와 동일하게 0으로 취급하며 불확실 목록에 기록한다 (설계 스펙 준수)
+                    log.warn("경쟁 시뮬레이션 skip, 0으로 처리: strategyId={}, skipReason={}", other.id(), result.skipReason());
+                    uncertainStrategyIds.add(other.id());
                     continue;
                 }
                 BigDecimal required = AccountBalance.buyTotal(result.plan().orders());

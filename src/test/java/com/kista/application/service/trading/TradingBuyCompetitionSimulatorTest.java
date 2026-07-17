@@ -162,6 +162,31 @@ class TradingBuyCompetitionSimulatorTest {
     }
 
     @Test
+    void simulate_treatsSkippedCompetitorAsZero_andRecordsUncertain() {
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
+                new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+
+        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
+                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
+        when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
+        when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null,
+                        com.kista.domain.model.order.NextOrdersPreview.SkipReason.NO_CYCLE_HISTORY));
+        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+
+        BuyCompetitionPreview result = simulator.simulate(
+                currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
+
+        assertThat(result.uncertainStrategyIds()).containsExactly(vrStrategy.id());
+        assertThat(result.blockedByHigherPriority()).isEmpty();
+        assertThat(result.sufficientBudget()).isTrue();
+    }
+
+    @Test
     void simulate_excludesPausedStrategy() {
         Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
                 Strategy.Status.PAUSED, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
