@@ -31,7 +31,7 @@ class AlpacaCalendarAdapterTest {
     void refreshMonth_거래일_목록에_없는_평일을_휴장일로_저장한다() throws Exception {
         RestTemplate restTemplate = new AlpacaConfig().alpacaRestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret");
+        AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
         AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(restTemplate, properties, holidayStorePort);
 
@@ -66,7 +66,7 @@ class AlpacaCalendarAdapterTest {
     void 거래일_응답이_비어있으면_해당_월_평일_전체를_휴장일로_처리한다() {
         RestTemplate restTemplate = new AlpacaConfig().alpacaRestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret");
+        AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
         AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(restTemplate, properties, holidayStorePort);
 
