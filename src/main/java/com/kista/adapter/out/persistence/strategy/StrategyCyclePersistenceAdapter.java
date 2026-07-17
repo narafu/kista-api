@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,6 +56,13 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
                 .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
         e.setStartAmount(startAmount);
         jpaRepository.save(e);
+    }
+
+    @Override
+    public List<StrategyCycle> findByStrategyIds(Collection<UUID> strategyIds) {
+        if (strategyIds.isEmpty()) return List.of();
+        return jpaRepository.findByStrategyIdInAndDeletedAtIsNullOrderByCreatedAtAsc(strategyIds)
+                .stream().map(this::toDomain).toList();
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.kista.domain.model.strategy.StrategyCycle;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +17,9 @@ public interface StrategyCyclePort {
 
     // 전략의 최초 사이클 — VR 첫 등록 bootstrap 판정에 사용
     Optional<StrategyCycle> findFirstByStrategyId(UUID strategyId);
+
+    // 여러 전략의 전체 사이클 배치 조회 (통계용) — deleted 제외, createdAt 오름차순
+    List<StrategyCycle> findByStrategyIds(Collection<UUID> strategyIds);
 
     // 사이클 종료 기록 — holdings=0 청산 시 종료금액·종료일자 저장
     void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate);

@@ -59,6 +59,20 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             """, nativeQuery = true)
     List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId, Pageable pageable);
 
+    // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native)
+    @Query(value = """
+            SELECT cp.* FROM cycle_position cp
+            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            JOIN strategy s ON sc.strategy_id = s.id
+            JOIN accounts a ON s.account_id = a.id
+            WHERE a.user_id = :userId
+              AND cp.created_at >= :from AND cp.created_at < :to
+              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
+            ORDER BY cp.created_at ASC
+            """, nativeQuery = true)
+    List<CyclePositionEntity> findByUserIdAndRange(
+            @Param("userId") UUID userId, @Param("from") Instant from, @Param("to") Instant to);
+
     // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy JOIN)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp

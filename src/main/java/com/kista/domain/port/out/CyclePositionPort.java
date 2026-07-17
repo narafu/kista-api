@@ -39,6 +39,9 @@ public interface CyclePositionPort {
     // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만)
     List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit);
 
+    // 사용자 스코프 스냅샷 범위 조회 (통계 equity curve용) — created_at 오름차순
+    List<CyclePosition> findByUserAndRange(UUID userId, Instant from, Instant to);
+
     // 커서 기반 페이지 조회 — limit건 반환 (hasMore 판단용으로 limit+1 전달 권장)
     List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from, Instant cursor, int limit);
 

@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +18,10 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
 
     // 전략의 최초 사이클 — deleted_at IS NULL(@SQLRestriction) 중 createdAt 가장 오래된 1건
     Optional<StrategyCycleEntity> findTop1ByStrategyIdOrderByCreatedAtAsc(UUID strategyId);
+
+    // 여러 전략의 전체 사이클 배치 조회 (통계용) — deleted 제외, createdAt 오름차순
+    List<StrategyCycleEntity> findByStrategyIdInAndDeletedAtIsNullOrderByCreatedAtAsc(
+            Collection<UUID> strategyIds);
 
     @Modifying
     @Query("UPDATE StrategyCycleEntity sc SET sc.deletedAt = :now WHERE sc.strategyId = :strategyId AND sc.deletedAt IS NULL")
