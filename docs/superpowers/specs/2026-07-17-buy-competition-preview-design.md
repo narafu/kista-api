@@ -91,27 +91,35 @@ final class BuyPriorityOrdering {
 
 ```java
 BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
-                                List<Order> currentBuyOrders, LocalDate today)
+                                List<Order> currentBuyOrders, LocalDate today,
+                                BigDecimal otherStrategiesPlannedBuyUsd)
 ```
+
+`otherStrategiesPlannedBuyUsd`는 `preview()`가 이미 계산해 둔 값(타 전략만의 당일 PLANNED BUY 합계)을 그대로 전달받는다 — 시뮬레이터 내부에서 계좌 전체 합계를 다시 조회하지 않는다.
 
 처리 순서:
 1. `requiredForThisStrategy` = `currentBuyOrders` 중 BUY 합계. 0이면 즉시 `null` 반환(호출측에서 처리, 시뮬레이터는 호출 안 됨).
-2. `availableDeposit` = `BrokerAdapterRegistry.require(account, LiveBalancePort.class).getLiveBalance(account, currentStrategy.ticker()).usdDeposit()` − `orderPort.sumPlannedBuyByAccountAndDate(account.id(), today)` (allocator와 동일한 라이브 잔고 기준).
+2. `availableDeposit` = `BrokerAdapterRegistry.require(account, LiveBalancePort.class).getLiveBalance(account, currentStrategy.ticker()).usdDeposit()` − `otherStrategiesPlannedBuyUsd`.
+   - **대상 전략 자신의 기존 PLANNED BUY는 빼지 않는다.** `requiredForThisStrategy`는 오늘 이미 저장된 주문 유무와 무관하게 매번 전체 재계산되므로(기존 `preview()`의 `orders` 필드와 동일한 특성), 계좌 전체 PLANNED 합계를 빼면 대상 전략 자신의 몫이 이중으로 차감돼 `sufficientBudget`이 실제보다 더 부족한 것으로 오판된다. 타 전략분만 빼야 double-count가 없다.
+   - **PLACED 주문은 별도로 빼지 않는다.** PLACED는 이미 브로커에 접수돼 KIS `itgr_ord_psbl_amt`(통합주문가능금액) 자체에 반영된 상태라, `LiveBalancePort`가 반환하는 라이브 잔고에 이미 녹아 있다. `sumPlannedBuyByAccountAndDate`/`otherStrategiesPlannedBuyUsd`가 `status='PLANNED'`만 필터하는 것은 브로커가 아직 모르는 앱 전용 예약분만 보정하기 위함이며 의도된 동작이다(`TradingOrderBudgetAllocator`도 동일 패턴).
 3. `strategyPort.findByAccountId(account.id())`로 계좌 내 전략 전체 조회 → 현재 전략 제외, `Status.ACTIVE`만 필터.
 4. 각 타 전략에 대해:
    - `strategyCyclePort.findLatestByStrategyId(other.id())`로 사이클 조회, 없으면 skip(경쟁 대상 아님).
-   - `orderPort.findPlannedOrPlacedByCycleAndDate(otherCycle.id(), today)`가 비어있지 않으면(이미 오늘 주문 존재) skip — 이미 `availableDeposit` 계산의 `reservedBuy`에 반영돼 있으므로 중복 계산 방지.
+   - `orderPort.findPlannedOrPlacedByCycleAndDate(otherCycle.id(), today)`가 비어있지 않으면(이미 오늘 PLANNED 또는 PLACED 존재) skip — PLANNED면 `otherStrategiesPlannedBuyUsd`에, PLACED면 라이브 잔고 자체에 이미 반영돼 있으므로 중복 계산 방지.
    - 비어있으면 `StrategyOrderPlanBuilder.build(...)`로 가상 계산. 실패(예외) 또는 skip(`NO_PRIVACY_BASE`/`NO_CYCLE_HISTORY`) 시 **0으로 취급하고 계속 진행**, `uncertainStrategyIds`에 추가.
    - BUY 합계가 0보다 크면 후보 목록에 추가.
 5. 현재 전략 + 후보 목록을 하나의 리스트로 합쳐 `BuyPriorityOrdering.comparator(...)`로 정렬.
 6. 정렬된 리스트를 순회하며 현재 전략 **앞**에 오는 후보들의 필요금액을 누적(`consumedByHigherPriority`)하고 `blockedByHigherPriority`에 담음. 이 리스트는 정렬 순서(우선순위 높은 순)를 그대로 유지해 UI가 "누가 먼저 예산을 가져가는지" 순서대로 보여줄 수 있게 한다.
 7. `sufficientBudget` = `(consumedByHigherPriority + requiredForThisStrategy) <= availableDeposit`.
 
-**주의**: 다른 후보들끼리도 서로 예산이 부족해 캐스케이딩 거절될 수 있지만, 이번 시뮬레이션은 그 정밀도까지는 재현하지 않는다 — "내 앞에 우선순위가 있는 전략들이 총 얼마를 쓰는지" 수준의 근사치로, 실제 배치가 반드시 이 그대로 승인/거절한다는 보장은 아니다(라이브 잔고·가격이 시점에 따라 달라질 수 있음). 문서·API 설명에 이 한계를 명시한다.
+**한계 (근사치임을 문서·API 설명에 명시)**:
+- 다른 후보들끼리도 서로 예산이 부족해 캐스케이딩 거절될 수 있지만, 이번 시뮬레이션은 그 정밀도까지는 재현하지 않는다 — "내 앞에 우선순위가 있는 전략들이 총 얼마를 쓰는지" 수준의 근사치다.
+- `BuyOrderPriceCapper`의 가격 캡·보정 주문(correction BUY)은 재현하지 않는다 — `StrategyOrderPlanBuilder`는 `CycleOrderComputer.compute()`까지만 수행하고 실제 배치의 `prepareForAllocation()` cap 단계는 거치지 않는다. 대상·경쟁자 모두 동일하게 생략되므로 방향성 있는 편향은 아니지만, cap이 실제로 발동하는 상황(현재가 급등)에서는 금액이 실제 배치보다 낮게 잡힐 수 있다.
+- 라이브 잔고·가격은 조회 시점 스냅샷이므로 실제 배치 시점과 다를 수 있다.
 
 ### `TradingPreviewService.preview()` 변경
 
-기존 인라인 로직을 `StrategyOrderPlanBuilder.build(...)` 호출로 교체하고, `plan.orders()`에 BUY가 1건 이상 있으면 `TradingBuyCompetitionSimulator.simulate(...)`를 호출해 `competition` 필드를 채운다. BUY가 없으면 `competition = null`.
+기존 인라인 로직을 `StrategyOrderPlanBuilder.build(...)` 호출로 교체하고, `plan.orders()`에 BUY가 1건 이상 있으면 `TradingBuyCompetitionSimulator.simulate(...)`를 호출해 `competition` 필드를 채운다. 이때 기존에 이미 계산해 둔 `otherStrategiesPlannedBuyUsd`를 그대로 전달한다. BUY가 없으면 `competition = null`.
 
 ## 어댑터 — API 응답
 
@@ -149,6 +157,7 @@ public record BuyCompetitionPreview(
   - 이미 PLANNED 있는 타 전략은 후보에서 제외되는지
   - 타 전략 계산 실패 시 0 처리 + `uncertainStrategyIds` 반영
   - `sufficientBudget` 경계값(정확히 availableDeposit과 같을 때 true)
+  - **대상 전략 자신이 오늘 이미 PLANNED BUY를 가진 상태에서 재호출해도 이중 차감되지 않는지** (`availableDeposit`이 `otherStrategiesPlannedBuyUsd`만 빼고 계산되는지 회귀 검증)
 - `TradingPreviewServiceTest` 갱신: BUY 없는 plan은 `competition == null`, BUY 있으면 시뮬레이터 호출·결과 반영 검증
 - `TradingOrderBudgetAllocatorTest`: 리팩터링한 `BuyPriorityOrdering` 사용 후에도 기존 정렬 동작 회귀 없는지 (기존 테스트 그대로 통과해야 함)
 - `NextOrdersResponseTest`(있다면) 또는 컨트롤러 테스트에서 `competition` 필드 직렬화 확인
