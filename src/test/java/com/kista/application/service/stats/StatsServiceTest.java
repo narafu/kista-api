@@ -151,6 +151,22 @@ class StatsServiceTest {
     }
 
     @Test
+    void qld를_벤치마크로_허용한다() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
+        when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
+        when(indexPricePort.findMaxTradeDate("QLD")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
+        when(indexPricePort.findBySymbolAndRange(eq("QLD"), any(), any())).thenReturn(List.of(
+                new IndexPrice("QLD", LocalDate.parse("2026-06-01"), new BigDecimal("120.00"))));
+
+        EquityCurve curve = statsService.getEquityCurve(
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "QLD");
+
+        assertThat(curve.benchmark()).hasSize(1);
+        assertThat(curve.benchmark().get(0).symbol()).isEqualTo("QLD");
+    }
+
+    @Test
     void 지원하지_않는_벤치마크_심볼은_거부한다() {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
                 () -> statsService.getEquityCurve(USER_ID, null, null, "TSLA"));

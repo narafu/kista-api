@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 class StatsService implements UserStatsUseCase {
 
-    private static final Set<String> BENCHMARK_SYMBOLS = Set.of("SPY", "QQQ");
+    private static final Set<String> BENCHMARK_SYMBOLS = Set.of("SPY", "QQQ", "QLD");
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;

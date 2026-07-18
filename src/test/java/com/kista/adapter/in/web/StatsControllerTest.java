@@ -59,16 +59,16 @@ class StatsControllerTest {
 
     @Test
     void equity_curve를_반환한다() throws Exception {
-        when(userStats.getEquityCurve(eq(USER_ID), any(), any(), eq("QQQ")))
+        when(userStats.getEquityCurve(eq(USER_ID), any(), any(), eq("QLD")))
                 .thenReturn(new EquityCurve(
                         List.of(new EquityPoint(LocalDate.parse("2026-06-02"),
                                 new BigDecimal("1000.00"), new BigDecimal("900.00"))),
-                        List.of(new IndexPrice("QQQ", LocalDate.parse("2026-06-02"),
+                        List.of(new IndexPrice("QLD", LocalDate.parse("2026-06-02"),
                                 new BigDecimal("450.00")))));
 
         mockMvc.perform(get("/api/stats/equity-curve")
                         .param("from", "2026-06-01").param("to", "2026-06-30")
-                        .param("benchmark", "QQQ")
+                        .param("benchmark", "QLD")
                         .with(authentication(auth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.points[0].date").value("2026-06-02"))
