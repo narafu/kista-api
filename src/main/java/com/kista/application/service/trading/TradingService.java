@@ -325,7 +325,7 @@ class TradingService {
     void placeOpenOrders(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         if (contexts.isEmpty()) return;
 
-        LocalDate tradeDate = DstInfo.nextTradeDate(); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 US 거래일
+        LocalDate tradeDate = DstInfo.nextTradeDate(); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 KST 거래일
         log.info("개장 order 생성 + INFINITE 매도 선접수 시작 — 거래일 {}", tradeDate);
 
         if (!isMarketOpen(tradeDate)) return;

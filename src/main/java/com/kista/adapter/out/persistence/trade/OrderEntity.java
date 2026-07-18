@@ -32,7 +32,7 @@ class OrderEntity extends BaseAuditEntity {
     private UUID strategyCycleId; // FK → strategy_cycle.id (멀티 전략 주문 격리)
 
     @Column(name = "trade_date", nullable = false)
-    private LocalDate tradeDate; // KST 거래일 — DB·도메인 동일 기준 (V27에서 US→KST shift 완료)
+    private LocalDate tradeDate; // KST 거래일 — DB·도메인 동일 기준 (V28에서 US→KST shift 완료)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)

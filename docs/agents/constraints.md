@@ -270,7 +270,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
 
 ### 시간 기준 정책 (KST 단일 기준)
-- **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (V27에서 US→KST shift 완료)
+- **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (V28에서 US→KST shift 완료)
 - **`privacy_trade_bases.release_date` = FIDA 발행일 원본(KST)** — 거래일 아님. 발행일↔거래일(+1일)은 `PrivacyDates.releaseDateFor()/tradeDateOf()` 업무 규칙 헬퍼만 사용
 - **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일), `market_index_prices`(US 거래일) — KST↔US 변환은 해당 어댑터 내부에서만 (`UsTradeDates.toUsTradeDate()/toKstTradeDate()`)
 - `UsTradeDates` 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter` — 도메인·서비스·orders persistence에서 사용 금지
