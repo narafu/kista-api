@@ -105,7 +105,7 @@ class FidaOrderControllerTest {
 
     @Test
     void 구버전_tradeDate_키로도_수신된다() throws Exception {
-        // @JsonAlias("tradeDate") 하위호환 — FIDA 송신측 키 전환 전까지 유지
+        // @JsonAlias("tradeDate") 하위호환 — 레거시 키로 전송해도 releaseDate로 역직렬화됨
         UUID masterId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
@@ -113,15 +113,14 @@ class FidaOrderControllerTest {
 
         given(privacy.executeFidaOrder(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
 
-        // 미래: 필드명이 releaseDate로 변경되면, 기존 tradeDate 키도 수신 가능해야 한다
-        // (현재는 필드명이 tradeDate이므로 이 테스트는 Step 3 후에 의미가 있다)
-        String jsonWithReleaseKey = objectMapper.writeValueAsString(req)
-                .replace("\"tradeDate\"", "\"releaseDate\"");
+        // releaseDate 키를 tradeDate 키로 바꿔 레거시 FIDA 송신 시뮬레이션
+        String jsonWithLegacyKey = objectMapper.writeValueAsString(req)
+                .replace("\"releaseDate\"", "\"tradeDate\"");
 
         mockMvc.perform(post("/api/internal/fida-orders")
                         .header("X-Internal-Token", VALID_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonWithReleaseKey))
+                        .content(jsonWithLegacyKey))
                 .andExpect(status().isCreated());
     }
 }
