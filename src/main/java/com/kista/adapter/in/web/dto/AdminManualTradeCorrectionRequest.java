@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
 import com.kista.domain.model.order.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -34,7 +35,7 @@ public record AdminManualTradeCorrectionRequest(
     // 개별 체결 명세
     public record FillRequest(
             @Schema(description = "체결 거래일 (KST)")
-            @NotNull LocalDate tradeDateKst,
+            @NotNull @JsonAlias("tradeDateKst") LocalDate tradeDate,
             @Schema(description = "매매 방향", example = "BUY")
             @NotNull String direction,
             @Schema(description = "체결 수량")
@@ -48,7 +49,7 @@ public record AdminManualTradeCorrectionRequest(
     ) {
         public AdminManualTradeCorrectionCommand.Fill toCommand() {
             return new AdminManualTradeCorrectionCommand.Fill(
-                    tradeDateKst,
+                    tradeDate,
                     Order.OrderDirection.valueOf(direction),
                     quantity,
                     price,

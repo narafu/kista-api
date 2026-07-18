@@ -32,7 +32,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
@@ -192,11 +191,11 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     private Instant resolveFrom(LocalDate from) {
-        return from != null ? from.atStartOfDay(ZoneOffset.UTC).toInstant() : Instant.EPOCH;
+        return from != null ? from.atStartOfDay(TimeZones.KST).toInstant() : Instant.EPOCH; // KST 자정 경계
     }
 
     private Instant resolveTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
-        return resolved.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return resolved.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 (to 당일 포함)
     }
 }

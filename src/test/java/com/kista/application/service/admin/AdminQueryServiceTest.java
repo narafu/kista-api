@@ -1,6 +1,5 @@
 package com.kista.application.service.admin;
 
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.*;
@@ -46,12 +45,12 @@ class AdminQueryServiceTest {
     }
 
     @Test
-    void listPrivacyBases_30일이면_KST_30일전을_UTC로_변환해_조회() {
+    void listPrivacyBases_30일이면_KST_30일전_발행분부터_조회() {
         when(privacyTradePort.findBasesFromTradeDate(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         service.listPrivacyBases(30);
 
-        LocalDate expected = TradeDateConverter.toUtc(LocalDate.now().minusDays(30));
+        LocalDate expected = LocalDate.now().minusDays(30);
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
         org.mockito.Mockito.verify(privacyTradePort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(expected);

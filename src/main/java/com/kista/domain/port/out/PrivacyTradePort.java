@@ -18,8 +18,8 @@ public interface PrivacyTradePort {
     // 당일 기준 매매표 조회 — 미수신 일자면 empty
     Optional<PrivacyTradeBase> findTodayTrade(LocalDate today);
 
-    // 관리자 조회 — release_date(UTC) >= fromUtc 인 기준 매매표를 주문 명세 포함, 거래일 내림차순 반환
-    List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromUtc);
+    // 관리자 조회 — release_date(KST 발행일 원본) >= fromReleaseDate 인 기준 매매표를 주문 명세 포함, 발행일 내림차순 반환
+    List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromReleaseDate);
 
     // PRIVACY 전략이면 당일 기준 매매표 조회, 아니면 null — 단건 전략 전용 (배치는 hasPrivacy 분기 사용)
     default PrivacyTradeBase findBaseIfPrivacy(Strategy strategy, LocalDate today) {

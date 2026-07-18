@@ -12,7 +12,7 @@ public record AdminReorderCommand(
         UUID strategyId,
         UUID orderId,
         Order.OrderTiming timing,   // 재주문 접수 시점 (AT_OPEN/AT_CLOSE/IMMEDIATE)
-        LocalDate tradeDateKst,
+        LocalDate tradeDate,   // KST 거래일
         Order.OrderDirection direction,
         Integer quantity,
         BigDecimal price,

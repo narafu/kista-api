@@ -78,7 +78,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                     throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다");
                 }
                 updatedStrategy = AdminCycleCloser.closeIfExhausted(strategyCyclePort, strategyPort,
-                        updatedStrategy, currentCycle, balance, fill.tradeDateKst()).strategy();
+                        updatedStrategy, currentCycle, balance, fill.tradeDate()).strategy();
                 cycleEnded = true;
             }
         }
@@ -105,7 +105,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     // 수동 체결 1건을 FILLED 주문 이력으로 변환
     private static Order toManualOrder(AdminManualTradeCorrectionCommand.Fill fill, Account account,
                                        StrategyCycle currentCycle, Strategy strategy) {
-        return Order.filledManual(account.id(), currentCycle.id(), fill.tradeDateKst(),
+        return Order.filledManual(account.id(), currentCycle.id(), fill.tradeDate(),
                 strategy.ticker(), Order.OrderTiming.AT_CLOSE, fill.direction(),
                 fill.quantity(), fill.price(), fill.externalOrderId());
     }
@@ -113,7 +113,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     // 체결 반영 후 잔고 재계산 + cycle_position 스냅샷 append
     private AccountBalance applyFillAndSnapshot(AdminManualTradeCorrectionCommand.Fill fill, Strategy strategy,
                                                 AccountBalance balance, StrategyCycle currentCycle) {
-        Execution execution = Execution.ofManualFill(fill.tradeDateKst(), strategy.ticker(),
+        Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
                 fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
         AccountBalance updated = balance.applyExecutions(List.of(execution));
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
@@ -133,7 +133,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                 balance.usdDeposit(),
                 updatedStrategy.status(),
                 cycleEnded,
-                cycleEnded ? command.fills().getLast().tradeDateKst() : null
+                cycleEnded ? command.fills().getLast().tradeDate() : null
         );
     }
 }

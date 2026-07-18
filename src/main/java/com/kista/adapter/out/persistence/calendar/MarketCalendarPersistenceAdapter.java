@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.calendar;
 
-import com.kista.common.TradeDateConverter;
+import com.kista.common.UsTradeDates;
 import com.kista.domain.port.out.MarketCalendarPort;
 import com.kista.domain.port.out.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +21,16 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
 
     @Override
     public boolean isMarketOpen(LocalDate date) {
-        // date는 KST 도메인 날짜 — DB는 UTC(=US 거래일) 기준이므로 변환 필수
-        LocalDate utcDate = TradeDateConverter.toUtc(date);
-        if (utcDate.getDayOfWeek() == DayOfWeek.SATURDAY || utcDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
+        // date는 KST 거래일 — 휴장일 테이블은 US 달력 기준이므로 변환 필수
+        LocalDate usDate = UsTradeDates.toUsTradeDate(date);
+        if (usDate.getDayOfWeek() == DayOfWeek.SATURDAY || usDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return false;
         }
-        if (holidayRepository.countByYear(utcDate.getYear()) == 0) {
-            log.error("{}년 시장 캘린더 데이터 없음 — 폐장으로 폴백 (refreshCalendar 미실행 의심)", utcDate.getYear());
+        if (holidayRepository.countByYear(usDate.getYear()) == 0) {
+            log.error("{}년 시장 캘린더 데이터 없음 — 폐장으로 폴백 (refreshCalendar 미실행 의심)", usDate.getYear());
             return false;
         }
-        return !holidayRepository.existsByTradeDate(utcDate);
+        return !holidayRepository.existsByTradeDate(usDate);
     }
 
     @Override

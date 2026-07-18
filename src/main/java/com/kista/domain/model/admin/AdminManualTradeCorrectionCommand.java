@@ -15,7 +15,7 @@ public record AdminManualTradeCorrectionCommand(
         List<Fill> fills
 ) {
     public record Fill(
-            LocalDate tradeDateKst,
+            LocalDate tradeDate,   // KST 거래일
             Order.OrderDirection direction,
             int quantity,
             BigDecimal price,

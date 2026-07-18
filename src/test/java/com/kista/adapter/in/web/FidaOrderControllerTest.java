@@ -102,4 +102,25 @@ class FidaOrderControllerTest {
                         .content("{}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 구버전_tradeDate_키로도_수신된다() throws Exception {
+        // @JsonAlias("tradeDate") 하위호환 — 레거시 키로 전송해도 releaseDate로 역직렬화됨
+        UUID masterId = UUID.randomUUID();
+        FidaOrderCommand req = new FidaOrderCommand(
+                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
+
+        given(privacy.executeFidaOrder(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
+
+        // releaseDate 키를 tradeDate 키로 바꿔 레거시 FIDA 송신 시뮬레이션
+        String jsonWithLegacyKey = objectMapper.writeValueAsString(req)
+                .replace("\"releaseDate\"", "\"tradeDate\"");
+
+        mockMvc.perform(post("/api/internal/fida-orders")
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithLegacyKey))
+                .andExpect(status().isCreated());
+    }
 }

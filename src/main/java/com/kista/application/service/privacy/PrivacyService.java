@@ -1,6 +1,5 @@
 package com.kista.application.service.privacy;
 
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
@@ -22,18 +21,8 @@ class PrivacyService implements PrivacyUseCase {
 
     @Override
     public PrivacyTradeSaveResult executeFidaOrder(FidaOrderCommand command) {
-        // FIDA는 UTC(=US 거래일) 일자 송신 → KST로 변환 후 도메인 전달
-        // Persistence adapter가 다시 KST→UTC 변환하므로 원본 FIDA 일자가 DB에 정확히 저장됨
-        FidaOrderCommand kstCommand = new FidaOrderCommand(
-                TradeDateConverter.toKst(command.tradeDate()),
-                command.ticker(),
-                command.currentCycleStart(),
-                command.currentCycleRealizedPnl(),
-                command.avgPrice(),
-                command.holdings(),
-                command.orders()
-        );
-        PrivacyTradeValidationReport report = validationService.inspect(kstCommand);
+        // FIDA 수신값은 KST 발행일 원본 — 변환 없이 그대로 검증·저장 (release_date는 거래일이 아님)
+        PrivacyTradeValidationReport report = validationService.inspect(command);
         if (report.hasBlockingIssues()) {
             log.error("[FIDA] 기준 매매표 저장 차단: {}", report.summary());
             IllegalArgumentException exception = new IllegalArgumentException("[FIDA] " + report.summary());
@@ -43,6 +32,6 @@ class PrivacyService implements PrivacyUseCase {
         if (report.hasIssues()) {
             notifyPort.notifyInfo("[PRIVACY] 기준 매매표 경고: " + report.summary());
         }
-        return privacyTradePort.saveBaseWithOrders(kstCommand);
+        return privacyTradePort.saveBaseWithOrders(command);
     }
 }

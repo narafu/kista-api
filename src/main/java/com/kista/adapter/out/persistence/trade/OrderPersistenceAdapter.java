@@ -1,6 +1,5 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
@@ -32,14 +31,14 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // PLANNED 상태인 오늘 계획 주문만 조회
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED));
+                strategyCycleId, tradeDate, Order.OrderStatus.PLANNED));
     }
 
     @Override
     public List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLACED));
+                strategyCycleId, tradeDate, Order.OrderStatus.PLACED));
     }
 
     @Override
@@ -55,13 +54,12 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
         // native query는 enum을 name() 문자열로 전달 — DB VARCHAR 컬럼과 매칭
         return toDomainList(repository.findByUserIdAndTradeDateBetweenAndTicker(
-                userId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to), ticker.name()));
+                userId, from, to, ticker.name()));
     }
 
     @Override
     public List<Order> findAll(LocalDate from, LocalDate to) {
-        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(
-                TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));
+        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(from, to));
     }
 
     @Override
@@ -74,29 +72,29 @@ public class OrderPersistenceAdapter implements OrderPort {
     public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 증권사 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
         repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderStatus.PLANNED);
+                strategyCycleId, tradeDate, Order.OrderStatus.PLANNED);
     }
 
     @Override
     public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate),
+                strategyCycleId, tradeDate,
                 List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)));
     }
 
     @Override
     public BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate) {
         // 계좌 기준 당일 PLANNED BUY 합계 — 타 전략 점유분 차감 계산에 사용
-        return repository.sumPlannedBuyAmountByAccountIdAndTradeDate(accountId, TradeDateConverter.toUtc(tradeDate));
+        return repository.sumPlannedBuyAmountByAccountIdAndTradeDate(accountId, tradeDate);
     }
 
     @Override
     public int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
             UUID accountId, LocalDate tradeDate, Ticker ticker) {
-        // KST 도메인 날짜를 UTC DB 거래일로 변환해 미체결 SELL 예약 수량을 합산한다
+        // 같은 계좌·거래일(KST)·ticker의 미체결 SELL 예약 수량을 합산한다
         Long quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
-                accountId, TradeDateConverter.toUtc(tradeDate), ticker.name());
+                accountId, tradeDate, ticker.name());
         return quantity != null ? Math.toIntExact(quantity) : 0;
     }
 
@@ -104,8 +102,8 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
                 accountId,
-                TradeDateConverter.toUtc(from),
-                TradeDateConverter.toUtc(to),
+                from,
+                to,
                 List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
     }
 
@@ -113,15 +111,15 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByUserIdAndTradeDateBetweenAndStatusIn(
                 userId,
-                TradeDateConverter.toUtc(from),
-                TradeDateConverter.toUtc(to),
+                from,
+                to,
                 List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
     }
 
     @Override
     public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
-                strategyId, TradeDateConverter.toUtc(from), TradeDateConverter.toUtc(to)));
+                strategyId, from, to));
     }
 
     @Override
@@ -133,7 +131,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // AT_OPEN + PLANNED 주문만 조회 — 개장 시 즉시 선접수 대상
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
-                strategyCycleId, TradeDateConverter.toUtc(tradeDate), Order.OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
+                strategyCycleId, tradeDate, Order.OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
     }
 
     @Override
@@ -182,7 +180,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         OrderEntity e = new OrderEntity();
         e.setAccountId(o.accountId());
         e.setStrategyCycleId(o.strategyCycleId());
-        e.setTradeDate(TradeDateConverter.toUtc(o.tradeDate())); // KST 도메인 → UTC DB
+        e.setTradeDate(o.tradeDate()); // KST 거래일 그대로 저장 (변환 없음)
         e.setTicker(o.ticker());
         e.setOrderType(o.orderType());
         e.setTiming(o.timing());
@@ -199,7 +197,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     private Order toDomain(OrderEntity e) {
         return new Order(
-                e.getId(), e.getAccountId(), e.getStrategyCycleId(), TradeDateConverter.toKst(e.getTradeDate()), e.getTicker(), // UTC DB → KST 도메인
+                e.getId(), e.getAccountId(), e.getStrategyCycleId(), e.getTradeDate(), e.getTicker(), // KST 거래일 그대로 복원
                 e.getOrderType(), e.getTiming(), e.getDirection(), e.getOrderLeg(), e.getQuantity(), e.getPrice(),
                 e.getStatus(), e.getExternalOrderId(), e.getFilledQuantity(), e.getFilledPrice()
         );

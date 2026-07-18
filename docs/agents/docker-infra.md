@@ -4,7 +4,7 @@
 - Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()`/`LocalTime.now()`를 타임존 없이 호출하면 UTC 날짜 반환 → KST 09시 이전 "오늘" 오판
 - 해결 정책(`45758166`): `KistaApplication.main()`의 전역 `TimeZone.setDefault()` 의존 제거 — 모든 `LocalDate.now()`/`LocalTime.now()` 호출부에 `TimeZones.KST`(`com.kista.common.TimeZones`)를 명시. 신규 호출부 추가 시 반드시 `LocalDate.now(TimeZones.KST)` 형태 사용, `KistaApplication`에 전역 설정 재도입 금지
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
-- tradeDate(KST)↔trade_date(UTC=US 거래일) 변환 정책: `constraints.md`의 "tradeDate 변환 정책" 섹션 참고
+- 시간 기준 정책(거래일 KST 단일 기준, US 외부 데이터만 어댑터 내부 변환): `constraints.md`의 "시간 기준 정책 (KST 단일 기준)" 섹션 참고
 
 ### Fly.io 런타임 메모리 설정
 - Fly.io: 2GB RAM (`fly.toml [[vm]] memory='2gb'`)
@@ -14,7 +14,7 @@
 
 ### Fly.io 배포 방식
 - `.github/workflows/fly-deploy.yml` — `main` push 시 GitHub Actions가 compileJava + ArchUnit 검증 후 `fly deploy` 자동 실행
-- 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:00 KST 실행 보장
+- 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
 
 ### Docker 빌드 OOM
 - `gradle.properties`는 Dockerfile에 복사되지 않음 — JVM이 컨테이너 메모리 ~25%를 힙으로 자동 할당해 BuildKit OOM 유발

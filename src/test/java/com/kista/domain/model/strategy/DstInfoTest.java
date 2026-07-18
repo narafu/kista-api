@@ -227,4 +227,23 @@ class DstInfoTest {
         assertThat(openKst.toLocalDate()).isEqualTo(LocalDate.of(2024, 6, 17)); // 월요일(오늘)
         assertThat(openKst.toLocalTime()).isEqualTo(LocalTime.of(22, 30));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // nextTradeDateAt() — 거래일 경계는 마감 배치 cron 발화(04:30 KST)와 동일 임계값이어야 함
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("거래일 경계는 04:30 직전까지 당일")
+    void 거래일_경계는_0430_직전까지_당일() {
+        assertThat(DstInfo.nextTradeDateAt(LocalDate.of(2026, 7, 18), LocalTime.of(4, 29)))
+                .isEqualTo(LocalDate.of(2026, 7, 18));
+    }
+
+    @Test
+    @DisplayName("거래일 경계 04:30부터 익일")
+    void 거래일_경계_0430부터_익일() {
+        // 마감 배치 cron 발화(04:30 KST)와 동일 임계값 — 04:00~04:30 불일치 창 제거
+        assertThat(DstInfo.nextTradeDateAt(LocalDate.of(2026, 7, 18), LocalTime.of(4, 30)))
+                .isEqualTo(LocalDate.of(2026, 7, 19));
+    }
 }

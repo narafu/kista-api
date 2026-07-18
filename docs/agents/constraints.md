@@ -269,15 +269,15 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
 - `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
 
-### tradeDate 변환 정책 (KST 코드 ↔ UTC=US 거래일 DB)
-- 도메인 `tradeDate`: **KST 일자** / DB `trade_date`: **UTC 일자(= US 거래일)** — KST 04:30 기준 ±1일 차이
-- 변환: `com.kista.common.TradeDateConverter.toUtc(KST)` → `-1일` / `toKst(UTC)` → `+1일`
-- 적용 위치: `OrderPersistenceAdapter` 전체, `PrivacyTradePersistenceAdapter`의 `saveBaseWithOrders`/`findTodayTrade`/`findSeedPreviewBase`(매매 실행 로직 연동) — JPA `@Converter` 자동 적용 금지 (가시성)
-- `privacy_trade_bases.release_date`: **발행일 원본** — DB 값을 KST 변환 없이 그대로 노출하고 API 응답도 `releaseDate` 필드 사용 (`PrivacyTradeBaseView.releaseDate`, `AdminPrivacyBaseResponse.releaseDate`)
-- **예외 — 어드민 표시용 `findBasesFromTradeDate`(toView)**: KST 변환 없이 `release_date` 원본을 그대로 노출 — 어드민 화면에서 DB 값과 다른 날짜(±1일)로 보여 혼란을 유발해 표시 전용 경로만 변환 제외
-- **Toss API 예외**: `TossOrderApi.fetchExecutions()` — Toss는 주문 접수일(KST) 기준으로 날짜 필터링. `toUtc()` 변환 없이 KST 날짜 전달. **주의**: 전날 저녁 선접수된 주문이 당일 장마감에 체결될 수 있어 `queryFrom = from - 1일`로 1일 앞당겨 조회 후, `filledAt(KST +09:00)` 기반 체결일이 요청 범위(from~to) 내인 것만 포함 (KIS는 US 거래일(UTC) 기준이라 변환 필요, Toss는 변환 시 전날 체결 조회 → 빈 결과)
-- FIDA 외부 입력(UTC) → `FidaOrderService` 진입부에서 `toKst()` 변환 후 도메인 호출
-- 인라인 `.minusDays(1)`/`.plusDays(1)` 직접 사용 금지 — `TradeDateConverter` 헬퍼 경유 필수
+### 시간 기준 정책 (KST 단일 기준)
+- **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (V28에서 US→KST shift 완료)
+- **`privacy_trade_bases.release_date` = FIDA 발행일 원본(KST)** — 거래일 아님. 발행일↔거래일(+1일)은 `PrivacyDates.releaseDateFor()/tradeDateOf()` 업무 규칙 헬퍼만 사용
+- **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일) — KST↔US 변환은 해당 어댑터 내부에서만 (`UsTradeDates.toUsTradeDate()/toKstTradeDate()`)
+- `UsTradeDates` 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter` — 도메인·서비스·orders persistence에서 사용 금지
+- **Toss API**: 주문 접수일(KST) 기준 — 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후 `filledAt`(KST) 재필터
+- Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지
+- 거래일 경계 시각: `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` (마감 배치 cron 발화와 동일) — preview·수동실행·주문취소가 `DstInfo.nextTradeDate()` SSOT 사용
+- 인라인 `.minusDays(1)`/`.plusDays(1)`로 날짜 기준 변환 금지 — 반드시 `UsTradeDates`/`PrivacyDates` 경유
 
 ### 소프트 삭제(Soft Delete) 패턴
 - `users`, `accounts`, `strategy`, `strategy_cycle`, `cycle_position`, `app_error_logs` — `deleted_at` 컬럼, `@SQLRestriction("deleted_at IS NULL")` 선언

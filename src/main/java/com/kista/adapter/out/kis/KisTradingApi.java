@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.common.TradeDateConverter;
+import com.kista.common.UsTradeDates;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.broker.*;
@@ -175,13 +175,13 @@ class KisTradingApi {
         if (response == null || response.output() == null) {
             return Collections.emptyList();
         }
-        LocalDate utcFrom = TradeDateConverter.toUtc(from); // KST fallback → UTC 기준으로 역변환 대응
+        LocalDate usFrom = UsTradeDates.toUsTradeDate(from); // KST fallback → US 거래일 기준으로 역변환 대응
         return response.output().stream()
                 .filter(item -> ticker.name().equals(item.pdno()))
                 .filter(item -> KisResponseParser.parseIntSafe(item.filledQuantity()) > 0) // 미체결(ft_ccld_qty=0) 제외
                 .map(item -> new Execution(
-                        // KIS ord_dt는 UTC(US거래일) → toKst()로 도메인 KST 일자로 복원
-                        TradeDateConverter.toKst(KisResponseParser.parseDate(item.ordDt(), utcFrom)),
+                        // KIS ord_dt는 US 거래일 → toKstTradeDate()로 도메인 KST 일자로 복원
+                        UsTradeDates.toKstTradeDate(KisResponseParser.parseDate(item.ordDt(), usFrom)),
                         ticker,
                         KisResponseParser.parseDirection(item.sllBuyDvsnCd()),
                         KisResponseParser.parseIntSafe(item.filledQuantity()),
@@ -192,9 +192,9 @@ class KisTradingApi {
                 .toList();
     }
 
-    // KST 날짜 → KIS API 날짜 파라미터 (UTC=US거래일 YYYYMMDD)
+    // KST 날짜 → KIS API 날짜 파라미터 (US 거래일 YYYYMMDD)
     private String formatTradeDate(LocalDate kst) {
-        return TradeDateConverter.toUtc(kst).format(FMT);
+        return UsTradeDates.toUsTradeDate(kst).format(FMT);
     }
 
     // ── Inner response records ─────────────────────────────────────────────────

@@ -1,7 +1,6 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.common.TimeZones;
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.*;
 import com.kista.domain.model.strategy.Strategy;
@@ -44,21 +43,21 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     @Transactional
     public PrivacyTradeSaveResult saveBaseWithOrders(FidaOrderCommand command) {
-        Optional<PrivacyTradeBaseEntity> existing = this.getByTradeDateAndTicker(command.tradeDate(), command.ticker());
+        Optional<PrivacyTradeBaseEntity> existing = this.getByReleaseDateAndTicker(command.releaseDate(), command.ticker());
 
         if (existing.isPresent()) {
-            // 동일 (tradeDate, ticker) 존재 — 내용 비교
+            // 동일 (releaseDate, ticker) 존재 — 내용 비교
             PrivacyTradeBaseEntity base = existing.get();
             if (isIdentical(base, command)) {
                 return new PrivacyTradeSaveResult(base.getId(), false); // 200
             }
             throw new PrivacyTradeConflictException(
-                    "기존 매매표와 내용이 다릅니다: tradeDate=" + command.tradeDate() + ", ticker=" + command.ticker());
+                    "기존 매매표와 내용이 다릅니다: releaseDate=" + command.releaseDate() + ", ticker=" + command.ticker());
         }
 
         // 신규 저장
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
-        base.setTradeDate(TradeDateConverter.toUtc(command.tradeDate())); // KST 도메인 → UTC DB
+        base.setReleaseDate(command.releaseDate()); // FIDA 발행일 원본 (KST) — 거래일 아님
         base.setTicker(command.ticker());
         base.setCurrentCycleStart(command.currentCycleStart());
         base.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());
@@ -80,8 +79,8 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         return new PrivacyTradeSaveResult(baseRepository.save(base).getId(), true); // 201
     }
 
-    private Optional<PrivacyTradeBaseEntity> getByTradeDateAndTicker(LocalDate kstDate, Ticker ticker) {
-        return baseRepository.findByTradeDateAndTicker(TradeDateConverter.toUtc(kstDate), ticker); // KST → UTC DB, 정확한 날짜 일치
+    private Optional<PrivacyTradeBaseEntity> getByReleaseDateAndTicker(LocalDate releaseDate, Ticker ticker) {
+        return baseRepository.findByReleaseDateAndTicker(releaseDate, ticker); // 발행일 정확 일치
     }
 
     private boolean isIdentical(PrivacyTradeBaseEntity base, FidaOrderCommand command) {
@@ -116,22 +115,23 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     public Optional<PrivacyCurrentBase> findSeedPreviewBase() {
-        // 미리보기는 사용자가 보는 KST 오늘 이후 기준표만 사용한다.
+        // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용 — 발행일은 거래일 전날
         LocalDate todayKst = LocalDate.now(TimeZones.KST);
         return baseRepository
-                .findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(todayKst, Ticker.SOXL)
+                .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
+                        PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
-                        TradeDateConverter.toKst(e.getTradeDate()))); // UTC DB → KST 도메인
+                        PrivacyDates.tradeDateOf(e.getReleaseDate()))); // 발행일 → 적용 거래일
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
-        // today는 KST 일자, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
-        return baseRepository.findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(
-                        TradeDateConverter.toUtc(today), Ticker.SOXL)
+        // today는 KST 거래일, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
+        return baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
+                        PrivacyDates.releaseDateFor(today), Ticker.SOXL)
                 .map(entity -> {
-                    LocalDate kstTradeDate = TradeDateConverter.toKst(entity.getTradeDate()); // UTC DB → KST 도메인
+                    LocalDate kstTradeDate = PrivacyDates.tradeDateOf(entity.getReleaseDate()); // 발행일 → 적용 거래일
                     List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()
                             .sorted(BASE_ORDER_SORT)
                             .map(p -> new PrivacyTradeBase.PrivacyTrade(
@@ -150,13 +150,13 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromUtc) {
-        return baseRepository.findBasesFromTradeDate(fromUtc).stream()
+    public List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromReleaseDate) {
+        return baseRepository.findBasesFromReleaseDate(fromReleaseDate).stream()
                 .map(this::toView)
                 .toList();
     }
 
-    // 엔티티 → 조회 뷰 변환 (관리자 표시용 — release_date 원본 그대로, KST 변환 안 함)
+    // 엔티티 → 조회 뷰 변환 (관리자 표시용 — 발행일 원본 그대로, 이제 예외가 아니라 규칙)
     private PrivacyTradeBaseView toView(PrivacyTradeBaseEntity e) {
         List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()
                 .sorted(BASE_ORDER_SORT)
@@ -165,7 +165,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .toList();
         return new PrivacyTradeBaseView(
                 e.getId(),
-                e.getTradeDate(),
+                e.getReleaseDate(),
                 e.getTicker().name(),
                 e.getCurrentCycleStart(),
                 e.getCurrentCycleRealizedPnl(),

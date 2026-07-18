@@ -76,7 +76,7 @@ class AdminReorderService implements AdminReorderUseCase {
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
         Order.OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
-        LocalDate tradeDate = command.tradeDateKst() != null ? command.tradeDateKst() : sourceOrder.tradeDate();
+        LocalDate tradeDate = command.tradeDate() != null ? command.tradeDate() : sourceOrder.tradeDate();
 
         // 1. 원본 상태별 취소 처리
         cancelIfNeeded(sourceOrder, account);

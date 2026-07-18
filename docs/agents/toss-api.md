@@ -17,9 +17,9 @@
 
 ### 날짜 처리 (KIS와 다름)
 
-- `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — `toUtc()` 변환 없이 KST 날짜 전달
+- `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
 - **`queryFrom = from - 1일`**: 전날 저녁 선접수 주문이 당일 장마감에 체결될 수 있어 1일 앞당겨 조회 후, `filledAt(KST)` 기반 필터링
-- KIS(`toUtc()` 변환 필수)와 반대 방향 — 혼용 금지
+- KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
 
 ### 주의사항
 

@@ -1,6 +1,5 @@
 package com.kista.adapter.out.persistence.trade;
 
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.support.DataJpaTestBase;
@@ -126,7 +125,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_sumsOnlyMatchingReservations() {
         LocalDate databaseTradeDate = LocalDate.of(2026, 7, 14);
-        LocalDate domainTradeDate = TradeDateConverter.toKst(databaseTradeDate);
+        LocalDate domainTradeDate = databaseTradeDate; // DB와 도메인이 같은 KST 일자
         UUID otherAccountId = UUID.randomUUID();
         insertAccount(otherAccountId, userId, false);
 
