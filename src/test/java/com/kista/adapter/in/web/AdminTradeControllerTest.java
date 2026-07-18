@@ -200,7 +200,7 @@ class AdminTradeControllerTest {
                   "strategyId": "00000000-0000-0000-0000-000000000030",
                   "fills": [
                     {
-                      "tradeDateKst": "2026-07-01",
+                      "tradeDate": "2026-07-01",
                       "direction": "SELL",
                       "quantity": 2,
                       "price": 267.37,
@@ -235,6 +235,42 @@ class AdminTradeControllerTest {
 
     @Test
     void reorder_adminRole_returns200() throws Exception {
+        String body = """
+                {
+                  "userId": "00000000-0000-0000-0000-000000000010",
+                  "accountId": "00000000-0000-0000-0000-000000000020",
+                  "strategyId": "00000000-0000-0000-0000-000000000030",
+                  "orderId": "00000000-0000-0000-0000-000000000050",
+                  "timing": "AT_CLOSE",
+                  "tradeDate": "2026-07-01",
+                  "quantity": 3,
+                  "price": 250.00,
+                  "memo": "reorder memo"
+                }
+                """;
+        when(adminReorder.reorder(org.mockito.ArgumentMatchers.eq(ADMIN_UUID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AdminReorderResult(
+                        UUID.fromString("00000000-0000-0000-0000-000000000010"),
+                        UUID.fromString("00000000-0000-0000-0000-000000000020"),
+                        UUID.fromString("00000000-0000-0000-0000-000000000030"),
+                        UUID.fromString("00000000-0000-0000-0000-000000000050"),
+                        Order.OrderStatus.PLANNED,
+                        Order.OrderStatus.PLANNED,
+                        null
+                ));
+
+        mockMvc.perform(post("/api/admin/trades/reorders")
+                        .with(csrf())
+                        .with(authentication(adminToken(ADMIN_UUID)))
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultingStatus").value("PLANNED"));
+    }
+
+    @Test
+    void 구버전_tradeDateKst_키로도_수신된다() throws Exception {
+        // 기존 정상 요청 JSON의 "tradeDate" 키를 "tradeDateKst"로 바꿔 전송 — @JsonAlias 하위호환 검증
         String body = """
                 {
                   "userId": "00000000-0000-0000-0000-000000000010",
