@@ -1,6 +1,5 @@
 package com.kista.adapter.in.web.dto;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.kista.domain.model.admin.AdminReorderCommand;
 import com.kista.domain.model.order.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,7 +22,7 @@ public record AdminReorderRequest(
         @Schema(description = "재주문 접수 시점", example = "AT_OPEN")
         @NotNull String timing,        // AT_OPEN / AT_CLOSE / IMMEDIATE
         @Schema(description = "거래일 (KST)")
-        @NotNull @JsonAlias("tradeDateKst") LocalDate tradeDate,
+        @NotNull LocalDate tradeDate,
         @Schema(description = "매매 방향 (생략 시 원본 주문 값 사용)", example = "BUY")
         String direction,
         @Schema(description = "주문 수량")
