@@ -1,19 +1,16 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.broker.BrokerCallGuard;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
-import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerPricePort;
-import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,11 +30,8 @@ class TradingPreviewService {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
-    private final BrokerAdapterRegistry registry;
-    private final PrivacyTradePort privacyTradePort;
-    private final TradingBalanceLoader balanceLoader;
-    private final CycleOrderComputer orderComputer;
-    private final CycleOrderStrategies cycleOrderStrategies;
+    private final StrategyOrderPlanBuilder planBuilder;
+    private final TradingBuyCompetitionSimulator competitionSimulator;
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -46,7 +40,7 @@ class TradingPreviewService {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
-        // 현재 StrategyCycle — initialUsdDeposit 조회 (PRIVACY에서 필요)
+        // 현재 StrategyCycle — initialUsdDeposit 조회(PRIVACY) 및 경쟁 시뮬레이션에 사용
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
                 .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id()));
 
@@ -65,31 +59,21 @@ class TradingPreviewService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 
-        // 잔고 로드 (preview 전용 — 이력 없음도 정상 skip으로 처리)
-        TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
-        if (load.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), load.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+        StrategyOrderPlanBuilder.PlanResult result =
+                planBuilder.build(strategy, account, currentCycle, today, "preview:" + strategyId);
+        if (result.isSkip()) {
+            return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd, null);
         }
-        AccountBalance balance = load.balance();
+        CycleOrderStrategy.OrderPlan plan = result.plan();
 
-        // 전략별 필요 데이터 조회 — CycleOrderStrategy 다형 메서드로 전략 타입 분기 제거
-        var orderStrategy = cycleOrderStrategies.of(strategy);
-        BigDecimal prevClosePrice = null;
-        if (orderStrategy.requiresPrevClose()) {
-            prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
-                    () -> registry.require(account, BrokerPricePort.class).getPrevClose(strategy.ticker(), account));
-        }
-        PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
+        // 오늘자 계획에 BUY가 있을 때만 계좌 내 예산 경쟁 시뮬레이션 수행
+        List<Order> buyOrders = plan.orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .toList();
+        BuyCompetitionPreview competition = buyOrders.isEmpty()
+                ? null
+                : competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd);
 
-        CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, "preview:" + strategyId, null)
-                .orElse(null);
-
-        // 전략 차원 skip — 현재 케이스는 PRIVACY 기준매매표 미수신만 해당
-        if (plan == null) {
-            return new NextOrdersPreview(today, null, List.of(), SkipReason.NO_PRIVACY_BASE, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
-        }
-
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd, competition);
     }
 }

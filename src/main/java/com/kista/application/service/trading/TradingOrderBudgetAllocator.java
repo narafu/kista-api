@@ -149,11 +149,11 @@ class TradingOrderBudgetAllocator {
     }
 
     private Comparator<Candidate> buyPriorityComparator() {
-        return Comparator
-                .comparingInt((Candidate candidate) -> strategyPriority(candidate.ctx().strategy().type()))
-                .thenComparing(candidate -> buyTotal(candidate.orders()))
-                .thenComparing(candidate -> candidate.ctx().strategy().id())
-                .thenComparing(candidate -> candidate.ctx().currentCycle().id());
+        return BuyPriorityOrdering.comparator(cycleOrderStrategies,
+                candidate -> candidate.ctx().strategy().type(),
+                candidate -> buyTotal(candidate.orders()),
+                candidate -> candidate.ctx().strategy().id(),
+                candidate -> candidate.ctx().currentCycle().id());
     }
 
     private Comparator<SellRequest> sellPriorityComparator() {

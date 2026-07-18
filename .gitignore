@@ -48,6 +48,9 @@ docker-compose.override.yml
 # Codex 로컬 설정
 .codex/
 
+# superpowers subagent-driven-development 진행 원장 (스크래치)
+.superpowers/
+
 # Serena MCP 런타임 디렉토리 (memories는 공유, 로컬 환경 설정만 제외)
 .serena/project.local.yml
 

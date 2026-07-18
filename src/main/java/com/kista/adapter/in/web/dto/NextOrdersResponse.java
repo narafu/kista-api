@@ -1,8 +1,10 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -23,7 +25,9 @@ public record NextOrdersResponse(
         @Schema(description = "오늘 이미 등록된 PLANNED·PLACED 주문 목록")
         List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED·PLACED 주문
         @Schema(description = "계좌 내 타 전략의 당일 PLANNED BUY 합계 (USD)")
-        BigDecimal otherStrategiesPlannedBuyUsd       // 계좌 내 타 전략 당일 PLANNED BUY 합계
+        BigDecimal otherStrategiesPlannedBuyUsd,       // 계좌 내 타 전략 당일 PLANNED BUY 합계
+        @Schema(description = "계좌 내 BUY 예산 경쟁 시뮬레이션 결과 (대상 전략에 BUY 주문이 없으면 null, 근사치)")
+        BuyCompetitionSummary competition
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
@@ -111,6 +115,51 @@ public record NextOrdersResponse(
         }
     }
 
+    // BUY 예산 경쟁 시뮬레이션 결과 — TradingBuyCompetitionSimulator 산출을 그대로 노출
+    // 야간 배치의 캐스케이딩 거절·가격 캡은 재현하지 않는 근사치 (docs 참고)
+    public record BuyCompetitionSummary(
+            @Schema(description = "대상 전략 BUY가 실제 배치에서 승인될지 근사 판정")
+            boolean sufficientBudget,
+            @Schema(description = "라이브 예수금 - 타 전략 당일 PLANNED BUY 합계")
+            BigDecimal availableDeposit,
+            @Schema(description = "대상 전략 오늘자 BUY 합계")
+            BigDecimal requiredForThisStrategy,
+            @Schema(description = "대상 전략보다 우선순위 앞선 경쟁 전략 필요금액 합")
+            BigDecimal consumedByHigherPriority,
+            @Schema(description = "우선순위가 앞선 경쟁 전략 목록 (우선순위 높은 순 정렬)")
+            List<CompetingStrategy> blockedByHigherPriority,
+            @Schema(description = "계산 실패/skip돼 0으로 처리된 전략 id 목록")
+            List<UUID> uncertainStrategyIds
+    ) {
+        public record CompetingStrategy(
+                @Schema(description = "경쟁 전략 ID")
+                UUID strategyId,
+                @Schema(description = "경쟁 전략 타입")
+                Strategy.Type type,
+                @Schema(description = "경쟁 전략 거래 종목")
+                Ticker ticker,
+                @Schema(description = "경쟁 전략 필요 매수금액")
+                BigDecimal requiredBuyUsd,
+                @Schema(description = "예산 배정 우선순위 (작을수록 먼저 승인)")
+                int priority
+        ) {
+            public static CompetingStrategy from(BuyCompetitionPreview.CompetingStrategy c) {
+                return new CompetingStrategy(c.strategyId(), c.type(), c.ticker(), c.requiredBuyUsd(), c.priority());
+            }
+        }
+
+        public static BuyCompetitionSummary from(BuyCompetitionPreview c) {
+            return new BuyCompetitionSummary(
+                    c.sufficientBudget(),
+                    c.availableDeposit(),
+                    c.requiredForThisStrategy(),
+                    c.consumedByHigherPriority(),
+                    c.blockedByHigherPriority().stream().map(CompetingStrategy::from).toList(),
+                    c.uncertainStrategyIds()
+            );
+        }
+    }
+
     public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
@@ -118,7 +167,8 @@ public record NextOrdersResponse(
                 result.orders().stream().map(OrderItem::from).toList(),
                 result.skipReason(),
                 result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList(),
-                result.otherStrategiesPlannedBuyUsd()
+                result.otherStrategiesPlannedBuyUsd(),
+                result.competition() == null ? null : BuyCompetitionSummary.from(result.competition())
         );
     }
 }
