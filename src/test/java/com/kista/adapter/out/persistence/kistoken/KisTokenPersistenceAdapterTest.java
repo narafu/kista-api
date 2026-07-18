@@ -120,4 +120,43 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
 
         assertThat(accessToken).isEqualTo("committed-token");
     }
+
+    @Test
+    void invalidateToken_matchingAccessToken_expiresStoredToken() {
+        tokenAdapter.saveToken(
+                accountId,
+                "rejected-token",
+                OffsetDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+        tokenAdapter.invalidateToken(
+                accountId,
+                "rejected-token",
+                OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+
+        Optional<String> found = tokenAdapter.findValidToken(accountId, OffsetDateTime.now(ZoneOffset.UTC));
+        String storedToken = jdbcTemplate.queryForObject(
+                "SELECT access_token FROM broker_tokens WHERE account_id = ?",
+                String.class,
+                accountId);
+
+        assertThat(found).isEmpty();
+        assertThat(storedToken).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void invalidateToken_staleAccessToken_preservesFreshToken() {
+        tokenAdapter.saveToken(
+                accountId,
+                "fresh-token",
+                OffsetDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+        tokenAdapter.invalidateToken(
+                accountId,
+                "stale-token",
+                OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+
+        Optional<String> found = tokenAdapter.findValidToken(accountId, OffsetDateTime.now(ZoneOffset.UTC));
+
+        assertThat(found).contains("fresh-token");
+    }
 }

@@ -30,4 +30,10 @@ public class KisTokenPersistenceAdapter implements BrokerTokenCachePort {
         repository.save(new KisTokenEntity(accountId, accessToken, expiresAt));
     }
 
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void invalidateToken(UUID accountId, String rejectedAccessToken, OffsetDateTime invalidatedAt) {
+        repository.invalidateToken(accountId, rejectedAccessToken, INVALIDATED_TOKEN, invalidatedAt);
+    }
+
 }

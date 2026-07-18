@@ -11,4 +11,5 @@ public interface BrokerTokenCachePort {
 
     Optional<String> findValidToken(UUID accountId, OffsetDateTime threshold);
     void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt);
+    void invalidateToken(UUID accountId, String rejectedAccessToken, OffsetDateTime invalidatedAt);
 }

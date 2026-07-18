@@ -148,5 +148,16 @@ class DoubleCheckedTokenCacheTest {
             tokens.put(accountId, accessToken);
             expiries.put(accountId, expiresAt);
         }
+
+        @Override
+        public void invalidateToken(UUID accountId, String rejectedAccessToken, OffsetDateTime invalidatedAt) {
+            tokens.computeIfPresent(accountId, (id, token) -> {
+                if (token.equals(rejectedAccessToken)) {
+                    expiries.put(id, invalidatedAt);
+                    return INVALIDATED_TOKEN;
+                }
+                return token;
+            });
+        }
     }
 }

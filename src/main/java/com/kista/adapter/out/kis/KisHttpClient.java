@@ -93,15 +93,16 @@ class KisHttpClient {
         return executeWithRetry(trId, account, headers -> get(path, headers, params, responseType));
     }
 
-    // 401 → 토큰 무효화 후 1회 재시도. 매 시도마다 buildHeaders로 최신 토큰을 다시 읽는다.
+    // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
     // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
     private <T> T executeWithRetry(String trId, Account account, Function<HttpHeaders, T> call) {
+        String rejectedToken = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         try {
-            return call.apply(buildHeaders(trId, account));
+            return call.apply(buildHeaders(rejectedToken, account.appKey(), account.secretKey(), trId));
         } catch (HttpStatusCodeException e) {
             if (e.getStatusCode().value() == 401) {
                 log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
-                kisAuthApi.invalidateToken(account.id());
+                kisAuthApi.invalidateToken(account.id(), rejectedToken);
                 try {
                     // 무효화된 캐시 → buildHeaders가 신규 토큰을 재발급해 헤더 재구성
                     return call.apply(buildHeaders(trId, account));

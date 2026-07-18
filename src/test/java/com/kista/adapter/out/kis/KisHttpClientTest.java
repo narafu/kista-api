@@ -57,7 +57,8 @@ class KisHttpClientTest {
     @Test
     @DisplayName("401 1회 → 토큰 무효화 후 재발급·재시도 성공")
     void retriesOnceAfter401_thenSucceeds() {
-        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisAuthApi.getToken(any(), anyString(), anyString()))
+                .thenReturn("rejected-token", "fresh-token");
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
                 .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
@@ -66,7 +67,7 @@ class KisHttpClientTest {
 
         assertThat(result).isEqualTo("OK");
         // 401 감지 → 토큰 무효화 1회
-        verify(kisAuthApi).invalidateToken(ACCOUNT.id());
+        verify(kisAuthApi).invalidateToken(ACCOUNT.id(), "rejected-token");
         // 최초 + 재시도 = getToken 2회, exchange 2회
         verify(kisAuthApi, times(2)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
         verify(kisRestTemplate, times(2)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
@@ -85,7 +86,7 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("재시도 실패");
 
-        verify(kisAuthApi).invalidateToken(ACCOUNT.id());
+        verify(kisAuthApi).invalidateToken(ACCOUNT.id(), "token");
     }
 
     @Test
@@ -101,7 +102,7 @@ class KisHttpClientTest {
                 .hasMessageContaining("요청 실패");
 
         // 비 401은 무효화·재시도 없음
-        verify(kisAuthApi, never()).invalidateToken(any());
+        verify(kisAuthApi, never()).invalidateToken(any(), anyString());
         verify(kisRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
     }
 
@@ -118,6 +119,6 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("KIS API 오류");
 
-        verify(kisAuthApi, never()).invalidateToken(any());
+        verify(kisAuthApi, never()).invalidateToken(any(), anyString());
     }
 }

@@ -48,9 +48,9 @@ class TossHttpClient {
     }
 
     public <T> T post(String path, Account account, Object body, Class<T> responseType) {
-        return executeWithRetry(account, path, () -> tossRestTemplate.exchange(
+        return executeWithRetry(account, path, token -> tossRestTemplate.exchange(
                 baseUrl + path, HttpMethod.POST,
-                new HttpEntity<>(body, buildHeaders(account)), responseType
+                new HttpEntity<>(body, buildHeaders(account, token)), responseType
         ).getBody());
     }
 
@@ -60,8 +60,8 @@ class TossHttpClient {
     public <T> T get(String path, Account account, MultiValueMap<String, String> params,
                      ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithRetry(account, path, () -> {
-            HttpHeaders headers = buildHeaders(account);
+        return executeWithRetry(account, path, token -> {
+            HttpHeaders headers = buildHeaders(account, token);
             return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
         });
     }
@@ -70,8 +70,8 @@ class TossHttpClient {
     public <T> T getNoAccountHeader(String path, Account account, MultiValueMap<String, String> params,
                                     ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithRetry(account, path, () -> {
-            HttpHeaders headers = buildHeadersNoAccount(account);
+        return executeWithRetry(account, path, token -> {
+            HttpHeaders headers = buildHeadersNoAccount(token);
             return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
         });
     }
@@ -88,18 +88,18 @@ class TossHttpClient {
 
     // POST 요청 (ParameterizedTypeReference 버전)
     public <T> T post(String path, Account account, Object body, ParameterizedTypeReference<T> typeRef) {
-        return executeWithRetry(account, path, () -> tossRestTemplate.exchange(
+        return executeWithRetry(account, path, token -> tossRestTemplate.exchange(
                 baseUrl + path, HttpMethod.POST,
-                new HttpEntity<>(body, buildHeaders(account)), typeRef
+                new HttpEntity<>(body, buildHeaders(account, token)), typeRef
         ).getBody());
     }
 
     // DELETE 요청 — 주문 취소 등 (응답 body 없음)
     public void delete(String path, Account account) {
-        executeWithRetry(account, path, () -> {
+        executeWithRetry(account, path, token -> {
             tossRestTemplate.exchange(
                     baseUrl + path, HttpMethod.DELETE,
-                    new HttpEntity<>(buildHeaders(account)), Void.class
+                    new HttpEntity<>(buildHeaders(account, token)), Void.class
             );
             return null;
         });
@@ -110,18 +110,32 @@ class TossHttpClient {
     private <T> T executeGet(String path, Account account, MultiValueMap<String, String> params,
                               Class<T> responseType, boolean withAccountHeader) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithRetry(account, path, () -> {
-            HttpHeaders headers = withAccountHeader ? buildHeaders(account) : buildHeadersNoAccount(account);
+        return executeWithRetry(account, path, token -> {
+            HttpHeaders headers = withAccountHeader ? buildHeaders(account, token) : buildHeadersNoAccount(token);
             return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
         });
     }
 
-    // 401 → 토큰 무효화 후 1회 재시도. 매 시도마다 call이 buildHeaders로 최신 토큰을 다시 읽는다.
-    private <T> T executeWithRetry(Account account, String path, java.util.function.Supplier<T> call) {
-        return execute401Retry(call, () -> {
-            log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
-            tossAuthApi.invalidateToken(account.id());
-        });
+    // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
+    private <T> T executeWithRetry(Account account, String path, java.util.function.Function<String, T> call) {
+        String rejectedToken = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+        try {
+            return call.apply(rejectedToken);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 401) {
+                log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
+                tossAuthApi.invalidateToken(account.id(), rejectedToken);
+                try {
+                    String retryToken = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+                    return call.apply(retryToken);
+                } catch (RestClientException retryEx) {
+                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
+                }
+            }
+            throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+        } catch (RestClientException e) {
+            throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
+        }
     }
 
     // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만
@@ -161,8 +175,7 @@ class TossHttpClient {
     }
 
     // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.brokerAccountCode에 accountSeq가 저장됨
-    private HttpHeaders buildHeaders(Account account) {
-        String token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+    private HttpHeaders buildHeaders(Account account, String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.set("X-Tossinvest-Account", account.brokerAccountCode());
@@ -171,9 +184,7 @@ class TossHttpClient {
     }
 
     // 계좌 헤더 미포함 — 시세 조회·환율 등 계좌 컨텍스트 불필요 API용
-    private HttpHeaders buildHeadersNoAccount(Account account) {
-        // appKey/secretKey 필드를 Toss clientId/clientSecret으로 재사용
-        String token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+    private HttpHeaders buildHeadersNoAccount(String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(MediaType.APPLICATION_JSON);
