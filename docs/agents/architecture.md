@@ -91,7 +91,8 @@ adapter/in/
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/
-  broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급)
+  broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
+                   BrokerTokenCachePort.saveToken은 REQUIRES_NEW로 락 해제 전 독립 커밋하여 외부 트랜잭션 롤백·동시 재발급 경합에서 토큰을 보존)
                    PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
   kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 invalidateToken(INVALIDATED_TOKEN 센티널) 후 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
