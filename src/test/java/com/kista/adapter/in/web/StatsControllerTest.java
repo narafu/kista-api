@@ -59,31 +59,18 @@ class StatsControllerTest {
 
     @Test
     void equity_curve를_반환한다() throws Exception {
-        when(userStats.getEquityCurve(eq(USER_ID), any(), any(), eq("QLD")))
+        when(userStats.getEquityCurve(eq(USER_ID), any(), any()))
                 .thenReturn(new EquityCurve(
                         List.of(new EquityPoint(LocalDate.parse("2026-06-02"),
-                                new BigDecimal("1000.00"), new BigDecimal("900.00"))),
-                        List.of(new IndexPrice("QLD", LocalDate.parse("2026-06-02"),
-                                new BigDecimal("450.00")))));
+                                new BigDecimal("1000.00"), new BigDecimal("900.00")))));
 
         mockMvc.perform(get("/api/stats/equity-curve")
                         .param("from", "2026-06-01").param("to", "2026-06-30")
-                        .param("benchmark", "QLD")
                         .with(authentication(auth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.points[0].date").value("2026-06-02"))
                 .andExpect(jsonPath("$.points[0].totalAsset").value(1000.00))
-                .andExpect(jsonPath("$.benchmark[0].close").value(450.00));
-    }
-
-    @Test
-    void 잘못된_벤치마크_심볼은_400을_반환한다() throws Exception {
-        when(userStats.getEquityCurve(eq(USER_ID), any(), any(), eq("TSLA")))
-                .thenThrow(new IllegalArgumentException("지원하지 않는 벤치마크 심볼"));
-
-        mockMvc.perform(get("/api/stats/equity-curve").param("benchmark", "TSLA")
-                        .with(authentication(auth())))
-                .andExpect(status().isBadRequest());
+                .andExpect(jsonPath("$.benchmark").doesNotExist());
     }
 
     @Test

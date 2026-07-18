@@ -1,7 +1,6 @@
 package com.kista.application.service.stats;
 
 import com.kista.common.TimeZones;
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.stats.*;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
@@ -9,7 +8,6 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.in.UserStatsUseCase;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,19 +20,14 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 class StatsService implements UserStatsUseCase {
-
-    private static final Set<String> BENCHMARK_SYMBOLS = Set.of("SPY", "QQQ", "QLD");
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final IndexPricePort indexPricePort;
-    private final IndexPriceFeedPort indexPriceFeedPort;
 
     // 사이클 + 소속 전략 조인 뷰
     private record CycleView(StrategyCycle cycle, Strategy strategy) {
@@ -69,10 +62,7 @@ class StatsService implements UserStatsUseCase {
     }
 
     @Override
-    public EquityCurve getEquityCurve(UUID userId, LocalDate from, LocalDate to, String benchmarkSymbol) {
-        if (!BENCHMARK_SYMBOLS.contains(benchmarkSymbol)) {
-            throw new IllegalArgumentException("지원하지 않는 벤치마크 심볼: " + benchmarkSymbol);
-        }
+    public EquityCurve getEquityCurve(UUID userId, LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
@@ -82,9 +72,7 @@ class StatsService implements UserStatsUseCase {
         List<CycleView> cycles = loadCycles(userId);
         List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant);
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
-        List<IndexPrice> benchmark = loadBenchmark(benchmarkSymbol,
-                points.isEmpty() ? effectiveTo : points.get(0).date(), effectiveTo);
-        return new EquityCurve(points, benchmark);
+        return new EquityCurve(points);
     }
 
     @Override
@@ -199,33 +187,6 @@ class StatsService implements UserStatsUseCase {
                     principal.setScale(2, RoundingMode.HALF_UP)));
         }
         return points;
-    }
-
-    // 결손 구간 lazy backfill 후 KST 변환해 반환 — 피드 실패는 저장분으로 폴백
-    private List<IndexPrice> loadBenchmark(String symbol, LocalDate fromKst, LocalDate toKst) {
-        // KST 표시일 → 미국 거래일 (−1일)
-        LocalDate fromUs = TradeDateConverter.toUtc(fromKst);
-        LocalDate toUs = TradeDateConverter.toUtc(toKst);
-        try {
-            LocalDate fetchFrom = indexPricePort.findMaxTradeDate(symbol)
-                    .map(max -> max.plusDays(1)).orElse(fromUs);
-            if (fetchFrom.isAfter(fromUs)) {
-                // 저장 구간 앞쪽 결손(최초 조회가 과거로 확장된 경우)도 채운다
-                List<IndexPrice> stored = indexPricePort.findBySymbolAndRange(symbol, fromUs, toUs);
-                if (!stored.isEmpty() && stored.get(0).tradeDate().isAfter(fromUs)) {
-                    indexPricePort.saveAll(indexPriceFeedPort.fetchDailyCloses(
-                            symbol, fromUs, stored.get(0).tradeDate().minusDays(1)));
-                }
-            }
-            if (!fetchFrom.isAfter(toUs)) {
-                indexPricePort.saveAll(indexPriceFeedPort.fetchDailyCloses(symbol, fetchFrom, toUs));
-            }
-        } catch (Exception e) {
-            log.warn("벤치마크 {} backfill 실패 — 저장분으로 응답: {}", symbol, e.getMessage());
-        }
-        return indexPricePort.findBySymbolAndRange(symbol, fromUs, toUs).stream()
-                .map(p -> new IndexPrice(p.symbol(), TradeDateConverter.toKst(p.tradeDate()), p.close()))
-                .toList();
     }
 
     private static BigDecimal assetOf(CyclePosition pos) {

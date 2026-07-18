@@ -30,14 +30,13 @@ public class StatsController {
         return StatsSummaryResponse.from(userStats.getSummary(userId));
     }
 
-    @Operation(summary = "누적 자산 곡선", description = "일별 전략 운용 자산·원금 + 벤치마크 지수 종가 (KST 거래일).")
+    @Operation(summary = "누적 자산 곡선", description = "일별 전략 운용 자산·원금.")
     @GetMapping("/equity-curve")
     public EquityCurveResponse getEquityCurve(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "SPY") String benchmark) {
-        return EquityCurveResponse.from(userStats.getEquityCurve(userId, from, to, benchmark));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return EquityCurveResponse.from(userStats.getEquityCurve(userId, from, to));
     }
 
     @Operation(summary = "사이클 성과 목록", description = "종료·진행 중 사이클의 손익/수익률/소요일 (커서 페이지네이션).")

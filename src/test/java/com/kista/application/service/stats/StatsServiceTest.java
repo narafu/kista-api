@@ -30,8 +30,6 @@ class StatsServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock IndexPricePort indexPricePort;
-    @Mock IndexPriceFeedPort indexPriceFeedPort;
     @InjectMocks StatsService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -121,55 +119,14 @@ class StatsServiceTest {
                         new BigDecimal("10.00"), null, 5, Instant.parse("2026-06-01T20:00:00Z"), null),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
                         new BigDecimal("10.00"), null, 20, Instant.parse("2026-06-01T20:30:00Z"), null)));
-        when(indexPricePort.findMaxTradeDate("SPY")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
-        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
-
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "SPY");
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
         assertThat(curve.points().get(0).date()).isEqualTo(LocalDate.parse("2026-06-02"));
         // 800 + 20 × 10.00 = 1000
         assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1000.00");
         assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1000.00");
-    }
-
-    @Test
-    void 벤치마크_결손_구간은_피드에서_backfill하고_피드_실패면_저장분만_반환한다() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-        when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
-        when(indexPricePort.findMaxTradeDate("QQQ")).thenReturn(Optional.empty());
-        when(indexPriceFeedPort.fetchDailyCloses(eq("QQQ"), any(), any()))
-                .thenThrow(new RuntimeException("alpaca down"));
-        when(indexPricePort.findBySymbolAndRange(eq("QQQ"), any(), any())).thenReturn(List.of());
-
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "QQQ");
-
-        assertThat(curve.benchmark()).isEmpty(); // 실패해도 예외 전파 없이 정상 응답
-    }
-
-    @Test
-    void qld를_벤치마크로_허용한다() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-        when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
-        when(indexPricePort.findMaxTradeDate("QLD")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
-        when(indexPricePort.findBySymbolAndRange(eq("QLD"), any(), any())).thenReturn(List.of(
-                new IndexPrice("QLD", LocalDate.parse("2026-06-01"), new BigDecimal("120.00"))));
-
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "QLD");
-
-        assertThat(curve.benchmark()).hasSize(1);
-        assertThat(curve.benchmark().get(0).symbol()).isEqualTo("QLD");
-    }
-
-    @Test
-    void 지원하지_않는_벤치마크_심볼은_거부한다() {
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> statsService.getEquityCurve(USER_ID, null, null, "TSLA"));
     }
 
     @Test
@@ -235,11 +192,8 @@ class StatsServiceTest {
                 depositSnapshot(a.id(), "1000.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
-        when(indexPricePort.findMaxTradeDate("SPY")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
-        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
-
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "SPY");
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         assertThat(curve.points().get(1).date()).isEqualTo(LocalDate.parse("2026-06-02"));
@@ -258,11 +212,8 @@ class StatsServiceTest {
                 depositSnapshot(ended.id(), "1200.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));
-        when(indexPricePort.findMaxTradeDate("SPY")).thenReturn(Optional.of(LocalDate.parse("2026-07-16")));
-        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
-
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"), "SPY");
+                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         // 06-01: 종료 사이클 포함 (endDate 당일까지 유효)
