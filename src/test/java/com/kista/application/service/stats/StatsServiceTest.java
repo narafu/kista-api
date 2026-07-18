@@ -1,5 +1,6 @@
 package com.kista.application.service.stats;
 
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.stats.*;
 import com.kista.domain.model.strategy.CyclePosition;
@@ -8,6 +9,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -179,6 +181,21 @@ class StatsServiceTest {
         assertThat(page.items().get(0).cycleId()).isEqualTo(c1.id());
         assertThat(page.hasMore()).isFalse();
         assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void equityCurve_조회_경계는_KST_자정() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
+        when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
+        ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
+
+        statsService.getEquityCurve(USER_ID, null, LocalDate.of(2026, 7, 18));
+
+        // to=2026-07-18 → toInstant = 2026-07-19T00:00 KST = 2026-07-18T15:00:00Z
+        verify(cyclePositionPort).findByUserAndRange(eq(USER_ID), any(), toCaptor.capture());
+        assertThat(toCaptor.getValue())
+                .isEqualTo(LocalDate.of(2026, 7, 19).atStartOfDay(TimeZones.KST).toInstant());
     }
 
     @Test
