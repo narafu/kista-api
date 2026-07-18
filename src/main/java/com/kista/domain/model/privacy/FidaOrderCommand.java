@@ -1,5 +1,6 @@
 package com.kista.domain.model.privacy;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import jakarta.validation.constraints.AssertTrue;
@@ -13,7 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record FidaOrderCommand(
-        @NotNull LocalDate tradeDate,
+        @NotNull @JsonAlias("tradeDate") LocalDate releaseDate, // FIDA 발행일 원본 (KST) — 거래일 아님
         @NotNull Ticker ticker,
         @NotNull @Positive BigDecimal currentCycleStart,
         @NotNull BigDecimal currentCycleRealizedPnl,

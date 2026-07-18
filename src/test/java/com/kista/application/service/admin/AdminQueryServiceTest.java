@@ -45,7 +45,7 @@ class AdminQueryServiceTest {
     }
 
     @Test
-    void listPrivacyBases_30일이면_KST_30일전을_UTC로_변환해_조회() {
+    void listPrivacyBases_30일이면_KST_30일전_발행분부터_조회() {
         when(privacyTradePort.findBasesFromTradeDate(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         service.listPrivacyBases(30);

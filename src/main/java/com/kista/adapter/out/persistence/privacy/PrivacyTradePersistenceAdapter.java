@@ -43,7 +43,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     @Transactional
     public PrivacyTradeSaveResult saveBaseWithOrders(FidaOrderCommand command) {
-        Optional<PrivacyTradeBaseEntity> existing = this.getByReleaseDateAndTicker(command.tradeDate(), command.ticker());
+        Optional<PrivacyTradeBaseEntity> existing = this.getByReleaseDateAndTicker(command.releaseDate(), command.ticker());
 
         if (existing.isPresent()) {
             // 동일 (releaseDate, ticker) 존재 — 내용 비교
@@ -52,12 +52,12 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 return new PrivacyTradeSaveResult(base.getId(), false); // 200
             }
             throw new PrivacyTradeConflictException(
-                    "기존 매매표와 내용이 다릅니다: tradeDate=" + command.tradeDate() + ", ticker=" + command.ticker());
+                    "기존 매매표와 내용이 다릅니다: releaseDate=" + command.releaseDate() + ", ticker=" + command.ticker());
         }
 
         // 신규 저장
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
-        base.setReleaseDate(command.tradeDate()); // FIDA 발행일 원본 그대로 (Task 3에서 command.releaseDate()로 리네임)
+        base.setReleaseDate(command.releaseDate()); // FIDA 발행일 원본 (KST) — 거래일 아님
         base.setTicker(command.ticker());
         base.setCurrentCycleStart(command.currentCycleStart());
         base.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());

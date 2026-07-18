@@ -59,7 +59,7 @@ class PrivacyServiceTest {
         assertThat(result.created()).isTrue();
         // FIDA 수신 날짜(KST 발행일)가 변환 없이 그대로 port에 전달된다
         verify(privacyTradePort).saveBaseWithOrders(
-                argThat(r -> r.tradeDate().equals(receivedDate)));
+                argThat(r -> r.releaseDate().equals(receivedDate)));
     }
 
     @Test

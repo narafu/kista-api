@@ -13,8 +13,8 @@ import java.util.UUID;
 public record FidaOrderResponse(
         @Schema(description = "생성된 기준 매매표 마스터 레코드 ID")
         UUID id,                            // 생성된 master record ID
-        @Schema(description = "거래일 (요청받은 FIDA 원본 값 그대로 echo, UTC — 저장 시에는 KST로 변환됨)")
-        LocalDate tradeDate,
+        @Schema(description = "발행일 (요청받은 FIDA 원본 값 그대로 echo, KST — 거래일 아님)")
+        LocalDate releaseDate,
         @Schema(description = "거래 종목", example = "SOXL")
         Ticker ticker,
         @Schema(description = "기준가")
@@ -51,7 +51,7 @@ public record FidaOrderResponse(
     public static FidaOrderResponse of(UUID id, FidaOrderCommand command) {
         return new FidaOrderResponse(
                 id,
-                command.tradeDate(),
+                command.releaseDate(),
                 command.ticker(),
                 command.currentCycleStart(),
                 command.currentCycleRealizedPnl(),
