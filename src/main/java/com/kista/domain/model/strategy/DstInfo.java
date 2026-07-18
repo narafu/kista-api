@@ -115,14 +115,18 @@ public record DstInfo(
                 atKst(date, marketOpenTime(isDst)));
     }
 
-    // 매매일 경계 기준 시각 — 실제 스케쥴러 cron은 04:30이지만 날짜 경계는 04:00 고정; 04:00 이후면 당일이 US 거래일, 이전이면 아직 전날
-    private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 0);
+    // 매매일 경계 기준 시각 — 마감 배치 cron 발화(TradingCloseScheduler 04:30 KST)와 동일 임계값.
+    // 04:30 이후면 당일 배치는 이미 계획 완료 → 다음 세션(익일)이 preview/수동 실행 대상
+    private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 30);
 
     // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케쥴러와 동일 로직 SSOT
     public static LocalDate nextTradeDate() {
-        return LocalTime.now(KST).isBefore(SCHEDULER_RUN_TIME)
-                ? LocalDate.now(KST)
-                : LocalDate.now(KST).plusDays(1);
+        return nextTradeDateAt(LocalDate.now(KST), LocalTime.now(KST));
+    }
+
+    // 시각 주입식 판단 — 테스트 및 nextTradeDate 공용
+    static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
+        return now.isBefore(SCHEDULER_RUN_TIME) ? today : today.plusDays(1);
     }
 
     // 개장 스케쥴러 수동 트리거용: marketOpen을 과거로 설정해 waitUntilMarketOpen() 스킵
