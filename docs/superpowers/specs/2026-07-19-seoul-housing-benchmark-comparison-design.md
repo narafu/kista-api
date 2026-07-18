@@ -170,6 +170,7 @@ GET /api/stats/housing-benchmark
       "investmentIndexKrw": 100.0,
       "benchmarkIndex": 100.0,
       "usdKrwMidRate": 1365.2,
+      "exchangeRateObservedDate": "2021-06-30",
       "investmentMonthlyReturn": null,
       "benchmarkMonthlyReturn": null
     }
