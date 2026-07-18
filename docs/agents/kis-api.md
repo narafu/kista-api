@@ -11,6 +11,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - `KisHttpClient.buildHeaders(String trId, Account account)` — Account 계좌별 자격증명으로 헤더 구성
 - `KisAuthApi.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`broker_tokens` PK = account_id UUID). `KisHttpClient`가 **구체 타입으로 직접 주입**받음 (KisTokenPort 삭제됨 — 어댑터 패키지 내부 협력)
 - 토큰 관리는 `KisAuthApi`만 담당; 만료 1분 전부터 재발급 (경계값 EGW00123 방지), `DoubleCheckedTokenCache`로 동시 요청 경합 차단
+- `KisHttpClient`는 401이 발생한 요청의 access token을 함께 전달해 **DB에 그 토큰이 아직 저장된 경우에만** `INVALIDATED_TOKEN`으로 조건부 갱신한 뒤 최신 토큰으로 1회 재시도한다. 느리게 도착한 stale 401이 동시 요청이 이미 재발급한 신규 토큰을 무효화하지 않도록 `accountId + rejectedAccessToken` 일치가 필수다.
 - **`KisAuthApi`는 `KisHttpClient` 빈 미주입** — `RestTemplate` 직접 사용 (순환 의존 방지, 정적 헬퍼 `splitAccountNo`/`buildHeaders`만 참조)
 - `BrokerConnectionTestPort` 구현 (`verifyCredentials`/`verifyAccount`): `verifyCredentials(appKey, secretKey, accountId)` — accountId=null이면 캐시 저장 생략(등록 전 사전 검증), 성공 토큰은 90초 단기 캐시(EGW00133 회피)
 - `verifyAccount(appKey, secretKey, accountNo)` — TTTC2101R로 계좌 실소유 검증 후 `null` 반환 (KIS는 brokerAccountCode 없음), 실패 시 `Account.InvalidBrokerKeyException`

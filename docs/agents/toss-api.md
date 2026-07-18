@@ -15,6 +15,11 @@
 
 - `XXX-XX-XXXXXX` (하이픈 포함) — KIS `XXXXXXXX-XX`와 다름, `AccountInfoStep` 분기 처리 필요
 
+### 토큰·인증
+
+- 계좌 API의 401 재시도는 최초 요청에 실제 사용한 access token을 기준으로 한다. `TossAuthApi.invalidateToken(accountId, rejectedAccessToken)`은 DB의 현재 토큰이 거절된 토큰과 같을 때만 무효화하고, 이미 다른 요청이 재발급한 신규 토큰이면 보존한다.
+- `TossHttpClient`는 조건부 무효화 후 캐시의 최신 토큰을 다시 읽어 동일 요청을 1회만 재시도한다. 헤더 빌더 내부에서 토큰을 재조회하지 말고, `executeWithRetry`가 고정한 시도별 토큰을 사용해야 한다.
+
 ### 날짜 처리 (KIS와 다름)
 
 - `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
