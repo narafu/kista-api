@@ -107,6 +107,9 @@ alpaca:
   api-secret: ${ALPACA_API_SECRET:}
   data-base-url: https://data.alpaca.markets
 
+kbland:
+  base-url: https://data-api.kbland.kr
+
 firebase:
   service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
 
