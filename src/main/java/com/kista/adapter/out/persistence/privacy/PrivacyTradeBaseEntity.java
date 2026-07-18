@@ -30,7 +30,7 @@ class PrivacyTradeBaseEntity extends BaseCreatedAtEntity {
     private UUID id;
 
     @Column(name = "release_date", nullable = false)
-    private LocalDate tradeDate;              // DB는 UTC(=US 거래일) 저장, FIDA 수신값 그대로 보존 — TradeDateConverter 경유
+    private LocalDate releaseDate;            // FIDA 발행일 원본 (KST) — 거래일 아님, 변환 금지
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)

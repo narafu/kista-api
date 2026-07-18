@@ -1,7 +1,6 @@
 package com.kista.application.service.admin;
 
 import com.kista.common.TimeZones;
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminAnomalies;
@@ -114,11 +113,11 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public List<PrivacyTradeBaseView> listPrivacyBases(Integer days) {
-        // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일을 UTC 거래일 경계로 변환
-        LocalDate fromUtc = days == null
+        // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일 발행분 (release_date는 KST 발행일 원본)
+        LocalDate fromReleaseDate = days == null
                 ? LocalDate.EPOCH
-                : TradeDateConverter.toUtc(LocalDate.now(TimeZones.KST).minusDays(days));
-        return privacyTradePort.findBasesFromTradeDate(fromUtc);
+                : LocalDate.now(TimeZones.KST).minusDays(days);
+        return privacyTradePort.findBasesFromTradeDate(fromReleaseDate);
     }
 
     @Override

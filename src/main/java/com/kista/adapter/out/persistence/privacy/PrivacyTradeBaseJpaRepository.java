@@ -11,16 +11,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface PrivacyTradeBaseJpaRepository extends JpaRepository<PrivacyTradeBaseEntity, UUID> {
-    // 중복 체크용 — 정확한 날짜 일치 (>= 쓰면 미래 레코드를 잡아 false 409 발생)
-    Optional<PrivacyTradeBaseEntity> findByTradeDateAndTicker(LocalDate tradeDate, Ticker ticker);
+    // 중복 체크용 — 정확한 발행일 일치 (>= 쓰면 미래 레코드를 잡아 false 409 발생)
+    Optional<PrivacyTradeBaseEntity> findByReleaseDateAndTicker(LocalDate releaseDate, Ticker ticker);
 
-    Optional<PrivacyTradeBaseEntity> findFirstByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
+    Optional<PrivacyTradeBaseEntity> findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(LocalDate releaseDate, Ticker ticker);
 
     @EntityGraph(attributePaths = "orders")
-    Optional<PrivacyTradeBaseEntity> findFirstWithOrdersByTradeDateGreaterThanEqualAndTickerOrderByTradeDateAsc(LocalDate tradeDate, Ticker ticker);
+    Optional<PrivacyTradeBaseEntity> findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(LocalDate releaseDate, Ticker ticker);
 
-    // N+1 방지: 주문(orders)을 join fetch, DISTINCT로 기준 매매표 중복 제거, 거래일 내림차순
+    // N+1 방지: 주문(orders)을 join fetch, DISTINCT로 기준 매매표 중복 제거, 발행일 내림차순
     @Query("SELECT DISTINCT b FROM PrivacyTradeBaseEntity b LEFT JOIN FETCH b.orders "
-            + "WHERE b.tradeDate >= :fromUtc ORDER BY b.tradeDate DESC")
-    List<PrivacyTradeBaseEntity> findBasesFromTradeDate(LocalDate fromUtc);
+            + "WHERE b.releaseDate >= :fromReleaseDate ORDER BY b.releaseDate DESC")
+    List<PrivacyTradeBaseEntity> findBasesFromReleaseDate(LocalDate fromReleaseDate);
 }

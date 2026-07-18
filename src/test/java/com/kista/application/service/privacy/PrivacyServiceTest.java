@@ -1,6 +1,5 @@
 package com.kista.application.service.privacy;
 
-import com.kista.common.TradeDateConverter;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
@@ -47,9 +46,9 @@ class PrivacyServiceTest {
     @Test
     void executeFidaOrder_delegates_to_privacyTradePort() {
         UUID baseId = UUID.randomUUID();
-        LocalDate utcDate = LocalDate.now(); // FIDA 송신값 (UTC=US 거래일)
+        LocalDate receivedDate = LocalDate.now(); // FIDA 송신값 (KST 발행일 원본)
         FidaOrderCommand req = new FidaOrderCommand(
-                utcDate, Ticker.SOXL, new BigDecimal("500.00"),
+                receivedDate, Ticker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, true));
@@ -58,9 +57,9 @@ class PrivacyServiceTest {
 
         assertThat(result.id()).isEqualTo(baseId);
         assertThat(result.created()).isTrue();
-        // FIDA UTC → KST 변환된 새 request로 포트 호출됨
+        // FIDA 수신 날짜(KST 발행일)가 변환 없이 그대로 port에 전달된다
         verify(privacyTradePort).saveBaseWithOrders(
-                argThat(r -> r.tradeDate().equals(TradeDateConverter.toKst(utcDate))));
+                argThat(r -> r.tradeDate().equals(receivedDate)));
     }
 
     @Test
