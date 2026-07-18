@@ -4,6 +4,8 @@ import com.kista.domain.port.out.BrokerTokenCachePort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -22,6 +24,7 @@ public class KisTokenPersistenceAdapter implements BrokerTokenCachePort {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
         // accountId를 PK로 upsert (Spring Data: 기존 행이면 UPDATE, 없으면 INSERT)
         repository.save(new KisTokenEntity(accountId, accessToken, expiresAt));

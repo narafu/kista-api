@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.kistoken;
 
 import com.kista.support.DataJpaTestBase;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.transaction.TestTransaction;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -23,11 +25,12 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired KisTokenPersistenceAdapter tokenAdapter;
 
+    private UUID userId;
     private UUID accountId;
 
     @BeforeEach
     void setUp() {
-        UUID userId = UUID.randomUUID();
+        userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
 
         // broker_tokens.account_id → accounts(id) FK 충족을 위한 선행 삽입
@@ -37,6 +40,20 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        TestTransaction.start();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (TestTransaction.isActive()) {
+            TestTransaction.end();
+        }
+        jdbcTemplate.update("DELETE FROM broker_tokens WHERE account_id = ?", accountId);
+        jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
 
     @Test
@@ -84,5 +101,23 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
         Optional<String> found = tokenAdapter.findValidToken(UUID.randomUUID(), OffsetDateTime.now(ZoneOffset.UTC));
 
         assertThat(found).isEmpty();
+    }
+
+    @Test
+    void saveToken_outerTransactionRollsBack_tokenRemainsCommitted() {
+        tokenAdapter.saveToken(
+                accountId,
+                "committed-token",
+                OffsetDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+        TestTransaction.flagForRollback();
+        TestTransaction.end();
+
+        String accessToken = jdbcTemplate.queryForObject(
+                "SELECT access_token FROM broker_tokens WHERE account_id = ?",
+                String.class,
+                accountId);
+
+        assertThat(accessToken).isEqualTo("committed-token");
     }
 }
