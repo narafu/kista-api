@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-// 매월 10일·20일 KST 09:00 KB Land 주택 벤치마크 수집 및 저장
+// 매월 10일·20일 KST 07:00 KB Land 주택 벤치마크 수집 및 저장
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -21,7 +21,7 @@ public class KbLandHousingBenchmarkScheduler {
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 0 9 10,20 * *", zone = TimeZones.KST_ID) // 매월 10일·20일 09:00 KST
+    @Scheduled(cron = "0 0 7 10,20 * *", zone = TimeZones.KST_ID) // 매월 10일·20일 07:00 KST
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("kbland-housing-benchmark", Duration.ofMinutes(30), this::runLocked);
     }
