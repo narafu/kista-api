@@ -5,9 +5,12 @@ import com.kista.domain.model.stats.*;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.toss.TossExchangeRate;
 import com.kista.domain.port.in.UserStatsUseCase;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.ExchangeRatePort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,12 +24,21 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 class StatsService implements UserStatsUseCase {
+
+    private static final String SEOUL_REGION_CODE = "1100000000";
+    private static final String SEOUL_REGION_NAME = "서울";
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
+    private final HousingBenchmarkPricePort housingBenchmarkPricePort;
+    private final ExchangeRatePort exchangeRatePort;
+    private final MonthlyReturnCalculator monthlyReturnCalculator = new MonthlyReturnCalculator();
+    private final HousingBenchmarkComparisonBuilder comparisonBuilder =
+            new HousingBenchmarkComparisonBuilder();
 
     // 사이클 + 소속 전략 조인 뷰
     private record CycleView(StrategyCycle cycle, Strategy strategy) {
@@ -90,6 +102,63 @@ class StatsService implements UserStatsUseCase {
         return new CyclePerformancePage(items, nextCursor, hasMore);
     }
 
+    @Override
+    public HousingBenchmarkComparison getHousingBenchmarkComparison(
+            UUID userId, BenchmarkScope scope, UUID strategyId,
+            int quintile, LocalDate from, LocalDate to) {
+        validateComparisonRequest(scope, strategyId, quintile, from, to);
+
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        Strategy selectedStrategy = null;
+        List<Strategy> strategies;
+        if (scope == BenchmarkScope.STRATEGY) {
+            selectedStrategy = strategyPort.findByIdOrThrow(strategyId);
+            accountPort.findByIdOrThrow(selectedStrategy.accountId()).verifyOwnedBy(userId);
+            strategies = List.of(selectedStrategy);
+        } else {
+            strategies = accountPort.findByUserId(userId).stream()
+                    .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
+                    .toList();
+        }
+
+        Set<UUID> strategyIds = strategies.stream().map(Strategy::id).collect(Collectors.toSet());
+        List<StrategyCycle> cycles = strategyIds.isEmpty()
+                ? List.of() : strategyCyclePort.findByStrategyIds(strategyIds);
+        LocalDate effectiveFrom = from != null ? from.withDayOfMonth(1)
+                : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo)
+                        .orElse(effectiveTo).withDayOfMonth(1);
+        Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
+        List<CyclePosition> positions = scope == BenchmarkScope.STRATEGY
+                ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
+                : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
+
+        List<MonthlyInvestmentPoint> investmentPoints = monthlyReturnCalculator.calculate(
+                cycles, positions, effectiveFrom, effectiveTo);
+        LocalDate benchmarkFrom = effectiveFrom.minusMonths(1).withDayOfMonth(1);
+        LocalDate benchmarkTo = effectiveTo.withDayOfMonth(1);
+        List<HousingBenchmarkPrice> benchmarkRows =
+                housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                        HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
+                        SEOUL_REGION_CODE, benchmarkFrom, benchmarkTo);
+        Map<LocalDate, BigDecimal> selectedBenchmarkPrices = benchmarkRows.stream()
+                .collect(Collectors.toMap(
+                        HousingBenchmarkPrice::baseMonth,
+                        price -> selectQuintilePrice(price, quintile),
+                        (left, right) -> right,
+                        TreeMap::new));
+        LocalDate sourceUpdatedDate = benchmarkRows.stream()
+                .map(HousingBenchmarkPrice::sourceUpdatedDate)
+                .filter(Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+
+        HousingBenchmarkComparison comparison = comparisonBuilder.build(
+                scope, selectedStrategy, quintile,
+                SEOUL_REGION_CODE, SEOUL_REGION_NAME, sourceUpdatedDate,
+                investmentPoints, selectedBenchmarkPrices);
+        return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
+    }
+
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 
     private List<CycleView> loadCycles(UUID userId) {
@@ -100,6 +169,49 @@ class StatsService implements UserStatsUseCase {
         return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()
                 .map(c -> new CycleView(c, strategies.get(c.strategyId())))
                 .toList();
+    }
+
+    private static void validateComparisonRequest(
+            BenchmarkScope scope, UUID strategyId, int quintile, LocalDate from, LocalDate to) {
+        if (scope == null) {
+            throw new IllegalArgumentException("scope은 필수입니다");
+        }
+        if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
+            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
+        }
+        if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
+            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
+        }
+        if (quintile < 1 || quintile > 5) {
+            throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        }
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+    }
+
+    private static BigDecimal selectQuintilePrice(HousingBenchmarkPrice price, int quintile) {
+        return switch (quintile) {
+            case 1 -> price.firstQuintilePrice();
+            case 2 -> price.secondQuintilePrice();
+            case 3 -> price.thirdQuintilePrice();
+            case 4 -> price.fourthQuintilePrice();
+            case 5 -> price.fifthQuintilePrice();
+            default -> throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        };
+    }
+
+    private CurrentExchangeRate fetchCurrentExchangeRate() {
+        try {
+            TossExchangeRate rate = exchangeRatePort.getExchangeRate();
+            if (rate == null || rate.midRate() == null || rate.midRate().signum() <= 0) {
+                return null;
+            }
+            return new CurrentExchangeRate(rate.midRate(), Instant.now(), "TOSS_INVEST");
+        } catch (RuntimeException e) {
+            log.warn("현재 USD/KRW 환율 조회 실패", e);
+            return null;
+        }
     }
 
     // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 − startAmount (스냅샷 없으면 제외)

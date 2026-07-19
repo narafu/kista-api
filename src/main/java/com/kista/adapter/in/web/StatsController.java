@@ -3,6 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.CyclePerformancePageResponse;
 import com.kista.adapter.in.web.dto.EquityCurveResponse;
 import com.kista.adapter.in.web.dto.StatsSummaryResponse;
+import com.kista.adapter.in.web.dto.HousingBenchmarkComparisonResponse;
+import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.UserStatsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,5 +51,31 @@ public class StatsController {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CyclePerformancePageResponse.from(
                 userStats.getCyclePerformances(userId, type, cursorInstant, Math.clamp(size, 1, 200)));
+    }
+
+    @Operation(summary = "서울 아파트 벤치마크 비교",
+            description = "USD 투자 성과와 KRW 서울 아파트 분위 가격을 현지 통화 기준으로 비교합니다.")
+    @GetMapping("/housing-benchmark")
+    public HousingBenchmarkComparisonResponse getHousingBenchmarkComparison(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(defaultValue = "PORTFOLIO") BenchmarkScope scope,
+            @RequestParam(required = false) UUID strategyId,
+            @RequestParam(defaultValue = "3") int quintile,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
+            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
+        }
+        if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
+            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
+        }
+        if (quintile < 1 || quintile > 5) {
+            throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        }
+        return HousingBenchmarkComparisonResponse.from(
+                userStats.getHousingBenchmarkComparison(
+                        userId, scope, strategyId, quintile, from, to));
     }
 }
