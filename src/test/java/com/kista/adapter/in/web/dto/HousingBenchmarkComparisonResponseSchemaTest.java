@@ -24,9 +24,12 @@ class HousingBenchmarkComparisonResponseSchemaTest {
         Schema<?> response = schemas.get("HousingBenchmarkComparisonResponse");
 
         assertNullableReferenceUnion(
-                property(response, "currentExchangeRate"), "CurrentExchangeRate");
-        assertNullableReferenceUnion(property(response, "strategy"), "StrategyInfo");
-        assertNullableReferenceUnion(property(response, "summary"), "Summary");
+                property(response, "currentExchangeRate"),
+                "HousingBenchmarkCurrentExchangeRate");
+        assertNullableReferenceUnion(
+                property(response, "strategy"), "HousingBenchmarkStrategyInfo");
+        assertNullableReferenceUnion(
+                property(response, "summary"), "HousingBenchmarkSummary");
         assertNullable(property(response, "emptyReason"), "emptyReason");
 
         Schema<?> benchmark = dereference(schemas, property(response, "benchmark"));

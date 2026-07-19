@@ -22,6 +22,7 @@ public record HousingBenchmarkComparisonResponse(
         Summary summary,
         List<Point> points,
         @JsonInclude(JsonInclude.Include.ALWAYS)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         CurrentExchangeRate currentExchangeRate,
         Quality quality,
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -30,20 +31,24 @@ public record HousingBenchmarkComparisonResponse(
     private static final String NOTICE =
             "투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다.";
 
+    @Schema(name = "HousingBenchmarkStrategyInfo")
     public record StrategyInfo(UUID id, String type, String ticker) {}
 
+    @Schema(name = "HousingBenchmarkDefinition")
     public record Benchmark(
             String regionCode, String regionName, int quintile,
             String label,
             @Schema(types = {"string", "null"}, format = "date") LocalDate sourceUpdatedDate
     ) {}
 
+    @Schema(name = "HousingBenchmarkPeriod")
     public record Period(
             @Schema(types = {"string", "null"}, format = "date") LocalDate fromMonth,
             @Schema(types = {"string", "null"}, format = "date") LocalDate toMonth,
             int monthCount
     ) {}
 
+    @Schema(name = "HousingBenchmarkSummary")
     public record Summary(
             BigDecimal investmentCumulativeReturn,
             BigDecimal benchmarkCumulativeReturn,
@@ -54,6 +59,7 @@ public record HousingBenchmarkComparisonResponse(
             BigDecimal benchmarkMaxDrawdown
     ) {}
 
+    @Schema(name = "HousingBenchmarkPoint")
     public record Point(
             LocalDate baseMonth,
             BigDecimal investmentIndexUsd,
@@ -62,8 +68,14 @@ public record HousingBenchmarkComparisonResponse(
             @Schema(types = {"number", "null"}) BigDecimal benchmarkMonthlyReturn
     ) {}
 
-    public record CurrentExchangeRate(BigDecimal midRate, Instant fetchedAt, String source) {}
+    @Schema(name = "HousingBenchmarkCurrentExchangeRate")
+    public record CurrentExchangeRate(
+            BigDecimal midRate,
+            Instant fetchedAt,
+            @Schema(allowableValues = "TOSS_INVEST") String source
+    ) {}
 
+    @Schema(name = "HousingBenchmarkQuality")
     public record Quality(
             String method, String investmentCurrency, String benchmarkCurrency, String notice
     ) {}

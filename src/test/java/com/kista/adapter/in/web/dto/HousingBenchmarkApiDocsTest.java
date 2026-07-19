@@ -34,19 +34,56 @@ class HousingBenchmarkApiDocsTest {
 
     @Test
     void apiDocs는_nullable_객체_ref와_null을_별도_oneOf_분기로_생성한다() throws Exception {
-        TestRestTemplate restTemplate = new TestRestTemplate();
+        JsonNode schemas = apiDocsSchemas();
+        JsonNode response = schemas.path("HousingBenchmarkComparisonResponse");
+        JsonNode properties = response.path("properties");
 
+        assertNullableReferenceUnion(
+                properties.path("strategy"), "HousingBenchmarkStrategyInfo");
+        assertNullableReferenceUnion(properties.path("summary"), "HousingBenchmarkSummary");
+        assertNullableReferenceUnion(
+                properties.path("currentExchangeRate"),
+                "HousingBenchmarkCurrentExchangeRate");
+        assertThat(response.path("required")).anySatisfy(required ->
+                assertThat(required.asText()).isEqualTo("currentExchangeRate"));
+        assertThat(schemas.path("HousingBenchmarkCurrentExchangeRate")
+                .path("properties").path("source").path("enum"))
+                .singleElement()
+                .satisfies(value -> assertThat(value.asText()).isEqualTo("TOSS_INVEST"));
+    }
+
+    @Test
+    void apiDocs는_equity와_housing_point를_고유한_컴포넌트로_생성한다() throws Exception {
+        JsonNode schemas = apiDocsSchemas();
+
+        assertThat(schemas.path("EquityCurveResponse").path("properties")
+                .path("points").path("items").path("$ref").asText())
+                .endsWith("/EquityCurvePoint");
+        assertThat(schemas.path("HousingBenchmarkComparisonResponse").path("properties")
+                .path("points").path("items").path("$ref").asText())
+                .endsWith("/HousingBenchmarkPoint");
+        assertThat(propertyNames(schemas.path("EquityCurvePoint")))
+                .containsExactlyInAnyOrder("date", "totalAsset", "principal");
+        assertThat(propertyNames(schemas.path("HousingBenchmarkPoint")))
+                .containsExactlyInAnyOrder(
+                        "baseMonth", "investmentIndexUsd", "benchmarkIndex",
+                        "investmentMonthlyReturn", "benchmarkMonthlyReturn");
+    }
+
+    private JsonNode apiDocsSchemas() throws Exception {
+        TestRestTemplate restTemplate = new TestRestTemplate();
         ResponseEntity<String> response = restTemplate.getForEntity(
                 "http://localhost:" + port + "/api-docs", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        JsonNode schema = new ObjectMapper().readTree(response.getBody())
-                .path("components").path("schemas")
-                .path("HousingBenchmarkComparisonResponse")
-                .path("properties");
-        assertNullableReferenceUnion(schema.path("strategy"), "StrategyInfo");
-        assertNullableReferenceUnion(schema.path("summary"), "Summary");
-        assertNullableReferenceUnion(schema.path("currentExchangeRate"), "CurrentExchangeRate");
+        return new ObjectMapper().readTree(response.getBody())
+                .path("components").path("schemas");
+    }
+
+    private static List<String> propertyNames(JsonNode schema) {
+        List<String> names = new ArrayList<>();
+        schema.path("properties").fieldNames().forEachRemaining(names::add);
+        return names;
     }
 
     private static void assertNullableReferenceUnion(JsonNode property, String refName) {
@@ -86,6 +123,11 @@ class HousingBenchmarkApiDocsTest {
     static class SchemaController {
         @GetMapping("/housing-benchmark-schema")
         HousingBenchmarkComparisonResponse schema() {
+            return null;
+        }
+
+        @GetMapping("/equity-curve-schema")
+        EquityCurveResponse equityCurve() {
             return null;
         }
     }
