@@ -28,7 +28,7 @@ public interface UserStatsUseCase {
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to);
 
-    // ETF(SPY/QQQ/QLD/IBIT) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
+    // ETF(SPY/QQQ/QLD/IBIT/ETHA) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
     HousingBenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to);

@@ -58,7 +58,7 @@ public class StatsController {
     }
 
     @Operation(summary = "벤치마크 비교 (서울 아파트 · ETF)",
-            description = "USD 투자 성과와 벤치마크(서울 아파트 분위 가격 또는 SPY/QQQ/QLD/IBIT ETF)를 비교합니다. "
+            description = "USD 투자 성과와 벤치마크(서울 아파트 분위 가격 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
                     + "benchmarkType=ETF면 symbol이 필수이며 quintile은 무시됩니다.")
     @GetMapping("/housing-benchmark")
     public HousingBenchmarkComparisonResponse getHousingBenchmarkComparison(

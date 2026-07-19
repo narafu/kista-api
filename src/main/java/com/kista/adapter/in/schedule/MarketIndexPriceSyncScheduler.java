@@ -20,9 +20,10 @@ public class MarketIndexPriceSyncScheduler {
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
-    // 매일 06:00 KST — TradingCloseScheduler(화~토 04:30 KST)보다 충분히 뒤라 IEX 종가 확정 시간을 벌고,
-    // 비거래일엔 Alpaca가 빈 배열을 반환하는 무해한 no-op이라 요일 조건 없이 매일 실행
-    @Scheduled(cron = "0 0 6 * * *", zone = TimeZones.KST_ID)
+    // 매일 09:00 KST — 미국 장마감(EDT 기준 KST 05:00, EST 기준 KST 06:00)보다 충분히 뒤라
+    // 표준시 구간에도 IEX 종가 확정 시간을 넉넉히 벌고, 비거래일엔 Alpaca가 빈 배열을 반환하는
+    // 무해한 no-op이라 요일 조건 없이 매일 실행
+    @Scheduled(cron = "0 0 9 * * *", zone = TimeZones.KST_ID)
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("market-index-price-sync", Duration.ofMinutes(30), this::runLocked);
     }

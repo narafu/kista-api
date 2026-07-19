@@ -45,7 +45,7 @@ class MarketIndexPriceSyncServiceTest {
         service.syncAndSave();
 
         ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(indexPriceFeedPort, times(4)).fetchDailyCloses(anyString(), fromCaptor.capture(), any());
+        verify(indexPriceFeedPort, times(5)).fetchDailyCloses(anyString(), fromCaptor.capture(), any());
         assertThat(fromCaptor.getAllValues()).allMatch(d -> d.equals(LocalDate.of(2000, 1, 1)));
     }
 
@@ -58,7 +58,7 @@ class MarketIndexPriceSyncServiceTest {
         service.syncAndSave();
 
         ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(indexPriceFeedPort, times(4)).fetchDailyCloses(anyString(), fromCaptor.capture(), any());
+        verify(indexPriceFeedPort, times(5)).fetchDailyCloses(anyString(), fromCaptor.capture(), any());
         assertThat(fromCaptor.getAllValues()).allMatch(d -> d.equals(maxDate.plusDays(1)));
     }
 

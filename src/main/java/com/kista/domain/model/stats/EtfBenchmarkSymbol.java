@@ -7,7 +7,8 @@ public enum EtfBenchmarkSymbol {
     SPY("SPDR S&P 500 ETF Trust"),
     QQQ("Invesco QQQ Trust"),
     QLD("ProShares Ultra QQQ (2x 레버리지)"),
-    IBIT("iShares Bitcoin Trust");
+    IBIT("iShares Bitcoin Trust"),
+    ETHA("iShares Ethereum Trust");
 
     private final String description;
 
