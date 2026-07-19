@@ -183,6 +183,72 @@ class StatsControllerTest {
     }
 
     @Test
+    void ETF_벤치마크_비교를_반환한다() throws Exception {
+        when(userStats.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.QLD, null, null))
+                .thenReturn(etfComparison());
+
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("benchmarkType", "ETF")
+                        .param("symbol", "QLD")
+                        .with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.benchmark.assetType").value("ETF"))
+                .andExpect(jsonPath("$.benchmark.symbol").value("QLD"))
+                .andExpect(jsonPath("$.benchmark.regionCode").doesNotExist())
+                .andExpect(jsonPath("$.quality.benchmarkCurrency").value("USD"));
+    }
+
+    @Test
+    void ETF_벤치마크_비교는_symbol이_없으면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("benchmarkType", "ETF")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void benchmarkType_생략시_기존_HOUSING_동작을_그대로_따른다() throws Exception {
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                .thenReturn(comparison(null));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.benchmark.assetType").value("HOUSING"));
+
+        verify(userStats).getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null);
+    }
+
+    private static HousingBenchmarkComparison etfComparison() {
+        return new HousingBenchmarkComparison(
+                BenchmarkScope.PORTFOLIO,
+                null,
+                new HousingBenchmarkComparison.Benchmark(
+                        BenchmarkAssetType.ETF, null, null, null, "QLD",
+                        "QLD (ProShares Ultra QQQ (2x 레버리지))", LocalDate.of(2026, 7, 18)),
+                new HousingBenchmarkComparison.Period(
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
+                new PerformanceComparisonSummary(
+                        new BigDecimal("0.1000000000"), new BigDecimal("0.1000000000"),
+                        BigDecimal.ZERO, new BigDecimal("2.1384283767"),
+                        new BigDecimal("2.1384283767"), BigDecimal.ZERO, BigDecimal.ZERO),
+                List.of(
+                        new HousingBenchmarkPoint(
+                                LocalDate.of(2026, 1, 1), new BigDecimal("100.0000000000"),
+                                new BigDecimal("100.0000000000"), null, null),
+                        new HousingBenchmarkPoint(
+                                LocalDate.of(2026, 2, 1), new BigDecimal("110.0000000000"),
+                                new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000"),
+                                new BigDecimal("0.1000000000"))),
+                null,
+                null);
+    }
+
+    @Test
     void 아파트_5분위_시계열을_반환한다() throws Exception {
         when(userStats.getHousingBenchmarkSeries(null, null, null)).thenReturn(List.of(
                 new HousingBenchmarkPrice(
@@ -241,7 +307,8 @@ class StatsControllerTest {
                 BenchmarkScope.PORTFOLIO,
                 null,
                 new HousingBenchmarkComparison.Benchmark(
-                        "1100000000", "서울", 3, "서울 아파트 3분위", LocalDate.of(2026, 6, 15)),
+                        BenchmarkAssetType.HOUSING, "1100000000", "서울", 3, null,
+                        "서울 아파트 3분위", LocalDate.of(2026, 6, 15)),
                 new HousingBenchmarkComparison.Period(
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
                 new PerformanceComparisonSummary(

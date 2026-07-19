@@ -39,6 +39,7 @@ class StatsServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock HousingBenchmarkPricePort housingBenchmarkPricePort;
     @Mock ExchangeRatePort exchangeRatePort;
+    @Mock IndexPricePort indexPricePort;
     @InjectMocks StatsService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -646,6 +647,112 @@ class StatsServiceTest {
         List<HousingBenchmarkRegion> result = statsService.getHousingBenchmarkRegions();
 
         assertThat(result).isEqualTo(regions);
+    }
+
+    // ── ETF 벤치마크 비교 ────────────────────────────────────────────────────
+
+    private StrategyCycle stubEtfInvestment(String januaryValue, String februaryValue) {
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), januaryValue, "2026-01-31T01:00:00Z"),
+                depositSnapshot(cycle.id(), februaryValue, "2026-02-28T01:00:00Z")));
+        return cycle;
+    }
+
+    private static List<IndexPrice> spyPrices() {
+        return List.of(
+                new IndexPrice("SPY", LocalDate.of(2026, 1, 30), new BigDecimal("400.00")),
+                new IndexPrice("SPY", LocalDate.of(2026, 2, 27), new BigDecimal("440.00")));
+    }
+
+    @Test
+    void ETF_벤치마크_비교는_월별_마지막_종가로_다운샘플링해_비교한다() {
+        stubEtfInvestment("100.00", "184.20");
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(spyPrices());
+        when(exchangeRatePort.getExchangeRate()).thenReturn(
+                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+
+        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
+
+        assertThat(result.benchmark().assetType()).isEqualTo(BenchmarkAssetType.ETF);
+        assertThat(result.benchmark().symbol()).isEqualTo("SPY");
+        assertThat(result.benchmark().regionCode()).isNull();
+        assertThat(result.benchmark().regionName()).isNull();
+        assertThat(result.benchmark().quintile()).isNull();
+        assertThat(result.benchmark().label()).isEqualTo("SPY (SPDR S&P 500 ETF Trust)");
+        assertThat(result.benchmark().sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 2, 27));
+        assertThat(result.points()).hasSize(2);
+        assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100.0");
+        assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo(
+                new BigDecimal("440.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100")));
+        assertThat(result.emptyReason()).isNull();
+        assertThat(result.currentExchangeRate().midRate()).isEqualByComparingTo("1365.20");
+
+        verify(indexPricePort).findBySymbolAndRange(
+                "SPY", LocalDate.of(2025, 12, 1), LocalDate.of(2026, 2, 28));
+    }
+
+    @Test
+    void ETF_가격_데이터가_없으면_INSUFFICIENT_COMMON_MONTHS를_반환한다() {
+        stubEtfInvestment("100.00", "184.20");
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
+
+        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
+
+        assertThat(result.points()).isEmpty();
+        assertThat(result.summary()).isNull();
+        assertThat(result.emptyReason()).isEqualTo("INSUFFICIENT_COMMON_MONTHS");
+    }
+
+    @Test
+    void ETF_비교도_소유한_개별_전략만_조회하고_전략_메타데이터를_반환한다() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount());
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
+                .thenReturn(List.of(
+                        depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                        depositSnapshot(cycle.id(), "110.00", "2026-02-28T01:00:00Z")));
+        when(indexPricePort.findBySymbolAndRange(eq("QQQ"), any(), any())).thenReturn(spyPrices());
+
+        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.QQQ, FROM, TO);
+
+        assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
+        verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
+        verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
+    }
+
+    @Test
+    void ETF_비교도_소유하지_않은_전략은_포지션을_읽기_전에_거부한다() {
+        UUID otherUserId = UUID.randomUUID();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(new Account(
+                ACCOUNT_ID, otherUserId, "타인계좌", "1", "key", "secret", null,
+                Account.Broker.KIS, null));
+
+        assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.SPY, FROM, TO))
+                .isInstanceOf(SecurityException.class);
+
+        verifyNoInteractions(cyclePositionPort, indexPricePort, exchangeRatePort);
+    }
+
+    @Test
+    void ETF_비교도_전략_scope에는_strategyId가_필요하다() {
+        assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.STRATEGY, null, EtfBenchmarkSymbol.SPY, FROM, TO))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(accountPort, strategyPort, strategyCyclePort,
+                cyclePositionPort, housingBenchmarkPricePort, exchangeRatePort, indexPricePort);
     }
 
     @Test

@@ -6,7 +6,9 @@ import com.kista.adapter.in.web.dto.StatsSummaryResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkComparisonResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkRegionsResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkSeriesResponse;
+import com.kista.domain.model.stats.BenchmarkAssetType;
 import com.kista.domain.model.stats.BenchmarkScope;
+import com.kista.domain.model.stats.EtfBenchmarkSymbol;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.UserStatsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -55,14 +57,17 @@ public class StatsController {
                 userStats.getCyclePerformances(userId, type, cursorInstant, Math.clamp(size, 1, 200)));
     }
 
-    @Operation(summary = "서울 아파트 벤치마크 비교",
-            description = "USD 투자 성과와 KRW 서울 아파트 분위 가격을 현지 통화 기준으로 비교합니다.")
+    @Operation(summary = "벤치마크 비교 (서울 아파트 · ETF)",
+            description = "USD 투자 성과와 벤치마크(서울 아파트 분위 가격 또는 SPY/QQQ/QLD/IBIT ETF)를 비교합니다. "
+                    + "benchmarkType=ETF면 symbol이 필수이며 quintile은 무시됩니다.")
     @GetMapping("/housing-benchmark")
     public HousingBenchmarkComparisonResponse getHousingBenchmarkComparison(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(defaultValue = "PORTFOLIO") BenchmarkScope scope,
             @RequestParam(required = false) UUID strategyId,
+            @RequestParam(defaultValue = "HOUSING") BenchmarkAssetType benchmarkType,
             @RequestParam(defaultValue = "3") int quintile,
+            @RequestParam(required = false) EtfBenchmarkSymbol symbol,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
@@ -73,6 +78,13 @@ public class StatsController {
         }
         if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
             throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
+        }
+        if (benchmarkType == BenchmarkAssetType.ETF) {
+            if (symbol == null) {
+                throw new IllegalArgumentException("benchmarkType=ETF에는 symbol이 필요합니다");
+            }
+            return HousingBenchmarkComparisonResponse.from(
+                    userStats.getEtfBenchmarkComparison(userId, scope, strategyId, symbol, from, to));
         }
         if (quintile < 1 || quintile > 5) {
             throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
