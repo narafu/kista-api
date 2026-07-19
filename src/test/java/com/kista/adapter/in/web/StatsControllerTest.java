@@ -184,7 +184,7 @@ class StatsControllerTest {
 
     @Test
     void 아파트_5분위_시계열을_반환한다() throws Exception {
-        when(userStats.getHousingBenchmarkSeries(null, null)).thenReturn(List.of(
+        when(userStats.getHousingBenchmarkSeries(null, null, null)).thenReturn(List.of(
                 new HousingBenchmarkPrice(
                         HousingBenchmarkPrice.SOURCE_KBLAND, HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
                         "1100000000", "서울", LocalDate.of(2026, 1, 1),
@@ -208,6 +208,32 @@ class StatsControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void 시계열_조회는_regionCode_파라미터를_서비스에_전달한다() throws Exception {
+        when(userStats.getHousingBenchmarkSeries(null, null, "0000000000")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/series")
+                        .param("regionCode", "0000000000")
+                        .with(authentication(auth())))
+                .andExpect(status().isOk());
+
+        verify(userStats).getHousingBenchmarkSeries(null, null, "0000000000");
+    }
+
+    @Test
+    void 지역_카탈로그를_반환한다() throws Exception {
+        when(userStats.getHousingBenchmarkRegions()).thenReturn(List.of(
+                new HousingBenchmarkRegion("1100000000", "서울"),
+                new HousingBenchmarkRegion("2600000000", "부산")));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/regions").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.regions[0].code").value("1100000000"))
+                .andExpect(jsonPath("$.regions[0].name").value("서울"))
+                .andExpect(jsonPath("$.regions[1].code").value("2600000000"))
+                .andExpect(jsonPath("$.regions[1].name").value("부산"));
     }
 
     private static HousingBenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {

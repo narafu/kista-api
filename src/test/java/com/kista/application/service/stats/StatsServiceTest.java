@@ -580,7 +580,7 @@ class StatsServiceTest {
                 HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000", FROM, TO))
                 .thenReturn(benchmarkPrices());
 
-        List<HousingBenchmarkPrice> result = statsService.getHousingBenchmarkSeries(FROM, TO);
+        List<HousingBenchmarkPrice> result = statsService.getHousingBenchmarkSeries(FROM, TO, null);
 
         assertThat(result).isEqualTo(benchmarkPrices());
         verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
@@ -594,7 +594,7 @@ class StatsServiceTest {
         ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
 
-        statsService.getHousingBenchmarkSeries(null, null);
+        statsService.getHousingBenchmarkSeries(null, null, null);
 
         verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
                 eq(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE), eq("1100000000"),
@@ -605,10 +605,47 @@ class StatsServiceTest {
 
     @Test
     void 시계열_조회는_역전된_기간을_거부한다() {
-        assertThatThrownBy(() -> statsService.getHousingBenchmarkSeries(TO, FROM))
+        assertThatThrownBy(() -> statsService.getHousingBenchmarkSeries(TO, FROM, null))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(housingBenchmarkPricePort);
+    }
+
+    @Test
+    void 시계열_조회는_지정된_regionCode를_그대로_port에_전달한다() {
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "2600000000", FROM, TO))
+                .thenReturn(List.of());
+
+        statsService.getHousingBenchmarkSeries(FROM, TO, "2600000000");
+
+        verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "2600000000", FROM, TO);
+    }
+
+    @Test
+    void 시계열_조회는_공백_regionCode를_서울로_대체한다() {
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000", FROM, TO))
+                .thenReturn(List.of());
+
+        statsService.getHousingBenchmarkSeries(FROM, TO, "  ");
+
+        verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000", FROM, TO);
+    }
+
+    @Test
+    void 지역_카탈로그는_port_결과를_그대로_반환한다() {
+        List<HousingBenchmarkRegion> regions = List.of(
+                new HousingBenchmarkRegion("1100000000", "서울"),
+                new HousingBenchmarkRegion("2600000000", "부산"));
+        when(housingBenchmarkPricePort.findDistinctRegions(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE))
+                .thenReturn(regions);
+
+        List<HousingBenchmarkRegion> result = statsService.getHousingBenchmarkRegions();
+
+        assertThat(result).isEqualTo(regions);
     }
 
     @Test

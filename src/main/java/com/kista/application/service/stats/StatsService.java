@@ -163,14 +163,21 @@ class StatsService implements UserStatsUseCase {
     }
 
     @Override
-    public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to) {
+    public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode) {
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         LocalDate effectiveFrom = from != null ? from : EARLIEST_BENCHMARK_DATE;
+        // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
+        String effectiveRegionCode = (regionCode != null && !regionCode.isBlank()) ? regionCode : SEOUL_REGION_CODE;
         return housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
-                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, SEOUL_REGION_CODE, effectiveFrom, effectiveTo);
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, effectiveRegionCode, effectiveFrom, effectiveTo);
+    }
+
+    @Override
+    public List<HousingBenchmarkRegion> getHousingBenchmarkRegions() {
+        return housingBenchmarkPricePort.findDistinctRegions(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

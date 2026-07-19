@@ -5,6 +5,7 @@ import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.EquityCurve;
 import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
+import com.kista.domain.model.stats.HousingBenchmarkRegion;
 import com.kista.domain.model.stats.StatsSummary;
 import com.kista.domain.model.strategy.Strategy;
 
@@ -26,6 +27,9 @@ public interface UserStatsUseCase {
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to);
 
-    // from/to null 허용 (null이면 전체 구간). 투자 데이터와 무관한 서울 5분위 원본 시계열
-    List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to);
+    // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 시계열
+    List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode);
+
+    // 시계열 조회에 사용 가능한 지역 카탈로그 (KB Land 제공 지역 그대로, 하드코딩 아님)
+    List<HousingBenchmarkRegion> getHousingBenchmarkRegions();
 }

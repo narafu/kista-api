@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.housingbenchmark;
 
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
+import com.kista.domain.model.stats.HousingBenchmarkRegion;
 import com.kista.domain.port.out.HousingBenchmarkPricePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -75,5 +76,10 @@ public class HousingBenchmarkPricePersistenceAdapter implements HousingBenchmark
                 .stream()
                 .map(HousingBenchmarkPriceEntity::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<HousingBenchmarkRegion> findDistinctRegions(String metricCode) {
+        return repository.findDistinctRegionsByMetricCode(metricCode);
     }
 }
