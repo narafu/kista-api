@@ -361,13 +361,13 @@ class MonthlyReturnCalculatorTest {
         List<MonthlyInvestmentPoint> points = calculator.calculate(
                 List.of(cycle), positions, JANUARY_1, MARCH_31);
 
+        // MDD 자체는 HousingBenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 반영되지 않고
+        // 월말 지수만 산출되는지 확인한다 (StatsServiceTest.월말_지수의_고점_대비_최대낙폭을_계산한다 참고)
         assertThat(points)
                 .extracting(MonthlyInvestmentPoint::investmentIndexUsd)
                 .containsExactly(new BigDecimal("100.0000000000"),
                         new BigDecimal("80.0000000000"),
                         new BigDecimal("120.0000000000"));
-        assertThat(calculator.calculateMaxDrawdown(points))
-                .isEqualTo(new BigDecimal("-0.2000000000"));
     }
 
     private static StrategyCycle activeCycle(UUID strategyId, String startAmount, LocalDate startDate) {

@@ -144,6 +144,10 @@ final class HousingBenchmarkComparisonBuilder {
     }
 
     private static BigDecimal annualizedReturn(BigDecimal lastIndex, long elapsedMonths) {
+        if (lastIndex.signum() <= 0) {
+            // 지수가 0 이하(전액 손실)면 Math.pow가 NaN을 낼 수 있어 -100%로 확정
+            return BigDecimal.ONE.negate().setScale(SCALE, HALF_UP);
+        }
         double annualized = Math.pow(
                 lastIndex.divide(HUNDRED, SCALE, HALF_UP).doubleValue(),
                 12.0 / elapsedMonths) - 1.0;

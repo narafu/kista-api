@@ -65,6 +65,7 @@ public class StatsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
         if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
             throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
         }

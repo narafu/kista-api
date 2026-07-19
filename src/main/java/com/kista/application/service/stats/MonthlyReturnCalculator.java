@@ -39,29 +39,6 @@ final class MonthlyReturnCalculator {
         return compoundDailyReturns(valuations, flows);
     }
 
-    BigDecimal calculateMaxDrawdown(List<MonthlyInvestmentPoint> points) {
-        BigDecimal peak = null;
-        BigDecimal maxDrawdown = BigDecimal.ZERO.setScale(SCALE, ROUNDING_MODE);
-
-        // 월중 변동은 배제하고 전달받은 월말 투자지수의 고점 대비 낙폭만 비교한다.
-        for (MonthlyInvestmentPoint point : points) {
-            BigDecimal index = point.investmentIndexUsd();
-            if (peak == null || index.compareTo(peak) > 0) {
-                peak = index;
-            }
-            if (peak.signum() <= 0) {
-                continue;
-            }
-            BigDecimal drawdown = index.divide(peak, SCALE, ROUNDING_MODE)
-                    .subtract(BigDecimal.ONE)
-                    .setScale(SCALE, ROUNDING_MODE);
-            if (drawdown.compareTo(maxDrawdown) < 0) {
-                maxDrawdown = drawdown;
-            }
-        }
-        return maxDrawdown;
-    }
-
     private List<DailyValuation> buildDailyValuations(
             List<StrategyCycle> cycles, List<CyclePosition> positions,
             LocalDate from, LocalDate to, Map<LocalDate, BigDecimal> flows) {
