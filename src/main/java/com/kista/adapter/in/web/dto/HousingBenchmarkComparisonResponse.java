@@ -15,14 +15,14 @@ import java.util.UUID;
 public record HousingBenchmarkComparisonResponse(
         String scope,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        @Schema(types = {"object", "null"}) StrategyInfo strategy,
+        StrategyInfo strategy,
         Benchmark benchmark,
         Period period,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        @Schema(types = {"object", "null"}) Summary summary,
+        Summary summary,
         List<Point> points,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        @Schema(types = {"object", "null"}) CurrentExchangeRate currentExchangeRate,
+        CurrentExchangeRate currentExchangeRate,
         Quality quality,
         @JsonInclude(JsonInclude.Include.NON_NULL)
         @Schema(types = {"string", "null"}) String emptyReason

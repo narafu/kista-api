@@ -163,7 +163,7 @@ class TossHoldingsApiTest {
                 .thenReturn(new TossResult<>(
                         new TossHoldingsApi.ExchangeRateResult("1370.00", "1365.20")));
 
-        tossHoldingsApi.getExchangeRate();
+        var exchangeRate = tossHoldingsApi.getExchangeRate();
 
         @SuppressWarnings({"rawtypes", "unchecked"})
         ArgumentCaptor<MultiValueMap<String, String>> paramsCaptor =
@@ -175,5 +175,6 @@ class TossHoldingsApiTest {
                 .containsExactlyInAnyOrderEntriesOf(
                         java.util.Map.of("baseCurrency", "USD", "quoteCurrency", "KRW"))
                 .doesNotContainKey("dateTime");
+        assertThat(exchangeRate.midRate()).isEqualByComparingTo("1365.20");
     }
 }

@@ -1,6 +1,9 @@
 package com.kista.adapter.in.web.dto;
 
+import com.kista.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
 import io.swagger.v3.core.converter.ModelConverters;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Schema;
 import org.junit.jupiter.api.Test;
 
@@ -14,11 +17,16 @@ class HousingBenchmarkComparisonResponseSchemaTest {
     void openApi31_스키마는_실제_null_응답_필드를_nullable_union으로_생성한다() {
         Map<String, Schema> schemas = ModelConverters.getInstance(true)
                 .readAll(HousingBenchmarkComparisonResponse.class);
+        OpenAPI openApi = new OpenAPI().components(new Components().schemas(schemas));
+
+        new HousingBenchmarkOpenApiCustomizer().customise(openApi);
+
         Schema<?> response = schemas.get("HousingBenchmarkComparisonResponse");
 
-        assertNullable(property(response, "currentExchangeRate"), "currentExchangeRate");
-        assertNullable(property(response, "strategy"), "strategy");
-        assertNullable(property(response, "summary"), "summary");
+        assertNullableReferenceUnion(
+                property(response, "currentExchangeRate"), "CurrentExchangeRate");
+        assertNullableReferenceUnion(property(response, "strategy"), "StrategyInfo");
+        assertNullableReferenceUnion(property(response, "summary"), "Summary");
         assertNullable(property(response, "emptyReason"), "emptyReason");
 
         Schema<?> benchmark = dereference(schemas, property(response, "benchmark"));
@@ -51,5 +59,26 @@ class HousingBenchmarkComparisonResponseSchemaTest {
 
     private static void assertNullable(Schema<?> schema, String path) {
         assertThat(schema.getTypes()).as(path).contains("null");
+    }
+
+    private static void assertNullableReferenceUnion(Schema<?> schema, String refName) {
+        var union = schema.getOneOf() != null ? schema.getOneOf() : schema.getAnyOf();
+        assertThat(union).as(refName + " nullable union").hasSize(2);
+        Schema<?> referenceBranch = union.stream()
+                .filter(branch -> branch.get$ref() != null)
+                .findFirst()
+                .orElseThrow();
+        Schema<?> nullBranch = union.stream()
+                .filter(branch -> branch.getTypes() != null && branch.getTypes().contains("null"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(referenceBranch).isNotSameAs(nullBranch);
+        assertThat(referenceBranch.get$ref()).endsWith("/" + refName);
+        assertThat(referenceBranch.getTypes()).isNullOrEmpty();
+        assertThat(nullBranch.get$ref()).isNull();
+        assertThat(nullBranch.getTypes()).containsExactly("null");
+        assertThat(schema.get$ref()).isNull();
+        assertThat(schema.getTypes()).isNullOrEmpty();
     }
 }
