@@ -76,7 +76,7 @@
 - 적용값: 환전 스프레드가 포함된 매수 환율 `rate`가 아니라 매매기준율 `midRate`
 - 저장 주기: 월별
 - 월말이 비영업일이거나 지정 시각 데이터가 없으면 해당 월 안에서 이전 날짜로 최대 7일까지 역순 재시도한다.
-- 저장된 실제 관측일을 함께 보관해 어떤 환율이 적용됐는지 추적한다.
+- 응답은 실제 시장 관측 시각을 반환하지 않으므로, 성공한 요청의 기준일을 `exchangeRateDate`(환율 적용일)로 저장해 어떤 as-of 요청이 적용됐는지 추적한다.
 
 USD 기준 투자 누적 지수에 기준 월 대비 환율 변화를 적용해 원화 기준 지수를 만든다.
 
@@ -107,7 +107,9 @@ USD 기준 투자 누적 지수에 기준 월 대비 환율 변화를 적용해 
 
 서울 아파트가 원화 자산이므로 투자 성과도 원화 기준으로 비교한다. 토스증권 공통 API의 특정 시점 환율 조회를 사용해 월말 USD/KRW 매매기준율을 저장하고 환율 효과를 포함한다. UI에는 `투자 성과는 월말 USD/KRW 매매기준율을 반영한 원화 기준입니다.`를 표시한다.
 
-토스증권 공식 문서는 `dateTime`으로 특정 시점 환율을 조회할 수 있음을 명시하지만 과거 조회 가능 기간과 호출 제한을 구체적으로 공개하지 않는다. 환율 검증과 backfill 범위는 전체 API 이력이 아니라 가장 이른 전략 월부터 KB 서울 데이터와 겹치는 실제 필요 구간으로 제한한다. 현재 로컬 전략 데이터는 2026-06-16부터 시작하므로 최초 필요 월은 2026년 6월이다. 스파이크 테스트에서 2023년 환율은 조회됐고 2020년 환율은 `exchange-rate-not-found`로 조회되지 않았지만, 2020년은 실제 필요 교집합 밖이므로 구현 중단 조건이 아니다. 실제 필요 교집합의 월 중 하나라도 토스에서 조회할 수 없을 때만 구현을 중단하고 대체 환율 소스를 선택한다. 검증되지 않은 환율로 차트를 제공하지 않는다.
+토스증권 공식 문서는 `dateTime`으로 특정 시점 환율을 조회할 수 있음을 명시하지만 과거 조회 가능 기간과 호출 제한을 구체적으로 공개하지 않는다. 환율 검증과 backfill 범위는 전체 API 이력이 아니라 가장 이른 전략 월부터 KB 서울 데이터와 겹치는 실제 필요 구간으로 제한한다. 읽기 전용 SQL로 확인한 현재 범위는 전략 시작일 2026-06-16, KB 서울 데이터 2008-12월~2026-06월이므로 실제 필요 교집합은 2026년 6월부터 시작한다. 계좌 OAuth 스파이크에서 2026-06-16, 2026-06-23, 2026-06-30 요청이 모두 성공했다. 2020년 환율은 `exchange-rate-not-found`로 조회되지 않았지만 실제 필요 교집합 밖이며, 전역 최저 지원일은 조사하지 않는다. 실제 필요 교집합의 월 중 하나라도 토스에서 조회할 수 없을 때만 구현을 중단하고 대체 환율 소스를 선택한다. 검증되지 않은 환율로 차트를 제공하지 않는다.
+
+로컬 관리자 자격증명이 없어 라이브 스파이크는 소유 Toss 계좌의 OAuth 토큰과 `getNoAccountHeader()`로 엔드포인트, `dateTime` 요청, 응답 매핑 의미를 검증했다. 운영 어댑터는 기존 관리자 토큰과 `getCommon()`을 사용하며, 이 호출 경로와 쿼리 계약은 Task 3의 `TossHistoricalExchangeRateAdapterTest`에서 mock 기반으로 검증한다.
 
 기존 데이터의 추가 한계는 다음과 같다.
 
@@ -170,7 +172,7 @@ GET /api/stats/housing-benchmark
       "investmentIndexKrw": 100.0,
       "benchmarkIndex": 100.0,
       "usdKrwMidRate": 1365.2,
-      "exchangeRateObservedDate": "2021-06-30",
+      "exchangeRateDate": "2021-06-30",
       "investmentMonthlyReturn": null,
       "benchmarkMonthlyReturn": null
     }
@@ -241,7 +243,7 @@ monthly_exchange_rates
 - base_currency VARCHAR(3) NOT NULL
 - quote_currency VARCHAR(3) NOT NULL
 - base_month DATE NOT NULL
-- observed_date DATE NOT NULL
+- exchange_rate_date DATE NOT NULL
 - mid_rate NUMERIC(18,6) NOT NULL
 - fetched_at TIMESTAMPTZ NOT NULL
 - created_at TIMESTAMPTZ NOT NULL
@@ -328,8 +330,8 @@ widgets/stats-overview/
   - 월 경계, 누락 스냅샷 carry-forward
   - 누적 수익률, CAGR, 최대 낙폭
 - `TossHistoricalExchangeRateAdapterTest`
-  - `dateTime`, USD/KRW 파라미터와 `midRate` 매핑
-  - 비영업일 이전 날짜 fallback
+  - 관리자 토큰 `getCommon()` 호출과 `dateTime`, USD/KRW 파라미터, `midRate` 매핑
+  - 비영업일 이전 요청 날짜 fallback과 성공한 요청일의 `exchangeRateDate` 매핑
 - `MonthlyExchangeRateServiceTest`
   - 저장분 재사용, 누락 월 upsert, 부분 실패 후 재실행
 - `StatsServiceTest`
@@ -350,7 +352,7 @@ widgets/stats-overview/
 - 필터 변경, 로딩, 오류, 빈 상태 렌더링
 - 차트가 API 지수를 재계산하지 않고 표시함
 - 분위 설명과 통화 주의사항 노출
-- 원화 기준과 환율 출처·관측일 안내 노출
+- 원화 기준과 환율 출처·적용일 안내 노출
 - 기존 운용 통계 탭 회귀 테스트
 - `npm run typecheck`, 관련 Vitest, 데스크톱·375px Playwright 스크린샷
 

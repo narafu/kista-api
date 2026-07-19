@@ -32,12 +32,12 @@
 - Modify: none
 
 **Interfaces:**
-- Consumes: existing `TossHttpClient.getCommon(String, MultiValueMap, ParameterizedTypeReference)` and local Toss administrator credentials.
-- Produces: verified request/response facts for `GET /api/v1/exchange-rate`: historical `dateTime`, `midRate`, weekend behavior, and oldest supported date.
+- Consumes: existing `TossHttpClient.getNoAccountHeader(String, Account, MultiValueMap, ParameterizedTypeReference)`, `AccountPort`, and external local Spring configuration.
+- Produces: verified request/response facts for `GET /api/v1/exchange-rate`: required-intersection `dateTime`, `rate`, `midRate`, omitted response `dateTime`, and weekend behavior.
 
 - [ ] **Step 1: Add an opt-in integration probe**
 
-Create an `@Tag("integration")` test that calls three business-day dates and one weekend date. Read credentials only through Spring configuration and skip with an assumption when they are absent.
+Create an `@Tag("integration")` test that loads one owned Toss account through `AccountPort` and calls the three required business-day dates through `getNoAccountHeader()`. This account OAuth path is only for live endpoint and response-semantic verification; never print account credentials or access tokens. Retain the previously recorded weekend result in the contract report.
 
 ```java
 @Tag("integration")
@@ -45,6 +45,7 @@ Create an `@Tag("integration")` test that calls three business-day dates and one
 @ActiveProfiles("local")
 class TossHistoricalExchangeRateApiIT {
     @Autowired TossHttpClient client;
+    @Autowired AccountPort accountPort;
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -64,10 +65,13 @@ class TossHistoricalExchangeRateApiIT {
 Run:
 
 ```bash
+SPRING_CONFIG_ADDITIONAL_LOCATION='file:/Users/phs/workspace/kista/kista-api/src/main/resources/application-local.yml' \
 ./gradlew integration --tests 'com.kista.adapter.out.toss.TossHistoricalExchangeRateApiIT'
 ```
 
-Expected: the three business-day requests in the earliest strategy month return positive `midRate` values. Record whether the weekend request resolves automatically or fails. Verify and backfill only from the earliest strategy month across the actual intersection with KB data. If Toss lacks any month in that required intersection, stop implementation and select a different historical FX source. The completed spike also established that 2023 is available and 2020 returns `exchange-rate-not-found`; 2020 is outside the actual required intersection and does not block implementation.
+Expected: the three business-day requests in the earliest strategy month return positive `midRate` values and omit response `dateTime`. The successful requested date is the effective `exchangeRateDate`; it is not a claimed underlying market observation date. Verify and backfill only from the earliest strategy month across the actual intersection with KB data. If Toss lacks any month in that required intersection, stop implementation and select a different historical FX source. The completed spike also established that 2020 returns `exchange-rate-not-found`, but 2020 is outside the actual required intersection and does not block implementation. Do not search for a globally oldest supported date.
+
+Local administrator credentials are absent, so this live probe does not verify the production authentication path. Task 3's `TossHistoricalExchangeRateAdapterTest` must verify that production uses administrator-token `getCommon()` with the same endpoint and query contract.
 
 - [ ] **Step 3: Remove the live probe after recording the contract**
 
@@ -75,7 +79,7 @@ Delete `TossHistoricalExchangeRateApiIT.java`; live credentials and external ava
 
 - [ ] **Step 4: Commit the verified design adjustment only if required**
 
-If the observed request timestamp or fallback differs from the design, patch the design and plan, then commit:
+If the effective request date or fallback differs from the design, patch the design and plan, then commit:
 
 ```bash
 git add docs/superpowers/specs/2026-07-19-seoul-housing-benchmark-comparison-design.md docs/superpowers/plans/2026-07-19-seoul-housing-benchmark-comparison.md
@@ -145,7 +149,7 @@ CREATE TABLE monthly_exchange_rates (
     base_currency VARCHAR(3) NOT NULL,
     quote_currency VARCHAR(3) NOT NULL,
     base_month DATE NOT NULL,
-    observed_date DATE NOT NULL,
+    exchange_rate_date DATE NOT NULL,
     mid_rate NUMERIC(18,6) NOT NULL,
     fetched_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -202,6 +206,7 @@ MonthlyExchangeRate result = adapter.fetchUsdKrw(LocalDate.of(2026, 6, 30));
 assertThat(result.baseCurrency()).isEqualTo("USD");
 assertThat(result.quoteCurrency()).isEqualTo("KRW");
 assertThat(result.midRate()).isEqualByComparingTo("1365.20");
+assertThat(result.exchangeRateDate()).isEqualTo(LocalDate.of(2026, 6, 30));
 verify(client).getCommon(eq("/api/v1/exchange-rate"), argThat(q ->
         q.getFirst("dateTime").startsWith("2026-06-30")
                 && q.getFirst("baseCurrency").equals("USD")
@@ -238,7 +243,7 @@ private MonthlyExchangeRate fetchMonth(YearMonth month) {
 }
 ```
 
-Save `baseMonth=month.atDay(1)`, preserve the successful `observedDate`, and notify errors through `NotifyPort` while continuing other months.
+Save `baseMonth=month.atDay(1)`, set `exchangeRateDate` to the successful requested date, and notify errors through `NotifyPort` while continuing other months. Toss does not return an underlying market observation date, so do not infer or store one.
 
 - [ ] **Step 5: Extend the KB scheduler sequence**
 
@@ -414,7 +419,7 @@ Add `POST /api/admin/scheduler/exchange-rate-backfill?fromMonth=YYYY-MM-01&toMon
 
 - [ ] **Step 3: Run the backfill locally**
 
-Invoke the local authenticated admin endpoint and poll the DB until the expected range is complete or an error is logged. Expected: one row per month, with positive `mid_rate`, no duplicate natural keys, and observed dates no more than seven days before month end.
+Invoke the local authenticated admin endpoint and poll the DB until the expected range is complete or an error is logged. Expected: one row per month, with positive `mid_rate`, no duplicate natural keys, and `exchange_rate_date` no more than seven days before month end.
 
 - [ ] **Step 4: Verify stored coverage**
 
