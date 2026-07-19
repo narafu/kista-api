@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPoint;
 import com.kista.domain.model.stats.PerformanceComparisonSummary;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,14 +14,18 @@ import java.util.UUID;
 
 public record HousingBenchmarkComparisonResponse(
         String scope,
-        StrategyInfo strategy,
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        @Schema(types = {"object", "null"}) StrategyInfo strategy,
         Benchmark benchmark,
         Period period,
-        Summary summary,
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        @Schema(types = {"object", "null"}) Summary summary,
         List<Point> points,
-        CurrentExchangeRate currentExchangeRate,
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        @Schema(types = {"object", "null"}) CurrentExchangeRate currentExchangeRate,
         Quality quality,
-        @JsonInclude(JsonInclude.Include.NON_NULL) String emptyReason
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(types = {"string", "null"}) String emptyReason
 ) {
     private static final String NOTICE =
             "투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다.";
@@ -29,10 +34,15 @@ public record HousingBenchmarkComparisonResponse(
 
     public record Benchmark(
             String regionCode, String regionName, int quintile,
-            String label, LocalDate sourceUpdatedDate
+            String label,
+            @Schema(types = {"string", "null"}, format = "date") LocalDate sourceUpdatedDate
     ) {}
 
-    public record Period(LocalDate fromMonth, LocalDate toMonth, int monthCount) {}
+    public record Period(
+            @Schema(types = {"string", "null"}, format = "date") LocalDate fromMonth,
+            @Schema(types = {"string", "null"}, format = "date") LocalDate toMonth,
+            int monthCount
+    ) {}
 
     public record Summary(
             BigDecimal investmentCumulativeReturn,
@@ -48,8 +58,8 @@ public record HousingBenchmarkComparisonResponse(
             LocalDate baseMonth,
             BigDecimal investmentIndexUsd,
             BigDecimal benchmarkIndex,
-            BigDecimal investmentMonthlyReturn,
-            BigDecimal benchmarkMonthlyReturn
+            @Schema(types = {"number", "null"}) BigDecimal investmentMonthlyReturn,
+            @Schema(types = {"number", "null"}) BigDecimal benchmarkMonthlyReturn
     ) {}
 
     public record CurrentExchangeRate(BigDecimal midRate, Instant fetchedAt, String source) {}

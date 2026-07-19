@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -108,7 +109,7 @@ class StatsService implements UserStatsUseCase {
             int quintile, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, quintile, from, to);
 
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        LocalDate effectiveTo = completedMonthEnd(to);
         Strategy selectedStrategy = null;
         List<Strategy> strategies;
         if (scope == BenchmarkScope.STRATEGY) {
@@ -188,6 +189,15 @@ class StatsService implements UserStatsUseCase {
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
+    }
+
+    private static LocalDate completedMonthEnd(LocalDate requestedTo) {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        YearMonth requestedMonth = YearMonth.from(requestedTo != null ? requestedTo : today);
+        YearMonth lastCompletedMonth = YearMonth.from(today).minusMonths(1);
+        YearMonth effectiveMonth = requestedMonth.isAfter(lastCompletedMonth)
+                ? lastCompletedMonth : requestedMonth;
+        return effectiveMonth.atEndOfMonth();
     }
 
     private static BigDecimal selectQuintilePrice(HousingBenchmarkPrice price, int quintile) {

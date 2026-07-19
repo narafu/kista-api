@@ -65,18 +65,22 @@ final class HousingBenchmarkComparisonBuilder {
         }
 
         List<HousingBenchmarkPoint> points = new ArrayList<>();
+        LocalDate previousMonth = null;
         BigDecimal previousInvestmentIndex = null;
         BigDecimal previousBenchmarkIndex = null;
         for (LocalDate month : commonMonths) {
             BigDecimal investmentIndex = normalize(
                     investmentByMonth.get(month).investmentIndexUsd(), firstInvestmentIndex);
             BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(month), firstBenchmarkPrice);
+            boolean consecutiveMonth = previousMonth != null
+                    && month.equals(previousMonth.plusMonths(1));
             points.add(new HousingBenchmarkPoint(
                     month,
                     investmentIndex,
                     benchmarkIndex,
-                    monthlyReturn(investmentIndex, previousInvestmentIndex),
-                    monthlyReturn(benchmarkIndex, previousBenchmarkIndex)));
+                    consecutiveMonth ? monthlyReturn(investmentIndex, previousInvestmentIndex) : null,
+                    consecutiveMonth ? monthlyReturn(benchmarkIndex, previousBenchmarkIndex) : null));
+            previousMonth = month;
             previousInvestmentIndex = investmentIndex;
             previousBenchmarkIndex = benchmarkIndex;
         }

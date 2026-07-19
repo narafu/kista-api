@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -316,6 +317,70 @@ class StatsServiceTest {
     }
 
     @Test
+    void 같은_과거_월의_to는_월초와_월말_모두_같은_완료_월말로_정규화한다() {
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "100.00", "2026-01-31T01:00:00Z"),
+                depositSnapshot(cycle.id(), "110.00", "2026-02-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "120.00", "2026-02-28T01:00:00Z")));
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenReturn(benchmarkPrices());
+
+        HousingBenchmarkComparison monthStart = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, LocalDate.of(2026, 2, 1));
+        HousingBenchmarkComparison monthEnd = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, LocalDate.of(2026, 2, 28));
+
+        assertThat(monthStart.points()).isEqualTo(monthEnd.points());
+        assertThat(monthStart.points().getLast().investmentIndexUsd()).isEqualByComparingTo("120");
+        ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(cyclePositionPort, times(2)).findByUserAndRange(
+                eq(USER_ID), eq(Instant.EPOCH), toCaptor.capture());
+        assertThat(toCaptor.getAllValues()).containsOnly(
+                LocalDate.of(2026, 3, 1).atStartOfDay(TimeZones.KST).toInstant());
+    }
+
+    @Test
+    void 현재_월은_미완료이므로_to를_생략해도_직전_완료_월까지만_비교한다() {
+        YearMonth currentMonth = YearMonth.from(LocalDate.now(TimeZones.KST));
+        YearMonth previousMonth = currentMonth.minusMonths(1);
+        YearMonth twoMonthsAgo = currentMonth.minusMonths(2);
+        LocalDate from = twoMonthsAgo.atDay(1);
+
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", from.toString());
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", from.atStartOfDay(TimeZones.KST).toInstant().toString()),
+                depositSnapshot(cycle.id(), "100.00", twoMonthsAgo.atEndOfMonth()
+                        .atStartOfDay(TimeZones.KST).toInstant().toString()),
+                depositSnapshot(cycle.id(), "120.00", previousMonth.atEndOfMonth()
+                        .atStartOfDay(TimeZones.KST).toInstant().toString()),
+                depositSnapshot(cycle.id(), "999.00", currentMonth.atDay(1)
+                        .atStartOfDay(TimeZones.KST).toInstant().toString())));
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of(
+                benchmarkPrice(twoMonthsAgo.atDay(1), "100", "100", "100", "100", "100"),
+                benchmarkPrice(previousMonth.atDay(1), "120", "120", "120", "120", "120"),
+                benchmarkPrice(currentMonth.atDay(1), "999", "999", "999", "999", "999")));
+
+        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, from, null);
+
+        assertThat(result.period().toMonth()).isEqualTo(previousMonth.atDay(1));
+        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("120");
+        verify(cyclePositionPort).findByUserAndRange(
+                USER_ID, Instant.EPOCH,
+                currentMonth.atDay(1).atStartOfDay(TimeZones.KST).toInstant());
+        verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000",
+                twoMonthsAgo.minusMonths(1).atDay(1), previousMonth.atDay(1));
+    }
+
+    @Test
     void 아파트_분위는_각_가격_컬럼을_명시적으로_선택한다() {
         stubPortfolioComparison("100.00", "100.00");
 
@@ -357,6 +422,33 @@ class StatsServiceTest {
                         .divide(new BigDecimal("184.2"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));
         assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo("200");
+    }
+
+    @Test
+    void 공통_포인트_사이에_달력_결측_월이_있으면_다음_월간_수익률은_null이다() {
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "100.00", "2026-01-31T01:00:00Z"),
+                depositSnapshot(cycle.id(), "110.00", "2026-02-28T01:00:00Z"),
+                depositSnapshot(cycle.id(), "121.00", "2026-03-31T01:00:00Z")));
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of(
+                benchmarkPrice(LocalDate.of(2026, 1, 1), "100", "100", "100", "100", "100"),
+                benchmarkPrice(LocalDate.of(2026, 3, 1), "121", "121", "121", "121", "121")));
+
+        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 1));
+
+        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseMonth)
+                .containsExactly(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 1));
+        assertThat(result.points().getLast().investmentMonthlyReturn()).isNull();
+        assertThat(result.points().getLast().benchmarkMonthlyReturn()).isNull();
+        assertThat(result.summary().investmentCumulativeReturn()).isEqualByComparingTo("0.21");
+        assertThat(result.summary().benchmarkCumulativeReturn()).isEqualByComparingTo("0.21");
     }
 
     @Test
