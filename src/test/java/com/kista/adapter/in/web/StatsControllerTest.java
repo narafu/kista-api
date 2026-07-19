@@ -182,6 +182,34 @@ class StatsControllerTest {
                 USER_ID, BenchmarkScope.STRATEGY, strategyId, 5, from, to);
     }
 
+    @Test
+    void 아파트_5분위_시계열을_반환한다() throws Exception {
+        when(userStats.getHousingBenchmarkSeries(null, null)).thenReturn(List.of(
+                new HousingBenchmarkPrice(
+                        HousingBenchmarkPrice.SOURCE_KBLAND, HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
+                        "1100000000", "서울", LocalDate.of(2026, 1, 1),
+                        new BigDecimal("10"), new BigDecimal("20"), new BigDecimal("40"),
+                        new BigDecimal("80"), new BigDecimal("160"), new BigDecimal("6.5"),
+                        LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"))));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/series").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points[0].baseMonth").value("2026-01-01"))
+                .andExpect(jsonPath("$.points[0].firstQuintilePrice").value(10))
+                .andExpect(jsonPath("$.points[0].fifthQuintilePrice").value(160))
+                .andExpect(jsonPath("$.sourceUpdatedDate").value("2026-02-15"));
+    }
+
+    @Test
+    void 시계열_역전된_기간은_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark/series")
+                        .param("from", "2026-07-01").param("to", "2026-01-01")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
     private static HousingBenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {
         return new HousingBenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,

@@ -30,6 +30,8 @@ class StatsService implements UserStatsUseCase {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
     private static final String SEOUL_REGION_NAME = "서울";
+    // 실제 KB Land 데이터는 2008-12부터 존재 — 여유 있는 안전 하한
+    private static final LocalDate EARLIEST_BENCHMARK_DATE = LocalDate.of(2000, 1, 1);
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -158,6 +160,17 @@ class StatsService implements UserStatsUseCase {
                 SEOUL_REGION_CODE, SEOUL_REGION_NAME, sourceUpdatedDate,
                 investmentPoints, selectedBenchmarkPrices);
         return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
+    }
+
+    @Override
+    public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        LocalDate effectiveFrom = from != null ? from : EARLIEST_BENCHMARK_DATE;
+        return housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, SEOUL_REGION_CODE, effectiveFrom, effectiveTo);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import com.kista.adapter.in.web.dto.CyclePerformancePageResponse;
 import com.kista.adapter.in.web.dto.EquityCurveResponse;
 import com.kista.adapter.in.web.dto.StatsSummaryResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkComparisonResponse;
+import com.kista.adapter.in.web.dto.HousingBenchmarkSeriesResponse;
 import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.UserStatsUseCase;
@@ -78,5 +79,20 @@ public class StatsController {
         return HousingBenchmarkComparisonResponse.from(
                 userStats.getHousingBenchmarkComparison(
                         userId, scope, strategyId, quintile, from, to));
+    }
+
+    @Operation(summary = "서울 아파트 5분위 가격 시계열",
+            description = "KB 5분위 매매평균가격 원본 시계열 (서울 전체 기준, 투자 성과와 무관).")
+    @GetMapping("/housing-benchmark/series")
+    public HousingBenchmarkSeriesResponse getHousingBenchmarkSeries(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+        return HousingBenchmarkSeriesResponse.from(userStats.getHousingBenchmarkSeries(from, to));
     }
 }

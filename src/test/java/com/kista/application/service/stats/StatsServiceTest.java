@@ -575,6 +575,43 @@ class StatsServiceTest {
     }
 
     @Test
+    void 시계열_조회는_from_to를_그대로_port에_전달한다() {
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000", FROM, TO))
+                .thenReturn(benchmarkPrices());
+
+        List<HousingBenchmarkPrice> result = statsService.getHousingBenchmarkSeries(FROM, TO);
+
+        assertThat(result).isEqualTo(benchmarkPrices());
+        verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, "1100000000", FROM, TO);
+    }
+
+    @Test
+    void 시계열_조회는_from_to가_모두_없으면_최소날짜부터_오늘까지_조회한다() {
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of());
+        ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
+
+        statsService.getHousingBenchmarkSeries(null, null);
+
+        verify(housingBenchmarkPricePort).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                eq(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE), eq("1100000000"),
+                fromCaptor.capture(), toCaptor.capture());
+        assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+    }
+
+    @Test
+    void 시계열_조회는_역전된_기간을_거부한다() {
+        assertThatThrownBy(() -> statsService.getHousingBenchmarkSeries(TO, FROM))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(housingBenchmarkPricePort);
+    }
+
+    @Test
     void 누락되거나_0_이하인_현재_환율은_null로_격리한다() {
         stubPortfolioComparison("100.00", "184.20");
         when(exchangeRatePort.getExchangeRate()).thenReturn(
