@@ -1,7 +1,9 @@
 package com.kista.domain.port.in;
 
 import com.kista.domain.model.stats.CyclePerformancePage;
+import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.EquityCurve;
+import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.StatsSummary;
 import com.kista.domain.model.strategy.Strategy;
 
@@ -17,4 +19,8 @@ public interface UserStatsUseCase {
 
     // type null이면 전체
     CyclePerformancePage getCyclePerformances(UUID userId, Strategy.Type type, Instant cursor, int size);
+
+    HousingBenchmarkComparison getHousingBenchmarkComparison(
+            UUID userId, BenchmarkScope scope, UUID strategyId,
+            int quintile, LocalDate from, LocalDate to);
 }

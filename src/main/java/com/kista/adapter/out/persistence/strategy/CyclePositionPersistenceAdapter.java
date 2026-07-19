@@ -78,6 +78,12 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public List<CyclePosition> findByStrategyAndRange(UUID strategyId, Instant from, Instant to) {
+        return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to)
+                .stream().map(this::toDomain).toList().reversed();
+    }
+
+    @Override
     public List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
                                                                       Instant cursor, int limit) {
         return toEntries(positionRepo.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit)));

@@ -16,12 +16,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -90,5 +93,116 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.items[0].closed").value(true))
                 .andExpect(jsonPath("$.nextCursor").value("2026-02-01T00:00:00Z"))
                 .andExpect(jsonPath("$.hasMore").value(true));
+    }
+
+    @Test
+    void 서울_아파트_벤치마크_비교를_기본값과_통화_기준으로_반환한다() throws Exception {
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                .thenReturn(comparison(new CurrentExchangeRate(
+                        new BigDecimal("1365.20"), Instant.parse("2026-07-19T01:30:00Z"), "TOSS_INVEST")));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scope").value("PORTFOLIO"))
+                .andExpect(jsonPath("$.benchmark.regionCode").value("1100000000"))
+                .andExpect(jsonPath("$.benchmark.quintile").value(3))
+                .andExpect(jsonPath("$.period.monthCount").value(2))
+                .andExpect(jsonPath("$.points[0].investmentIndexUsd").value(100.0))
+                .andExpect(jsonPath("$.points[1].benchmarkIndex").value(110.0))
+                .andExpect(jsonPath("$.points[1].investmentMonthlyReturn").value(0.1))
+                .andExpect(jsonPath("$.summary.investmentCumulativeReturn").value(0.1))
+                .andExpect(jsonPath("$.summary.excessReturn").value(0.0))
+                .andExpect(jsonPath("$.quality.method").value("ESTIMATED_TIME_WEIGHTED_RETURN"))
+                .andExpect(jsonPath("$.quality.investmentCurrency").value("USD"))
+                .andExpect(jsonPath("$.quality.benchmarkCurrency").value("KRW"))
+                .andExpect(jsonPath("$.quality.notice").value(
+                        "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다."))
+                .andExpect(jsonPath("$.currentExchangeRate.midRate").value(1365.2))
+                .andExpect(jsonPath("$.currentExchangeRate.fetchedAt").value("2026-07-19T01:30:00Z"))
+                .andExpect(jsonPath("$.currentExchangeRate.source").value("TOSS_INVEST"))
+                .andExpect(jsonPath("$.emptyReason").doesNotExist());
+    }
+
+    @Test
+    void 현재_환율이_없어도_명시적_null과_함께_200을_반환한다() throws Exception {
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                .thenReturn(comparison(null));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points[0].investmentIndexUsd").value(100.0))
+                .andExpect(jsonPath("$.currentExchangeRate").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void 전략_scope는_strategyId가_필수다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("scope", "STRATEGY")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void 분위는_1부터_5까지만_허용한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("quintile", "0")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("quintile", "6")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void 소유_전략과_기간_파라미터를_서비스에_전달한다() throws Exception {
+        UUID strategyId = UUID.randomUUID();
+        LocalDate from = LocalDate.of(2021, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 1);
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, 5, from, to))
+                .thenReturn(comparison(null));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark")
+                        .param("scope", "STRATEGY")
+                        .param("strategyId", strategyId.toString())
+                        .param("quintile", "5")
+                        .param("from", from.toString())
+                        .param("to", to.toString())
+                        .with(authentication(auth())))
+                .andExpect(status().isOk());
+
+        verify(userStats).getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, 5, from, to);
+    }
+
+    private static HousingBenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {
+        return new HousingBenchmarkComparison(
+                BenchmarkScope.PORTFOLIO,
+                null,
+                new HousingBenchmarkComparison.Benchmark(
+                        "1100000000", "서울", 3, "서울 아파트 3분위", LocalDate.of(2026, 6, 15)),
+                new HousingBenchmarkComparison.Period(
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
+                new PerformanceComparisonSummary(
+                        new BigDecimal("0.1000000000"), new BigDecimal("0.1000000000"),
+                        BigDecimal.ZERO, new BigDecimal("2.1384283767"),
+                        new BigDecimal("2.1384283767"), BigDecimal.ZERO, BigDecimal.ZERO),
+                List.of(
+                        new HousingBenchmarkPoint(
+                                LocalDate.of(2026, 1, 1), new BigDecimal("100.0000000000"),
+                                new BigDecimal("100.0000000000"), null, null),
+                        new HousingBenchmarkPoint(
+                                LocalDate.of(2026, 2, 1), new BigDecimal("110.0000000000"),
+                                new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000"),
+                                new BigDecimal("0.1000000000"))),
+                currentExchangeRate,
+                null);
     }
 }
