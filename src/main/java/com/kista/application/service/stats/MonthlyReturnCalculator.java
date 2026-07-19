@@ -84,6 +84,11 @@ final class MonthlyReturnCalculator {
 
         Map<UUID, CyclePosition> latestByCycle = new HashMap<>();
         positionsByDate.headMap(from, false).values().forEach(latestByCycle::putAll);
+        Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
+                .collect(Collectors.groupingBy(StrategyCycle::strategyId));
+        cyclesByStrategy.replaceAll((strategyId, strategyCycles) -> strategyCycles.stream()
+                .sorted(MonthlyReturnCalculator::compareCycles)
+                .toList());
 
         List<DailyValuation> valuations = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
@@ -92,13 +97,13 @@ final class MonthlyReturnCalculator {
                 latestByCycle.putAll(dailyPositions);
             }
 
-            // 같은 전략의 사이클이 교체일에 겹치면 시작일이 가장 늦은 사이클 하나만 평가한다.
+            // 같은 전략은 교체일의 신규 사이클을 선택하고, 최종 종료일에는 포트폴리오에서 제외한다.
             Map<UUID, StrategyCycle> activeByStrategy = new HashMap<>();
-            for (StrategyCycle cycle : cycles) {
-                if (!isActiveOn(cycle, date)) {
-                    continue;
+            for (var entry : cyclesByStrategy.entrySet()) {
+                StrategyCycle active = activeCycleOn(entry.getValue(), date);
+                if (active != null) {
+                    activeByStrategy.put(entry.getKey(), active);
                 }
-                activeByStrategy.merge(cycle.strategyId(), cycle, MonthlyReturnCalculator::laterCycle);
             }
 
             BigDecimal value = BigDecimal.ZERO;
@@ -124,44 +129,49 @@ final class MonthlyReturnCalculator {
         Map<LocalDate, BigDecimal> flows = new HashMap<>();
         Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
                 .collect(Collectors.groupingBy(StrategyCycle::strategyId));
-        Map<UUID, BigDecimal> initialCapitalByCycle = buildInitialCapitalByCycle(cycles, positions);
+        Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle =
+                buildCompleteValuesByCycle(cycles, positions);
 
-        // 첫 완전평가액은 유입, 종료금은 해당 사이클이 포트폴리오에서 빠지는 날의 유출로 기록한다.
+        // 전략 최초 진입, 내부 사이클 교체, 최종 종료를 하나의 연속된 외부흐름으로 기록한다.
         for (List<StrategyCycle> strategyCycles : cyclesByStrategy.values()) {
             List<StrategyCycle> ordered = strategyCycles.stream()
                     .sorted(MonthlyReturnCalculator::compareCycles)
                     .toList();
-            for (int index = 0; index < ordered.size(); index++) {
-                StrategyCycle cycle = ordered.get(index);
-                BigDecimal initialCapital = initialCapitalByCycle.get(cycle.id());
-                if (initialCapital == null) {
-                    continue;
-                }
-                flows.merge(cycle.startDate(), initialCapital, BigDecimal::add);
-                if (cycle.endDate() == null || cycle.endAmount() == null) {
-                    continue;
-                }
+            StrategyCycle first = ordered.getFirst();
+            BigDecimal initialValue = firstCompleteValue(valuesByCycle.get(first.id()));
+            if (initialValue != null) {
+                flows.merge(first.startDate(), initialValue, BigDecimal::add);
+            }
 
-                LocalDate removalDate = cycle.endDate().plusDays(1);
-                if (index + 1 < ordered.size()) {
-                    LocalDate nextStartDate = ordered.get(index + 1).startDate();
-                    if (nextStartDate.isBefore(removalDate)) {
-                        removalDate = nextStartDate;
-                    }
+            for (int index = 1; index < ordered.size(); index++) {
+                StrategyCycle previous = ordered.get(index - 1);
+                StrategyCycle next = ordered.get(index);
+                BigDecimal previousValue = lastCompleteValue(
+                        valuesByCycle.get(previous.id()), next.startDate());
+                BigDecimal nextValue = firstCompleteValue(valuesByCycle.get(next.id()));
+                if (previousValue != null && nextValue != null) {
+                    flows.merge(next.startDate(), nextValue.subtract(previousValue), BigDecimal::add);
                 }
-                flows.merge(removalDate, cycle.endAmount().negate(), BigDecimal::add);
+            }
+
+            StrategyCycle last = ordered.getLast();
+            if (last.endDate() != null) {
+                BigDecimal finalValue = lastCompleteValue(valuesByCycle.get(last.id()), last.endDate());
+                if (finalValue != null) {
+                    flows.merge(last.endDate(), finalValue.negate(), BigDecimal::add);
+                }
             }
         }
         return flows;
     }
 
-    private Map<UUID, BigDecimal> buildInitialCapitalByCycle(
+    private Map<UUID, NavigableMap<LocalDate, BigDecimal>> buildCompleteValuesByCycle(
             List<StrategyCycle> cycles, List<CyclePosition> positions) {
         Map<UUID, StrategyCycle> cycleById = cycles.stream()
                 .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
         Map<UUID, NavigableMap<LocalDate, CyclePosition>> dailyPositionsByCycle = new HashMap<>();
 
-        // 같은 날의 마지막 스냅샷이 완전한 경우에만 해당 사이클의 초기 외부자금 후보로 사용한다.
+        // 같은 날의 마지막 스냅샷이 완전한 경우에만 전략 흐름의 전체 평가값 후보로 사용한다.
         for (CyclePosition position : positions) {
             StrategyCycle cycle = cycleById.get(position.strategyCycleId());
             if (cycle == null) {
@@ -175,17 +185,17 @@ final class MonthlyReturnCalculator {
                     .merge(date, position, MonthlyReturnCalculator::laterPosition);
         }
 
-        Map<UUID, BigDecimal> initialCapitalByCycle = new HashMap<>();
+        Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle = new HashMap<>();
         for (var entry : dailyPositionsByCycle.entrySet()) {
-            for (CyclePosition position : entry.getValue().values()) {
-                BigDecimal value = assetOf(position);
+            for (var dailyPosition : entry.getValue().entrySet()) {
+                BigDecimal value = assetOf(dailyPosition.getValue());
                 if (value != null) {
-                    initialCapitalByCycle.put(entry.getKey(), value);
-                    break;
+                    valuesByCycle.computeIfAbsent(entry.getKey(), ignored -> new TreeMap<>())
+                            .put(dailyPosition.getKey(), value);
                 }
             }
         }
-        return initialCapitalByCycle;
+        return valuesByCycle;
     }
 
     private List<MonthlyInvestmentPoint> compoundDailyReturns(
@@ -241,13 +251,42 @@ final class MonthlyReturnCalculator {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static boolean isActiveOn(StrategyCycle cycle, LocalDate date) {
-        return !date.isBefore(cycle.startDate())
-                && (cycle.endDate() == null || !date.isAfter(cycle.endDate()));
+    private static StrategyCycle activeCycleOn(List<StrategyCycle> ordered, LocalDate date) {
+        StrategyCycle candidate = null;
+        int candidateIndex = -1;
+        for (int index = 0; index < ordered.size(); index++) {
+            StrategyCycle cycle = ordered.get(index);
+            if (date.isBefore(cycle.startDate())) {
+                break;
+            }
+            candidate = cycle;
+            candidateIndex = index;
+        }
+        if (candidate == null) {
+            return null;
+        }
+
+        boolean finalCycle = candidateIndex == ordered.size() - 1;
+        if (candidate.endDate() == null) {
+            return candidate;
+        }
+        if (finalCycle) {
+            return date.isBefore(candidate.endDate()) ? candidate : null;
+        }
+        return !date.isAfter(candidate.endDate()) ? candidate : null;
     }
 
-    private static StrategyCycle laterCycle(StrategyCycle first, StrategyCycle second) {
-        return compareCycles(first, second) >= 0 ? first : second;
+    private static BigDecimal firstCompleteValue(NavigableMap<LocalDate, BigDecimal> values) {
+        return values == null || values.isEmpty() ? null : values.firstEntry().getValue();
+    }
+
+    private static BigDecimal lastCompleteValue(
+            NavigableMap<LocalDate, BigDecimal> values, LocalDate date) {
+        if (values == null) {
+            return null;
+        }
+        Map.Entry<LocalDate, BigDecimal> entry = values.floorEntry(date);
+        return entry == null ? null : entry.getValue();
     }
 
     private static int compareCycles(StrategyCycle first, StrategyCycle second) {

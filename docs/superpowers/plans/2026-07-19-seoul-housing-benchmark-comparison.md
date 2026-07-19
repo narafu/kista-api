@@ -61,7 +61,7 @@ assertThat(calculate(withEndOfDayWithdrawal("100", "110", "90")))
         .isEqualTo(new BigDecimal("110.0000000000"));
 ```
 
-Also assert initial external capital uses the first complete valuation including holdings, multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, every active cycle must have a complete valuation, holdings without `closingPrice` do not fall back to `avgPrice`, ended cycles leave the portfolio after their end date, an individual strategy ends after its last cycle, a nonpositive previous value omits the day, KST midnight separates dates, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
+Also assert initial strategy capital uses the first complete valuation including holdings, VR rollover compares the old last and new first complete full valuations instead of cash-only `endAmount`, terminal strategy exit uses its last complete valuation on `endDate`, a survivor's same-day return is preserved, same-day replacement selects only the new cycle, multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, every active strategy must have a complete valuation, holdings without `closingPrice` do not fall back to `avgPrice`, an individual strategy ends after its last cycle, a nonpositive previous value omits the day, KST midnight separates dates, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
 
 - [ ] **Step 2: Run the calculator test and verify failure**
 
@@ -87,7 +87,7 @@ List<MonthlyInvestmentPoint> compoundDailyReturns(
         List<DailyValuation> valuations, Map<LocalDate, BigDecimal> flows);
 ```
 
-Use end-of-day external-flow semantics: `dailyReturn = (currentValue - flow) / previousValue - 1`. Derive each cycle's initial inflow from its first complete valid valuation, not `startAmount`. Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue <= 0` or any active cycle lacks a complete valuation.
+Use end-of-day external-flow semantics: `dailyReturn = (currentValue - flow) / previousValue - 1`. Build one continuous flow timeline per strategy: first entry is the first cycle's first complete valuation, internal transitions are `new first complete value - old last complete value`, and final exit on `endDate` is the negative last complete value while the post-flow portfolio excludes that strategy. Never infer internal or final flows from cash-only `endAmount`. Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue <= 0` or any active strategy lacks a complete valuation.
 
 - [ ] **Step 4: Run tests**
 

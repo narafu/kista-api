@@ -82,6 +82,27 @@ class MonthlyReturnCalculatorTest {
     }
 
     @Test
+    void VR_롤오버의_현금과_보유주식이_그대로_이월되면_외부흐름은_0이다() {
+        UUID strategyId = UUID.randomUUID();
+        StrategyCycle previous = closedCycle(strategyId, "50", "50", JANUARY_1, FEBRUARY_1);
+        StrategyCycle next = activeCycle(strategyId, "50", FEBRUARY_1);
+
+        List<MonthlyInvestmentPoint> result = calculator.calculate(
+                List.of(previous, next),
+                List.of(position(previous, JANUARY_31, "50", "10", null, 10),
+                        position(previous, FEBRUARY_1, "50", "10", null, 10),
+                        position(next, FEBRUARY_1, "50", "10", null, 10),
+                        position(next, FEBRUARY_28, "50", "10", null, 10)),
+                JANUARY_1, FEBRUARY_28);
+
+        // 현금 50만 비교하지 않고 이전·신규 사이클의 전체 평가액 150을 비교한다.
+        assertThat(result).last().satisfies(point -> {
+            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+            assertThat(point.monthlyReturn()).isEqualTo(new BigDecimal("0.0000000000"));
+        });
+    }
+
+    @Test
     void 일말_사이클_교체의_일부_회수는_당일_수익을_보존한다() {
         UUID strategyId = UUID.randomUUID();
         StrategyCycle previous = closedCycle(strategyId, "100", "110", JANUARY_1, FEBRUARY_1);
@@ -221,20 +242,24 @@ class MonthlyReturnCalculatorTest {
     }
 
     @Test
-    void 종료된_전략은_종료일_다음날부터_포트폴리오에서_제외한다() {
-        StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, JANUARY_31);
+    void 최종_전략_종료는_종료일_전체평가액을_일말_회수하고_생존전략_수익을_보존한다() {
+        StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, FEBRUARY_1);
         StrategyCycle active = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
 
         List<MonthlyInvestmentPoint> result = calculator.calculate(
                 List.of(ended, active),
-                List.of(position(ended, JANUARY_31, "100"),
+                List.of(position(ended, JANUARY_31, "0", "10", null, 10),
+                        position(ended, FEBRUARY_1, "10", "10", null, 10),
                         position(active, JANUARY_31, "100"),
+                        position(active, FEBRUARY_1, "110"),
                         position(active, FEBRUARY_28, "110")),
                 JANUARY_1, FEBRUARY_28);
 
-        // 종료금 100 회수 후 남은 전략 100 -> 110의 수익률은 10%다.
-        assertThat(result).last().extracting(MonthlyInvestmentPoint::investmentIndexUsd)
-                .isEqualTo(new BigDecimal("110.0000000000"));
+        // 종료 전략의 현금 endAmount 100이 아닌 마지막 전체 평가액 110을 종료일에 회수한다.
+        assertThat(result).last().satisfies(point -> {
+            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.monthlyReturn()).isEqualTo(new BigDecimal("0.1000000000"));
+        });
     }
 
     @Test
@@ -242,7 +267,7 @@ class MonthlyReturnCalculatorTest {
         StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, JANUARY_31);
 
         List<MonthlyInvestmentPoint> result = calculator.calculate(
-                List.of(ended), List.of(position(ended, JANUARY_31, "100")),
+                List.of(ended), List.of(position(ended, JANUARY_31.minusDays(1), "100")),
                 JANUARY_1, MARCH_31);
 
         assertThat(result)
