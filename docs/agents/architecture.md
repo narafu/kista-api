@@ -64,7 +64,10 @@ application/
     strategy/    ← StrategyService(신규 등록 시 RuntimeSettings 전략 생성 정책 적용; 수정·사이클 흐름은 미적용)
     user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM), UserSettingsService, UserCascadeDeleter(소프트 삭제 cascade helper)
     portfolio/   ← PortfolioService
-    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert)
+    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), StatsService(UserStatsUseCase 구현 — summary/equity-curve/cycles/housing-benchmark 단일 진입점)
+                   MonthlyReturnCalculator — 사이클·포지션 스냅샷에서 현금흐름 조정 월별 USD 투자지수(TWR) 계산, Spring·포트 비의존 순수 클래스
+                   HousingBenchmarkComparisonBuilder — 투자지수·KB Land 분위가를 공통월 첫 달=100 기준 정규화해 비교 summary·points 조립, 마찬가지로 순수 클래스
+                   getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary 계산에는 미반영(조회 실패 시 null 처리, 200 정상 반환) — 투자(USD)·서울아파트(KRW) 현지통화 그대로 비교, 환율 변환 없음
     market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
     privacy/     ← PrivacyService
     admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함), AdminStrategyService, AdminCycleCloser(holdings 소진 시 사이클 종료), AdminSelectionChain, AdminReorderService, AdminTradeCorrectionService
@@ -82,7 +85,7 @@ adapter/in/
                    SchedulerJobRunner (공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
                    SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
   web/           ← REST Controller + DTO: Auth(카카오/JWT/승인/탈퇴/SSE), Account(CRUD+연결테스트), TradingCycle(CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`),
-                   Dashboard(DB기반 사이클 이력), Statistics(KIS 전용 live), TossStatistics(Toss 전용 live 5개), FearGreed(`GET /api/market/fear-greed`),
+                   Dashboard(DB기반 사이클 이력), Statistics(KIS 전용 live), TossStatistics(Toss 전용 live 5개), Stats(`GET /api/stats/*` DB 근사 집계 — summary/equity-curve/cycles/housing-benchmark), FearGreed(`GET /api/market/fear-greed`),
                    Meta(`GET /api/meta` enum SSOT 번들만, Cache 1h), OrderCancel, MarketHoliday(휴장일/세션 DIRECT|BLOCKED), FidaOrder(`/api/internal/**`, X-Internal-Token),
                    Settings(텔레그램+알림채널), Fcm, TradeStream(SSE), Admin*(`/api/admin/**` — Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade),
                    RuntimeConfig(`GET /api/runtime-config` 공개·no-store), AdminSettings(`GET|PUT /api/admin/settings`),
