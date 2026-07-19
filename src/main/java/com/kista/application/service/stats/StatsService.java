@@ -39,6 +39,7 @@ class StatsService implements UserStatsUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final HousingBenchmarkPricePort housingBenchmarkPricePort;
     private final ExchangeRatePort exchangeRatePort;
+    private final IndexPricePort indexPricePort;
     private final MonthlyReturnCalculator monthlyReturnCalculator = new MonthlyReturnCalculator();
     private final HousingBenchmarkComparisonBuilder comparisonBuilder =
             new HousingBenchmarkComparisonBuilder();
@@ -110,6 +111,65 @@ class StatsService implements UserStatsUseCase {
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, quintile, from, to);
+        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to);
+
+        LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
+        LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
+        List<HousingBenchmarkPrice> benchmarkRows =
+                housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                        HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
+                        SEOUL_REGION_CODE, benchmarkFrom, benchmarkTo);
+        Map<LocalDate, BigDecimal> selectedBenchmarkPrices = benchmarkRows.stream()
+                .collect(Collectors.toMap(
+                        HousingBenchmarkPrice::baseMonth,
+                        price -> selectQuintilePrice(price, quintile),
+                        (left, right) -> right,
+                        TreeMap::new));
+        LocalDate sourceUpdatedDate = benchmarkRows.stream()
+                .map(HousingBenchmarkPrice::sourceUpdatedDate)
+                .filter(Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+
+        HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
+                BenchmarkAssetType.HOUSING, SEOUL_REGION_CODE, SEOUL_REGION_NAME, quintile, null,
+                SEOUL_REGION_NAME + " 아파트 " + quintile + "분위", sourceUpdatedDate);
+
+        HousingBenchmarkComparison comparison = comparisonBuilder.build(
+                scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), selectedBenchmarkPrices);
+        return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
+    }
+
+    @Override
+    public HousingBenchmarkComparison getEtfBenchmarkComparison(
+            UUID userId, BenchmarkScope scope, UUID strategyId,
+            EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
+        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to);
+        LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
+        LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
+        LocalDate dailyTo = benchmarkTo.plusMonths(1).minusDays(1);
+
+        List<IndexPrice> dailyPrices = indexPricePort.findBySymbolAndRange(symbol.name(), benchmarkFrom, dailyTo);
+        Map<LocalDate, BigDecimal> prices = IndexPriceMonthlyDownsampler.toMonthlyLastClose(dailyPrices);
+        LocalDate sourceUpdatedDate = dailyPrices.stream().map(IndexPrice::tradeDate)
+                .max(LocalDate::compareTo).orElse(null);
+
+        HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
+                BenchmarkAssetType.ETF, null, null, null, symbol.name(),
+                symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
+
+        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), prices)
+                .withCurrentExchangeRate(fetchCurrentExchangeRate());
+    }
+
+    // 자산 종류(HOUSING/ETF)와 무관한 공통 준비 단계 — 소유권 검증·사이클/포지션 조회·월별 투자 지수 계산
+    private record InvestmentContext(
+            Strategy selectedStrategy, LocalDate effectiveFrom, LocalDate effectiveTo,
+            List<MonthlyInvestmentPoint> investmentPoints) {}
+
+    private InvestmentContext buildInvestmentContext(
+            UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
+        validateScopeAndRange(scope, strategyId, from, to);
 
         LocalDate effectiveTo = completedMonthEnd(to);
         Strategy selectedStrategy = null;
@@ -137,29 +197,8 @@ class StatsService implements UserStatsUseCase {
 
         List<MonthlyInvestmentPoint> investmentPoints = monthlyReturnCalculator.calculate(
                 cycles, positions, effectiveFrom, effectiveTo);
-        LocalDate benchmarkFrom = effectiveFrom.minusMonths(1).withDayOfMonth(1);
-        LocalDate benchmarkTo = effectiveTo.withDayOfMonth(1);
-        List<HousingBenchmarkPrice> benchmarkRows =
-                housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
-                        HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
-                        SEOUL_REGION_CODE, benchmarkFrom, benchmarkTo);
-        Map<LocalDate, BigDecimal> selectedBenchmarkPrices = benchmarkRows.stream()
-                .collect(Collectors.toMap(
-                        HousingBenchmarkPrice::baseMonth,
-                        price -> selectQuintilePrice(price, quintile),
-                        (left, right) -> right,
-                        TreeMap::new));
-        LocalDate sourceUpdatedDate = benchmarkRows.stream()
-                .map(HousingBenchmarkPrice::sourceUpdatedDate)
-                .filter(Objects::nonNull)
-                .max(LocalDate::compareTo)
-                .orElse(null);
 
-        HousingBenchmarkComparison comparison = comparisonBuilder.build(
-                scope, selectedStrategy, quintile,
-                SEOUL_REGION_CODE, SEOUL_REGION_NAME, sourceUpdatedDate,
-                investmentPoints, selectedBenchmarkPrices);
-        return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
+        return new InvestmentContext(selectedStrategy, effectiveFrom, effectiveTo, investmentPoints);
     }
 
     @Override
@@ -205,6 +244,24 @@ class StatsService implements UserStatsUseCase {
         }
         if (quintile < 1 || quintile > 5) {
             throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        }
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+    }
+
+    // 자산 종류와 무관한 공통 검증 (quintile 제외) — HOUSING은 validateComparisonRequest로 이미 검증된 뒤
+    // buildInvestmentContext에서 한 번 더(멱등) 타고, ETF는 이 메서드가 유일한 검증 지점이다.
+    private static void validateScopeAndRange(
+            BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
+        if (scope == null) {
+            throw new IllegalArgumentException("scope은 필수입니다");
+        }
+        if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
+            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
+        }
+        if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
+            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
         }
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");

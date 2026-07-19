@@ -3,6 +3,7 @@ package com.kista.domain.port.in;
 import com.kista.domain.model.stats.CyclePerformancePage;
 import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.EquityCurve;
+import com.kista.domain.model.stats.EtfBenchmarkSymbol;
 import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
 import com.kista.domain.model.stats.HousingBenchmarkRegion;
@@ -26,6 +27,11 @@ public interface UserStatsUseCase {
     HousingBenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to);
+
+    // ETF(SPY/QQQ/QLD/IBIT) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
+    HousingBenchmarkComparison getEtfBenchmarkComparison(
+            UUID userId, BenchmarkScope scope, UUID strategyId,
+            EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to);
 
     // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 시계열
     List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode);

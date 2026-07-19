@@ -27,15 +27,9 @@ final class HousingBenchmarkComparisonBuilder {
     HousingBenchmarkComparison build(
             BenchmarkScope scope,
             Strategy strategy,
-            int quintile,
-            String regionCode,
-            String regionName,
-            LocalDate sourceUpdatedDate,
+            HousingBenchmarkComparison.Benchmark benchmark,
             List<MonthlyInvestmentPoint> investmentPoints,
             Map<LocalDate, BigDecimal> benchmarkPrices) {
-        HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
-                regionCode, regionName, quintile, regionName + " 아파트 " + quintile + "분위",
-                sourceUpdatedDate);
         HousingBenchmarkComparison.StrategyInfo strategyInfo = strategy == null ? null
                 : new HousingBenchmarkComparison.StrategyInfo(
                         strategy.id(), strategy.type(), strategy.ticker());
