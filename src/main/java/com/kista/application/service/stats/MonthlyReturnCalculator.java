@@ -35,7 +35,7 @@ final class MonthlyReturnCalculator {
 
         // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
         List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to);
-        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles);
+        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles, positions);
         return compoundDailyReturns(valuations, flows);
     }
 
@@ -102,35 +102,42 @@ final class MonthlyReturnCalculator {
             }
 
             BigDecimal value = BigDecimal.ZERO;
-            boolean hasValuation = false;
+            boolean complete = !activeByStrategy.isEmpty();
             for (StrategyCycle cycle : activeByStrategy.values()) {
                 CyclePosition position = latestByCycle.get(cycle.id());
-                if (position == null) {
-                    continue;
+                BigDecimal cycleValue = position == null ? null : assetOf(position);
+                if (cycleValue == null) {
+                    complete = false;
+                    break;
                 }
-                value = value.add(assetOf(position));
-                hasValuation = true;
+                value = value.add(cycleValue);
             }
-            if (hasValuation) {
+            if (complete) {
                 valuations.add(new DailyValuation(date, value));
             }
         }
         return valuations;
     }
 
-    private Map<LocalDate, BigDecimal> buildExternalFlows(List<StrategyCycle> cycles) {
+    private Map<LocalDate, BigDecimal> buildExternalFlows(
+            List<StrategyCycle> cycles, List<CyclePosition> positions) {
         Map<LocalDate, BigDecimal> flows = new HashMap<>();
         Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
                 .collect(Collectors.groupingBy(StrategyCycle::strategyId));
+        Map<UUID, BigDecimal> initialCapitalByCycle = buildInitialCapitalByCycle(cycles, positions);
 
-        // 시작금은 유입, 종료금은 해당 사이클이 포트폴리오에서 빠지는 날의 유출로 기록한다.
+        // 첫 완전평가액은 유입, 종료금은 해당 사이클이 포트폴리오에서 빠지는 날의 유출로 기록한다.
         for (List<StrategyCycle> strategyCycles : cyclesByStrategy.values()) {
             List<StrategyCycle> ordered = strategyCycles.stream()
                     .sorted(MonthlyReturnCalculator::compareCycles)
                     .toList();
             for (int index = 0; index < ordered.size(); index++) {
                 StrategyCycle cycle = ordered.get(index);
-                flows.merge(cycle.startDate(), cycle.startAmount(), BigDecimal::add);
+                BigDecimal initialCapital = initialCapitalByCycle.get(cycle.id());
+                if (initialCapital == null) {
+                    continue;
+                }
+                flows.merge(cycle.startDate(), initialCapital, BigDecimal::add);
                 if (cycle.endDate() == null || cycle.endAmount() == null) {
                     continue;
                 }
@@ -146,6 +153,39 @@ final class MonthlyReturnCalculator {
             }
         }
         return flows;
+    }
+
+    private Map<UUID, BigDecimal> buildInitialCapitalByCycle(
+            List<StrategyCycle> cycles, List<CyclePosition> positions) {
+        Map<UUID, StrategyCycle> cycleById = cycles.stream()
+                .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
+        Map<UUID, NavigableMap<LocalDate, CyclePosition>> dailyPositionsByCycle = new HashMap<>();
+
+        // 같은 날의 마지막 스냅샷이 완전한 경우에만 해당 사이클의 초기 외부자금 후보로 사용한다.
+        for (CyclePosition position : positions) {
+            StrategyCycle cycle = cycleById.get(position.strategyCycleId());
+            if (cycle == null) {
+                continue;
+            }
+            LocalDate date = position.createdAt().atZone(TimeZones.KST).toLocalDate();
+            if (date.isBefore(cycle.startDate())) {
+                continue;
+            }
+            dailyPositionsByCycle.computeIfAbsent(cycle.id(), ignored -> new TreeMap<>())
+                    .merge(date, position, MonthlyReturnCalculator::laterPosition);
+        }
+
+        Map<UUID, BigDecimal> initialCapitalByCycle = new HashMap<>();
+        for (var entry : dailyPositionsByCycle.entrySet()) {
+            for (CyclePosition position : entry.getValue().values()) {
+                BigDecimal value = assetOf(position);
+                if (value != null) {
+                    initialCapitalByCycle.put(entry.getKey(), value);
+                    break;
+                }
+            }
+        }
+        return initialCapitalByCycle;
     }
 
     private List<MonthlyInvestmentPoint> compoundDailyReturns(
@@ -172,9 +212,10 @@ final class MonthlyReturnCalculator {
             boolean validIndex = previousValue == null;
             if (previousValue != null) {
                 BigDecimal flow = sumFlows(orderedFlows, previousDate, valuation.date());
-                BigDecimal denominator = previousValue.add(flow);
-                if (denominator.signum() > 0) {
-                    BigDecimal dailyFactor = valuation.value().divide(denominator, SCALE, ROUNDING_MODE);
+                if (previousValue.signum() > 0) {
+                    BigDecimal valueBeforeEndOfDayFlow = valuation.value().subtract(flow);
+                    BigDecimal dailyFactor = valueBeforeEndOfDayFlow
+                            .divide(previousValue, SCALE, ROUNDING_MODE);
                     investmentIndex = investmentIndex.multiply(dailyFactor).setScale(SCALE, ROUNDING_MODE);
                     monthlyFactor = monthlyFactor.multiply(dailyFactor).setScale(SCALE, ROUNDING_MODE);
                     validIndex = true;
@@ -227,8 +268,10 @@ final class MonthlyReturnCalculator {
     }
 
     private static BigDecimal assetOf(CyclePosition position) {
-        BigDecimal unitPrice = position.closingPrice() != null ? position.closingPrice()
-                : position.avgPrice() != null ? position.avgPrice() : BigDecimal.ZERO;
+        if (position.holdings() > 0 && position.closingPrice() == null) {
+            return null;
+        }
+        BigDecimal unitPrice = position.closingPrice() != null ? position.closingPrice() : BigDecimal.ZERO;
         return position.usdDeposit().add(unitPrice.multiply(BigDecimal.valueOf(position.holdings())));
     }
 

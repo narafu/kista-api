@@ -48,20 +48,20 @@ assertThat(calculate(singleCycle("100", "110")))
         .extracting(MonthlyInvestmentPoint::investmentIndexUsd)
         .containsExactly(new BigDecimal("100.0000000000"), new BigDecimal("110.0000000000"));
 
-assertThat(calculate(withAdditionalContribution("50")))
-        .last().extracting(MonthlyInvestmentPoint::monthlyReturn)
-        .isEqualTo(new BigDecimal("0.0000000000"));
-
-assertThat(calculate(withFullReinvestment("110", "110")))
-        .last().extracting(MonthlyInvestmentPoint::monthlyReturn)
-        .isEqualTo(new BigDecimal("0.0000000000"));
-
-assertThat(calculate(withPartialWithdrawal("110", "90")))
+assertThat(calculate(withEndOfDayContribution("100", "110", "150")))
         .last().extracting(MonthlyInvestmentPoint::investmentIndexUsd)
-        .isEqualTo(new BigDecimal("100.0000000000"));
+        .isEqualTo(new BigDecimal("110.0000000000"));
+
+assertThat(calculate(withFullReinvestment("100", "110", "110")))
+        .last().extracting(MonthlyInvestmentPoint::investmentIndexUsd)
+        .isEqualTo(new BigDecimal("110.0000000000"));
+
+assertThat(calculate(withEndOfDayWithdrawal("100", "110", "90")))
+        .last().extracting(MonthlyInvestmentPoint::investmentIndexUsd)
+        .isEqualTo(new BigDecimal("110.0000000000"));
 ```
 
-Also assert multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, ended cycles leave the portfolio after their end date, an individual strategy ends after its last cycle, a nonpositive denominator omits the day, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
+Also assert initial external capital uses the first complete valuation including holdings, multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, every active cycle must have a complete valuation, holdings without `closingPrice` do not fall back to `avgPrice`, ended cycles leave the portfolio after their end date, an individual strategy ends after its last cycle, a nonpositive previous value omits the day, KST midnight separates dates, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
 
 - [ ] **Step 2: Run the calculator test and verify failure**
 
@@ -80,13 +80,14 @@ List<DailyValuation> buildDailyValuations(
         List<StrategyCycle> cycles, List<CyclePosition> positions,
         LocalDate from, LocalDate to);
 
-Map<LocalDate, BigDecimal> buildExternalFlows(List<StrategyCycle> cycles);
+Map<LocalDate, BigDecimal> buildExternalFlows(
+        List<StrategyCycle> cycles, List<CyclePosition> positions);
 
 List<MonthlyInvestmentPoint> compoundDailyReturns(
         List<DailyValuation> valuations, Map<LocalDate, BigDecimal> flows);
 ```
 
-Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue + flow <= 0`.
+Use end-of-day external-flow semantics: `dailyReturn = (currentValue - flow) / previousValue - 1`. Derive each cycle's initial inflow from its first complete valid valuation, not `startAmount`. Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue <= 0` or any active cycle lacks a complete valuation.
 
 - [ ] **Step 4: Run tests**
 
