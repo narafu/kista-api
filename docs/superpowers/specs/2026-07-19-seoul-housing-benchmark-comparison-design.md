@@ -17,7 +17,9 @@
 - 선택 가능한 기간은 `1년`, `3년`, `5년`, `전체`다.
 - 포트폴리오와 벤치마크를 첫 공통 월의 지수 100으로 맞춰 한 차트에 표시한다.
 - 핵심 수치는 투자 누적 수익률, 아파트 누적 상승률, 두 값의 차이인 초과 성과다.
-- 투자 성과는 월말 USD/KRW 매매기준율을 반영한 원화 기준으로 표시한다.
+- 투자 성과는 USD 현지 통화 기준, 서울 아파트 성과는 KRW 현지 통화 기준으로 유지한다.
+- 통화 변환은 비교 지수, 월간 수익률, 누적 수익률, 연평균 수익률, 최대 낙폭, 초과 성과에 적용하지 않는다.
+- 현재 USD/KRW 매매기준율은 화면 조회 시점의 참고 정보로만 표시한다.
 - 보조 지표는 연평균 수익률과 최대 낙폭이다.
 - 월별 승패, 상회 횟수, 연속 상회·하회는 제공하지 않는다.
 - 분위별 대표 지역·단지 설명은 선택기 옆 정보 영역에 두며 차트보다 낮은 시각적 우선순위를 갖는다.
@@ -37,6 +39,7 @@
 ### 투자 자산
 
 - 평가값: `cycle_position.usd_deposit + holdings * closing_price`
+- 통화 기준: USD. 환율을 곱하거나 다른 통화로 변환하지 않는다.
 - 날짜 기준: `cycle_position.created_at`을 KST 날짜로 변환한다.
 - 하루에 같은 사이클 스냅샷이 여러 건이면 마지막 값을 사용한다.
 - 스냅샷이 없는 날은 직전 값을 이어 사용한다.
@@ -48,16 +51,16 @@
 
 ### 투자 수익률
 
-단순 자산 증감률은 신규 시드 투입과 회수를 수익으로 오인하므로 사용하지 않는다. 일별 평가액과 외부 자금 흐름을 이용해 일별 시간가중수익률을 만든 뒤 월 단위로 복리 연결한다.
+단순 자산 증감률은 신규 시드 투입과 회수를 수익으로 오인하므로 사용하지 않는다. 일별 USD 평가액과 외부 자금 흐름을 이용해 일별 시간가중수익률을 만든 뒤 월 단위로 복리 연결한다.
 
 ```text
 일별 수익률 r(d) = V(d) / (V(d-1) + F(d)) - 1
 월간 수익률 R(m) = product(1 + r(d)) - 1
-투자 누적 지수 I(m) = I(m-1) * (1 + R(m))
+투자 누적 지수 I(usd,m) = I(usd,m-1) * (1 + R(m))
 ```
 
-- `V(d)`: 대상 범위의 일말 전략 운용 자산
-- `F(d)`: 해당 일의 외부 순유입. 유입은 양수, 회수는 음수
+- `V(d)`: 대상 범위의 일말 USD 전략 운용 자산
+- `F(d)`: 해당 일의 USD 외부 순유입. 유입은 양수, 회수는 음수
 - 첫 전략·첫 사이클 시작금액은 외부 유입이다.
 - 같은 전략의 사이클 교체는 이전 `endAmount`와 다음 `startAmount`의 차이만 외부 흐름으로 본다.
 - 다음 사이클 시드가 이전 종료금액과 같으면 전액 재투자이므로 흐름은 0이다.
@@ -67,24 +70,6 @@
 - 분모가 0 이하이거나 필요한 평가값이 없으면 해당 일 수익률을 만들지 않는다.
 
 월별 포인트는 해당 월의 마지막 유효 일별 누적 지수를 사용한다. 이 방식은 사이클 수익 재투자를 보존하면서 전략 추가·종료로 인한 자산 규모 변화가 성과로 계산되는 것을 막는다.
-
-### USD/KRW 환율
-
-- 데이터 소스: 토스증권 공통 API `GET /api/v1/exchange-rate`
-- 인증: 기존 관리자 OAuth 2.0 Client Credentials와 `TossHttpClient.getCommon()`을 재사용한다.
-- 요청: `baseCurrency=USD`, `quoteCurrency=KRW`, `dateTime=<월말 기준시각>`
-- 적용값: 환전 스프레드가 포함된 매수 환율 `rate`가 아니라 매매기준율 `midRate`
-- 저장 주기: 월별
-- 월말이 비영업일이거나 지정 시각 데이터가 없으면 해당 월 안에서 이전 날짜로 최대 7일까지 역순 재시도한다.
-- 응답은 실제 시장 관측 시각을 반환하지 않으므로, 성공한 요청의 기준일을 `exchangeRateDate`(환율 적용일)로 저장해 어떤 as-of 요청이 적용됐는지 추적한다.
-
-USD 기준 투자 누적 지수에 기준 월 대비 환율 변화를 적용해 원화 기준 지수를 만든다.
-
-```text
-원화 투자 지수 I(krw,m) = I(usd,m) * FX(m) / FX(base)
-```
-
-`FX(base)`와 `FX(m)`은 각 월의 마지막 유효 매매기준율이다. 필요한 월의 환율이 없으면 해당 월 이후를 임의 보간하지 않고 공통 구간에서 제외한다.
 
 ### 아파트 상승률
 
@@ -98,18 +83,26 @@ USD 기준 투자 누적 지수에 기준 월 대비 환율 변화를 적용해 
 - 투자와 아파트 데이터가 모두 존재하는 첫 월부터 마지막 공통 월까지만 반환한다.
 - 첫 공통 월은 투자 지수와 아파트 지수 모두 100이다.
 - 누적 수익률: `마지막 지수 / 100 - 1`
-- 초과 성과: `투자 누적 수익률 - 아파트 누적 상승률`
+- 초과 성과: `USD 현지 통화 기준 투자 누적 수익률 - KRW 현지 통화 기준 아파트 누적 상승률`
 - 연평균 수익률: `(마지막 지수 / 100)^(12 / 경과 개월 수) - 1`
 - 최대 낙폭: 월별 지수의 이전 최고점 대비 최대 하락률
 - 비교 가능한 공통 월이 2개 미만이면 요약 지표를 반환하지 않고 빈 상태 사유를 제공한다.
+- 현재 환율의 존재 여부와 값은 공통 구간이나 어떤 계산 결과에도 영향을 주지 않는다.
 
 ## 통화와 정확도 정책
 
-서울 아파트가 원화 자산이므로 투자 성과도 원화 기준으로 비교한다. 토스증권 공통 API의 특정 시점 환율 조회를 사용해 월말 USD/KRW 매매기준율을 저장하고 환율 효과를 포함한다. UI에는 `투자 성과는 월말 USD/KRW 매매기준율을 반영한 원화 기준입니다.`를 표시한다.
+투자와 서울 아파트의 성과는 각각 USD와 KRW 현지 통화 수익률로 비교한다. 이는 환율 효과를 제외한 명목 성과 비교이며, 서로 다른 통화 기반의 수익률 차이라는 점을 API와 UI에 명시한다.
 
-토스증권 공식 문서는 `dateTime`으로 특정 시점 환율을 조회할 수 있음을 명시하지만 과거 조회 가능 기간과 호출 제한을 구체적으로 공개하지 않는다. 환율 검증과 backfill 범위는 전체 API 이력이 아니라 가장 이른 전략 월부터 KB 서울 데이터와 겹치는 실제 필요 구간으로 제한한다. 읽기 전용 SQL로 확인한 현재 범위는 전략 시작일 2026-06-16, KB 서울 데이터 2008-12월~2026-06월이므로 실제 필요 교집합은 2026년 6월부터 시작한다. 계좌 OAuth 스파이크에서 2026-06-16, 2026-06-23, 2026-06-30 요청이 모두 성공했다. 2020년 환율은 `exchange-rate-not-found`로 조회되지 않았지만 실제 필요 교집합 밖이며, 전역 최저 지원일은 조사하지 않는다. 실제 필요 교집합의 월 중 하나라도 토스에서 조회할 수 없을 때만 구현을 중단하고 대체 환율 소스를 선택한다. 검증되지 않은 환율로 차트를 제공하지 않는다.
+현재 USD/KRW 환율은 다음 정책을 따른다.
 
-로컬 관리자 자격증명이 없어 라이브 스파이크는 소유 Toss 계좌의 OAuth 토큰과 `getNoAccountHeader()`로 엔드포인트, `dateTime` 요청, 응답 매핑 의미를 검증했다. 운영 어댑터는 기존 관리자 토큰과 `getCommon()`을 사용하며, 이 호출 경로와 쿼리 계약은 Task 3의 `TossHistoricalExchangeRateAdapterTest`에서 mock 기반으로 검증한다.
+- 토스증권 공통 API `GET /api/v1/exchange-rate`를 기존 `ExchangeRatePort`와 `TossHttpClient.getCommon()` 경로로 호출한다.
+- 요청 파라미터는 `baseCurrency=USD`, `quoteCurrency=KRW`이며 과거 시점 `dateTime`은 보내지 않는다.
+- 환전 스프레드가 포함된 `rate`가 아니라 `midRate`만 사용한다.
+- 비교 API 요청마다 라이브 조회하며 DB, 캐시, 월별 스냅샷에 저장하지 않는다.
+- 성공 시 서버가 응답을 받은 시각을 `fetchedAt`으로 기록하고 `source`는 `TOSS_INVEST`로 반환한다.
+- 응답이 없거나 `midRate`가 null 또는 0 이하이거나 외부 호출이 실패하면 `currentExchangeRate`는 null이다.
+- 라이브 환율 실패는 비교 API 실패로 전파하지 않는다. 계산된 지수와 요약 지표는 그대로 HTTP 200으로 반환한다.
+- `currentExchangeRate`는 정보 표시 전용이며 서버 계산과 UI 계산 입력으로 사용하지 않는다.
 
 기존 데이터의 추가 한계는 다음과 같다.
 
@@ -169,27 +162,31 @@ GET /api/stats/housing-benchmark
   "points": [
     {
       "baseMonth": "2021-06-01",
-      "investmentIndexKrw": 100.0,
+      "investmentIndexUsd": 100.0,
       "benchmarkIndex": 100.0,
-      "usdKrwMidRate": 1365.2,
-      "exchangeRateDate": "2021-06-30",
       "investmentMonthlyReturn": null,
       "benchmarkMonthlyReturn": null
     }
   ],
+  "currentExchangeRate": {
+    "midRate": 1365.2,
+    "fetchedAt": "2026-07-19T01:30:00Z",
+    "source": "TOSS_INVEST"
+  },
   "quality": {
     "method": "ESTIMATED_TIME_WEIGHTED_RETURN",
-    "currencyBasis": "KRW",
-    "exchangeRateSource": "TOSS_INVEST",
-    "notice": "투자 성과는 월말 USD/KRW 매매기준율을 반영한 원화 기준입니다."
+    "investmentCurrency": "USD",
+    "benchmarkCurrency": "KRW",
+    "notice": "투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다."
   }
 }
 ```
 
+- `currentExchangeRate`는 nullable이며 라이브 조회 실패 시 JSON null로 반환한다.
 - 비율은 퍼센트가 아닌 소수 비율로 반환한다. UI가 `0.325`를 `+32.5%p`로 표시한다.
 - 서버가 정규화와 요약 계산의 단일 기준이다. UI에서 수익률을 재계산하지 않는다.
 - `strategy`는 개별 전략일 때 `id`, `type`, `ticker`를 포함한다.
-- 데이터가 부족하면 HTTP 200과 빈 `points`, null `summary`, 기계 판독 가능한 `emptyReason`을 반환한다.
+- 데이터가 부족하면 HTTP 200과 빈 `points`, null `summary`, 기계 판독 가능한 `emptyReason`을 반환한다. 이때도 현재 환율 조회는 정보 제공용으로 시도할 수 있다.
 - 잘못된 분위·기간·scope 조합은 400, 소유하지 않은 전략은 403으로 처리한다.
 
 ## API 내부 구조
@@ -199,32 +196,27 @@ domain/model/stats/
   HousingBenchmarkComparison
   HousingBenchmarkPoint
   PerformanceComparisonSummary
+  CurrentExchangeRate
 
 domain/port/in/
-  UserStatsUseCase.getHousingBenchmarkComparison(...)
+  UserStatsUseCase.getHousingBenchmarkComparison(UUID, BenchmarkScope, UUID, int, LocalDate, LocalDate)
 
 domain/port/out/
   HousingBenchmarkPricePort
-  MonthlyExchangeRatePort
-  HistoricalExchangeRateFeedPort
   CyclePositionPort
   StrategyCyclePort
 
-application/service/stats/
-  StatsService                       요청 조율과 소유권 확인
-  MonthlyReturnCalculator           일별 TWR, 월별 복리, MDD/CAGR 순수 계산
-  HousingBenchmarkComparisonBuilder 공통 월 정렬과 응답 모델 조립
+domain/port/out/broker/
+  ExchangeRatePort                     기존 현재 환율 포트 재사용
 
-application/service/market/
-  MonthlyExchangeRateService        누락 월 조회·저장과 월말 영업일 fallback
+application/service/stats/
+  StatsService                         요청 조율, 소유권 확인, 선택적 현재 환율 조회
+  MonthlyReturnCalculator              USD 일별 TWR, 월별 복리, MDD/CAGR 순수 계산
+  HousingBenchmarkComparisonBuilder   공통 월 정렬과 응답 모델 조립
 
 adapter/out/toss/
-  TossHistoricalExchangeRateAdapter dateTime 지정 환율 조회
-
-adapter/out/persistence/exchangerate/
-  MonthlyExchangeRateEntity
-  MonthlyExchangeRateJpaRepository
-  MonthlyExchangeRatePersistenceAdapter
+  TossBrokerAdapter
+  TossHoldingsApi                      기존 getCommon 현재 환율 호출 재사용
 
 adapter/in/web/
   StatsController
@@ -234,28 +226,9 @@ adapter/in/web/
 - 기존 `HousingBenchmarkPricePort`의 기간 조회를 재사용한다.
 - 전략별·사용자별 포지션 범위 조회는 기존 포트를 우선 재사용하고, 필요한 경우 도메인 포트에 목적이 드러나는 조회 메서드를 추가한다.
 - 계산기는 Spring과 JPA에 의존하지 않는 package-private 순수 클래스로 둔다.
-- 신규 테이블 `monthly_exchange_rates`를 추가한다.
-
-```text
-monthly_exchange_rates
-- id UUID PK
-- source VARCHAR(20) NOT NULL
-- base_currency VARCHAR(3) NOT NULL
-- quote_currency VARCHAR(3) NOT NULL
-- base_month DATE NOT NULL
-- exchange_rate_date DATE NOT NULL
-- mid_rate NUMERIC(18,6) NOT NULL
-- fetched_at TIMESTAMPTZ NOT NULL
-- created_at TIMESTAMPTZ NOT NULL
-- updated_at TIMESTAMPTZ NOT NULL
-- UNIQUE(source, base_currency, quote_currency, base_month)
-```
-
-- 비교 API는 저장된 환율만 읽고 외부 API를 호출하지 않는다.
-- KB Land 스케줄러 실행 후 같은 기준 월의 환율을 수집한다.
-- 최초 배포 시 가장 이른 전략 월부터 시작해 KB 서울 데이터와 투자 기록이 겹치는 실제 필요 월만 대상으로 별도 backfill use case를 실행한다.
-- backfill은 월별 독립 트랜잭션과 요청 간 짧은 지연을 사용하고, 실패 월을 건너뛴 뒤 재실행 시 누락 월만 보충한다.
-- Flyway 버전은 구현 시 저장소의 최신 번호 다음으로 결정한다.
+- `StatsService`는 비교 계산을 완료한 뒤 `ExchangeRatePort.getExchangeRate()`를 호출하고 성공한 양수 `midRate`만 `CurrentExchangeRate`로 감싼다.
+- 선택적 환율 조회는 예외를 잡아 경고 로그만 남기며 비교 결과를 유지한다.
+- 환율용 테이블, 마이그레이션, 스케줄러, backfill use case를 추가하지 않는다.
 
 ## UI 설계
 
@@ -281,7 +254,8 @@ monthly_exchange_rates
 5. 초과 성과, 투자 누적 수익률, 아파트 누적 상승률
 6. 시작점 100의 월별 누적 성과 선 차트
 7. 누적 수익률, 연평균 수익률, 최대 낙폭 비교표
-8. 분위 설명과 데이터 출처·업데이트일·환율 적용 안내
+8. 분위 설명과 데이터 출처·업데이트일·서로 다른 현지 통화 기준 안내
+9. `currentExchangeRate`가 있으면 현재 USD/KRW 매매기준율과 조회 시각, 출처를 낮은 우선순위의 참고 정보로 표시
 
 분위 설명은 UI 상수로 관리한다. `대표 지역`이 공식 분류처럼 보이지 않도록 `해당 가격대에서 자주 언급되는 지역·단지 예시`라고 표현하고 다음 문구를 항상 노출한다.
 
@@ -300,11 +274,13 @@ widgets/stats-overview/
   HousingBenchmarkComparison.tsx     조회 상태와 화면 조합
   HousingBenchmarkChart.tsx          Recharts 월별 누적 성과 차트
   HousingBenchmarkSummary.tsx        핵심 수치와 비교표
-  HousingBenchmarkInfo.tsx           분위 설명과 주의사항
+  HousingBenchmarkInfo.tsx           분위 설명, 통화 기준, 현재 환율 참고 정보
 ```
 
 - 기존 Recharts, 카드, 토글, 포맷 유틸을 재사용한다.
 - 차트 데이터는 API의 정규화 지수를 그대로 사용한다.
+- `currentExchangeRate`가 null이면 환율 정보만 생략하며 오류나 빈 상태를 표시하지 않는다.
+- UI는 현재 환율로 지수나 지표를 재계산하지 않는다.
 - 모바일에서는 선택기를 세로로 재배치하고 핵심 수치 3개를 `초과 성과` 1행 + 나머지 2열로 표시한다.
 - 비교표는 모바일에서도 가로 스크롤 없이 지표·투자·아파트 3열을 유지한다.
 - 양수·음수는 색상뿐 아니라 `+`/`-` 부호로 구분한다.
@@ -313,7 +289,8 @@ widgets/stats-overview/
 
 - 탭 최초 진입: 차트와 요약 영역 크기를 유지하는 스켈레톤을 표시한다.
 - 필터 변경: 이전 데이터를 유지하면서 컨트롤에 갱신 상태만 표시한다.
-- API 오류: 벤치마크 탭 안에서만 `SectionError`를 표시하며 기존 운용 통계에는 영향을 주지 않는다.
+- 비교 API 오류: 벤치마크 탭 안에서만 `SectionError`를 표시하며 기존 운용 통계에는 영향을 주지 않는다.
+- 현재 환율만 조회 실패: 비교 콘텐츠를 정상 표시하고 환율 참고 정보만 생략한다.
 - 투자 데이터 없음: `선택한 기간에 전략 운용 기록이 없습니다.`
 - 공통 월 부족: `투자 기록과 서울 아파트 데이터가 겹치는 기간이 부족합니다.`
 - KB 데이터 최신 월이 요청 종료 월보다 이전이면 마지막 제공 월까지만 차트를 그리고 업데이트일을 표시한다.
@@ -328,19 +305,20 @@ widgets/stats-overview/
   - 일부 회수와 추가 투입 처리
   - 동시에 여러 전략이 시작·종료되는 포트폴리오
   - 월 경계, 누락 스냅샷 carry-forward
-  - 누적 수익률, CAGR, 최대 낙폭
-- `TossHistoricalExchangeRateAdapterTest`
-  - 관리자 토큰 `getCommon()` 호출과 `dateTime`, USD/KRW 파라미터, `midRate` 매핑
-  - 비영업일 이전 요청 날짜 fallback과 성공한 요청일의 `exchangeRateDate` 매핑
-- `MonthlyExchangeRateServiceTest`
-  - 저장분 재사용, 누락 월 upsert, 부분 실패 후 재실행
+  - USD 누적 수익률, CAGR, 최대 낙폭
+  - 환율 입력이나 환율 변환 없이 동일한 결과를 계산
 - `StatsServiceTest`
   - 전체 포트폴리오와 개별 전략 범위
   - 전략 소유권 검증
   - KB 분위 컬럼 선택과 공통 월 교집합
   - 데이터 부족 응답
+  - 현재 환율 성공 시 `midRate`, `fetchedAt`, `source` 포함
+  - 현재 환율 예외, null, 0 이하 응답 시 `currentExchangeRate=null`이고 지수와 지표는 동일
 - `StatsControllerTest`
   - 기본 파라미터, 잘못된 파라미터, 인증 사용자 전달, 응답 매핑
+  - nullable `currentExchangeRate` JSON 계약과 `investmentIndexUsd` 필드
+- 기존 `TossHoldingsApiTest`
+  - `getCommon()` 호출, USD/KRW 파라미터, 현재 `midRate` 매핑 계약 유지
 - `./gradlew compileJava`
 - 관련 단위 테스트와 `./gradlew test --tests 'com.kista.architecture.*'`
 
@@ -350,25 +328,26 @@ widgets/stats-overview/
 - 기본값이 전체 포트폴리오·3분위·5년임
 - 개별 전략 전환 시 전략 선택기가 나타나고 소유 전략을 조회함
 - 필터 변경, 로딩, 오류, 빈 상태 렌더링
-- 차트가 API 지수를 재계산하지 않고 표시함
-- 분위 설명과 통화 주의사항 노출
-- 원화 기준과 환율 출처·적용일 안내 노출
-- 기존 운용 통계 탭 회귀 테스트
+- 차트가 `investmentIndexUsd`와 `benchmarkIndex`를 재계산하지 않고 표시함
+- USD 투자와 KRW 아파트의 현지 통화 기준 및 환율 미반영 안내 노출
+- 현재 환율이 있을 때 값·조회 시각·출처 표시, null일 때 비교 화면 정상 유지
+- 분위 설명과 기존 운용 통계 탭 회귀 테스트
 - `npm run typecheck`, 관련 Vitest, 데스크톱·375px Playwright 스크린샷
 
 ## 구현 순서
 
-1. 토스 과거 환율 스파이크 테스트로 조회 범위와 응답 검증
-2. `kista-api`: 환율 마이그레이션·어댑터·backfill
-3. `kista-api`: 계산기 테스트와 도메인 모델
-4. `kista-api`: 포트 조회 확장, 서비스, 컨트롤러 DTO
-5. API 테스트와 OpenAPI 확인
-6. `kista-ui`: OpenAPI 타입 갱신, stats entity API·hook
-7. `kista-ui`: 통계 탭과 벤치마크 위젯
-8. 양쪽 테스트, 타입 검사, 반응형 시각 검증
+1. `kista-api`: USD 현지 통화 월별 수익률 계산기와 테스트
+2. `kista-api`: 포트 조회 확장, 비교 서비스, nullable 현재 환율 응답, 컨트롤러 DTO
+3. API 테스트와 OpenAPI 확인
+4. `kista-ui`: OpenAPI 타입 갱신, stats entity API·hook
+5. `kista-ui`: 통계 탭과 벤치마크 위젯
+6. 양쪽 테스트, 타입 검사, 반응형 시각 검증
 
 ## 제외 범위
 
+- 성과 비교를 위한 FX 변환
+- 과거·월별 환율 수집, 저장, backfill, 스케줄러 연동
+- 환율 테이블과 Flyway 마이그레이션
 - 대시보드 요약 카드
 - SPY·QQQ 등 주식 지수 벤치마크 복원
 - 월별 승패와 상회 횟수
