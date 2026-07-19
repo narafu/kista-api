@@ -116,6 +116,8 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.quality.method").value("ESTIMATED_TIME_WEIGHTED_RETURN"))
                 .andExpect(jsonPath("$.quality.investmentCurrency").value("USD"))
                 .andExpect(jsonPath("$.quality.benchmarkCurrency").value("KRW"))
+                .andExpect(jsonPath("$.quality.notice").value(
+                        "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다."))
                 .andExpect(jsonPath("$.currentExchangeRate.midRate").value(1365.2))
                 .andExpect(jsonPath("$.currentExchangeRate.fetchedAt").value("2026-07-19T01:30:00Z"))
                 .andExpect(jsonPath("$.currentExchangeRate.source").value("TOSS_INVEST"))

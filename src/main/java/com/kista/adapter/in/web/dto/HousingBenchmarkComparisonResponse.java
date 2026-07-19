@@ -29,7 +29,7 @@ public record HousingBenchmarkComparisonResponse(
         @Schema(types = {"string", "null"}) String emptyReason
 ) {
     private static final String NOTICE =
-            "투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다.";
+            "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다.";
 
     @Schema(name = "HousingBenchmarkStrategyInfo")
     public record StrategyInfo(UUID id, String type, String ticker) {}
