@@ -48,9 +48,9 @@ class TossHistoricalExchangeRateApiIT {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "2025-06-30T16:00:00+09:00",
-            "2023-06-30T16:00:00+09:00",
-            "2020-06-30T16:00:00+09:00"
+            "2026-06-16T16:00:00+09:00",
+            "2026-06-23T16:00:00+09:00",
+            "2026-06-30T16:00:00+09:00"
     })
     void historicalMidRateIsAvailable(String dateTime) {
         ExchangeRateResult result = request(dateTime);
@@ -67,7 +67,7 @@ Run:
 ./gradlew integration --tests 'com.kista.adapter.out.toss.TossHistoricalExchangeRateApiIT'
 ```
 
-Expected: the three business-day requests return positive `midRate` values. Record whether the weekend request resolves automatically or fails. If 2020 is rejected, stop implementation and revise the design with a different historical FX source.
+Expected: the three business-day requests in the earliest strategy month return positive `midRate` values. Record whether the weekend request resolves automatically or fails. Verify and backfill only from the earliest strategy month across the actual intersection with KB data. If Toss lacks any month in that required intersection, stop implementation and select a different historical FX source. The completed spike also established that 2023 is available and 2020 returns `exchange-rate-not-found`; 2020 is outside the actual required intersection and does not block implementation.
 
 - [ ] **Step 3: Remove the live probe after recording the contract**
 
@@ -406,7 +406,7 @@ git commit -m "feat(stats): 서울 아파트 벤치마크 비교 API 추가"
 
 - [ ] **Step 1: Determine the local required range with read-only SQL**
 
-Query the earliest KST cycle date and latest KB month using the running PostgreSQL container. Do not print credentials.
+Query the earliest KST strategy date and the KB month bounds using the running PostgreSQL container. Derive the backfill range as the actual month intersection beginning with the earliest strategy month; currently the earliest strategy date is 2026-06-16, so the first candidate month is 2026-06. Do not print credentials. Before backfill, verify that Toss can supply every month in this derived range; if any required month is unavailable, stop and select another source.
 
 - [ ] **Step 2: Add a protected manual backfill trigger**
 
