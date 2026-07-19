@@ -263,6 +263,47 @@ class MonthlyReturnCalculatorTest {
     }
 
     @Test
+    void 단독_전략의_최종_종료일은_0인_교체후_평가액으로_당일_수익을_보존한다() {
+        StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, FEBRUARY_1);
+
+        List<MonthlyInvestmentPoint> result = calculator.calculate(
+                List.of(ended),
+                List.of(position(ended, JANUARY_31, "100"),
+                        position(ended, FEBRUARY_1, "110")),
+                JANUARY_1, FEBRUARY_28);
+
+        assertThat(result).last().satisfies(point -> {
+            assertThat(point.baseMonth()).isEqualTo(FEBRUARY_1);
+            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.monthlyReturn()).isEqualTo(new BigDecimal("0.1000000000"));
+        });
+    }
+
+    @Test
+    void 같은_전략의_사이클_사이에_날짜_공백이_있으면_종료와_재진입을_각각_외부흐름으로_처리한다() {
+        UUID strategyId = UUID.randomUUID();
+        StrategyCycle previous = closedCycle(strategyId, "100", "100", JANUARY_1, FEBRUARY_1);
+        StrategyCycle restarted = activeCycle(strategyId, "150", LocalDate.of(2026, 3, 10));
+        StrategyCycle survivor = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
+
+        List<MonthlyInvestmentPoint> result = calculator.calculate(
+                List.of(previous, restarted, survivor),
+                List.of(position(previous, JANUARY_31, "100"),
+                        position(previous, FEBRUARY_1, "100"),
+                        position(survivor, JANUARY_31, "100"),
+                        position(survivor, FEBRUARY_28, "100"),
+                        position(restarted, LocalDate.of(2026, 3, 10), "150"),
+                        position(restarted, MARCH_31, "150")),
+                JANUARY_1, MARCH_31);
+
+        assertThat(result)
+                .extracting(MonthlyInvestmentPoint::investmentIndexUsd)
+                .containsExactly(new BigDecimal("100.0000000000"),
+                        new BigDecimal("100.0000000000"),
+                        new BigDecimal("100.0000000000"));
+    }
+
+    @Test
     void 개별_전략_시계열은_마지막_사이클의_종료월에서_끝난다() {
         StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, JANUARY_31);
 

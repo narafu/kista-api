@@ -61,7 +61,7 @@ assertThat(calculate(withEndOfDayWithdrawal("100", "110", "90")))
         .isEqualTo(new BigDecimal("110.0000000000"));
 ```
 
-Also assert initial strategy capital uses the first complete valuation including holdings, VR rollover compares the old last and new first complete full valuations instead of cash-only `endAmount`, terminal strategy exit uses its last complete valuation on `endDate`, a survivor's same-day return is preserved, same-day replacement selects only the new cycle, multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, every active strategy must have a complete valuation, holdings without `closingPrice` do not fall back to `avgPrice`, an individual strategy ends after its last cycle, a nonpositive previous value omits the day, KST midnight separates dates, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
+Also assert initial strategy capital uses the first complete valuation including holdings, same-date VR rollover compares the old last and new first complete full valuations instead of cash-only `endAmount`, a calendar gap splits old terminal withdrawal from later external entry, terminal strategy exit uses its last complete valuation on `endDate`, a survivor's same-day return is preserved, standalone final exit permits only the required zero post-flow valuation, same-day replacement selects only the new cycle, multiple strategies aggregate before return calculation, the last same-day snapshot wins, missing snapshots carry forward, every active strategy must have a complete valuation, holdings without `closingPrice` do not fall back to `avgPrice`, an individual strategy ends after its last cycle, a nonpositive previous value omits the day, KST midnight separates dates, month boundaries use the last valid index, and MDD uses month-end USD indices. Do not create an exchange-rate fixture or parameter.
 
 - [ ] **Step 2: Run the calculator test and verify failure**
 
@@ -78,7 +78,7 @@ Use `BigDecimal` with scale 10 and `HALF_UP` for intermediate returns. Keep thes
 ```java
 List<DailyValuation> buildDailyValuations(
         List<StrategyCycle> cycles, List<CyclePosition> positions,
-        LocalDate from, LocalDate to);
+        LocalDate from, LocalDate to, Map<LocalDate, BigDecimal> flows);
 
 Map<LocalDate, BigDecimal> buildExternalFlows(
         List<StrategyCycle> cycles, List<CyclePosition> positions);
@@ -87,7 +87,7 @@ List<MonthlyInvestmentPoint> compoundDailyReturns(
         List<DailyValuation> valuations, Map<LocalDate, BigDecimal> flows);
 ```
 
-Use end-of-day external-flow semantics: `dailyReturn = (currentValue - flow) / previousValue - 1`. Build one continuous flow timeline per strategy: first entry is the first cycle's first complete valuation, internal transitions are `new first complete value - old last complete value`, and final exit on `endDate` is the negative last complete value while the post-flow portfolio excludes that strategy. Never infer internal or final flows from cash-only `endAmount`. Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue <= 0` or any active strategy lacks a complete valuation.
+Use end-of-day external-flow semantics: `dailyReturn = (currentValue - flow) / previousValue - 1`. Within each strategy, only `previous.endDate == next.startDate` is continuous: that internal transition is `new first complete value - old last complete value`. A calendar gap records the old last complete value as a negative flow on `endDate` and the new first complete value as a positive flow on `startDate`. Final exit on `endDate` is the negative last complete value while the post-flow portfolio excludes that strategy. If this leaves no active strategy, emit `currentValue=0` only when a previous valid portfolio valuation and a negative terminal flow exist; do not otherwise emit empty or incomplete portfolios. Never infer internal or final flows from cash-only `endAmount`. Do not access ports, current time, exchange rates, or currency conversion in this class. Omit a day when `previousValue <= 0` or any active strategy lacks a complete valuation.
 
 - [ ] **Step 4: Run tests**
 

@@ -33,9 +33,9 @@ final class MonthlyReturnCalculator {
             return List.of();
         }
 
-        // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
-        List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to);
         Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles, positions);
+        // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
+        List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to, flows);
         return compoundDailyReturns(valuations, flows);
     }
 
@@ -64,7 +64,7 @@ final class MonthlyReturnCalculator {
 
     private List<DailyValuation> buildDailyValuations(
             List<StrategyCycle> cycles, List<CyclePosition> positions,
-            LocalDate from, LocalDate to) {
+            LocalDate from, LocalDate to, Map<LocalDate, BigDecimal> flows) {
         Map<UUID, StrategyCycle> cycleById = cycles.stream()
                 .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
         NavigableMap<LocalDate, Map<UUID, CyclePosition>> positionsByDate = new TreeMap<>();
@@ -91,6 +91,7 @@ final class MonthlyReturnCalculator {
                 .toList());
 
         List<DailyValuation> valuations = new ArrayList<>();
+        boolean hasPreviousValuation = false;
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
             Map<UUID, CyclePosition> dailyPositions = positionsByDate.get(date);
             if (dailyPositions != null) {
@@ -119,6 +120,12 @@ final class MonthlyReturnCalculator {
             }
             if (complete) {
                 valuations.add(new DailyValuation(date, value));
+                hasPreviousValuation = true;
+            } else if (activeByStrategy.isEmpty()
+                    && hasPreviousValuation
+                    && flows.getOrDefault(date, BigDecimal.ZERO).signum() < 0) {
+                // 활성 전략이 모두 종료되는 음수 흐름일만 0인 교체 후 평가액을 허용한다.
+                valuations.add(new DailyValuation(date, BigDecimal.ZERO));
             }
         }
         return valuations;
@@ -146,23 +153,42 @@ final class MonthlyReturnCalculator {
             for (int index = 1; index < ordered.size(); index++) {
                 StrategyCycle previous = ordered.get(index - 1);
                 StrategyCycle next = ordered.get(index);
-                BigDecimal previousValue = lastCompleteValue(
-                        valuesByCycle.get(previous.id()), next.startDate());
-                BigDecimal nextValue = firstCompleteValue(valuesByCycle.get(next.id()));
-                if (previousValue != null && nextValue != null) {
-                    flows.merge(next.startDate(), nextValue.subtract(previousValue), BigDecimal::add);
+                if (isContiguousTransition(previous, next)) {
+                    BigDecimal previousValue = lastCompleteValue(
+                            valuesByCycle.get(previous.id()), next.startDate());
+                    BigDecimal nextValue = firstCompleteValue(valuesByCycle.get(next.id()));
+                    if (previousValue != null && nextValue != null) {
+                        flows.merge(next.startDate(), nextValue.subtract(previousValue), BigDecimal::add);
+                    }
+                } else {
+                    addExitFlow(flows, previous, valuesByCycle.get(previous.id()));
+                    addEntryFlow(flows, next, valuesByCycle.get(next.id()));
                 }
             }
 
             StrategyCycle last = ordered.getLast();
-            if (last.endDate() != null) {
-                BigDecimal finalValue = lastCompleteValue(valuesByCycle.get(last.id()), last.endDate());
-                if (finalValue != null) {
-                    flows.merge(last.endDate(), finalValue.negate(), BigDecimal::add);
-                }
-            }
+            addExitFlow(flows, last, valuesByCycle.get(last.id()));
         }
         return flows;
+    }
+
+    private static void addEntryFlow(Map<LocalDate, BigDecimal> flows, StrategyCycle cycle,
+                                     NavigableMap<LocalDate, BigDecimal> values) {
+        BigDecimal value = firstCompleteValue(values);
+        if (value != null) {
+            flows.merge(cycle.startDate(), value, BigDecimal::add);
+        }
+    }
+
+    private static void addExitFlow(Map<LocalDate, BigDecimal> flows, StrategyCycle cycle,
+                                    NavigableMap<LocalDate, BigDecimal> values) {
+        if (cycle.endDate() == null) {
+            return;
+        }
+        BigDecimal value = lastCompleteValue(values, cycle.endDate());
+        if (value != null) {
+            flows.merge(cycle.endDate(), value.negate(), BigDecimal::add);
+        }
     }
 
     private Map<UUID, NavigableMap<LocalDate, BigDecimal>> buildCompleteValuesByCycle(
@@ -266,14 +292,19 @@ final class MonthlyReturnCalculator {
             return null;
         }
 
-        boolean finalCycle = candidateIndex == ordered.size() - 1;
         if (candidate.endDate() == null) {
             return candidate;
         }
-        if (finalCycle) {
+        boolean contiguousReplacement = candidateIndex + 1 < ordered.size()
+                && isContiguousTransition(candidate, ordered.get(candidateIndex + 1));
+        if (!contiguousReplacement) {
             return date.isBefore(candidate.endDate()) ? candidate : null;
         }
         return !date.isAfter(candidate.endDate()) ? candidate : null;
+    }
+
+    private static boolean isContiguousTransition(StrategyCycle previous, StrategyCycle next) {
+        return previous.endDate() != null && previous.endDate().equals(next.startDate());
     }
 
     private static BigDecimal firstCompleteValue(NavigableMap<LocalDate, BigDecimal> values) {
