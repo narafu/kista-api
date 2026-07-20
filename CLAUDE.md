@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-한국투자증권(KIS) REST API를 통한 SOXL 분할매매 자동화 서비스.
+한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
 Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 
 이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
@@ -36,10 +36,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - **시간 기준 정책**: 거래일은 전 구간 KST 단일 기준(변환 없음), `release_date`는 FIDA 발행일 원본, US 기준 외부 데이터만 어댑터 내부 `UsTradeDates` 변환 (`docs/agents/constraints.md` 참고)
 - **작업 완료 후 자동 커밋**: 요청된 작업 완료 시 스스로 커밋 생성
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
-
-## Git 규칙
-- `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
-- 커밋 전 `git config user.name` / `git config user.email` 확인 — 올바른 author: `narafu <narafu@kakao.com>`
+- Git 규칙(push·author·커밋 메시지)은 `docs/agents/constraints.md` 참고
 
 @docs/agents/commands.md
 @docs/agents/architecture.md

@@ -38,14 +38,8 @@
 - 현재 Dockerfile: `COPY gradlew settings.gradle.kts build.gradle.kts lombok.config ./` 로 이미 수정됨
 - 새 루트 설정 파일 추가 시 동일하게 COPY 라인에 포함할 것
 
-### WSL Docker Desktop Integration 미활성화 시 우회 방법
-- 증상: `The command 'docker' could not be found in this WSL 2 distro.`
-- 원인: Docker Desktop → Settings → Resources → WSL Integration이 Ubuntu distro에 비활성화
-- 직접 해결 (Docker Desktop 설정 없이): `~/.local/bin/docker` 래퍼 스크립트로 PowerShell 경유 실행 (이미 설치됨)
-  - `~/.local/bin`은 `~/.zshrc`에서 이미 PATH 포함 — 스크립트 생성 즉시 사용 가능
-  - 핵심: `wslpath -w "$(pwd)"` 로 WSL 경로 → Windows UNC 경로 변환 후 PowerShell `Set-Location` 으로 이동
-  - Docker context: `desktop-windows`(기본) 대신 `--context desktop-linux` 지정 필수 (`docker context ls` 로 확인)
-- `docker-compose.yml`: `postgres:17` 서비스 (kistadb/kista/kista, 포트 5432)
+### docker-compose 서비스
+- `postgres:17` (kistadb/kista/kista, 포트 5432)
 
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패

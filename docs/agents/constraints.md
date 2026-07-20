@@ -1,8 +1,9 @@
 ## 핵심 제약 사항
 
 ### Git 규칙
-- 커밋 메시지는 한글로 작성한다.
-- Conventional Commit 접두사 사용: `feat(scope):`, `fix:`, `docs:`, `debug:` 등 + 명령형 제목
+- `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
+- 커밋 전 author 확인 (`git config user.name`/`user.email`): `narafu <narafu@kakao.com>`
+- 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
 
 ### domain/port/out/ 네이밍 규칙
 - 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `StrategyPort`)

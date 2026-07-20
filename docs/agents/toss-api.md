@@ -28,9 +28,7 @@
 
 ### 주의사항
 
-- KIS API와 필드명·인증 방식이 다르므로 혼용 주의
-- `TossApiException` → `GlobalExceptionHandler` 503 자동 처리
-- `Account.isToss()` 삭제됨 — `account.broker() == Account.Broker.TOSS` 직접 비교
+- KIS API와 필드명·인증 방식이 다르므로 혼용 주의 (`TossApiException` → 503은 constraints.md, 브로커 분기는 architecture.md "BrokerAdapter Registry 패턴" 참고)
 
 ### 가격 조회 API 3분리 — TossPriceApi
 
