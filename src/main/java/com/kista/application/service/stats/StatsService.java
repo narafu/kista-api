@@ -181,7 +181,7 @@ class StatsService implements UserStatsUseCase {
             BenchmarkGranularity granularity) {
         validateScopeAndRange(scope, strategyId, from, to);
 
-        LocalDate effectiveTo = completedMonthEnd(to);
+        LocalDate effectiveTo = completedMonthEnd(to, granularity);
         Strategy selectedStrategy = null;
         List<Strategy> strategies;
         if (scope == BenchmarkScope.STRATEGY) {
@@ -278,8 +278,14 @@ class StatsService implements UserStatsUseCase {
         }
     }
 
-    private static LocalDate completedMonthEnd(LocalDate requestedTo) {
+    // 아파트(KB Land)는 월 단위로 늦게 발행되어 이번 달 데이터가 아직 없을 수 있으므로
+    // 직전 완료 월까지만 비교한다. ETF는 매일 갱신되는 데이터라 이 clamp가 필요 없다 —
+    // 그대로 적용하면 당월 투자 기록·ETF 시세가 전부 잘려나간다.
+    private static LocalDate completedMonthEnd(LocalDate requestedTo, BenchmarkGranularity granularity) {
         LocalDate today = LocalDate.now(TimeZones.KST);
+        if (granularity == BenchmarkGranularity.DAILY) {
+            return requestedTo != null ? requestedTo : today;
+        }
         YearMonth requestedMonth = YearMonth.from(requestedTo != null ? requestedTo : today);
         YearMonth lastCompletedMonth = YearMonth.from(today).minusMonths(1);
         YearMonth effectiveMonth = requestedMonth.isAfter(lastCompletedMonth)

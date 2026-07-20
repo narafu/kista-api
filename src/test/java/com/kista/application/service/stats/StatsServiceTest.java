@@ -721,6 +721,27 @@ class StatsServiceTest {
     }
 
     @Test
+    void ETF_비교는_이번_달이_아직_끝나지_않아도_아파트처럼_지난달로_clamp하지_않는다() {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", today.toString());
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", today.atStartOfDay(TimeZones.KST).toInstant().toString())));
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
+        when(exchangeRatePort.getExchangeRate()).thenReturn(
+                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+
+        statsService.getEtfBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, null, null);
+
+        // 아파트(MONTHLY)는 이번 달이 미완료면 지난달 말까지만 조회하지만, ETF(DAILY)는 이번 달 말일까지
+        // 그대로 조회 범위에 포함한다 — 매일 갱신되는 데이터라 발행 지연을 기다릴 필요가 없다.
+        LocalDate endOfCurrentMonth = YearMonth.from(today).atEndOfMonth();
+        verify(indexPricePort).findBySymbolAndRange(eq("SPY"), any(), eq(endOfCurrentMonth));
+    }
+
+    @Test
     void ETF_가격_데이터가_없으면_INSUFFICIENT_COMMON_MONTHS를_반환한다() {
         stubEtfInvestment("100.00", "184.20");
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
