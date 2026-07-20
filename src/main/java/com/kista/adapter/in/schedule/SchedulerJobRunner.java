@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.function.Supplier;
 
-// 스케쥴러 공통 실행 골격 — "알림 시작 → contexts 빌드 → try 실행 → 인터럽트/예외 처리 → 알림 완료"
+// 스케쥴러 공통 실행 골격 — "알림 시작 → try(contexts 빌드 → 실행) → 인터럽트/예외 처리 → 알림 완료"
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -34,9 +34,9 @@ class SchedulerJobRunner {
     // name: 스케쥴러 표시명 (e.g., "장 개시 스케쥴러", "마감 매매 스케쥴러 수동")
     void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) throws InterruptedException {
         notifyPort.notifyInfo(name + " 시작");
-        List<BatchContext> contexts = contextSupplier.get();
-        log.info("{} 시작 — ACTIVE 전략 {}개", name, contexts.size());
         try {
+            List<BatchContext> contexts = contextSupplier.get(); // try 안으로 이동 — 조회 자체가 실패해도 오류 알림 누락 없이 잡히도록
+            log.info("{} 시작 — ACTIVE 전략 {}개", name, contexts.size());
             action.accept(contexts);
             log.info("{} 완료", name);
             notifyPort.notifyInfo(name + " 완료");
