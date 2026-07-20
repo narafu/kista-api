@@ -1,5 +1,7 @@
 # 예산 배정 거절 사실 기록 — 매수/매도 거절 배너 (v2, 단순화)
 
+> **[DEFERRED 2026-07-21]** 이 v2(전용 `order_rejections` 테이블 영속화)는 구현 계획까지 작성됐으나, 사용자가 "최대한 심플하게"를 재차 요청하면서 백엔드 변경이 전혀 없는 v3(프론트엔드에서 `preview.orders`와 `todayOrders`를 방향별로 diff)로 대체되어 이번 라운드에서는 보류됐다. v3 문서: `2026-07-21-order-rejection-banner-frontend-diff-design.md`. v2는 "전량 거절된 날은 감지 못함", "당일이 지나면 이력이 안 남음" 같은 v3의 한계가 실제로 문제가 될 때 다시 꺼내볼 백로그로 남긴다. 구현 계획: `docs/superpowers/plans/2026-07-20-order-rejection-banner.md`(마찬가지로 DEFERRED).
+
 > v1(개별 REJECTED 주문 row를 `orders`에 leg 단위로 영속화하는 안)은 advisor 검토를 거치며 leg-scoped delete·`todayOrders`/`rejectedOrders` 필드 분리·취소버튼 가드·이력탭 렌더링까지 변경 범위가 계속 불어났다. 사용자 피드백("바로 주문 영역이 너무 복잡해지고 있다")에 따라 훨씬 가벼운 v2로 재설계한다. **v1의 문제 인식(배경)은 유효하므로 그대로 유지하고, 해결 방식만 바꾼다.**
 
 ## 배경
