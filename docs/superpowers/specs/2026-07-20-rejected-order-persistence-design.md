@@ -147,7 +147,9 @@ public record RejectionResponse(String direction, int orderCount) {
 
 - `useStrategyOrderPreviewQuery` 반환 타입에 `rejections?: { direction: 'BUY'|'SELL'; orderCount: number }[]` 추가.
 - `StrategyDetail.tsx`: "다음 주문" 카드 헤더에 `rejections`가 있으면 방향별로 한 줄씩 배너 렌더링 — "예수금 부족으로 매수 3건 미접수" / "판매가능수량 부족으로 매도 2건 미접수". **`mode`(preview/executed)와 무관하게 항상 렌더링** — 기존 주문 목록(`OrderRows`, `placedOrders`, 취소 로직)은 전혀 건드리지 않으므로 mode 분기 자체가 필요 없다.
-- `BuyCompetitionNotice`는 그대로 둔다 — `mode === 'preview'`일 때만 의미 있는 "지금 시도하면 될까" 추정이라는 역할이 이번 변경과 겹치지 않는다. 다만 `mode === 'executed'`이면서 `rejections`에 BUY가 있는 상태에서 재시뮬레이션 배지도 함께 뜨면 메시지가 중복될 수 있으므로, 헤더 인라인 배지(`StrategyDetail.tsx:229-231`) 조건에 `mode === 'preview'`를 추가해 실측 배너와 겹치지 않게 한다 (v1과 동일한 결론, 변경 범위는 한 줄).
+- `StrategyDetail.tsx`의 헤더 인라인 `BuyCompetitionNotice`(`:229-231`)는 **제거**한다 — 새 거절 배너가 사실 그대로의 단일 정보원이 되므로, 근사치 재시뮬레이션 배지를 "다음 주문" 카드에 남겨두면 같은 자리에서 서로 다른 근거(라이브 재계산 vs 실측 이력)로 같은 말을 반복해 오히려 복잡도를 늘린다.
+  - `competition`/`hasDeficit` 계산 로직 자체와 `preview.competition` 필드는 그대로 둔다 — **`StrategyCard.tsx`(전략 목록 카드)가 같은 `competition`을 목록 카드 테두리 색상(예수금 부족 시 빨간 테두리)에 별도로 쓰고 있어**, 이번 변경 범위(다음 주문 카드)를 벗어나 목록 페이지까지 건드리지 않는다. 백엔드 `TradingBuyCompetitionSimulator`/`BuyCompetitionPreview`도 변경 없음.
+  - `CardContent` 내부의 row-variant 배지(`StrategyDetail.tsx:308-310`, `orders.length===0` preview 분기 안에 위치)는 그대로 유지 — 이건 "바로 주문" 버튼을 누르기 전 미리보기 상황에서만 쓰이므로 이번 변경과 별개다.
 - 이력 탭(`StrategyOrderHistory`)은 이번 변경과 무관 — REJECTED 개념 자체가 `orders`에 없으므로 아무것도 안 해도 된다.
 
 ## 에러 처리
@@ -166,4 +168,7 @@ public record RejectionResponse(String direction, int orderCount) {
   - 거절 기록 실패가 다른 사이클의 SELL 저장·알림 발송을 막지 않는지 (`runSafely` 격리)
 - `OrderRejectionPersistenceAdapterTest`: upsert 자연키 충돌 시 덮어쓰기, `deleteIfExists`가 존재하지 않아도 예외 없이 no-op인지
 - `TradingPreviewServiceTest`: `rejections` 필드가 `findByCycleAndDate` 결과를 그대로 반영하는지, 기존 `todayPlannedOrders`/예산 계산 관련 테스트는 무변경으로 통과하는지(회귀)
-- kista-ui: `StrategyDetail`에서 `rejections` 배너가 `mode`와 무관하게 렌더링되는지, `executed` 모드에서 `BuyCompetitionNotice` 헤더 배지가 숨겨지는지
+- kista-ui:
+  - `StrategyDetail`에서 `rejections` 배너가 `mode`와 무관하게 렌더링되는지
+  - `StrategyDetail` 헤더에서 `BuyCompetitionNotice`가 더 이상 렌더링되지 않는지(제거 회귀) — `CardContent` 내부 preview 분기의 row-variant 배지는 기존 그대로 유지되는지 별도 확인
+  - `StrategyCard`(목록 카드) 테두리 색상 로직은 이번 변경으로 회귀가 없는지(무변경 확인용 스냅샷)
