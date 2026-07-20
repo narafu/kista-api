@@ -173,5 +173,6 @@ public record RejectionResponse(String direction, int orderCount) {
 - `TradingPreviewServiceTest`: `rejections` 필드가 `findByCycleAndDate` 결과를 그대로 반영하는지, 기존 `todayPlannedOrders`/예산 계산 관련 테스트는 무변경으로 통과하는지(회귀)
 - kista-ui:
   - `StrategyDetail`에서 `rejections` 배너가 `mode`와 무관하게 렌더링되는지
-  - `StrategyDetail`에서 `BuyCompetitionNotice`가 데스크톱·모바일 어느 쪽에서도 더 이상 렌더링되지 않는지(제거 회귀 — 헤더 인라인 + CardContent row-variant 둘 다), 기존 `StrategyDetail.test.tsx`의 "buy competition notice" 테스트 2건은 `hasDeficit` 소형 배지(`:235-237`)만으로도 그대로 통과하는지 확인
+  - `StrategyDetail`에서 `BuyCompetitionNotice`가 데스크톱·모바일 어느 쪽에서도 더 이상 렌더링되지 않는지(제거 회귀 — 헤더 인라인 + CardContent row-variant 둘 다)
+  - **주의**: 기존 `StrategyDetail.test.tsx`의 "buy competition notice" 테스트 2건은 "그대로 통과"하지 않는다 — 현재는 `BuyCompetitionNotice`가 렌더링하는 `예수금 부족` 배지로 통과하는 테스트라, 컴포넌트 제거 후 남는 유일한 소스는 `:235-237`의 소형 배지인데 이는 `isHoliday`(휴장일이면 `휴장일` 텍스트로 대체)와도 얽혀 있고 이 테스트 파일은 `todayKst()`/휴장일을 mock하지 않아 주말 실행 시 flaky해질 수 있다. `BuyCompetitionNotice.test.tsx` 삭제와 함께 이 2건은 새 거절 배너 렌더링 검증으로 재작성하거나 삭제한다 — "무변경으로 통과" 취급 금지
   - `StrategyCard`(목록 카드) 테두리 색상 로직은 이번 변경으로 회귀가 없는지(무변경 확인용 스냅샷)
