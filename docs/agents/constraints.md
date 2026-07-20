@@ -26,20 +26,14 @@
 - `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
 
 ### Account ↔ Strategy 분리
-- `Account` record 필드 9개: `id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt` — type/status/ticker/multiple/updatedAt 없음 (updatedAt은 persistence 레이어 `BaseAuditEntity`가 관리; `createdAt`은 신규 등록 시 null, persistence 저장 후 채워짐)
-- `Strategy` record 필드 6개: `id, accountId, type(Type), status(Status), ticker(Ticker), cycleSeedType(CycleSeedType)`
-- `StrategyVersion` record 필드 5개: `id, strategyId, versionNo, createdAt, deletedAt` — 전략 설정 이력 부모
-- `StrategyInfiniteDetail` record 필드 2개: `strategyVersionId, divisionCount`
-- `StrategyVrDetail` record 필드 4개: `strategyVersionId, intervalWeeks, bandWidth, recurringAmount` — gradient()/poolLimitRate() 계산 메서드 제공
-- `StrategyCycle` record 필드 9개: `id, strategyId, strategyVersionId, startAmount, endAmount, startDate, endDate, createdAt, deletedAt` — 실행된 사이클과 적용 버전 고정값
-- `CyclePosition` record 필드 8개: `id, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, createdAt, deletedAt` — 체결마다 append되는 공통 포지션 스냅샷
-- `CyclePositionInfiniteDetail` record 필드 2개: `cyclePositionId, isReverseMode`
-- `StrategyCycleVrDetail` record 필드 4개: `strategyCycleId, value, gradient, poolLimit` — 사이클 시작 시 VR 파라미터 스냅샷
-- `StrategyDetail` record 필드 7개: `Strategy strategy, BigDecimal initialUsdDeposit, Integer divisionCount, boolean isReverseMode, Double currentRound, Integer currentHoldings, VrSummary vr` — 최신 사이클/활성 버전/최신 포지션을 합쳐 응답 조립 (`StrategyService.toDetail()`), `VrSummary`는 nested record (VR 외 타입은 null)
-- `Type`, `Status`, `Ticker`, `CycleSeedType` 모두 `Strategy` record의 nested enum
-- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker(accountId, ticker)` (계좌당 여러 전략 등록 가능, 종목별 1개)
-- `StrategyCycle.startAmount`: 사이클 시작 시드(시작금액); VR에서는 사이클 시작 pool(예수금) — 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신
-- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (DEFAULT `NONE`); **VR 전략은 NONE 강제** — 롤오버가 자체 사이클 교체 담당
+계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
+- `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
+- `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지)
+- 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount; `gradient()`/`poolLimitRate()`는 VR 공식 메서드)
+- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount`=시작 시드(VR은 시작 pool)는 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신) → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimit)
+- `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `VrSummary` nested(VR 외 null)
+- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
+- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
 
 ### 잔고검증 토글 (UserSettings.balanceCheckEnabled)
 - `UserSettings` aggregate(`domain/model/user/UserSettings.java`) — `User` record 아님

@@ -1,7 +1,7 @@
 ## 아키텍처
 
 Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의존성을 강제 검증**한다 (`HexagonalArchitectureTest`).
-클래스·필드 상세는 코드가 SSOT — 아래 맵은 위치·역할·비자명한 규칙만 기록한다 (핵심 record 필드 → constraints.md "Account ↔ Strategy 분리").
+클래스·필드 상세는 코드가 SSOT — 아래 맵은 위치·역할·비자명한 규칙만 기록한다 (record aggregate 분리 제약 → constraints.md "Account ↔ Strategy 분리").
 
 ```
 common/          ← 공통 유틸리티 (Spring/JPA 독립)
