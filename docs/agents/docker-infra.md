@@ -71,6 +71,13 @@ fly deploy --app kista-api
 # 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
 ```
 
+### 외부 모니터링/알림
+Fly.io 자체 헬스체크(`fly.toml`)는 실패한 machine을 재시작할 뿐 사람에게 알리지 않음 — 아래 3개는 사람이 실제로 장애를 인지하기 위한 외부 계층.
+
+- **가동 여부**: UptimeRobot(무료) → `https://kista-api.fly.dev/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
+- **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 완료 시 ping. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
+- **메트릭 가시성**: Grafana Cloud OTLP push — Fly.io는 단일 프로세스라 Alloy 사이드카 대신 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, → "Fly.io 환경변수 설정" 참고)
+
 ### Fly.io 환경변수 설정
 ```bash
 # 환경변수 일괄 설정
@@ -88,6 +95,12 @@ fly secrets list --app kista-api
 #   TELEGRAM_CHAT_ID         — 관리자봇 chat ID
 #   DB_URL, DB_USERNAME, DB_PASSWORD — Supabase PostgreSQL 연결
 #   CORS_ALLOWED_ORIGINS     — 쉼표 구분 허용 Origin (Vercel 프로덕션 URL)
+# 선택 환경변수 (모니터링 — 미설정 시 각 기능 비활성/생략, 배포 안전):
+#   HEARTBEAT_OPEN_URL       — healthchecks.io 개장 스케쥴러 dead-man's switch ping URL
+#   HEARTBEAT_CLOSE_URL      — healthchecks.io 마감 스케쥴러 dead-man's switch ping URL
+#   GRAFANA_CLOUD_OTLP_ENABLED    — true 설정 시 OTLP metrics push 활성화 (기본 false)
+#   GRAFANA_CLOUD_OTLP_ENDPOINT   — Grafana Cloud OTLP gateway URL (예: https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp)
+#   GRAFANA_CLOUD_OTLP_AUTH_HEADER — Grafana Cloud 발급 "Basic xxxx" 인증 헤더 값 전체
 # SPRING_PROFILES_ACTIVE=prod 는 fly.toml [env]에 이미 고정
 ```
 
@@ -148,17 +161,22 @@ docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
 ## 백업/복구 런북
 
 ### DB 백업 (Supabase 운영)
-- Supabase 자동 백업: 대시보드 → Database → Backups에서 플랜별 보존 기간 확인 (Free: 없음, Pro: 일 1회 7일 보존)
+- Supabase 자동 백업: 대시보드 → Database → Backups에서 플랜별 보존 기간 확인 (Free: 없음, Pro: 일 1회 7일 보존) — Free 플랜 유지 중이므로 자체 백업 필수
+- **자동 백업**: `.github/workflows/db-backup.yml` — 매일 02:00 KST cron, `pg_dump` → GPG 대칭키 암호화 → GitHub Actions artifact 업로드(30일 보존). `workflow_dispatch`로 수동 실행도 가능
+  - 레포가 **public**이라 artifact는 누구나 다운로드 가능 — 반드시 GPG로 암호화한 뒤 업로드 (평문 업로드 금지)
+  - 필요 GH secret: `SUPABASE_DB_URL`(session mode 포트 5432, pgbouncer 6543 아님), `BACKUP_ENCRYPTION_KEY`
 - 수동 백업: `supabase db dump --linked -f backup-$(date +%Y%m%d).sql` — 중요 스키마 변경(마이그레이션 배포) 직전 필수 실행
-- 백업 파일은 레포 밖 안전한 위치에 보관 (git 커밋 금지 — 사용자 데이터 포함)
+- 백업 파일(복호화 후)은 레포 밖 안전한 위치에 보관 (git 커밋 금지 — 사용자 데이터 포함)
 
 ### 복구
-1. 신규/기존 프로젝트에 복원: `psql "$DB_URL" < backup-YYYYMMDD.sql`
-2. 복원 후 `flyway_schema_history` 최신 버전이 배포 코드의 마이그레이션 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패
-3. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
+1. artifact 백업 사용 시 먼저 복호화: `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -o backup.sql -d backup-YYYYMMDD.sql.gpg`
+2. 신규/기존 프로젝트에 복원: `psql "$DB_URL" < backup.sql`
+3. 복원 후 `flyway_schema_history` 최신 버전이 배포 코드의 마이그레이션 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패
+4. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
 ### 키 백업 (분실 시 복구 불가 — DB 백업과 별도 보관 필수)
 - `AES_ENCRYPTION_KEY` — 분실 시 accounts의 암호화 컬럼(계좌번호·API 키) 전체 복호화 불가 → 사용자 재등록 필요
 - `JWT_SIGNING_KEY` — 분실 시 전체 사용자 재로그인 (치명적이지 않음)
-- 확인: `fly secrets list -a kista-api` (값은 안 보임 — 원본을 별도 보관해야 함)
+- `BACKUP_ENCRYPTION_KEY` — 분실 시 GitHub Actions에 쌓인 모든 DB 백업 artifact 복호화 불가 (백업 자체가 무의미해짐)
+- 확인: `fly secrets list -a kista-api` (값은 안 보임 — 원본을 별도 보관해야 함), GH secret은 `gh secret list`로 이름만 확인 가능
 ```

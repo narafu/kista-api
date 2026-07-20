@@ -50,6 +50,7 @@ dependencies {
 
     // Observability
     implementation(libs.micrometer.prometheus)
+    implementation(libs.micrometer.otlp) // Grafana Cloud OTLP push (Fly.io 단일 프로세스 — Alloy 사이드카 대신 앱이 직접 push)
 
     // Firebase
     implementation(libs.firebase.admin)

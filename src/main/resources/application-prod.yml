@@ -13,6 +13,14 @@ management:
   endpoint:
     health:
       show-details: never
+  otlp:
+    metrics:
+      export:
+        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false} # Grafana Cloud 미설정 환경(로컬 재현 등)에서 push 시도로 인한 커넥션 재시도 방지
+        url: ${GRAFANA_CLOUD_OTLP_ENDPOINT:}
+        headers:
+          Authorization: ${GRAFANA_CLOUD_OTLP_AUTH_HEADER:}
+        step: 60s
 
 logging:
   level:

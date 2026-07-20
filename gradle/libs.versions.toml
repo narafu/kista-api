@@ -26,6 +26,7 @@ springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-sta
 
 # Observability
 micrometer-prometheus           = { module = "io.micrometer:micrometer-registry-prometheus" }
+micrometer-otlp                 = { module = "io.micrometer:micrometer-registry-otlp" }
 
 # Lombok
 lombok                         = { module = "org.projectlombok:lombok", version.ref = "lombok" }

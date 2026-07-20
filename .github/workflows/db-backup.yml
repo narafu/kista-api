@@ -1,0 +1,36 @@
+name: DB Backup
+
+on:
+  schedule:
+    - cron: '0 17 * * *'  # 매일 02:00 KST (스케쥴러 실행 구간과 겹치지 않는 시간대)
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Supabase pg_dump → 암호화 → artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: pg_dump 실행
+        run: |
+          docker run --rm postgres:17 pg_dump "${{ secrets.SUPABASE_DB_URL }}" --no-owner --no-privileges > backup.sql
+          # 빈 덤프(연결 실패 등)를 백업으로 취급하지 않도록 최소 크기 확인
+          size=$(stat -c%s backup.sql)
+          if [ "$size" -lt 1024 ]; then
+            echo "::error::pg_dump 결과가 비정상적으로 작음 (${size} bytes) — 연결 실패 의심"
+            exit 1
+          fi
+
+      - name: GPG 대칭키 암호화
+        run: |
+          # 레포가 public이라 artifact가 누구나 다운로드 가능 — 평문 업로드 금지
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "${{ secrets.BACKUP_ENCRYPTION_KEY }}" \
+            -o "backup-$(date +%Y%m%d).sql.gpg" backup.sql
+          rm backup.sql
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: backup-*.sql.gpg
+          retention-days: 30
