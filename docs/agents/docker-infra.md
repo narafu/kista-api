@@ -77,6 +77,9 @@ Fly.io 자체 헬스체크(`fly.toml`)는 실패한 machine을 재시작할 뿐 
 - **가동 여부**: UptimeRobot(무료) → `https://kista-api.fly.dev/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
 - **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 완료 시 ping. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
 - **메트릭 가시성**: Grafana Cloud OTLP push — Fly.io는 단일 프로세스라 Alloy 사이드카 대신 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, → "Fly.io 환경변수 설정" 참고)
+  - 대시보드 JSON: `deploy/grafana/kista-api-dashboard.json` — Grafana Cloud 계정 유실 시 재구성용, Dashboards → New → Import로 재적용
+  - **Import 시 주의**: 대시보드 JSON Model 편집창(Settings → JSON Model)은 계정이 이미 v2 스키마(`elements`/`layout`)로 마이그레이션된 경우 구버전 `panels`/`gridPos` JSON을 거부함(`Missing property "elements"` 등) — 기존 대시보드를 고치려 하지 말고 **Import로 새로 생성** 후 기존 것 삭제
+  - Grafana Cloud 메트릭 이름은 Micrometer 관례와 다를 수 있음 — 예: 업타임은 `process_uptime_seconds`가 아니라 **`process_uptime_milliseconds`**(단위도 ms). 확인 방법: Explore에서 `{application="kista-api"}`로 전체 시리즈 조회 후 이름 확인
 
 ### Fly.io 환경변수 설정
 ```bash
@@ -165,6 +168,7 @@ docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
 - **자동 백업**: `.github/workflows/db-backup.yml` — 매일 02:00 KST cron, `pg_dump` → GPG 대칭키 암호화 → GitHub Actions artifact 업로드(30일 보존). `workflow_dispatch`로 수동 실행도 가능
   - 레포가 **public**이라 artifact는 누구나 다운로드 가능 — 반드시 GPG로 암호화한 뒤 업로드 (평문 업로드 금지)
   - 필요 GH secret: `SUPABASE_DB_URL`(session mode 포트 5432, pgbouncer 6543 아님), `BACKUP_ENCRYPTION_KEY`
+  - `SUPABASE_DB_URL` 구성: 앱이 쓰는 Fly `DB_URL`(JDBC, pgbouncer 6543)과 다름 — host/user/password는 동일하게 재사용하되 포트만 `5432`로 바꾸고 `postgresql://user:password@host:5432/postgres` 형태의 순수 URI로 변환 필요
 - 수동 백업: `supabase db dump --linked -f backup-$(date +%Y%m%d).sql` — 중요 스키마 변경(마이그레이션 배포) 직전 필수 실행
 - 백업 파일(복호화 후)은 레포 밖 안전한 위치에 보관 (git 커밋 금지 — 사용자 데이터 포함)
 
