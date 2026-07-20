@@ -1,9 +1,10 @@
 package com.kista.application.service.stats;
 
+import com.kista.domain.model.stats.BenchmarkGranularity;
 import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPoint;
-import com.kista.domain.model.stats.MonthlyInvestmentPoint;
+import com.kista.domain.model.stats.InvestmentPoint;
 import com.kista.domain.model.stats.PerformanceComparisonSummary;
 import com.kista.domain.model.strategy.Strategy;
 
@@ -23,13 +24,15 @@ final class HousingBenchmarkComparisonBuilder {
     private static final int SCALE = 10;
     private static final RoundingMode HALF_UP = RoundingMode.HALF_UP;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
+    private static final double DAYS_PER_YEAR = 365.0;
 
     HousingBenchmarkComparison build(
             BenchmarkScope scope,
             Strategy strategy,
             HousingBenchmarkComparison.Benchmark benchmark,
-            List<MonthlyInvestmentPoint> investmentPoints,
-            Map<LocalDate, BigDecimal> benchmarkPrices) {
+            List<InvestmentPoint> investmentPoints,
+            Map<LocalDate, BigDecimal> benchmarkPrices,
+            BenchmarkGranularity granularity) {
         HousingBenchmarkComparison.StrategyInfo strategyInfo = strategy == null ? null
                 : new HousingBenchmarkComparison.StrategyInfo(
                         strategy.id(), strategy.type(), strategy.ticker());
@@ -38,43 +41,45 @@ final class HousingBenchmarkComparisonBuilder {
             return empty(scope, strategyInfo, benchmark, "NO_INVESTMENT_DATA");
         }
 
-        Map<LocalDate, MonthlyInvestmentPoint> investmentByMonth = investmentPoints.stream()
+        Map<LocalDate, InvestmentPoint> investmentByDate = investmentPoints.stream()
                 .collect(Collectors.toMap(
-                        MonthlyInvestmentPoint::baseMonth, Function.identity(), (left, right) -> right));
-        TreeSet<LocalDate> commonMonths = new TreeSet<>(investmentByMonth.keySet());
-        commonMonths.retainAll(benchmarkPrices.entrySet().stream()
+                        InvestmentPoint::baseDate, Function.identity(), (left, right) -> right));
+        TreeSet<LocalDate> commonDates = new TreeSet<>(investmentByDate.keySet());
+        commonDates.retainAll(benchmarkPrices.entrySet().stream()
                 .filter(entry -> entry.getValue() != null && entry.getValue().signum() > 0)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet()));
 
-        if (commonMonths.size() < 2) {
+        if (commonDates.size() < 2) {
             return empty(scope, strategyInfo, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
-        LocalDate firstMonth = commonMonths.getFirst();
-        BigDecimal firstInvestmentIndex = investmentByMonth.get(firstMonth).investmentIndexUsd();
-        BigDecimal firstBenchmarkPrice = benchmarkPrices.get(firstMonth);
+        LocalDate firstDate = commonDates.getFirst();
+        BigDecimal firstInvestmentIndex = investmentByDate.get(firstDate).investmentIndexUsd();
+        BigDecimal firstBenchmarkPrice = benchmarkPrices.get(firstDate);
         if (firstInvestmentIndex == null || firstInvestmentIndex.signum() <= 0) {
             return empty(scope, strategyInfo, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
         List<HousingBenchmarkPoint> points = new ArrayList<>();
-        LocalDate previousMonth = null;
+        LocalDate previousDate = null;
         BigDecimal previousInvestmentIndex = null;
         BigDecimal previousBenchmarkIndex = null;
-        for (LocalDate month : commonMonths) {
+        for (LocalDate date : commonDates) {
             BigDecimal investmentIndex = normalize(
-                    investmentByMonth.get(month).investmentIndexUsd(), firstInvestmentIndex);
-            BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(month), firstBenchmarkPrice);
-            boolean consecutiveMonth = previousMonth != null
-                    && month.equals(previousMonth.plusMonths(1));
+                    investmentByDate.get(date).investmentIndexUsd(), firstInvestmentIndex);
+            BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(date), firstBenchmarkPrice);
+            // MONTHLY는 인접 데이터 간 공백(결측월)이 있으면 수익률을 비워 오해를 막는다.
+            // DAILY는 commonDates 자체가 이미 실거래일 교집합이라 인접 검사 없이 항상 계산한다.
+            boolean computeReturn = previousDate != null
+                    && (granularity == BenchmarkGranularity.DAILY || date.equals(previousDate.plusMonths(1)));
             points.add(new HousingBenchmarkPoint(
-                    month,
+                    date,
                     investmentIndex,
                     benchmarkIndex,
-                    consecutiveMonth ? monthlyReturn(investmentIndex, previousInvestmentIndex) : null,
-                    consecutiveMonth ? monthlyReturn(benchmarkIndex, previousBenchmarkIndex) : null));
-            previousMonth = month;
+                    computeReturn ? periodReturn(investmentIndex, previousInvestmentIndex) : null,
+                    computeReturn ? periodReturn(benchmarkIndex, previousBenchmarkIndex) : null));
+            previousDate = date;
             previousInvestmentIndex = investmentIndex;
             previousBenchmarkIndex = benchmarkIndex;
         }
@@ -83,13 +88,15 @@ final class HousingBenchmarkComparisonBuilder {
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
-        long elapsedMonths = ChronoUnit.MONTHS.between(firstMonth, points.getLast().baseMonth());
+        double periodsPerYear = granularity == BenchmarkGranularity.DAILY
+                ? DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate())
+                : 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate());
         PerformanceComparisonSummary summary = new PerformanceComparisonSummary(
                 investmentCumulativeReturn,
                 benchmarkCumulativeReturn,
                 investmentCumulativeReturn.subtract(benchmarkCumulativeReturn).setScale(SCALE, HALF_UP),
-                annualizedReturn(lastInvestmentIndex, elapsedMonths),
-                annualizedReturn(lastBenchmarkIndex, elapsedMonths),
+                annualizedReturn(lastInvestmentIndex, periodsPerYear),
+                annualizedReturn(lastBenchmarkIndex, periodsPerYear),
                 maxDrawdown(points.stream().map(HousingBenchmarkPoint::investmentIndexUsd).toList()),
                 maxDrawdown(points.stream().map(HousingBenchmarkPoint::benchmarkIndex).toList()));
 
@@ -98,7 +105,7 @@ final class HousingBenchmarkComparisonBuilder {
                 strategyInfo,
                 benchmark,
                 new HousingBenchmarkComparison.Period(
-                        firstMonth, points.getLast().baseMonth(), points.size()),
+                        firstDate, points.getLast().baseDate(), points.size()),
                 summary,
                 List.copyOf(points),
                 null,
@@ -122,7 +129,7 @@ final class HousingBenchmarkComparisonBuilder {
                 .setScale(SCALE, HALF_UP);
     }
 
-    private static BigDecimal monthlyReturn(BigDecimal current, BigDecimal previous) {
+    private static BigDecimal periodReturn(BigDecimal current, BigDecimal previous) {
         if (previous == null || previous.signum() <= 0) {
             return null;
         }
@@ -137,14 +144,14 @@ final class HousingBenchmarkComparisonBuilder {
                 .setScale(SCALE, HALF_UP);
     }
 
-    private static BigDecimal annualizedReturn(BigDecimal lastIndex, long elapsedMonths) {
+    private static BigDecimal annualizedReturn(BigDecimal lastIndex, double periodsPerYear) {
         if (lastIndex.signum() <= 0) {
             // 지수가 0 이하(전액 손실)면 Math.pow가 NaN을 낼 수 있어 -100%로 확정
             return BigDecimal.ONE.negate().setScale(SCALE, HALF_UP);
         }
         double annualized = Math.pow(
                 lastIndex.divide(HUNDRED, SCALE, HALF_UP).doubleValue(),
-                12.0 / elapsedMonths) - 1.0;
+                periodsPerYear) - 1.0;
         return BigDecimal.valueOf(annualized).setScale(SCALE, HALF_UP);
     }
 

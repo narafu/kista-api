@@ -4,9 +4,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record HousingBenchmarkPoint(
-        LocalDate baseMonth,
+        LocalDate baseDate,
         BigDecimal investmentIndexUsd,
         BigDecimal benchmarkIndex,
-        BigDecimal investmentMonthlyReturn,
-        BigDecimal benchmarkMonthlyReturn
+        BigDecimal investmentPeriodReturn,
+        BigDecimal benchmarkPeriodReturn
 ) {}

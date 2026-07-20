@@ -371,7 +371,7 @@ class StatsServiceTest {
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, 3, from, null);
 
-        assertThat(result.period().toMonth()).isEqualTo(previousMonth.atDay(1));
+        assertThat(result.period().toDate()).isEqualTo(previousMonth.atDay(1));
         assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("120");
         verify(cyclePositionPort).findByUserAndRange(
                 USER_ID, Instant.EPOCH,
@@ -415,7 +415,7 @@ class StatsServiceTest {
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, LocalDate.of(2026, 3, 31));
 
-        assertThat(result.period().fromMonth()).isEqualTo(LocalDate.of(2026, 2, 1));
+        assertThat(result.period().fromDate()).isEqualTo(LocalDate.of(2026, 2, 1));
         assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100");
         assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100");
         assertThat(result.points().getLast().investmentIndexUsd())
@@ -444,10 +444,10 @@ class StatsServiceTest {
                 USER_ID, BenchmarkScope.PORTFOLIO, null, 3,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 1));
 
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseMonth)
+        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 1));
-        assertThat(result.points().getLast().investmentMonthlyReturn()).isNull();
-        assertThat(result.points().getLast().benchmarkMonthlyReturn()).isNull();
+        assertThat(result.points().getLast().investmentPeriodReturn()).isNull();
+        assertThat(result.points().getLast().benchmarkPeriodReturn()).isNull();
         assertThat(result.summary().investmentCumulativeReturn()).isEqualByComparingTo("0.21");
         assertThat(result.summary().benchmarkCumulativeReturn()).isEqualByComparingTo("0.21");
     }
@@ -669,9 +669,19 @@ class StatsServiceTest {
     }
 
     @Test
-    void ETF_벤치마크_비교는_월별_마지막_종가로_다운샘플링해_비교한다() {
-        stubEtfInvestment("100.00", "184.20");
-        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(spyPrices());
+    void ETF_벤치마크_비교는_다운샘플링_없이_거래일별_교집합으로_비교한다() {
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "102.00", "2026-01-06T01:00:00Z"),
+                depositSnapshot(cycle.id(), "184.20", "2026-02-28T01:00:00Z")));
+        List<IndexPrice> prices = List.of(
+                new IndexPrice("SPY", LocalDate.of(2026, 1, 5), new BigDecimal("400.00")),
+                new IndexPrice("SPY", LocalDate.of(2026, 1, 6), new BigDecimal("404.00")),
+                new IndexPrice("SPY", LocalDate.of(2026, 2, 27), new BigDecimal("440.00")));
+        when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(prices);
         when(exchangeRatePort.getExchangeRate()).thenReturn(
                 new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
 
@@ -685,8 +695,18 @@ class StatsServiceTest {
         assertThat(result.benchmark().quintile()).isNull();
         assertThat(result.benchmark().label()).isEqualTo("SPY (SPDR S&P 500 ETF Trust)");
         assertThat(result.benchmark().sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 2, 27));
-        assertThat(result.points()).hasSize(2);
-        assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100.0");
+        // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일 그대로 포인트가 생긴다 (기존 월별이면 2개였다).
+        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+                .containsExactly(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6), LocalDate.of(2026, 2, 27));
+        assertThat(result.points().get(0).investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.points().get(0).benchmarkIndex()).isEqualByComparingTo("100.0");
+        assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("102.0");
+        assertThat(result.points().get(1).benchmarkIndex()).isEqualByComparingTo(
+                new BigDecimal("404.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100")));
+        // 캘린더 인접 여부와 무관하게(1/6 -> 2/27) 항상 직전 공통일 대비 수익률을 계산한다.
+        assertThat(result.points().get(1).investmentPeriodReturn()).isEqualByComparingTo("0.02");
+        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("102.0");
         assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("440.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));

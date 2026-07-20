@@ -28,7 +28,7 @@ public record HousingBenchmarkComparison(
             LocalDate sourceUpdatedDate
     ) {}
 
-    public record Period(LocalDate fromMonth, LocalDate toMonth, int monthCount) {}
+    public record Period(LocalDate fromDate, LocalDate toDate, int pointCount) {}
 
     public HousingBenchmarkComparison withCurrentExchangeRate(CurrentExchangeRate rate) {
         return new HousingBenchmarkComparison(

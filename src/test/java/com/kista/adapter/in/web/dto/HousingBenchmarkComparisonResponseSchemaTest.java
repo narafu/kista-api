@@ -36,14 +36,14 @@ class HousingBenchmarkComparisonResponseSchemaTest {
         assertNullable(property(benchmark, "sourceUpdatedDate"), "benchmark.sourceUpdatedDate");
 
         Schema<?> period = dereference(schemas, property(response, "period"));
-        assertNullable(property(period, "fromMonth"), "period.fromMonth");
-        assertNullable(property(period, "toMonth"), "period.toMonth");
+        assertNullable(property(period, "fromDate"), "period.fromDate");
+        assertNullable(property(period, "toDate"), "period.toDate");
 
         Schema<?> point = dereference(schemas, property(response, "points").getItems());
-        assertNullable(property(point, "investmentMonthlyReturn"),
-                "points[].investmentMonthlyReturn");
-        assertNullable(property(point, "benchmarkMonthlyReturn"),
-                "points[].benchmarkMonthlyReturn");
+        assertNullable(property(point, "investmentPeriodReturn"),
+                "points[].investmentPeriodReturn");
+        assertNullable(property(point, "benchmarkPeriodReturn"),
+                "points[].benchmarkPeriodReturn");
     }
 
     private static Schema<?> property(Schema<?> schema, String name) {

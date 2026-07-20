@@ -50,9 +50,9 @@ public record HousingBenchmarkComparisonResponse(
 
     @Schema(name = "HousingBenchmarkPeriod")
     public record Period(
-            @Schema(types = {"string", "null"}, format = "date") LocalDate fromMonth,
-            @Schema(types = {"string", "null"}, format = "date") LocalDate toMonth,
-            int monthCount
+            @Schema(types = {"string", "null"}, format = "date") LocalDate fromDate,
+            @Schema(types = {"string", "null"}, format = "date") LocalDate toDate,
+            int pointCount
     ) {}
 
     @Schema(name = "HousingBenchmarkSummary")
@@ -68,11 +68,11 @@ public record HousingBenchmarkComparisonResponse(
 
     @Schema(name = "HousingBenchmarkPoint")
     public record Point(
-            LocalDate baseMonth,
+            LocalDate baseDate,
             BigDecimal investmentIndexUsd,
             BigDecimal benchmarkIndex,
-            @Schema(types = {"number", "null"}) BigDecimal investmentMonthlyReturn,
-            @Schema(types = {"number", "null"}) BigDecimal benchmarkMonthlyReturn
+            @Schema(types = {"number", "null"}) BigDecimal investmentPeriodReturn,
+            @Schema(types = {"number", "null"}) BigDecimal benchmarkPeriodReturn
     ) {}
 
     @Schema(name = "HousingBenchmarkCurrentExchangeRate")
@@ -101,7 +101,7 @@ public record HousingBenchmarkComparisonResponse(
                         benchmark.assetType().name(), benchmark.regionCode(), benchmark.regionName(),
                         benchmark.quintile(), benchmark.symbol(),
                         benchmark.label(), benchmark.sourceUpdatedDate()),
-                new Period(period.fromMonth(), period.toMonth(), period.monthCount()),
+                new Period(period.fromDate(), period.toDate(), period.pointCount()),
                 toSummary(comparison.summary()),
                 comparison.points().stream().map(HousingBenchmarkComparisonResponse::toPoint).toList(),
                 rate == null ? null : new CurrentExchangeRate(
@@ -122,7 +122,7 @@ public record HousingBenchmarkComparisonResponse(
 
     private static Point toPoint(HousingBenchmarkPoint point) {
         return new Point(
-                point.baseMonth(), point.investmentIndexUsd(), point.benchmarkIndex(),
-                point.investmentMonthlyReturn(), point.benchmarkMonthlyReturn());
+                point.baseDate(), point.investmentIndexUsd(), point.benchmarkIndex(),
+                point.investmentPeriodReturn(), point.benchmarkPeriodReturn());
     }
 }

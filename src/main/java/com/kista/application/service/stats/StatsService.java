@@ -111,7 +111,7 @@ class StatsService implements UserStatsUseCase {
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, quintile, from, to);
-        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to);
+        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.MONTHLY);
 
         LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
         LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
@@ -136,7 +136,8 @@ class StatsService implements UserStatsUseCase {
                 SEOUL_REGION_NAME + " 아파트 " + quintile + "분위", sourceUpdatedDate);
 
         HousingBenchmarkComparison comparison = comparisonBuilder.build(
-                scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), selectedBenchmarkPrices);
+                scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), selectedBenchmarkPrices,
+                BenchmarkGranularity.MONTHLY);
         return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 
@@ -144,13 +145,15 @@ class StatsService implements UserStatsUseCase {
     public HousingBenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
-        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to);
+        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.DAILY);
         LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
         LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
         LocalDate dailyTo = benchmarkTo.plusMonths(1).minusDays(1);
 
+        // ETF는 다운샘플링 없이 거래일별 종가를 그대로 벤치마크 가격으로 사용한다.
         List<IndexPrice> dailyPrices = indexPricePort.findBySymbolAndRange(symbol.name(), benchmarkFrom, dailyTo);
-        Map<LocalDate, BigDecimal> prices = IndexPriceMonthlyDownsampler.toMonthlyLastClose(dailyPrices);
+        Map<LocalDate, BigDecimal> prices = dailyPrices.stream()
+                .collect(Collectors.toMap(IndexPrice::tradeDate, IndexPrice::close, (left, right) -> right, TreeMap::new));
         LocalDate sourceUpdatedDate = dailyPrices.stream().map(IndexPrice::tradeDate)
                 .max(LocalDate::compareTo).orElse(null);
 
@@ -158,17 +161,19 @@ class StatsService implements UserStatsUseCase {
                 BenchmarkAssetType.ETF, null, null, null, symbol.name(),
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
-        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), prices)
+        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), prices,
+                        BenchmarkGranularity.DAILY)
                 .withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 
-    // 자산 종류(HOUSING/ETF)와 무관한 공통 준비 단계 — 소유권 검증·사이클/포지션 조회·월별 투자 지수 계산
+    // 자산 종류(HOUSING/ETF)와 무관한 공통 준비 단계 — 소유권 검증·사이클/포지션 조회·투자 지수 계산
     private record InvestmentContext(
             Strategy selectedStrategy, LocalDate effectiveFrom, LocalDate effectiveTo,
-            List<MonthlyInvestmentPoint> investmentPoints) {}
+            List<InvestmentPoint> investmentPoints) {}
 
     private InvestmentContext buildInvestmentContext(
-            UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
+            UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to,
+            BenchmarkGranularity granularity) {
         validateScopeAndRange(scope, strategyId, from, to);
 
         LocalDate effectiveTo = completedMonthEnd(to);
@@ -195,8 +200,8 @@ class StatsService implements UserStatsUseCase {
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
 
-        List<MonthlyInvestmentPoint> investmentPoints = monthlyReturnCalculator.calculate(
-                cycles, positions, effectiveFrom, effectiveTo);
+        List<InvestmentPoint> investmentPoints = monthlyReturnCalculator.calculate(
+                cycles, positions, effectiveFrom, effectiveTo, granularity);
 
         return new InvestmentContext(selectedStrategy, effectiveFrom, effectiveTo, investmentPoints);
     }
