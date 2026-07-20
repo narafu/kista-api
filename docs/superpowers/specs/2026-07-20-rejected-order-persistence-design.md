@@ -37,14 +37,18 @@ public static Order rejected(Order template, UUID accountId, UUID strategyCycleI
 
 ### `TradingOrderPlanner`
 
-`saveAllocatedOrders`는 개장(`TradingOpenScheduler`)·마감(`TradingCloseScheduler`) 양쪽에서 모두 호출된다. 개장에서 거절된 leg가 마감에서 재계산돼 다시 거절되면(`findPlannedOrPlacedByCycleAndDate`가 REJECTED를 점유로 안 보므로 매번 새 후보로 잡힘), 같은 `(strategyCycleId, tradeDate, orderLeg)`에 REJECTED 행이 **중복 저장**될 수 있다. `orders`에는 이 조합에 대한 UNIQUE 제약이 없으므로, 저장 전 해당 사이클·거래일의 기존 REJECTED를 지우고 최신 결과로 교체하는 replace 패턴을 쓴다(성공(PLANNED/PLACED)한 leg의 과거 REJECTED 이력은 이 삭제 대상이 아니다 — 애초에 그 leg는 이번 run에서 거절 후보로 다시 안 들어오므로 `saveRejectedOrders` 호출 자체가 그 leg를 건드리지 않는다):
+`saveAllocatedOrders`는 개장(`TradingOpenScheduler`)·마감(`TradingCloseScheduler`) 양쪽에서 모두 호출된다. 개장에서 거절된 leg가 마감에서 재계산돼 다시 거절되면(`findPlannedOrPlacedByCycleAndDate`가 REJECTED를 점유로 안 보므로 매번 새 후보로 잡힘), 같은 `(strategyCycleId, tradeDate, orderLeg)`에 REJECTED 행이 **중복 저장**될 수 있다. `orders`에는 이 조합에 대한 UNIQUE 제약이 없으므로, 저장 전 **이번에 다시 거절 판정된 leg만** 지우고 최신 결과로 교체하는 replace 패턴을 쓴다.
+
+삭제 범위를 `(cycle, tradeDate)` 전체로 잡으면 안 된다 — 한 사이클에 BUY_01/BUY_02 두 leg가 개장에서 함께 거절된 뒤, 마감에서 BUY_01만 예수금 확보로 승인(PLANNED)되고 BUY_02는 여전히 거절이면, `saveRejectedOrders([BUY_02])` 호출이 사이클·거래일 전체를 지워버려 이미 회복된 BUY_01의 REJECTED 이력까지 함께 사라진다. 이는 "재시도로 회복된 leg의 과거 거절 이력은 이력 탭에 보존한다"는 요구를 정면으로 깨므로, **삭제는 반드시 이번 run에서 실제로 다시 거절된 leg 목록으로 범위를 좁힌다**:
 
 ```java
 // 예산 배정 거절 후보를 REJECTED로 기록 (브로커 미접수 이력 보존)
-// 같은 (cycle, tradeDate)에 대한 이전 REJECTED는 지우고 최신 거절 결과로 교체 —
-// 개장·마감 스케쥴러가 같은 leg를 반복 거절해도 중복 행이 쌓이지 않는다
+// 이번에 다시 거절된 leg만 지우고 최신 결과로 교체 —
+// 개장·마감 스케쥴러가 같은 leg를 반복 거절해도 중복 행이 쌓이지 않되,
+// 같은 사이클의 다른 leg가 이미 회복(PLANNED/PLACED)됐다면 그 leg의 REJECTED 이력은 건드리지 않는다
 void saveRejectedOrders(List<Order> templates, Account account, UUID strategyCycleId, LocalDate tradeDate) {
-    orderPort.deleteRejectedByCycleAndDate(strategyCycleId, tradeDate);
+    List<String> legs = templates.stream().map(Order::orderLeg).toList();
+    orderPort.deleteRejectedByCycleDateAndLegs(strategyCycleId, tradeDate, legs);
     List<Order> rejected = templates.stream()
             .map(o -> Order.rejected(o, account.id(), strategyCycleId))
             .toList();
@@ -53,7 +57,7 @@ void saveRejectedOrders(List<Order> templates, Account account, UUID strategyCyc
 }
 ```
 
-`OrderPort`에 `void deleteRejectedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);` 신규 추가.
+`OrderPort`에 `void deleteRejectedByCycleDateAndLegs(UUID strategyCycleId, LocalDate tradeDate, List<String> orderLegs);` 신규 추가.
 
 ### `TradingService.saveAllocatedOrders`
 
@@ -92,10 +96,10 @@ for (BatchContext ctx : rejectedContexts) {
 
 ```java
 List<Order> findRejectedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
-void deleteRejectedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
+void deleteRejectedByCycleDateAndLegs(UUID strategyCycleId, LocalDate tradeDate, List<String> orderLegs);
 ```
 
-`OrderPersistenceAdapter`/`OrderJpaRepository`에 `findByStrategyCycleIdAndTradeDateAndStatusIn(..., List.of(REJECTED))` / `deleteByStrategyCycleIdAndTradeDateAndStatus(..., REJECTED)` 패턴으로 구현 (기존 `findPlannedOrPlacedByCycleAndDate`와 동일한 헬퍼 재사용).
+`OrderPersistenceAdapter`/`OrderJpaRepository`에 `findByStrategyCycleIdAndTradeDateAndStatusIn(..., List.of(REJECTED))` / `deleteByStrategyCycleIdAndTradeDateAndStatusAndOrderLegIn(..., REJECTED, orderLegs)` 패턴으로 구현 (기존 `findPlannedOrPlacedByCycleAndDate`와 동일한 헬퍼 재사용).
 
 ### `TradingPreviewService.preview()`
 
@@ -161,10 +165,11 @@ public record NextOrdersPreview(
   - SELL 거절도 동일하게 REJECTED로 저장되는지
   - 같은 사이클에서 SELL 승인 + BUY 거절이 동시에 일어날 때 SELL은 PLANNED, BUY는 REJECTED로 각각 정확히 저장되는지
   - REJECTED 저장이 예외를 던져도 같은 배치의 다른 사이클 처리가 계속되는지 (`runSafely` 격리)
-  - **개장에서 거절된 leg가 마감에서도 다시 거절될 때 REJECTED 행이 1건으로 유지되는지(중복 저장 회귀)** — `saveRejectedOrders` 호출 전 `deleteRejectedByCycleAndDate`가 먼저 실행되는지 검증
+  - **개장에서 거절된 leg가 마감에서도 다시 거절될 때 REJECTED 행이 1건으로 유지되는지(중복 저장 회귀)** — `saveRejectedOrders` 호출 전 `deleteRejectedByCycleDateAndLegs`가 해당 leg만 지우는지 검증
+  - **같은 사이클에서 BUY_01은 마감에 회복(PLANNED)되고 BUY_02는 계속 거절일 때, BUY_01의 과거 REJECTED 이력이 삭제되지 않고 남아있는지(부분 회복 회귀)** — 삭제 범위가 사이클·거래일 전체가 아니라 이번 run에서 다시 거절된 leg로 한정되는지가 핵심
 - `OrderPersistenceAdapterTest`:
   - `findRejectedByCycleAndDate`가 REJECTED만 반환하는지
-  - `deleteRejectedByCycleAndDate`가 REJECTED만 삭제하고 같은 사이클·거래일의 PLANNED/PLACED/FILLED 등 다른 상태는 건드리지 않는지
+  - `deleteRejectedByCycleDateAndLegs`가 지정한 leg의 REJECTED만 삭제하고, 같은 사이클·거래일의 다른 leg REJECTED나 PLANNED/PLACED/FILLED 등 다른 상태는 건드리지 않는지
   - `findPlannedOrPlacedByCycleAndDate`가 REJECTED를 여전히 배제하는 회귀 테스트(가장 중요 — 슬롯 재시도가 걸려있음)
 - `TradingPreviewServiceTest`:
   - **`todayOrders`에는 REJECTED가 절대 섞이지 않는지(회귀)** — PLANNED/PLACED만 있던 기존 테스트가 그대로 통과해야 함
