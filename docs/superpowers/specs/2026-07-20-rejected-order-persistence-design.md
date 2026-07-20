@@ -1,181 +1,169 @@
-# 예산 배정 거절 주문(REJECTED) 영속화 — 매수/매도 거절 이력 표시
+# 예산 배정 거절 사실 기록 — 매수/매도 거절 배너 (v2, 단순화)
+
+> v1(개별 REJECTED 주문 row를 `orders`에 leg 단위로 영속화하는 안)은 advisor 검토를 거치며 leg-scoped delete·`todayOrders`/`rejectedOrders` 필드 분리·취소버튼 가드·이력탭 렌더링까지 변경 범위가 계속 불어났다. 사용자 피드백("바로 주문 영역이 너무 복잡해지고 있다")에 따라 훨씬 가벼운 v2로 재설계한다. **v1의 문제 인식(배경)은 유효하므로 그대로 유지하고, 해결 방식만 바꾼다.**
 
 ## 배경
 
-토스증권 PRIVACY 전략에서 예수금 부족 상태로 개장 스케쥴러(22:30 KST)가 실행되면, `TradingOrderBudgetAllocator`가 예산 부족으로 거절한 BUY 후보는 `TradingService.saveAllocatedOrders`에서 알림만 발송하고 **`orders` 테이블에 전혀 저장하지 않는다**. 반면 같은 사이클의 SELL이 승인되면 정상적으로 PLANNED/PLACED로 저장된다. 그 결과 사용자는 "매도만 접수됐고 매수는 아무 흔적도 없는" 화면을 보게 된다.
+토스증권 PRIVACY 전략에서 예수금 부족 상태로 개장 스케쥴러(22:30 KST)가 실행되면, `TradingOrderBudgetAllocator`가 예산 부족으로 거절한 BUY 후보는 `TradingService.saveAllocatedOrders`에서 알림만 발송하고 DB에 전혀 흔적을 남기지 않는다. 같은 사이클의 SELL이 승인되면 정상 저장되므로, 사용자는 "매도만 접수되고 매수는 아무 정보도 없는" 화면을 보게 된다.
 
-kista-ui `StrategyDetail.tsx`에는 이런 상황을 위한 `BuyCompetitionNotice` 배지가 이미 있지만, 이는 **조회 시점의 라이브 잔고로 매번 새로 재시뮬레이션**(`TradingBuyCompetitionSimulator`)한 근사치다. 스케쥴러 실행 시각과 사용자가 화면을 보는 시각 사이에 라이브 잔고나 경쟁 전략 상태가 조금이라도 바뀌면, 실제로는 거절됐던 매수가 재시뮬레이션에서 "충분함"으로 나와 배지 자체가 뜨지 않을 수 있다. 이번에 확인된 실제 사례가 이 케이스로 추정된다.
+kista-ui의 `BuyCompetitionNotice` 배지는 조회 시점 라이브 잔고로 매번 새로 재시뮬레이션하는 근사치라, 스케쥴러 실행 시각과 화면 조회 시각 사이 잔고가 조금만 바뀌어도 실제 거절과 어긋나 배지가 안 뜰 수 있다 — 이번 실제 사례가 이 케이스로 추정된다.
 
-이 설계는 "그날 실제로 거절이 있었다"는 사실 자체를 SELL과 동일하게 `orders` 테이블에 영속화해, 재시뮬레이션의 정확도에 의존하지 않고 사용자에게 정확한 이력을 보여준다.
+## 설계 방향 전환
+
+v1은 "거절된 각 주문의 수량·가격까지 SELL처럼 정확히 이력화"하는 데 초점을 맞췄고, 그러다 보니 `orders` 테이블의 슬롯 점유·재시도 의미론과 계속 충돌해 leg 단위 삭제·필드 분리 같은 방어 로직이 늘어났다.
+
+v2는 목표를 낮춘다: 사용자가 알아야 할 건 **"오늘 예수금(또는 판매가능수량) 부족으로 매수(또는 매도)가 몇 건 접수 안 됐다"**는 사실이지, 개별 주문의 정확한 가격까지는 아니다. 이 사실은 **사이클 + 거래일 + 방향** 단위로 최대 2건(BUY 1, SELL 1)만 있으면 충분하므로, `orders`와 완전히 분리된 작은 테이블 하나로 표현한다.
+
+이 전환으로 사라지는 것:
+- `Order.OrderStatus.REJECTED` 신규 상태 — 불필요
+- leg 단위 delete-replace, `orderLeg` 기반 dedup — 불필요 (방향 단위라 upsert 하나로 끝남)
+- `NextOrdersPreview.todayOrders`/`rejectedOrders` 필드 분리, kista-ui `mode`/카운트/취소버튼 가드 — 불필요 (주문 목록 자체를 안 건드림)
+- `OrderRows.tsx`/이력 탭에서 REJECTED 상태 렌더링 — 불필요
+- 슬롯 점유·재시도 쿼리(`findPlannedOrPlacedByCycleAndDate`)와의 상호작용 — 애초에 무관해짐 (별도 테이블이라 orders 조회에 전혀 안 걸림)
 
 ## 범위
 
-- BUY/SELL, 전략 타입(INFINITE/PRIVACY/VR) 구분 없이 **예산 배정 거절 후보는 모두 동일하게 REJECTED로 기록**한다 — `TradingOrderBudgetAllocator`가 이미 BUY/SELL을 방향 독립적으로, 전략 타입 무관하게 처리하므로 저장 단계에서 방향·타입별로 분기할 이유가 없다.
-- 개장(`TradingOpenScheduler`)·마감(`TradingCloseScheduler`) 양쪽 경로 모두 `saveAllocatedOrders`를 공유하므로 자동으로 동일 적용된다.
-- **슬롯 점유·재시도 판단 로직은 절대 변경하지 않는다.** `findPlannedOrPlacedByCycleAndDate`(PLANNED/PLACED만 필터)는 그대로 유지해, 장마감 전 예수금이 채워지면 REJECTED된 슬롯도 "비어있음"으로 재계산·재승인·재접수되는 기존 동작을 보존한다.
-- DB 마이그레이션 불필요 — `orders.status`는 `VARCHAR(20)` + CHECK 제약 없음.
+- BUY/SELL, 전략 타입(INFINITE/PRIVACY/VR) 구분 없이 동일 적용.
+- 개장·마감 스케쥴러 모두 `saveAllocatedOrders`를 공유하므로 자동 적용.
+- 화면엔 기존 주문 목록(`todayOrders`, `OrderRows`)을 전혀 건드리지 않고, "다음 주문" 카드에 배너 한 줄만 추가한다.
 
 ## 도메인 모델
 
-`domain/model/order/Order.java`:
+`domain/model/order/OrderRejection.java` (신규):
 
 ```java
-public enum OrderStatus {
-    PLANNED, PLACED, FILLED, PARTIALLY_FILLED, FAILED, CANCELLED,
-    REJECTED   // 신규 — 예산 배정 단계에서 거절, 브로커 접수 시도조차 안 됨
-}
+public record OrderRejection(
+        UUID id,
+        UUID strategyCycleId,
+        LocalDate tradeDate,
+        Order.OrderDirection direction,  // BUY=예수금 부족, SELL=판매가능수량 부족
+        int orderCount                   // 이번 배정에서 거절된 주문 후보 건수
+) {}
+```
 
-// 예산 배정 거절 이력 기록용 — Order.plan()과 동일 패턴, status만 REJECTED
-public static Order rejected(Order template, UUID accountId, UUID strategyCycleId) {
-    return new Order(null, accountId, strategyCycleId, template.tradeDate(), template.ticker(),
-            template.orderType(), template.timing(), template.direction(), template.orderLeg(),
-            template.quantity(), template.price(), OrderStatus.REJECTED, null, null, null);
+`domain/port/out/OrderRejectionPort.java` (신규):
+
+```java
+public interface OrderRejectionPort {
+    // (strategyCycleId, tradeDate, direction) 자연키 upsert — 개장·마감이 같은 방향을 반복 거절해도 최신 건수로 덮어쓸 뿐 중복 행이 안 생긴다
+    void upsert(UUID strategyCycleId, LocalDate tradeDate, Order.OrderDirection direction, int orderCount);
+
+    // 재시도로 해당 방향이 승인되면 호출 — 더 이상 거절 상태가 아니므로 배너에서 사라져야 한다
+    void deleteIfExists(UUID strategyCycleId, LocalDate tradeDate, Order.OrderDirection direction);
+
+    List<OrderRejection> findByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 }
 ```
+
+## 영속성
+
+신규 테이블 `order_rejections` (Flyway `V31__create_order_rejections.sql` — 실제 파일 작성 시 `ls src/main/resources/db/migration`으로 최신 버전 재확인 필수):
+
+```sql
+CREATE TABLE order_rejections (
+    id                UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    strategy_cycle_id UUID          NOT NULL,
+    trade_date        DATE          NOT NULL,
+    direction         VARCHAR(10)   NOT NULL,
+    order_count       INTEGER       NOT NULL,
+    created_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT order_rejections_strategy_cycle_id_fkey
+        FOREIGN KEY (strategy_cycle_id) REFERENCES strategy_cycle(id) ON DELETE CASCADE,
+    CONSTRAINT uq_order_rejections_cycle_date_direction
+        UNIQUE (strategy_cycle_id, trade_date, direction)
+);
+
+CREATE INDEX idx_order_rejections_cycle_date ON order_rejections(strategy_cycle_id, trade_date);
+```
+
+`OrderRejectionEntity` + `OrderRejectionJpaRepository`(package-private) + `OrderRejectionPersistenceAdapter`는 기존 `adapter/out/persistence/trade/` 3종 구성 패턴 그대로 따른다. `upsert`는 `INSERT ... ON CONFLICT (strategy_cycle_id, trade_date, direction) DO UPDATE SET order_count = EXCLUDED.order_count, updated_at = now()` native query로 구현 — JPA merge보다 자연키 upsert 의도가 명확하다.
 
 ## 애플리케이션 레이어
 
-### `TradingOrderPlanner`
-
-`saveAllocatedOrders`는 개장(`TradingOpenScheduler`)·마감(`TradingCloseScheduler`) 양쪽에서 모두 호출된다. 개장에서 거절된 leg가 마감에서 재계산돼 다시 거절되면(`findPlannedOrPlacedByCycleAndDate`가 REJECTED를 점유로 안 보므로 매번 새 후보로 잡힘), 같은 `(strategyCycleId, tradeDate, orderLeg)`에 REJECTED 행이 **중복 저장**될 수 있다. `orders`에는 이 조합에 대한 UNIQUE 제약이 없으므로, 저장 전 **이번에 다시 거절 판정된 leg만** 지우고 최신 결과로 교체하는 replace 패턴을 쓴다.
-
-삭제 범위를 `(cycle, tradeDate)` 전체로 잡으면 안 된다 — 한 사이클에 BUY_01/BUY_02 두 leg가 개장에서 함께 거절된 뒤, 마감에서 BUY_01만 예수금 확보로 승인(PLANNED)되고 BUY_02는 여전히 거절이면, `saveRejectedOrders([BUY_02])` 호출이 사이클·거래일 전체를 지워버려 이미 회복된 BUY_01의 REJECTED 이력까지 함께 사라진다. 이는 "재시도로 회복된 leg의 과거 거절 이력은 이력 탭에 보존한다"는 요구를 정면으로 깨므로, **삭제는 반드시 이번 run에서 실제로 다시 거절된 leg 목록으로 범위를 좁힌다**:
-
-```java
-// 예산 배정 거절 후보를 REJECTED로 기록 (브로커 미접수 이력 보존)
-// 이번에 다시 거절된 leg만 지우고 최신 결과로 교체 —
-// 개장·마감 스케쥴러가 같은 leg를 반복 거절해도 중복 행이 쌓이지 않되,
-// 같은 사이클의 다른 leg가 이미 회복(PLANNED/PLACED)됐다면 그 leg의 REJECTED 이력은 건드리지 않는다
-void saveRejectedOrders(List<Order> templates, Account account, UUID strategyCycleId, LocalDate tradeDate) {
-    List<String> legs = templates.stream().map(Order::orderLeg).toList();
-    orderPort.deleteRejectedByCycleDateAndLegs(strategyCycleId, tradeDate, legs);
-    List<Order> rejected = templates.stream()
-            .map(o -> Order.rejected(o, account.id(), strategyCycleId))
-            .toList();
-    orderPort.saveAll(rejected);
-    log.info("[{}] 거절 주문 {}건 기록 (REJECTED)", account.nickname(), rejected.size());
-}
-```
-
-`OrderPort`에 `void deleteRejectedByCycleDateAndLegs(UUID strategyCycleId, LocalDate tradeDate, List<String> orderLegs);` 신규 추가.
-
 ### `TradingService.saveAllocatedOrders`
 
-거절 루프를 개별 `Candidate`(현재는 `BatchContext`로 dedup되어 있어 `orders()`에 접근 못 함) 단위로 순회하도록 변경한다:
-
 ```java
-List<TradingOrderBudgetAllocator.Candidate> rejected = Stream.concat(
-                allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
-        .toList();
+for (TradingOrderBudgetAllocator.Candidate approved : allocation.approved()) {
+    Optional<BatchContext> saved = runSafely("계획 주문 저장", approved.ctx(), () -> {
+        orderPlanner.savePlannedOrders(approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
+        return approved.ctx();
+    });
+    if (saved.isPresent()) {
+        savedContexts.add(saved.get());
+        // 이번 run에서 승인된 각 방향에 대해 과거 거절 배너를 해소한다
+        Set<Order.OrderDirection> approvedDirections = approved.orders().stream()
+                .map(Order::direction).collect(Collectors.toSet());
+        for (Order.OrderDirection direction : approvedDirections) {
+            runSafely("거절 배너 해소", approved.ctx(), () -> {
+                orderRejectionPort.deleteIfExists(approved.ctx().currentCycle().id(), tradeDate, direction);
+                return null;
+            });
+        }
+    }
+}
 
-for (TradingOrderBudgetAllocator.Candidate candidate : rejected) {
-    runSafely("거절 주문 기록", candidate.ctx(), () -> {
-        orderPlanner.saveRejectedOrders(
-                candidate.orders(), candidate.ctx().account(), candidate.ctx().currentCycle().id(), tradeDate);
+for (TradingOrderBudgetAllocator.Candidate candidate : allocation.rejectedBuy()) {
+    runSafely("거절 배너 기록", candidate.ctx(), () -> {
+        orderRejectionPort.upsert(candidate.ctx().currentCycle().id(), tradeDate, Order.OrderDirection.BUY, candidate.orders().size());
+        return null;
+    });
+}
+for (TradingOrderBudgetAllocator.Candidate candidate : allocation.rejectedSell()) {
+    runSafely("거절 배너 기록", candidate.ctx(), () -> {
+        orderRejectionPort.upsert(candidate.ctx().currentCycle().id(), tradeDate, Order.OrderDirection.SELL, candidate.orders().size());
         return null;
     });
 }
 
-Set<BatchContext> rejectedContexts = rejected.stream()
-        .map(TradingOrderBudgetAllocator.Candidate::ctx)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
-for (BatchContext ctx : rejectedContexts) {
-    runSafely("예수금 부족 알림", ctx, () -> {
-        userNotificationPort.notifyInsufficientBalance(
-                ctx.user(), ctx.account(), ctx.strategy().type(), ctx.strategy().ticker());
-        return null;
-    });
-}
+Set<BatchContext> rejectedContexts = ...; // 기존 알림 발송 로직 변경 없음
 ```
 
-`rejectedBuy`와 `rejectedSell`에 같은 `ctx`가 동시에 나타날 수 있으나(같은 사이클의 BUY·SELL이 모두 거절된 경우) 각각 다른 `orders()`를 가진 별개의 `Candidate`이므로 중복 저장이 아니다. 저장·알림 모두 기존과 동일하게 `runSafely`로 개별 격리해, 한 사이클의 REJECTED 기록 실패가 다른 사이클의 SELL 저장이나 알림 발송을 막지 않는다.
+**주의**: `allocation.approved()`(`mergeApproved`)는 방향별로 분리되지 않는다 — 한 사이클에서 BUY·SELL이 같은 run에 함께 승인되면 병합된 `Candidate.orders()`에 두 방향이 섞여 들어온다(`TradingOrderBudgetAllocator.java` 주석: "Approved contains only approved directions per candidate" — direction을 필터링해서 포함할 뿐 단일 방향으로 축소하지 않는다는 뜻). 그래서 해소 루프는 `getFirst().direction()`이 아니라 **`orders()`에 실제 존재하는 방향 집합을 순회**해야 한다. 반대로 `rejectedBuy`/`rejectedSell`은 `allocateBuysForAccount`/`allocateSellsForAccountTicker` 단계에서 이미 방향별로 분리된 리스트이므로 어느 리스트에서 왔는지로 방향이 확정된다 — 별도 파생 불필요.
 
-### `OrderPort` / 영속성
-
-신규 메서드 추가 — **기존 `findPlannedOrPlacedByCycleAndDate`는 변경하지 않는다**:
-
-```java
-List<Order> findRejectedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
-void deleteRejectedByCycleDateAndLegs(UUID strategyCycleId, LocalDate tradeDate, List<String> orderLegs);
-```
-
-`OrderPersistenceAdapter`/`OrderJpaRepository`에 `findByStrategyCycleIdAndTradeDateAndStatusIn(..., List.of(REJECTED))` / `deleteByStrategyCycleIdAndTradeDateAndStatusAndOrderLegIn(..., REJECTED, orderLegs)` 패턴으로 구현 (기존 `findPlannedOrPlacedByCycleAndDate`와 동일한 헬퍼 재사용).
+저장·해소·기록 모두 기존과 동일하게 `runSafely`로 개별 격리한다.
 
 ### `TradingPreviewService.preview()`
 
-**`todayOrders`는 PLANNED/PLACED만 담는 기존 의미를 그대로 유지한다.** REJECTED는 별도 필드로 분리한다 — `todayOrders`는 kista-ui에서 `mode`(preview/executed) 판정·"N건 접수됨" 카운트·취소 대상 목록의 입력으로 쓰이므로, 여기에 REJECTED를 섞으면 거절 건이 "접수됨"으로 잘못 집계되고, 승인된 주문이 하나도 없이 전량 거절된 날엔 `mode`가 `preview`로 남아야 하는데 REJECTED 존재만으로 `executed`로 잘못 전환된다.
-
 ```java
-List<Order> todayOrders = orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today); // 기존과 동일 — PLANNED/PLACED만
-List<Order> rejectedOrders = orderPort.findRejectedByCycleAndDate(currentCycle.id(), today);
-
-// 같은 leg가 이후 재시도로 성공(PLANNED/PLACED 존재)했으면 당일 카드에서는 REJECTED 숨김
-Set<String> activeLegs = todayOrders.stream().map(Order::orderLeg).collect(Collectors.toSet());
-List<Order> visibleRejectedOrders = rejectedOrders.stream()
-        .filter(o -> !activeLegs.contains(o.orderLeg()))
-        .toList();
+List<OrderRejection> rejections = orderRejectionPort.findByCycleAndDate(currentCycle.id(), today);
+return new NextOrdersPreview(today, plan.position(), plan.orders(), null,
+        todayPlannedOrders, otherStrategiesPlannedBuyUsd, competition, rejections);
 ```
 
-`otherStrategiesPlannedBuyUsd`/`thisStrategyPlannedBuy` 등 예산 관련 계산은 계속 `todayOrders`(PLANNED/PLACED)만 사용 — 변경 없음. `NextOrdersPreview`에 `rejectedOrders` 필드를 신규 추가하고 `visibleRejectedOrders`를 담는다(`todayOrders`는 손대지 않음).
-
-```java
-public record NextOrdersPreview(
-    LocalDate tradeDate, InfinitePosition position, List<Order> orders, SkipReason skipReason,
-    List<Order> todayOrders, BigDecimal otherStrategiesPlannedBuyUsd, BuyCompetitionPreview competition,
-    List<Order> rejectedOrders   // 신규 — 당일 예산 배정 거절 이력(재시도 성공 leg는 제외된 상태)
-) { ... }
-```
+`todayPlannedOrders`(PLANNED/PLACED 목록)는 v1 이전과 완전히 동일 — 변경 없음. `NextOrdersPreview`에 `List<OrderRejection> rejections` 필드만 추가.
 
 ## 어댑터 — API 응답
 
-`adapter/in/web/dto/NextOrdersResponse.java`에 `rejectedOrders` 필드를 `todayOrders`와 별도로 추가(같은 order 항목 DTO 재사용, `status` 필드 포함).
+`NextOrdersResponse`에 `rejections: List<RejectionResponse>` 필드 추가:
+
+```java
+public record RejectionResponse(String direction, int orderCount) {
+    public static RejectionResponse from(OrderRejection r) { return new RejectionResponse(r.direction().name(), r.orderCount()); }
+}
+```
 
 ## 프론트엔드 (kista-ui)
 
-### 타입 / 데이터
-
-`useStrategyOrderPreviewQuery`가 반환하는 타입에 `rejectedOrders?: OrderRowData[]` 추가. `todayOrders`(→ `serverOrders`)는 기존 의미(PLANNED/PLACED) 그대로 유지되므로 `mode`/`hasServerOrders`/취소 로직은 **변경 없음**.
-
-### `OrderRows.tsx`
-
-- `status === 'REJECTED'`일 때: 회색/취소선 스타일 + "예수금 부족으로 미접수" 라벨(방향 배지 옆 또는 별도 텍스트).
-- 취소 버튼: 현재 `o.id` 존재 여부로만 렌더링하는데, REJECTED는 `id`가 있어도 취소 대상이 아니므로 `status`가 `PLANNED`/`PLACED`일 때만 취소 버튼을 그리도록 조건 추가.
-
-### `StrategyDetail.tsx`
-
-- `mode === 'executed'`일 때만 `rejectedOrders`를 `placedOrders`와 합쳐 `OrderRows`에 전달(사용자가 선택한 "같은 목록에 섞어서, 상태만 다르게 표시"). `mode === 'preview'`(오늘 아직 승인된 주문이 하나도 없는 상태)에서는 `preview.orders`(재계산된 살아있는 계획)가 더 유용하므로 `rejectedOrders`를 목록에 섞지 않는다 — 전량 거절돼 `todayOrders`가 비어 있던 날에도 REJECTED 이력 자체는 이력 탭에서 항상 확인 가능하다.
-- 헤더 배지 문구: `mode === 'executed'`이고 `rejectedOrders.length > 0`이면 "N건 접수됨" → "N건 접수됨 · M건 거절"로 합산 표기. `placedOrders.length`(REJECTED 미포함) 기준 카운트는 그대로 유지.
-- `StrategyOrderHistory`(이력 탭)는 이미 status 필터 없는 조회를 쓰고 있어 REJECTED가 자동으로 노출됨 — 상태 라벨 매핑(`REJECTED` → "거절됨")만 추가하면 된다.
-
-### `BuyCompetitionNotice` 처리 방침
-
-기존 배지는 라이브 재시뮬레이션 근사치라 이번에 확인된 사례처럼 실제 거절과 어긋날 수 있다(가설, 미확정). REJECTED 영속화 이후에도 완전히 대체되는 건 아니므로 용도를 분리한다:
-- **`mode === 'preview'`**(아직 오늘 확정된 결과가 없어 "지금 바로 주문하면 될까"가 유효한 질문인 상황): 기존 로직 그대로 유지.
-- **`mode === 'executed'`**(REJECTED 등 실제 결과가 이미 화면에 사실 그대로 표시되는 상황): 헤더 인라인 배지(`StrategyDetail.tsx:229-231`)는 렌더링하지 않는다 — 근사치와 실측 이력이 동시에 노출되어 서로 다른 말을 하는 혼선을 피한다. 조건을 `hasDeficit && competition && mode === 'preview'`로 변경.
+- `useStrategyOrderPreviewQuery` 반환 타입에 `rejections?: { direction: 'BUY'|'SELL'; orderCount: number }[]` 추가.
+- `StrategyDetail.tsx`: "다음 주문" 카드 헤더에 `rejections`가 있으면 방향별로 한 줄씩 배너 렌더링 — "예수금 부족으로 매수 3건 미접수" / "판매가능수량 부족으로 매도 2건 미접수". **`mode`(preview/executed)와 무관하게 항상 렌더링** — 기존 주문 목록(`OrderRows`, `placedOrders`, 취소 로직)은 전혀 건드리지 않으므로 mode 분기 자체가 필요 없다.
+- `BuyCompetitionNotice`는 그대로 둔다 — `mode === 'preview'`일 때만 의미 있는 "지금 시도하면 될까" 추정이라는 역할이 이번 변경과 겹치지 않는다. 다만 `mode === 'executed'`이면서 `rejections`에 BUY가 있는 상태에서 재시뮬레이션 배지도 함께 뜨면 메시지가 중복될 수 있으므로, 헤더 인라인 배지(`StrategyDetail.tsx:229-231`) 조건에 `mode === 'preview'`를 추가해 실측 배너와 겹치지 않게 한다 (v1과 동일한 결론, 변경 범위는 한 줄).
+- 이력 탭(`StrategyOrderHistory`)은 이번 변경과 무관 — REJECTED 개념 자체가 `orders`에 없으므로 아무것도 안 해도 된다.
 
 ## 에러 처리
 
-- REJECTED 저장 실패는 `runSafely`로 격리되어 다른 사이클의 SELL 저장·PLANNED 저장·알림 발송에 영향을 주지 않는다.
-- `notifyInsufficientBalance` 알림은 기존 동작 그대로 유지(REJECTED 저장 성공 여부와 무관하게 발송).
+- `upsert`/`deleteIfExists` 실패는 `runSafely`로 격리되어 다른 사이클의 저장·알림에 영향 없음.
+- `notifyInsufficientBalance` 알림은 기존 동작 그대로 유지.
 
 ## 테스트 계획
 
 - `TradingServiceTest`:
-  - 예수금 부족으로 BUY 거절 시 REJECTED row가 저장되는지, orderLeg·direction·quantity·price가 원본 후보와 일치하는지
-  - SELL 거절도 동일하게 REJECTED로 저장되는지
-  - 같은 사이클에서 SELL 승인 + BUY 거절이 동시에 일어날 때 SELL은 PLANNED, BUY는 REJECTED로 각각 정확히 저장되는지
-  - REJECTED 저장이 예외를 던져도 같은 배치의 다른 사이클 처리가 계속되는지 (`runSafely` 격리)
-  - **개장에서 거절된 leg가 마감에서도 다시 거절될 때 REJECTED 행이 1건으로 유지되는지(중복 저장 회귀)** — `saveRejectedOrders` 호출 전 `deleteRejectedByCycleDateAndLegs`가 해당 leg만 지우는지 검증
-  - **같은 사이클에서 BUY 후보와 SELL 후보가 한 배치 run에서 함께 거절될 때(예: 예수금도 부족하고 판매가능수량도 부족) 두 REJECTED 행이 모두 살아남는지(같은 run 내 클로버 회귀)** — BUY·SELL은 `Candidate`가 분리돼 있어 `saveRejectedOrders`가 사이클당 두 번 호출된다. 삭제 범위가 사이클·거래일 전체면 두 번째 호출(SELL)이 첫 번째 호출(BUY)이 막 저장한 REJECTED를 지워버린다 — leg로 한정해야 이 클로버가 안 생긴다. (참고: `한 사이클의 BUY 주문은 all-or-nothing`이므로 "같은 사이클에서 BUY 일부만 회복·나머지는 거절"은 allocator를 통해 재현 불가능한 시나리오다 — 테스트로 만들지 않는다)
-- `OrderPersistenceAdapterTest`:
-  - `findRejectedByCycleAndDate`가 REJECTED만 반환하는지
-  - `deleteRejectedByCycleDateAndLegs`가 지정한 leg의 REJECTED만 삭제하고, 같은 사이클·거래일의 다른 leg REJECTED나 PLANNED/PLACED/FILLED 등 다른 상태는 건드리지 않는지
-  - `findPlannedOrPlacedByCycleAndDate`가 REJECTED를 여전히 배제하는 회귀 테스트(가장 중요 — 슬롯 재시도가 걸려있음)
-- `TradingPreviewServiceTest`:
-  - **`todayOrders`에는 REJECTED가 절대 섞이지 않는지(회귀)** — PLANNED/PLACED만 있던 기존 테스트가 그대로 통과해야 함
-  - REJECTED만 있고 재시도 성공(todayOrders)이 없으면 `rejectedOrders`에 노출되는지
-  - 같은 orderLeg로 재시도 성공한 경우 `rejectedOrders`에서 제외되는지
-  - 예산 계산(`otherStrategiesPlannedBuyUsd` 등)이 REJECTED 존재 여부와 무관하게 동일한지(회귀)
-- kista-ui:
-  - `OrderRows` REJECTED 렌더링 스냅샷 테스트, 취소 버튼 미노출 테스트
-  - `StrategyDetail`: 전량 거절(승인 0건)인 날 `mode`가 `preview`로 유지되는지, "N건 접수됨" 카운트에 REJECTED가 포함되지 않는지, `executed` 모드에서 `BuyCompetitionNotice` 헤더 배지가 렌더링되지 않는지
+  - 예수금 부족으로 BUY 거절 시 `order_rejections`에 `(cycle, date, BUY, count)`가 upsert되는지
+  - SELL 거절도 동일하게 기록되는지
+  - 같은 사이클에서 개장 때 거절, 마감 때도 다시 거절되면 행이 1건으로 유지되고 `orderCount`가 최신값으로 갱신되는지 (upsert 회귀)
+  - 거절 후 재시도로 승인되면 해당 방향의 거절 행이 삭제되는지 (`deleteIfExists` 호출 검증)
+  - **같은 사이클에서 BUY 과거 거절 이력이 있는 상태로, 이번 run에 BUY+SELL이 동시에(병합된 하나의 `Candidate.orders()`로) 승인될 때 BUY 거절 배너가 정상 해소되는지** — `mergeApproved`가 방향을 병합한다는 사실을 놓치면 `getFirst().direction()`만 보고 SELL만 해소하고 BUY 배너가 안 지워지는 회귀가 생긴다
+  - 거절 기록 실패가 다른 사이클의 SELL 저장·알림 발송을 막지 않는지 (`runSafely` 격리)
+- `OrderRejectionPersistenceAdapterTest`: upsert 자연키 충돌 시 덮어쓰기, `deleteIfExists`가 존재하지 않아도 예외 없이 no-op인지
+- `TradingPreviewServiceTest`: `rejections` 필드가 `findByCycleAndDate` 결과를 그대로 반영하는지, 기존 `todayPlannedOrders`/예산 계산 관련 테스트는 무변경으로 통과하는지(회귀)
+- kista-ui: `StrategyDetail`에서 `rejections` 배너가 `mode`와 무관하게 렌더링되는지, `executed` 모드에서 `BuyCompetitionNotice` 헤더 배지가 숨겨지는지
