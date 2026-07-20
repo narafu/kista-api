@@ -197,7 +197,10 @@ class StatsService implements UserStatsUseCase {
         Set<UUID> strategyIds = strategies.stream().map(Strategy::id).collect(Collectors.toSet());
         List<StrategyCycle> cycles = strategyIds.isEmpty()
                 ? List.of() : strategyCyclePort.findByStrategyIds(strategyIds);
-        LocalDate effectiveFrom = from != null ? from.withDayOfMonth(1)
+        // MONTHLY(아파트)는 월 단위 비교라 요청한 from을 월초로 내림하지만, DAILY(ETF)는 사용자가
+        // 고른 정확한 날짜를 그대로 써야 한다 — 월초로 내리면 요청하지 않은 기간까지 포함된다.
+        LocalDate effectiveFrom = from != null
+                ? (granularity == BenchmarkGranularity.DAILY ? from : from.withDayOfMonth(1))
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo)
                         .orElse(effectiveTo).withDayOfMonth(1);
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
