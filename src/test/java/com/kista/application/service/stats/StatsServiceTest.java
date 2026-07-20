@@ -673,9 +673,11 @@ class StatsServiceTest {
         stubUserWithStrategy();
         StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        // IndexPrice.tradeDate는 US 거래일 원본이라 StatsService가 KST로 +1일 보정한다.
+        // 투자 스냅샷은 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
                 depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
-                depositSnapshot(cycle.id(), "102.00", "2026-01-06T01:00:00Z"),
+                depositSnapshot(cycle.id(), "102.00", "2026-01-07T01:00:00Z"),
                 depositSnapshot(cycle.id(), "184.20", "2026-02-28T01:00:00Z")));
         List<IndexPrice> prices = List.of(
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 5), new BigDecimal("400.00")),
@@ -694,19 +696,20 @@ class StatsServiceTest {
         assertThat(result.benchmark().regionName()).isNull();
         assertThat(result.benchmark().quintile()).isNull();
         assertThat(result.benchmark().label()).isEqualTo("SPY (SPDR S&P 500 ETF Trust)");
-        assertThat(result.benchmark().sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 2, 27));
-        // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일 그대로 포인트가 생긴다 (기존 월별이면 2개였다).
+        // US 거래일 원본 2/27 + 1일 보정 = KST 2/28
+        assertThat(result.benchmark().sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 2, 28));
+        // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일이 +1일 보정된 KST 날짜로 그대로 포인트가 생긴다.
         assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
-                .containsExactly(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6), LocalDate.of(2026, 2, 27));
+                .containsExactly(LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 7), LocalDate.of(2026, 2, 28));
         assertThat(result.points().get(0).investmentIndexUsd()).isEqualByComparingTo("100.0");
         assertThat(result.points().get(0).benchmarkIndex()).isEqualByComparingTo("100.0");
         assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("102.0");
         assertThat(result.points().get(1).benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("404.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));
-        // 캘린더 인접 여부와 무관하게(1/6 -> 2/27) 항상 직전 공통일 대비 수익률을 계산한다.
+        // 캘린더 인접 여부와 무관하게(1/7 -> 2/28) 항상 직전 공통일 대비 수익률을 계산한다.
         assertThat(result.points().get(1).investmentPeriodReturn()).isEqualByComparingTo("0.02");
-        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("102.0");
+        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("184.2");
         assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("440.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));

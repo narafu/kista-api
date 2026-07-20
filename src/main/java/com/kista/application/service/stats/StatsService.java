@@ -151,11 +151,16 @@ class StatsService implements UserStatsUseCase {
         LocalDate dailyTo = benchmarkTo.plusMonths(1).minusDays(1);
 
         // ETF는 다운샘플링 없이 거래일별 종가를 그대로 벤치마크 가격으로 사용한다.
+        // IndexPrice.tradeDate는 US 거래일 원본(KST 변환은 소비처 책임 — IndexPrice 문서 참고) —
+        // KST 투자지수 날짜와 매칭하려면 +1일 보정이 필요하다. KST 거래일(정산 아침)은 항상 US 거래일
+        // 다음날이라는 규칙은 UsTradeDates.toKstTradeDate와 동일하나, 그 클래스는 어댑터 전용이라
+        // 여기서는 같은 규칙을 직접 적용한다.
         List<IndexPrice> dailyPrices = indexPricePort.findBySymbolAndRange(symbol.name(), benchmarkFrom, dailyTo);
         Map<LocalDate, BigDecimal> prices = dailyPrices.stream()
-                .collect(Collectors.toMap(IndexPrice::tradeDate, IndexPrice::close, (left, right) -> right, TreeMap::new));
+                .collect(Collectors.toMap(
+                        price -> price.tradeDate().plusDays(1), IndexPrice::close, (left, right) -> right, TreeMap::new));
         LocalDate sourceUpdatedDate = dailyPrices.stream().map(IndexPrice::tradeDate)
-                .max(LocalDate::compareTo).orElse(null);
+                .max(LocalDate::compareTo).map(date -> date.plusDays(1)).orElse(null);
 
         HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
                 BenchmarkAssetType.ETF, null, null, null, symbol.name(),
