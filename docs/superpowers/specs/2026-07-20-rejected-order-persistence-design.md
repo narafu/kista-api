@@ -166,7 +166,7 @@ public record NextOrdersPreview(
   - 같은 사이클에서 SELL 승인 + BUY 거절이 동시에 일어날 때 SELL은 PLANNED, BUY는 REJECTED로 각각 정확히 저장되는지
   - REJECTED 저장이 예외를 던져도 같은 배치의 다른 사이클 처리가 계속되는지 (`runSafely` 격리)
   - **개장에서 거절된 leg가 마감에서도 다시 거절될 때 REJECTED 행이 1건으로 유지되는지(중복 저장 회귀)** — `saveRejectedOrders` 호출 전 `deleteRejectedByCycleDateAndLegs`가 해당 leg만 지우는지 검증
-  - **같은 사이클에서 BUY_01은 마감에 회복(PLANNED)되고 BUY_02는 계속 거절일 때, BUY_01의 과거 REJECTED 이력이 삭제되지 않고 남아있는지(부분 회복 회귀)** — 삭제 범위가 사이클·거래일 전체가 아니라 이번 run에서 다시 거절된 leg로 한정되는지가 핵심
+  - **같은 사이클에서 BUY 후보와 SELL 후보가 한 배치 run에서 함께 거절될 때(예: 예수금도 부족하고 판매가능수량도 부족) 두 REJECTED 행이 모두 살아남는지(같은 run 내 클로버 회귀)** — BUY·SELL은 `Candidate`가 분리돼 있어 `saveRejectedOrders`가 사이클당 두 번 호출된다. 삭제 범위가 사이클·거래일 전체면 두 번째 호출(SELL)이 첫 번째 호출(BUY)이 막 저장한 REJECTED를 지워버린다 — leg로 한정해야 이 클로버가 안 생긴다. (참고: `한 사이클의 BUY 주문은 all-or-nothing`이므로 "같은 사이클에서 BUY 일부만 회복·나머지는 거절"은 allocator를 통해 재현 불가능한 시나리오다 — 테스트로 만들지 않는다)
 - `OrderPersistenceAdapterTest`:
   - `findRejectedByCycleAndDate`가 REJECTED만 반환하는지
   - `deleteRejectedByCycleDateAndLegs`가 지정한 leg의 REJECTED만 삭제하고, 같은 사이클·거래일의 다른 leg REJECTED나 PLANNED/PLACED/FILLED 등 다른 상태는 건드리지 않는지
