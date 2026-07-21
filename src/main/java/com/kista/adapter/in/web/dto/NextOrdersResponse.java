@@ -166,7 +166,7 @@ public record NextOrdersResponse(
                 result.position() == null ? null : PositionSnapshot.from(result.position()),
                 result.orders().stream().map(OrderItem::from).toList(),
                 result.skipReason(),
-                result.todayPlannedOrders().stream().map(TodayOrderItem::from).toList(),
+                result.todayOrders().stream().map(TodayOrderItem::from).toList(),
                 result.otherStrategiesPlannedBuyUsd(),
                 result.competition() == null ? null : BuyCompetitionSummary.from(result.competition())
         );

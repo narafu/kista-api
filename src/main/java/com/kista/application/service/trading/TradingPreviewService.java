@@ -48,12 +48,12 @@ class TradingPreviewService {
         LocalDate today = DstInfo.nextTradeDate();
 
         // 오늘 이미 등록된 주문 조회 — PLANNED(취소 가능) + PLACED(AT_OPEN 선접수됨) 모두 포함
-        List<Order> todayPlannedOrders =
+        List<Order> todayOrders =
                 orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
 
         // 계좌 내 타 전략 당일 PLANNED BUY 합계 (이 전략 분 제외 — 예수금 부족 계산에 사용)
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
-        BigDecimal thisStrategyPlannedBuy = todayPlannedOrders.stream()
+        BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -62,7 +62,7 @@ class TradingPreviewService {
         StrategyOrderPlanBuilder.PlanResult result =
                 planBuilder.build(strategy, account, currentCycle, today, "preview:" + strategyId);
         if (result.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayPlannedOrders, otherStrategiesPlannedBuyUsd, null);
+            return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null);
         }
         CycleOrderStrategy.OrderPlan plan = result.plan();
 
@@ -74,6 +74,6 @@ class TradingPreviewService {
                 ? null
                 : competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd);
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayPlannedOrders, otherStrategiesPlannedBuyUsd, competition);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, competition);
     }
 }
