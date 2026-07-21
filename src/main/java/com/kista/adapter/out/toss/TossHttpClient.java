@@ -17,6 +17,10 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -40,7 +44,8 @@ class TossHttpClient {
     // 공통 API용 — 관리자 토큰 사용, 계좌 컨텍스트 불필요 (시세·환율·캔들·시장정보)
     public <T> T getCommon(String path, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithBackoffRetry(path, tossAuthApi::getAdminToken, token -> tossAuthApi.invalidateAdminToken(),
+        return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
+                ignoredToken -> tossAuthApi.invalidateAdminToken(),
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
@@ -80,7 +85,8 @@ class TossHttpClient {
     public <T> T getCommon(String path, MultiValueMap<String, String> params,
                            ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithBackoffRetry(path, tossAuthApi::getAdminToken, token -> tossAuthApi.invalidateAdminToken(),
+        return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
+                ignoredToken -> tossAuthApi.invalidateAdminToken(),
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
@@ -123,8 +129,8 @@ class TossHttpClient {
     private static final int MAX_RETRY_ATTEMPTS = 2;
 
     // 계좌 토큰 재시도 — 공통 헬퍼(executeWithBackoffRetry)에 계좌별 토큰 조회/무효화만 주입
-    private <T> T executeWithRetry(Account account, String path, java.util.function.Function<String, T> call) {
-        return executeWithBackoffRetry(path,
+    private <T> T executeWithRetry(Account account, String path, Function<String, T> call) {
+        return executeWithBackoffRetry("계좌", path,
                 () -> tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey()),
                 token -> tossAuthApi.invalidateToken(account.id(), token),
                 call);
@@ -139,20 +145,12 @@ class TossHttpClient {
         }
     }
 
-    // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만 (매 시도의 토큰을 인자로 받는다)
-    private HttpHeaders buildAdminHeaders(String token) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
     // 401 → 실패한 요청의 토큰만 무효화 후 최신 토큰으로 최대 MAX_RETRY_ATTEMPTS회 재시도한다.
     // 재시도 사이 짧은 백오프를 둬 갓 재발급된 토큰의 리소스 서버 반영 지연을 흡수한다.
     // 계좌 토큰(executeWithRetry)·관리자 토큰(getCommon) 양쪽이 공유하는 재시도 골격.
-    private <T> T executeWithBackoffRetry(String path, java.util.function.Supplier<String> tokenFetcher,
-                                           java.util.function.Consumer<String> tokenInvalidator,
-                                           java.util.function.Function<String, T> call) {
+    private <T> T executeWithBackoffRetry(String tokenKind, String path, Supplier<String> tokenFetcher,
+                                           Consumer<String> tokenInvalidator,
+                                           Function<String, T> call) {
         String token = tokenFetcher.get();
         for (int attempt = 0; ; attempt++) {
             try {
@@ -164,7 +162,7 @@ class TossHttpClient {
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
                 }
-                log.warn("Toss 401 — 토큰 무효화 후 재시도 {}/{}: path={}", attempt + 1, MAX_RETRY_ATTEMPTS, path);
+                log.warn("Toss 401 — {} 토큰 무효화 후 재시도 {}/{}: path={}", tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
                 tokenInvalidator.accept(token);
                 sleepBackoff(attempt);
                 token = tokenFetcher.get();
@@ -185,6 +183,14 @@ class TossHttpClient {
 
     // 계좌 헤더 미포함 — 시세 조회·환율 등 계좌 컨텍스트 불필요 API용
     private HttpHeaders buildHeadersNoAccount(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만 (매 시도의 토큰을 인자로 받는다)
+    private HttpHeaders buildAdminHeaders(String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(MediaType.APPLICATION_JSON);
