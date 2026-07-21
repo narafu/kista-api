@@ -32,7 +32,7 @@ class NextOrdersResponseTest {
                 false, new BigDecimal("1000.00"), new BigDecimal("200.00"), new BigDecimal("900.00"),
                 List.of(new BuyCompetitionPreview.CompetingStrategy(
                         competitorId, Strategy.Type.VR, Ticker.TQQQ, new BigDecimal("900.00"), 0)),
-                List.of());
+                List.of(), false);
         NextOrdersPreview preview = new NextOrdersPreview(
                 LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, competition);
 

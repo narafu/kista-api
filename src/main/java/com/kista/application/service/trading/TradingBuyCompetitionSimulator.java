@@ -2,6 +2,7 @@ package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -10,6 +11,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
@@ -47,12 +49,20 @@ class TradingBuyCompetitionSimulator {
                                     BigDecimal otherStrategiesPlannedBuyUsd) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);
 
-        // 라이브 예수금에서 타 전략의 당일 PLANNED BUY만 차감 — 대상 전략 자신의 기존 예약분은
-        // requiredForThis가 매번 전체 재계산이라 이미 반영돼 있으므로 이중 차감하지 않는다.
-        // PLACED 주문은 브로커에 이미 접수돼 라이브 예수금 자체에 반영돼 있어 별도 차감 불필요.
-        BigDecimal liveDeposit = registry.require(account, LiveBalancePort.class)
-                .getLiveBalance(account, currentStrategy.ticker())
-                .usdDeposit();
+        BigDecimal liveDeposit;
+        try {
+            // 라이브 예수금에서 타 전략의 당일 PLANNED BUY만 차감 — 대상 전략 자신의 기존 예약분은
+            // requiredForThis가 매번 전체 재계산이라 이미 반영돼 있으므로 이중 차감하지 않는다.
+            // PLACED 주문은 브로커에 이미 접수돼 라이브 예수금 자체에 반영돼 있어 별도 차감 불필요.
+            liveDeposit = registry.require(account, LiveBalancePort.class)
+                    .getLiveBalance(account, currentStrategy.ticker())
+                    .usdDeposit();
+        } catch (KisApiException | TossApiException e) {
+            // 브로커 라이브 예수금 조회 자체가 실패(토큰 재시도 소진 등) — 미리보기 전체를 503으로 막지 않고
+            // 경쟁 시뮬레이션만 생략한 채 주문 계획(plan.orders())은 정상 반환한다
+            log.warn("대상 전략 라이브 예수금 조회 실패, 경쟁 시뮬레이션 생략: strategyId={}, error={}", currentStrategy.id(), e.getMessage());
+            return BuyCompetitionPreview.unavailable(requiredForThis);
+        }
         BigDecimal availableDeposit = liveDeposit.subtract(otherStrategiesPlannedBuyUsd);
 
         List<UUID> uncertainStrategyIds = new ArrayList<>();
@@ -109,6 +119,6 @@ class TradingBuyCompetitionSimulator {
         }
 
         boolean sufficient = consumedByHigherPriority.add(requiredForThis).compareTo(availableDeposit) <= 0;
-        return new BuyCompetitionPreview(sufficient, availableDeposit, requiredForThis, consumedByHigherPriority, blocked, uncertainStrategyIds);
+        return new BuyCompetitionPreview(sufficient, availableDeposit, requiredForThis, consumedByHigherPriority, blocked, uncertainStrategyIds, false);
     }
 }

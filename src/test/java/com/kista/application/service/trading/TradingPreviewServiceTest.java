@@ -89,7 +89,7 @@ class TradingPreviewServiceTest {
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         BuyCompetitionPreview competition = new BuyCompetitionPreview(
-                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of());
+                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of(), false);
         when(competitionSimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), eq(List.of(buyOrder)), any(), eq(BigDecimal.ZERO)))
                 .thenReturn(competition);
 
@@ -115,7 +115,7 @@ class TradingPreviewServiceTest {
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         BuyCompetitionPreview competition = new BuyCompetitionPreview(
-                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of());
+                true, new BigDecimal("1000.00"), new BigDecimal("100.00"), BigDecimal.ZERO, List.of(), List.of(), false);
         // 300.00(계좌 전체) - 50.00(이 전략분) = 250.00(타 전략분)이 그대로 전파되는지 검증
         when(competitionSimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), eq(List.of(newBuyOrder)), any(), eq(new BigDecimal("250.00"))))
                 .thenReturn(competition);

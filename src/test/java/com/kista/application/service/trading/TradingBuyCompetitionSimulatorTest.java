@@ -203,4 +203,23 @@ class TradingBuyCompetitionSimulatorTest {
         verifyNoInteractions(planBuilder);
         verify(strategyCyclePort, never()).findLatestByStrategyId(pausedVr.id());
     }
+
+    @Test
+    void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
+        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
+                .thenThrow(new com.kista.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
+        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+
+        BuyCompetitionPreview result = simulator.simulate(
+                currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
+
+        assertThat(result.liveBalanceUnavailable()).isTrue();
+        assertThat(result.sufficientBudget()).isTrue();
+        assertThat(result.availableDeposit()).isNull();
+        assertThat(result.requiredForThisStrategy()).isEqualByComparingTo("200.00");
+        assertThat(result.consumedByHigherPriority()).isEqualByComparingTo("0");
+        assertThat(result.blockedByHigherPriority()).isEmpty();
+        assertThat(result.uncertainStrategyIds()).isEmpty();
+        verifyNoInteractions(strategyPort); // 경쟁 전략 조회 자체를 시작하지 않고 즉시 반환
+    }
 }
