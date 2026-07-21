@@ -116,25 +116,41 @@ class TossHttpClient {
         });
     }
 
-    // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
+    // 401 재시도 시 백오프 간격(ms) — 재발급 직후 토큰이 Toss 리소스 서버에 즉시 반영되지 않는 경우 대응
+    private static final long RETRY_BACKOFF_MILLIS = 300;
+    // 최초 시도 이후 허용하는 최대 401 재시도 횟수
+    private static final int MAX_RETRY_ATTEMPTS = 2;
+
+    // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 최대 MAX_RETRY_ATTEMPTS회 재시도한다.
+    // 재시도 사이 짧은 백오프를 둬 갓 재발급된 토큰의 리소스 서버 반영 지연을 흡수한다.
     private <T> T executeWithRetry(Account account, String path, java.util.function.Function<String, T> call) {
-        String rejectedToken = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
-        try {
-            return call.apply(rejectedToken);
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 401) {
-                log.warn("Toss 401 — 토큰 무효화 후 재시도: path={}", path);
-                tossAuthApi.invalidateToken(account.id(), rejectedToken);
-                try {
-                    String retryToken = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
-                    return call.apply(retryToken);
-                } catch (RestClientException retryEx) {
-                    throw new TossApiException("Toss API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
+        String token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return call.apply(token);
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode().value() != 401) {
+                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
                 }
+                if (attempt >= MAX_RETRY_ATTEMPTS) {
+                    throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
+                }
+                log.warn("Toss 401 — 토큰 무효화 후 재시도 {}/{}: path={}", attempt + 1, MAX_RETRY_ATTEMPTS, path);
+                tossAuthApi.invalidateToken(account.id(), token);
+                sleepBackoff(attempt);
+                token = tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+            } catch (RestClientException e) {
+                throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
             }
-            throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
-        } catch (RestClientException e) {
-            throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
+        }
+    }
+
+    // 재시도 간 백오프 — 인터럽트 시 상태만 복원하고 즉시 재시도 진행(대기 없이)
+    private void sleepBackoff(int attempt) {
+        try {
+            Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1));
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
         }
     }
 
