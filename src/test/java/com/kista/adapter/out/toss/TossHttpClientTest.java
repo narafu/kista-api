@@ -94,4 +94,41 @@ class TossHttpClientTest {
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
+
+    @Test
+    @DisplayName("공통 API(getCommon) 401도 최대 2회까지 백오프 재시도 후 성공")
+    void getCommon_retriesTwiceAfter401_thenSucceeds() {
+        when(tossAuthApi.getAdminToken())
+                .thenReturn("admin-token-0", "admin-token-1", "admin-token-2");
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(unauthorized())
+                .thenThrow(unauthorized())
+                .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
+
+        String result = newClient().getCommon(PATH, new LinkedMultiValueMap<>(), String.class);
+
+        assertThat(result).isEqualTo("OK");
+        verify(tossAuthApi, times(2)).invalidateAdminToken();
+        verify(tossAuthApi, times(3)).getAdminToken();
+        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+                any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    @DisplayName("공통 API 401이 세 번(최초+2차 재시도 모두) 발생하면 TossApiException")
+    void getCommon_throwsTossApiException_when401Persists() {
+        when(tossAuthApi.getAdminToken())
+                .thenReturn("admin-token-0", "admin-token-1", "admin-token-2");
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(unauthorized());
+
+        TossHttpClient client = newClient();
+        assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), String.class))
+                .isInstanceOf(TossApiException.class)
+                .hasMessageContaining("토큰 재시도 실패");
+
+        verify(tossAuthApi, times(2)).invalidateAdminToken();
+        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+                any(HttpEntity.class), eq(String.class));
+    }
 }

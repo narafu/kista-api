@@ -19,6 +19,7 @@
 
 - 계좌 API의 401 재시도는 최초 요청에 실제 사용한 access token을 기준으로 한다. `TossAuthApi.invalidateToken(accountId, rejectedAccessToken)`은 DB의 현재 토큰이 거절된 토큰과 같을 때만 무효화하고, 이미 다른 요청이 재발급한 신규 토큰이면 보존한다.
 - `TossHttpClient`는 조건부 무효화 후 캐시의 최신 토큰을 다시 읽어 동일 요청을 최대 2회(백오프 300ms/600ms 포함) 재시도한다 — 갓 재발급된 토큰이 Toss 리소스 서버에 즉시 반영되지 않아 재시도 직후에도 401이 나는 사례(운영 `app_error_logs` 관측)에 대응. 헤더 빌더 내부에서 토큰을 재조회하지 말고, `executeWithRetry`가 고정한 시도별 토큰을 사용해야 한다.
+- 관리자(공통) 토큰 경로(`getCommon`)도 동일한 `executeWithBackoffRetry` 헬퍼를 공유해 계좌 토큰 경로와 같은 백오프(300ms/600ms)·최대 2회 재시도 정책을 적용한다.
 
 ### 날짜 처리 (KIS와 다름)
 
