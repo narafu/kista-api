@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 // 매매 관련 서비스 4개를 TradingExecutionUseCase 단일 진입점으로 위임하는 Facade
@@ -69,5 +70,10 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     @Override
     public NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         return tradingPreviewService.preview(strategyId, requesterId);
+    }
+
+    @Override
+    public Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
+        return tradingPreviewService.previewBatch(accountId, requesterId);
     }
 }

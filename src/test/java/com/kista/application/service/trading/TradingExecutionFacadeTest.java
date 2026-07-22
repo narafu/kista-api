@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -134,5 +135,21 @@ class TradingExecutionFacadeTest {
 
         assertThat(result).isSameAs(preview);
         verify(tradingPreviewService).preview(strategyId, requesterId);
+    }
+
+    @Test
+    @DisplayName("previewBatch는 TradingPreviewService.previewBatch에 위임한다")
+    void previewBatch_delegates() {
+        UUID accountId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        UUID strategyId = UUID.randomUUID();
+        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null);
+        Map<UUID, NextOrdersPreview> previews = Map.of(strategyId, preview);
+        when(tradingPreviewService.previewBatch(accountId, requesterId)).thenReturn(previews);
+
+        Map<UUID, NextOrdersPreview> result = facade.previewBatch(accountId, requesterId);
+
+        assertThat(result).isSameAs(previews);
+        verify(tradingPreviewService).previewBatch(accountId, requesterId);
     }
 }

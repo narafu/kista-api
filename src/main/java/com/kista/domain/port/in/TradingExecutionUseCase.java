@@ -9,6 +9,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 // 매매 실행·취소·미리보기 통합 인터페이스 (Facade 위임)
@@ -31,4 +32,6 @@ public interface TradingExecutionUseCase {
     void cancelOrder(UUID orderId, UUID requesterId);
     // 다음 주문 미리보기 (DB 저장 없음) — strategyId 기준
     NextOrdersPreview preview(UUID strategyId, UUID requesterId);
+    // 계좌 내 전략 전체 다음 주문 미리보기 일괄 조회 (DB 저장 없음) — strategyId → preview 맵, 사이클 없는 전략은 생략
+    Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId);
 }

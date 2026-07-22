@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
 @RestController
@@ -131,6 +133,16 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         return NextOrdersResponse.from(tradingExecution.preview(id, userId));
+    }
+
+    // 계좌 내 전략 전체 다음 주문 미리보기 일괄 조회 — 전략 목록 화면에서 전략별 N회 호출 대신 1회로 축소
+    @Operation(summary = "계좌 내 전략 전체 다음 주문 미리보기 일괄 조회")
+    @GetMapping("/api/accounts/{accountId}/trading-cycles/previews")
+    public Map<UUID, NextOrdersResponse> previewBatch(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId) {
+        return tradingExecution.previewBatch(accountId, userId).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> NextOrdersResponse.from(e.getValue())));
     }
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기

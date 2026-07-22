@@ -18,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -44,6 +46,24 @@ class TradingPreviewService {
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
                 .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id()));
 
+        return buildPreview(strategy, account, currentCycle);
+    }
+
+    // 계좌 내 전략 전체를 한 번의 트랜잭션·요청으로 미리보기 — 목록 화면에서 전략 N개를 개별 호출하던 것을 1회로 축소
+    // 사이클 없는 전략은 결과 맵에서 생략(단건 preview는 404지만 배치는 부분 실패를 허용) — 계좌 내 전략 수는 소규모라 O(N) 순회로 충분
+    @Transactional(readOnly = true)
+    Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+
+        Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
+        for (Strategy strategy : strategyPort.findByAccountId(accountId)) {
+            strategyCyclePort.findLatestByStrategyId(strategy.id())
+                    .ifPresent(cycle -> previews.put(strategy.id(), buildPreview(strategy, account, cycle)));
+        }
+        return previews;
+    }
+
+    private NextOrdersPreview buildPreview(Strategy strategy, Account account, StrategyCycle currentCycle) {
         // 스케쥴러는 KST 04:00에 실행 — 04:00 이후 미리보기는 내일 매매 기준
         LocalDate today = DstInfo.nextTradeDate();
 
@@ -60,7 +80,7 @@ class TradingPreviewService {
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 
         StrategyOrderPlanBuilder.PlanResult result =
-                planBuilder.build(strategy, account, currentCycle, today, "preview:" + strategyId);
+                planBuilder.build(strategy, account, currentCycle, today, "preview:" + strategy.id());
         if (result.isSkip()) {
             return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null);
         }

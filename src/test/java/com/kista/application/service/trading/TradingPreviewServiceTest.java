@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -156,5 +157,39 @@ class TradingPreviewServiceTest {
 
         assertThatThrownBy(() -> service.preview(unknownId, ACCOUNT.userId()))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void previewBatch_returnsPreviewPerStrategy_keyedByStrategyId() {
+        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result).containsOnlyKeys(STRATEGY.id());
+        assertThat(result.get(STRATEGY.id()).orders()).hasSize(1);
+    }
+
+    @Test
+    void previewBatch_omitsStrategy_whenNoCycleHistory() {
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.empty());
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void previewBatch_throwsSecurityException_whenNotOwner() {
+        UUID otherId = UUID.randomUUID();
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), otherId)).thenThrow(new SecurityException());
+
+        assertThatThrownBy(() -> service.previewBatch(ACCOUNT.id(), otherId))
+                .isInstanceOf(SecurityException.class);
     }
 }

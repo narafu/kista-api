@@ -253,6 +253,28 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void previewBatch_returns200_withMapKeyedByStrategyId() throws Exception {
+        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
+        var preview = new com.kista.domain.model.order.NextOrdersPreview(
+                java.time.LocalDate.of(2026, 1, 5), null, List.of(),
+                null, List.of(), BigDecimal.ZERO, null);
+        when(tradingExecution.previewBatch(eq(ACCOUNT_ID), any()))
+                .thenReturn(java.util.Map.of(strategyId, preview));
+
+        mockMvc.perform(get("/api/accounts/{accountId}/trading-cycles/previews", ACCOUNT_ID)
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + strategyId + "'].tradeDate").value("2026-01-05"))
+                .andExpect(jsonPath("$['" + strategyId + "'].skipReason").doesNotExist());
+    }
+
+    @Test
+    void previewBatch_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/accounts/{accountId}/trading-cycles/previews", ACCOUNT_ID))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void seedPreview_returns200_with_minSeed() throws Exception {
         var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null);
         when(accountStatistics.strategySeedPreview(eq(ACCOUNT_ID), any(),
