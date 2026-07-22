@@ -132,4 +132,3 @@ git add src/main/java/com/kista/adapter/out/toss/TossHttpClient.java \
         docs/agents/toss-api.md
 git commit -m "fix(toss): 신규 토큰 전파 재시도에서 토큰 재사용"
 ```
-
