@@ -7,7 +7,7 @@
 - 마감 경로: 잔고 조회 → 현재가(배치 캐시 or 단건 fallback) → 전략 계산·BUY cap 사전 계산 → 누락된 `AT_CLOSE` 주문만 예산 배정 후 `orders`에 PLANNED 저장 → `DstInfo.waitUntilOrderTime()` 대기 (cron 04:30 발화 기준 DST≈0분, 비DST=60분 — orderAt은 DST=04:30/비DST=05:30) → AT_CLOSE 주문 접수 (PLACED 기록) → 체결 리포트. 신규 BUY·SELL이 모두 거절되거나 신규 주문 저장이 실패하고 기존 주문도 없는 사이클은 접수·리포트 대상에서 제외하며, 기존 PLANNED/PLACED 주문이 있으면 후속 흐름을 유지한다.
 - 개장 경로: 동일한 leg-aware 후보·예산 배정을 수행하되 누락된 `AT_OPEN` 주문도 저장하고, 개장 시점에는 `AT_OPEN` PLANNED 주문만 선접수한다. 마감 경로에서는 선접수된 주문도 포함해 중복 없이 후속 접수·리포트한다.
 - 재계산 skip: correction까지 포함된 complete INFINITE concrete leg 조합 또는 direction-aware legacy `UNKNOWN` 양방향 점유처럼 안전한 경우에만 전략 주문 계산을 생략한다. 리버스 `AT_CLOSE`는 `REVERSE_INFINITE_LOC_BUY` BUY 슬롯과 `REVERSE_INFINITE_LOC_SELL` SELL 슬롯이 모두 있어야 complete로 본다. partial concrete leg는 항상 계산해 누락 leg를 복구한다. 개장 스케쥴러처럼 `AT_OPEN`까지 생성 대상이면 해당 timing의 SELL leg 누락 가능성도 보수적으로 본다. VR/PRIVACY concrete compute skip은 ladder 길이가 variable이라 비활성화한다.
-- 계좌별 브로커 토큰: `broker_tokens` 테이블에 account_id(PK) 기준 독립 관리 (`KisTokenEntity`)
+- 계좌별 브로커 토큰: KIS는 `broker_tokens` 테이블에 account_id(PK) 기준 독립 관리 (`KisTokenEntity`), Toss 계좌·관리자 토큰은 Redis canonical hash에 공유 (`TossDistributedTokenCoordinator` + `TossRedisTokenStore`)
 - 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 미설정 시 생략
 - 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 사이클 계속 실행. 계좌별 예산 배정, 사이클별 PLANNED 저장, 잔고 부족 사용자 알림 실패는 각각 격리되어 다른 계좌·사이클 처리를 막지 않는다.
 - `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `notifyPort.notifyError()`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림
