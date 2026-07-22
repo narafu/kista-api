@@ -95,14 +95,14 @@ adapter/in/
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/
-  broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
-                   Toss 401 복구는 동일 락에서 현재 토큰 비교 → 최근 IssuedToken 세대 보호 → 조건부 무효화·재발급을 원자화;
+  broker/        ← DoubleCheckedTokenCache (KIS JVM 내 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
                    BrokerTokenCachePort.saveToken/invalidateToken은 REQUIRES_NEW로 락 해제 전 독립 커밋;
                    invalidateToken은 accountId+거절된 accessToken 일치 시만 INVALIDATED_TOKEN으로 갱신해 stale 401이 이미 재발급된 신규 토큰을 무효화하지 않음)
                    PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
   kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화한 후 최신 토큰으로 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
   toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
+                   TossDistributedTokenCoordinator (Redis owner lease로 Fly 인스턴스 간 계좌·관리자 OAuth 발급 단일화; PostgreSQL 계좌 토큰·Redis 관리자 토큰 canonical 저장소 double-check; SHA-256 최근 발급 fingerprint 2초 TTL),
                    TossResponseParser (숫자 파싱 헬퍼, 패키지 내부 전용), TossBrokerAdapter (공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
   kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격 조회
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter

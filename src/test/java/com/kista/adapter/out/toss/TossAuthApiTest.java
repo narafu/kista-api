@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +34,7 @@ class TossAuthApiTest {
 
     @Mock RestTemplate tossRestTemplate;
     @Mock BrokerTokenCachePort brokerTokenCachePort;
+    @Mock TossDistributedTokenCoordinator tokenCoordinator;
 
     TossAuthApi api;
 
@@ -45,7 +47,23 @@ class TossAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        api = new TossAuthApi(tossRestTemplate, brokerTokenCachePort, BASE_URL, ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
+        api = new TossAuthApi(tossRestTemplate, brokerTokenCachePort, tokenCoordinator,
+                BASE_URL, ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
+        stubCoordinatorIssuance();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubCoordinatorIssuance() {
+        lenient().when(tokenCoordinator.getAccountToken(any(), any(), any())).thenAnswer(invocation -> {
+            Supplier<Optional<String>> currentToken = invocation.getArgument(1);
+            TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
+            Optional<String> first = currentToken.get();
+            return first.isPresent() ? first.get() : currentToken.get().orElseGet(issuer::issue);
+        });
+        lenient().when(tokenCoordinator.getAdminToken(any())).thenAnswer(invocation -> {
+            TossDistributedTokenCoordinator.AdminTokenIssuer issuer = invocation.getArgument(0);
+            return issuer.issue().accessToken();
+        });
     }
 
     @Nested
@@ -121,6 +139,8 @@ class TossAuthApiTest {
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String current = api.getAdminToken();
+        when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any()))
+                .thenReturn("admin-token-1");
         String recovered = api.recoverAdminToken("stale-admin-token");
 
         assertThat(current).isEqualTo("admin-token-1");
@@ -136,11 +156,28 @@ class TossAuthApiTest {
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String issued = api.getAdminToken();
+        when(tokenCoordinator.recoverAdminToken(eq(issued), any())).thenReturn("admin-token-1");
         String recovered = api.recoverAdminToken(issued);
 
         assertThat(recovered).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
                 anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
+    }
+
+    @Test
+    @DisplayName("계좌 401 복구를 rejected token과 함께 분산 coordinator에 위임")
+    void recoverToken_delegatesToDistributedCoordinator() {
+        when(tokenCoordinator.recoverAccountToken(
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any()))
+                .thenReturn("coordinated-token");
+
+        String recovered = api.recoverToken(
+                ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token");
+
+        assertThat(recovered).isEqualTo("coordinated-token");
+        verify(tokenCoordinator).recoverAccountToken(
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any());
+        verifyNoInteractions(tossRestTemplate);
     }
 
     @Nested

@@ -16,6 +16,11 @@
 - `.github/workflows/fly-deploy.yml` — `main` push 시 GitHub Actions가 compileJava + ArchUnit 검증 후 `fly deploy` 자동 실행
 - 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
 
+### Fly.io 다중 인스턴스 Toss 토큰 조정
+- rolling 배포로 구·신 인스턴스가 겹칠 수 있어 Toss 계좌·관리자 OAuth 발급은 Upstash Redis owner lease로 단일화한다. JVM-local lock에 의존하지 않는다.
+- Redis 키 수명: owner lease 60초(Toss HTTP 13초+DB 연결 대기 20초 상한에 여유 포함), 최근 발급 SHA-256 fingerprint 2초, 관리자 access token은 OAuth 실제 만료보다 5분 짧은 TTL. 계좌 access token canonical 저장소는 PostgreSQL `broker_tokens`을 유지한다.
+- Redis 연결·명령 실패 시 로컬 OAuth 발급으로 fallback하지 않는 fail-closed 정책이다. `REDIS_URL` 오설정은 Toss 호출 503으로 드러나며 운영 인스턴스는 모두 같은 Redis를 보아야 한다.
+
 ### Docker 빌드 OOM
 - `gradle.properties`는 Dockerfile에 복사되지 않음 — JVM이 컨테이너 메모리 ~25%를 힙으로 자동 할당해 BuildKit OOM 유발
 - 증상: `docker compose up` 빌드 중 `failed to receive status: ... error reading from server: EOF`
@@ -91,6 +96,7 @@ fly secrets list --app kista-api
 #   TELEGRAM_BOT_TOKEN       — 관리자봇 토큰 (NotifyPort 오류/리포트 알림)
 #   TELEGRAM_CHAT_ID         — 관리자봇 chat ID
 #   DB_URL, DB_USERNAME, DB_PASSWORD — Supabase PostgreSQL 연결
+#   REDIS_URL               — Upstash Redis TLS URL (JWT blacklist + Toss 분산 토큰 조정)
 #   CORS_ALLOWED_ORIGINS     — 쉼표 구분 허용 Origin (Vercel 프로덕션 URL)
 # 선택 환경변수 (모니터링 — 미설정 시 각 기능 비활성/생략, 배포 안전):
 #   HEARTBEAT_OPEN_URL       — healthchecks.io 개장 스케쥴러 dead-man's switch ping URL

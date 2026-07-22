@@ -5,15 +5,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,70 +122,6 @@ class DoubleCheckedTokenCacheTest {
 
         assertThat(result).isEqualTo("refreshed-token");
         assertThat(fetchCount.get()).isOne();
-    }
-
-    @Test
-    @DisplayName("늦은 401이 최근 발급 세대를 거절해도 같은 토큰을 재사용한다")
-    void staggeredRecovery_reusesRecentlyIssuedGeneration() throws InterruptedException {
-        InMemoryTokenCache cachePort = new InMemoryTokenCache();
-        cachePort.saveToken(accountId, "token-0", OffsetDateTime.now().plusHours(1));
-        CountDownLatch token1Issued = new CountDownLatch(1);
-        CountDownLatch lateRequestRecovered = new CountDownLatch(1);
-        AtomicInteger fetchCount = new AtomicInteger();
-        AtomicReference<String> firstResult = new AtomicReference<>();
-        AtomicReference<String> lateResult = new AtomicReference<>();
-        Supplier<String> fetcher = () -> {
-            String token = "token-" + fetchCount.incrementAndGet();
-            cachePort.saveToken(accountId, token, OffsetDateTime.now().plusHours(1));
-            return token;
-        };
-
-        Thread firstRequest = Thread.ofVirtual().start(() -> {
-            firstResult.set(cache.recoverRejectedToken(
-                    cachePort, accountId, "token-0", threshold, Duration.ofSeconds(2), fetcher));
-            token1Issued.countDown();
-            await(lateRequestRecovered);
-        });
-        Thread lateRequest = Thread.ofVirtual().start(() -> {
-            await(token1Issued);
-            String rejectedToken = cache.getOrFetch(cachePort, accountId, threshold, fetcher);
-            lateResult.set(cache.recoverRejectedToken(
-                    cachePort, accountId, rejectedToken, threshold, Duration.ofSeconds(2), fetcher));
-            lateRequestRecovered.countDown();
-        });
-
-        firstRequest.join(5_000);
-        lateRequest.join(5_000);
-
-        assertThat(firstRequest.isAlive()).isFalse();
-        assertThat(lateRequest.isAlive()).isFalse();
-        assertThat(firstResult.get()).isEqualTo("token-1");
-        assertThat(lateResult.get()).isEqualTo("token-1");
-        assertThat(fetchCount.get()).isOne();
-    }
-
-    @Test
-    @DisplayName("거절 토큰보다 캐시의 현재 세대가 새로우면 현재 토큰을 반환한다")
-    void recovery_returnsCurrentToken_whenRejectedGenerationIsStale() {
-        InMemoryTokenCache cachePort = new InMemoryTokenCache();
-        cachePort.saveToken(accountId, "token-1", OffsetDateTime.now().plusHours(1));
-        AtomicInteger fetchCount = new AtomicInteger();
-
-        String result = cache.recoverRejectedToken(
-                cachePort, accountId, "token-0", threshold, Duration.ofSeconds(2),
-                () -> "token-" + fetchCount.incrementAndGet());
-
-        assertThat(result).isEqualTo("token-1");
-        assertThat(fetchCount.get()).isZero();
-    }
-
-    private void await(CountDownLatch latch) {
-        try {
-            assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError(exception);
-        }
     }
 
     // --- 테스트 전용 인메모리 BrokerTokenCachePort 구현 ---

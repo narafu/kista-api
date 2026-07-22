@@ -1,7 +1,6 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
 import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
@@ -16,14 +15,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
 
 // BrokerConnectionTestPort 구현체 — getToken/getAdminToken/recover* 는 TossHttpClient에 직접 주입되는 구체 메서드
 // OAuth form-encoded 호출 — tossRestTemplate 직접 사용 (TossHttpClient 순환 의존 회피)
@@ -32,18 +27,9 @@ import java.util.concurrent.locks.ReentrantLock;
 @RequiredArgsConstructor
 class TossAuthApi implements BrokerConnectionTestPort {
 
-    // 300ms + 600ms 재시도 총 대기(900ms)보다 길게 최근 발급 세대를 보호한다.
-    private static final Duration TOKEN_PROPAGATION_GRACE = Duration.ofSeconds(2);
-    // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
-    private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
-    // 관리자(공통 API) 토큰 락 — broker_tokens는 accounts FK라 계좌 없는 관리자 토큰은 인메모리로 별도 관리
-    private final ReentrantLock adminLock = new ReentrantLock();
-    private volatile String adminAccessToken;
-    private volatile OffsetDateTime adminExpiresAt = OffsetDateTime.MIN;
-    private volatile Instant adminIssuedAt = Instant.MIN;
-
     private final RestTemplate tossRestTemplate;
     private final BrokerTokenCachePort brokerTokenCachePort;
+    private final TossDistributedTokenCoordinator tokenCoordinator;
     @Value("${toss.base-url}")
     private final String tossBaseUrl;
     @Value("${toss.admin-client-id}")
@@ -54,7 +40,9 @@ class TossAuthApi implements BrokerConnectionTestPort {
     // ── 토큰 발급 / 401 복구 — TossHttpClient가 구체 타입으로 직접 주입 ─────────────
 
     public String getToken(UUID accountId, String clientId, String clientSecret) {
-        return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
+        return tokenCoordinator.getAccountToken(
+                accountId,
+                () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
                 () -> fetchAndCacheToken(accountId, clientId, clientSecret));
     }
 
@@ -73,44 +61,23 @@ class TossAuthApi implements BrokerConnectionTestPort {
     }
 
     public String recoverToken(UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
-        return tokenCache.recoverRejectedToken(
-                brokerTokenCachePort, accountId, rejectedAccessToken, this::threshold, TOKEN_PROPAGATION_GRACE,
+        return tokenCoordinator.recoverAccountToken(
+                accountId,
+                rejectedAccessToken,
+                () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
+                rejected -> brokerTokenCachePort.invalidateToken(
+                        accountId, rejected, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1)),
                 () -> fetchAndCacheToken(accountId, clientId, clientSecret));
     }
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
 
     public String getAdminToken() {
-        // 1차 조회 — 락 없이 빠른 경로
-        if (adminExpiresAt.isAfter(threshold())) return adminAccessToken;
-        // 캐시 miss 시 락으로 경합 차단
-        adminLock.lock();
-        try {
-            if (adminExpiresAt.isAfter(threshold())) return adminAccessToken;
-            return issueAndStoreAdminToken();
-        } finally {
-            adminLock.unlock();
-        }
+        return tokenCoordinator.getAdminToken(this::issueAdminToken);
     }
 
     public String recoverAdminToken(String rejectedAccessToken) {
-        adminLock.lock();
-        try {
-            // 다른 요청이 이미 교체한 유효 토큰이면 현재 관리자 세대를 반환한다.
-            if (adminExpiresAt.isAfter(threshold()) && !Objects.equals(adminAccessToken, rejectedAccessToken)) {
-                return adminAccessToken;
-            }
-            // 갓 발급한 현재 세대는 401이어도 전파 유예 동안 무효화하지 않는다.
-            if (Objects.equals(adminAccessToken, rejectedAccessToken)
-                    && adminIssuedAt.plus(TOKEN_PROPAGATION_GRACE).isAfter(Instant.now())) {
-                return adminAccessToken;
-            }
-            // 보호 대상이 아닌 현재 세대를 만료 처리하고 같은 락 안에서 즉시 교체한다.
-            adminExpiresAt = OffsetDateTime.MIN;
-            return issueAndStoreAdminToken();
-        } finally {
-            adminLock.unlock();
-        }
+        return tokenCoordinator.recoverAdminToken(rejectedAccessToken, this::issueAdminToken);
     }
 
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────
@@ -136,13 +103,10 @@ class TossAuthApi implements BrokerConnectionTestPort {
 
     // ── private helpers ────────────────────────────────────────────────────────
 
-    private String issueAndStoreAdminToken() {
+    private TossDistributedTokenCoordinator.IssuedAdminToken issueAdminToken() {
         TokenResponse response = issueOAuthToken(adminClientId, adminClientSecret);
-        adminAccessToken = response.accessToken();
-        // 만료 5분 전 갱신 트리거를 위해 expiresIn에서 300초 차감
-        adminExpiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(response.expiresIn() - 300);
-        adminIssuedAt = Instant.now();
-        return adminAccessToken;
+        return new TossDistributedTokenCoordinator.IssuedAdminToken(
+                response.accessToken(), response.expiresIn());
     }
 
     // Toss OAuth form-encoded 토큰 발급 (grant_type=client_credentials)

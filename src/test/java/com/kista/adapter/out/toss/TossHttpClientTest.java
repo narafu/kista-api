@@ -17,7 +17,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,6 +28,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,8 +85,10 @@ class TossHttpClientTest {
             }
         };
         tokenCache.saveToken(ACCOUNT.id(), "token-0", OffsetDateTime.now().plusHours(1));
+        TossDistributedTokenCoordinator tokenCoordinator = mockAccountCoordinator();
         TossAuthApi realAuthApi = new TossAuthApi(
-                tossRestTemplate, tokenCache, "http://toss.test", "admin-id", "admin-secret");
+                tossRestTemplate, tokenCache, tokenCoordinator,
+                "http://toss.test", "admin-id", "admin-secret");
         TossHttpClient client = newClient(realAuthApi);
         AtomicInteger oauthFetchCount = new AtomicInteger();
         CountDownLatch requestCRejectedToken1 = new CountDownLatch(1);
@@ -142,10 +145,10 @@ class TossHttpClientTest {
     @Test
     @DisplayName("늦게 시작한 관리자 요청의 token-1 401은 최근 발급 세대를 재사용")
     void staggeredAdminRequests_reuseRecentlyIssuedTokenGeneration() throws InterruptedException {
+        TossDistributedTokenCoordinator tokenCoordinator = mockAdminCoordinator("admin-token-0");
         TossAuthApi realAuthApi = new TossAuthApi(
-                tossRestTemplate, new InMemoryTokenCache(), "http://toss.test", "admin-id", "admin-secret");
-        ReflectionTestUtils.setField(realAuthApi, "adminAccessToken", "admin-token-0");
-        ReflectionTestUtils.setField(realAuthApi, "adminExpiresAt", OffsetDateTime.now().plusHours(1));
+                tossRestTemplate, new InMemoryTokenCache(), tokenCoordinator,
+                "http://toss.test", "admin-id", "admin-secret");
         TossHttpClient client = newClient(realAuthApi);
         AtomicInteger oauthFetchCount = new AtomicInteger();
         CountDownLatch token1Issued = new CountDownLatch(1);
@@ -322,6 +325,53 @@ class TossHttpClientTest {
             Thread.currentThread().interrupt();
             throw new AssertionError(exception);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private TossDistributedTokenCoordinator mockAccountCoordinator() {
+        TossDistributedTokenCoordinator coordinator = org.mockito.Mockito.mock(
+                TossDistributedTokenCoordinator.class);
+        when(coordinator.getAccountToken(any(), any(), any())).thenAnswer(invocation -> {
+            Supplier<Optional<String>> currentToken = invocation.getArgument(1);
+            TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
+            return currentToken.get().orElseGet(issuer::issue);
+        });
+        when(coordinator.recoverAccountToken(any(), anyString(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    String rejectedToken = invocation.getArgument(1);
+                    Supplier<Optional<String>> currentToken = invocation.getArgument(2);
+                    Consumer<String> invalidator = invocation.getArgument(3);
+                    TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(4);
+                    Optional<String> current = currentToken.get();
+                    if (current.isPresent() && !current.get().equals(rejectedToken)) {
+                        return current.get();
+                    }
+                    if ("token-1".equals(rejectedToken)) {
+                        return rejectedToken;
+                    }
+                    invalidator.accept(rejectedToken);
+                    return issuer.issue();
+                });
+        return coordinator;
+    }
+
+    private TossDistributedTokenCoordinator mockAdminCoordinator(String initialToken) {
+        TossDistributedTokenCoordinator coordinator = org.mockito.Mockito.mock(
+                TossDistributedTokenCoordinator.class);
+        AtomicReference<String> currentToken = new AtomicReference<>(initialToken);
+        when(coordinator.getAdminToken(any())).thenAnswer(invocation -> currentToken.get());
+        when(coordinator.recoverAdminToken(anyString(), any())).thenAnswer(invocation -> {
+            String rejectedToken = invocation.getArgument(0);
+            String current = currentToken.get();
+            if (!current.equals(rejectedToken) || "admin-token-1".equals(rejectedToken)) {
+                return current;
+            }
+            TossDistributedTokenCoordinator.AdminTokenIssuer issuer = invocation.getArgument(1);
+            String issued = issuer.issue().accessToken();
+            currentToken.set(issued);
+            return issued;
+        });
+        return coordinator;
     }
 
     private static class InMemoryTokenCache implements BrokerTokenCachePort {
