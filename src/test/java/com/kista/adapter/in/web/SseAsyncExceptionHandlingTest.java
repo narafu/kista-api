@@ -13,11 +13,14 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 class SseAsyncExceptionHandlingTest {
@@ -46,8 +49,16 @@ class SseAsyncExceptionHandlingTest {
 
         controller.emitter.completeWithError(exception);
 
-        mockMvc.perform(asyncDispatch(result));
+        MvcResult dispatched = mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andReturn();
 
+        assertThat(dispatched.getResolvedException()).isSameAs(exception);
+        assertThat(dispatched.getResponse().getContentAsString())
+                .isEqualTo("event:ping\ndata:connected\n\n")
+                .doesNotContain("problem+json")
+                .doesNotContain("Internal Server Error");
         verifyNoInteractions(appErrorLogPort);
     }
 

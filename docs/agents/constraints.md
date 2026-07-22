@@ -24,7 +24,7 @@
 - `ManualTradingException` / `OrderCancelException` → 409, `Account.DuplicateAccountException` → 409
 - `User.CooldownException` → 429(Retry-After 포함, 재신청 쿨다운), `Account.KisRateLimitException` → 429
 - `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
-- SSE의 `AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`은 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
+- `GlobalExceptionHandler`의 async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 
 ### Account ↔ Strategy 분리
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
