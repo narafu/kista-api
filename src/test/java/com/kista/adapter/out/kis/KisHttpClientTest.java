@@ -1,5 +1,6 @@
 package com.kista.adapter.out.kis;
 
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import org.junit.jupiter.api.DisplayName;
@@ -55,10 +56,11 @@ class KisHttpClientTest {
     }
 
     @Test
-    @DisplayName("401 1회 → 토큰 무효화 후 재발급·재시도 성공")
+    @DisplayName("401 1회 → 토큰 복구 후 재시도 성공")
     void retriesOnceAfter401_thenSucceeds() {
-        when(kisAuthApi.getToken(any(), anyString(), anyString()))
-                .thenReturn("rejected-token", "fresh-token");
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("rejected-token");
+        when(kisAuthApi.recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "rejected-token"))
+                .thenReturn(new TokenCoordinator.RecoveredToken("fresh-token", true));
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
                 .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
@@ -66,10 +68,9 @@ class KisHttpClientTest {
         String result = newClient().tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {});
 
         assertThat(result).isEqualTo("OK");
-        // 401 감지 → 토큰 무효화 1회
-        verify(kisAuthApi).invalidateToken(ACCOUNT.id(), "rejected-token");
-        // 최초 + 재시도 = getToken 2회, exchange 2회
-        verify(kisAuthApi, times(2)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
+        // 401 감지 → 복구(무효화+재발급) 1회, 복구된 토큰을 바로 재시도에 사용 — getToken 재호출 없음
+        verify(kisAuthApi).recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "rejected-token");
+        verify(kisAuthApi, times(1)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
         verify(kisRestTemplate, times(2)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
     }
 
@@ -77,6 +78,8 @@ class KisHttpClientTest {
     @DisplayName("401 2회(재시도도 401) → KisApiException")
     void throwsKisApiException_when401Twice() {
         when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisAuthApi.recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "token"))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token", true));
         when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
                 .thenThrow(unauthorized());
@@ -86,7 +89,7 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("재시도 실패");
 
-        verify(kisAuthApi).invalidateToken(ACCOUNT.id(), "token");
+        verify(kisAuthApi).recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "token");
     }
 
     @Test
@@ -101,8 +104,8 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("요청 실패");
 
-        // 비 401은 무효화·재시도 없음
-        verify(kisAuthApi, never()).invalidateToken(any(), anyString());
+        // 비 401은 복구·재시도 없음
+        verify(kisAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString());
         verify(kisRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
     }
 
@@ -119,6 +122,6 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("KIS API 오류");
 
-        verify(kisAuthApi, never()).invalidateToken(any(), anyString());
+        verify(kisAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString());
     }
 }

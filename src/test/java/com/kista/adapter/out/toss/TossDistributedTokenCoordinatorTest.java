@@ -1,5 +1,6 @@
 package com.kista.adapter.out.toss;
 
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,12 +32,12 @@ class TossDistributedTokenCoordinatorTest {
         AtomicReference<String> successorResult = new AtomicReference<>();
         AtomicInteger oauthCalls = new AtomicInteger();
 
-        String ownerResult = owner.getAccountToken(ACCOUNT_ID, () -> {
+        String ownerResult = owner.obtain(ACCOUNT_ID, () -> {
             oauthCalls.incrementAndGet();
             store.advance(Duration.ofSeconds(61));
-            successorResult.set(successor.getAccountToken(
+            successorResult.set(successor.obtain(
                     ACCOUNT_ID, () -> token("token-2", oauthCalls)));
-            return new TossTokenStore.TokenValue("token-1", 3_600);
+            return new TokenCoordinator.IssuedToken("token-1", 3_600);
         });
 
         assertThat(ownerResult).isEqualTo("token-2");
@@ -79,7 +80,7 @@ class TossDistributedTokenCoordinatorTest {
         TossDistributedTokenCoordinator coordinator = new TossDistributedTokenCoordinator(
                 store, ignored -> polls.incrementAndGet(), () -> "waiter", 3);
 
-        assertThatThrownBy(() -> coordinator.getAccountToken(
+        assertThatThrownBy(() -> coordinator.obtain(
                 ACCOUNT_ID, () -> token("never", oauthCalls)))
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("lease 대기 시간 초과");
@@ -93,10 +94,10 @@ class TossDistributedTokenCoordinatorTest {
         FakeTokenStore store = new FakeTokenStore();
         TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
 
-        String account = coordinator.getAccountToken(
-                ACCOUNT_ID, () -> new TossTokenStore.TokenValue("account-token", 3_600));
+        String account = coordinator.obtain(
+                ACCOUNT_ID, () -> new TokenCoordinator.IssuedToken("account-token", 3_600));
         String admin = coordinator.getAdminToken(
-                () -> new TossTokenStore.TokenValue("admin-token", 7_200));
+                () -> new TokenCoordinator.IssuedToken("admin-token", 7_200));
 
         assertThat(account).isEqualTo("account-token");
         assertThat(admin).isEqualTo("admin-token");
@@ -113,9 +114,9 @@ class TossDistributedTokenCoordinatorTest {
         TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
         AtomicInteger oauthCalls = new AtomicInteger();
 
-        String issued = coordinator.getAccountToken(
+        String issued = coordinator.obtain(
                 ACCOUNT_ID, () -> token("token-1", oauthCalls));
-        TossDistributedTokenCoordinator.RecoveredToken protectedToken = coordinator.recoverAccountToken(
+        TokenCoordinator.RecoveredToken protectedToken = coordinator.recover(
                 ACCOUNT_ID, issued, () -> token("token-2", oauthCalls));
 
         assertThat(protectedToken.accessToken()).isEqualTo("token-1");
@@ -127,7 +128,7 @@ class TossDistributedTokenCoordinatorTest {
                 .doesNotContain("token-1");
 
         store.advance(Duration.ofSeconds(2));
-        TossDistributedTokenCoordinator.RecoveredToken reissued = coordinator.recoverAccountToken(
+        TokenCoordinator.RecoveredToken reissued = coordinator.recover(
                 ACCOUNT_ID, issued, () -> token("token-2", oauthCalls));
 
         assertThat(reissued.accessToken()).isEqualTo("token-2");
@@ -144,8 +145,8 @@ class TossDistributedTokenCoordinatorTest {
         AtomicInteger oauthCalls = new AtomicInteger();
 
         // 이미 다른 인스턴스가 발급해 저장해 둔 canonical 토큰(token-1)이 존재하는 상태를 시뮬레이션
-        coordinator.getAccountToken(ACCOUNT_ID, () -> token("token-1", oauthCalls));
-        TossDistributedTokenCoordinator.RecoveredToken recovered = coordinator.recoverAccountToken(
+        coordinator.obtain(ACCOUNT_ID, () -> token("token-1", oauthCalls));
+        TokenCoordinator.RecoveredToken recovered = coordinator.recover(
                 ACCOUNT_ID, "stale-rejected-token", () -> token("token-2", oauthCalls));
 
         assertThat(recovered.accessToken()).isEqualTo("token-1");
@@ -162,7 +163,7 @@ class TossDistributedTokenCoordinatorTest {
         AtomicInteger oauthCalls = new AtomicInteger();
         TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
 
-        assertThatThrownBy(() -> coordinator.getAccountToken(
+        assertThatThrownBy(() -> coordinator.obtain(
                 ACCOUNT_ID, () -> token("never", oauthCalls)))
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("Redis");
@@ -175,8 +176,8 @@ class TossDistributedTokenCoordinatorTest {
         FakeTokenStore store = new FakeTokenStore();
         TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
 
-        assertThatThrownBy(() -> coordinator.getAccountToken(
-                ACCOUNT_ID, () -> new TossTokenStore.TokenValue("short-token", 300)))
+        assertThatThrownBy(() -> coordinator.obtain(
+                ACCOUNT_ID, () -> new TokenCoordinator.IssuedToken("short-token", 300)))
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("5분 이하");
         assertThat(store.find("account:" + ACCOUNT_ID)).isEmpty();
@@ -186,9 +187,9 @@ class TossDistributedTokenCoordinatorTest {
         return new TossDistributedTokenCoordinator(store, ignored -> {}, () -> ownerId, 3);
     }
 
-    private TossTokenStore.TokenValue token(String value, AtomicInteger calls) {
+    private TokenCoordinator.IssuedToken token(String value, AtomicInteger calls) {
         calls.incrementAndGet();
-        return new TossTokenStore.TokenValue(value, 3_600);
+        return new TokenCoordinator.IssuedToken(value, 3_600);
     }
 
     private static final class FakeTokenStore implements TossTokenStore {

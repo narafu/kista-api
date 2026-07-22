@@ -1,5 +1,6 @@
 package com.kista.adapter.out.toss;
 
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.account.Account;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,12 +48,12 @@ class TossAuthApiTest {
     }
 
     private void stubCoordinatorIssuance() {
-        lenient().when(tokenCoordinator.getAccountToken(any(), any())).thenAnswer(invocation -> {
-            TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(1);
+        lenient().when(tokenCoordinator.obtain(any(), any())).thenAnswer(invocation -> {
+            TokenCoordinator.TokenIssuer issuer = invocation.getArgument(1);
             return issuer.issue().accessToken();
         });
         lenient().when(tokenCoordinator.getAdminToken(any())).thenAnswer(invocation -> {
-            TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(0);
+            TokenCoordinator.TokenIssuer issuer = invocation.getArgument(0);
             return issuer.issue().accessToken();
         });
     }
@@ -65,7 +66,7 @@ class TossAuthApiTest {
         @DisplayName("캐시 히트 시 tossRestTemplate 미호출")
         void getToken_cacheHit_noApiCall() {
             doReturn("cached-token").when(tokenCoordinator)
-                    .getAccountToken(eq(ACCOUNT_ID), any());
+                    .obtain(eq(ACCOUNT_ID), any());
 
             String result = api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET);
 
@@ -102,7 +103,7 @@ class TossAuthApiTest {
         @DisplayName("캐시 미스 후 double-check 히트 시 tossRestTemplate 미호출")
         void getToken_doubleCheckHit_noApiCall() {
             doReturn("concurrent-token").when(tokenCoordinator)
-                    .getAccountToken(eq(ACCOUNT_ID), any());
+                    .obtain(eq(ACCOUNT_ID), any());
 
             String result = api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET);
 
@@ -119,8 +120,8 @@ class TossAuthApiTest {
 
         String current = api.getAdminToken();
         when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any()))
-                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", false));
-        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token");
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", false));
+        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token");
 
         assertThat(current).isEqualTo("admin-token-1");
         assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
@@ -136,8 +137,8 @@ class TossAuthApiTest {
 
         String issued = api.getAdminToken();
         when(tokenCoordinator.recoverAdminToken(eq(issued), any()))
-                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", true));
-        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverAdminToken(issued);
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", true));
+        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken(issued);
 
         assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
@@ -147,15 +148,15 @@ class TossAuthApiTest {
     @Test
     @DisplayName("계좌 401 복구를 rejected token과 함께 분산 coordinator에 위임")
     void recoverToken_delegatesToDistributedCoordinator() {
-        when(tokenCoordinator.recoverAccountToken(
+        when(tokenCoordinator.recover(
                 eq(ACCOUNT_ID), eq("rejected-token"), any()))
-                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("coordinated-token", false));
+                .thenReturn(new TokenCoordinator.RecoveredToken("coordinated-token", false));
 
-        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverToken(
+        TokenCoordinator.RecoveredToken recovered = api.recoverToken(
                 ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token");
 
         assertThat(recovered.accessToken()).isEqualTo("coordinated-token");
-        verify(tokenCoordinator).recoverAccountToken(
+        verify(tokenCoordinator).recover(
                 eq(ACCOUNT_ID), eq("rejected-token"), any());
         verifyNoInteractions(tossRestTemplate);
     }

@@ -1,5 +1,6 @@
 package com.kista.adapter.out.toss;
 
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.toss.TossApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,9 +12,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+// 계좌 토큰(obtain/recover)은 TokenCoordinator를 구현해 KIS(KisTokenCoordinator, JVM-local 락)와
+// 같은 계약을 공유한다 — 관리자(admin) 토큰은 Account가 없어 KIS에 대응 개념이 없으므로 별도 public
+// 메서드로만 노출한다(→ root ARCHITECTURE.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다").
 @Slf4j
 @Component
-class TossDistributedTokenCoordinator {
+class TossDistributedTokenCoordinator implements TokenCoordinator {
 
     private static final String ADMIN_SCOPE = "admin"; // 모든 계좌·인스턴스가 공유하는 admin 토큰 발급 lease scope
     // TossConfig의 OAuth RestTemplate 타임아웃(connect 3s + response 10s ≈ 13s 최악 케이스)보다
@@ -48,12 +52,14 @@ class TossDistributedTokenCoordinator {
         this.maxPollAttempts = maxPollAttempts;
     }
 
-    String getAccountToken(UUID accountId, TokenIssuer issuer) {
+    @Override
+    public String obtain(UUID accountId, TokenIssuer issuer) {
         // 최초 조회는 복구 흐름이 아니므로 freshlyIssued 여부를 폐기하고 토큰 문자열만 반환
         return getOrIssue(accountScope(accountId), null, issuer).accessToken();
     }
 
-    RecoveredToken recoverAccountToken(UUID accountId, String rejectedToken, TokenIssuer issuer) {
+    @Override
+    public RecoveredToken recover(UUID accountId, String rejectedToken, TokenIssuer issuer) {
         return getOrIssue(accountScope(accountId), rejectedToken, issuer);
     }
 
@@ -104,14 +110,15 @@ class TossDistributedTokenCoordinator {
                 return reusable;
             }
 
-            TossTokenStore.TokenValue issued = issuer.issue();
+            IssuedToken issued = issuer.issue();
             Duration canonicalTtl = Duration.ofSeconds(issued.expiresInSeconds())
                     .minus(TOKEN_EXPIRY_MARGIN);
             if (canonicalTtl.isZero() || canonicalTtl.isNegative()) {
                 throw new TossApiException("Toss token 만료 시간이 5분 이하입니다", null);
             }
             TossTokenStore.StoreResult result = tokenStore.storeIfCurrent(
-                    lease, issued, canonicalTtl);
+                    lease, new TossTokenStore.TokenValue(issued.accessToken(), issued.expiresInSeconds()),
+                    canonicalTtl);
             if (result == TossTokenStore.StoreResult.STORED) {
                 // 방금 OAuth로 새로 발급한 토큰 — 리소스 서버 전파 지연 가능성이 있어 대기 필요
                 return new RecoveredToken(issued.accessToken(), true);
@@ -182,14 +189,4 @@ class TossDistributedTokenCoordinator {
     interface PollWaiter {
         void await(Duration duration);
     }
-
-    @FunctionalInterface
-    interface TokenIssuer {
-        TossTokenStore.TokenValue issue();
-    }
-
-    // 401 복구 결과 — freshlyIssued=false는 이미 다른 인스턴스가 저장해 둔 canonical 토큰을
-    // Redis 읽기만으로 재사용한 경우(전파 지연 위험 없음), true는 방금 발급되었거나
-    // 최근 발급 지문 보호 구간 내라 전파 지연 위험이 남아 있는 경우(호출부가 백오프 대기 필요)
-    record RecoveredToken(String accessToken, boolean freshlyIssued) {}
 }

@@ -17,6 +17,7 @@
 
 ### 토큰·인증
 
+- 계좌 토큰 조정(`obtain`/`recover`)은 `adapter/out/broker/TokenCoordinator` 공통 계약을 `TossDistributedTokenCoordinator`가 구현한다 — KIS(`KisTokenCoordinator`, JVM 내 로컬 락)와 같은 형태의 인터페이스지만 메커니즘은 다르다(→ root ARCHITECTURE.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다"). 관리자(admin) 토큰은 Account가 없어 대응 개념이 없으므로 `getAdminToken`/`recoverAdminToken`으로 인터페이스 밖에 별도 노출한다.
 - Toss 계좌·관리자 access token의 canonical 저장소는 모두 Redis다. 계좌 hash key는 `toss:token:canonical:account:<UUID>`, 관리자는 `toss:token:canonical:admin`이며 access token, expiry epoch, fencing generation을 저장한다. TTL은 OAuth `expires_in`보다 5분 짧다. Toss는 PostgreSQL `broker_tokens`를 읽거나 무효화하거나 저장하지 않으며, 해당 DB 경로는 KIS 전용이다.
 - scope별 발급 owner는 Lua로 20초 lease `SET NX PX`(OAuth RestTemplate 타임아웃 최악 케이스 ~13초보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`를 원자 실행한다. follower polling ceiling은 25초(POLL_INTERVAL 50ms × 500회)로 lease TTL을 5초 여유로 초과해, 정상 owner 완료나 lease 자연 만료보다 먼저 포기하지 않는다. lease는 중복 OAuth를 줄일 뿐 correctness를 보장하지 않는다. canonical write Lua가 incoming generation을 현재 generation counter와 저장된 canonical generation 모두와 비교해 stale owner write를 거절하는 fencing CAS가 correctness 경계다.
 - lease 만료 후 successor가 더 큰 generation을 받으면 지연된 owner는 자신의 token을 저장·반환하지 않는다. successor의 더 큰 generation canonical token을 bounded polling해 반환하며 저장이 완료되지 않으면 503으로 fail-closed 한다.

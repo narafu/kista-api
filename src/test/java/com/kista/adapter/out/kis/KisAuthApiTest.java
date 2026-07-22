@@ -1,5 +1,6 @@
 package com.kista.adapter.out.kis;
 
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ class KisAuthApiTest {
 
     @Mock RestTemplate kisRestTemplate;
     @Mock BrokerTokenCachePort brokerTokenCachePort;
+    @Mock KisTokenCoordinator tokenCoordinator;
 
     KisAuthApi api;
 
@@ -39,80 +41,54 @@ class KisAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        api = new KisAuthApi(kisRestTemplate, brokerTokenCachePort, BASE_URL);
+        api = new KisAuthApi(kisRestTemplate, brokerTokenCachePort, tokenCoordinator, BASE_URL);
     }
 
+    // getToken/recoverToken의 캐시·락 동작 자체는 KisTokenCoordinatorTest가 검증한다.
+    // 여기서는 KisAuthApi가 tokenCoordinator에 올바르게 위임하는지, issuer가 KIS OAuth 응답을
+    // IssuedToken으로 정확히 변환하는지만 검증한다.
     @Nested
-    @DisplayName("KisAuthApi — getToken")
+    @DisplayName("KisAuthApi — getToken / recoverToken")
     class TokenTests {
 
         @Test
-        @DisplayName("캐시에 유효 토큰 있으면 KIS API 호출 없이 반환")
-        void getToken_whenCacheHit_returnsCachedToken() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
+        @DisplayName("getToken은 tokenCoordinator.obtain 결과를 그대로 반환한다")
+        void getToken_delegatesToCoordinator() {
+            when(tokenCoordinator.obtain(eq(ACCOUNT_ID), any())).thenReturn("coordinated-token");
 
             String result = api.getToken(ACCOUNT_ID, "key", "secret");
 
-            assertThat(result).isEqualTo("cached-token");
-            verifyNoInteractions(kisRestTemplate);
+            assertThat(result).isEqualTo("coordinated-token");
         }
 
         @Test
-        @DisplayName("캐시 미스 시 KIS API 호출하여 신규 토큰 반환")
-        void getToken_whenCacheMiss_returnsNewToken() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
+        @DisplayName("getToken이 넘기는 issuer는 KIS OAuth를 호출해 IssuedToken(accessToken, expiresInSeconds)으로 변환한다")
+        void getToken_issuerConvertsKisOAuthResponse_toIssuedToken() {
             when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
-
-            String result = api.getToken(ACCOUNT_ID, "key", "secret");
-
-            assertThat(result).isEqualTo("new-token");
-        }
-
-        @Test
-        @DisplayName("캐시 미스 시 발급 토큰을 account_id와 함께 saveToken으로 캐시에 저장")
-        void getToken_whenCacheMiss_savesTokenToCache() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
+            ArgumentCaptor<TokenCoordinator.TokenIssuer> issuerCaptor =
+                    ArgumentCaptor.forClass(TokenCoordinator.TokenIssuer.class);
+            when(tokenCoordinator.obtain(eq(ACCOUNT_ID), issuerCaptor.capture())).thenReturn("new-token");
 
             api.getToken(ACCOUNT_ID, "key", "secret");
+            TokenCoordinator.IssuedToken issued = issuerCaptor.getValue().issue();
 
-            ArgumentCaptor<OffsetDateTime> expiresCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-            verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
-            // KIS 응답은 KST(+09:00)이므로 offset이 +09:00이어야 함
-            assertThat(expiresCaptor.getValue().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
+            assertThat(issued.accessToken()).isEqualTo("new-token");
+            // 2099년 만료이므로 충분히 큰 양수 초
+            assertThat(issued.expiresInSeconds()).isGreaterThan(0);
         }
 
         @Test
-        @DisplayName("캐시 만료 1분 전 임박 토큰은 재발급 — findValidToken에 now+1분 전달")
-        void getToken_uses1MinBuffer_forCacheCheck() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
+        @DisplayName("recoverToken은 tokenCoordinator.recover 결과를 그대로 반환한다")
+        void recoverToken_delegatesToCoordinator() {
+            when(tokenCoordinator.recover(eq(ACCOUNT_ID), eq("rejected-token"), any()))
+                    .thenReturn(new TokenCoordinator.RecoveredToken("fresh-token", true));
 
-            api.getToken(ACCOUNT_ID, "key", "secret");
+            TokenCoordinator.RecoveredToken result =
+                    api.recoverToken(ACCOUNT_ID, "key", "secret", "rejected-token");
 
-            // double-check 패턴으로 findValidToken이 2회 호출됨 (1차: 락 전, 2차: 락 후)
-            ArgumentCaptor<OffsetDateTime> thresholdCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-            verify(brokerTokenCachePort, times(2)).findValidToken(eq(ACCOUNT_ID), thresholdCaptor.capture());
-            // 두 번 모두 threshold가 현재 시각보다 최소 59초 이상 미래여야 함 (1분 버퍼)
-            thresholdCaptor.getAllValues().forEach(t ->
-                    assertThat(t).isAfter(OffsetDateTime.now().plusSeconds(59)));
-        }
-
-        @Test
-        @DisplayName("캐시 miss 후 lock 내 2차 조회(double-check)에서 hit 시 KIS API 미호출")
-        void getToken_doubleCheck_preventsRedundantIssue() {
-            // 1차 miss, 2차 hit (다른 스레드가 이미 발급한 상황 시뮬레이션)
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
-                    .thenReturn(Optional.empty())
-                    .thenReturn(Optional.of("concurrent-token"));
-
-            String result = api.getToken(ACCOUNT_ID, "key", "secret");
-
-            assertThat(result).isEqualTo("concurrent-token");
-            verifyNoInteractions(kisRestTemplate);
+            assertThat(result.accessToken()).isEqualTo("fresh-token");
+            assertThat(result.freshlyIssued()).isTrue();
         }
 
         @Test

@@ -95,14 +95,17 @@ adapter/in/
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/
-  broker/        ← DoubleCheckedTokenCache (KIS JVM 내 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
+  broker/        ← TokenCoordinator (계좌 토큰 obtain/recover 공통 계약 — domain/port/out 아닌 순수 adapter 내부 인터페이스,
+                   KIS/Toss 둘 다 구현하지만 폴리모픽 주입 지점은 없음: KisAuthApi/TossAuthApi 각자 구체 타입을 직접 주입)
+                   DoubleCheckedTokenCache (KisTokenCoordinator 전용 JVM 내 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
                    BrokerTokenCachePort.saveToken/invalidateToken은 REQUIRES_NEW로 락 해제 전 독립 커밋;
                    invalidateToken은 accountId+거절된 accessToken 일치 시만 INVALIDATED_TOKEN으로 갱신해 stale 401이 이미 재발급된 신규 토큰을 무효화하지 않음)
                    PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
   kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화한 후 최신 토큰으로 1회 재시도, RestClientException → KisApiException 래핑)
+                   KisTokenCoordinator (TokenCoordinator 구현 — DoubleCheckedTokenCache + BrokerTokenCachePort 조합, 재발급이 비파괴적이라 항상 freshlyIssued=true)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
   toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
-                   TossDistributedTokenCoordinator + TossRedisTokenStore (계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation을 비교하는 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL),
+                   TossDistributedTokenCoordinator(TokenCoordinator 구현) + TossRedisTokenStore (계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation을 비교하는 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자(admin) 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드,
                    TossResponseParser (숫자 파싱 헬퍼, 패키지 내부 전용), TossBrokerAdapter (공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
   kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격 조회
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter

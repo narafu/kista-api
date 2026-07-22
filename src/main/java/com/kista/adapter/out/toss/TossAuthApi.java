@@ -1,6 +1,7 @@
 package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
@@ -36,33 +37,33 @@ class TossAuthApi implements BrokerConnectionTestPort {
     // ── 토큰 발급 / 401 복구 — TossHttpClient가 구체 타입으로 직접 주입 ─────────────
 
     public String getToken(UUID accountId, String clientId, String clientSecret) {
-        return tokenCoordinator.getAccountToken(
+        return tokenCoordinator.obtain(
                 accountId,
                 () -> issueAccountToken(accountId, clientId, clientSecret));
     }
 
-    private TossTokenStore.TokenValue issueAccountToken(
+    private TokenCoordinator.IssuedToken issueAccountToken(
             UUID accountId, String clientId, String clientSecret) {
         log.info("Toss 토큰 신규 발급: accountId={}", accountId);
         TokenResponse response = issueOAuthToken(clientId, clientSecret);
-        return new TossTokenStore.TokenValue(response.accessToken(), response.expiresIn());
+        return new TokenCoordinator.IssuedToken(response.accessToken(), response.expiresIn());
     }
 
-    public TossDistributedTokenCoordinator.RecoveredToken recoverToken(
+    public TokenCoordinator.RecoveredToken recoverToken(
             UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
-        return tokenCoordinator.recoverAccountToken(
+        return tokenCoordinator.recover(
                 accountId,
                 rejectedAccessToken,
                 () -> issueAccountToken(accountId, clientId, clientSecret));
     }
 
-    // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
+    // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 (Account 없음, TokenCoordinator 범위 밖) ──
 
     public String getAdminToken() {
         return tokenCoordinator.getAdminToken(this::issueAdminToken);
     }
 
-    public TossDistributedTokenCoordinator.RecoveredToken recoverAdminToken(String rejectedAccessToken) {
+    public TokenCoordinator.RecoveredToken recoverAdminToken(String rejectedAccessToken) {
         return tokenCoordinator.recoverAdminToken(rejectedAccessToken, this::issueAdminToken);
     }
 
@@ -89,9 +90,9 @@ class TossAuthApi implements BrokerConnectionTestPort {
 
     // ── private helpers ────────────────────────────────────────────────────────
 
-    private TossTokenStore.TokenValue issueAdminToken() {
+    private TokenCoordinator.IssuedToken issueAdminToken() {
         TokenResponse response = issueOAuthToken(adminClientId, adminClientSecret);
-        return new TossTokenStore.TokenValue(
+        return new TokenCoordinator.IssuedToken(
                 response.accessToken(), response.expiresIn());
     }
 

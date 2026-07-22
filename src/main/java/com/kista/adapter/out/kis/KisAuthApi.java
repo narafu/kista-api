@@ -1,7 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.adapter.out.broker.DoubleCheckedTokenCache;
+import com.kista.adapter.out.broker.TokenCoordinator;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -30,7 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// BrokerConnectionTestPort 구현체 — getToken/invalidateToken은 KisHttpClient에 직접 주입되는 구체 메서드
+// BrokerConnectionTestPort 구현체 — getToken/recoverToken은 KisHttpClient에 직접 주입되는 구체 메서드
 // OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
 @Slf4j
 @Component
@@ -41,48 +42,44 @@ class KisAuthApi implements BrokerConnectionTestPort {
     private static final DateTimeFormatter KIS_EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // 계좌별 토큰 발급 락 템플릿 — 동시 요청 시 중복 발급 방지 (KIS/Toss 공용)
-    private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
-
     // 연결 테스트 직후 계좌번호 검증 시 재발급 방지 — KIS EGW00133(1분당 1회 제한) 우회용 단기 캐시
     private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
     private final RestTemplate kisRestTemplate;
+    // verifyCredentials/verifyAccount(계좌 등록 전, accountId 없을 수 있음) 전용 — 코디네이터를 거치지 않는 단순 캐시 접근
     private final BrokerTokenCachePort brokerTokenCachePort;
+    // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
+    // TokenCoordinator를 구현하는 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
+    // TossAuthApi가 TossDistributedTokenCoordinator를 구체 타입으로 주입받는 것과 동일하게 구체 타입 사용
+    private final KisTokenCoordinator tokenCoordinator;
     @Value("${kis.base-url}")
     private final String kisBaseUrl;
 
-    // ── 토큰 발급 / 무효화 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
+    // ── 토큰 발급 / 401 복구 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
     public String getToken(UUID accountId, String appKey, String appSecret) {
-        return tokenCache.getOrFetch(brokerTokenCachePort, accountId, this::threshold,
-                () -> fetchAndCacheToken(accountId, appKey, appSecret));
+        return tokenCoordinator.obtain(accountId, () -> issueAccountToken(accountId, appKey, appSecret));
     }
 
-    private String fetchAndCacheToken(UUID accountId, String appKey, String appSecret) {
+    public TokenCoordinator.RecoveredToken recoverToken(
+            UUID accountId, String appKey, String appSecret, String rejectedAccessToken) {
+        return tokenCoordinator.recover(accountId, rejectedAccessToken,
+                () -> issueAccountToken(accountId, appKey, appSecret));
+    }
+
+    private TokenCoordinator.IssuedToken issueAccountToken(UUID accountId, String appKey, String appSecret) {
         log.info("KIS 토큰 신규 발급: accountId={}", accountId);
         try {
             TokenResponse response = issueOAuthToken(appKey, appSecret);
             OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-            // 발급된 토큰을 account_id 기준으로 DB에 upsert
-            brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-            return response.accessToken();
+            long expiresInSeconds = Duration.between(OffsetDateTime.now(KST), expiresAt).getSeconds();
+            return new TokenCoordinator.IssuedToken(response.accessToken(), expiresInSeconds);
         } catch (Account.InvalidBrokerKeyException e) {
             throw e; // 증권사 키 검증 실패는 그대로 전파
         } catch (Exception e) {
             throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
         }
-    }
-
-    public void invalidateToken(UUID accountId, String rejectedAccessToken) {
-        brokerTokenCachePort.invalidateToken(
-                accountId, rejectedAccessToken, OffsetDateTime.now(KST).minusHours(1));
-    }
-
-    // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
-    private OffsetDateTime threshold() {
-        return OffsetDateTime.now(KST).plusMinutes(1);
     }
 
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────

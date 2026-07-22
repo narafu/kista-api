@@ -102,10 +102,10 @@ class KisHttpClient {
         } catch (HttpStatusCodeException e) {
             if (e.getStatusCode().value() == 401) {
                 log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
-                kisAuthApi.invalidateToken(account.id(), rejectedToken);
+                String recoveredToken = kisAuthApi.recoverToken(
+                        account.id(), account.appKey(), account.secretKey(), rejectedToken).accessToken();
                 try {
-                    // 무효화된 캐시 → buildHeaders가 신규 토큰을 재발급해 헤더 재구성
-                    return call.apply(buildHeaders(trId, account));
+                    return call.apply(buildHeaders(recoveredToken, account.appKey(), account.secretKey(), trId));
                 } catch (RestClientException retryEx) {
                     throw new KisApiException("KIS API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
                 }

@@ -10,7 +10,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-// 계좌별 토큰 발급 double-checked locking 템플릿 — 현재 KIS AuthApi가 사용
+// 계좌별 토큰 발급 double-checked locking 템플릿 — KisTokenCoordinator 전용
+// (Toss는 다중 인스턴스 환경 때문에 Redis 분산 lease+fencing인 TossDistributedTokenCoordinator를 별도로 쓴다)
 // 1차 캐시 조회(락 없음) → miss 시 accountId별 락 → 2차 double-check → 신규 발급
 public final class DoubleCheckedTokenCache {
 
