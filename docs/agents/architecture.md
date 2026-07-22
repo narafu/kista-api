@@ -65,7 +65,7 @@ application/
     strategy/    ← StrategyService(신규 등록 시 RuntimeSettings 전략 생성 정책 적용; 수정·사이클 흐름은 미적용)
     user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM), UserSettingsService, UserCascadeDeleter(소프트 삭제 cascade helper)
     portfolio/   ← PortfolioService
-    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), StatsService(UserStatsUseCase 구현 — summary/equity-curve(type 필터)/cycles/housing-benchmark 단일 진입점)
+    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), StatsService(UserStatsUseCase 구현 — summary/equity-curve(type 필터는 사이클과 해당 cycleId 포지션 모두에 적용)/cycles/housing-benchmark 단일 진입점)
                    MonthlyReturnCalculator — 사이클·포지션 스냅샷에서 현금흐름 조정 월별 USD 투자지수(TWR) 계산, Spring·포트 비의존 순수 클래스
                    HousingBenchmarkComparisonBuilder — 투자지수·KB Land 분위가를 공통월 첫 달=100 기준 정규화해 비교 summary·points 조립, 마찬가지로 순수 클래스
                    getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary 계산에는 미반영(조회 실패 시 null 처리, 200 정상 반환) — 투자(USD)·서울아파트(KRW) 현지통화 그대로 비교, 환율 변환 없음
