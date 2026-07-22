@@ -102,7 +102,7 @@ adapter/out/
   kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화한 후 최신 토큰으로 1회 재시도, RestClientException → KisApiException 래핑)
                    KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
   toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
-                   TossDistributedTokenCoordinator (Redis owner lease로 Fly 인스턴스 간 계좌·관리자 OAuth 발급 단일화; PostgreSQL 계좌 토큰·Redis 관리자 토큰 canonical 저장소 double-check; SHA-256 최근 발급 fingerprint 2초 TTL),
+                   TossDistributedTokenCoordinator (전용 2-connection Hikari pool의 PostgreSQL session advisory lock으로 Fly 인스턴스 간 계좌·관리자 OAuth 발급 단일화; PostgreSQL 계좌 토큰·Redis 관리자 토큰 canonical 저장소 double-check; Redis SHA-256 최근 발급 fingerprint 2초 TTL),
                    TossResponseParser (숫자 파싱 헬퍼, 패키지 내부 전용), TossBrokerAdapter (공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
   kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격 조회
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter

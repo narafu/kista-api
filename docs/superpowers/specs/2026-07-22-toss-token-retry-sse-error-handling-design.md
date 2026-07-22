@@ -40,17 +40,18 @@
 
 계좌별 전체 API 요청을 직렬화하거나 별도 in-flight Future를 도입하지 않는다. 락은 캐시 복구와 OAuth 발급만 조정하며 정상 리소스 API 호출은 계속 병렬로 실행한다.
 
-### 운영 다중 인스턴스: Redis 분산 발급 조정
+### 운영 다중 인스턴스: PostgreSQL session advisory lock 발급 조정
 
-Fly 운영은 rolling 배포 중 구·신 인스턴스가 겹칠 수 있으므로 JVM-local 락과 최근 발급 기록만으로는 충분하지 않다. Toss 계좌·관리자 토큰 발급은 Redis owner lease로 인스턴스 간 단일화한다.
+Fly 운영은 rolling 배포 중 구·신 인스턴스가 겹칠 수 있으므로 JVM-local 락과 최근 발급 기록만으로는 충분하지 않다. Toss 계좌·관리자 토큰 발급은 PostgreSQL session advisory lock으로 인스턴스 간 단일화한다. 고정 TTL lease는 최악 경로가 예상 시간을 넘길 때 stale owner와 새 owner가 겹칠 수 있으므로 사용하지 않는다.
 
 - 계좌 토큰의 canonical 저장소는 기존 PostgreSQL `broker_tokens`를 유지한다.
 - 관리자 토큰은 Redis에 access token과 만료 TTL을 저장해 모든 인스턴스가 공유한다.
-- 계좌·관리자별 발급 lease를 Redis `SET NX`와 유한 TTL로 획득한다. 획득 후 canonical 저장소를 다시 확인한 뒤에만 OAuth를 호출한다.
-- 최근 발급 token fingerprint를 2초 TTL로 Redis에 저장한다. 같은 fingerprint의 전파 중 401은 무효화하지 않는다.
-- lease 해제는 Lua compare-and-delete로 owner 값이 일치할 때만 수행한다. 대기자는 제한 시간 동안 canonical 토큰 저장 완료를 polling한다.
+- 계좌·관리자별 signed 64-bit key로 `pg_try_advisory_lock`을 bounded polling한다. 획득 후 canonical 저장소를 다시 확인한 뒤에만 OAuth를 호출한다.
+- main JPA pool과 분리된 2-connection Hikari pool에서 전용 JDBC connection을 획득해 임계구역 전체에서 유지하고 같은 session에서 unlock한다. pool borrow/validation과 SQL query는 각각 1초로 제한한다. lock에는 TTL이 없고 session 장애 시 PostgreSQL이 자동 해제한다. coordinator의 `NOT_SUPPORTED` 경계로 caller transaction을 suspend해 OAuth 구간에 Spring transaction을 사용하지 않는다.
+- 최근 발급 token fingerprint를 2초 TTL로 Redis에 먼저 저장한 뒤 canonical token을 저장한다. 같은 fingerprint의 전파 중 401은 무효화하지 않는다.
 - Redis 장애 시 로컬 발급으로 우회하지 않는다. 중복 OAuth 발급보다 요청 실패가 안전하므로 명시적으로 실패한다.
-- 정상 Toss 리소스 API 호출은 lease 밖에서 실행한다.
+- PostgreSQL lock 오류도 로컬 발급으로 우회하지 않는다. 정상 Toss 리소스 API 호출은 advisory lock 밖에서 실행한다.
+- Redis-lease 구버전과 advisory-lock 신버전은 서로 배타적이지 않으므로 최초 운영 전환은 Fly `immediate` 전략으로 old/new overlap 없이 수행한다. 검증 후 별도 follow-up 배포에서 `rolling`으로 복원한다.
 
 ### SSE: 본문 없는 전용 비정상 종료 처리
 

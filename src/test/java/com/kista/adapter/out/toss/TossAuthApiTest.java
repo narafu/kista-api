@@ -54,11 +54,21 @@ class TossAuthApiTest {
 
     @SuppressWarnings("unchecked")
     private void stubCoordinatorIssuance() {
-        lenient().when(tokenCoordinator.getAccountToken(any(), any(), any())).thenAnswer(invocation -> {
+        lenient().when(tokenCoordinator.getAccountToken(any(), any(), any(), any())).thenAnswer(invocation -> {
             Supplier<Optional<String>> currentToken = invocation.getArgument(1);
             TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
+            TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(3);
             Optional<String> first = currentToken.get();
-            return first.isPresent() ? first.get() : currentToken.get().orElseGet(issuer::issue);
+            if (first.isPresent()) {
+                return first.get();
+            }
+            Optional<String> second = currentToken.get();
+            if (second.isPresent()) {
+                return second.get();
+            }
+            TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
+            persister.persist(issued);
+            return issued.accessToken();
         });
         lenient().when(tokenCoordinator.getAdminToken(any())).thenAnswer(invocation -> {
             TossDistributedTokenCoordinator.AdminTokenIssuer issuer = invocation.getArgument(0);
@@ -168,7 +178,7 @@ class TossAuthApiTest {
     @DisplayName("계좌 401 복구를 rejected token과 함께 분산 coordinator에 위임")
     void recoverToken_delegatesToDistributedCoordinator() {
         when(tokenCoordinator.recoverAccountToken(
-                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any()))
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any(), any()))
                 .thenReturn("coordinated-token");
 
         String recovered = api.recoverToken(
@@ -176,7 +186,7 @@ class TossAuthApiTest {
 
         assertThat(recovered).isEqualTo("coordinated-token");
         verify(tokenCoordinator).recoverAccountToken(
-                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any());
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any(), any());
         verifyNoInteractions(tossRestTemplate);
     }
 

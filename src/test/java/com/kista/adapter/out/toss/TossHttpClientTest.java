@@ -331,17 +331,25 @@ class TossHttpClientTest {
     private TossDistributedTokenCoordinator mockAccountCoordinator() {
         TossDistributedTokenCoordinator coordinator = org.mockito.Mockito.mock(
                 TossDistributedTokenCoordinator.class);
-        when(coordinator.getAccountToken(any(), any(), any())).thenAnswer(invocation -> {
+        when(coordinator.getAccountToken(any(), any(), any(), any())).thenAnswer(invocation -> {
             Supplier<Optional<String>> currentToken = invocation.getArgument(1);
             TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
-            return currentToken.get().orElseGet(issuer::issue);
+            TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(3);
+            Optional<String> current = currentToken.get();
+            if (current.isPresent()) {
+                return current.get();
+            }
+            TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
+            persister.persist(issued);
+            return issued.accessToken();
         });
-        when(coordinator.recoverAccountToken(any(), anyString(), any(), any(), any()))
+        when(coordinator.recoverAccountToken(any(), anyString(), any(), any(), any(), any()))
                 .thenAnswer(invocation -> {
                     String rejectedToken = invocation.getArgument(1);
                     Supplier<Optional<String>> currentToken = invocation.getArgument(2);
                     Consumer<String> invalidator = invocation.getArgument(3);
                     TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(4);
+                    TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(5);
                     Optional<String> current = currentToken.get();
                     if (current.isPresent() && !current.get().equals(rejectedToken)) {
                         return current.get();
@@ -350,7 +358,9 @@ class TossHttpClientTest {
                         return rejectedToken;
                     }
                     invalidator.accept(rejectedToken);
-                    return issuer.issue();
+                    TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
+                    persister.persist(issued);
+                    return issued.accessToken();
                 });
         return coordinator;
     }

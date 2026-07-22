@@ -43,16 +43,18 @@ class TossAuthApi implements BrokerConnectionTestPort {
         return tokenCoordinator.getAccountToken(
                 accountId,
                 () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
-                () -> fetchAndCacheToken(accountId, clientId, clientSecret));
+                () -> issueAccountToken(accountId, clientId, clientSecret),
+                issued -> brokerTokenCachePort.saveToken(
+                        accountId, issued.accessToken(), issued.expiresAt()));
     }
 
-    private String fetchAndCacheToken(UUID accountId, String clientId, String clientSecret) {
+    private TossDistributedTokenCoordinator.IssuedAccountToken issueAccountToken(
+            UUID accountId, String clientId, String clientSecret) {
         log.info("Toss 토큰 신규 발급: accountId={}", accountId);
         TokenResponse response = issueOAuthToken(clientId, clientSecret);
         // 만료 5분 전 갱신 트리거를 위해 expiresIn에서 300초 차감
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(response.expiresIn() - 300);
-        brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-        return response.accessToken();
+        return new TossDistributedTokenCoordinator.IssuedAccountToken(response.accessToken(), expiresAt);
     }
 
     // 만료 5분 전부터 무효 처리 — 경계값 만료 오류 방지
@@ -67,7 +69,9 @@ class TossAuthApi implements BrokerConnectionTestPort {
                 () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
                 rejected -> brokerTokenCachePort.invalidateToken(
                         accountId, rejected, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1)),
-                () -> fetchAndCacheToken(accountId, clientId, clientSecret));
+                () -> issueAccountToken(accountId, clientId, clientSecret),
+                issued -> brokerTokenCachePort.saveToken(
+                        accountId, issued.accessToken(), issued.expiresAt()));
     }
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────

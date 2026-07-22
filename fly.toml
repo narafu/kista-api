@@ -21,7 +21,7 @@ protocol = "http"
 timeout = "10s"
 
 [deployment]
-strategy = "rolling"            # 배포 시 무중단을 보장하는 전략
+strategy = "immediate"          # Redis lease → PostgreSQL advisory lock 1회성 protocol cutover; 검증 후 rolling 복원
 
 # Fly.io 2GB 실험: JVM heap 여유와 GC 압박 완화 목적
 [[vm]]

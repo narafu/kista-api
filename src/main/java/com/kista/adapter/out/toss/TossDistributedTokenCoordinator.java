@@ -3,15 +3,17 @@ package com.kista.adapter.out.toss;
 import com.kista.domain.model.toss.TossApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,59 +21,58 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 @Component
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class TossDistributedTokenCoordinator {
 
-    // Toss HTTP 최대 13초(connect 3s + response 10s) + Hikari 연결 대기 20초보다 충분히 길게 잡아
-    // 정상 발급·DB 저장 중 lease 만료로 다른 인스턴스가 중복 발급하지 않게 한다.
-    private static final Duration LEASE_TTL = Duration.ofMinutes(1);
     private static final Duration POLL_INTERVAL = Duration.ofMillis(50);
     private static final Duration RECENT_FINGERPRINT_TTL = Duration.ofSeconds(2);
     private static final Duration ADMIN_EXPIRY_MARGIN = Duration.ofMinutes(5);
     private static final int DEFAULT_MAX_POLL_ATTEMPTS = 320;
-    private static final String KEY_PREFIX = "toss:token:";
+    private static final String REDIS_KEY_PREFIX = "toss:token:";
+    private static final String LOCK_SCOPE_PREFIX = "kista:toss-token:";
 
-    static final String ADMIN_TOKEN_KEY = KEY_PREFIX + "admin";
-    static final String ADMIN_LEASE_KEY = KEY_PREFIX + "lease:admin";
-    static final String ADMIN_FINGERPRINT_KEY = KEY_PREFIX + "recent:admin";
-
-    private static final DefaultRedisScript<Long> RELEASE_LEASE_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('get', KEYS[1]) == ARGV[1] "
-                    + "then return redis.call('del', KEYS[1]) else return 0 end",
-            Long.class);
+    static final String ADMIN_TOKEN_KEY = REDIS_KEY_PREFIX + "admin";
+    static final String ADMIN_FINGERPRINT_KEY = REDIS_KEY_PREFIX + "recent:admin";
+    static final long ADMIN_LOCK_KEY = lockKey(LOCK_SCOPE_PREFIX + "admin");
 
     private final StringRedisTemplate redisTemplate;
+    private final TossTokenIssuanceLock issuanceLock;
     private final PollWaiter pollWaiter;
-    private final Supplier<String> ownerIds;
     private final int maxPollAttempts;
 
     @Autowired
-    TossDistributedTokenCoordinator(StringRedisTemplate redisTemplate) {
-        this(redisTemplate, TossDistributedTokenCoordinator::sleep,
-                () -> UUID.randomUUID().toString(), DEFAULT_MAX_POLL_ATTEMPTS);
+    TossDistributedTokenCoordinator(
+            StringRedisTemplate redisTemplate,
+            TossTokenIssuanceLock issuanceLock
+    ) {
+        this(redisTemplate, issuanceLock, TossDistributedTokenCoordinator::sleep,
+                DEFAULT_MAX_POLL_ATTEMPTS);
     }
 
     TossDistributedTokenCoordinator(
             StringRedisTemplate redisTemplate,
+            TossTokenIssuanceLock issuanceLock,
             PollWaiter pollWaiter,
-            Supplier<String> ownerIds,
             int maxPollAttempts
     ) {
         this.redisTemplate = redisTemplate;
+        this.issuanceLock = issuanceLock;
         this.pollWaiter = pollWaiter;
-        this.ownerIds = ownerIds;
         this.maxPollAttempts = maxPollAttempts;
     }
 
     String getAccountToken(
             UUID accountId,
             Supplier<Optional<String>> currentToken,
-            AccountTokenIssuer issuer
+            AccountTokenIssuer issuer,
+            AccountTokenPersister persister
     ) {
         Optional<String> cached = currentToken.get();
         if (cached.isPresent()) {
             return cached.get();
         }
-        return coordinateAccountIssuance(accountId, null, currentToken, ignored -> {}, issuer);
+        return coordinateAccountIssuance(
+                accountId, null, currentToken, ignored -> {}, issuer, persister);
     }
 
     String recoverAccountToken(
@@ -79,7 +80,8 @@ class TossDistributedTokenCoordinator {
             String rejectedToken,
             Supplier<Optional<String>> currentToken,
             Consumer<String> invalidator,
-            AccountTokenIssuer issuer
+            AccountTokenIssuer issuer,
+            AccountTokenPersister persister
     ) {
         Optional<String> current = currentToken.get();
         if (isNewer(current, rejectedToken)) {
@@ -88,7 +90,8 @@ class TossDistributedTokenCoordinator {
         if (matchesRecentFingerprint(accountFingerprintKey(accountId), rejectedToken)) {
             return rejectedToken;
         }
-        return coordinateAccountIssuance(accountId, rejectedToken, currentToken, invalidator, issuer);
+        return coordinateAccountIssuance(
+                accountId, rejectedToken, currentToken, invalidator, issuer, persister);
     }
 
     String getAdminToken(AdminTokenIssuer issuer) {
@@ -115,13 +118,14 @@ class TossDistributedTokenCoordinator {
             String rejectedToken,
             Supplier<Optional<String>> currentToken,
             Consumer<String> invalidator,
-            AccountTokenIssuer issuer
+            AccountTokenIssuer issuer,
+            AccountTokenPersister persister
     ) {
-        String leaseKey = accountLeaseKey(accountId);
+        long lockKey = accountLockKey(accountId);
         for (int attempt = 0; attempt <= maxPollAttempts; attempt++) {
-            String ownerId = ownerIds.get();
-            if (acquireLease(leaseKey, ownerId)) {
-                try {
+            Optional<TossTokenIssuanceLock.Handle> acquired = issuanceLock.tryAcquire(lockKey);
+            if (acquired.isPresent()) {
+                try (TossTokenIssuanceLock.Handle ignored = acquired.orElseThrow()) {
                     Optional<String> current = currentToken.get();
                     if (rejectedToken == null && current.isPresent()) {
                         return current.get();
@@ -135,11 +139,12 @@ class TossDistributedTokenCoordinator {
                         }
                         invalidator.accept(rejectedToken);
                     }
-                    String issuedToken = issuer.issue();
-                    storeFingerprint(accountFingerprintKey(accountId), issuedToken);
-                    return issuedToken;
-                } finally {
-                    releaseLease(leaseKey, ownerId);
+                    IssuedAccountToken issuedToken = issuer.issue();
+                    // Redis 세대 보호가 실패한 fresh token을 DB에 commit하지 않도록
+                    // fingerprint를 canonical persistence보다 먼저 저장한다.
+                    storeFingerprint(accountFingerprintKey(accountId), issuedToken.accessToken());
+                    persister.persist(issuedToken);
+                    return issuedToken.accessToken();
                 }
             }
 
@@ -160,14 +165,14 @@ class TossDistributedTokenCoordinator {
                 }
             }
         }
-        throw waitTimeout(leaseKey);
+        throw waitTimeout(lockKey);
     }
 
     private String coordinateAdminIssuance(String rejectedToken, AdminTokenIssuer issuer) {
         for (int attempt = 0; attempt <= maxPollAttempts; attempt++) {
-            String ownerId = ownerIds.get();
-            if (acquireLease(ADMIN_LEASE_KEY, ownerId)) {
-                try {
+            Optional<TossTokenIssuanceLock.Handle> acquired = issuanceLock.tryAcquire(ADMIN_LOCK_KEY);
+            if (acquired.isPresent()) {
+                try (TossTokenIssuanceLock.Handle ignored = acquired.orElseThrow()) {
                     String current = redisGet(ADMIN_TOKEN_KEY);
                     if (rejectedToken == null && current != null) {
                         return current;
@@ -181,11 +186,9 @@ class TossDistributedTokenCoordinator {
                         }
                     }
                     IssuedAdminToken issuedToken = issuer.issue();
-                    storeAdminToken(issuedToken);
                     storeFingerprint(ADMIN_FINGERPRINT_KEY, issuedToken.accessToken());
+                    storeAdminToken(issuedToken);
                     return issuedToken.accessToken();
-                } finally {
-                    releaseLease(ADMIN_LEASE_KEY, ownerId);
                 }
             }
 
@@ -206,24 +209,7 @@ class TossDistributedTokenCoordinator {
                 }
             }
         }
-        throw waitTimeout(ADMIN_LEASE_KEY);
-    }
-
-    private boolean acquireLease(String leaseKey, String ownerId) {
-        try {
-            return Boolean.TRUE.equals(
-                    redisTemplate.opsForValue().setIfAbsent(leaseKey, ownerId, LEASE_TTL));
-        } catch (RuntimeException exception) {
-            throw redisFailure("lease 획득", exception);
-        }
-    }
-
-    private void releaseLease(String leaseKey, String ownerId) {
-        try {
-            redisTemplate.execute(RELEASE_LEASE_SCRIPT, List.of(leaseKey), ownerId);
-        } catch (RuntimeException exception) {
-            throw redisFailure("lease 해제", exception);
-        }
+        throw waitTimeout(ADMIN_LOCK_KEY);
     }
 
     private String redisGet(String key) {
@@ -263,29 +249,37 @@ class TossDistributedTokenCoordinator {
     }
 
     private static String fingerprint(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 digest unavailable", exception);
-        }
+        return HexFormat.of().formatHex(sha256(token));
     }
 
-    static String accountLeaseKey(UUID accountId) {
-        return KEY_PREFIX + "lease:account:" + accountId;
+    static long accountLockKey(UUID accountId) {
+        return lockKey(LOCK_SCOPE_PREFIX + "account:" + accountId);
     }
 
     static String accountFingerprintKey(UUID accountId) {
-        return KEY_PREFIX + "recent:account:" + accountId;
+        return REDIS_KEY_PREFIX + "recent:account:" + accountId;
+    }
+
+    private static long lockKey(String scope) {
+        return ByteBuffer.wrap(sha256(scope)).getLong();
+    }
+
+    private static byte[] sha256(String value) {
+        try {
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest unavailable", exception);
+        }
     }
 
     private static TossApiException redisFailure(String operation, RuntimeException cause) {
         return new TossApiException("Toss 토큰 Redis " + operation + " 실패", cause);
     }
 
-    private static TossApiException waitTimeout(String leaseKey) {
-        return new TossApiException("Toss 토큰 발급 lease 대기 시간 초과: " + leaseKey, null);
+    private static TossApiException waitTimeout(long lockKey) {
+        return new TossApiException(
+                "Toss 토큰 PostgreSQL advisory lock 대기 시간 초과: " + lockKey, null);
     }
 
     private static void sleep(Duration duration) {
@@ -293,7 +287,8 @@ class TossDistributedTokenCoordinator {
             Thread.sleep(duration);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new TossApiException("Toss 토큰 발급 lease 대기 중 interrupted", exception);
+            throw new TossApiException(
+                    "Toss 토큰 PostgreSQL advisory lock 대기 중 interrupted", exception);
         }
     }
 
@@ -304,13 +299,20 @@ class TossDistributedTokenCoordinator {
 
     @FunctionalInterface
     interface AccountTokenIssuer {
-        String issue();
+        IssuedAccountToken issue();
+    }
+
+    @FunctionalInterface
+    interface AccountTokenPersister {
+        void persist(IssuedAccountToken issuedToken);
     }
 
     @FunctionalInterface
     interface AdminTokenIssuer {
         IssuedAdminToken issue();
     }
+
+    record IssuedAccountToken(String accessToken, OffsetDateTime expiresAt) {}
 
     record IssuedAdminToken(String accessToken, long expiresInSeconds) {}
 }

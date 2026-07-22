@@ -17,12 +17,12 @@
 
 ### 토큰·인증
 
-- 계좌 토큰의 canonical 저장소는 PostgreSQL `broker_tokens`이다. `TossAuthApi` 계좌 토큰 조회·401 복구는 `TossDistributedTokenCoordinator`를 통하며, Redis 60초 owner lease 획득 후 DB를 double-check하고 필요할 때만 OAuth를 호출한다. DB 저장이 완료된 뒤 Lua compare-delete로 자신의 lease만 해제한다. 60초는 Toss HTTP 타임아웃(3초 연결+10초 응답)과 Hikari 연결 대기(20초)를 합친 정상 임계구역에 여유를 둔 값이다.
+- 계좌 토큰의 canonical 저장소는 PostgreSQL `broker_tokens`이다. `TossAuthApi` 계좌 토큰 조회·401 복구는 `TossDistributedTokenCoordinator`를 통하며, 계좌별 PostgreSQL session advisory lock 획득 후 DB를 double-check하고 필요할 때만 OAuth를 호출한다. `pg_try_advisory_lock(bigint)`에 사용한 전용 JDBC connection을 OAuth·fingerprint·canonical 저장이 모두 끝날 때까지 유지하고 같은 connection에서 unlock한다. advisory connection은 JPA main pool이 아닌 2-connection `HikariPool-TossAdvisoryLock`에서 빌려 `REQUIRES_NEW` 저장과 pool을 서로 고갈시키지 않는다. lock은 TTL이 없어 임계구역이 길어져도 다른 owner가 생기지 않으며 프로세스나 DB session 종료 시 자동 해제된다. coordinator는 `NOT_SUPPORTED`로 caller transaction을 suspend해 OAuth 호출 동안 Spring transaction을 유지하지 않는다.
 - 관리자(공통 API) access token은 모든 Fly 인스턴스가 Redis `toss:token:admin`을 canonical 캐시로 공유한다. TTL은 OAuth `expires_in`보다 5분 짧게 저장한다.
-- 계좌·관리자 신규 토큰은 raw bearer가 아닌 SHA-256 fingerprint만 Redis에 2초 TTL로 기록한다. 같은 fingerprint의 401은 리소스 서버 전파 중으로 보고 무효화하지 않는다.
-- lease 대기자는 50ms 간격으로 canonical 저장소를 최대 16초 polling한다. Redis 오류나 대기 시간 초과 시 JVM-local 발급으로 우회하지 않고 `TossApiException`(503)으로 fail-closed 한다.
+- 계좌·관리자 신규 토큰은 raw bearer가 아닌 SHA-256 fingerprint만 Redis에 2초 TTL로 기록한다. 같은 fingerprint의 401은 리소스 서버 전파 중으로 보고 무효화하지 않는다. fingerprint는 계좌 DB 저장 또는 관리자 Redis token 저장보다 먼저 기록해, fingerprint 저장 실패 뒤 fresh canonical token만 남는 상태를 방지한다.
+- advisory lock 대기자는 최대 320회의 50ms sleep(소유권 경합 대기 합계 최대 16초) 동안 canonical 저장소를 polling한다. 이는 전체 wall-clock 보장이 아니다. 전용 pool borrow/validation과 advisory SQL query는 각각 1초 timeout이며, PostgreSQL 연결·query·lock 해제 오류, Redis 오류, polling 소진 시 JVM-local 발급으로 우회하지 않고 `TossApiException`(503)으로 즉시 fail-closed 한다.
 - `TossHttpClient`는 최초 401에서 원자적 복구로 최신/신규 토큰을 **먼저 획득한 뒤 300ms 대기**하고, 후속 401에서는 같은 토큰으로 600ms를 추가 대기해 동일 요청을 최대 2회 재시도한다 — 갓 재발급된 토큰이 Toss 리소스 서버에 즉시 반영되지 않아 재시도 직후에도 401이 나는 사례(운영 `app_error_logs` 관측)에 대응. 헤더 빌더 내부에서 토큰을 재조회하지 말고, `executeWithRetry`가 고정한 시도별 토큰을 사용해야 한다.
-- 관리자 경로(`getCommon`)도 동일한 분산 세대 보호와 백오프(300ms/600ms)·최대 2회 재시도 정책을 적용한다. lease는 캐시 복구와 OAuth 발급만 조정하며 정상 리소스 API 호출은 직렬화하지 않는다.
+- 관리자 경로(`getCommon`)도 동일한 분산 세대 보호와 백오프(300ms/600ms)·최대 2회 재시도 정책을 적용한다. advisory lock은 캐시 복구와 OAuth 발급만 조정하며 정상 리소스 API 호출은 직렬화하지 않는다.
 
 ### 날짜 처리 (KIS와 다름)
 

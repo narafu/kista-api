@@ -61,7 +61,7 @@ jobs:
           # 마감 스케쥴러 실행 구간: 화~토 04:25~06:20 KST (04:30 기동, 비DST 06:10 리포트)
           if [ "$dow" -ge 2 ] && [ "$dow" -le 6 ] && [ "$now" -ge 425 ] && [ "$now" -le 620 ]; then blocked=yes; fi
           if [ "$blocked" = yes ]; then
-            echo "::error::현재 KST $(TZ=Asia/Seoul date +%H:%M)는 매매 스케쥴러 실행 시간대 — 롤링 배포가 sleep 중인 매매 스레드를 강제 종료해 주문 접수가 유실될 수 있어 차단합니다. 장 종료 후 Actions에서 Re-run 하거나, 긴급 시 workflow_dispatch force=true로 강제 배포하세요."
+            echo "::error::현재 KST $(TZ=Asia/Seoul date +%H:%M)는 매매 스케쥴러 실행 시간대 — 배포가 sleep 중인 매매 스레드를 강제 종료해 주문 접수가 유실될 수 있어 차단합니다. 장 종료 후 Actions에서 Re-run 하거나, 긴급 시 workflow_dispatch force=true로 강제 배포하세요."
             exit 1
           fi
           echo "매매 시간대 아님 (KST $(TZ=Asia/Seoul date +%H:%M)) — 배포 진행"

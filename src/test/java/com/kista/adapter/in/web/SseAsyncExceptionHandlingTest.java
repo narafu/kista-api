@@ -46,6 +46,7 @@ class SseAsyncExceptionHandlingTest {
         MvcResult result = mockMvc.perform(get("/test/sse"))
                 .andExpect(request().asyncStarted())
                 .andReturn();
+        assertThat(result.getResponse().isCommitted()).isTrue();
 
         controller.emitter.completeWithError(exception);
 
