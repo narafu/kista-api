@@ -17,7 +17,7 @@
 
 ### 토큰·인증
 
-- 계좌 토큰의 canonical 저장소는 PostgreSQL `broker_tokens`이다. `TossAuthApi` 계좌 조회·40 401 복구는 `TossDistributedTokenCoordinator`를 통하며, Redis 60초 owner lease 획득 후 DB를 double-check하고 필요할 때만 OAuth를 호출한다. DB 저장이 완료된 뒤 Lua compare-delete로 자신의 lease만 해제한다. 60초는 Toss HTTP 타임아웃(3초 연결+10초 응답)과 Hikari 연결 대기(20초)를 합친 정상 임계구역에 여유를 둔 값이다.
+- 계좌 토큰의 canonical 저장소는 PostgreSQL `broker_tokens`이다. `TossAuthApi` 계좌 토큰 조회·401 복구는 `TossDistributedTokenCoordinator`를 통하며, Redis 60초 owner lease 획득 후 DB를 double-check하고 필요할 때만 OAuth를 호출한다. DB 저장이 완료된 뒤 Lua compare-delete로 자신의 lease만 해제한다. 60초는 Toss HTTP 타임아웃(3초 연결+10초 응답)과 Hikari 연결 대기(20초)를 합친 정상 임계구역에 여유를 둔 값이다.
 - 관리자(공통 API) access token은 모든 Fly 인스턴스가 Redis `toss:token:admin`을 canonical 캐시로 공유한다. TTL은 OAuth `expires_in`보다 5분 짧게 저장한다.
 - 계좌·관리자 신규 토큰은 raw bearer가 아닌 SHA-256 fingerprint만 Redis에 2초 TTL로 기록한다. 같은 fingerprint의 401은 리소스 서버 전파 중으로 보고 무효화하지 않는다.
 - lease 대기자는 50ms 간격으로 canonical 저장소를 최대 16초 polling한다. Redis 오류나 대기 시간 초과 시 JVM-local 발급으로 우회하지 않고 `TossApiException`(503)으로 fail-closed 한다.
