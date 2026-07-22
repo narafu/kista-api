@@ -26,3 +26,6 @@ logging:
   level:
     root: WARN
     com.kista: INFO
+    # 정상 전파 지연에서도 흔히 타는 경로라 WARN 대신 DEBUG로 남기되(alarm fatigue 방지),
+    # com.kista 기본 INFO보다 낮은 레벨이라 이 클래스만 별도로 열어야 실제로 관측 가능
+    com.kista.adapter.out.toss.TossDistributedTokenCoordinator: DEBUG
