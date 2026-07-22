@@ -87,7 +87,11 @@ class StatsService implements UserStatsUseCase {
         List<CycleView> cycles = loadCycles(userId).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
                 .toList();
-        List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant);
+        Set<UUID> cycleIds = cycles.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
+        List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant)
+                .stream()
+                .filter(pos -> cycleIds.contains(pos.strategyCycleId()))
+                .toList();
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
         return new EquityCurve(points);
     }

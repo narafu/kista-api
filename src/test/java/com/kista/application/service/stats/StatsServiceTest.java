@@ -189,6 +189,7 @@ class StatsServiceTest {
         StrategyCycle privacy = activeCycle(PRIVACY_STRATEGY_ID, "2000.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(infinite, privacy));
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+                depositSnapshot(infinite.id(), "1050.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(infinite.id(), "1100.00", "2026-06-02T01:00:00Z"),
                 depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
 
@@ -197,6 +198,7 @@ class StatsServiceTest {
                 LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
+        assertThat(curve.points().getFirst().date()).isEqualTo(LocalDate.parse("2026-06-02"));
         assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("2300.00");
         assertThat(curve.points().getFirst().principal()).isEqualByComparingTo("2000.00");
     }
