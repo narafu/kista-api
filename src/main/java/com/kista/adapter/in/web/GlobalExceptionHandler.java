@@ -52,10 +52,7 @@ public class GlobalExceptionHandler {
         Map.entry(Account.DuplicateAccountException.class,         new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(ManualTradingException.class,                    new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        // SSE(TradeSseEmitterRegistry) 30분 타임아웃 등 정상 연결 종료 — 실제 장애 아님, saveErrorLog 생략
-        Map.entry(AsyncRequestNotUsableException.class,             new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Async Request Not Usable")),
-        Map.entry(AsyncRequestTimeoutException.class,               new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Async Request Timeout"))
+        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict"))
     );
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지
@@ -77,6 +74,12 @@ public class GlobalExceptionHandler {
                 .toList()
                 .toString();
         return problem(HttpStatus.BAD_REQUEST, "Validation Failed", message);
+    }
+
+    // SSE 타임아웃·연결 종료는 이미 끝난 스트림에 별도 응답 본문을 쓰지 않고 종료 처리
+    @ExceptionHandler({AsyncRequestTimeoutException.class, AsyncRequestNotUsableException.class})
+    public void handleAsyncLifecycle(Exception ex) {
+        log.debug("SSE async request 종료: {}", ex.getClass().getSimpleName());
     }
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
