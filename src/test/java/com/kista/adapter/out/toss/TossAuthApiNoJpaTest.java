@@ -4,6 +4,8 @@ import com.kista.support.DataJpaTestBase;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @DisplayName("TossAuthApi Redis canonical token JPA 격리")
+@Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest 컨텍스트·HikariCP 풀 공유 — activeConnections 단언이 병렬 실행 중 다른 테스트와 경합하지 않도록
 class TossAuthApiNoJpaTest extends DataJpaTestBase {
 
     @Autowired
