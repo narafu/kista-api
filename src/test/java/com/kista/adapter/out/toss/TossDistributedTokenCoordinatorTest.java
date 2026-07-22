@@ -115,21 +115,43 @@ class TossDistributedTokenCoordinatorTest {
 
         String issued = coordinator.getAccountToken(
                 ACCOUNT_ID, () -> token("token-1", oauthCalls));
-        String protectedToken = coordinator.recoverAccountToken(
+        TossDistributedTokenCoordinator.RecoveredToken protectedToken = coordinator.recoverAccountToken(
                 ACCOUNT_ID, issued, () -> token("token-2", oauthCalls));
 
-        assertThat(protectedToken).isEqualTo("token-1");
+        assertThat(protectedToken.accessToken()).isEqualTo("token-1");
+        // 최근 발급 지문 보호 구간 내 재사용 — 전파 지연 위험이 남아있어 freshlyIssued=true
+        assertThat(protectedToken.freshlyIssued()).isTrue();
         assertThat(oauthCalls.get()).isOne();
         assertThat(store.fingerprint("account:" + ACCOUNT_ID))
                 .isEqualTo("3f08aace122ee2368432c1ca23a049bc640bafbf00fdf33a52429f38ba12dbf9")
                 .doesNotContain("token-1");
 
         store.advance(Duration.ofSeconds(2));
-        String reissued = coordinator.recoverAccountToken(
+        TossDistributedTokenCoordinator.RecoveredToken reissued = coordinator.recoverAccountToken(
                 ACCOUNT_ID, issued, () -> token("token-2", oauthCalls));
 
-        assertThat(reissued).isEqualTo("token-2");
+        assertThat(reissued.accessToken()).isEqualTo("token-2");
+        // 실제 신규 OAuth 발급 — 전파 지연 위험이 있어 freshlyIssued=true
+        assertThat(reissued.freshlyIssued()).isTrue();
         assertThat(oauthCalls.get()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("현재 canonical 토큰이 rejected token과 다르면 재발급 없이 재사용하고 freshlyIssued=false")
+    void recoverAccountToken_reusesDifferentCanonicalToken_withoutPropagationWait() {
+        FakeTokenStore store = new FakeTokenStore();
+        TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
+        AtomicInteger oauthCalls = new AtomicInteger();
+
+        // 이미 다른 인스턴스가 발급해 저장해 둔 canonical 토큰(token-1)이 존재하는 상태를 시뮬레이션
+        coordinator.getAccountToken(ACCOUNT_ID, () -> token("token-1", oauthCalls));
+        TossDistributedTokenCoordinator.RecoveredToken recovered = coordinator.recoverAccountToken(
+                ACCOUNT_ID, "stale-rejected-token", () -> token("token-2", oauthCalls));
+
+        assertThat(recovered.accessToken()).isEqualTo("token-1");
+        // Redis 읽기만으로 이미 다른 canonical 토큰을 재사용 — 전파 지연 위험 없어 freshlyIssued=false
+        assertThat(recovered.freshlyIssued()).isFalse();
+        assertThat(oauthCalls.get()).isOne();
     }
 
     @Test

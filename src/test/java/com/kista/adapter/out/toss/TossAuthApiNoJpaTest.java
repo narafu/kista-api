@@ -43,7 +43,7 @@ class TossAuthApiNoJpaTest extends DataJpaTestBase {
         TossTokenStore tokenStore = mock(TossTokenStore.class);
         RestTemplate restTemplate = mock(RestTemplate.class);
         when(tokenStore.find(scope)).thenReturn(Optional.empty());
-        when(tokenStore.tryAcquire(eq(scope), anyString(), eq(Duration.ofMinutes(1))))
+        when(tokenStore.tryAcquire(eq(scope), anyString(), eq(Duration.ofSeconds(20))))
                 .thenReturn(Optional.of(new TossTokenStore.Lease(scope, "owner", 1L)));
         when(tokenStore.storeIfCurrent(any(), any(), eq(Duration.ofHours(23).plusMinutes(55))))
                 .thenReturn(TossTokenStore.StoreResult.STORED);

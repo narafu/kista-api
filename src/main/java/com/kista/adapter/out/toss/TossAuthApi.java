@@ -48,7 +48,8 @@ class TossAuthApi implements BrokerConnectionTestPort {
         return new TossTokenStore.TokenValue(response.accessToken(), response.expiresIn());
     }
 
-    public String recoverToken(UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
+    public TossDistributedTokenCoordinator.RecoveredToken recoverToken(
+            UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
         return tokenCoordinator.recoverAccountToken(
                 accountId,
                 rejectedAccessToken,
@@ -61,7 +62,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
         return tokenCoordinator.getAdminToken(this::issueAdminToken);
     }
 
-    public String recoverAdminToken(String rejectedAccessToken) {
+    public TossDistributedTokenCoordinator.RecoveredToken recoverAdminToken(String rejectedAccessToken) {
         return tokenCoordinator.recoverAdminToken(rejectedAccessToken, this::issueAdminToken);
     }
 

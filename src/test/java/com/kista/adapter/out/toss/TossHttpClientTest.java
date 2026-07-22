@@ -19,6 +19,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -192,7 +193,7 @@ class TossHttpClientTest {
     void retriesSameFreshToken_whenPropagationIsDelayed() {
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
-                .thenReturn("token-1");
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
                 .thenThrow(unauthorized())
@@ -228,7 +229,7 @@ class TossHttpClientTest {
     void throwsAfterRetryLimit_withoutInvalidatingFreshToken() {
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
-                .thenReturn("token-1");
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
                 .thenThrow(unauthorized());
@@ -250,7 +251,8 @@ class TossHttpClientTest {
     @DisplayName("공통 API(getCommon) 401도 최대 2회까지 백오프 재시도 후 성공")
     void getCommon_retriesTwiceAfter401_thenSucceeds() {
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
-        when(tossAuthApi.recoverAdminToken("admin-token-0")).thenReturn("admin-token-1");
+        when(tossAuthApi.recoverAdminToken("admin-token-0"))
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
                 .thenThrow(unauthorized())
@@ -270,7 +272,8 @@ class TossHttpClientTest {
     @DisplayName("공통 API 401이 세 번(최초+2차 재시도 모두) 발생하면 TossApiException")
     void getCommon_throwsTossApiException_when401Persists() {
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
-        when(tossAuthApi.recoverAdminToken("admin-token-0")).thenReturn("admin-token-1");
+        when(tossAuthApi.recoverAdminToken("admin-token-0"))
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized());
 
@@ -284,6 +287,29 @@ class TossHttpClientTest {
         verify(tossAuthApi).getAdminToken();
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    @DisplayName("복구된 토큰이 이미 다른 canonical 토큰의 재사용(freshlyIssued=false)이면 백오프 대기를 생략")
+    @SuppressWarnings("unchecked")
+    void skipsBackoff_whenRecoveredTokenIsCheapReuse_notFreshlyIssued() {
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        // freshlyIssued=false — 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("token-1", false));
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
+                any(ParameterizedTypeReference.class)))
+                .thenThrow(unauthorized())
+                .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
+
+        long start = System.nanoTime();
+        String result = newClient().get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<String>() {});
+        long elapsedMillis = Duration.ofNanos(System.nanoTime() - start).toMillis();
+
+        assertThat(result).isEqualTo("OK");
+        // sleepBackoff(0)은 300ms — freshlyIssued=false면 생략되므로 훨씬 짧은 시간 안에 재시도가 끝나야 한다
+        assertThat(elapsedMillis).isLessThan(250);
     }
 
     private Thread startRequest(String name, AtomicReference<Throwable> failure, Runnable request) {
@@ -321,16 +347,19 @@ class TossHttpClientTest {
                     String rejectedToken = invocation.getArgument(1);
                     String current = currentToken.get();
                     if (!current.equals(rejectedToken)) {
-                        return current;
+                        // 이미 다른 인스턴스가 저장해 둔 canonical 토큰 재사용 — 전파 대기 불필요
+                        return new TossDistributedTokenCoordinator.RecoveredToken(current, false);
                     }
                     TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(2);
                     if ("token-1".equals(rejectedToken)) {
-                        return rejectedToken;
+                        // 최근 발급 지문 보호 구간 내 재사용 — 전파 대기 필요
+                        return new TossDistributedTokenCoordinator.RecoveredToken(rejectedToken, true);
                     }
                     String issued = issuer.issue().accessToken();
                     currentToken.set(issued);
                     tokenStored.countDown();
-                    return issued;
+                    // 실제 신규 발급 — 전파 대기 필요
+                    return new TossDistributedTokenCoordinator.RecoveredToken(issued, true);
                 });
         return coordinator;
     }
@@ -344,14 +373,20 @@ class TossHttpClientTest {
         when(coordinator.recoverAdminToken(anyString(), any())).thenAnswer(invocation -> {
             String rejectedToken = invocation.getArgument(0);
             String current = currentToken.get();
-            if (!current.equals(rejectedToken) || "admin-token-1".equals(rejectedToken)) {
-                return current;
+            if (!current.equals(rejectedToken)) {
+                // 이미 다른 인스턴스가 저장해 둔 canonical 토큰 재사용 — 전파 대기 불필요
+                return new TossDistributedTokenCoordinator.RecoveredToken(current, false);
+            }
+            if ("admin-token-1".equals(rejectedToken)) {
+                // 최근 발급 지문 보호 구간 내 재사용 — 전파 대기 필요
+                return new TossDistributedTokenCoordinator.RecoveredToken(current, true);
             }
             TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(1);
             String issued = issuer.issue().accessToken();
             currentToken.set(issued);
             tokenStored.countDown();
-            return issued;
+            // 실제 신규 발급 — 전파 대기 필요
+            return new TossDistributedTokenCoordinator.RecoveredToken(issued, true);
         });
         return coordinator;
     }

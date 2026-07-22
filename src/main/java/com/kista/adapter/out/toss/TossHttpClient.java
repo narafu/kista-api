@@ -149,7 +149,7 @@ class TossHttpClient {
     // 재시도 사이 짧은 백오프를 둬 갓 재발급된 토큰의 리소스 서버 반영 지연을 흡수한다.
     // 계좌 토큰(executeWithRetry)·관리자 토큰(getCommon) 양쪽이 공유하는 재시도 골격.
     private <T> T executeWithBackoffRetry(String tokenKind, String path, Supplier<String> tokenFetcher,
-                                           Function<String, String> tokenRecoverer,
+                                           Function<String, TossDistributedTokenCoordinator.RecoveredToken> tokenRecoverer,
                                            Function<String, T> call) {
         String token = tokenFetcher.get();
         boolean refreshed = false; // 최초 401에서만 토큰을 갱신하고 이후에는 신규 토큰을 재사용
@@ -167,8 +167,13 @@ class TossHttpClient {
                 if (!refreshed) {
                     log.warn("Toss 401 — {} 토큰 복구 후 전파 대기 재시도 {}/{}: path={}",
                             tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
-                    token = tokenRecoverer.apply(token);
-                    sleepBackoff(attempt);
+                    TossDistributedTokenCoordinator.RecoveredToken recovered = tokenRecoverer.apply(token);
+                    token = recovered.accessToken();
+                    // 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우
+                    // (freshlyIssued=false)에는 전파 지연 위험이 없으므로 백오프 대기를 생략한다.
+                    if (recovered.freshlyIssued()) {
+                        sleepBackoff(attempt);
+                    }
                     refreshed = true;
                 } else {
                     log.warn("Toss 401 — {} 신규 토큰 전파 대기 재시도 {}/{}: path={}",

@@ -1,5 +1,6 @@
 package com.kista.application.service.auth;
 
+import com.kista.common.Sha256;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.auth.RefreshToken;
 import com.kista.domain.model.auth.TokenConstants;
@@ -14,14 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 
 @Slf4j
@@ -129,13 +126,7 @@ class TokenService implements TokenUseCase {
 
     // package-private — TokenServiceTest에서 직접 테스트
     static String sha256Hex(String input) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 알고리즘 없음", e);
-        }
+        return Sha256.hex(input);
     }
 
     private String issueNewRt(UUID userId, String userAgent) {

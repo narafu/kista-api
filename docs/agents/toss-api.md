@@ -18,11 +18,12 @@
 ### 토큰·인증
 
 - Toss 계좌·관리자 access token의 canonical 저장소는 모두 Redis다. 계좌 hash key는 `toss:token:canonical:account:<UUID>`, 관리자는 `toss:token:canonical:admin`이며 access token, expiry epoch, fencing generation을 저장한다. TTL은 OAuth `expires_in`보다 5분 짧다. Toss는 PostgreSQL `broker_tokens`를 읽거나 무효화하거나 저장하지 않으며, 해당 DB 경로는 KIS 전용이다.
-- scope별 발급 owner는 Lua로 60초 lease `SET NX PX`와 generation `INCR`를 원자 실행한다. lease는 중복 OAuth를 줄일 뿐 correctness를 보장하지 않는다. canonical write Lua가 incoming generation을 현재 generation counter와 저장된 canonical generation 모두와 비교해 stale owner write를 거절하는 fencing CAS가 correctness 경계다.
+- scope별 발급 owner는 Lua로 20초 lease `SET NX PX`(OAuth RestTemplate 타임아웃 최악 케이스 ~13초보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`를 원자 실행한다. follower polling ceiling은 25초(POLL_INTERVAL 50ms × 500회)로 lease TTL을 5초 여유로 초과해, 정상 owner 완료나 lease 자연 만료보다 먼저 포기하지 않는다. lease는 중복 OAuth를 줄일 뿐 correctness를 보장하지 않는다. canonical write Lua가 incoming generation을 현재 generation counter와 저장된 canonical generation 모두와 비교해 stale owner write를 거절하는 fencing CAS가 correctness 경계다.
 - lease 만료 후 successor가 더 큰 generation을 받으면 지연된 owner는 자신의 token을 저장·반환하지 않는다. successor의 더 큰 generation canonical token을 bounded polling해 반환하며 저장이 완료되지 않으면 503으로 fail-closed 한다.
 - canonical CAS와 최근 발급 SHA-256 fingerprint(2초 TTL)는 같은 Lua script에서 원자 저장한다. 같은 fingerprint의 401은 리소스 서버 전파 중으로 보고 해당 token을 보존한다. raw bearer token은 canonical hash에만 저장하고 로그/fingerprint key에는 저장하지 않는다.
 - lease 해제는 owner 값이 일치할 때만 삭제하는 Lua compare-delete다. 만료된 owner가 successor lease를 삭제할 수 없다. Redis read/script 오류, malformed hash, polling 소진 시 JVM-local·PostgreSQL fallback 없이 `TossApiException`(503)으로 fail-closed 한다.
 - `TossHttpClient`는 최초 401에서 원자적 복구로 최신/신규 토큰을 **먼저 획득한 뒤 300ms 대기**하고, 후속 401에서는 같은 토큰으로 600ms를 추가 대기해 동일 요청을 최대 2회 재시도한다 — 갓 재발급된 토큰이 Toss 리소스 서버에 즉시 반영되지 않아 재시도 직후에도 401이 나는 사례(운영 `app_error_logs` 관측)에 대응. 헤더 빌더 내부에서 토큰을 재조회하지 말고, `executeWithRetry`가 고정한 시도별 토큰을 사용해야 한다.
+- 복구 API는 `RecoveredToken(accessToken, freshlyIssued)`를 반환한다. 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우(`freshlyIssued=false`)엔 전파 지연 위험이 없어 `TossHttpClient`가 300ms 백오프를 생략한다 — 실제 신규 발급이거나 최근 발급 지문 보호 구간 재사용인 경우(`freshlyIssued=true`)에만 대기한다.
 - 관리자 경로(`getCommon`)도 동일한 Redis fencing 세대 보호와 백오프(300ms/600ms)·최대 2회 재시도 정책을 적용한다. lease는 OAuth 발급만 조정하며 정상 리소스 API 호출은 직렬화하지 않는다.
 
 ### 날짜 처리 (KIS와 다름)

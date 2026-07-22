@@ -119,11 +119,11 @@ class TossAuthApiTest {
 
         String current = api.getAdminToken();
         when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any()))
-                .thenReturn("admin-token-1");
-        String recovered = api.recoverAdminToken("stale-admin-token");
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", false));
+        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token");
 
         assertThat(current).isEqualTo("admin-token-1");
-        assertThat(recovered).isEqualTo("admin-token-1");
+        assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
                 anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
     }
@@ -135,10 +135,11 @@ class TossAuthApiTest {
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String issued = api.getAdminToken();
-        when(tokenCoordinator.recoverAdminToken(eq(issued), any())).thenReturn("admin-token-1");
-        String recovered = api.recoverAdminToken(issued);
+        when(tokenCoordinator.recoverAdminToken(eq(issued), any()))
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("admin-token-1", true));
+        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverAdminToken(issued);
 
-        assertThat(recovered).isEqualTo("admin-token-1");
+        assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
                 anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
     }
@@ -148,12 +149,12 @@ class TossAuthApiTest {
     void recoverToken_delegatesToDistributedCoordinator() {
         when(tokenCoordinator.recoverAccountToken(
                 eq(ACCOUNT_ID), eq("rejected-token"), any()))
-                .thenReturn("coordinated-token");
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("coordinated-token", false));
 
-        String recovered = api.recoverToken(
+        TossDistributedTokenCoordinator.RecoveredToken recovered = api.recoverToken(
                 ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token");
 
-        assertThat(recovered).isEqualTo("coordinated-token");
+        assertThat(recovered.accessToken()).isEqualTo("coordinated-token");
         verify(tokenCoordinator).recoverAccountToken(
                 eq(ACCOUNT_ID), eq("rejected-token"), any());
         verifyNoInteractions(tossRestTemplate);
