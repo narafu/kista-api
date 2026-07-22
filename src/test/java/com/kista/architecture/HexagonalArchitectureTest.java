@@ -1,11 +1,19 @@
 package com.kista.architecture;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Set;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -149,5 +157,38 @@ class HexagonalArchitectureTest {
                 .should().dependOnClassesThat()
                 .resideInAPackage("com.kista.application.service..");
         rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("생성자가 2개 이상인 Spring 빈은 정확히 하나에 @Autowired가 있어야 한다")
+    void multi_constructor_beans_must_have_exactly_one_autowired_constructor() {
+        // 실 인시던트 재발 방지: TossRedisTokenStore가 생성자 2개(테스트용 Clock 주입 오버로드 포함)인데
+        // @Autowired가 없어 Spring이 기본 생성자를 못 찾고 BeanCreationException으로 부팅 자체가 실패한 사례
+        ArchRule rule = classes()
+                .that().areAnnotatedWith(org.springframework.stereotype.Component.class)
+                .or().areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .or().areAnnotatedWith(org.springframework.stereotype.Repository.class)
+                .should(haveExactlyOneAutowiredConstructorWhenMultiple());
+        rule.check(classes);
+    }
+
+    private static ArchCondition<JavaClass> haveExactlyOneAutowiredConstructorWhenMultiple() {
+        return new ArchCondition<>("생성자가 2개 이상이면 정확히 하나에 @Autowired가 있어야 함") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                Set<JavaConstructor> constructors = javaClass.getConstructors();
+                if (constructors.size() < 2) {
+                    return;
+                }
+                long autowiredCount = constructors.stream()
+                        .filter(constructor -> constructor.isAnnotatedWith(Autowired.class))
+                        .count();
+                if (autowiredCount != 1) {
+                    events.add(SimpleConditionEvent.violated(javaClass, String.format(
+                            "%s has %d constructors but %d are annotated with @Autowired (expected exactly 1)",
+                            javaClass.getFullName(), constructors.size(), autowiredCount)));
+                }
+            }
+        };
     }
 }
