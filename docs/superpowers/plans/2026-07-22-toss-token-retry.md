@@ -202,3 +202,66 @@ git add src/main/java/com/kista/adapter/out/broker/DoubleCheckedTokenCache.java 
         docs/superpowers/plans/2026-07-22-toss-token-retry.md
 git commit -m "fix(toss): 동시 401에서 신규 토큰 발급 세대 보호"
 ```
+
+### Task 3: Redis 기반 다중 인스턴스 토큰 발급 조정
+
+**Files:**
+- Create: `src/main/java/com/kista/adapter/out/toss/TossDistributedTokenCoordinator.java`
+- Create: `src/test/java/com/kista/adapter/out/toss/TossDistributedTokenCoordinatorTest.java`
+- Modify: `src/main/java/com/kista/adapter/out/toss/TossAuthApi.java`
+- Modify: `src/test/java/com/kista/adapter/out/toss/TossAuthApiTest.java`
+- Modify: `src/test/java/com/kista/adapter/out/toss/TossHttpClientTest.java`
+- Modify: `src/main/java/com/kista/adapter/out/broker/DoubleCheckedTokenCache.java`
+- Modify: `src/test/java/com/kista/adapter/out/broker/DoubleCheckedTokenCacheTest.java`
+- Modify: `docs/agents/architecture.md`
+- Modify: `docs/agents/toss-api.md`
+- Modify: `docs/agents/docker-infra.md`
+
+**Interfaces:**
+- Produces: Redis owner lease, shared recent-token fingerprint, shared 관리자 token cache
+- Consumes: `StringRedisTemplate`, PostgreSQL-backed `BrokerTokenCachePort`, Toss OAuth issuer
+
+- [ ] **Step 1: 다중 coordinator RED 테스트**
+
+서로 다른 coordinator 인스턴스 두 개가 같은 Redis 테스트 저장소를 공유하는 테스트를 작성한다. A가 계좌 또는 관리자 token-1 발급 lease를 보유한 동안 B가 동일 토큰 복구를 시작해도 OAuth 발급은 전체 1회이고 B가 token-1을 받는지 검증한다. owner가 다른 lease를 삭제하지 못하는 테스트와 최근 fingerprint TTL 만료 후 재발급 가능한 테스트도 작성한다.
+
+- [ ] **Step 2: RED 확인**
+
+Run: `./gradlew test --tests 'com.kista.adapter.out.toss.TossDistributedTokenCoordinatorTest' --tests 'com.kista.adapter.out.toss.TossAuthApiTest'`
+
+Expected: coordinator 타입이 없어 컴파일 실패하거나 기존 JVM-local 구현이 두 발급을 수행해 실패.
+
+- [ ] **Step 3: Redis 분산 coordinator 최소 구현**
+
+`StringRedisTemplate.opsForValue().setIfAbsent(lockKey, ownerId, leaseTtl)`로 lease를 획득한다. lease 획득 후 canonical 저장소를 double-check하고 필요할 때만 issuer를 호출한다. 해제는 owner 값 일치 시에만 삭제하는 Lua script를 사용한다. 대기자는 제한 시간 동안 canonical 토큰을 polling하며 무한 대기하지 않는다.
+
+관리자 토큰은 Redis token key에 실제 OAuth 만료보다 5분 짧은 TTL로 저장한다. 계좌·관리자 최근 발급 fingerprint는 SHA-256으로 저장하고 2초 TTL을 적용한다. raw bearer token은 fingerprint key에 저장하지 않는다.
+
+- [ ] **Step 4: TossAuthApi 통합**
+
+계좌 `getToken`과 401 복구, 관리자 `getAdminToken`과 401 복구를 coordinator를 통해 실행한다. 계좌 DB 저장과 관리자 Redis 저장이 완료된 후 lease를 해제한다. 기존 JVM-local 발급 세대 맵은 제거하고 KIS가 사용하는 `DoubleCheckedTokenCache.getOrFetch` 동작은 유지한다.
+
+- [ ] **Step 5: GREEN 및 회귀 검증**
+
+Run: `./gradlew test --tests 'com.kista.adapter.out.toss.*' --tests 'com.kista.adapter.out.broker.DoubleCheckedTokenCacheTest' --tests 'com.kista.adapter.out.kis.KisAuthApiTest' --tests 'com.kista.adapter.out.kis.KisHttpClientTest'`
+
+Expected: 모든 테스트 통과.
+
+- [ ] **Step 6: 전체 검증과 문서 동기화**
+
+Redis 키 수명, 다중 Fly 인스턴스 정책, Redis 장애 시 fail-closed 동작을 관련 문서에 반영한다.
+
+Run: `docker compose up -d postgres && ./gradlew test && ./gradlew compileJava && ./gradlew test --tests 'com.kista.architecture.*' && git diff --check`
+
+Expected: 전체 테스트, 컴파일, ArchUnit, whitespace 검사 통과.
+
+- [ ] **Step 7: 커밋과 doc-sync**
+
+```bash
+git add src/main/java/com/kista/adapter/out/toss \
+        src/main/java/com/kista/adapter/out/broker/DoubleCheckedTokenCache.java \
+        src/test/java/com/kista/adapter/out/toss \
+        src/test/java/com/kista/adapter/out/broker/DoubleCheckedTokenCacheTest.java \
+        docs/agents docs/superpowers
+git commit -m "fix(toss): Redis로 다중 인스턴스 토큰 발급 조정"
+```

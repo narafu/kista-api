@@ -40,6 +40,18 @@
 
 계좌별 전체 API 요청을 직렬화하거나 별도 in-flight Future를 도입하지 않는다. 락은 캐시 복구와 OAuth 발급만 조정하며 정상 리소스 API 호출은 계속 병렬로 실행한다.
 
+### 운영 다중 인스턴스: Redis 분산 발급 조정
+
+Fly 운영은 rolling 배포 중 구·신 인스턴스가 겹칠 수 있으므로 JVM-local 락과 최근 발급 기록만으로는 충분하지 않다. Toss 계좌·관리자 토큰 발급은 Redis owner lease로 인스턴스 간 단일화한다.
+
+- 계좌 토큰의 canonical 저장소는 기존 PostgreSQL `broker_tokens`를 유지한다.
+- 관리자 토큰은 Redis에 access token과 만료 TTL을 저장해 모든 인스턴스가 공유한다.
+- 계좌·관리자별 발급 lease를 Redis `SET NX`와 유한 TTL로 획득한다. 획득 후 canonical 저장소를 다시 확인한 뒤에만 OAuth를 호출한다.
+- 최근 발급 token fingerprint를 2초 TTL로 Redis에 저장한다. 같은 fingerprint의 전파 중 401은 무효화하지 않는다.
+- lease 해제는 Lua compare-and-delete로 owner 값이 일치할 때만 수행한다. 대기자는 제한 시간 동안 canonical 토큰 저장 완료를 polling한다.
+- Redis 장애 시 로컬 발급으로 우회하지 않는다. 중복 OAuth 발급보다 요청 실패가 안전하므로 명시적으로 실패한다.
+- 정상 Toss 리소스 API 호출은 lease 밖에서 실행한다.
+
 ### SSE: 본문 없는 전용 비정상 종료 처리
 
 `AsyncRequestTimeoutException`과 `AsyncRequestNotUsableException`을 일반 `ProblemDetail` 매핑에서 제거한다. 두 예외를 받는 전용 `@ExceptionHandler`는 반환 본문 없이 처리하고 앱 오류 로그도 저장하지 않는다.
