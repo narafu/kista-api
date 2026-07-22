@@ -9,6 +9,7 @@ import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.privacy.PrivacyTradeConflictException;
 import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.AppErrorLogPort;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -78,8 +79,13 @@ public class GlobalExceptionHandler {
 
     // SSE 타임아웃·연결 종료는 이미 끝난 스트림에 별도 응답 본문을 쓰지 않고 종료 처리
     @ExceptionHandler({AsyncRequestTimeoutException.class, AsyncRequestNotUsableException.class})
-    public void handleAsyncLifecycle(Exception ex) {
+    public void handleAsyncLifecycle(Exception ex, HttpServletResponse response) {
         log.debug("SSE async request 종료: {}", ex.getClass().getSimpleName());
+        // 커밋 이전 스트림(예: 최초 emitter.send 이전 종료)은 본문 없이 상태코드만 세팅해 클라이언트에 실패를 알림
+        // 이미 커밋된 스트림에 body를 쓰면 HttpMessageNotWritableException이 발생하므로 그 경우는 status 변경도 생략
+        if (!response.isCommitted()) {
+            response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        }
     }
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────

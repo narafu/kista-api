@@ -36,6 +36,32 @@ class SseAsyncExceptionHandlingTest {
                 new AsyncRequestNotUsableException("disconnected"));
     }
 
+    @Test
+    void asyncRequestTimeout_before_first_send_sets_503_without_body() throws Exception {
+        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
+        TestSseController controller = new TestSseController();
+        MockMvc mockMvc = standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler(appErrorLogPort))
+                .build();
+
+        // SseEmitterRegistry.connect() 재현 — emitter.send() 호출 없이 반환하므로 응답이 아직 커밋되지 않는다.
+        MvcResult result = mockMvc.perform(get("/test/sse-uncommitted"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        assertThat(result.getResponse().isCommitted()).isFalse();
+
+        AsyncRequestTimeoutException exception = new AsyncRequestTimeoutException();
+        controller.uncommittedEmitter.completeWithError(exception);
+
+        MvcResult dispatched = mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isServiceUnavailable())
+                .andReturn();
+
+        assertThat(dispatched.getResolvedException()).isSameAs(exception);
+        assertThat(dispatched.getResponse().getContentAsString()).isEmpty();
+        verifyNoInteractions(appErrorLogPort);
+    }
+
     private static void assertAsyncLifecycleErrorIsHandledWithoutResponseBody(Exception exception) throws Exception {
         AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
         TestSseController controller = new TestSseController();
@@ -66,6 +92,7 @@ class SseAsyncExceptionHandlingTest {
     @Controller
     static class TestSseController {
         private SseEmitter emitter;
+        private SseEmitter uncommittedEmitter;
 
         @GetMapping(value = "/test/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
         SseEmitter stream() throws IOException {
@@ -73,6 +100,13 @@ class SseAsyncExceptionHandlingTest {
             // 연결 직후 ping 전송으로 이미 커밋된 SSE 응답을 재현한다.
             emitter.send(SseEmitter.event().name("ping").data("connected"));
             return emitter;
+        }
+
+        @GetMapping(value = "/test/sse-uncommitted", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        SseEmitter streamUncommitted() {
+            uncommittedEmitter = new SseEmitter();
+            // SseEmitterRegistry.connect()와 동일하게 최초 send() 없이 반환 — 응답이 커밋되지 않은 상태를 재현한다.
+            return uncommittedEmitter;
         }
     }
 }
