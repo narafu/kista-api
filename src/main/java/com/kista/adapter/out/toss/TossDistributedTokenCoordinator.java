@@ -1,6 +1,7 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.toss.TossApiException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+@Slf4j
 @Component
 class TossDistributedTokenCoordinator {
 
@@ -152,7 +154,13 @@ class TossDistributedTokenCoordinator {
             return new RecoveredToken(current.orElseThrow().accessToken(), false);
         }
         // 거절된 토큰과 동일 — 최근 발급 지문 보호 구간 내 재사용은 여전히 전파 지연 위험이 있어 대기 필요
-        return tokenStore.matchesRecentFingerprint(scope, rejectedToken)
+        boolean recentFingerprint = tokenStore.matchesRecentFingerprint(scope, rejectedToken);
+        if (recentFingerprint) {
+            // 정상 전파 지연 케이스에서도 흔히 발생하는 경로라 WARN 대신 DEBUG로 남긴다 —
+            // 같은 scope에서 반복 관측되면(최종적으로 재시도 소진 → 503) 원인 추적용 단서로 사용
+            log.debug("Toss 토큰 최근 발급 지문 보호 구간 내 재사용: scope={}", scope);
+        }
+        return recentFingerprint
                 ? new RecoveredToken(rejectedToken, true)
                 : null;
     }
