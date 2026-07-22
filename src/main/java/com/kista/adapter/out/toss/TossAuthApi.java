@@ -90,8 +90,16 @@ class TossAuthApi implements BrokerConnectionTestPort {
         }
     }
 
-    public void invalidateAdminToken() {
-        adminExpiresAt = OffsetDateTime.MIN;
+    public void invalidateAdminToken(String rejectedAccessToken) {
+        adminLock.lock();
+        try {
+            // stale 401이 이미 발급된 현재 관리자 토큰을 만료시키지 않게 한다.
+            if (java.util.Objects.equals(adminAccessToken, rejectedAccessToken)) {
+                adminExpiresAt = OffsetDateTime.MIN;
+            }
+        } finally {
+            adminLock.unlock();
+        }
     }
 
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────

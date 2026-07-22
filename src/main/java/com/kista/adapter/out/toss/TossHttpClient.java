@@ -45,7 +45,7 @@ class TossHttpClient {
     public <T> T getCommon(String path, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                ignoredToken -> tossAuthApi.invalidateAdminToken(),
+                tossAuthApi::invalidateAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
@@ -86,7 +86,7 @@ class TossHttpClient {
                            ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                ignoredToken -> tossAuthApi.invalidateAdminToken(),
+                tossAuthApi::invalidateAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
@@ -152,6 +152,7 @@ class TossHttpClient {
                                            Consumer<String> tokenInvalidator,
                                            Function<String, T> call) {
         String token = tokenFetcher.get();
+        boolean refreshed = false; // 최초 401에서만 토큰을 갱신하고 이후에는 신규 토큰을 재사용
         for (int attempt = 0; ; attempt++) {
             try {
                 return call.apply(token);
@@ -162,10 +163,19 @@ class TossHttpClient {
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
                 }
-                log.warn("Toss 401 — {} 토큰 무효화 후 재시도 {}/{}: path={}", tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
-                tokenInvalidator.accept(token);
-                sleepBackoff(attempt);
-                token = tokenFetcher.get();
+                // 최초 거절 토큰만 조건부 무효화하고 캐시의 최신 토큰을 한 번 읽는다.
+                if (!refreshed) {
+                    log.warn("Toss 401 — {} 토큰 무효화 후 갱신 재시도 {}/{}: path={}",
+                            tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
+                    tokenInvalidator.accept(token);
+                    sleepBackoff(attempt);
+                    token = tokenFetcher.get();
+                    refreshed = true;
+                } else {
+                    log.warn("Toss 401 — {} 신규 토큰 전파 대기 재시도 {}/{}: path={}",
+                            tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
+                    sleepBackoff(attempt);
+                }
             } catch (RestClientException e) {
                 throw new TossApiException("Toss API 요청 실패: " + e.getMessage(), e);
             }

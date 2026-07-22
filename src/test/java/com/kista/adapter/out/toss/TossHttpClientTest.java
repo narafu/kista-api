@@ -5,6 +5,7 @@ import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,10 +55,11 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("401이 두 번(최초+1차 재시도) 발생해도 2차 재시도에서 성공")
-    void retriesTwiceAfter401_thenSucceeds() {
+    @DisplayName("신규 토큰 전파가 지연되면 같은 신규 토큰으로 재시도")
+    @SuppressWarnings("unchecked")
+    void retriesSameFreshToken_whenPropagationIsDelayed() {
         when(tossAuthApi.getToken(any(), anyString(), anyString()))
-                .thenReturn("token-0", "token-1", "token-2");
+                .thenReturn("token-0", "token-1");
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
                 .thenThrow(unauthorized())
@@ -68,17 +71,23 @@ class TossHttpClientTest {
 
         assertThat(result).isEqualTo("OK");
         verify(tossAuthApi).invalidateToken(ACCOUNT.id(), "token-0");
-        verify(tossAuthApi).invalidateToken(ACCOUNT.id(), "token-1");
-        verify(tossAuthApi, times(3)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
+        verify(tossAuthApi, never()).invalidateToken(ACCOUNT.id(), "token-1");
+        verify(tossAuthApi, times(2)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
+        ArgumentCaptor<HttpEntity<?>> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+                requestCaptor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(requestCaptor.getAllValues())
+                .extracting(request -> request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                .containsExactly("Bearer token-0", "Bearer token-1", "Bearer token-1");
     }
 
     @Test
-    @DisplayName("401이 세 번(최초+2차 재시도 모두) 발생하면 TossApiException")
-    void throwsTossApiException_when401Persists() {
+    @DisplayName("재시도 한도 후에도 신규 토큰은 무효화하지 않음")
+    void throwsAfterRetryLimit_withoutInvalidatingFreshToken() {
         when(tossAuthApi.getToken(any(), anyString(), anyString()))
-                .thenReturn("token-0", "token-1", "token-2");
+                .thenReturn("token-0", "token-1");
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
                 .thenThrow(unauthorized());
@@ -90,7 +99,8 @@ class TossHttpClientTest {
                 .hasMessageContaining("토큰 재시도 실패");
 
         verify(tossAuthApi).invalidateToken(ACCOUNT.id(), "token-0");
-        verify(tossAuthApi).invalidateToken(ACCOUNT.id(), "token-1");
+        verify(tossAuthApi, never()).invalidateToken(ACCOUNT.id(), "token-1");
+        verify(tossAuthApi, times(2)).getToken(eq(ACCOUNT.id()), anyString(), anyString());
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
@@ -99,7 +109,7 @@ class TossHttpClientTest {
     @DisplayName("공통 API(getCommon) 401도 최대 2회까지 백오프 재시도 후 성공")
     void getCommon_retriesTwiceAfter401_thenSucceeds() {
         when(tossAuthApi.getAdminToken())
-                .thenReturn("admin-token-0", "admin-token-1", "admin-token-2");
+                .thenReturn("admin-token-0", "admin-token-1");
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
                 .thenThrow(unauthorized())
@@ -108,8 +118,9 @@ class TossHttpClientTest {
         String result = newClient().getCommon(PATH, new LinkedMultiValueMap<>(), String.class);
 
         assertThat(result).isEqualTo("OK");
-        verify(tossAuthApi, times(2)).invalidateAdminToken();
-        verify(tossAuthApi, times(3)).getAdminToken();
+        verify(tossAuthApi).invalidateAdminToken("admin-token-0");
+        verify(tossAuthApi, never()).invalidateAdminToken("admin-token-1");
+        verify(tossAuthApi, times(2)).getAdminToken();
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), eq(String.class));
     }
@@ -118,7 +129,7 @@ class TossHttpClientTest {
     @DisplayName("공통 API 401이 세 번(최초+2차 재시도 모두) 발생하면 TossApiException")
     void getCommon_throwsTossApiException_when401Persists() {
         when(tossAuthApi.getAdminToken())
-                .thenReturn("admin-token-0", "admin-token-1", "admin-token-2");
+                .thenReturn("admin-token-0", "admin-token-1");
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized());
 
@@ -127,7 +138,9 @@ class TossHttpClientTest {
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("토큰 재시도 실패");
 
-        verify(tossAuthApi, times(2)).invalidateAdminToken();
+        verify(tossAuthApi).invalidateAdminToken("admin-token-0");
+        verify(tossAuthApi, never()).invalidateAdminToken("admin-token-1");
+        verify(tossAuthApi, times(2)).getAdminToken();
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), eq(String.class));
     }

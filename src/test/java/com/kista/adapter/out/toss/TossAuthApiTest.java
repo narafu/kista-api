@@ -114,6 +114,22 @@ class TossAuthApiTest {
         }
     }
 
+    @Test
+    @DisplayName("stale 관리자 401은 현재 관리자 토큰을 무효화하지 않음")
+    void invalidateAdminToken_preservesCurrentToken_whenRejectedTokenIsStale() {
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
+                .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
+
+        String current = api.getAdminToken();
+        api.invalidateAdminToken("stale-admin-token");
+        String preserved = api.getAdminToken();
+
+        assertThat(current).isEqualTo("admin-token-1");
+        assertThat(preserved).isEqualTo("admin-token-1");
+        verify(tossRestTemplate, times(1)).exchange(
+                anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
+    }
+
     @Nested
     @DisplayName("BrokerConnectionTestPort — verifyAccount")
     class ConnectionTestTests {
