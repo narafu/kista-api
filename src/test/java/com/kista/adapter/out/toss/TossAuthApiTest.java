@@ -115,17 +115,30 @@ class TossAuthApiTest {
     }
 
     @Test
-    @DisplayName("stale 관리자 401은 현재 관리자 토큰을 무효화하지 않음")
-    void invalidateAdminToken_preservesCurrentToken_whenRejectedTokenIsStale() {
+    @DisplayName("stale 관리자 401 복구는 현재 관리자 토큰을 반환")
+    void recoverAdminToken_returnsCurrentToken_whenRejectedTokenIsStale() {
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String current = api.getAdminToken();
-        api.invalidateAdminToken("stale-admin-token");
-        String preserved = api.getAdminToken();
+        String recovered = api.recoverAdminToken("stale-admin-token");
 
         assertThat(current).isEqualTo("admin-token-1");
-        assertThat(preserved).isEqualTo("admin-token-1");
+        assertThat(recovered).isEqualTo("admin-token-1");
+        verify(tossRestTemplate, times(1)).exchange(
+                anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
+    }
+
+    @Test
+    @DisplayName("최근 발급한 관리자 토큰의 401 복구는 같은 발급 세대를 재사용")
+    void recoverAdminToken_reusesRecentlyIssuedGeneration() {
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
+                .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
+
+        String issued = api.getAdminToken();
+        String recovered = api.recoverAdminToken(issued);
+
+        assertThat(recovered).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
                 anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
     }

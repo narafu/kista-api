@@ -17,7 +17,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -45,7 +44,7 @@ class TossHttpClient {
     public <T> T getCommon(String path, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                tossAuthApi::invalidateAdminToken,
+                tossAuthApi::recoverAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
@@ -86,7 +85,7 @@ class TossHttpClient {
                            ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                tossAuthApi::invalidateAdminToken,
+                tossAuthApi::recoverAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
                     return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
@@ -128,11 +127,12 @@ class TossHttpClient {
     // 최초 시도 이후 허용하는 최대 401 재시도 횟수
     private static final int MAX_RETRY_ATTEMPTS = 2;
 
-    // 계좌 토큰 재시도 — 공통 헬퍼(executeWithBackoffRetry)에 계좌별 토큰 조회/무효화만 주입
+    // 계좌 토큰 재시도 — 공통 헬퍼에 계좌별 토큰 조회/원자적 401 복구만 주입
     private <T> T executeWithRetry(Account account, String path, Function<String, T> call) {
         return executeWithBackoffRetry("계좌", path,
                 () -> tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey()),
-                token -> tossAuthApi.invalidateToken(account.id(), token),
+                token -> tossAuthApi.recoverToken(
+                        account.id(), account.appKey(), account.secretKey(), token),
                 call);
     }
 
@@ -145,11 +145,11 @@ class TossHttpClient {
         }
     }
 
-    // 401 → 실패한 요청의 토큰만 무효화 후 최신 토큰으로 최대 MAX_RETRY_ATTEMPTS회 재시도한다.
+    // 401 → 실패 토큰을 최신/최근 발급 세대와 원자적으로 비교한 뒤 최대 MAX_RETRY_ATTEMPTS회 재시도한다.
     // 재시도 사이 짧은 백오프를 둬 갓 재발급된 토큰의 리소스 서버 반영 지연을 흡수한다.
     // 계좌 토큰(executeWithRetry)·관리자 토큰(getCommon) 양쪽이 공유하는 재시도 골격.
     private <T> T executeWithBackoffRetry(String tokenKind, String path, Supplier<String> tokenFetcher,
-                                           Consumer<String> tokenInvalidator,
+                                           Function<String, String> tokenRecoverer,
                                            Function<String, T> call) {
         String token = tokenFetcher.get();
         boolean refreshed = false; // 최초 401에서만 토큰을 갱신하고 이후에는 신규 토큰을 재사용
@@ -163,13 +163,12 @@ class TossHttpClient {
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
                 }
-                // 최초 거절 토큰만 조건부 무효화하고 캐시의 최신 토큰을 한 번 읽는다.
+                // 최초 401은 같은 발급 락의 원자적 복구로 교체/최근 세대를 먼저 확보한 뒤 전파를 기다린다.
                 if (!refreshed) {
-                    log.warn("Toss 401 — {} 토큰 무효화 후 갱신 재시도 {}/{}: path={}",
+                    log.warn("Toss 401 — {} 토큰 복구 후 전파 대기 재시도 {}/{}: path={}",
                             tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
-                    tokenInvalidator.accept(token);
+                    token = tokenRecoverer.apply(token);
                     sleepBackoff(attempt);
-                    token = tokenFetcher.get();
                     refreshed = true;
                 } else {
                     log.warn("Toss 401 — {} 신규 토큰 전파 대기 재시도 {}/{}: path={}",
