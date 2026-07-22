@@ -96,6 +96,7 @@ adapter/in/
 
 adapter/out/
   broker/        ← DoubleCheckedTokenCache (KIS/Toss 공용 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
+                   Toss 401 복구는 동일 락에서 현재 토큰 비교 → 최근 IssuedToken 세대 보호 → 조건부 무효화·재발급을 원자화;
                    BrokerTokenCachePort.saveToken/invalidateToken은 REQUIRES_NEW로 락 해제 전 독립 커밋;
                    invalidateToken은 accountId+거절된 accessToken 일치 시만 INVALIDATED_TOKEN으로 갱신해 stale 401이 이미 재발급된 신규 토큰을 무효화하지 않음)
                    PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
