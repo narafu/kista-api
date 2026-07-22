@@ -40,9 +40,10 @@ public class StatsController {
     @GetMapping("/equity-curve")
     public EquityCurveResponse getEquityCurve(
             @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) Strategy.Type type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return EquityCurveResponse.from(userStats.getEquityCurve(userId, from, to));
+        return EquityCurveResponse.from(userStats.getEquityCurve(userId, type, from, to));
     }
 
     @Operation(summary = "사이클 성과 목록", description = "종료·진행 중 사이클의 손익/수익률/소요일 (커서 페이지네이션).")

@@ -77,14 +77,16 @@ class StatsService implements UserStatsUseCase {
     }
 
     @Override
-    public EquityCurve getEquityCurve(UUID userId, LocalDate from, LocalDate to) {
+    public EquityCurve getEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
         Instant fromInstant = Instant.EPOCH;
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 — 04:30 배치 스냅샷이 해당 KST 일자에 속함
 
-        List<CycleView> cycles = loadCycles(userId);
+        List<CycleView> cycles = loadCycles(userId).stream()
+                .filter(v -> type == null || v.strategy().type() == type)
+                .toList();
         List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant);
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
         return new EquityCurve(points);

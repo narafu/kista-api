@@ -62,7 +62,7 @@ class StatsControllerTest {
 
     @Test
     void equity_curve를_반환한다() throws Exception {
-        when(userStats.getEquityCurve(eq(USER_ID), any(), any()))
+        when(userStats.getEquityCurve(eq(USER_ID), isNull(), any(), any()))
                 .thenReturn(new EquityCurve(
                         List.of(new EquityPoint(LocalDate.parse("2026-06-02"),
                                 new BigDecimal("1000.00"), new BigDecimal("900.00")))));
@@ -74,6 +74,23 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.points[0].date").value("2026-06-02"))
                 .andExpect(jsonPath("$.points[0].totalAsset").value(1000.00))
                 .andExpect(jsonPath("$.benchmark").doesNotExist());
+    }
+
+    @Test
+    void equity_curve는_type_필터를_전달한다() throws Exception {
+        when(userStats.getEquityCurve(eq(USER_ID), eq(Strategy.Type.VR), any(), any()))
+                .thenReturn(new EquityCurve(List.of()));
+
+        mockMvc.perform(get("/api/stats/equity-curve")
+                        .param("type", "VR")
+                        .param("from", "2026-06-01")
+                        .param("to", "2026-06-30")
+                        .with(authentication(auth())))
+                .andExpect(status().isOk());
+
+        verify(userStats).getEquityCurve(
+                USER_ID, Strategy.Type.VR,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
     }
 
     @Test

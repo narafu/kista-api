@@ -19,7 +19,7 @@ public interface UserStatsUseCase {
     StatsSummary getSummary(UUID userId);
 
     // from/to null 허용 (null이면 전체/오늘)
-    EquityCurve getEquityCurve(UUID userId, LocalDate from, LocalDate to);
+    EquityCurve getEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to);
 
     // type null이면 전체
     CyclePerformancePage getCyclePerformances(UUID userId, Strategy.Type type, Instant cursor, int size);

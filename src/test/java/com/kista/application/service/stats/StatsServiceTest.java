@@ -45,11 +45,15 @@ class StatsServiceTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
+    private static final UUID PRIVACY_STRATEGY_ID = UUID.randomUUID();
     private static final LocalDate FROM = LocalDate.of(2026, 1, 1);
     private static final LocalDate TO = LocalDate.of(2026, 2, 28);
 
     private static final Strategy STRATEGY = new Strategy(
             STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
+            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+    private static final Strategy PRIVACY_STRATEGY = new Strategy(
+            PRIVACY_STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
             Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
     // Account는 record(final) — mock(Account.class) 대신 실제 인스턴스 생성 (AccountServiceTest 패턴)
@@ -73,6 +77,12 @@ class StatsServiceTest {
 
     private static StrategyCycle activeCycle(String start, String startDate) {
         return new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
+                new BigDecimal(start), null, LocalDate.parse(startDate), null,
+                Instant.parse(startDate + "T00:00:00Z"), null);
+    }
+
+    private static StrategyCycle activeCycle(UUID strategyId, String start, String startDate) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, null,
                 new BigDecimal(start), null, LocalDate.parse(startDate), null,
                 Instant.parse(startDate + "T00:00:00Z"), null);
     }
@@ -162,13 +172,33 @@ class StatsServiceTest {
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
                         new BigDecimal("10.00"), null, 20, Instant.parse("2026-06-01T20:30:00Z"), null)));
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
         assertThat(curve.points().get(0).date()).isEqualTo(LocalDate.parse("2026-06-02"));
         // 800 + 20 × 10.00 = 1000
         assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1000.00");
         assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void equity_curve는_전략_type으로_사이클을_필터링한다() {
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY, PRIVACY_STRATEGY));
+        StrategyCycle infinite = activeCycle(STRATEGY_ID, "1000.00", "2026-06-01");
+        StrategyCycle privacy = activeCycle(PRIVACY_STRATEGY_ID, "2000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(infinite, privacy));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+                depositSnapshot(infinite.id(), "1100.00", "2026-06-02T01:00:00Z"),
+                depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
+
+        EquityCurve curve = statsService.getEquityCurve(
+                USER_ID, Strategy.Type.PRIVACY,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(curve.points()).hasSize(1);
+        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("2300.00");
+        assertThat(curve.points().getFirst().principal()).isEqualByComparingTo("2000.00");
     }
 
     @Test
@@ -230,7 +260,7 @@ class StatsServiceTest {
         when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
         ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
 
-        statsService.getEquityCurve(USER_ID, null, LocalDate.of(2026, 7, 18));
+        statsService.getEquityCurve(USER_ID, null, null, LocalDate.of(2026, 7, 18));
 
         // to=2026-07-18 → toInstant = 2026-07-19T00:00 KST = 2026-07-18T15:00:00Z
         verify(cyclePositionPort).findByUserAndRange(eq(USER_ID), any(), toCaptor.capture());
@@ -250,7 +280,7 @@ class StatsServiceTest {
                 depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         assertThat(curve.points().get(1).date()).isEqualTo(LocalDate.parse("2026-06-02"));
@@ -270,7 +300,7 @@ class StatsServiceTest {
                 depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         // 06-01: 종료 사이클 포함 (endDate 당일까지 유효)
