@@ -203,16 +203,15 @@ git add src/main/java/com/kista/adapter/out/broker/DoubleCheckedTokenCache.java 
 git commit -m "fix(toss): 동시 401에서 신규 토큰 발급 세대 보호"
 ```
 
-### Task 3: PostgreSQL session advisory lock 기반 다중 인스턴스 토큰 발급 조정
+### Task 3: Redis fencing generation 기반 다중 인스턴스 토큰 발급 조정
 
 **Files:**
 - Create: `src/main/java/com/kista/adapter/out/toss/TossDistributedTokenCoordinator.java`
-- Create: `src/main/java/com/kista/adapter/out/toss/TossTokenIssuanceLock.java`
-- Create: `src/main/java/com/kista/adapter/out/toss/TossPostgresAdvisoryLock.java`
-- Create: `src/main/java/com/kista/adapter/out/toss/TossAdvisoryLockDataSourceConfig.java`
+- Create: `src/main/java/com/kista/adapter/out/toss/TossTokenStore.java`
+- Create: `src/main/java/com/kista/adapter/out/toss/TossRedisTokenStore.java`
 - Create: `src/test/java/com/kista/adapter/out/toss/TossDistributedTokenCoordinatorTest.java`
-- Create: `src/test/java/com/kista/adapter/out/toss/TossPostgresAdvisoryLockTest.java`
-- Create: `src/test/java/com/kista/adapter/out/toss/TossPostgresAdvisoryLockIT.java`
+- Create: `src/test/java/com/kista/adapter/out/toss/TossRedisTokenStoreIT.java`
+- Create: `src/test/java/com/kista/adapter/out/toss/TossAuthApiNoJpaTest.java`
 - Modify: `src/main/java/com/kista/adapter/out/toss/TossAuthApi.java`
 - Modify: `src/test/java/com/kista/adapter/out/toss/TossAuthApiTest.java`
 - Modify: `src/test/java/com/kista/adapter/out/toss/TossHttpClientTest.java`
@@ -223,28 +222,26 @@ git commit -m "fix(toss): 동시 401에서 신규 토큰 발급 세대 보호"
 - Modify: `docs/agents/docker-infra.md`
 
 **Interfaces:**
-- Produces: PostgreSQL session advisory lock, shared recent-token fingerprint, shared 관리자 token cache
-- Consumes: `DataSource`, `StringRedisTemplate`, PostgreSQL-backed `BrokerTokenCachePort`, Toss OAuth issuer
+- Produces: Redis canonical account/admin token, TTL owner lease, monotonically increasing fencing generation, owner-safe unlock
+- Consumes: `StringRedisTemplate`, Toss OAuth issuer
 
 - [ ] **Step 1: 다중 coordinator RED 테스트**
 
-서로 다른 coordinator 인스턴스 두 개가 같은 advisory lock fake와 Redis 테스트 저장소를 공유하는 테스트를 작성한다. A가 계좌 또는 관리자 token-1 발급 lock을 보유한 동안 B가 동일 토큰 복구를 시작해도 OAuth 발급은 전체 1회이고 B가 token-1을 받는지 검증한다. 임계구역 시간을 60초보다 훨씬 길게 진행해도 두 번째 owner가 생기지 않고, session release/crash 뒤에만 다음 owner가 생기는지 검증한다. fingerprint TTL·저장 순서와 fail-closed 동작도 검증한다.
+faithful fake store와 fake clock을 공유하는 coordinator 두 개를 만든다. generation 1 owner를 OAuth 중 지연시키고 lease를 만료한 뒤 generation 2 successor가 token-2를 저장하게 한다. 지연된 generation 1 CAS가 거절되고 token-2를 읽어 반환하며 canonical token-2가 유지되는지 검증한다. owner-safe unlock, bounded polling, fingerprint TTL, Redis fail-closed도 각각 검증한다.
 
 - [ ] **Step 2: RED 확인**
 
 Run: `./gradlew test --tests 'com.kista.adapter.out.toss.TossDistributedTokenCoordinatorTest' --tests 'com.kista.adapter.out.toss.TossAuthApiTest'`
 
-Expected: coordinator 타입이 없어 컴파일 실패하거나 기존 JVM-local 구현이 두 발급을 수행해 실패.
+Expected: 기존 advisory-lock constructor/API 및 DB persister 계약 때문에 컴파일 또는 stale-writer 단언 실패.
 
-- [ ] **Step 3: PostgreSQL advisory lock coordinator 최소 구현**
+- [ ] **Step 3: Redis lease/fence/CAS 최소 구현**
 
-계좌 UUID/관리자 scope를 SHA-256으로 변환한 안정적인 signed 64-bit key로 `pg_try_advisory_lock`을 bounded polling한다. 각 시도는 main JPA pool과 분리된 2-connection Hikari pool의 전용 JDBC connection을 사용하고, 획득한 connection은 canonical double-check·OAuth·fingerprint·canonical 저장 전체에서 유지한 뒤 같은 session의 `pg_advisory_unlock`으로 해제한다. pool borrow/validation과 SQL query는 각각 1초로 제한한다. 고정 TTL은 두지 않으며 session/process 장애 시 PostgreSQL 자동 해제를 사용한다. coordinator에 `NOT_SUPPORTED` 경계를 두어 caller transaction을 suspend한다.
-
-관리자 토큰은 Redis token key에 실제 OAuth 만료보다 5분 짧은 TTL로 저장한다. 계좌·관리자 최근 발급 fingerprint는 SHA-256으로 저장하고 2초 TTL을 적용한다. raw bearer token은 fingerprint key에 저장하지 않는다.
+`TossTokenStore`는 `find(scope)`, `tryAcquire(scope, owner, ttl)`, `storeIfCurrent(lease, token, ttl)`, `release(lease)`, `matchesRecentFingerprint(scope, token)`을 제공한다. `TossRedisTokenStore`의 acquire Lua는 `SET NX PX`와 `INCR`를 원자 실행한다. CAS Lua는 incoming generation이 generation key 또는 canonical hash generation보다 작으면 0을 반환하고, 아니면 access token/generation/expiry hash와 shortened TTL 및 2초 fingerprint를 원자 저장한다. release Lua는 owner compare-delete를 사용한다. 모든 Redis 예외는 `TossApiException`으로 감싼다.
 
 - [ ] **Step 4: TossAuthApi 통합**
 
-계좌 `getToken`과 401 복구, 관리자 `getAdminToken`과 401 복구를 coordinator를 통해 실행한다. fingerprint 저장을 계좌 DB 저장과 관리자 Redis token 저장보다 먼저 수행하고 모든 저장이 완료된 후 advisory lock을 해제한다. 기존 JVM-local 발급 세대 맵은 제거하고 KIS가 사용하는 `DoubleCheckedTokenCache.getOrFetch` 동작은 유지한다.
+`TossAuthApi`에서 `BrokerTokenCachePort` 의존성과 DB current/invalidate/persist callback을 제거한다. 계좌·관리자 모두 `TossTokenStore.TokenValue(accessToken, expiresInSeconds)` issuer만 coordinator에 전달한다. `TossAuthApiNoJpaTest`는 outer transaction 안 발급 전후 `broker_tokens` 행과 JPA pool active connection 수가 증가하지 않음을 검증한다. KIS `DoubleCheckedTokenCache`는 변경하지 않는다.
 
 - [ ] **Step 5: GREEN 및 회귀 검증**
 
@@ -254,11 +251,11 @@ Expected: 모든 테스트 통과.
 
 - [ ] **Step 6: 전체 검증과 문서 동기화**
 
-PostgreSQL session lock 수명, Redis 키 수명, 다중 Fly 인스턴스 정책, PostgreSQL/Redis 장애 시 fail-closed 동작을 관련 문서에 반영한다.
+Redis canonical hash/lease/generation/fingerprint 키, fencing CAS, Toss의 JPA 비사용, Redis fail-closed를 관련 문서에 반영한다. PostgreSQL advisory-lock 코드·테스트·pool 문서를 모두 제거한다.
 
-Redis lease 구버전과 PostgreSQL advisory lock 신버전이 동시에 실행되지 않도록 최초 배포만 Fly `immediate` 전략을 사용한다. production 검증 뒤 별도 follow-up 커밋·배포에서 `rolling`으로 복원한다.
+현재 production의 pre-branch token protocol과 겹치지 않도록 최초 배포는 Fly `immediate`를 유지한다. production 검증 뒤 별도 follow-up 커밋·배포에서 `rolling`으로 복원한다.
 
-Run: `docker compose up -d postgres && ./gradlew test && ./gradlew compileJava && ./gradlew test --tests 'com.kista.architecture.*' && git diff --check`
+Run: `docker compose up -d postgres redis && ./gradlew test && ./gradlew compileJava && ./gradlew test --tests 'com.kista.architecture.*' && ./gradlew integration --tests 'com.kista.adapter.out.toss.TossRedisTokenStoreIT' && git diff --check`
 
 Expected: 전체 테스트, 컴파일, ArchUnit, whitespace 검사 통과.
 
@@ -270,5 +267,5 @@ git add src/main/java/com/kista/adapter/out/toss \
         src/test/java/com/kista/adapter/out/toss \
         src/test/java/com/kista/adapter/out/broker/DoubleCheckedTokenCacheTest.java \
         docs/agents docs/superpowers
-git commit -m "fix(toss): PostgreSQL advisory lock으로 토큰 발급 조정"
+git commit -m "fix(toss): Redis fencing으로 토큰 세대 보호"
 ```
