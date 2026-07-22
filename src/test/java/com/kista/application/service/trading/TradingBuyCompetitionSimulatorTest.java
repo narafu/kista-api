@@ -1,17 +1,14 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
@@ -38,10 +35,9 @@ class TradingBuyCompetitionSimulatorTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderPort orderPort;
-    @Mock BrokerAdapterRegistry registry;
-    @Mock LiveBalancePort liveBalancePort;
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock CycleOrderStrategies cycleOrderStrategies;
+    @Mock PreviewDepositCache depositCache;
     @Mock CycleOrderStrategy vrOrderStrategy;
     @Mock CycleOrderStrategy infiniteOrderStrategy;
 
@@ -57,8 +53,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @BeforeEach
     void setUp() {
-        simulator = new TradingBuyCompetitionSimulator(strategyPort, strategyCyclePort, orderPort, registry, planBuilder, cycleOrderStrategies);
-        lenient().doReturn(liveBalancePort).when(registry).require(any(Account.class), any());
+        simulator = new TradingBuyCompetitionSimulator(strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
         lenient().when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(infiniteOrderStrategy);
         lenient().when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(vrOrderStrategy);
         lenient().when(infiniteOrderStrategy.allocationPriority()).thenReturn(1);
@@ -71,8 +66,8 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_sufficientBudget_whenNoCompetitors() {
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy));
         List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
@@ -94,8 +89,8 @@ class TradingBuyCompetitionSimulatorTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today))
@@ -119,8 +114,8 @@ class TradingBuyCompetitionSimulatorTest {
         CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
                 null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
 
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
@@ -144,8 +139,8 @@ class TradingBuyCompetitionSimulatorTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
@@ -168,8 +163,8 @@ class TradingBuyCompetitionSimulatorTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
@@ -191,8 +186,8 @@ class TradingBuyCompetitionSimulatorTest {
         Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
                 Strategy.Status.PAUSED, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
 
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, pausedVr));
         List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
 
@@ -206,7 +201,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
-        when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
                 .thenThrow(new com.kista.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
 

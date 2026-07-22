@@ -52,7 +52,8 @@ application/
                    TradingService(배치·단건 실행 코어), ManualTradingService(수동 실행), TradingPreviewService(미리보기 전용, @Transactional readOnly),
                    OrderCancelService(주문 취소), CycleRotationService(사이클 종료 후 cycleSeedType 기반 재등록),
                    MarketEventNotifier(장 개시·마감 알림 — UserPort+UserSettingsPort+UserNotificationPort 조합)
-                   package-private helper: TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingOrderBudgetAllocator/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/CycleSnapshotCreator/SeedResolutionPolicy/TradingDayCounter
+                   package-private helper: TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingOrderBudgetAllocator/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/CycleSnapshotCreator/SeedResolutionPolicy/TradingDayCounter/PreviewDepositCache
+                   PreviewDepositCache — TradingBuyCompetitionSimulator 전용 계좌 단위 라이브 예수금(usdDeposit) 짧은 TTL(3초) 캐시 + 계좌별 락으로 동시 miss 단일화. usdDeposit은 ticker 무관 계좌 전체 값이라 계좌당 전략 N개의 preview 병렬 호출을 실제 조회 1회로 축소. 실주문 집행 경로(ManualTradingService/TradingOrderBudgetAllocator)는 미사용 — 항상 최신값 직접 조회
                    BuyOrderPriceCapper — 신규 후보의 cap·수량 재산정·correction BUY를 영속화 없이 allocator 전에 준비하고, 기존 PLANNED BUY의 접수 전 보정도 담당
                    TradingOrderBudgetAllocator — 계좌별 slot-aware BUY/SELL 독립 예산 배정 (우선순위·실패 격리·제외 규칙 상세 → workflow.md "스케쥴러 주문 예산 배정")
                    live 잔고·판매가능수량 조회는 BrokerAdapterRegistry.require(account, LiveBalancePort/SellableQuantityPort.class) 직접 라우팅 — 별도 Router 클래스 없음 (KIS: TTTS3012R fetchHolding 재사용 / Toss: /api/v1/sellable-quantity)

@@ -1,6 +1,5 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.BuyCompetitionPreview;
@@ -12,7 +11,6 @@ import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +34,9 @@ class TradingBuyCompetitionSimulator {
     private final StrategyPort strategyPort;              // 계좌 내 전략 전체 조회
     private final StrategyCyclePort strategyCyclePort;    // 경쟁 전략의 현재 사이클 조회
     private final OrderPort orderPort;                    // 경쟁 전략의 당일 기존 주문 유무 확인
-    private final BrokerAdapterRegistry registry;         // 라이브 예수금 조회
     private final StrategyOrderPlanBuilder planBuilder;   // 경쟁 전략 가상 계산
     private final CycleOrderStrategies cycleOrderStrategies; // 우선순위 조회
+    private final PreviewDepositCache depositCache;        // 계좌 단위 라이브 예수금 짧은 TTL 캐시 (preview 전용)
 
     // 정렬 대상 후보 — 대상 전략과 경쟁 전략을 동일한 형태로 취급
     private record RankedCandidate(UUID strategyId, UUID cycleId, Strategy.Type type,
@@ -54,9 +52,7 @@ class TradingBuyCompetitionSimulator {
             // 라이브 예수금에서 타 전략의 당일 PLANNED BUY만 차감 — 대상 전략 자신의 기존 예약분은
             // requiredForThis가 매번 전체 재계산이라 이미 반영돼 있으므로 이중 차감하지 않는다.
             // PLACED 주문은 브로커에 이미 접수돼 라이브 예수금 자체에 반영돼 있어 별도 차감 불필요.
-            liveDeposit = registry.require(account, LiveBalancePort.class)
-                    .getLiveBalance(account, currentStrategy.ticker())
-                    .usdDeposit();
+            liveDeposit = depositCache.getUsdDeposit(account, currentStrategy.ticker());
         } catch (KisApiException | TossApiException e) {
             // 브로커 라이브 예수금 조회 자체가 실패(토큰 재시도 소진 등) — 미리보기 전체를 503으로 막지 않고
             // 경쟁 시뮬레이션만 생략한 채 주문 계획(plan.orders())은 정상 반환한다
