@@ -15,12 +15,12 @@
 ### Fly.io 배포 방식
 - `.github/workflows/fly-deploy.yml` — `main` push 시 GitHub Actions가 compileJava + ArchUnit 검증 후 `fly deploy` 자동 실행
 - 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
-- `fly.toml`의 `strategy = "immediate"`는 현재 production의 pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 **1회성 protocol cutover** 설정이다. 이 배포에는 짧은 downtime과 health-check 없는 동시 교체가 허용된다. 실제 배포는 자동 workflow가 수행하며 이 변경 작업에서 수동 배포하지 않는다.
-- 첫 production 배포 성공 후 `fly status --app kista-api`와 Toss 계좌/관리자 토큰 발급을 확인한다. 이어지는 별도 follow-up에서 `fly.toml`을 정확히 `strategy = "rolling"`으로 되돌려 커밋·push하고 자동 배포 성공까지 확인한다. 최초 cutover와 rolling 복원을 같은 배포에 섞지 않는다.
+- `fly.toml`의 배포 전략은 `[deploy]` 섹션의 `strategy` 키다 — **`[deployment]`는 flyctl이 인식하지 못하는 오타 섹션名**이라 조용히 무시된다(`flyctl config show --local --toml`로 로컬 파싱 결과를 직접 비교해야 확인 가능, `config show` 기본 동작은 로컬 파일이 아닌 Fly 서비스에 저장된 원격 설정을 보여줘서 이 오타를 못 잡는다). Redis fencing 도입 시 이 오타 때문에 의도했던 `immediate`(pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 1회성 protocol cutover)가 실제로는 한 번도 적용되지 않고 매번 flyctl 기본값인 `rolling`으로 배포됐다 — 그런데도 신·구 프로토콜이 실제로 충돌하는 사고는 없었다(2026-07-22 확인). 현재 `strategy = "rolling"`으로 명시 고정돼 있다.
+- 향후 유사한 protocol cutover가 필요하면: (1) `[deploy] strategy = "immediate"`로 변경 후 `flyctl config show --local --toml`로 로컬 파싱 결과에 `[deploy] strategy = 'immediate'`가 실제로 찍히는지 반드시 확인, (2) 배포 로그에 `Updating existing machines ... with immediate strategy` 문구로 실제 적용을 재확인, (3) `fly status`로 정상 기동 확인 후 별도 커밋으로 `rolling` 복원 — 오타로 검증 자체가 무력화됐던 사례가 있으니 "커밋했다"가 아니라 "실제 적용을 확인했다"를 기준으로 삼을 것.
 
 ### Fly.io 다중 인스턴스 Toss 토큰 조정
 - 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
-- scope별 60초 Redis owner lease와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
+- scope별 20초 Redis owner lease(OAuth RestTemplate 타임아웃 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
 - Redis에는 canonical raw token 외에 영구 generation counter와 최근 SHA-256 fingerprint(2초)가 존재한다. raw bearer token을 로그 또는 fingerprint key에 기록하지 않는다. Redis 연결·script 실패는 로컬/DB fallback 없이 503으로 fail-closed 하며 운영 인스턴스는 모두 같은 Redis를 보아야 한다.
 
 ### Docker 빌드 OOM
