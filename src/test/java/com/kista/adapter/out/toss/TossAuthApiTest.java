@@ -1,13 +1,11 @@
 package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.out.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
@@ -17,11 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,7 +28,6 @@ import static org.mockito.Mockito.*;
 class TossAuthApiTest {
 
     @Mock RestTemplate tossRestTemplate;
-    @Mock BrokerTokenCachePort brokerTokenCachePort;
     @Mock TossDistributedTokenCoordinator tokenCoordinator;
 
     TossAuthApi api;
@@ -47,31 +41,18 @@ class TossAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        api = new TossAuthApi(tossRestTemplate, brokerTokenCachePort, tokenCoordinator,
+        api = new TossAuthApi(tossRestTemplate, tokenCoordinator,
                 BASE_URL, ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
         stubCoordinatorIssuance();
     }
 
-    @SuppressWarnings("unchecked")
     private void stubCoordinatorIssuance() {
-        lenient().when(tokenCoordinator.getAccountToken(any(), any(), any(), any())).thenAnswer(invocation -> {
-            Supplier<Optional<String>> currentToken = invocation.getArgument(1);
-            TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
-            TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(3);
-            Optional<String> first = currentToken.get();
-            if (first.isPresent()) {
-                return first.get();
-            }
-            Optional<String> second = currentToken.get();
-            if (second.isPresent()) {
-                return second.get();
-            }
-            TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
-            persister.persist(issued);
-            return issued.accessToken();
+        lenient().when(tokenCoordinator.getAccountToken(any(), any())).thenAnswer(invocation -> {
+            TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(1);
+            return issuer.issue().accessToken();
         });
         lenient().when(tokenCoordinator.getAdminToken(any())).thenAnswer(invocation -> {
-            TossDistributedTokenCoordinator.AdminTokenIssuer issuer = invocation.getArgument(0);
+            TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(0);
             return issuer.issue().accessToken();
         });
     }
@@ -83,8 +64,8 @@ class TossAuthApiTest {
         @Test
         @DisplayName("캐시 히트 시 tossRestTemplate 미호출")
         void getToken_cacheHit_noApiCall() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
-                    .thenReturn(Optional.of("cached-token"));
+            doReturn("cached-token").when(tokenCoordinator)
+                    .getAccountToken(eq(ACCOUNT_ID), any());
 
             String result = api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET);
 
@@ -93,30 +74,21 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("캐시 미스 시 OAuth 발급 후 brokerTokenCachePort.saveToken 호출")
+        @DisplayName("Redis canonical miss 시 OAuth token과 expiresIn을 coordinator에 전달")
         void getToken_cacheMiss_fetchAndCache() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
-                    .thenReturn(Optional.empty());
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("new-token", 86400L)));
 
             String result = api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET);
 
             assertThat(result).isEqualTo("new-token");
-            // double-check 패턴 — findValidToken이 2회 호출됨 (락 전 1차, 락 후 2차)
-            verify(brokerTokenCachePort, times(2)).findValidToken(eq(ACCOUNT_ID), any());
-            // saveToken은 1회 호출되어야 함
-            ArgumentCaptor<OffsetDateTime> expiresCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
-            verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
-            // expiresAt은 현재보다 미래여야 함 (expires_in 86400 - 300 = 86100초 후)
-            assertThat(expiresCaptor.getValue()).isAfter(OffsetDateTime.now().plusSeconds(86000));
+            verify(tossRestTemplate).exchange(
+                    anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class));
         }
 
         @Test
         @DisplayName("REST 오류 시 Account.InvalidBrokerKeyException throw")
         void getToken_restClientException_throwsInvalidBrokerKeyException() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
-                    .thenReturn(Optional.empty());
             when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
                     .thenThrow(HttpClientErrorException.create(
                             HttpStatus.UNAUTHORIZED, "Unauthorized",
@@ -129,16 +101,13 @@ class TossAuthApiTest {
         @Test
         @DisplayName("캐시 미스 후 double-check 히트 시 tossRestTemplate 미호출")
         void getToken_doubleCheckHit_noApiCall() {
-            // 1차 miss, 2차 hit (다른 스레드가 이미 발급한 상황 시뮬레이션)
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any()))
-                    .thenReturn(Optional.empty())
-                    .thenReturn(Optional.of("concurrent-token"));
+            doReturn("concurrent-token").when(tokenCoordinator)
+                    .getAccountToken(eq(ACCOUNT_ID), any());
 
             String result = api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET);
 
             assertThat(result).isEqualTo("concurrent-token");
             verifyNoInteractions(tossRestTemplate);
-            verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
         }
     }
 
@@ -178,7 +147,7 @@ class TossAuthApiTest {
     @DisplayName("계좌 401 복구를 rejected token과 함께 분산 coordinator에 위임")
     void recoverToken_delegatesToDistributedCoordinator() {
         when(tokenCoordinator.recoverAccountToken(
-                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any(), any()))
+                eq(ACCOUNT_ID), eq("rejected-token"), any()))
                 .thenReturn("coordinated-token");
 
         String recovered = api.recoverToken(
@@ -186,7 +155,7 @@ class TossAuthApiTest {
 
         assertThat(recovered).isEqualTo("coordinated-token");
         verify(tokenCoordinator).recoverAccountToken(
-                eq(ACCOUNT_ID), eq("rejected-token"), any(), any(), any(), any());
+                eq(ACCOUNT_ID), eq("rejected-token"), any());
         verifyNoInteractions(tossRestTemplate);
     }
 
@@ -211,8 +180,6 @@ class TossAuthApiTest {
             String result = api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null);
 
             assertThat(result).isEqualTo("42");
-            // verifyAccount는 캐시 저장 없음 (accountId 미보유)
-            verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
         }
 
         @Test

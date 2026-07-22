@@ -2,7 +2,6 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.port.out.BrokerTokenCachePort;
 import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +14,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,7 +25,6 @@ import java.util.UUID;
 class TossAuthApi implements BrokerConnectionTestPort {
 
     private final RestTemplate tossRestTemplate;
-    private final BrokerTokenCachePort brokerTokenCachePort;
     private final TossDistributedTokenCoordinator tokenCoordinator;
     @Value("${toss.base-url}")
     private final String tossBaseUrl;
@@ -42,36 +38,21 @@ class TossAuthApi implements BrokerConnectionTestPort {
     public String getToken(UUID accountId, String clientId, String clientSecret) {
         return tokenCoordinator.getAccountToken(
                 accountId,
-                () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
-                () -> issueAccountToken(accountId, clientId, clientSecret),
-                issued -> brokerTokenCachePort.saveToken(
-                        accountId, issued.accessToken(), issued.expiresAt()));
+                () -> issueAccountToken(accountId, clientId, clientSecret));
     }
 
-    private TossDistributedTokenCoordinator.IssuedAccountToken issueAccountToken(
+    private TossTokenStore.TokenValue issueAccountToken(
             UUID accountId, String clientId, String clientSecret) {
         log.info("Toss 토큰 신규 발급: accountId={}", accountId);
         TokenResponse response = issueOAuthToken(clientId, clientSecret);
-        // 만료 5분 전 갱신 트리거를 위해 expiresIn에서 300초 차감
-        OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(response.expiresIn() - 300);
-        return new TossDistributedTokenCoordinator.IssuedAccountToken(response.accessToken(), expiresAt);
-    }
-
-    // 만료 5분 전부터 무효 처리 — 경계값 만료 오류 방지
-    private OffsetDateTime threshold() {
-        return OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5);
+        return new TossTokenStore.TokenValue(response.accessToken(), response.expiresIn());
     }
 
     public String recoverToken(UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
         return tokenCoordinator.recoverAccountToken(
                 accountId,
                 rejectedAccessToken,
-                () -> brokerTokenCachePort.findValidToken(accountId, threshold()),
-                rejected -> brokerTokenCachePort.invalidateToken(
-                        accountId, rejected, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1)),
-                () -> issueAccountToken(accountId, clientId, clientSecret),
-                issued -> brokerTokenCachePort.saveToken(
-                        accountId, issued.accessToken(), issued.expiresAt()));
+                () -> issueAccountToken(accountId, clientId, clientSecret));
     }
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 ─────────────────
@@ -107,9 +88,9 @@ class TossAuthApi implements BrokerConnectionTestPort {
 
     // ── private helpers ────────────────────────────────────────────────────────
 
-    private TossDistributedTokenCoordinator.IssuedAdminToken issueAdminToken() {
+    private TossTokenStore.TokenValue issueAdminToken() {
         TokenResponse response = issueOAuthToken(adminClientId, adminClientSecret);
-        return new TossDistributedTokenCoordinator.IssuedAdminToken(
+        return new TossTokenStore.TokenValue(
                 response.accessToken(), response.expiresIn());
     }
 

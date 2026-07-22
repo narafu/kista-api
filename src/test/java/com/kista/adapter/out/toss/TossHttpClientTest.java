@@ -2,7 +2,6 @@ package com.kista.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.toss.TossApiException;
-import com.kista.domain.port.out.BrokerTokenCachePort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,16 +19,11 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.OffsetDateTime;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,19 +69,10 @@ class TossHttpClientTest {
     @SuppressWarnings("unchecked")
     void staggeredAccountRequests_reuseRecentlyIssuedTokenGeneration() throws InterruptedException {
         CountDownLatch token1Stored = new CountDownLatch(1);
-        InMemoryTokenCache tokenCache = new InMemoryTokenCache() {
-            @Override
-            public void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
-                super.saveToken(accountId, accessToken, expiresAt);
-                if (accessToken.equals("token-1")) {
-                    token1Stored.countDown();
-                }
-            }
-        };
-        tokenCache.saveToken(ACCOUNT.id(), "token-0", OffsetDateTime.now().plusHours(1));
-        TossDistributedTokenCoordinator tokenCoordinator = mockAccountCoordinator();
+        TossDistributedTokenCoordinator tokenCoordinator =
+                mockAccountCoordinator("token-0", token1Stored);
         TossAuthApi realAuthApi = new TossAuthApi(
-                tossRestTemplate, tokenCache, tokenCoordinator,
+                tossRestTemplate, tokenCoordinator,
                 "http://toss.test", "admin-id", "admin-secret");
         TossHttpClient client = newClient(realAuthApi);
         AtomicInteger oauthFetchCount = new AtomicInteger();
@@ -145,13 +130,14 @@ class TossHttpClientTest {
     @Test
     @DisplayName("늦게 시작한 관리자 요청의 token-1 401은 최근 발급 세대를 재사용")
     void staggeredAdminRequests_reuseRecentlyIssuedTokenGeneration() throws InterruptedException {
-        TossDistributedTokenCoordinator tokenCoordinator = mockAdminCoordinator("admin-token-0");
+        CountDownLatch token1Issued = new CountDownLatch(1);
+        TossDistributedTokenCoordinator tokenCoordinator =
+                mockAdminCoordinator("admin-token-0", token1Issued);
         TossAuthApi realAuthApi = new TossAuthApi(
-                tossRestTemplate, new InMemoryTokenCache(), tokenCoordinator,
+                tossRestTemplate, tokenCoordinator,
                 "http://toss.test", "admin-id", "admin-secret");
         TossHttpClient client = newClient(realAuthApi);
         AtomicInteger oauthFetchCount = new AtomicInteger();
-        CountDownLatch token1Issued = new CountDownLatch(1);
         CountDownLatch requestCRejectedToken1 = new CountDownLatch(1);
         AtomicInteger requestCToken1Calls = new AtomicInteger();
 
@@ -159,9 +145,6 @@ class TossHttpClientTest {
                 any(HttpEntity.class), eq(TossAuthApi.TokenResponse.class)))
                 .thenAnswer(invocation -> {
                     int generation = oauthFetchCount.incrementAndGet();
-                    if (generation == 1) {
-                        token1Issued.countDown();
-                    }
                     return ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-" + generation, 86400L));
                 });
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
@@ -327,45 +310,33 @@ class TossHttpClientTest {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private TossDistributedTokenCoordinator mockAccountCoordinator() {
+    private TossDistributedTokenCoordinator mockAccountCoordinator(
+            String initialToken, CountDownLatch tokenStored) {
         TossDistributedTokenCoordinator coordinator = org.mockito.Mockito.mock(
                 TossDistributedTokenCoordinator.class);
-        when(coordinator.getAccountToken(any(), any(), any(), any())).thenAnswer(invocation -> {
-            Supplier<Optional<String>> currentToken = invocation.getArgument(1);
-            TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(2);
-            TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(3);
-            Optional<String> current = currentToken.get();
-            if (current.isPresent()) {
-                return current.get();
-            }
-            TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
-            persister.persist(issued);
-            return issued.accessToken();
-        });
-        when(coordinator.recoverAccountToken(any(), anyString(), any(), any(), any(), any()))
+        AtomicReference<String> currentToken = new AtomicReference<>(initialToken);
+        when(coordinator.getAccountToken(any(), any())).thenAnswer(invocation -> currentToken.get());
+        when(coordinator.recoverAccountToken(any(), anyString(), any()))
                 .thenAnswer(invocation -> {
                     String rejectedToken = invocation.getArgument(1);
-                    Supplier<Optional<String>> currentToken = invocation.getArgument(2);
-                    Consumer<String> invalidator = invocation.getArgument(3);
-                    TossDistributedTokenCoordinator.AccountTokenIssuer issuer = invocation.getArgument(4);
-                    TossDistributedTokenCoordinator.AccountTokenPersister persister = invocation.getArgument(5);
-                    Optional<String> current = currentToken.get();
-                    if (current.isPresent() && !current.get().equals(rejectedToken)) {
-                        return current.get();
+                    String current = currentToken.get();
+                    if (!current.equals(rejectedToken)) {
+                        return current;
                     }
+                    TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(2);
                     if ("token-1".equals(rejectedToken)) {
                         return rejectedToken;
                     }
-                    invalidator.accept(rejectedToken);
-                    TossDistributedTokenCoordinator.IssuedAccountToken issued = issuer.issue();
-                    persister.persist(issued);
-                    return issued.accessToken();
+                    String issued = issuer.issue().accessToken();
+                    currentToken.set(issued);
+                    tokenStored.countDown();
+                    return issued;
                 });
         return coordinator;
     }
 
-    private TossDistributedTokenCoordinator mockAdminCoordinator(String initialToken) {
+    private TossDistributedTokenCoordinator mockAdminCoordinator(
+            String initialToken, CountDownLatch tokenStored) {
         TossDistributedTokenCoordinator coordinator = org.mockito.Mockito.mock(
                 TossDistributedTokenCoordinator.class);
         AtomicReference<String> currentToken = new AtomicReference<>(initialToken);
@@ -376,44 +347,13 @@ class TossHttpClientTest {
             if (!current.equals(rejectedToken) || "admin-token-1".equals(rejectedToken)) {
                 return current;
             }
-            TossDistributedTokenCoordinator.AdminTokenIssuer issuer = invocation.getArgument(1);
+            TossDistributedTokenCoordinator.TokenIssuer issuer = invocation.getArgument(1);
             String issued = issuer.issue().accessToken();
             currentToken.set(issued);
+            tokenStored.countDown();
             return issued;
         });
         return coordinator;
     }
 
-    private static class InMemoryTokenCache implements BrokerTokenCachePort {
-
-        private final ConcurrentHashMap<UUID, String> tokens = new ConcurrentHashMap<>();
-        private final ConcurrentHashMap<UUID, OffsetDateTime> expiries = new ConcurrentHashMap<>();
-
-        @Override
-        public Optional<String> findValidToken(UUID accountId, OffsetDateTime threshold) {
-            String token = tokens.get(accountId);
-            OffsetDateTime expiry = expiries.get(accountId);
-            if (token == null || expiry == null || !expiry.isAfter(threshold)) {
-                return Optional.empty();
-            }
-            return Optional.of(token);
-        }
-
-        @Override
-        public void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
-            tokens.put(accountId, accessToken);
-            expiries.put(accountId, expiresAt);
-        }
-
-        @Override
-        public void invalidateToken(UUID accountId, String rejectedAccessToken, OffsetDateTime invalidatedAt) {
-            tokens.computeIfPresent(accountId, (id, token) -> {
-                if (token.equals(rejectedAccessToken)) {
-                    expiries.put(id, invalidatedAt);
-                    return INVALIDATED_TOKEN;
-                }
-                return token;
-            });
-        }
-    }
 }

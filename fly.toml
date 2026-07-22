@@ -21,7 +21,7 @@ protocol = "http"
 timeout = "10s"
 
 [deployment]
-strategy = "immediate"          # Redis lease → PostgreSQL advisory lock 1회성 protocol cutover; 검증 후 rolling 복원
+strategy = "immediate"          # pre-branch token protocol → Redis fencing 1회성 cutover; 검증 후 rolling 복원
 
 # Fly.io 2GB 실험: JVM heap 여유와 GC 압박 완화 목적
 [[vm]]

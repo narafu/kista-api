@@ -15,13 +15,13 @@
 ### Fly.io 배포 방식
 - `.github/workflows/fly-deploy.yml` — `main` push 시 GitHub Actions가 compileJava + ArchUnit 검증 후 `fly deploy` 자동 실행
 - 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
-- `fly.toml`의 `strategy = "immediate"`는 Redis lease binary와 PostgreSQL advisory-lock binary가 겹치지 않게 하는 **1회성 protocol cutover** 설정이다. 이 배포에는 짧은 downtime과 health-check 없는 동시 교체가 허용된다. 실제 배포는 자동 workflow가 수행하며 이 변경 작업에서 수동 배포하지 않는다.
+- `fly.toml`의 `strategy = "immediate"`는 현재 production의 pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 **1회성 protocol cutover** 설정이다. 이 배포에는 짧은 downtime과 health-check 없는 동시 교체가 허용된다. 실제 배포는 자동 workflow가 수행하며 이 변경 작업에서 수동 배포하지 않는다.
 - 첫 production 배포 성공 후 `fly status --app kista-api`와 Toss 계좌/관리자 토큰 발급을 확인한다. 이어지는 별도 follow-up에서 `fly.toml`을 정확히 `strategy = "rolling"`으로 되돌려 커밋·push하고 자동 배포 성공까지 확인한다. 최초 cutover와 rolling 복원을 같은 배포에 섞지 않는다.
 
 ### Fly.io 다중 인스턴스 Toss 토큰 조정
-- rolling 배포로 구·신 인스턴스가 겹칠 수 있어 Toss 계좌·관리자 OAuth 발급은 모든 인스턴스가 공유하는 PostgreSQL session advisory lock으로 단일화한다. JVM-local lock이나 TTL 기반 lease에 의존하지 않는다.
-- 각 lock 시도는 main JPA pool과 분리된 2-connection `HikariPool-TossAdvisoryLock`에서 전용 JDBC connection을 빌린다. pool borrow/validation과 SQL query timeout은 각각 1초다. 획득한 session은 OAuth·fingerprint·canonical 저장이 끝난 뒤 같은 connection에서 unlock하고 반환한다. coordinator의 `NOT_SUPPORTED` 경계가 caller transaction을 suspend한다. 임계구역이 예상 시간을 넘겨도 lock owner는 바뀌지 않으며 프로세스/connection 장애 시 PostgreSQL이 자동 해제한다. lock 획득·해제 실패는 로컬 발급으로 fallback하지 않고 503으로 fail-closed 한다.
-- Redis에는 최근 발급 SHA-256 fingerprint(2초)와 관리자 access token(OAuth 실제 만료보다 5분 짧은 TTL)만 저장한다. 계좌 access token canonical 저장소는 PostgreSQL `broker_tokens`을 유지한다. Redis 연결·명령 실패도 fail-closed이며 운영 인스턴스는 모두 같은 Redis와 PostgreSQL을 보아야 한다.
+- 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
+- scope별 60초 Redis owner lease와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
+- Redis에는 canonical raw token 외에 영구 generation counter와 최근 SHA-256 fingerprint(2초)가 존재한다. raw bearer token을 로그 또는 fingerprint key에 기록하지 않는다. Redis 연결·script 실패는 로컬/DB fallback 없이 503으로 fail-closed 하며 운영 인스턴스는 모두 같은 Redis를 보아야 한다.
 
 ### Docker 빌드 OOM
 - `gradle.properties`는 Dockerfile에 복사되지 않음 — JVM이 컨테이너 메모리 ~25%를 힙으로 자동 할당해 BuildKit OOM 유발
