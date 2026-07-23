@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -100,6 +101,43 @@ class StrategyOrderPlanBuilderTest {
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort, never()).getPrevClose(any(), any());
+    }
+
+    @Test
+    void build_usesPrevCloseCache_insteadOfLiveCall_whenTickerPresent() {
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
+        when(balanceLoader.tryLoadBalance(strategy))
+                .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
+        when(orderStrategy.requiresPrevClose()).thenReturn(true);
+        when(privacyTradePort.findBaseIfPrivacy(strategy, today)).thenReturn(null);
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of());
+        when(orderComputer.compute(balance, strategy, new BigDecimal("22.00"), today, cycle, null, "label", null))
+                .thenReturn(Optional.of(plan));
+        Map<Ticker, BigDecimal> prevCloseCache = Map.of(Ticker.SOXL, new BigDecimal("22.00"));
+
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", prevCloseCache);
+
+        assertThat(result.isSkip()).isFalse();
+        assertThat(result.plan()).isSameAs(plan);
+        verify(pricePort, never()).getPrevClose(any(), any());
+    }
+
+    @Test
+    void build_fallsBackToLiveCall_whenTickerMissingFromPrevCloseCache() {
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
+        when(balanceLoader.tryLoadBalance(strategy))
+                .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
+        when(orderStrategy.requiresPrevClose()).thenReturn(true);
+        when(pricePort.getPrevClose(Ticker.SOXL, account)).thenReturn(new BigDecimal("21.00"));
+        when(privacyTradePort.findBaseIfPrivacy(strategy, today)).thenReturn(null);
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of());
+        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
+                .thenReturn(Optional.of(plan));
+
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+
+        assertThat(result.isSkip()).isFalse();
+        verify(pricePort).getPrevClose(Ticker.SOXL, account);
     }
 
     @Test

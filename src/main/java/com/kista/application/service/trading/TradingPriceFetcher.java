@@ -37,6 +37,13 @@ class TradingPriceFetcher {
                 (t, acc) -> registry.require(acc, BrokerPricePort.class).getPriceSnapshot(t, acc));
     }
 
+    // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
+    Map<Ticker, BigDecimal> fetchPrevCloses(List<Ticker> tickers, Account account) {
+        return fetchWithFallback(tickers, account, "전일종가",
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrevCloses(t, acc),
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrevClose(t, acc));
+    }
+
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
     private <T> Map<Ticker, T> fetchWithFallback(List<Ticker> tickers, Account account, String label,
                                                   BiFunction<List<Ticker>, Account, Map<Ticker, T>> bulkFetch,

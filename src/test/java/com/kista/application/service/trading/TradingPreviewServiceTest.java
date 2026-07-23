@@ -44,6 +44,7 @@ class TradingPreviewServiceTest {
     @Mock OrderPort orderPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock TradingBuyCompetitionSimulator competitionSimulator;
+    @Mock TradingPriceFetcher priceFetcher;
 
     TradingPreviewService service;
 
@@ -58,7 +59,8 @@ class TradingPreviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, competitionSimulator);
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, competitionSimulator, priceFetcher);
+        lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
@@ -165,7 +167,7 @@ class TradingPreviewServiceTest {
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
-        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
@@ -185,11 +187,76 @@ class TradingPreviewServiceTest {
     }
 
     @Test
+    void previewBatch_fetchesPrevClosesOnceInBulk_andPassesCacheToPlanBuilder() {
+        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
+        Map<Ticker, BigDecimal> prevCloseCache = Map.of(Ticker.SOXL, new BigDecimal("22.00"));
+        when(priceFetcher.fetchPrevCloses(List.of(Ticker.SOXL), ACCOUNT)).thenReturn(prevCloseCache);
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), eq(prevCloseCache)))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+
+        service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        verify(priceFetcher, times(1)).fetchPrevCloses(List.of(Ticker.SOXL), ACCOUNT);
+        verify(planBuilder).build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), eq(prevCloseCache));
+    }
+
+    @Test
     void previewBatch_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), otherId)).thenThrow(new SecurityException());
 
         assertThatThrownBy(() -> service.previewBatch(ACCOUNT.id(), otherId))
                 .isInstanceOf(SecurityException.class);
+    }
+
+    // 회귀 테스트 — 리팩토링 전에는 대상 전략 N개를 순회할 때마다 TradingBuyCompetitionSimulator가
+    // 계좌 내 다른 전략 전체를 처음부터 다시 계산해 planBuilder.build()가 O(N²)로 호출됐다
+    // (전략 3개 기준 최대 9회). 전략별 계산을 1회로 캐싱한 뒤에는 전략당 정확히 1회씩, 총 N회만 호출돼야 한다.
+    @Test
+    void previewBatch_callsPlanBuilderBuildOncePerStrategy_evenWithCrossCompetition() {
+        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy s3 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        List<Strategy> strategies = List.of(s1, s2, s3);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
+
+        Map<UUID, StrategyCycle> cycles = new java.util.HashMap<>();
+        for (Strategy s : strategies) {
+            StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
+                    new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+            cycles.put(s.id(), cycle);
+            when(strategyCyclePort.findLatestByStrategyId(s.id())).thenReturn(Optional.of(cycle));
+
+            Order buy = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LOC,
+                    Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
+            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buy));
+            when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
+                    .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        }
+
+        PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
+        lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
+        com.kista.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.domain.strategy.CycleOrderStrategies.class);
+        com.kista.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.domain.strategy.CycleOrderStrategy.class);
+        lenient().when(cycleOrderStrategies.of(any(Strategy.Type.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
+        lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
+
+        TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
+                strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+        TradingPreviewService realService = new TradingPreviewService(
+                accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, priceFetcher);
+
+        realService.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        for (Strategy s : strategies) {
+            verify(planBuilder, times(1)).build(eq(s), eq(ACCOUNT), eq(cycles.get(s.id())), any(), anyString(), any());
+        }
     }
 }

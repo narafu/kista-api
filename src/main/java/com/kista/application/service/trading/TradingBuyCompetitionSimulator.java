@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 // 바로주문 미리보기에서 계좌 내 활성 전략 전체를 야간 배치와 동일한 우선순위로 시뮬레이션해
@@ -42,9 +43,23 @@ class TradingBuyCompetitionSimulator {
     private record RankedCandidate(UUID strategyId, UUID cycleId, Strategy.Type type,
                                     Strategy.Ticker ticker, BigDecimal requiredBuyUsd, boolean isCurrent) {}
 
+    // 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 전략별 cycle·당일 주문·매매 계획을
+    // 미리 계산해 재사용한다. 대상 전략 N개를 순회할 때마다 경쟁 시뮬레이션을 처음부터 다시 계산하던
+    // O(N²) KIS 시세 조회·DB 조회를 O(N)으로 줄인다. planResultsByStrategyId에 없는 전략은 사전 계산이
+    // 실패한 것으로 간주해 uncertain 처리한다.
+    record BatchContext(List<Strategy> strategies, Map<UUID, StrategyCycle> cyclesByStrategyId,
+                         Map<UUID, List<Order>> todayOrdersByStrategyId,
+                         Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId) {}
+
     BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
                                     List<Order> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd) {
+        return simulate(currentStrategy, account, currentCycle, currentBuyOrders, today, otherStrategiesPlannedBuyUsd, null);
+    }
+
+    BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
+                                    List<Order> currentBuyOrders, LocalDate today,
+                                    BigDecimal otherStrategiesPlannedBuyUsd, BatchContext context) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);
 
         BigDecimal liveDeposit;
@@ -66,22 +81,32 @@ class TradingBuyCompetitionSimulator {
         ranked.add(new RankedCandidate(currentStrategy.id(), currentCycle.id(), currentStrategy.type(),
                 currentStrategy.ticker(), requiredForThis, true));
 
-        for (Strategy other : strategyPort.findByAccountId(account.id())) {
+        List<Strategy> candidates = context != null ? context.strategies() : strategyPort.findByAccountId(account.id());
+        for (Strategy other : candidates) {
             if (other.id().equals(currentStrategy.id()) || other.status() != Strategy.Status.ACTIVE) {
                 continue;
             }
-            StrategyCycle otherCycle = strategyCyclePort.findLatestByStrategyId(other.id()).orElse(null);
+            StrategyCycle otherCycle = context != null
+                    ? context.cyclesByStrategyId().get(other.id())
+                    : strategyCyclePort.findLatestByStrategyId(other.id()).orElse(null);
             if (otherCycle == null) {
                 continue; // 사이클 없는 전략은 경쟁 대상이 될 수 없음
             }
-            boolean alreadyOrdered = !orderPort.findPlannedOrPlacedByCycleAndDate(otherCycle.id(), today).isEmpty();
+            List<Order> otherTodayOrders = context != null
+                    ? context.todayOrdersByStrategyId().getOrDefault(other.id(), List.of())
+                    : orderPort.findPlannedOrPlacedByCycleAndDate(otherCycle.id(), today);
+            boolean alreadyOrdered = !otherTodayOrders.isEmpty();
             if (alreadyOrdered) {
                 continue; // PLANNED는 otherStrategiesPlannedBuyUsd에, PLACED는 라이브 예수금에 이미 반영됨
             }
 
             try {
-                StrategyOrderPlanBuilder.PlanResult result =
-                        planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
+                StrategyOrderPlanBuilder.PlanResult result = context != null
+                        ? context.planResultsByStrategyId().get(other.id())
+                        : planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
+                if (result == null) {
+                    throw new IllegalStateException("경쟁 전략 매매 계획 사전 계산 실패(캐시 없음): strategyId=" + other.id());
+                }
                 if (result.isSkip()) {
                     // NO_CYCLE_HISTORY/NO_PRIVACY_BASE 모두 야간 배치의 실제 동작을 확정할 수 없어
                     // 예외와 동일하게 0으로 취급하며 불확실 목록에 기록한다 (설계 스펙 준수)

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 // 전략 1건의 오늘자 주문 계획 계산 오케스트레이션 — 잔고 로드 → prevClose(필요 시) → privacyBase(필요 시) → compute()
 // TradingPreviewService(대상 전략 1건)와 TradingBuyCompetitionSimulator(경쟁 전략 N건 가상 계산)가 공유
@@ -39,6 +40,14 @@ class StrategyOrderPlanBuilder {
     }
 
     PlanResult build(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today, String label) {
+        return build(strategy, account, currentCycle, today, label, null);
+    }
+
+    // prevCloseCache: 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 종목별 전일종가를
+    // 1회 일괄 조회(getPrevCloses)해 넘기면 전략마다 개별 KIS 호출을 생략한다. 캐시에 없는 종목은
+    // 기존과 동일하게 단건 라이브 조회로 폴백한다.
+    PlanResult build(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today, String label,
+                      Map<Strategy.Ticker, BigDecimal> prevCloseCache) {
         // 잔고 이력 없으면 계산 자체가 불가능한 skip
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
         if (load.isSkip()) {
@@ -49,8 +58,10 @@ class StrategyOrderPlanBuilder {
         CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy);
         BigDecimal prevClosePrice = null;
         if (orderStrategy.requiresPrevClose()) {
-            prevClosePrice = BrokerCallGuard.wrap("전일종가 조회",
-                    () -> registry.require(account, BrokerPricePort.class).getPrevClose(strategy.ticker(), account));
+            prevClosePrice = prevCloseCache != null && prevCloseCache.containsKey(strategy.ticker())
+                    ? prevCloseCache.get(strategy.ticker())
+                    : BrokerCallGuard.wrap("전일종가 조회",
+                            () -> registry.require(account, BrokerPricePort.class).getPrevClose(strategy.ticker(), account));
         }
         PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 
