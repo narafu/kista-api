@@ -2,6 +2,8 @@ package com.kista.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.domain.model.account.Account.Broker;
+import com.kista.domain.model.settings.BenchmarkFieldSettings;
+import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.settings.StrategyFieldSettings;
@@ -9,6 +11,7 @@ import com.kista.domain.model.strategy.Strategy.Type;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 // 공개 및 관리자 API가 공유하는 타입 기반 런타임 설정 응답
@@ -19,7 +22,9 @@ public record RuntimeSettingsResponse(
         @Schema(description = "증권사별 공개 설정")
         Map<Broker, BrokerResponse> brokers,
         @Schema(description = "전략 타입별 생성 정책 설정")
-        Map<Type, StrategyResponse> strategies
+        Map<Type, StrategyResponse> strategies,
+        @Schema(description = "ETF 벤치마크 비교 자산 설정")
+        BenchmarkResponse benchmarks
 ) {
     public static RuntimeSettingsResponse from(RuntimeSettings settings) {
         // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다.
@@ -28,7 +33,7 @@ public record RuntimeSettingsResponse(
         Map<Type, StrategyResponse> strategies = new EnumMap<>(Type.class);
         settings.strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
         return new RuntimeSettingsResponse(new AuthResponse(settings.approvalRequired()),
-                Map.copyOf(brokers), Map.copyOf(strategies));
+                Map.copyOf(brokers), Map.copyOf(strategies), BenchmarkResponse.from(settings.benchmarks()));
     }
 
     public record AuthResponse(
@@ -67,5 +72,25 @@ public record RuntimeSettingsResponse(
             @Schema(description = "VR 롤오버 주기 생성 설정 (주 단위)")
             StrategyFieldSettings<?> intervalWeeks
     ) { // 전략별 생성 필드 공개 설정 — 적용 안 되는 필드는 null 대신 생략
+    }
+
+    public record BenchmarkResponse(
+            @Schema(description = "ETF 벤치마크 비교 자산 설정")
+            BenchmarkFieldResponse<String> etf
+    ) { // 벤치마크 비교 자산 공개 설정
+        static BenchmarkResponse from(BenchmarkSettings settings) {
+            return new BenchmarkResponse(BenchmarkFieldResponse.from(settings.etf()));
+        }
+    }
+
+    public record BenchmarkFieldResponse<T>(
+            @Schema(description = "허용 값 목록")
+            List<T> allowedValues,
+            @Schema(description = "비교 기본값")
+            T defaultValue
+    ) { // 개별 벤치마크 필드 공개 설정
+        static <T> BenchmarkFieldResponse<T> from(BenchmarkFieldSettings<T> settings) {
+            return new BenchmarkFieldResponse<>(settings.allowedValues(), settings.defaultValue());
+        }
     }
 }

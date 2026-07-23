@@ -14,11 +14,20 @@ import java.util.Objects;
 public record RuntimeSettings(
         boolean approvalRequired, // 신규 가입 승인 필요 여부
         Map<Broker, BrokerSettings> brokers, // 증권사별 신규 등록 설정
-        Map<Type, StrategyCreationSettings> strategies // 전략별 신규 생성 설정
+        Map<Type, StrategyCreationSettings> strategies, // 전략별 신규 생성 설정
+        BenchmarkSettings benchmarks // ETF 벤치마크 비교 자산 설정
 ) {
     public RuntimeSettings {
         brokers = immutableEnumMap(Broker.class, brokers, "broker");
         strategies = immutableEnumMap(Type.class, strategies, "strategy");
+        // benchmarks 도입 이전에 저장된 행에는 이 필드가 없으므로 역직렬화 시 기본값으로 보충한다.
+        if (benchmarks == null) benchmarks = BenchmarkSettings.defaults();
+    }
+
+    // benchmarks 도입 이전 호출부와의 호환을 위한 생성자 — 기본 벤치마크 설정을 적용한다.
+    public RuntimeSettings(boolean approvalRequired, Map<Broker, BrokerSettings> brokers,
+            Map<Type, StrategyCreationSettings> strategies) {
+        this(approvalRequired, brokers, strategies, null);
     }
 
     public static RuntimeSettings defaults() {
