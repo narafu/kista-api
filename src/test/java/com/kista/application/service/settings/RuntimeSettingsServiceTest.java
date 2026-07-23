@@ -1,5 +1,7 @@
 package com.kista.application.service.settings;
 
+import com.kista.domain.model.settings.BenchmarkFieldSettings;
+import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.UserUseCase;
@@ -51,7 +53,7 @@ class RuntimeSettingsServiceTest {
         when(settingsPort.save(updated)).thenReturn(updated);
         when(userPort.findAllByStatus(User.UserStatus.PENDING)).thenReturn(List.of(pending));
 
-        assertThat(service.updateSettings(adminId, updated)).isEqualTo(updated);
+        assertThat(service.updateSettings(adminId, updated, true)).isEqualTo(updated);
 
         verify(settingsPort, times(1)).save(updated);
         verify(userPort).findAllByStatus(User.UserStatus.PENDING);
@@ -62,6 +64,26 @@ class RuntimeSettingsServiceTest {
     }
 
     @Test
+    void updateSettings_whenBenchmarksOmitted_keepsPreviousBenchmarksInsteadOfDefaults() {
+        UUID adminId = UUID.randomUUID();
+        BenchmarkSettings customBenchmarks = new BenchmarkSettings(
+                new BenchmarkFieldSettings<>(List.of("VOO", "TQQQ"), "VOO"));
+        RuntimeSettings previous = new RuntimeSettings(true, RuntimeSettings.defaults().brokers(),
+                RuntimeSettings.defaults().strategies(), customBenchmarks);
+        // 요청 DTO에 benchmarks가 없었던 상황을 재현 — toDomain()이 이미 null을 defaults()로 치환한 상태
+        RuntimeSettings requested = new RuntimeSettings(false, previous.brokers(), previous.strategies());
+        RuntimeSettings expectedSaved = new RuntimeSettings(false, previous.brokers(), previous.strategies(), customBenchmarks);
+        when(settingsPort.loadForUpdate()).thenReturn(previous);
+        when(settingsPort.save(expectedSaved)).thenReturn(expectedSaved);
+
+        RuntimeSettings saved = service.updateSettings(adminId, requested, false);
+
+        assertThat(saved.benchmarks()).isEqualTo(customBenchmarks);
+        verify(settingsPort).save(expectedSaved);
+        verify(settingsPort, never()).save(requested);
+    }
+
+    @Test
     void updateSettings_whenApprovalRemainsOff_doesNotApproveUsersAgain() {
         UUID adminId = UUID.randomUUID();
         RuntimeSettings defaults = RuntimeSettings.defaults();
@@ -69,7 +91,7 @@ class RuntimeSettingsServiceTest {
         when(settingsPort.loadForUpdate()).thenReturn(disabled);
         when(settingsPort.save(disabled)).thenReturn(disabled);
 
-        service.updateSettings(adminId, disabled);
+        service.updateSettings(adminId, disabled, true);
 
         verifyNoInteractions(userPort, userUseCase);
     }

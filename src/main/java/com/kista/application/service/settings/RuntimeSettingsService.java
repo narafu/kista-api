@@ -35,11 +35,18 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
     }
 
     @Override
-    public RuntimeSettings updateSettings(UUID adminId, RuntimeSettings settings) {
+    public RuntimeSettings updateSettings(UUID adminId, RuntimeSettings settings, boolean benchmarksProvided) {
         RuntimeSettings previous = settingsPort.loadForUpdate();
 
+        // benchmarks는 생략 시 기존 값 유지가 문서화된 예외 규칙 — auth/brokers/strategies는 여전히 전체 교체
+        // settings.benchmarks()는 toDomain() 변환 과정에서 이미 기본값으로 치환되어 null 여부로 생략을 판별할 수 없으므로
+        // 컨트롤러가 전달한 benchmarksProvided(요청 DTO 단계의 null 여부)를 기준으로 판단한다.
+        RuntimeSettings effective = benchmarksProvided
+                ? settings
+                : new RuntimeSettings(settings.approvalRequired(), settings.brokers(), settings.strategies(), previous.benchmarks());
+
         // 검증 완료된 전체 설정을 단일 저장 호출로 반영한다.
-        RuntimeSettings saved = settingsPort.save(settings);
+        RuntimeSettings saved = settingsPort.save(effective);
 
         // 승인 설정을 끄는 순간의 PENDING 사용자만 기존 승인 흐름으로 활성화한다.
         if (previous.approvalRequired() && !saved.approvalRequired()) {

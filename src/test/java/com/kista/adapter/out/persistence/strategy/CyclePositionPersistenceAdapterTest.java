@@ -279,4 +279,72 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).extracting(CyclePosition::usdDeposit)
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
     }
+
+    // ===== findByCycleIdsAndRange — equity curve type 필터가 DB 조회 자체를 cycleIds로 좁히는지 검증 =====
+
+    @Test
+    void findByCycleIdsAndRange_returnsEmpty_whenCycleIdsIsEmpty() {
+        List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
+                java.util.Set.of(), Instant.EPOCH, Instant.now());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findByCycleIdsAndRange_onlyIncludesRequestedCycleIds() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+        UUID includedCycleId = insertCycleChain(accountId, false, false);
+        insertPosition(includedCycleId, new BigDecimal("111.00"), base, false);
+
+        UUID excludedCycleId = insertCycleChain(accountId, false, false);
+        insertPosition(excludedCycleId, new BigDecimal("999.00"), base, false);
+
+        List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
+                java.util.Set.of(includedCycleId), base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
+
+        assertThat(result).extracting(CyclePosition::usdDeposit)
+                .containsExactly(new BigDecimal("111.00"));
+    }
+
+    @Test
+    void findByCycleIdsAndRange_excludesSoftDeletedAtCycleLevel() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+
+        UUID activeCycleId = insertCycleChain(accountId, false, false);
+        insertPosition(activeCycleId, new BigDecimal("1.00"), base, false); // 유일하게 살아있는 행
+
+        insertPosition(activeCycleId, new BigDecimal("2.00"), base, true); // cp 자체 삭제
+
+        UUID deletedCycleId = insertCycleChain(accountId, false, true); // sc 삭제
+        insertPosition(deletedCycleId, new BigDecimal("3.00"), base, false);
+
+        List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
+                java.util.Set.of(activeCycleId, deletedCycleId),
+                base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
+
+        assertThat(result).extracting(CyclePosition::usdDeposit)
+                .containsExactly(new BigDecimal("1.00"));
+    }
+
+    @Test
+    void findByCycleIdsAndRange_ordersAscendingAndRespectsRangeBoundaries() {
+        Instant from = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(3, ChronoUnit.HOURS);
+        Instant to = from.plus(3, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+
+        // 등록 순서를 뒤섞어 createdAt ASC 정렬이 insert 순서가 아님을 검증
+        insertPosition(cycleId, new BigDecimal("30.00"), from.plus(2, ChronoUnit.HOURS), false);
+        insertPosition(cycleId, new BigDecimal("10.00"), from, false); // 하한 경계 포함 (>= from)
+        insertPosition(cycleId, new BigDecimal("20.00"), from.plus(1, ChronoUnit.HOURS), false);
+
+        // 경계 밖 — 제외되어야 함
+        insertPosition(cycleId, new BigDecimal("9.00"), from.minus(1, ChronoUnit.MILLIS), false); // from 직전
+        insertPosition(cycleId, new BigDecimal("40.00"), to, false); // 상한 경계는 제외 (< to)
+
+        List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
+                java.util.Set.of(cycleId), from, to);
+
+        assertThat(result).extracting(CyclePosition::usdDeposit)
+                .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
+    }
 }

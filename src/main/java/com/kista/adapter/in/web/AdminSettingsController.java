@@ -38,7 +38,9 @@ public class AdminSettingsController {
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid AdminSettingsRequest request) {
         // 요청 전체를 도메인 설정으로 검증한 뒤 단일 갱신 유스케이스를 호출한다.
-        return noStore(RuntimeSettingsResponse.from(adminSettingsUseCase.updateSettings(adminId, request.toDomain())));
+        // benchmarks 생략 여부는 DTO 단계에서만 판별 가능 — toDomain() 변환 시 null이 기본값으로 치환되기 전에 확인한다.
+        return noStore(RuntimeSettingsResponse.from(
+                adminSettingsUseCase.updateSettings(adminId, request.toDomain(), request.benchmarks() != null)));
     }
 
     private ResponseEntity<RuntimeSettingsResponse> noStore(RuntimeSettingsResponse response) {

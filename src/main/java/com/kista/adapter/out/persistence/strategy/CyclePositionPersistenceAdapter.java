@@ -78,6 +78,13 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public List<CyclePosition> findByCycleIdsAndRange(Set<UUID> cycleIds, Instant from, Instant to) {
+        if (cycleIds.isEmpty()) return List.of(); // 불필요한 쿼리 방지
+        return positionRepo.findByCycleIdsAndRange(cycleIds, from, to)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<CyclePosition> findByStrategyAndRange(UUID strategyId, Instant from, Instant to) {
         return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to)
                 .stream().map(this::toDomain).toList().reversed();

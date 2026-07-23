@@ -203,6 +203,33 @@ class TradingPreviewServiceTest {
         verify(planBuilder).build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), eq(prevCloseCache));
     }
 
+    // 회귀 테스트 — accountId+today로만 결정되는 계좌 전체 당일 PLANNED BUY 합계 조회가
+    // 대상 전략 개수만큼 반복 실행되지 않고 previewBatch()에서 1회만 조회돼야 한다
+    @Test
+    void previewBatch_callsSumPlannedBuyByAccountAndDateOnce_regardlessOfStrategyCount() {
+        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        List<Strategy> strategies = List.of(s1, s2);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
+
+        for (Strategy s : strategies) {
+            StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
+                    new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+            when(strategyCyclePort.findLatestByStrategyId(s.id())).thenReturn(Optional.of(cycle));
+            Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LIMIT,
+                    Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+            when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
+                    .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        }
+
+        service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        verify(orderPort, times(1)).sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any());
+    }
+
     @Test
     void previewBatch_throwsSecurityException_whenNotOwner() {
         UUID otherId = UUID.randomUUID();

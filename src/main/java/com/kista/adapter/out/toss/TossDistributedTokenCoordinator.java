@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 
 // 계좌 토큰(obtain/recover)은 TokenCoordinator를 구현해 KIS(KisTokenCoordinator, JVM-local 락)와
 // 같은 계약을 공유한다 — 관리자(admin) 토큰은 Account가 없어 KIS에 대응 개념이 없으므로 별도 public
-// 메서드로만 노출한다(→ root ARCHITECTURE.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다").
+// 메서드로만 노출한다(→ docs/agents/architecture.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다").
 @Slf4j
 @Component
 class TossDistributedTokenCoordinator implements TokenCoordinator {

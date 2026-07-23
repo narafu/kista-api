@@ -45,8 +45,8 @@ class TradingBuyCompetitionSimulator {
 
     // 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 전략별 cycle·당일 주문·매매 계획을
     // 미리 계산해 재사용한다. 대상 전략 N개를 순회할 때마다 경쟁 시뮬레이션을 처음부터 다시 계산하던
-    // O(N²) KIS 시세 조회·DB 조회를 O(N)으로 줄인다. planResultsByStrategyId에 없는 전략은 사전 계산이
-    // 실패한 것으로 간주해 uncertain 처리한다.
+    // O(N²) KIS 시세 조회·DB 조회를 O(N)으로 줄인다. planResultsByStrategyId에 없는 전략은 캐시 미스로 보고
+    // 즉시 재계산을 시도하며, 재계산마저 실패하면 그때 uncertain 처리한다.
     record BatchContext(List<Strategy> strategies, Map<UUID, StrategyCycle> cyclesByStrategyId,
                          Map<UUID, List<Order>> todayOrdersByStrategyId,
                          Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId) {}
@@ -103,9 +103,10 @@ class TradingBuyCompetitionSimulator {
             try {
                 StrategyOrderPlanBuilder.PlanResult result = context != null
                         ? context.planResultsByStrategyId().get(other.id())
-                        : planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
+                        : null;
                 if (result == null) {
-                    throw new IllegalStateException("경쟁 전략 매매 계획 사전 계산 실패(캐시 없음): strategyId=" + other.id());
+                    // 캐시 없음(non-batch 호출) 또는 사전 계산 실패(캐시 미스) — 즉시 재계산해 과소평가 방지
+                    result = planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
                 }
                 if (result.isSkip()) {
                     // NO_CYCLE_HISTORY/NO_PRIVACY_BASE 모두 야간 배치의 실제 동작을 확정할 수 없어

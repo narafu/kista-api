@@ -49,7 +49,7 @@ class TradingPreviewService {
         StrategyCycle currentCycle = strategyCyclePort.findLatestByStrategyId(strategy.id())
                 .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id()));
 
-        return buildPreview(strategy, account, currentCycle, DstInfo.nextTradeDate(), null, null, null);
+        return buildPreview(strategy, account, currentCycle, DstInfo.nextTradeDate(), null, null, null, null);
     }
 
     // 계좌 내 전략 전체를 한 번의 트랜잭션·요청으로 미리보기 — 목록 화면에서 전략 N개를 개별 호출하던 것을 1회로 축소
@@ -82,6 +82,9 @@ class TradingPreviewService {
                 .toList();
         Map<Strategy.Ticker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account);
 
+        // 계좌 내 당일 PLANNED BUY 합계 — accountId+today로만 결정되는 값(전략 무관)이라 1회만 조회해 재사용
+        BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, today);
+
         Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId = new LinkedHashMap<>();
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
@@ -90,9 +93,12 @@ class TradingPreviewService {
                 planResultsByStrategyId.put(strategy.id(),
                         planBuilder.build(strategy, account, cycle, today, "batch:" + strategy.id(), prevCloseCache));
             } catch (RuntimeException e) {
-                // 경쟁 시뮬레이션(competitor)에서만 이 캐시를 참조한다 — 대상(target) 전략으로 쓰일 때는
-                // buildPreview()가 캐시 누락을 감지해 동일 계산을 재시도하며, 그때 실패하면 기존과 동일하게 전파된다
-                log.warn("배치 미리보기 사전 계산 실패, 경쟁 시뮬레이션에서 uncertain 처리 예정: strategyId={}, error={}",
+                // 대상(target) 전략으로 쓰일 때는 buildPreview()가 캐시 누락을 감지해 동일 계산을 재시도하며,
+                // 그때 실패하면 기존과 동일하게 전파된다. 경쟁(competitor)으로 쓰일 때도 캐시 미스 시
+                // TradingBuyCompetitionSimulator가 즉시 재계산을 시도한다 — 실패한 전략 1개당 최대 1회
+                // 추가 계산이 발생해 O(N²) 회귀를 완전히 막지는 못하지만, 과소평가(경쟁 금액 0 처리) 대신
+                // 정확성을 우선한 트레이드오프다. 재계산도 실패하면 그때 uncertain 처리한다.
+                log.warn("배치 미리보기 사전 계산 실패, 경쟁 시뮬레이션에서 재계산 시도 예정: strategyId={}, error={}",
                         strategy.id(), e.getMessage());
             }
         }
@@ -105,7 +111,8 @@ class TradingPreviewService {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), planResultsByStrategyId.get(strategy.id()), context));
+                    todayOrdersByStrategyId.get(strategy.id()), planResultsByStrategyId.get(strategy.id()), context,
+                    totalAccountPlannedBuy));
         }
         return previews;
     }
@@ -113,14 +120,18 @@ class TradingPreviewService {
     private NextOrdersPreview buildPreview(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> precomputedTodayOrders,
                                             StrategyOrderPlanBuilder.PlanResult precomputedPlanResult,
-                                            TradingBuyCompetitionSimulator.BatchContext context) {
+                                            TradingBuyCompetitionSimulator.BatchContext context,
+                                            BigDecimal precomputedTotalAccountPlannedBuy) {
         // 오늘 이미 등록된 주문 조회 — PLANNED(취소 가능) + PLACED(AT_OPEN 선접수됨) 모두 포함
         List<Order> todayOrders = precomputedTodayOrders != null
                 ? precomputedTodayOrders
                 : orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
 
         // 계좌 내 타 전략 당일 PLANNED BUY 합계 (이 전략 분 제외 — 예수금 부족 계산에 사용)
-        BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
+        // accountId+today로만 결정되는 값이라 배치 호출 시 previewBatch()가 1회 조회한 값을 재사용한다
+        BigDecimal totalAccountPlannedBuy = precomputedTotalAccountPlannedBuy != null
+                ? precomputedTotalAccountPlannedBuy
+                : orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))

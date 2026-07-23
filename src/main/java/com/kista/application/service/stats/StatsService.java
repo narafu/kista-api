@@ -88,10 +88,8 @@ class StatsService implements UserStatsUseCase {
                 .filter(v -> type == null || v.strategy().type() == type)
                 .toList();
         Set<UUID> cycleIds = cycles.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
-        List<CyclePosition> positions = cyclePositionPort.findByUserAndRange(userId, fromInstant, toInstant)
-                .stream()
-                .filter(pos -> cycleIds.contains(pos.strategyCycleId()))
-                .toList();
+        // userId 스코프는 loadCycles(userId)가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
+        List<CyclePosition> positions = cyclePositionPort.findByCycleIdsAndRange(cycleIds, fromInstant, toInstant);
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
         return new EquityCurve(points);
     }

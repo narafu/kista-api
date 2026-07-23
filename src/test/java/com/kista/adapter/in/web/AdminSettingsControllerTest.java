@@ -74,14 +74,14 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any());
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
     void putSettings_savesCompletePayload() throws Exception {
         RuntimeSettings defaults = RuntimeSettings.defaults();
         RuntimeSettings updated = new RuntimeSettings(false, defaults.brokers(), defaults.strategies());
-        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any())).thenReturn(updated);
+        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(false))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
                         .with(authentication(adminToken(ADMIN_ID)))
@@ -101,7 +101,7 @@ class AdminSettingsControllerTest {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.auth.approvalRequired").value(false));
 
-        verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated);
+        verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated, false);
     }
 
     @Test
@@ -122,7 +122,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any());
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test

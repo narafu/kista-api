@@ -13,7 +13,7 @@ import java.util.UUID;
 // KIS 계좌 토큰 조정 — JVM-local 더블체크락(DoubleCheckedTokenCache) + PostgreSQL broker_tokens 캐시.
 // Toss(TossDistributedTokenCoordinator, Redis 분산 lease+fencing)와 같은 TokenCoordinator 계약을
 // 구현하지만 메커니즘은 다르다 — KIS 재발급은 이전 토큰을 무효화하지 않아(비파괴적) 인스턴스 간
-// 분산 조정이 불필요하다. 이 비대칭은 의도된 설계다(root ARCHITECTURE.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다" 참고).
+// 분산 조정이 불필요하다. 이 비대칭은 의도된 설계다(docs/agents/architecture.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다" 참고).
 @Component
 class KisTokenCoordinator implements TokenCoordinator {
 

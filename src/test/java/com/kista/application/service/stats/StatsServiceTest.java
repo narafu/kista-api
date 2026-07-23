@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -166,7 +167,7 @@ class StatsServiceTest {
                 Instant.parse("2026-06-01T00:00:00Z"), null);
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
         // KST 2026-06-02 (UTC 06-01 20:00 / 06-01 20:30) 스냅샷 2건 — 최신 건만 반영
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("900.00"),
                         new BigDecimal("10.00"), null, 5, Instant.parse("2026-06-01T20:00:00Z"), null),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
@@ -188,9 +189,8 @@ class StatsServiceTest {
         StrategyCycle infinite = activeCycle(STRATEGY_ID, "1000.00", "2026-06-01");
         StrategyCycle privacy = activeCycle(PRIVACY_STRATEGY_ID, "2000.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(infinite, privacy));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
-                depositSnapshot(infinite.id(), "1050.00", "2026-06-01T01:00:00Z"),
-                depositSnapshot(infinite.id(), "1100.00", "2026-06-02T01:00:00Z"),
+        // type=PRIVACY 필터 시 DB 조회 자체가 privacy 사이클 ID로 좁혀지므로 infinite 스냅샷은 stub하지 않는다
+        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(privacy.id())), any(), any())).thenReturn(List.of(
                 depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
 
         EquityCurve curve = statsService.getEquityCurve(
@@ -259,13 +259,13 @@ class StatsServiceTest {
     void equityCurve_조회_경계는_KST_자정() {
         stubUserWithStrategy();
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-        when(cyclePositionPort.findByUserAndRange(any(), any(), any())).thenReturn(List.of());
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of());
         ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
 
         statsService.getEquityCurve(USER_ID, null, null, LocalDate.of(2026, 7, 18));
 
         // to=2026-07-18 → toInstant = 2026-07-19T00:00 KST = 2026-07-18T15:00:00Z
-        verify(cyclePositionPort).findByUserAndRange(eq(USER_ID), any(), toCaptor.capture());
+        verify(cyclePositionPort).findByCycleIdsAndRange(any(), any(), toCaptor.capture());
         assertThat(toCaptor.getValue())
                 .isEqualTo(LocalDate.of(2026, 7, 19).atStartOfDay(TimeZones.KST).toInstant());
     }
@@ -277,7 +277,7 @@ class StatsServiceTest {
         StrategyCycle b = activeCycle("2000.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(a, b));
         // A는 KST 06-01·06-02 스냅샷, B는 06-01만 → 06-02 포인트에 B의 06-01 값이 carry-forward
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 depositSnapshot(a.id(), "1000.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
@@ -297,7 +297,7 @@ class StatsServiceTest {
         StrategyCycle ended = closedCycle("1000.00", "1200.00", "2026-05-01", "2026-06-01");
         StrategyCycle active = activeCycle("500.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(ended, active));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), any(), any())).thenReturn(List.of(
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 depositSnapshot(ended.id(), "1200.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));

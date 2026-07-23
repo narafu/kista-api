@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface CyclePositionPort {
@@ -41,6 +42,9 @@ public interface CyclePositionPort {
 
     // 사용자 스코프 스냅샷 범위 조회 (통계 equity curve용) — created_at 오름차순
     List<CyclePosition> findByUserAndRange(UUID userId, Instant from, Instant to);
+
+    // 사이클 ID 목록 스코프 범위 조회 (통계 equity curve type 필터용 — 이미 알고 있는 cycleIds로 DB 조회 자체를 좁힘) — created_at 오름차순
+    List<CyclePosition> findByCycleIdsAndRange(Set<UUID> cycleIds, Instant from, Instant to);
 
     // 개별 전략 스코프 월별 수익률 계산용 — created_at 오름차순
     List<CyclePosition> findByStrategyAndRange(UUID strategyId, Instant from, Instant to);

@@ -182,6 +182,41 @@ class TradingBuyCompetitionSimulatorTest {
     }
 
     @Test
+    void simulate_recomputesCompetitor_whenBatchContextCacheMiss() {
+        // 버그 재현: 배치 사전 계산(planResultsByStrategyId)이 실패해 competitor 항목이 없을 때
+        // 과거에는 IllegalStateException으로 즉시 uncertain·0 처리했으나, 이제는 즉시 재계산을 시도해
+        // 실제 경쟁 금액을 반영해야 한다.
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
+                new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+        CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
+                null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
+
+        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
+        when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(vrPlan, null));
+        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+
+        // planResultsByStrategyId에 vrStrategy 항목이 없는 BatchContext (사전 계산 실패 상황 재현)
+        TradingBuyCompetitionSimulator.BatchContext context = new TradingBuyCompetitionSimulator.BatchContext(
+                List.of(currentStrategy, vrStrategy),
+                java.util.Map.of(vrStrategy.id(), vrCycle),
+                java.util.Map.of(vrStrategy.id(), List.of()),
+                java.util.Map.of()); // 캐시 없음
+
+        BuyCompetitionPreview result = simulator.simulate(
+                currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO, context);
+
+        assertThat(result.uncertainStrategyIds()).isEmpty();
+        assertThat(result.consumedByHigherPriority()).isEqualByComparingTo("900.00");
+        assertThat(result.blockedByHigherPriority()).hasSize(1);
+        assertThat(result.sufficientBudget()).isFalse(); // 900 + 200 > 1000
+        verify(planBuilder).build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString());
+    }
+
+    @Test
     void simulate_excludesPausedStrategy() {
         Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
                 Strategy.Status.PAUSED, Ticker.TQQQ, Strategy.CycleSeedType.NONE);

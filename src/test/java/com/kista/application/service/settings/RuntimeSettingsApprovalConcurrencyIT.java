@@ -47,7 +47,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
         jdbcTemplate.update("INSERT INTO users (id, kakao_id, nickname, status, role, notification_channel, created_at, updated_at) " +
                         "VALUES (?, ?, ?, 'ACTIVE', 'ADMIN', 'TELEGRAM', now(), now())",
                 adminId, "admin-" + adminId, "admin");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults());
+        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults(), true);
 
         // 가입 INSERT를 승인 설정 판정 뒤에 일시 정지시키는 테스트 전용 트리거다.
         jdbcTemplate.execute("CREATE OR REPLACE FUNCTION block_runtime_settings_signup() RETURNS trigger AS $$ " +
@@ -60,7 +60,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
     void tearDown() {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS block_runtime_settings_signup_trigger ON users");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS block_runtime_settings_signup()");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults());
+        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults(), true);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", adminId, signupId);
         executor.shutdownNow();
     }
@@ -83,7 +83,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
         RuntimeSettings defaults = RuntimeSettings.defaults();
         RuntimeSettings approvalDisabled = new RuntimeSettings(false, defaults.brokers(), defaults.strategies());
         Future<RuntimeSettings> disable = executor.submit(() ->
-                adminSettingsUseCase.updateSettings(adminId, approvalDisabled));
+                adminSettingsUseCase.updateSettings(adminId, approvalDisabled, true));
 
         releaseGate.countDown();
         gate.get();

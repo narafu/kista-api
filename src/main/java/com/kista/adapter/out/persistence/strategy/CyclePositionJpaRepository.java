@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, UUID> {
@@ -72,6 +73,18 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             """, nativeQuery = true)
     List<CyclePositionEntity> findByUserIdAndRange(
             @Param("userId") UUID userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    // 사이클 ID 목록 스코프 범위 조회 (equity curve type 필터 — 메모리 필터 대신 IN 절로 DB에서 좁힘, native)
+    @Query(value = """
+            SELECT cp.* FROM cycle_position cp
+            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            WHERE cp.strategy_cycle_id IN (:cycleIds)
+              AND cp.created_at >= :from AND cp.created_at < :to
+              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL
+            ORDER BY cp.created_at ASC
+            """, nativeQuery = true)
+    List<CyclePositionEntity> findByCycleIdsAndRange(
+            @Param("cycleIds") Set<UUID> cycleIds, @Param("from") Instant from, @Param("to") Instant to);
 
     // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy JOIN)
     @Query(value = """
