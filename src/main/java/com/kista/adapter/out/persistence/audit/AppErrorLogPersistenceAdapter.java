@@ -33,28 +33,40 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
         StringWriter sw = new StringWriter();
         e.printStackTrace(new PrintWriter(sw));
-        String fullTrace = sw.toString();
-        String stackTrace = fullTrace.lines()
+        String stackTrace = truncateStackTrace(sw.toString());
+
+        repo.save(buildEntity(e.getClass().getSimpleName(), e.getMessage(), stackTrace, Map.of("caller", caller)));
+    }
+
+    @Override
+    public void save(String errorType, String message, String stackTrace, Map<String, String> context) {
+        repo.save(buildEntity(errorType, message, truncateStackTrace(stackTrace), context));
+    }
+
+    // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
+    private static String truncateStackTrace(String fullTrace) {
+        if (fullTrace == null) return null;
+        return fullTrace.lines()
                 .limit(MAX_STACK_LINES)
                 .collect(java.util.stream.Collectors.joining("\n"));
+    }
 
+    private AppErrorLogEntity buildEntity(String errorType, String message, String stackTrace, Map<String, String> context) {
         // context JSON 직렬화
         String contextJson;
         try {
-            contextJson = objectMapper.writeValueAsString(Map.of("caller", caller));
+            contextJson = objectMapper.writeValueAsString(context != null ? context : Map.of());
         } catch (JsonProcessingException ex) {
-            contextJson = "{\"caller\":\"unknown\"}";
+            contextJson = "{}";
         }
-
-        AppErrorLogEntity entity = new AppErrorLogEntity(
+        return new AppErrorLogEntity(
                 null,
-                e.getClass().getSimpleName(), // 예외 클래스 단순명
-                e.getMessage(),
+                errorType,
+                message,
                 stackTrace,
                 contextJson,
                 null // deletedAt
         );
-        repo.save(entity);
     }
 
     @Override

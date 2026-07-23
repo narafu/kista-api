@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll() // management port(8081) 전용, Render에서 외부 미노출
                         .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/telegram/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/client-errors").permitAll() // UI 오류 리포트 — 로그인 전 화면도 호출 가능해야 함
                         .requestMatchers("/api/auth/status-stream").authenticated() // 상태 SSE 연결은 인증 필수
                         .requestMatchers("/api/trades/stream").authenticated() // 매매 SSE 연결은 인증 필수
                         .requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated() // 회원 탈퇴는 인증 필수

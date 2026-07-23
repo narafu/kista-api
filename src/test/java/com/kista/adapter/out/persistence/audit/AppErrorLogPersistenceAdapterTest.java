@@ -43,6 +43,21 @@ class AppErrorLogPersistenceAdapterTest {
     }
 
     @Test
+    void save_clientError_stores_entity_without_exception() {
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        ArgumentCaptor<AppErrorLogEntity> captor = ArgumentCaptor.forClass(AppErrorLogEntity.class);
+
+        adapter.save("TypeError", "cannot read property", "at foo()\nat bar()", java.util.Map.of("pathname", "/login"));
+
+        verify(repo).save(captor.capture());
+        AppErrorLogEntity saved = captor.getValue();
+        assertThat(saved.getErrorType()).isEqualTo("TypeError");
+        assertThat(saved.getMessage()).isEqualTo("cannot read property");
+        assertThat(saved.getStackTrace()).isEqualTo("at foo()\nat bar()");
+        assertThat(saved.getContext()).contains("/login");
+    }
+
+    @Test
     void findRecent_returns_mapped_list() {
         AppErrorLogEntity entity = new AppErrorLogEntity(
                 null, "KisApiException", "KIS 오류", "stack", "{\"caller\":\"TradingService\"}", null

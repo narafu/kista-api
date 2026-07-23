@@ -90,7 +90,8 @@ adapter/in/
                    Meta(`GET /api/meta` enum SSOT 번들만, Cache 1h), OrderCancel, MarketHoliday(휴장일/세션 DIRECT|BLOCKED), FidaOrder(`/api/internal/**`, X-Internal-Token),
                    Settings(텔레그램+알림채널), Fcm, TradeStream(SSE), Admin*(`/api/admin/**` — Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade),
                    RuntimeConfig(`GET /api/runtime-config` 공개·no-store), AdminSettings(`GET|PUT /api/admin/settings`),
-                   AdminObservability(`/api/admin/logs/` 감사·앱에러 로그 조회, `DELETE /errors/{id}` 소프트 삭제), AdminPing(`/api/admin/_ping`), DevAuth(local 전용)
+                   AdminObservability(`/api/admin/logs/` 감사·앱에러 로그 조회, `DELETE /errors/{id}` 소프트 삭제), AdminPing(`/api/admin/_ping`), DevAuth(local 전용),
+                   ClientErrorLog(`POST /api/client-errors`, permitAll — kista-ui error.tsx/global-error.tsx 리포트를 app_error_logs에 저장, 실패해도 204)
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
