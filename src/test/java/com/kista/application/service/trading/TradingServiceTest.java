@@ -214,7 +214,7 @@ class TradingServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, PRICE)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -234,7 +234,7 @@ class TradingServiceTest {
         verify(kisPricePort, never()).getPriceSnapshot(any(), any()); // 단건 fallback 없음 — getPriceSnapshots 성공
         verify(kisPricePort, never()).getPrice(any(), any());         // 단건 fallback 없음
         verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
-        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT));         // 종가(PostClose) 1회
+        verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort, atLeastOnce()).findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
         verify(brokerOrderPort).place(any(), eq(ACCOUNT));
@@ -255,7 +255,7 @@ class TradingServiceTest {
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, PRICE, Order.OrderStatus.PLACED, "ORD-001", null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         // 오늘 이미 PLANNED 주문 존재 → planAndSaveOrders에서 재계산 skip
@@ -314,7 +314,7 @@ class TradingServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00")))); // 시작가+전일종가
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, closingPrice)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(FRESH_HISTORY)); // holdings=0
@@ -716,7 +716,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(originalBuy, sell));
@@ -785,7 +785,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(failingAccount))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(buy));
@@ -825,7 +825,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(failingAccount))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(buy));
@@ -909,7 +909,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(privacyBase));
         when(privacyStrategy.buildOrders(any(), any(), any())).thenReturn(List.of(buy, sell));
@@ -939,7 +939,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate));
@@ -971,7 +971,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existing));
@@ -1012,7 +1012,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(avg, ref, correction1, correction2, correction3));
@@ -1046,7 +1046,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(avg, ref));
@@ -1137,7 +1137,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(avg));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(ref));
@@ -1160,7 +1160,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingBuy, existingSell));
@@ -1186,7 +1186,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
         when(cyclePositionInfiniteDetailPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 2))
@@ -1223,7 +1223,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
         when(cyclePositionInfiniteDetailPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 2))
@@ -1264,7 +1264,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
         when(cyclePositionInfiniteDetailPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 2))
@@ -1305,7 +1305,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(privacyCycle.id()), any()))
@@ -1337,7 +1337,7 @@ class TradingServiceTest {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         // 오늘 주문 이미 존재 (SELL은 PLACED, BUY는 PLANNED)
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -1375,7 +1375,7 @@ class TradingServiceTest {
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(strategy2.id())).thenReturn(Optional.of(history2));
@@ -1392,7 +1392,7 @@ class TradingServiceTest {
         ), PAST_DST);
 
         verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
-        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT));         // 종가(PostClose) 1회
+        verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(kisPricePort, never()).getPriceSnapshot(any(), any());
     }
@@ -1409,7 +1409,7 @@ class TradingServiceTest {
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE), Ticker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE, Ticker.TQQQ, PRICE));
         // STRATEGY: 잔고 조회에서 예외
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         RuntimeException ex = new RuntimeException("잔고 조회 오류");
@@ -1479,7 +1479,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now(), null, null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maintainStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
         // 사이클 종료 판정: 이전 포지션 holdings > 0 → 진짜 청산으로 판단 (limit 무관, CycleOrderComputer=2, Reporter=1)
@@ -1512,7 +1512,7 @@ class TradingServiceTest {
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
         // 사이클 종료 판정: 이전 포지션 holdings > 0 → 진짜 청산으로 판단 (limit 무관, CycleOrderComputer=2, Reporter=1)
@@ -1543,7 +1543,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
         // 사이클 종료 판정: 이전 포지션 holdings > 0 → 진짜 청산으로 판단 (limit 무관, CycleOrderComputer=2, Reporter=1)
@@ -1564,7 +1564,7 @@ class TradingServiceTest {
     void executeBatch_firstDayBuyFails_doesNotEndCycle() throws InterruptedException {
         // 0회차(holdings=0) 매수 실패 — 이전 포지션이 initialSnapshot(holdings=0)이므로 사이클 종료가 아님
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(FRESH_HISTORY)); // holdings=0
         // 이전 포지션도 holdings=0 (initialSnapshot) — 진짜 청산 아님
@@ -1682,7 +1682,7 @@ class TradingServiceTest {
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
         // 사이클 종료 판정: 이전 포지션 holdings > 0 → 진짜 청산으로 판단 (limit 무관, CycleOrderComputer=2, Reporter=1)
