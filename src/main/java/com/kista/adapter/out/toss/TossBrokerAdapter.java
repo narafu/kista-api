@@ -139,6 +139,17 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
         return tossPriceApi.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
+    // Toss 일봉이 애프터마켓 체결을 포함하는지 미검증 — 검증 전까지는 기존 라이브 현재가를 그대로 유지
+    @Override
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
+        return tossPriceApi.getPrice(ticker); // 공통 API — account 불필요
+    }
+
+    @Override
+    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+        return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
+    }
+
     @Override
     public AccountBalance getLiveBalance(Account account, Ticker ticker) {
         return tossHoldingsApi.getBalance(account, ticker);

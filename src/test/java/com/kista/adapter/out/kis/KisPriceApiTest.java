@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,5 +59,52 @@ class KisPriceApiTest {
 
         assertThat(snapshot.current()).isEqualByComparingTo("73.72");
         assertThat(snapshot.prevClose()).isEqualByComparingTo("73.72");
+    }
+
+    @Test
+    @DisplayName("확정 종가(dailyprice) 봉 날짜가 기대 거래일과 일치하면 그 값을 사용")
+    void getClosingPrice_usesDailyPriceWhenDateMatches() {
+        var dailyResponse = new KisPriceApi.DailyPriceResponse(
+                List.of(new KisPriceApi.DailyPriceResponse.Output2("20260723", "165.10")));
+        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
+                eq(KisPriceApi.DailyPriceResponse.class), any())).thenReturn(dailyResponse);
+
+        // tradeDate(KST)=2026-07-24 → 기대 US 거래일=2026-07-23
+        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+
+        assertThat(closingPrice).isEqualByComparingTo("165.10");
+    }
+
+    @Test
+    @DisplayName("확정 종가 봉 날짜가 기대 거래일과 다르면(미발행 등) 라이브 현재가로 fallback")
+    void getClosingPrice_fallsBackToLivePriceWhenBarDateMismatches() {
+        var dailyResponse = new KisPriceApi.DailyPriceResponse(
+                List.of(new KisPriceApi.DailyPriceResponse.Output2("20260722", "160.00"))); // 하루 더 과거 봉
+        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
+                eq(KisPriceApi.DailyPriceResponse.class), any())).thenReturn(dailyResponse);
+        var priceResponse = new KisPriceApi.PriceResponse(
+                new KisPriceApi.PriceResponse.Output("165.10", "163.00"));
+        when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
+                eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
+
+        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+
+        assertThat(closingPrice).isEqualByComparingTo("165.10"); // 라이브 last 값으로 fallback
+    }
+
+    @Test
+    @DisplayName("확정 종가 응답이 비어있으면 라이브 현재가로 fallback")
+    void getClosingPrice_fallsBackToLivePriceWhenDailyPriceEmpty() {
+        when(kisHttpClient.pricingGet(eq("HHDFS76240000"), anyString(), eq(ACCOUNT),
+                eq(KisPriceApi.DailyPriceResponse.class), any()))
+                .thenReturn(new KisPriceApi.DailyPriceResponse(List.of()));
+        var priceResponse = new KisPriceApi.PriceResponse(
+                new KisPriceApi.PriceResponse.Output("165.10", "163.00"));
+        when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
+                eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
+
+        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+
+        assertThat(closingPrice).isEqualByComparingTo("165.10");
     }
 }

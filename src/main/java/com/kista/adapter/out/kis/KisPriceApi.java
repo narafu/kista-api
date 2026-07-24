@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.common.UsTradeDates;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.kis.KisApiException;
 import com.kista.domain.model.strategy.PriceSnapshot;
@@ -10,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +27,8 @@ class KisPriceApi {
     private static final String SINGLE_TR_ID = "HHDFS00000300";
     private static final String MULTI_PATH   = "/uapi/overseas-price/v1/quotations/multprice";
     private static final String MULTI_TR_ID  = "HHDFS76220000";
+    private static final String DAILY_PATH  = "/uapi/overseas-price/v1/quotations/dailyprice";
+    private static final String DAILY_TR_ID = "HHDFS76240000";
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
@@ -119,6 +124,55 @@ class KisPriceApi {
         return result;
     }
 
+    // 정규장 확정 종가 — 마감 리포트 전용(dailyprice, HHDFS76240000). 응답 봉 날짜가 기대 거래일과 다르면
+    // (미발행 등) 라이브 현재가로 fallback — "하루 전 종가를 오늘 종가로 오기록"하는 사고를 방지한다.
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
+        return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> getPrice(ticker, account));
+    }
+
+    // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
+    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        for (Ticker ticker : tickers) {
+            result.put(ticker, getClosingPrice(ticker, tradeDate, account));
+        }
+        return result;
+    }
+
+    // dailyprice 확정 종가 조회 — 응답 봉 날짜(xymd)가 기대 US 거래일과 일치할 때만 신뢰
+    private Optional<BigDecimal> fetchConfirmedClose(Ticker ticker, LocalDate tradeDate, Account account) {
+        String expectedUsDate = UsTradeDates.toUsTradeDate(tradeDate).format(DateTimeFormatter.BASIC_ISO_DATE);
+        try {
+            DailyPriceResponse response = kisHttpClient.pricingGet(
+                    DAILY_TR_ID, DAILY_PATH, account, DailyPriceResponse.class,
+                    p -> {
+                        p.add("EXCD", exchangeRegistry.excd(ticker));
+                        p.add("SYMB", ticker.name());
+                        p.add("GUBN", "0");
+                        p.add("BYMD", expectedUsDate);
+                        p.add("MODP", "0");
+                    });
+            if (response == null || response.output2() == null || response.output2().isEmpty()) {
+                log.warn("확정 종가(dailyprice) 응답 없음 — 라이브 현재가로 fallback: ticker={}", ticker);
+                return Optional.empty();
+            }
+            DailyPriceResponse.Output2 bar = response.output2().get(0);
+            if (bar.clos() == null || bar.clos().isBlank()) {
+                log.warn("확정 종가(dailyprice) 종가 빈값 — 라이브 현재가로 fallback: ticker={}", ticker);
+                return Optional.empty();
+            }
+            if (bar.xymd() == null || !bar.xymd().equals(expectedUsDate)) {
+                log.warn("확정 종가(dailyprice) 봉 날짜 불일치(기대={}, 응답={}) — 아직 미발행으로 보고 라이브 현재가로 fallback: ticker={}",
+                        expectedUsDate, bar.xymd(), ticker);
+                return Optional.empty();
+            }
+            return Optional.of(KisResponseParser.parseBd(bar.clos()));
+        } catch (Exception e) {
+            log.warn("확정 종가(dailyprice) 조회 실패 — 라이브 현재가로 fallback: ticker={}", ticker, e);
+            return Optional.empty();
+        }
+    }
+
     // multprice(HHDFS76220000) 1회 호출 — NREC + 종목별 EXCD_nn/SYMB_nn 파라미터 구성
     private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, Account account) {
         return kisHttpClient.pricingGet(
@@ -180,6 +234,15 @@ class KisPriceApi {
             @JsonProperty("symb") String symb,
             @JsonProperty("last") String last,
             @JsonProperty("base") String base
+        ) {}
+    }
+
+    // 해외주식 기간별시세(일봉) 응답 — GUBN=0(일) + BYMD 기준 output2[0]이 해당 날짜의 봉.
+    // xymd(영업일자, YYYYMMDD)는 KIS 공식 문서 기준 추정 필드명 — 실응답 검증 필요(위 주의사항 참고)
+    record DailyPriceResponse(@JsonProperty("output2") List<Output2> output2) {
+        record Output2(
+            @JsonProperty("xymd") String xymd, // 영업일자 (YYYYMMDD)
+            @JsonProperty("clos") String clos  // 종가
         ) {}
     }
 }
