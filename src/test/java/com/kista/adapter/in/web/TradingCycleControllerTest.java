@@ -257,7 +257,7 @@ class TradingCycleControllerTest {
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
         var preview = new com.kista.domain.model.order.NextOrdersPreview(
                 java.time.LocalDate.of(2026, 1, 5), null, List.of(),
-                null, List.of(), BigDecimal.ZERO, null);
+                null, List.of(), BigDecimal.ZERO, null, null);
         when(tradingExecution.previewBatch(eq(ACCOUNT_ID), any()))
                 .thenReturn(java.util.Map.of(strategyId, preview));
 

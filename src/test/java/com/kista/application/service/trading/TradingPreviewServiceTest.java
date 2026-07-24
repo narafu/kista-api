@@ -44,6 +44,7 @@ class TradingPreviewServiceTest {
     @Mock OrderPort orderPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock TradingBuyCompetitionSimulator competitionSimulator;
+    @Mock TradingSellSufficiencySimulator sellSufficiencySimulator;
     @Mock TradingPriceFetcher priceFetcher;
 
     TradingPreviewService service;
@@ -59,7 +60,7 @@ class TradingPreviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, competitionSimulator, priceFetcher);
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, competitionSimulator, sellSufficiencySimulator, priceFetcher);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
@@ -82,6 +83,37 @@ class TradingPreviewServiceTest {
         assertThat(result.orders()).hasSize(1);
         assertThat(result.competition()).isNull();
         verify(competitionSimulator, never()).simulate(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void preview_returnsSellSufficiencyNull_whenPlanHasNoSellOrders() {
+        Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buyOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.sellSufficiency()).isNull();
+        verify(sellSufficiencySimulator, never()).simulate(any(), any(), any(), any());
+    }
+
+    @Test
+    void preview_callsSellSufficiencySimulator_whenPlanHasSellOrders() {
+        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        com.kista.domain.model.order.SellSufficiencyPreview sellSufficiency =
+                new com.kista.domain.model.order.SellSufficiencyPreview(false, 2, 0, 3, false);
+        when(sellSufficiencySimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(List.of(sellOrder)), any()))
+                .thenReturn(sellSufficiency);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.sellSufficiency()).isSameAs(sellSufficiency);
     }
 
     @Test
@@ -278,7 +310,7 @@ class TradingPreviewServiceTest {
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
                 strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
         TradingPreviewService realService = new TradingPreviewService(
-                accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, priceFetcher);
+                accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, sellSufficiencySimulator, priceFetcher);
 
         realService.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 

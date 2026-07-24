@@ -3,6 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.order.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -27,7 +28,9 @@ public record NextOrdersResponse(
         @Schema(description = "계좌 내 타 전략의 당일 PLANNED BUY 합계 (USD)")
         BigDecimal otherStrategiesPlannedBuyUsd,       // 계좌 내 타 전략 당일 PLANNED BUY 합계
         @Schema(description = "계좌 내 BUY 예산 경쟁 시뮬레이션 결과 (대상 전략에 BUY 주문이 없으면 null, 근사치)")
-        BuyCompetitionSummary competition
+        BuyCompetitionSummary competition,
+        @Schema(description = "SELL 판매가능수량 충족 시뮬레이션 결과 (대상 전략에 SELL 주문이 없으면 null, 근사치)")
+        SellSufficiencySummary sellSufficiency
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
@@ -163,6 +166,27 @@ public record NextOrdersResponse(
         }
     }
 
+    // SELL 판매가능수량 충족 시뮬레이션 결과 — TradingSellSufficiencySimulator 산출을 그대로 노출
+    // BUY와 달리 계좌당 종목 유일성 제약상 경쟁이 없어 단일 종목 기준 판정만 존재한다 (근사치)
+    public record SellSufficiencySummary(
+            @Schema(description = "대상 전략 SELL이 실제 배치에서 승인될지 근사 판정 (liveQuantityUnavailable=true면 신뢰 불가)")
+            boolean sufficientQuantity,
+            @Schema(description = "브로커 판매가능수량 (liveQuantityUnavailable=true면 0)")
+            int sellableQuantity,
+            @Schema(description = "동일 계좌·종목·거래일 기준 기존 PLANNED/PLACED SELL 예약 수량 합")
+            int reservedQuantity,
+            @Schema(description = "대상 전략 오늘자 SELL 합계 수량")
+            int requiredQuantity,
+            @Schema(description = "true면 브로커 판매가능수량 조회 자체가 실패해 충족 시뮬레이션을 생략함 — 이 경우 sufficientQuantity는 신뢰할 수 없음")
+            boolean liveQuantityUnavailable
+    ) {
+        public static SellSufficiencySummary from(SellSufficiencyPreview p) {
+            return new SellSufficiencySummary(
+                    p.sufficientQuantity(), p.sellableQuantity(), p.reservedQuantity(),
+                    p.requiredQuantity(), p.liveQuantityUnavailable());
+        }
+    }
+
     public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
@@ -171,7 +195,8 @@ public record NextOrdersResponse(
                 result.skipReason(),
                 result.todayOrders().stream().map(TodayOrderItem::from).toList(),
                 result.otherStrategiesPlannedBuyUsd(),
-                result.competition() == null ? null : BuyCompetitionSummary.from(result.competition())
+                result.competition() == null ? null : BuyCompetitionSummary.from(result.competition()),
+                result.sellSufficiency() == null ? null : SellSufficiencySummary.from(result.sellSufficiency())
         );
     }
 }

@@ -4,6 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.NextOrdersPreview;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.order.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
@@ -36,6 +37,7 @@ class TradingPreviewService {
     private final OrderPort orderPort;
     private final StrategyOrderPlanBuilder planBuilder;
     private final TradingBuyCompetitionSimulator competitionSimulator;
+    private final TradingSellSufficiencySimulator sellSufficiencySimulator;
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
@@ -142,7 +144,7 @@ class TradingPreviewService {
                 ? precomputedPlanResult
                 : planBuilder.build(strategy, account, currentCycle, today, "preview:" + strategy.id());
         if (result.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null);
+            return new NextOrdersPreview(today, null, List.of(), result.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null);
         }
         CycleOrderStrategy.OrderPlan plan = result.plan();
 
@@ -156,6 +158,14 @@ class TradingPreviewService {
                     ? competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd, context)
                     : competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd);
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, competition);
+        // 오늘자 계획에 SELL이 있을 때만 판매가능수량 충족 시뮬레이션 수행
+        List<Order> sellOrders = plan.orders().stream()
+                .filter(o -> o.direction() == Order.OrderDirection.SELL)
+                .toList();
+        SellSufficiencyPreview sellSufficiency = sellOrders.isEmpty()
+                ? null
+                : sellSufficiencySimulator.simulate(strategy, account, sellOrders, today);
+
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, competition, sellSufficiency);
     }
 }
