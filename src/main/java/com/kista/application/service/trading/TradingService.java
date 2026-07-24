@@ -64,20 +64,6 @@ class TradingService {
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(CycleState state, List<Order> mainOrders) {}
 
-    // 중복 생성 방지 단위 — concrete leg는 timing·direction·leg 조합으로 점유한다
-    private record OrderSlot(Order.OrderTiming timing, Order.OrderDirection direction, String orderLeg) {
-        static OrderSlot of(Order order) {
-            return new OrderSlot(order.timing(), order.direction(), order.orderLeg());
-        }
-    }
-
-    // legacy UNKNOWN leg는 기존 timing·direction 전체 슬롯을 보수적으로 점유한다
-    private record LegacySlot(Order.OrderTiming timing, Order.OrderDirection direction) {
-        static LegacySlot of(Order order) {
-            return new LegacySlot(order.timing(), order.direction());
-        }
-    }
-
     // 전략 계산 결과 중 신규 생성 가능한 주문만 allocator에 전달하기 위한 후보
     private record CyclePlanCandidate(
             CycleState state,
@@ -220,22 +206,13 @@ class TradingService {
         });
     }
 
-    // concrete leg는 동일 leg만, legacy UNKNOWN leg는 같은 timing·direction 전체를 중복 생성에서 제외한다
+    // creatableTimings 필터 후 TradingOrderSlots로 기존 주문과 동일 슬롯을 제외한다 (TradingPreviewService와 공유 기준)
     private List<Order> filterCreatableOrders(List<Order> plannedTemplates, List<Order> existingOrders,
                                               Set<Order.OrderTiming> creatableTimings) {
-        Set<OrderSlot> existingConcreteSlots = existingOrders.stream()
-                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
-                .map(OrderSlot::of)
-                .collect(Collectors.toSet());
-        Set<LegacySlot> existingLegacySlots = existingOrders.stream()
-                .filter(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
-                .map(LegacySlot::of)
-                .collect(Collectors.toSet());
-        return plannedTemplates.stream()
+        List<Order> timingFiltered = plannedTemplates.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
-                .filter(order -> !existingLegacySlots.contains(LegacySlot.of(order)))
-                .filter(order -> !existingConcreteSlots.contains(OrderSlot.of(order)))
                 .toList();
+        return TradingOrderSlots.excludeExisting(timingFiltered, existingOrders);
     }
 
     // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다

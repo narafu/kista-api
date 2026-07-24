@@ -158,13 +158,17 @@ class TradingPreviewService {
                     ? competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd, context)
                     : competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd);
 
-        // 오늘자 계획에 SELL이 있을 때만 판매가능수량 충족 시뮬레이션 수행
-        List<Order> sellOrders = plan.orders().stream()
-                .filter(o -> o.direction() == Order.OrderDirection.SELL)
-                .toList();
-        SellSufficiencyPreview sellSufficiency = sellOrders.isEmpty()
+        // 오늘자 계획에 SELL이 있을 때만 판매가능수량 충족 시뮬레이션 수행.
+        // planBuilder.build()는 매번 처음부터 재계산하므로, 오늘 이미 접수(PLACED)된 SELL도 동일하게
+        // 다시 제시한다. 그 몫은 sellSufficiencySimulator가 reservedQuantity로 DB에서 별도 조회해
+        // 이미 반영하므로, 신규 필요분에서는 기존 주문과 겹치는 슬롯을 제외해야 이중 계산되지 않는다
+        // (TradingService.filterCreatableOrders와 동일 기준 — TradingOrderSlots 공유).
+        List<Order> newSellOrders = TradingOrderSlots.excludeExisting(
+                plan.orders().stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList(),
+                todayOrders);
+        SellSufficiencyPreview sellSufficiency = newSellOrders.isEmpty()
                 ? null
-                : sellSufficiencySimulator.simulate(strategy, account, sellOrders, today);
+                : sellSufficiencySimulator.simulate(strategy, account, newSellOrders, today);
 
         return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, competition, sellSufficiency);
     }

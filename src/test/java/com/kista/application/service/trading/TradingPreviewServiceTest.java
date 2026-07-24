@@ -116,6 +116,53 @@ class TradingPreviewServiceTest {
         assertThat(result.sellSufficiency()).isSameAs(sellSufficiency);
     }
 
+    // 회귀 테스트 — INFINITE AT_OPEN SELL이 오늘 이미 접수(PLACED)됐는데, planBuilder가 매번 처음부터
+    // 재계산하는 특성상 동일 SELL을 다시 제시한다. 기존 주문과 겹치는 슬롯은 신규 필요분에서 제외해야
+    // sellSufficiencySimulator가 "이미 접수된 수량 + 그걸 다시 계산한 수량"을 이중으로 합산하지 않는다.
+    @Test
+    void preview_excludesAlreadyPlacedSellLeg_fromSellSufficiencyRequiredQuantity() {
+        Order existingSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingSell));
+
+        Order recomputedSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(recomputedSell));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.sellSufficiency()).isNull();
+        verify(sellSufficiencySimulator, never()).simulate(any(), any(), any(), any());
+    }
+
+    // 일부만 이미 접수된 경우 — 신규 leg만 sellSufficiencySimulator에 전달돼야 한다
+    @Test
+    void preview_passesOnlyNewSellLeg_whenPlanHasBothExistingAndNewSellOrders() {
+        Order existingSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
+                .thenReturn(List.of(existingSell));
+
+        Order sameRecomputedSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
+        Order newSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+                Order.OrderDirection.SELL, 5, new BigDecimal("61.00"), Order.OrderTiming.AT_OPEN, "LEG_B");
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sameRecomputedSell, newSell));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+        com.kista.domain.model.order.SellSufficiencyPreview sellSufficiency =
+                new com.kista.domain.model.order.SellSufficiencyPreview(true, 30, 22, 5, false);
+        when(sellSufficiencySimulator.simulate(eq(STRATEGY), eq(ACCOUNT), eq(List.of(newSell)), any()))
+                .thenReturn(sellSufficiency);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.sellSufficiency()).isSameAs(sellSufficiency);
+    }
+
     @Test
     void preview_callsCompetitionSimulator_whenPlanHasBuyOrders() {
         Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
