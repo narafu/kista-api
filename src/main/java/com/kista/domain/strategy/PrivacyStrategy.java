@@ -150,6 +150,11 @@ public class PrivacyStrategy {
             }
         }
 
+        // 명시 SELL 합이 실제 보유수량을 초과하면 가장 싼 SELL부터 차례로 차감 — BUY의 adjustBuyQuantities(보유
+        // 초과 시 가장 비싼 BUY부터 차감)와 대칭으로, 보유하지 않은 수량을 매도 시도해 판매가능수량 부족으로
+        // 전량 거절되는 상황을 방지한다
+        result = capSellQuantitiesToHoldings(result, balance.holdings());
+
         if (nullTemplate == null) return result;
 
         // null SELL = balance.holdings() - 명시 SELL 합 (음수면 제외)
@@ -163,6 +168,37 @@ public class PrivacyStrategy {
         result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
                 nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return result;
+    }
+
+    // SELL 합계가 실제 보유수량을 초과하면 가장 싼 SELL부터 차례로 차감 — 0이 된 leg는 제외
+    private List<Order> capSellQuantitiesToHoldings(List<Order> sells, int holdings) {
+        int totalQty = sells.stream().mapToInt(Order::quantity).sum();
+        int excess = totalQty - holdings;
+        if (excess <= 0) return sells;
+
+        log.warn("[PRIVACY] SELL 합계가 보유수량 초과 — 가장 싼 SELL부터 차감: totalQty={}, holdings={}, excess={}",
+                totalQty, holdings, excess);
+
+        int[] quantities = sells.stream().mapToInt(Order::quantity).toArray();
+        List<Integer> cheapestFirst = java.util.stream.IntStream.range(0, sells.size()).boxed()
+                .sorted(Comparator.comparing(i -> sells.get(i).price()))
+                .toList();
+
+        int remaining = excess;
+        for (int idx : cheapestFirst) {
+            if (remaining == 0) break;
+            int take = Math.min(remaining, quantities[idx]);
+            quantities[idx] -= take;
+            remaining -= take;
+        }
+
+        List<Order> capped = new ArrayList<>();
+        for (int i = 0; i < sells.size(); i++) {
+            if (quantities[i] > 0) {
+                capped.add(quantities[i] == sells.get(i).quantity() ? sells.get(i) : sells.get(i).withQuantity(quantities[i]));
+            }
+        }
+        return capped;
     }
 
     private void adjustBuyQuantities(List<BuyEntry> buyEntries, BigDecimal diff) {

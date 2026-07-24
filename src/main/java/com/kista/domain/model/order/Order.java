@@ -125,6 +125,13 @@ public record Order(
                 OrderStatus.PLANNED, null, null, null);
     }
 
+    // 수량만 교체한 새 PLANNED 주문 — 보유수량 캡 보정 재계산 시 기존 id·체결 정보 초기화
+    public Order withQuantity(int newQuantity) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, orderLeg, newQuantity, price,
+                OrderStatus.PLANNED, null, null, null);
+    }
+
     // 관리자 재주문용 PLANNED 신규 주문 — 원본에서 계좌·사이클·종목·주문유형 승계, direction/price/timing 명시 재정의
     public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
                                 int quantity, BigDecimal price, OrderTiming timing) {

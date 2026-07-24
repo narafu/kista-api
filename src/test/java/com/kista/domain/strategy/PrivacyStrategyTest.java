@@ -314,14 +314,14 @@ class PrivacyStrategyTest {
     }
 
     @Test
-    @DisplayName("명시 SELL 합 > balance — null SELL remaining 음수 → null SELL 제외")
+    @DisplayName("명시 SELL 합 > balance — 명시 SELL 자체가 보유수량으로 캡되고 null SELL은 제외")
     void nullSellExcludedWhenRemainingNegative() {
-        // balance=50, SELL [70, null] → remaining=-20 → null SELL 제외
+        // balance=50, SELL [70, null] → 명시 SELL 70이 보유수량 50으로 캡 → remaining=0 → null SELL 제외
         PrivacyTradeBase base = base(100, List.of(sell(70, "12"), sellNull("13")));
         List<Order> orders = strategy.buildOrders(balance(50), INITIAL_USD_DEPOSIT, base);
 
         assertThat(sellOrders(orders)).hasSize(1);
-        assertThat(sellOrders(orders).getFirst().quantity()).isEqualTo(70);
+        assertThat(sellOrders(orders).getFirst().quantity()).isEqualTo(50);
     }
 
     @Test
@@ -344,6 +344,76 @@ class PrivacyStrategyTest {
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(Order::quantity).containsExactlyInAnyOrder(15, 15);
+    }
+
+    // ── SELL 합계가 보유수량 초과 시 캡 (가장 싼 SELL부터 차감) ──────────────
+
+    @Test
+    @DisplayName("SELL 캡 단일 차감 — 초과분이 가장 싼 SELL 1건 내 — 해당 건만 차감")
+    void sellCapPartialSingleEntry() {
+        // SELL 합=155.28×7 + 157.52×7 + 164.38×6=20, holdings=17 → excess=3 → 가장 싼 155.28에서 3주 차감
+        PrivacyTradeBase base = base(0, List.of(
+                sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
+        List<Order> orders = strategy.buildOrders(balance(17), INITIAL_USD_DEPOSIT, base);
+
+        assertThat(sellOrders(orders)).hasSize(3);
+        Order cheapestSell = sellOrders(orders).stream()
+                .filter(o -> o.price().compareTo(new BigDecimal("155.28")) == 0)
+                .findFirst().orElseThrow();
+        assertThat(cheapestSell.quantity()).isEqualTo(4); // 7 - 3
+        assertThat(sellOrders(orders)).extracting(Order::quantity).contains(7, 6); // 나머지는 그대로
+    }
+
+    @Test
+    @DisplayName("SELL 캡 이월 — 초과분 > 가장 싼 SELL → 제거 후 다음 싼 SELL로 이월 차감")
+    void sellCapCarryover() {
+        // SELL 합=7+7+6=20, holdings=5 → excess=15
+        // 155.28(7) 전량 차감 후 remaining=8 → 157.52(7) 전량 차감 후 remaining=1 → 164.38(6→5)
+        PrivacyTradeBase base = base(0, List.of(
+                sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
+        List<Order> orders = strategy.buildOrders(balance(5), INITIAL_USD_DEPOSIT, base);
+
+        // 가장 싼 두 SELL은 quantity=0이 되어 결과에서 제외
+        assertThat(sellOrders(orders)).noneMatch(o -> o.price().compareTo(new BigDecimal("155.28")) == 0);
+        assertThat(sellOrders(orders)).noneMatch(o -> o.price().compareTo(new BigDecimal("157.52")) == 0);
+        Order mostExpensiveSell = sellOrders(orders).stream()
+                .filter(o -> o.price().compareTo(new BigDecimal("164.38")) == 0)
+                .findFirst().orElseThrow();
+        assertThat(mostExpensiveSell.quantity()).isEqualTo(5); // 6 - 1
+    }
+
+    @Test
+    @DisplayName("SELL 캡 전량 소진 — 초과분 > SELL 합 → SELL 전부 제거")
+    void sellCapExceedsAllSells() {
+        // SELL 합=7+7=14, holdings=0 → excess=14 → 전부 제거
+        PrivacyTradeBase base = base(0, List.of(sell(7, "155.28"), sell(7, "157.52")));
+        List<Order> orders = strategy.buildOrders(balance(0), INITIAL_USD_DEPOSIT, base);
+
+        assertThat(sellOrders(orders)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("SELL 캡 이월 + null SELL 병존 — 캡으로 줄어든 명시 SELL 합 기준으로 null SELL remaining 계산")
+    void sellCapCarryoverWithNullSellTemplate() {
+        // 명시 SELL 합=7+7+6=20, holdings=5 → 캡 후 명시 SELL 합=5(155.28/157.52 제거, 164.38→5)
+        // null SELL remaining = holdings(5) - capped 명시 SELL 합(5) = 0 → null SELL 제외
+        PrivacyTradeBase base = base(0, List.of(
+                sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38"), sellNull("170.00")));
+        List<Order> orders = strategy.buildOrders(balance(5), INITIAL_USD_DEPOSIT, base);
+
+        assertThat(sellOrders(orders)).hasSize(1);
+        Order remaining = sellOrders(orders).getFirst();
+        assertThat(remaining.price()).isEqualByComparingTo("164.38");
+        assertThat(remaining.quantity()).isEqualTo(5); // 6 - 1(이월 차감), null SELL은 remaining=0으로 제외
+    }
+
+    @Test
+    @DisplayName("SELL 합 = 보유수량 — 정확히 일치하면 캡 없이 그대로 반환")
+    void sellCapNotAppliedWhenExactlyEqualToHoldings() {
+        PrivacyTradeBase base = base(0, List.of(sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
+        List<Order> orders = strategy.buildOrders(balance(20), INITIAL_USD_DEPOSIT, base);
+
+        assertThat(sellOrders(orders)).extracting(Order::quantity).containsExactlyInAnyOrder(7, 7, 6);
     }
 
     // 헬퍼
