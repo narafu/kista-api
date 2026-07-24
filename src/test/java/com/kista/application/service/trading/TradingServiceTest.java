@@ -1365,7 +1365,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_fetchesPricesTwice_startAndClose_notPerCycle() throws InterruptedException {
-        // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(종가), 단건 fallback 없음
+        // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getClosingPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
