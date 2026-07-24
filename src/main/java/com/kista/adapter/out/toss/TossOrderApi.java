@@ -7,10 +7,12 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +25,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 class TossOrderApi {
 
     // Toss 주문 API 경로
@@ -56,7 +59,16 @@ class TossOrderApi {
 
     public void cancel(Order order, Account account) {
         // DELETE /api/v1/orders/{externalOrderId}
-        tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
+        try {
+            tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
+        } catch (TossApiException e) {
+            // 이미 체결/만료된 주문은 Toss가 404(not-found)로 응답 — KIS는 이 경우 예외 없이 조용히 무시하므로 동일하게 흡수
+            if (e.getCause() instanceof HttpClientErrorException.NotFound) {
+                log.info("취소 대상 주문 없음(이미 체결/만료로 추정) — externalOrderId={}", order.externalOrderId());
+                return;
+            }
+            throw e;
+        }
     }
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
