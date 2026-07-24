@@ -139,8 +139,8 @@ class TradingService {
         waitFor("마감 시각", dst.waitUntilPostClose(), dst);
         marketEventNotifier.notifyMarketClose();
 
-        // 장 마감 후 종가 일괄 조회
-        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchPrices(priceCtx.cycleTickers(), priceCtx.priceAccount());
+        // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss는 라이브 위임)
+        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
 
         // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
         reportAll(placedStates, closingPrices, today);

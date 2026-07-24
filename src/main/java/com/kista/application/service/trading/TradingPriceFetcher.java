@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,13 @@ class TradingPriceFetcher {
         return fetchWithFallback(tickers, account, "전일종가",
                 (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrevCloses(t, acc),
                 (t, acc) -> registry.require(acc, BrokerPricePort.class).getPrevClose(t, acc));
+    }
+
+    // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
+    Map<Ticker, BigDecimal> fetchClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+        return fetchWithFallback(tickers, account, "확정종가",
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getClosingPrices(t, tradeDate, acc),
+                (t, acc) -> registry.require(acc, BrokerPricePort.class).getClosingPrice(t, tradeDate, acc));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
