@@ -12,15 +12,18 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserSettingsPort;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,6 +45,8 @@ class TradingReporterTest {
     @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock UserSettingsPort userSettingsPort;
     @Mock CyclePositionPersistor cyclePositionPersistor;
+    @Mock BrokerOrderCorrectionPort brokerOrderPort;
+    @Mock NotifyPort notifyPort;
     TradingReporter reporter;
 
     static final LocalDate TODAY = LocalDate.of(2026, 7, 9);
@@ -63,8 +68,9 @@ class TradingReporterTest {
     @BeforeEach
     void setUp() {
         reporter = new TradingReporter(registry, orderPort, userNotificationPort,
-                realtimeNotificationPort, userSettingsPort, cyclePositionPersistor);
+                realtimeNotificationPort, userSettingsPort, cyclePositionPersistor, notifyPort);
         when(registry.require(ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
+        lenient().when(registry.require(ACCOUNT, BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderPort);
         lenient().when(userSettingsPort.findOrDefault(USER.id()))
                 .thenReturn(UserSettings.defaultFor(USER.id())); // TRADING_ALERT 기본 활성
     }
@@ -144,5 +150,32 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
 
         verify(realtimeNotificationPort, times(2)).notifyTrade(eq(USER.id()), any());
+    }
+
+    @Test
+    void 마감_리포트는_체결_조회_전에_잔여_PLACED_주문을_취소한다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = placedOrder(orderId, "E1", 5);
+        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT)).thenReturn(List.of());
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
+
+        InOrder inOrder = inOrder(brokerOrderPort, executionPort);
+        inOrder.verify(brokerOrderPort).cancel(order, ACCOUNT);
+        inOrder.verify(executionPort).getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT);
+    }
+
+    @Test
+    void 취소_실패는_격리되고_관리자_알림으로_표면화되며_체결조회는_계속된다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = placedOrder(orderId, "E1", 5);
+        doThrow(new RuntimeException("이미 체결된 주문")).when(brokerOrderPort).cancel(order, ACCOUNT);
+        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT))
+                .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
+
+        verify(notifyPort).notifyError(any());
+        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), Order.OrderStatus.FILLED);
     }
 }

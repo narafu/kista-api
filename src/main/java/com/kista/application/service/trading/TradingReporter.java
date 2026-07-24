@@ -11,6 +11,7 @@ import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,12 +39,16 @@ class TradingReporter {
     private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final UserSettingsPort userSettingsPort;                // TRADING_ALERT 알림 활성 여부 조회
     private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
+    private final NotifyPort notifyPort;                            // 취소 실패 등 관리자 알림
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
         User user = ctx.user();
+        // 장마감 후에도 체결 가능한 잔여 PLACED 주문을 취소 — 애프터마켓 체결이 CANCELLED로 오기록되는 것을 방지
+        cancelUnresolvedOrders(mainOrders, account);
+
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = registry.require(account, ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account);
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
@@ -72,6 +77,20 @@ class TradingReporter {
             realtimeNotificationPort.notifyTrade(user.id(), event);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
+    }
+
+    // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 이미 체결된 주문의 취소는 브로커가 거부(무시)한다.
+    // 실패해도 흐름은 계속되며(다음 getExecutions로 실제 상태를 확정), 취소 자체 실패만 관리자에게 알린다.
+    private void cancelUnresolvedOrders(List<Order> mainOrders, Account account) {
+        for (Order order : mainOrders) {
+            if (order.status() != Order.OrderStatus.PLACED || order.externalOrderId() == null) continue;
+            try {
+                registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
+            } catch (Exception e) {
+                log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
+                notifyPort.notifyError(e);
+            }
+        }
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록

@@ -152,7 +152,7 @@ class TradingServiceTest {
                 strategyCyclePort, rotationService, userNotificationPort, cycleStrategies, vrRolloverService);
         TradingReporter reporter = new TradingReporter(
                 tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
-                userSettingsPort, positionPersistor);
+                userSettingsPort, positionPersistor, notifyPort);
         // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT), any()))
