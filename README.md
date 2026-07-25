@@ -35,7 +35,7 @@ graph TB
 
     subgraph out["adapter/out"]
         persistence["persistence/ JPA"]
-        broker["kis/ · toss/ BrokerAdapter"]
+        broker["kis/ · toss/ · mock/ BrokerAdapter"]
         notify["notify/ Telegram · FCM"]
         sse["sse/ SseEmitterRegistry"]
         kakao_out["kakao/ OAuth"]

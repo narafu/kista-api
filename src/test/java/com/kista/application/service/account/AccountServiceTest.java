@@ -274,6 +274,44 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("KIS 등록 시 accountNo가 비어있으면 IllegalArgumentException 발생 (→ 400) — @NotBlank 제거로 서비스가 대신 검증")
+    void register_blankAccountNo_nonMockBroker_throws() {
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Account.Broker.KIS, true));
+        RegisterAccountCommand cmd = new RegisterAccountCommand(
+                "테스트계좌", null, "appKey", "appSecret", null, Account.Broker.KIS
+        );
+
+        assertThatThrownBy(() -> accountService.register(userId, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("계좌번호");
+
+        verifyNoInteractions(connectionTesters);
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("MOCK 등록 시 accountNo/appKey/secretKey가 비어있으면 서버가 합성 값을 생성해 등록한다")
+    void register_mockBroker_synthesizesMissingCredentials() {
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Account.Broker.MOCK, true));
+        when(connectionTesters.of(Account.Broker.MOCK)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(null);
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.existsByAccountNo(any())).thenReturn(false);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RegisterAccountCommand cmd = new RegisterAccountCommand(
+                "모의계좌", null, null, null, null, Account.Broker.MOCK
+        );
+
+        Account result = accountService.register(userId, cmd);
+
+        assertThat(result.broker()).isEqualTo(Account.Broker.MOCK);
+        assertThat(result.accountNo()).matches("\\d{8}-\\d{2}");
+        assertThat(result.appKey()).isEqualTo("MOCK");
+        assertThat(result.secretKey()).isEqualTo("MOCK");
+    }
+
+    @Test
     @DisplayName("기존 계좌 조회와 수정은 증권사 등록 설정을 조회하지 않음")
     void existingAccountOperations_doNotLoadRuntimeSettings() {
         when(accountPort.findByUserId(userId)).thenReturn(java.util.List.of(activeAccount(userId)));

@@ -58,7 +58,6 @@
 
 ### 수량 변수명 규칙
 - **보유 잔고 수량**: `holdings` (avgPrice와 짝), **주문/체결 수량**: `quantity` (단건 거래)
-- `qty` 사용 금지 (DB 컬럼/Java 필드/JSON 키 모두)
 - `privacy_trade_base_orders.quantity` — nullable (FIDA 수신 시 수량 미확정 허용)
 - 복합 수량 필드: `orderedQuantity`/`filledQuantity` (`orderedQty`/`filledQty` 금지)
 

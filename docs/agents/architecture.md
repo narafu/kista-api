@@ -108,6 +108,10 @@ adapter/out/
   toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
                    TossDistributedTokenCoordinator(TokenCoordinator 구현) + TossRedisTokenStore (계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation을 비교하는 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자(admin) 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드,
                    TossResponseParser (숫자 파싱 헬퍼, 패키지 내부 전용), TossBrokerAdapter (공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
+  mock/          ← MockBrokerAdapter (BrokerAdapterPort + PortfolioPort/MarginPort/SellableQuantityPort/BrokerOrderCorrectionPort/ExecutionPort/BrokerPricePort/LiveBalancePort 구현; BrokerConnectionTestPort는 MockAuthApi가 구현) —
+                   증권사 API 호출 없이 DB(cycle_position/orders) 기반으로 잔고·체결 시뮬레이션. 시세는 adapter/out/marketdata/CommonMarketPriceFeed(Toss 공통 시세 재사용) 경유.
+                   getLiveBalance()의 usdDeposit은 계좌 내 전략 전체 합산값(TradingOrderBudgetAllocator가 대표 전략 1개로 계좌 전체 BUY 예산을 판단하는 기존 계약에 맞춤 — 전략별 값을 그대로 반환하면 다른 전략 잔고로 오판정)
+  marketdata/    ← CommonMarketPriceFeed — 계좌 자격증명 불필요한 공통 시세 조회 인터페이스, TossPriceApi가 구현(모의계좌가 재사용)
   kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격 조회
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter
   redis/         ← RedisBlacklistAdapter (BlacklistPort — userId/JTI 단위 JWT 블랙리스트, TTL 기반)

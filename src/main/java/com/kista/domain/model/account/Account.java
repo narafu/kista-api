@@ -21,7 +21,8 @@ public record Account(
     @RequiredArgsConstructor
     public enum Broker {
         TOSS("토스증권",    "토스"),  // 토스증권 Open API
-        KIS("한국투자증권", "한투");  // 한국투자증권 Open API
+        KIS("한국투자증권", "한투"),  // 한국투자증권 Open API
+        MOCK("모의계좌",    "모의");  // 증권사 연동 없는 DB 기반 모의매매
 
         private final String label;      // 한국어 전체 이름
         private final String shortLabel; // UI 모바일 약칭

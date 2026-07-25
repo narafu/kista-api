@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -37,25 +38,39 @@ class AccountService implements AccountUseCase {
         Account.Broker broker = cmd.broker() != null ? cmd.broker() : Account.Broker.KIS;
         requireBrokerEnabled(broker);
 
+        // MOCK은 서버가 합성 자격증명 생성, 그 외 브로커는 필수 입력 검증
+        String accountNo = cmd.accountNo();
+        String appKey = cmd.appKey();
+        String secretKey = cmd.secretKey();
+        if (broker == Account.Broker.MOCK) {
+            if (accountNo == null || accountNo.isBlank()) accountNo = generateMockAccountNo();
+            if (appKey == null || appKey.isBlank()) appKey = "MOCK";
+            if (secretKey == null || secretKey.isBlank()) secretKey = "MOCK";
+        } else if (accountNo == null || accountNo.isBlank()) {
+            throw new IllegalArgumentException("계좌번호는 필수입니다");
+        }
+        // 람다 캡처를 위한 effectively-final 복사본 (accountNo는 위 분기에서 재할당됨)
+        final String resolvedAccountNo = accountNo;
+
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
         // 전역 계좌번호 중복 체크 (크로스-유저, 해시 기반 — V11 이후 신규 등록에만 적용)
-        if (accountPort.existsByAccountNo(cmd.accountNo())) {
-            throw new Account.DuplicateAccountException(cmd.accountNo());
+        if (accountPort.existsByAccountNo(resolvedAccountNo)) {
+            throw new Account.DuplicateAccountException(resolvedAccountNo);
         }
         // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback)
         accountPort.findByUserId(userId).stream()
-                .filter(a -> a.accountNo().equals(cmd.accountNo()))
+                .filter(a -> a.accountNo().equals(resolvedAccountNo))
                 .findAny()
-                .ifPresent(a -> { throw new Account.DuplicateAccountException(cmd.accountNo()); });
+                .ifPresent(a -> { throw new Account.DuplicateAccountException(resolvedAccountNo); });
         // 증권사별 자격증명+계좌 검증 — KIS는 accountNo 소유 검증 후 null, Toss는 accountSeq 반환
         String brokerAccountCode = connectionTesters.of(broker)
-                .verifyAccount(cmd.appKey(), cmd.secretKey(), cmd.accountNo());
+                .verifyAccount(appKey, secretKey, accountNo);
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
-                cmd.accountNo(), cmd.appKey(), cmd.secretKey(),
+                accountNo, appKey, secretKey,
                 brokerAccountCode,
                 broker,
                 null    // createdAt — DB에서 자동 설정
@@ -104,5 +119,17 @@ class AccountService implements AccountUseCase {
         if (!runtimeSettingsPort.load().brokers().get(broker).enabled()) {
             throw new IllegalArgumentException(broker + " 증권사 신규 계좌 등록이 비활성화되어 있습니다");
         }
+    }
+
+    // MOCK 계좌 등록용 합성 계좌번호 생성 — KIS 형식(XXXXXXXX-XX)을 재사용해 기존 표시·마스킹 로직과 호환
+    // 충돌 시(전역 유니크 제약) 재시도 — 공간이 넓어(10^10) 실질적으로 1회 안에 끝나지만 방어적으로 유한 재시도한다
+    private String generateMockAccountNo() {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            int digits = ThreadLocalRandom.current().nextInt(100_000_000);
+            int suffix = ThreadLocalRandom.current().nextInt(100);
+            String candidate = "%08d-%02d".formatted(digits, suffix);
+            if (!accountPort.existsByAccountNo(candidate)) return candidate;
+        }
+        throw new IllegalStateException("모의계좌 번호 생성 재시도 초과");
     }
 }

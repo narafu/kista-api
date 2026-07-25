@@ -2,6 +2,7 @@ package com.kista.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.adapter.out.broker.PrevCloseCache;
+import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.model.strategy.PriceSnapshot;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class TossPriceApi {
+class TossPriceApi implements CommonMarketPriceFeed {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";

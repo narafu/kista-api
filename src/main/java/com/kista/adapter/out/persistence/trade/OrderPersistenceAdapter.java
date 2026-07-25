@@ -41,6 +41,7 @@ public class OrderPersistenceAdapter implements OrderPort {
                 strategyCycleId, tradeDate, Order.OrderStatus.PLACED));
     }
 
+
     @Override
     public void markPlaced(UUID orderId, String externalOrderId) {
         // 명시적 save로 dirty checking 의존 없이 PLACED + externalOrderId 기록

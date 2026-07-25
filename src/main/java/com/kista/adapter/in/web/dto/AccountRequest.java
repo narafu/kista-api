@@ -10,14 +10,14 @@ import jakarta.validation.constraints.Pattern;
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
-        @Schema(description = "계좌번호 — KIS: XXXXXXXX-XX (예: 74420614-01), Toss: XXX-XX-XXXXXX (예: 131-01-001931)", example = "74420614-01")
-        @NotBlank @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 KIS XXXXXXXX-XX 또는 Toss XXX-XX-XXXXXX 형식이어야 합니다")
+        @Schema(description = "계좌번호 — KIS: XXXXXXXX-XX (예: 74420614-01), Toss: XXX-XX-XXXXXX (예: 131-01-001931), MOCK: 생략 가능(서버 자동 생성)", example = "74420614-01")
+        @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 KIS XXXXXXXX-XX 또는 Toss XXX-XX-XXXXXX 형식이어야 합니다")
         String accountNo,
         @Schema(description = "API 앱 키 (KIS App Key / Toss Client ID)", example = "PSxxxxxxxxxx")
         String appKey,
         @Schema(description = "API 앱 시크릿 (KIS App Secret / Toss Client Secret)")
         String secretKey,
-        @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS"})
+        @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS", "MOCK"})
         Account.Broker broker
 ) {
     public RegisterAccountCommand toRegisterCommand() {

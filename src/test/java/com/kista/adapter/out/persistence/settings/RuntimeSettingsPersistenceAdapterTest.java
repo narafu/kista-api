@@ -1,9 +1,11 @@
 package com.kista.adapter.out.persistence.settings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.kista.domain.model.settings.RuntimeSettings;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -73,5 +75,23 @@ class RuntimeSettingsPersistenceAdapterTest {
                 org.mockito.ArgumentMatchers.eq(RuntimeSettingsPersistenceAdapter.SETTING_KEY),
                 org.mockito.ArgumentMatchers.contains("approvalRequired"));
         verify(repository).findBySettingKeyForUpdate(RuntimeSettingsPersistenceAdapter.SETTING_KEY);
+    }
+
+    @Test
+    @DisplayName("brokers 맵에 신규 enum 키(MOCK)가 없는 저장된 JSON도 defaults로 보충되어 로드된다")
+    void loadBackfillsMissingBrokerEnumKey() throws Exception {
+        // MOCK 도입 이전에 저장된 것처럼 KIS/TOSS만 있는 brokers 맵을 가진 JSON을 직접 구성
+        ObjectNode root = (ObjectNode) objectMapper.valueToTree(RuntimeSettings.defaults());
+        ((ObjectNode) root.get("brokers")).remove("MOCK");
+        String staleJson = objectMapper.writeValueAsString(root);
+
+        RuntimeSettingsEntity entity = new RuntimeSettingsEntity(
+                RuntimeSettingsPersistenceAdapter.SETTING_KEY, staleJson);
+        when(repository.findById(RuntimeSettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(entity));
+
+        RuntimeSettings loaded = adapter.load();
+
+        assertThat(loaded.brokers()).containsKey(com.kista.domain.model.account.Account.Broker.MOCK);
+        assertThat(loaded.brokers().get(com.kista.domain.model.account.Account.Broker.MOCK).enabled()).isTrue();
     }
 }
