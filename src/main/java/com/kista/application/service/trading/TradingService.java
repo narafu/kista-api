@@ -101,6 +101,10 @@ class TradingService {
         // 시장 개장 여부 확인 (1회) — 모든 전략 공통, 가격 조회 전 조기 반환
         if (!isMarketOpen(today)) return;
 
+        // 시작예정일 미도래 사이클 제외
+        contexts = filterScheduledStart(contexts, today);
+        if (contexts.isEmpty()) return;
+
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         PriceContext priceCtx = loadPriceContext(contexts, today);
 
@@ -307,6 +311,10 @@ class TradingService {
 
         if (!isMarketOpen(tradeDate)) return;
 
+        // 시작예정일 미도래 사이클 제외
+        contexts = filterScheduledStart(contexts, tradeDate);
+        if (contexts.isEmpty()) return;
+
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         PriceContext priceCtx = loadPriceContext(contexts, tradeDate);
 
@@ -459,6 +467,16 @@ class TradingService {
             notifyPort.notifyMarketClosed();
         }
         return open;
+    }
+
+    // 시작예정일 미도래 사이클 제외 — tradeDate가 startDate 이후일 때만 집행 (tradeDate > startDate)
+    private List<BatchContext> filterScheduledStart(List<BatchContext> contexts, LocalDate tradeDate) {
+        return contexts.stream().filter(ctx -> {
+            boolean started = tradeDate.isAfter(ctx.currentCycle().startDate());
+            if (!started) log.info("[strategyId={}] 시작예정일 미도래 skip (startDate={}, tradeDate={})",
+                    ctx.strategy().id(), ctx.currentCycle().startDate(), tradeDate);
+            return started;
+        }).toList();
     }
 
     // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 + 사용자 알림 후 Optional.empty() 반환 (격리 실행)

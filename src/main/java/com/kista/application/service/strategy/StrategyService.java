@@ -3,6 +3,7 @@ package com.kista.application.service.strategy;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.broker.BrokerCallGuard;
 import com.kista.common.CycleLookups;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.strategy.*;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +56,8 @@ class StrategyService implements StrategyUseCase {
 
         // 중간부터 시작 입력 검증 (세 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부
         int initialHoldings = validateBootstrapPosition(cmd);
+        // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
+        LocalDate scheduledStart = resolveScheduledStart(cmd);
         Strategy.Ticker resolvedTicker = resolved.ticker();
 
         // 종목 중복 + 잔고 검증
@@ -85,7 +89,8 @@ class StrategyService implements StrategyUseCase {
         // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
         InitialCycleResult initialResult = saveInitialCycleAndPosition(
                 persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
-                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, persisted.vrDetail());
+                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, persisted.vrDetail(),
+                scheduledStart);
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
@@ -113,6 +118,16 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)는 0보다 커야 합니다");
         }
         return normalizedHoldings;
+    }
+
+    // 시작예정일 — 기본값 오늘(KST), 과거 거부. 상한 없음
+    private LocalDate resolveScheduledStart(RegisterStrategyCommand cmd) {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate scheduled = cmd.scheduledStartDate() != null ? cmd.scheduledStartDate() : today;
+        if (scheduled.isBefore(today)) {
+            throw new IllegalArgumentException("시작예정일(scheduledStartDate)은 오늘 이후여야 합니다");
+        }
+        return scheduled;
     }
 
     // 중간부터 시작 시 시장가(전일종가) 조회 — startAmount·초기 포지션·VR V값을 동일 기준으로 정합
@@ -209,10 +224,10 @@ class StrategyService implements StrategyUseCase {
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
-            BigDecimal initialStockValue, StrategyVrDetail vrDetail) {
+            BigDecimal initialStockValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
         BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
         BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount));
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount, scheduledStart));
 
         CyclePosition initialPosition = initialHoldings > 0
                 ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(

@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record TradingCycleRequest(
         @Schema(description = "전략 종류 (등록 시 필수)", example = "INFINITE")
@@ -29,14 +30,17 @@ public record TradingCycleRequest(
         @Schema(description = "VR: 매수·매도 사다리 밴드 폭 (%, 예: 15.00)", example = "15.00")
         BigDecimal bandWidth,
         @Schema(description = "VR: 주기당 추가 예수금 (USD, 음수=인출, 0=없음)", example = "0")
-        Integer recurringAmount
+        Integer recurringAmount,
+        @Schema(description = "시작예정일, 기본값=오늘, 오늘 이후만 허용", example = "2026-08-01")
+        LocalDate scheduledStartDate
 ) {
     public RegisterStrategyCommand toRegisterCommand() {
         return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType,
                 divisionCount != null ? divisionCount : 0,
                 initialHoldings, initialAvgPrice,
                 intervalWeeks, bandWidth,
-                recurringAmount != null ? recurringAmount : 0);
+                recurringAmount != null ? recurringAmount : 0,
+                scheduledStartDate);
     }
 
     public UpdateStrategyCommand toUpdateCommand() {

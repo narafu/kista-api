@@ -1,6 +1,7 @@
 package com.kista.domain.model.strategy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 // 전략 등록 인바운드 파라미터
 public record RegisterStrategyCommand(
@@ -15,5 +16,6 @@ public record RegisterStrategyCommand(
         // VR 전략 전용 필드 (비VR 경로는 null)
         Integer intervalWeeks,                       // 리밸런싱 주기 (주 단위, 1 이상, VR 전용)
         BigDecimal bandWidth,                         // 매수·매도 사다리 밴드 폭 (%, VR 전용)
-        Integer recurringAmount                      // 주기당 추가 예수금 (USD, 음수=인출, VR 전용)
+        Integer recurringAmount,                      // 주기당 추가 예수금 (USD, 음수=인출, VR 전용)
+        LocalDate scheduledStartDate                  // 시작예정일 (null이면 오늘, 과거 거부)
 ) {}

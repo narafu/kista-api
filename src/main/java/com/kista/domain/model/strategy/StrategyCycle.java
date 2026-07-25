@@ -34,9 +34,14 @@ public record StrategyCycle(
         this(id, strategyId, null, startAmount, endAmount, startDate, endDate, createdAt, deletedAt);
     }
 
-    public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount) {
+    // 시작예정일 지정 — 미래 시작예정일 기능 전용, 기존 3-인자 오버로드는 "오늘 시작"으로 위임
+    public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount, LocalDate startDate) {
         return new StrategyCycle(null, strategyId, strategyVersionId,
-                startAmount, null, LocalDate.now(TimeZones.KST), null, null, null);
+                startAmount, null, startDate, null, null, null);
+    }
+
+    public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount) {
+        return start(strategyId, strategyVersionId, startAmount, LocalDate.now(TimeZones.KST));
     }
 
     public static StrategyCycle start(UUID strategyId, BigDecimal startAmount) {

@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.broker.Execution;
@@ -87,7 +88,7 @@ class TradingServiceTest {
     );
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null
+            UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null
     );
 
     // CyclePosition 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
@@ -569,11 +570,11 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         StrategyCycle infiniteCycle = new StrategyCycle(UUID.randomUUID(), infinite.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), 10, null, null);
         CyclePosition infiniteHistory = new CyclePosition(null, infiniteCycle.id(), new BigDecimal("1000.00"),
@@ -894,7 +895,7 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), 10, null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
@@ -1295,7 +1296,7 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.PRIVACY,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), 10, null, null);
         Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
@@ -1368,7 +1369,7 @@ class TradingServiceTest {
         // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getClosingPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
         Order existingFirst = placedOrder(ACCOUNT, STRATEGY_CYCLE);
@@ -1402,7 +1403,7 @@ class TradingServiceTest {
         // STRATEGY → 예외 발생, strategy2 → 정상 실행
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
@@ -1476,7 +1477,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN);
         StrategyCycle maintainCycle = new StrategyCycle(
-                UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now().minusDays(1), null, null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
@@ -1508,7 +1509,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -1540,7 +1541,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
@@ -1591,7 +1592,7 @@ class TradingServiceTest {
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
-                new BigDecimal("5000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("5000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         // VR 잔고 이력 — holdings=5, usdDeposit=$5000 (live 잔고 검증 통과용)
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
@@ -1650,7 +1651,7 @@ class TradingServiceTest {
 
     private StrategyCycle cycle(Strategy strategy) {
         return new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
     }
 
     private Order plannedBuy(Account account, StrategyCycle cycle, String price) {
@@ -1678,7 +1679,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -1698,5 +1699,103 @@ class TradingServiceTest {
         verify(strategyCyclePort, never()).save(any());
         // rotateCycleIfConsecutive 내부 catch → notifyError (executeBatch 바깥 catch와 별개)
         verify(notifyPort, atLeastOnce()).notifyError(any());
+    }
+
+    // ── filterScheduledStart 경계 테스트 (executeBatch/placeOpenOrders 공통) ───────
+
+    @Test
+    void executeBatch_scheduledStartEqualsTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
+        // 경계값 — startDate == tradeDate(오늘) → tradeDate.isAfter(startDate)=false → skip
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        StrategyCycle scheduledCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, today, null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, scheduledCycle, ACCOUNT, USER)), PAST_DST);
+
+        // 시작예정일 미도래 — 잔고 조회조차 진입하지 않는다 (필터에서 조기 제외)
+        verify(cycleHistoryPort, never()).findLatestOneByStrategyId(any());
+        verify(orderPort, never()).saveAll(any());
+        verify(brokerOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void executeBatch_scheduledStartAfterTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
+        // startDate > tradeDate(오늘) → 아직 미도래 → skip (경계값과 동일 분기, 요구사항 완전성 검증용)
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        StrategyCycle futureCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, today.plusDays(5), null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, futureCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(cycleHistoryPort, never()).findLatestOneByStrategyId(any());
+        verify(orderPort, never()).saveAll(any());
+        verify(brokerOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void executeBatch_scheduledStartBeforeTradeDate_executesNormally() throws InterruptedException {
+        // startDate < tradeDate(오늘) → 정상 실행 (경계값 바로 다음날)
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, today.minusDays(1), null, null, null);
+        Order template = buyTemplate(Ticker.SOXL, "20.00", Order.OrderTiming.AT_CLOSE);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(template));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(startedCycle.id()), any())).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, startedCycle, ACCOUNT, USER)), PAST_DST);
+
+        // 필터를 통과해 잔고 조회·계획 저장까지 진행된다
+        verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
+        verify(orderPort).saveAll(anyList());
+    }
+
+    @Test
+    void placeOpenOrders_scheduledStartEqualsTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
+        // 개장 스케쥴러는 tradeDate = DstInfo.nextTradeDate()(익일 거래일) 기준 — 실제 계산값을 그대로 경계로 사용
+        // (월 22:30 발화 시 tradeDate=화, 화 22:30 발화 시 tradeDate=수 — 어느 시각에 실행되든 boundary는 동일 규칙)
+        LocalDate tradeDate = DstInfo.nextTradeDate();
+        StrategyCycle scheduledCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, tradeDate, null, null, null);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, scheduledCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(cycleHistoryPort, never()).findLatestOneByStrategyId(any());
+        verify(orderPort, never()).saveAll(any());
+        verify(orderPort, never()).findAtOpenPlannedByCycleAndDate(any(), any());
+    }
+
+    @Test
+    void placeOpenOrders_scheduledStartBeforeTradeDate_executesNormally() throws InterruptedException {
+        // startDate가 다음 거래일 하루 전 — 정상적으로 개장 order 생성까지 진행
+        LocalDate tradeDate = DstInfo.nextTradeDate();
+        StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, tradeDate.minusDays(1), null, null, null);
+        Order template = buyTemplate(Ticker.SOXL, "20.00", Order.OrderTiming.AT_CLOSE);
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(template));
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, startedCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
+        verify(orderPort).saveAll(anyList());
     }
 }
