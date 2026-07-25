@@ -11,7 +11,7 @@ class TradingCycleRequestTest {
     void omittedDivisionCountMapsToCommandSentinel() {
         TradingCycleRequest request = new TradingCycleRequest(
                 Strategy.Type.INFINITE, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
 
         assertThat(request.toRegisterCommand().divisionCount()).isZero();
     }

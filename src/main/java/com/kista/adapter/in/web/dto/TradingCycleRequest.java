@@ -19,9 +19,11 @@ public record TradingCycleRequest(
         Strategy.CycleSeedType cycleSeedType,
         @Schema(description = "분할 수 (null이면 런타임 기본값)", example = "20")
         Integer divisionCount,
+        @Schema(description = "중간부터 시작 — 등록 시점 기존 보유 수량 (null/0이면 빈 포지션에서 시작)", example = "10")
+        Integer initialHoldings,
+        @Schema(description = "중간부터 시작 — 등록 시점 기존 평단가 (initialHoldings>0이면 필수)", example = "45.50")
+        BigDecimal initialAvgPrice,
         // VR 전용 필드 (비VR 등록 시 null — @NotNull 없음, 서비스 검증)
-        @Schema(description = "VR: 주식 평가금 (초기 V값)", example = "3000.00")
-        BigDecimal initialValue,
         @Schema(description = "VR: 리밸런싱 주기 (주 단위, 1 이상)", example = "4")
         Integer intervalWeeks,
         @Schema(description = "VR: 매수·매도 사다리 밴드 폭 (%, 예: 15.00)", example = "15.00")
@@ -32,7 +34,8 @@ public record TradingCycleRequest(
     public RegisterStrategyCommand toRegisterCommand() {
         return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType,
                 divisionCount != null ? divisionCount : 0,
-                initialValue, intervalWeeks, bandWidth,
+                initialHoldings, initialAvgPrice,
+                intervalWeeks, bandWidth,
                 recurringAmount != null ? recurringAmount : 0);
     }
 

@@ -1,6 +1,7 @@
 package com.kista.application.service.strategy;
 
 import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.application.service.broker.BrokerCallGuard;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.settings.StrategyCreationSettings;
@@ -8,7 +9,7 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.LiveBalancePort;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.StrategyCreationResolver;
 import com.kista.domain.strategy.StrategyCreationResolver.ResolvedCreation;
@@ -51,20 +52,29 @@ class StrategyService implements StrategyUseCase {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         ResolvedCreation resolved = resolveCreationSettings(cmd);
 
-        // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리)
+        // 중간부터 시작 입력 검증 (세 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부
+        int initialHoldings = validateBootstrapPosition(cmd);
+        Strategy.Ticker resolvedTicker = resolved.ticker();
+
+        // 종목 중복 + 잔고 검증
+        validateUniqueTicker(accountId, resolvedTicker);
+        validateBalanceIfRequired(account, accountId, userId, cmd.initialUsdDeposit());
+
+        // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
+        BigDecimal marketPrice = initialHoldings > 0 ? fetchMarketPrice(account, resolvedTicker) : null;
+        BigDecimal initialStockValue = initialHoldings > 0
+                ? marketPrice.multiply(BigDecimal.valueOf(initialHoldings)).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리) — V값은 시장가×보유수량 기준
         if (cmd.type() == Strategy.Type.VR) {
-            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount());
+            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), initialStockValue);
         }
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
         Strategy.CycleSeedType seedType = cmd.type() == Strategy.Type.VR
                 ? Strategy.CycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : Strategy.CycleSeedType.NONE);
-        Strategy.Ticker resolvedTicker = resolved.ticker();
-
-        // 종목 중복 + 잔고 검증
-        validateUniqueTicker(accountId, resolvedTicker);
-        validateBalanceIfRequired(account, accountId, userId, cmd.initialUsdDeposit());
 
         int divisionCount = resolved.divisionCount();
 
@@ -72,17 +82,10 @@ class StrategyService implements StrategyUseCase {
         var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
                 resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount());
 
-        // VR: 브로커 live 잔고 조회 (NOT_SUPPORTED 트랜잭션 — HTTP 호출 허용)
-        AccountBalance liveBalance = null;
-        if (persisted.strategy().isVr()) {
-            liveBalance = registry.require(account, LiveBalancePort.class)
-                    .getLiveBalance(account, persisted.strategy().ticker());
-        }
-
         // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
         InitialCycleResult initialResult = saveInitialCycleAndPosition(
                 persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
-                liveBalance, persisted.vrDetail(), cmd.initialValue());
+                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, persisted.vrDetail());
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
@@ -90,10 +93,33 @@ class StrategyService implements StrategyUseCase {
         if (persisted.strategy().isVr()) {
             StrategyDetail.VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
                     persisted.vrDetail(), initialResult.cycleVr());
-            int initialHoldings = liveBalance != null ? liveBalance.holdings() : 0;
             return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), null, false, null, initialHoldings, vrSummary);
         }
-        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), divisionCount, false, 0.0, 0, null);
+        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), divisionCount, false, 0.0, initialHoldings, null);
+    }
+
+    // 중간부터 시작 입력 검증 — holdings>0이면 avgPrice>0 필수, 둘 다 음수 거부. null/0이면 빈 포지션(기존 동작)
+    private int validateBootstrapPosition(RegisterStrategyCommand cmd) {
+        Integer holdings = cmd.initialHoldings();
+        BigDecimal avgPrice = cmd.initialAvgPrice();
+        if (holdings != null && holdings < 0) {
+            throw new IllegalArgumentException("보유 수량(initialHoldings)은 0 이상이어야 합니다");
+        }
+        if (avgPrice != null && avgPrice.signum() < 0) {
+            throw new IllegalArgumentException("평단가(initialAvgPrice)는 0 이상이어야 합니다");
+        }
+        int normalizedHoldings = holdings != null ? holdings : 0;
+        if (normalizedHoldings > 0 && (avgPrice == null || avgPrice.signum() <= 0)) {
+            throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)는 0보다 커야 합니다");
+        }
+        return normalizedHoldings;
+    }
+
+    // 중간부터 시작 시 시장가(전일종가) 조회 — startAmount·초기 포지션·VR V값을 동일 기준으로 정합
+    // 조회 실패 시 등록 자체가 실패한다 — BrokerCallGuard가 IllegalStateException으로 래핑해 GlobalExceptionHandler 400 매핑
+    private BigDecimal fetchMarketPrice(Account account, Strategy.Ticker ticker) {
+        return BrokerCallGuard.wrap("전일종가 조회",
+                () -> registry.require(account, BrokerPricePort.class).getPrevClose(ticker, account));
     }
 
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
@@ -107,15 +133,15 @@ class StrategyService implements StrategyUseCase {
     }
 
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
+    // initialValue: 시장가×보유수량으로 계산된 V값 (register()에서 전달, null 아님)
     private void validateVrCommand(RegisterStrategyCommand cmd, Integer intervalWeeks,
-                                   BigDecimal bandWidth, Integer recurringAmount) {
+                                   BigDecimal bandWidth, Integer recurringAmount, BigDecimal initialValue) {
         if (intervalWeeks == null || intervalWeeks <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
         }
         if (bandWidth == null || bandWidth.signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭(bandWidth)은 0보다 커야 합니다");
         }
-        BigDecimal initialValue = normalizeMoney(cmd.initialValue());
         BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
         BigDecimal initialAssets = initialValue.add(initialUsdDeposit);
@@ -179,27 +205,29 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
+    // startAmount = 현금 + 시장가×보유수량 (세 전략 공통 — 중간부터 시작해도 등록 직후 미실현손익 0)
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
-            AccountBalance liveBalance, StrategyVrDetail vrDetail, BigDecimal initialValue) {
+            int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
+            BigDecimal initialStockValue, StrategyVrDetail vrDetail) {
         BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
-        BigDecimal normalizedInitialValue = normalizeMoney(initialValue);
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, normalizedInitialUsdDeposit));
+        BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount));
+
+        CyclePosition initialPosition = initialHoldings > 0
+                ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
+                        cycle.id(), normalizedInitialUsdDeposit, initialHoldings, initialAvgPrice, marketPrice))
+                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
+
         if (saved.isInfinite()) {
-            // 초기 스냅샷: 입금액 기준, 보유 없음 — 실제 종가는 첫 매매 후 저장
-            CyclePosition initialPosition = cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
             return new InitialCycleResult(cycle, null);
         } else if (saved.isVr()) {
             StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
-                    cycle.id(), normalizedInitialUsdDeposit, normalizedInitialValue, vrDetail);
-            int holdings = liveBalance != null ? liveBalance.holdings() : 0;
-            BigDecimal avgPrice = liveBalance != null ? liveBalance.avgPrice() : null;
-            cyclePositionPort.save(CyclePosition.vrInitialSnapshot(cycle.id(), normalizedInitialUsdDeposit, holdings, avgPrice));
+                    cycle.id(), normalizedInitialUsdDeposit, initialStockValue, vrDetail);
             return new InitialCycleResult(cycle, savedCycleVr);
         } else {
-            // PRIVACY: 초기 스냅샷, 보유 없음
-            cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
+            // PRIVACY
             return new InitialCycleResult(cycle, null);
         }
     }

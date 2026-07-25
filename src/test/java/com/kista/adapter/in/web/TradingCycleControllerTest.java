@@ -316,7 +316,6 @@ class TradingCycleControllerTest {
                                 {
                                   "type": "VR",
                                   "initialUsdDeposit": 2000.00,
-                                  "initialValue": 3000.00,
                                   "intervalWeeks": 4,
                                   "bandWidth": 15.00,
                                   "recurringAmount": 0

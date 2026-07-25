@@ -32,10 +32,11 @@ public record CyclePosition(
                 balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
     }
 
-    // VR 전략 첫 등록 시 초기 포지션 — 예수금은 pool, 보유/평단은 live 잔고 값
-    public static CyclePosition vrInitialSnapshot(UUID strategyCycleId, BigDecimal pool,
-                                                   int holdings, BigDecimal avgPrice) {
-        return new CyclePosition(null, strategyCycleId, pool, null, avgPrice, holdings, null, null);
+    // 중간부터 시작 — 기존 보유 수량·평단가로 seed하는 초기 포지션 (세 전략 공통)
+    // closingPrice: 등록 시점 조회한 시장가(전일종가) — startAmount·VR V값과 동일 기준으로 정합해 등록 직후 미실현손익 0
+    public static CyclePosition bootstrapSnapshot(UUID strategyCycleId, BigDecimal usdDeposit,
+                                                    int holdings, BigDecimal avgPrice, BigDecimal closingPrice) {
+        return new CyclePosition(null, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, null, null);
     }
 
     // DB 저장 포지션 → 매매 계산용 잔고 변환 (tradeSnapshot의 역방향)
