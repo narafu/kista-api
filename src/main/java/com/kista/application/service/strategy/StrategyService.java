@@ -98,9 +98,9 @@ class StrategyService implements StrategyUseCase {
         if (persisted.strategy().isVr()) {
             StrategyDetail.VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
                     persisted.vrDetail(), initialResult.cycleVr());
-            return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), null, false, null, initialHoldings, vrSummary);
+            return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
         }
-        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), divisionCount, false, 0.0, initialHoldings, null);
+        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
     }
 
     // 중간부터 시작 입력 검증 — holdings>0이면 avgPrice>0 필수, 둘 다 음수 거부. null/0이면 빈 포지션(기존 동작)
@@ -368,6 +368,7 @@ class StrategyService implements StrategyUseCase {
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
+        LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         Integer divisionCount = strategy.isInfinite()
                 ? strategyVersionPort.findActiveByStrategyId(strategy.id())
@@ -396,7 +397,7 @@ class StrategyService implements StrategyUseCase {
                 ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle).orElse(null)
                 : null;
 
-        return new StrategyDetail(strategy, initialUsdDeposit, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
+        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
     }
 
 }

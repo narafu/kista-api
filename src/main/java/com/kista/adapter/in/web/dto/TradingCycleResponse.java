@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.StrategyDetail;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record TradingCycleResponse(
@@ -21,6 +22,8 @@ public record TradingCycleResponse(
         String ticker,
         @Schema(description = "초기 입금액", example = "2000.00")
         BigDecimal initialUsdDeposit,
+        @Schema(description = "사이클 시작일 (미래면 시작예정일 — 이 날짜 이후 첫 거래일부터 매매 시작)", example = "2026-08-01")
+        LocalDate startDate,
         @Schema(description = "연속 사이클 정책", example = "NONE")
         String cycleSeedType,
         @Schema(description = "분할 수 (INFINITE 전략만 non-null)", example = "20")
@@ -63,6 +66,7 @@ public record TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
                 c.ticker().name(), detail.initialUsdDeposit(),
+                detail.startDate(),
                 c.cycleSeedType() != null ? c.cycleSeedType().name() : Strategy.CycleSeedType.NONE.name(),
                 detail.divisionCount(),
                 detail.isReverseMode(),
