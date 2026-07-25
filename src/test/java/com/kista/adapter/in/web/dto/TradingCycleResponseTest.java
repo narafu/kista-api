@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.StrategyDetail;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,11 +17,24 @@ class TradingCycleResponseTest {
         Strategy strategy = new Strategy(
                 UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.INFINITE,
                 Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), 20, false, null, 0, null);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null);
 
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
         assertThat(response.divisionCount()).isEqualTo(20);
         assertThat(response.currentHoldings()).isZero();
+    }
+
+    @Test
+    void from_strategyDetail_mapsStartDate() {
+        Strategy strategy = new Strategy(
+                UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), startDate, 20, false, null, 0, null);
+
+        TradingCycleResponse response = TradingCycleResponse.from(detail);
+
+        assertThat(response.startDate()).isEqualTo(startDate);
     }
 }

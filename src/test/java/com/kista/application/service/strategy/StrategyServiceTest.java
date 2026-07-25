@@ -168,14 +168,18 @@ class StrategyServiceTest {
         UUID cycleId = UUID.randomUUID();
         Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, Strategy.Status.ACTIVE, ticker,
                 Strategy.CycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(strategyPort.save(any())).thenReturn(saved);
-        when(strategyCyclePort.save(any())).thenReturn(cycle);
+        // 저장 인자(특히 startDate)를 그대로 반영 — 고정값 반환 시 scheduledStartDate 검증이 무의미해짐
+        when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
+            StrategyCycle arg = invocation.getArgument(0);
+            return new StrategyCycle(cycleId, arg.strategyId(), arg.strategyVersionId(),
+                    arg.startAmount(), arg.endAmount(), arg.startDate(), arg.endDate(),
+                    arg.createdAt(), arg.deletedAt());
+        });
         when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         if (type == Strategy.Type.VR) {
             when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
@@ -976,6 +980,8 @@ class StrategyServiceTest {
         StrategyDetail detail = result.get(0);
         assertThat(detail.divisionCount()).isNull();
         assertThat(detail.currentRound()).isNull();
+        // toDetail()이 조립하는 startDate는 findLatestByStrategyId로 조회한 사이클의 startDate와 일치해야 함
+        assertThat(detail.startDate()).isEqualTo(vrCycle.startDate());
         assertThat(detail.vr()).isNotNull();
         assertThat(detail.vr().intervalWeeks()).isEqualTo(4);
         assertThat(detail.vr().bandWidth()).isEqualByComparingTo("15.00");
@@ -1195,11 +1201,13 @@ class StrategyServiceTest {
                 Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
                 null, null, null, null, null, scheduledStart);
 
-        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         ArgumentCaptor<StrategyCycle> captor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(captor.capture());
         assertThat(captor.getValue().startDate()).isEqualTo(scheduledStart);
+        // register() 반환 StrategyDetail의 startDate도 저장된 사이클 시작일과 일치해야 함
+        assertThat(detail.startDate()).isEqualTo(scheduledStart);
     }
 
     @Test
