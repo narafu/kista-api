@@ -45,7 +45,7 @@ class StrategyVrVersionEntity extends BaseAuditEntity {
     @Column(name = "g_max", nullable = false)
     private int gMax; // gradient 램프 상한값
 
-    @Column(name = "initial_pool_limit_rate", nullable = false, precision = 6, scale = 4)
+    @Column(name = "initial_pool_limit_rate", nullable = false, precision = 6, scale = 2)
     private BigDecimal initialPoolLimitRate; // 램프 시작 시점(경과 0주)의 poolLimitRate 값
 
     @Column(name = "p_grace_weeks", nullable = false)
@@ -54,6 +54,6 @@ class StrategyVrVersionEntity extends BaseAuditEntity {
     @Column(name = "p_step_weeks", nullable = false)
     private int pStepWeeks; // poolLimitRate 램프 단계 주기(주)
 
-    @Column(name = "pool_limit_floor", nullable = false, precision = 6, scale = 4)
+    @Column(name = "pool_limit_floor", nullable = false, precision = 6, scale = 2)
     private BigDecimal poolLimitFloor; // poolLimitRate 램프 하한값
 }
