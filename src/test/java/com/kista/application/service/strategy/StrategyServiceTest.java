@@ -1122,6 +1122,7 @@ class StrategyServiceTest {
         assertThat(detail.vr().intervalWeeks()).isEqualTo(4);
         assertThat(detail.vr().bandWidth()).isEqualByComparingTo("15.00");
         assertThat(detail.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(detail.vr().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(detail.vr().gradient()).isEqualTo(10);
     }
 

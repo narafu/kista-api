@@ -60,7 +60,7 @@ public class VrStrategyLifecycle {
                 : null;
         return new StrategyDetail.VrSummary(
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
-                vrDetail.recurringAmount(), poolLimit, cycleVr.gradient(),
+                vrDetail.recurringAmount(), poolLimit, cycleVr.poolLimitRate(), cycleVr.gradient(),
                 vrDetail.initialGradient(), vrDetail.gGraceWeeks(), vrDetail.gStepWeeks(), vrDetail.gMax(),
                 vrDetail.initialPoolLimitRate(), vrDetail.pGraceWeeks(), vrDetail.pStepWeeks(), vrDetail.poolLimitFloor());
     }

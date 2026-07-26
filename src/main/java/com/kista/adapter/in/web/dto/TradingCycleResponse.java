@@ -50,6 +50,8 @@ public record TradingCycleResponse(
             int recurringAmount,
             @Schema(description = "pool 상한 금액 (USD)")
             BigDecimal poolLimit,
+            @Schema(description = "pool 상한 비율(0~1) — 현재 사이클 고정 스냅샷", example = "0.75")
+            BigDecimal poolLimitRate,
             @Schema(description = "실력공식 경사 계수 (G) — 현재 사이클 고정 스냅샷", example = "10")
             int gradient,
             @Schema(description = "램프 시작 시점(경과 0주) gradient(G) 값", example = "10")
@@ -72,7 +74,7 @@ public record TradingCycleResponse(
         // StrategyDetail.VrSummary → 응답 DTO 변환
         static VrSummary from(StrategyDetail.VrSummary s) {
             return new VrSummary(s.value(), s.bandWidth(), s.intervalWeeks(),
-                    s.recurringAmount(), s.poolLimit(), s.gradient(),
+                    s.recurringAmount(), s.poolLimit(), s.poolLimitRate(), s.gradient(),
                     s.initialGradient(), s.gGraceWeeks(), s.gStepWeeks(), s.gMax(),
                     s.initialPoolLimitRate(), s.pGraceWeeks(), s.pStepWeeks(), s.poolLimitFloor());
         }

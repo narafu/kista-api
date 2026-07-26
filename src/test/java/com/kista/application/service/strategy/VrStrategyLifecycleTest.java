@@ -106,6 +106,7 @@ class VrStrategyLifecycleTest {
         assertThat(result).isPresent();
         assertThat(result.get().intervalWeeks()).isEqualTo(4);
         assertThat(result.get().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.get().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(result.get().gradient()).isEqualTo(10);
     }
 

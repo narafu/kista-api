@@ -22,6 +22,7 @@ public record StrategyDetail(
             int intervalWeeks,       // 리밸런싱 주기 (주 단위)
             int recurringAmount,     // 주기당 추가 예수금 (USD, 음수=인출)
             BigDecimal poolLimit,    // 사이클 pool 상한 금액 (USD, startAmount×poolLimitRate 파생값)
+            BigDecimal poolLimitRate, // 사이클에 고정된 pool 상한 비율(0~1) — 현재 사이클 고정 스냅샷
             int gradient,            // 실력공식 경사 계수 (G) — 현재 사이클 고정 스냅샷
             // 램프 설정값 — StrategyVrDetail 원본 그대로 노출 (gradientAt/poolLimitRateAt 재계산에 필요)
             int initialGradient,             // 램프 시작 시점(경과 0주)의 gradient(G) 값
