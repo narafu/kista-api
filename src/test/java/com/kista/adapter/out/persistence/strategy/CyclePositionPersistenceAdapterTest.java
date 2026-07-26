@@ -156,11 +156,11 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 """, String.class))
                 .containsExactly("cycle_position_id", "is_reverse_mode", "created_at", "deleted_at");
 
-        String migration = Files.readString(Path.of("src/main/resources/db/migration/V17__split_infinite_strategy_details.sql"));
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V1__init.sql"));
 
-        assertThat(migration).contains("INSERT INTO cycle_position_infinite (cycle_position_id, is_reverse_mode, created_at, deleted_at)");
-        assertThat(migration).contains("SELECT id, is_reverse_mode, created_at, deleted_at");
-        assertThat(migration).doesNotContain("FROM cycle_position\nWHERE deleted_at IS NULL;");
+        assertThat(migration).contains("CREATE TABLE cycle_position_infinite");
+        assertThat(migration).contains("is_reverse_mode   BOOLEAN     NOT NULL");
+        assertThat(migration).contains("deleted_at        TIMESTAMPTZ");
     }
 
     // ===== findByUserAndRange — raw JDBC로 FK 체인·created_at·deleted_at을 직접 통제 =====

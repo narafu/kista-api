@@ -124,10 +124,10 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 """, String.class))
                 .containsExactly("strategy_version_id", "division_count", "created_at", "updated_at", "deleted_at");
 
-        String migration = Files.readString(Path.of("src/main/resources/db/migration/V17__split_infinite_strategy_details.sql"));
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V1__init.sql"));
 
-        assertThat(migration).contains("INSERT INTO strategy_infinite_version (strategy_version_id, division_count, created_at, updated_at, deleted_at)");
-        assertThat(migration).contains("JOIN strategy_version sv ON sv.strategy_id = s.id");
-        assertThat(migration).contains("WHERE s.type = 'INFINITE';");
+        assertThat(migration).contains("CREATE TABLE strategy_infinite_version");
+        assertThat(migration).contains("division_count      INTEGER     NOT NULL");
+        assertThat(migration).contains("deleted_at          TIMESTAMPTZ");
     }
 }
