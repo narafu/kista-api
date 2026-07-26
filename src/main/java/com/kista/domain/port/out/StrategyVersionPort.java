@@ -2,6 +2,7 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.strategy.StrategyVersion;
 
+import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,4 +22,7 @@ public interface StrategyVersionPort {
     int nextVersionNo(UUID strategyId);
 
     void deleteByStrategyId(UUID strategyId);
+
+    // 운영 중 재설정 시 활성 버전만 소프트 삭제 — 전략 삭제(deleteByStrategyId)와 달리 새 버전 발급 직전 호출
+    void softDeleteActiveByStrategyId(UUID strategyId, Instant now);
 }

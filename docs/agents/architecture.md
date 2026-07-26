@@ -16,9 +16,9 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     account/     ← Account (nested exceptions: InvalidBrokerKeyException, KisRateLimitException, DuplicateAccountException), Broker,
                    Register/UpdateAccountCommand, SellableQuantity
     strategy/    ← Strategy (nested: Type{INFINITE/PRIVACY/VR}, Status, Ticker, CycleSeedType), StrategyCycle, CyclePosition, StrategyDetail,
-                   CyclePositionHistoryEntry, CycleHistoryPage, Register/UpdateStrategyCommand, BatchContext, InfinitePosition, ReverseModePosition,
+                   CyclePositionHistoryEntry, CycleHistoryPage, Register/UpdateStrategyCommand, ReconfigureVrCommand(VR 운영 중 재설정), BatchContext, InfinitePosition, ReverseModePosition,
                    AccountBalance, TradingSnapshot, TradingReport, DstInfo, PriceSnapshot,
-                   StrategyVrDetail(+gradient()/poolLimitRate()), StrategyCycleVrDetail, VrPosition(+lowerBand/upperBand/buyPrice/sellPrice/nextValue())
+                   StrategyVrDetail(+gradientAt(weeks)/poolLimitRateAt(weeks) 램프 8필드 포함), StrategyCycleVrDetail(value·gradient·poolLimitRate 스냅샷), VrPosition(+lowerBand/upperBand/buyPrice/sellPrice/nextValue())
     order/       ← Order, TradeEvent, CancelResult, NextOrdersPreview
                    Order.withPlaced(externalOrderId) — 브로커 접수 완료 표시 헬퍼
                    OrderPort 조회/삭제는 strategyCycleId+tradeDate 기준 (cycle 단위 격리)
@@ -85,7 +85,7 @@ adapter/in/
                    BatchContextFactory (전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError)
                    SchedulerJobRunner (공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
                    SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
-  web/           ← REST Controller + DTO: Auth(카카오/JWT/승인/탈퇴/SSE), Account(CRUD+연결테스트), TradingCycle(CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`),
+  web/           ← REST Controller + DTO: Auth(카카오/JWT/승인/탈퇴/SSE), Account(CRUD+연결테스트), TradingCycle(CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`+`PUT /api/trading-cycles/{id}/vr-config` VR 운영 중 재설정),
                    Dashboard(DB기반 사이클 이력), Statistics(KIS 전용 live), TossStatistics(Toss 전용 live 5개), Stats(`GET /api/stats/*` DB 근사 집계 — summary/equity-curve(type optional)/cycles/housing-benchmark), FearGreed(`GET /api/market/fear-greed`),
                    Meta(`GET /api/meta` enum SSOT 번들만, Cache 1h), OrderCancel, MarketHoliday(휴장일/세션 DIRECT|BLOCKED), FidaOrder(`/api/internal/**`, X-Internal-Token),
                    Settings(텔레그램+알림채널), Fcm, TradeStream(SSE), Admin*(`/api/admin/**` — Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade),
@@ -212,8 +212,9 @@ adapter/out/
 ### VR 전략 패턴 (밸류리밸런싱)
 공식·bootstrap 규칙·가격 캡·롤오버 조건의 SSOT는 constraints.md "VR 공식" — 여기서는 구조·흐름만 기록.
 - **TQQQ 전용** — `Strategy.Type.VR.resolveTicker()` → `Ticker.TQQQ` 강제. divisionCount 없음(null 직렬화), cycleSeedType=NONE 강제
-- `strategy_vr_version` (`StrategyVrVersionEntity`): 전략 버전별 VR 설정 — intervalWeeks(롤오버 주기), bandWidth(밴드 폭 %), recurringAmount(USD, 양수=적립·0=거치·음수=인출)
-- `strategy_cycle_vr` (`StrategyCycleVrEntity`): 사이클 시작 시 스냅샷 — value(사이클 기준 V값), gradient, poolLimit
+- `strategy_vr_version` (`StrategyVrVersionEntity`): 전략 버전별 VR 설정 — intervalWeeks(롤오버 주기), bandWidth(밴드 폭 %), recurringAmount(USD, 양수=적립·0=거치·음수=인출) + 램프 파라미터 8개(initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor)
+- `strategy_cycle_vr` (`StrategyCycleVrEntity`): 사이클 시작 시 스냅샷 — value(사이클 기준 V값), gradient(경과주수 기준 `gradientAt()` 재계산값), poolLimitRate(비율 스냅샷, 달러 아님 — poolLimit은 `startAmount×poolLimitRate`로 조회 시점 파생)
 - 주문 생성: `CycleOrderComputer` → `VrCycleOrderStrategy.plan()` → `VrStrategy.buildOrders()` → 매수·매도 사다리 LIMIT+AT_OPEN 주문 생성 (bootstrap은 LOC+AT_CLOSE)
 - **holdings=0에도 사이클 유지** — `endsCycleOnLiquidation()=false`, `CyclePositionPersistor`가 종료 미발동
-- **N주 롤오버**: `VrCycleRolloverService.rollIfDue()` — `CyclePositionPersistor`의 포지션 저장 직후 매일 판정, due이면 V′ 계산 후 기존 사이클 종료 + 새 사이클 원자 생성 (V′≤0 보류 등 규칙 → constraints.md)
+- **N주 롤오버**: `VrCycleRolloverService.rollIfDue()` — `CyclePositionPersistor`의 포지션 저장 직후 매일 판정, due이면 V′ 계산 후 기존 사이클 종료 + 새 사이클 원자 생성 (V′≤0 보류 등 규칙 → constraints.md). gradient·poolLimitRate는 스냅샷 이월이 아닌 전략 최초 사이클 startDate 기준 경과주수로 매번 재계산
+- **운영 중 재설정**: `VrReconfigureService`(`application/service/trading`, package-private) + `VrReconfigureUseCase` — `PUT /api/trading-cycles/{id}/vr-config`로 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입(수량/예수금)을 새 버전 발급+강제 롤오버 1회로 처리. 상세 규칙 → constraints.md "VR 공식"

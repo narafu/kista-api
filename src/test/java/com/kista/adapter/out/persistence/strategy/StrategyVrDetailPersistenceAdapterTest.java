@@ -37,6 +37,13 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
 
     private UUID accountId;
 
+    // 램프가 개입하지 않는(고정값처럼 동작하는) 기본 테스트 데이터 — gMax=initialGradient, poolLimitFloor=initialPoolLimitRate
+    private static StrategyVrDetail noRampDetail(UUID versionId, int intervalWeeks, BigDecimal bandWidth, int recurringAmount) {
+        return new StrategyVrDetail(versionId, intervalWeeks, bandWidth, recurringAmount,
+                10, 52, 26, 10,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+    }
+
     @BeforeEach
     void setUp() {
         UUID userId = UUID.randomUUID();
@@ -61,8 +68,7 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
 
-        StrategyVrDetail detail = new StrategyVrDetail(
-                version.id(), 4, new BigDecimal("15.00"), 100);
+        StrategyVrDetail detail = noRampDetail(version.id(), 4, new BigDecimal("15.00"), 100);
 
         // RED → GREEN: save 후 findByVersionId로 왕복 검증
         StrategyVrDetail saved = vrDetailAdapter.save(detail);
@@ -72,8 +78,42 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(saved.intervalWeeks()).isEqualTo(4);
         assertThat(saved.bandWidth()).isEqualByComparingTo(new BigDecimal("15.00"));
         assertThat(saved.recurringAmount()).isEqualTo(100);
+        assertThat(saved.initialGradient()).isEqualTo(10);
+        assertThat(saved.gGraceWeeks()).isEqualTo(52);
+        assertThat(saved.gStepWeeks()).isEqualTo(26);
+        assertThat(saved.gMax()).isEqualTo(10);
+        assertThat(saved.initialPoolLimitRate()).isEqualByComparingTo(new BigDecimal("0.75"));
+        assertThat(saved.pGraceWeeks()).isEqualTo(52);
+        assertThat(saved.pStepWeeks()).isEqualTo(26);
+        assertThat(saved.poolLimitFloor()).isEqualByComparingTo(new BigDecimal("0.75"));
         assertThat(found).isPresent();
         assertThat(found.get()).isEqualTo(saved);
+    }
+
+    @Test
+    void save_andFindByVersionId_roundTrip_withActiveRamp() {
+        // 램프가 실제로 개입하는(gMax>initial, floor<initial) 값도 그대로 왕복되는지 검증
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyVersion version = strategyVersionAdapter.save(
+                new StrategyVersion(null, strategy.id(), 1, null, null));
+
+        StrategyVrDetail detail = new StrategyVrDetail(
+                version.id(), 4, new BigDecimal("15.00"), 100,
+                10, 52, 26, 15,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+
+        StrategyVrDetail saved = vrDetailAdapter.save(detail);
+        Optional<StrategyVrDetail> found = vrDetailAdapter.findByStrategyVersionId(version.id());
+
+        assertThat(found).isPresent();
+        assertThat(found.get().gMax()).isEqualTo(15);
+        assertThat(found.get().poolLimitFloor()).isEqualByComparingTo(new BigDecimal("0.50"));
+        // gradientAt/poolLimitRateAt이 유예기간 이후 실제로 램프 상승/하강하는지도 확인
+        assertThat(found.get().gradientAt(200)).isEqualTo(15);
+        assertThat(found.get().poolLimitRateAt(200)).isEqualByComparingTo(new BigDecimal("0.50"));
     }
 
     @Test
@@ -96,8 +136,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         StrategyVersion v2 = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 2, null, null));
 
-        vrDetailAdapter.save(new StrategyVrDetail(v1.id(), 4, new BigDecimal("10.00"), 0));
-        StrategyVrDetail latestDetail = new StrategyVrDetail(v2.id(), 8, new BigDecimal("20.00"), 200);
+        vrDetailAdapter.save(noRampDetail(v1.id(), 4, new BigDecimal("10.00"), 0));
+        StrategyVrDetail latestDetail = noRampDetail(v2.id(), 8, new BigDecimal("20.00"), 200);
         vrDetailAdapter.save(latestDetail);
 
         // 활성 버전 중 created_at DESC LIMIT 1 — v2가 나중에 생성되므로 v2 반환
@@ -123,8 +163,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         StrategyVersion v2 = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 2, null, null));
 
-        vrDetailAdapter.save(new StrategyVrDetail(v1.id(), 4, new BigDecimal("10.00"), 100));
-        vrDetailAdapter.save(new StrategyVrDetail(v2.id(), 8, new BigDecimal("20.00"), 200));
+        vrDetailAdapter.save(noRampDetail(v1.id(), 4, new BigDecimal("10.00"), 100));
+        vrDetailAdapter.save(noRampDetail(v2.id(), 8, new BigDecimal("20.00"), 200));
 
         // JPA flush 후 v2 soft-delete 직접 적용 (adapter 메서드는 active 전체 삭제라 v1도 포함됨)
         entityManager.flush();
@@ -159,10 +199,10 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
 
-        vrDetailAdapter.save(new StrategyVrDetail(version.id(), 4, new BigDecimal("15.00"), 100));
+        vrDetailAdapter.save(noRampDetail(version.id(), 4, new BigDecimal("15.00"), 100));
         // 같은 PK로 다시 저장 — intervalWeeks 변경
         StrategyVrDetail updated = vrDetailAdapter.save(
-                new StrategyVrDetail(version.id(), 8, new BigDecimal("25.00"), 50));
+                noRampDetail(version.id(), 8, new BigDecimal("25.00"), 50));
 
         Optional<StrategyVrDetail> found = vrDetailAdapter.findByStrategyVersionId(version.id());
         assertThat(found).isPresent();

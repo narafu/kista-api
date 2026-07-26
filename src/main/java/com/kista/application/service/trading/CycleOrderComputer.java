@@ -37,7 +37,7 @@ class CycleOrderComputer {
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final StrategyCyclePort strategyCyclePort;            // VR 최초 사이클 판정용
-    private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimit)
+    private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimitRate)
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
     private final TradingDayCounter tradingDayCounter;       // VR 첫 사이클 분할 거래일 계산
@@ -87,8 +87,12 @@ class CycleOrderComputer {
             boolean firstCycle = isFirstOpenCycle(currentCycle);
             boolean cycleDue = !tradeDate.isBefore(dueDate);
             int remainingTradingDays = tradingDayCounter.countOpenDaysInclusive(tradeDate, dueDate);
+            // poolLimit(달러)은 더 이상 저장값이 아닌 파생값 — 현재 사이클 시작 시드(startAmount) × 고정 poolLimitRate 스냅샷
+            BigDecimal poolLimit = currentCycle.startAmount()
+                    .multiply(cycleVr.poolLimitRate())
+                    .setScale(2, RoundingMode.HALF_UP);
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
-                    cycleVr.value(), vrDetail.bandWidth(), cycleVr.poolLimit(), poolUsed, currentPrice,
+                    cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, currentPrice,
                     firstCycle, cycleDue, remainingTradingDays, vrDetail.recurringAmount());
         }
 

@@ -71,8 +71,12 @@ class StrategyService implements StrategyUseCase {
                 : BigDecimal.ZERO;
 
         // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리) — V값은 시장가×보유수량 기준
+        // 램프 파라미터(gradient/poolLimitRate 경과주수 함수)는 RuntimeSettings 정책 밖 — 요청값 정규화 후 여기서 직접 검증
+        VrRampParams ramp = null;
         if (cmd.type() == Strategy.Type.VR) {
-            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), initialStockValue);
+            int normalizedRecurringAmount = resolved.recurringAmount() != null ? resolved.recurringAmount() : 0;
+            ramp = normalizeVrRampParams(cmd, normalizedRecurringAmount);
+            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), initialStockValue, ramp);
         }
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
@@ -84,7 +88,7 @@ class StrategyService implements StrategyUseCase {
 
         // 전략·버전·상세 저장 (strategy → strategy_versions → 전략별 detail)
         var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
-                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount());
+                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp);
 
         // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
         InitialCycleResult initialResult = saveInitialCycleAndPosition(
@@ -94,10 +98,10 @@ class StrategyService implements StrategyUseCase {
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
-        // VR 응답 조립 — VrSummary
+        // VR 응답 조립 — VrSummary (poolLimit 달러 파생을 위해 startAmount 전달)
         if (persisted.strategy().isVr()) {
             StrategyDetail.VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
-                    persisted.vrDetail(), initialResult.cycleVr());
+                    persisted.vrDetail(), initialResult.cycleVr(), initialResult.cycle().startAmount());
             return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
         }
         return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
@@ -150,7 +154,8 @@ class StrategyService implements StrategyUseCase {
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
     // initialValue: 시장가×보유수량으로 계산된 V값 (register()에서 전달, null 아님)
     private void validateVrCommand(RegisterStrategyCommand cmd, Integer intervalWeeks,
-                                   BigDecimal bandWidth, Integer recurringAmount, BigDecimal initialValue) {
+                                   BigDecimal bandWidth, Integer recurringAmount, BigDecimal initialValue,
+                                   VrRampParams ramp) {
         if (intervalWeeks == null || intervalWeeks <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
         }
@@ -173,6 +178,52 @@ class StrategyService implements StrategyUseCase {
                 throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 " + required + " 이상이어야 합니다");
             }
         }
+
+        // 램프 파라미터 검증 — 정규화된(null 아님) 값 기준
+        if (ramp.initialGradient() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 gradient(initialGradient)는 0보다 커야 합니다");
+        }
+        if (ramp.gStepWeeks() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 gradient 스텝 주기(gStepWeeks)는 0보다 커야 합니다");
+        }
+        if (ramp.gGraceWeeks() < 0) {
+            throw new IllegalArgumentException("VR 전략의 gradient 유예 주수(gGraceWeeks)는 0 이상이어야 합니다");
+        }
+        if (ramp.gMax() < ramp.initialGradient()) {
+            throw new IllegalArgumentException("VR 전략의 gradient 상한(gMax)은 initialGradient 이상이어야 합니다");
+        }
+        if (ramp.pStepWeeks() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0보다 커야 합니다");
+        }
+        if (ramp.pGraceWeeks() < 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 유예 주수(pGraceWeeks)는 0 이상이어야 합니다");
+        }
+        if (ramp.poolLimitFloor().signum() <= 0
+                || ramp.poolLimitFloor().compareTo(ramp.initialPoolLimitRate()) > 0
+                || ramp.initialPoolLimitRate().compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException(
+                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate <= 1 이어야 합니다");
+        }
+    }
+
+    // VR 램프 파라미터 정규화 — 미지정 필드를 recurringAmount 부호·관례값(52주 유예/26주 스텝)으로 채운다
+    // gMax/poolLimitFloor 미지정 시 initial* 값을 그대로 사용해 램프가 사실상 비활성화(no-op)되도록 한다
+    private VrRampParams normalizeVrRampParams(RegisterStrategyCommand cmd, int normalizedRecurringAmount) {
+        int initialGradient = cmd.initialGradient() != null
+                ? cmd.initialGradient()
+                : (normalizedRecurringAmount < 0 ? 20 : 10);
+        int gGraceWeeks = cmd.gGraceWeeks() != null ? cmd.gGraceWeeks() : 52;
+        int gStepWeeks = cmd.gStepWeeks() != null ? cmd.gStepWeeks() : 26;
+        int gMax = cmd.gMax() != null ? cmd.gMax() : initialGradient;
+        BigDecimal initialPoolLimitRate = cmd.initialPoolLimitRate() != null
+                ? cmd.initialPoolLimitRate()
+                : normalizedRecurringAmount > 0 ? new BigDecimal("0.75")
+                        : normalizedRecurringAmount == 0 ? new BigDecimal("0.50") : new BigDecimal("0.25");
+        int pGraceWeeks = cmd.pGraceWeeks() != null ? cmd.pGraceWeeks() : 52;
+        int pStepWeeks = cmd.pStepWeeks() != null ? cmd.pStepWeeks() : 26;
+        BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : initialPoolLimitRate;
+        return new VrRampParams(initialGradient, gGraceWeeks, gStepWeeks, gMax,
+                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
     }
 
     // VR 금액 입력 null은 사용자가 0을 입력한 것과 동일하게 취급
@@ -201,10 +252,11 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy → strategy_versions → 전략 타입별 detail 순 저장
+    // ramp: VR 등록일 때만 non-null (register()에서 정규화 완료 후 전달)
     private SavedStrategyAndVersion saveStrategyWithVersion(
             UUID accountId, Strategy.Type type, Strategy.Ticker ticker,
             Strategy.CycleSeedType seedType, int divisionCount,
-            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
+            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
         Strategy strategy = new Strategy(null, accountId, type, Strategy.Status.ACTIVE, ticker, seedType);
         Strategy saved = strategyPort.save(strategy);
         StrategyVersion version = strategyVersionPort.save(
@@ -214,7 +266,9 @@ class StrategyService implements StrategyUseCase {
         if (saved.isInfinite()) {
             strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), divisionCount));
         } else if (saved.isVr()) {
-            vrDetail = vrStrategyLifecycle.saveVersionDetail(version.id(), intervalWeeks, bandWidth, recurringAmount);
+            vrDetail = vrStrategyLifecycle.saveVersionDetail(version.id(), intervalWeeks, bandWidth, recurringAmount,
+                    ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
+                    ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
         }
         return new SavedStrategyAndVersion(saved, version, vrDetail);
     }
@@ -252,6 +306,11 @@ class StrategyService implements StrategyUseCase {
 
     // 초기 사이클·포지션 저장 결과 — cycle + VR 전용 cycleVr (VR 외 전략은 null)
     private record InitialCycleResult(StrategyCycle cycle, StrategyCycleVrDetail cycleVr) {}
+
+    // VR 램프 파라미터 정규화 결과 — 8필드 모두 non-null(int/BigDecimal), normalizeVrRampParams()의 반환 묶음
+    private record VrRampParams(int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
+                                 BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks,
+                                 BigDecimal poolLimitFloor) {}
 
     @Override
     public void delete(UUID strategyId, UUID requesterId) {

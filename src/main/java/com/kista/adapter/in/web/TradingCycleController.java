@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.in.VrReconfigureUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class TradingCycleController {
     private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume
     private final AccountStatisticsUseCase accountStatistics;   // 사이클 이력 조회
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
+    private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
     @Operation(summary = "내 전체 거래 사이클 목록")
@@ -75,6 +77,18 @@ public class TradingCycleController {
             @RequestBody TradingCycleRequest request) {
         return TradingCycleResponse.from(
                 tradingCycle.update(id, userId, request.toUpdateCommand())
+        );
+    }
+
+    // VR 전략 운영 중 재설정 — 새 버전 발급 + 강제 롤오버(파라미터 수정·자본 주입)
+    @Operation(summary = "VR 전략 운영 중 재설정")
+    @PutMapping("/api/trading-cycles/{id}/vr-config")
+    public TradingCycleResponse reconfigureVr(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody VrConfigRequest request) {
+        return TradingCycleResponse.from(
+                vrReconfigure.reconfigure(id, userId, request.toCommand())
         );
     }
 

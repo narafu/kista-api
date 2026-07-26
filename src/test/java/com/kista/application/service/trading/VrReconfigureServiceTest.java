@@ -1,0 +1,375 @@
+package com.kista.application.service.trading;
+
+import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.order.CancelResult;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.domain.model.strategy.ReconfigureVrCommand;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.strategy.StrategyCycleVrDetail;
+import com.kista.domain.model.strategy.StrategyDetail;
+import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.domain.model.user.User;
+import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.domain.port.in.StrategyUseCase;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyCycleVrPort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.domain.port.out.StrategyVrDetailPort;
+import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.domain.port.out.UserPort;
+import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.support.DomainFixtures;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+// VrReconfigureService 단위 테스트 — 순수 파라미터 수정/자본 주입/램프 시계·검증/소유권 분기 검증
+// package-private VrReconfigureService와 같은 패키지에 위치 (application.service.trading)
+@ExtendWith(MockitoExtension.class)
+@DisplayName("VrReconfigureService 단위 테스트")
+class VrReconfigureServiceTest {
+
+    @Mock StrategyPort strategyPort;
+    @Mock AccountPort accountPort;
+    @Mock UserPort userPort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock StrategyVrDetailPort strategyVrDetailPort;
+    @Mock StrategyCycleVrPort strategyCycleVrPort;
+    @Mock CyclePositionPort cyclePositionPort;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock CycleSnapshotCreator cycleSnapshotCreator;
+    @Mock OrderCancelService orderCancelService;
+    @Mock UserNotificationPort userNotificationPort;
+    @Mock StrategyUseCase strategyUseCase;
+    @Mock BrokerPricePort pricePort; // registry.require(account, BrokerPricePort.class) 반환값
+
+    @InjectMocks VrReconfigureService service;
+
+    private final UUID strategyId = UUID.randomUUID();
+    private final UUID requesterId = UUID.randomUUID();
+    private final UUID accountId = UUID.randomUUID();
+    private final UUID strategyVersionId = UUID.randomUUID();
+    private final UUID cycleId = UUID.randomUUID();
+
+    private Account account;
+    private Strategy vrStrategy;
+    private StrategyCycle currentCycle;
+    private StrategyVrDetail currentDetail;
+    private StrategyCycleVrDetail currentCycleVr;
+    private CyclePosition latestPosition;
+    private StrategyCycle newCycleAfterReconfigure;
+    private StrategyDetail expectedDetail;
+    private User user;
+    private BigDecimal currentPrice;
+    private LocalDate today;
+
+    @BeforeEach
+    void setUp() {
+        account = DomainFixtures.kisAccount(accountId, requesterId);
+        vrStrategy = new Strategy(strategyId, accountId, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
+                BigDecimal.valueOf(1000), null, LocalDate.now().minusWeeks(4), null, null, null);
+        // 기본 램프: initialGradient=10/gMax=15/gGraceWeeks=gStepWeeks=52,26 / initialPoolLimitRate=0.75/floor=0.50
+        currentDetail = new StrategyVrDetail(strategyVersionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 15, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+        currentCycleVr = new StrategyCycleVrDetail(cycleId, new BigDecimal("1000.00"), 10, new BigDecimal("0.75"));
+        latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("50.00"), 10, null, null);
+        newCycleAfterReconfigure = new StrategyCycle(UUID.randomUUID(), strategyId, UUID.randomUUID(),
+                BigDecimal.valueOf(500), null, LocalDate.now(), null, null, null);
+        expectedDetail = new StrategyDetail(vrStrategy, BigDecimal.ZERO, LocalDate.now(), null, false, null, null, null);
+        user = DomainFixtures.activeUser(requesterId, NotificationChannel.NONE);
+        currentPrice = new BigDecimal("120.00");
+        // 서비스 내부와 동일한 SSOT 호출 — DstInfo.nextTradeDate()는 실제 시각 기준이라 테스트에서도 그대로 재사용
+        today = com.kista.domain.model.strategy.DstInfo.nextTradeDate();
+    }
+
+    // reconfigure()가 검증을 통과해 cycleSnapshotCreator.reconfigureVrCycle까지 도달하는 공통 스텁 체인.
+    // 일부 테스트(램프 검증 실패)는 이 체인 중 뒷부분(findFirstByStrategyId 이후) 스텁이 실제로는 호출되지 않으므로 lenient 처리.
+    private void stubHappyPathChain(LocalDate firstStartDate) {
+        lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
+        lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
+        lenient().when(registry.require(account, BrokerPricePort.class)).thenReturn(pricePort);
+        lenient().when(pricePort.getPrice(Ticker.TQQQ, account)).thenReturn(currentPrice);
+        lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
+        lenient().when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(currentCycle));
+        lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
+        lenient().when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(currentCycleVr));
+        lenient().when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.of(latestPosition));
+        StrategyCycle firstCycle = new StrategyCycle(UUID.randomUUID(), strategyId, strategyVersionId,
+                BigDecimal.valueOf(500), null, firstStartDate, null, null, null);
+        lenient().when(strategyCyclePort.findFirstByStrategyId(strategyId)).thenReturn(Optional.of(firstCycle));
+        lenient().when(cycleSnapshotCreator.reconfigureVrCycle(
+                        any(), any(), any(), any(), any(), any(),
+                        anyInt(), anyInt(), anyInt(), anyInt(),
+                        any(), anyInt(), anyInt(), any(),
+                        any(), any(), any(), anyLong()))
+                .thenReturn(newCycleAfterReconfigure);
+        lenient().when(userPort.findByIdOrThrow(requesterId)).thenReturn(user);
+        lenient().when(strategyUseCase.getById(strategyId, requesterId)).thenReturn(expectedDetail);
+    }
+
+    private void stubHappyPathChain() {
+        stubHappyPathChain(today.minusWeeks(10));
+    }
+
+    // cmd의 15개(실제 14개) 필드 전부 null인 기본 커맨드 — 필요한 필드만 override해서 사용
+    private ReconfigureVrCommand allNullCmd() {
+        return new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null);
+    }
+
+    // cycleSnapshotCreator.reconfigureVrCycle(...) 호출 인자 전체를 캡처해 검증하기 위한 홀더
+    private record CapturedCall(
+            UUID strategyId, UUID currentCycleId, LocalDate today,
+            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount,
+            Integer initialGradient, Integer gGraceWeeks, Integer gStepWeeks, Integer gMax,
+            BigDecimal initialPoolLimitRate, Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor,
+            AccountBalance postBalance, BigDecimal closingPrice, BigDecimal newValue, Long weeks) {
+    }
+
+    private CapturedCall captureReconfigureCall() {
+        ArgumentCaptor<UUID> strategyIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<UUID> cycleIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<LocalDate> todayCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<Integer> intervalWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<BigDecimal> bandWidthCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<Integer> recurringAmountCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> initialGradientCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> gGraceWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> gStepWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> gMaxCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<BigDecimal> initialPoolLimitRateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<Integer> pGraceWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> pStepWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<BigDecimal> poolLimitFloorCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<AccountBalance> postBalanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
+        ArgumentCaptor<BigDecimal> closingPriceCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<BigDecimal> newValueCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<Long> weeksCaptor = ArgumentCaptor.forClass(Long.class);
+
+        verify(cycleSnapshotCreator).reconfigureVrCycle(
+                strategyIdCaptor.capture(), cycleIdCaptor.capture(), todayCaptor.capture(),
+                intervalWeeksCaptor.capture(), bandWidthCaptor.capture(), recurringAmountCaptor.capture(),
+                initialGradientCaptor.capture(), gGraceWeeksCaptor.capture(), gStepWeeksCaptor.capture(), gMaxCaptor.capture(),
+                initialPoolLimitRateCaptor.capture(), pGraceWeeksCaptor.capture(), pStepWeeksCaptor.capture(), poolLimitFloorCaptor.capture(),
+                postBalanceCaptor.capture(), closingPriceCaptor.capture(), newValueCaptor.capture(), weeksCaptor.capture());
+
+        return new CapturedCall(
+                strategyIdCaptor.getValue(), cycleIdCaptor.getValue(), todayCaptor.getValue(),
+                intervalWeeksCaptor.getValue(), bandWidthCaptor.getValue(), recurringAmountCaptor.getValue(),
+                initialGradientCaptor.getValue(), gGraceWeeksCaptor.getValue(), gStepWeeksCaptor.getValue(), gMaxCaptor.getValue(),
+                initialPoolLimitRateCaptor.getValue(), pGraceWeeksCaptor.getValue(), pStepWeeksCaptor.getValue(), poolLimitFloorCaptor.getValue(),
+                postBalanceCaptor.getValue(), closingPriceCaptor.getValue(), newValueCaptor.getValue(), weeksCaptor.getValue());
+    }
+
+    // --- 1) 순수 파라미터 수정 (자본 주입 없음) ---
+
+    @Test
+    @DisplayName("순수 파라미터 수정: bandWidth만 변경 → V 이월, holdings/usdDeposit 불변, 나머지 램프값 상속")
+    void reconfigure_pureParamChange_carriesOverBalanceAndValue() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
+                null, null, null, null, null, null, null);
+
+        StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.bandWidth()).isEqualByComparingTo("20.00");
+        // 나머지 램프 파라미터는 미지정이므로 현재 활성 버전 값 그대로 상속
+        assertThat(captured.intervalWeeks()).isEqualTo(currentDetail.intervalWeeks());
+        assertThat(captured.recurringAmount()).isEqualTo(currentDetail.recurringAmount());
+        assertThat(captured.initialGradient()).isEqualTo(currentDetail.initialGradient());
+        assertThat(captured.gGraceWeeks()).isEqualTo(currentDetail.gGraceWeeks());
+        assertThat(captured.gStepWeeks()).isEqualTo(currentDetail.gStepWeeks());
+        assertThat(captured.gMax()).isEqualTo(currentDetail.gMax());
+        assertThat(captured.initialPoolLimitRate()).isEqualByComparingTo(currentDetail.initialPoolLimitRate());
+        assertThat(captured.pGraceWeeks()).isEqualTo(currentDetail.pGraceWeeks());
+        assertThat(captured.pStepWeeks()).isEqualTo(currentDetail.pStepWeeks());
+        assertThat(captured.poolLimitFloor()).isEqualByComparingTo(currentDetail.poolLimitFloor());
+        // 자본 주입 없음 → holdings/usdDeposit 불변, V 이월
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo(latestPosition.usdDeposit());
+        assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
+
+        verify(orderCancelService).cancelByCycle(strategyId, requesterId);
+        verify(strategyUseCase).getById(strategyId, requesterId);
+        assertThat(result).isSameAs(expectedDetail);
+    }
+
+    // --- 2) 수량 주입 ---
+
+    @Test
+    @DisplayName("수량 주입: holdings 증가 + 평단가 가중평균 + V += 주입수량×현재가")
+    void reconfigure_injectShares_updatesHoldingsAvgPriceAndValue() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, 5, new BigDecimal("60.00"), null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        // newHoldings = 기존 10 + 5 = 15
+        assertThat(captured.postBalance().holdings()).isEqualTo(15);
+        // 가중평균: (50.00×10 + 60.00×5) / 15 = 800.00/15 = 53.3333 (scale4 HALF_UP)
+        BigDecimal expectedAvgPrice = new BigDecimal("500.00").add(new BigDecimal("300.00"))
+                .divide(BigDecimal.valueOf(15), 4, java.math.RoundingMode.HALF_UP);
+        assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(expectedAvgPrice);
+        // V += 5 × 120.00 = 600.00 → 1000.00 + 600.00 = 1600.00
+        assertThat(captured.newValue()).isEqualByComparingTo("1600.00");
+    }
+
+    // --- 3) 예수금 주입 ---
+
+    @Test
+    @DisplayName("예수금 주입: usdDeposit 증가, holdings/avgPrice 불변, V 이월")
+    void reconfigure_injectDeposit_updatesDepositOnly() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, new BigDecimal("200.00"));
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("700.00"); // 500.00 + 200.00
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
+        // 수량 주입 없으므로 V 이월 (증분 없음)
+        assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
+    }
+
+    // --- 4) 비-VR 전략 ---
+
+    @Test
+    @DisplayName("비-VR 전략 재설정 시도 → IllegalArgumentException")
+    void reconfigure_nonVrStrategy_throwsIllegalArgumentException() {
+        Strategy infiniteStrategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(infiniteStrategy);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, allNullCmd()))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(orderCancelService, never()).cancelByCycle(any(), any());
+    }
+
+    // --- 5) 소유권 불일치 ---
+
+    @Test
+    @DisplayName("소유권 불일치 → SecurityException 그대로 전파")
+    void reconfigure_ownershipMismatch_propagatesSecurityException() {
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
+        when(accountPort.requireOwnedAccount(accountId, requesterId))
+                .thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, allNullCmd()))
+                .isInstanceOf(SecurityException.class);
+
+        verify(orderCancelService, never()).cancelByCycle(any(), any());
+    }
+
+    // --- 6) 램프 시계 유지 확인 ---
+
+    @Test
+    @DisplayName("램프 시계는 최초 사이클 startDate 기준 — cmd로 램프값을 새로 지정해도 weeks 계산 자체는 불변")
+    void reconfigure_rampClock_basedOnFirstCycleStartDate_regardlessOfCmdOverrides() {
+        // 최초 시작일을 오늘로부터 정확히 60주 전으로 고정 → weeks=60 기대
+        stubHappyPathChain(today.minusWeeks(60));
+        // initialGradient를 새 값(12, gMax=15 이내)으로 재지정해도 weeks 계산 자체는 firstStart 기준 그대로여야 함
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 12, null, null, null,
+                null, null, null, null, null, null, null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.weeks()).isEqualTo(60L);
+        // 사전 계산 검증: ChronoUnit.WEEKS.between(firstStart, today)와 동일한 값이어야 함
+        assertThat(captured.weeks()).isEqualTo(ChronoUnit.WEEKS.between(today.minusWeeks(60), today));
+        // 램프값 자체는 cmd 재지정이 정상 반영됨 (weeks 계산과는 독립적으로 갱신)
+        assertThat(captured.initialGradient()).isEqualTo(12);
+    }
+
+    // --- 7) 램프 검증 실패 ---
+
+    @Test
+    @DisplayName("gMax < initialGradient → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    void reconfigure_invalidRamp_gMaxLessThanInitialGradient_throws() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 20, null, null, 15,
+                null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("poolLimitFloor > initialPoolLimitRate → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    void reconfigure_invalidRamp_poolLimitFloorGreaterThanInitial_throws() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                new BigDecimal("0.60"), null, null, new BigDecimal("0.70"), null, null, null);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+
+    // --- 8) 주식 주입인데 단가 누락 ---
+
+    @Test
+    @DisplayName("injectShares>0인데 injectSharePrice 누락 → IllegalArgumentException")
+    void reconfigure_injectSharesWithoutPrice_throws() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, 5, null, null);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+}

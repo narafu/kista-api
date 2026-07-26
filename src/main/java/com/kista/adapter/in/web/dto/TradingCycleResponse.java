@@ -50,13 +50,31 @@ public record TradingCycleResponse(
             int recurringAmount,
             @Schema(description = "pool 상한 금액 (USD)")
             BigDecimal poolLimit,
-            @Schema(description = "실력공식 경사 계수 (G)", example = "10")
-            int gradient
+            @Schema(description = "실력공식 경사 계수 (G) — 현재 사이클 고정 스냅샷", example = "10")
+            int gradient,
+            @Schema(description = "램프 시작 시점(경과 0주) gradient(G) 값", example = "10")
+            int initialGradient,
+            @Schema(description = "gradient 램프 시작 전 유예 주수", example = "52")
+            int gGraceWeeks,
+            @Schema(description = "gradient가 한 단계 상승하는 주기 (주 단위)", example = "26")
+            int gStepWeeks,
+            @Schema(description = "gradient 램프 상한값", example = "20")
+            int gMax,
+            @Schema(description = "램프 시작 시점(경과 0주) poolLimitRate 값", example = "0.75")
+            BigDecimal initialPoolLimitRate,
+            @Schema(description = "poolLimitRate 램프 시작 전 유예 주수", example = "52")
+            int pGraceWeeks,
+            @Schema(description = "poolLimitRate가 한 단계 하강하는 주기 (주 단위)", example = "26")
+            int pStepWeeks,
+            @Schema(description = "poolLimitRate 램프 하한값", example = "0.50")
+            BigDecimal poolLimitFloor
     ) {
         // StrategyDetail.VrSummary → 응답 DTO 변환
         static VrSummary from(StrategyDetail.VrSummary s) {
             return new VrSummary(s.value(), s.bandWidth(), s.intervalWeeks(),
-                    s.recurringAmount(), s.poolLimit(), s.gradient());
+                    s.recurringAmount(), s.poolLimit(), s.gradient(),
+                    s.initialGradient(), s.gGraceWeeks(), s.gStepWeeks(), s.gMax(),
+                    s.initialPoolLimitRate(), s.pGraceWeeks(), s.pStepWeeks(), s.poolLimitFloor());
         }
     }
 

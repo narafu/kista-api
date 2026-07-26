@@ -30,7 +30,7 @@
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
 - `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
 - `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지)
-- 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount; `gradient()`/`poolLimitRate()`는 VR 공식 메서드)
+- 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드)
 - 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount`=시작 시드(VR은 시작 pool)는 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신) → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimit)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `VrSummary` nested(VR 외 null)
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
@@ -121,13 +121,16 @@ sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
 V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10)
      평가금 = holdings × 종가
 ```
-- gradient G: `recurringAmount < 0` → 20(인출), 그 외 → 10 (`StrategyVrDetail.gradient()`)
-- poolLimitRate: `recurringAmount > 0` → 0.75, `== 0` → 0.50, `< 0` → 0.25 (`StrategyVrDetail.poolLimitRate()`)
+- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 아래 부호파생 기본값 + 유예 52주·단계 26주·상하한=초기값(램프 없음, 기존 동작 보존)
+  - `gradientAt(weeks)`: `weeks < gGraceWeeks` → `initialGradient`; 이후 `gStepWeeks`마다 `+1`(고정, `StrategyVrDetail.G_STEP`), `gMax` 상한. 미입력 시 `initialGradient` 기본값 = `recurringAmount < 0` → 20(인출), 그 외 → 10
+  - `poolLimitRateAt(weeks)`: `weeks < pGraceWeeks` → `initialPoolLimitRate`; 이후 `pStepWeeks`마다 `-5%p`(고정, `StrategyVrDetail.POOL_LIMIT_STEP`), `poolLimitFloor` 하한(scale=2 HALF_UP). 미입력 시 `initialPoolLimitRate` 기본값 = `recurringAmount > 0` → 0.75, `== 0` → 0.50, `< 0` → 0.25
+  - G·poolLimitRate 두 램프의 유예·단계주기는 서로 독립
+  - weeks 재계산 시점: 사이클 롤오버(`VrCycleRolloverService`) 및 운영 중 재설정(`VrReconfigureService`) — 둘 다 `ChronoUnit.WEEKS.between(전략 최초 사이클.startDate, today)`. 사이클 진행 중엔 `strategy_cycle_vr` 스냅샷(gradient·poolLimitRate) 고정
 - 등록 검증: `initialValue`, `initialUsdDeposit`, `recurringAmount` null은 0으로 취급
 - 적립식(`recurringAmount > 0`): 초기 V와 초기 시드가 모두 0이어도 등록 가능
 - 거치식/인출식(`recurringAmount <= 0`): `initialValue + initialUsdDeposit > 0` 필수
-- 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수
-- 첫 사이클 poolLimit: (`initialValue` + `initialUsdDeposit`) × `poolLimitRate()`; 이후 롤오버 poolLimit은 기존처럼 USD pool × `poolLimitRate()`
+- 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수 — 운영 중 재설정으로 `recurringAmount`를 인출식으로 바꾸는 경우도 `VrReconfigureService`가 동일 규칙 재검증
+- **`strategy_cycle_vr.pool_limit_rate`**(비율, 달러 아님)를 스냅샷 저장. poolLimit(달러)은 저장하지 않고 조회 시점에 `startAmount × poolLimitRate`로 파생(scale=2 HALF_UP) — 첫 사이클은 `poolLimitRateAt(0)`, 롤오버·재설정 사이클은 `poolLimitRateAt(weeks)`를 저장
 - 첫 사이클 bootstrap(`initialValue`=기존 TQQQ 평가금, `initialUsdDeposit`=초기 USD pool): V만 있으면 poolLimit LOC+AT_CLOSE 분할매도, pool만 있으면 poolLimit LOC+AT_CLOSE 분할매수 — 각각 poolLimit 금액을 남은 거래일로 분할, 적립식 V=0/pool=0이면 due date 당일 recurringAmount LOC+AT_CLOSE 매수
 - bootstrap LOC 가격: 매수 `currentPrice × 1.10`, 매도 `currentPrice × 0.90`; 주문 수량은 예산/가격 내림 정수
 - 사다리 병합: 동일 가격 연속 rung은 수량 병합(매수), 매도는 holdings>20이면 마지막 단(s=20)에 잔여 전량
@@ -135,6 +138,10 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림
 - 단, 적립식 bootstrap 매수 실패(`recurringAmount>0`, 기존 V=0, holdings=0)는 V=0 새 사이클로 롤오버해 다음 due date에 다시 recurringAmount LOC 매수를 시도
+- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
+  - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
+  - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 예수금 주입 +$X: `usdDeposit+=X`, V 불변
+  - 검증 순서: 램프 파라미터·자본 주입 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
 
 ### 계좌번호 마스킹 (AccountNumberMasker)
 - `domain/model/account/AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)

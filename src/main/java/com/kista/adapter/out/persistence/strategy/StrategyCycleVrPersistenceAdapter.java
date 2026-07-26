@@ -30,7 +30,7 @@ class StrategyCycleVrPersistenceAdapter implements StrategyCycleVrPort {
                 entity.getStrategyCycleId(),
                 entity.getValue(),
                 entity.getGradient(),
-                entity.getPoolLimit()
+                entity.getPoolLimitRate()
         );
     }
 
@@ -41,7 +41,7 @@ class StrategyCycleVrPersistenceAdapter implements StrategyCycleVrPort {
         entity.setStrategyCycleId(detail.strategyCycleId());
         entity.setValue(detail.value());
         entity.setGradient(detail.gradient());
-        entity.setPoolLimit(detail.poolLimit());
+        entity.setPoolLimitRate(detail.poolLimitRate());
         return entity;
     }
 }

@@ -30,6 +30,6 @@ class StrategyCycleVrEntity extends BaseAuditEntity {
     @Column(name = "gradient", nullable = false)
     private int gradient; // VR 사이클 기울기
 
-    @Column(name = "pool_limit", nullable = false, precision = 20, scale = 2)
-    private BigDecimal poolLimit; // VR 사이클 풀 상한
+    @Column(name = "pool_limit_rate", nullable = false, precision = 6, scale = 4)
+    private BigDecimal poolLimitRate; // VR 사이클에 고정된 pool 상한 비율
 }

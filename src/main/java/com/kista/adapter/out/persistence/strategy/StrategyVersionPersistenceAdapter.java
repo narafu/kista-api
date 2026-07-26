@@ -42,6 +42,11 @@ class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
         jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }
 
+    @Override
+    public void softDeleteActiveByStrategyId(UUID strategyId, Instant now) {
+        jpaRepository.softDeleteActiveByStrategyId(strategyId, now);
+    }
+
     private StrategyVersion toDomain(StrategyVersionEntity entity) {
         return new StrategyVersion(
                 entity.getId(),

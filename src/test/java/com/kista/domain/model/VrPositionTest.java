@@ -122,40 +122,50 @@ class VrPositionTest {
         assertThat(result).isEqualByComparingTo("10500.00");
     }
 
-    // ── StrategyVrDetail: gradient / poolLimitRate ──────────────────────────
+    // ── StrategyVrDetail: gradientAt(0) / poolLimitRateAt(0) ────────────────
+    // gradient()/poolLimitRate() 고정 메서드는 경과주수 기반 램프(gradientAt/poolLimitRateAt)로 대체됨.
+    // 경과 0주는 항상 유예기간(gGraceWeeks/pGraceWeeks) 이내이므로 initialGradient/initialPoolLimitRate가 그대로 반환된다 —
+    // 등록 시점 관례값(부호파생 initialGradient=10/20, initialPoolLimitRate=0.75/0.50/0.25)은 StrategyService.normalizeVrRampParams()가 결정하며
+    // 여기서는 램프 없음(gMax=initial, floor=initial) 픽스처로 그 결과값이 gradientAt(0)/poolLimitRateAt(0)에 그대로 반영됨만 검증한다.
 
     @Test
-    @DisplayName("gradient: recurringAmount < 0 → 20, 그 외 → 10")
-    void strategyVrDetail_gradient() {
+    @DisplayName("gradientAt(0): 인출식 관례(20)·거치식/적립식 관례(10) 초기값이 그대로 반환된다")
+    void strategyVrDetail_gradientAt_zeroWeeks() {
         UUID vid = UUID.randomUUID();
-        // 인출(음수) → 고난도 G=20
-        StrategyVrDetail detail1 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), -100);
-        assertThat(detail1.gradient()).isEqualTo(20);
+        // 인출(음수) 관례 → 고난도 G=20 (램프 미개입: gMax=initialGradient)
+        StrategyVrDetail detail1 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), -100,
+                20, 52, 26, 20, new BigDecimal("0.25"), 52, 26, new BigDecimal("0.25"));
+        assertThat(detail1.gradientAt(0)).isEqualTo(20);
 
-        // 적립 없음 → G=10
-        StrategyVrDetail detail2 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 0);
-        assertThat(detail2.gradient()).isEqualTo(10);
+        // 적립 없음 관례 → G=10
+        StrategyVrDetail detail2 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        assertThat(detail2.gradientAt(0)).isEqualTo(10);
 
-        // 입금(양수) → G=10
-        StrategyVrDetail detail3 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 200);
-        assertThat(detail3.gradient()).isEqualTo(10);
+        // 입금(양수) 관례 → G=10
+        StrategyVrDetail detail3 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+        assertThat(detail3.gradientAt(0)).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("poolLimitRate: recurringAmount에 따라 0.75/0.50/0.25")
-    void strategyVrDetail_poolLimitRate() {
+    @DisplayName("poolLimitRateAt(0): recurringAmount 관례에 따른 초기값(0.75/0.50/0.25)이 그대로 반환된다")
+    void strategyVrDetail_poolLimitRateAt_zeroWeeks() {
         UUID vid = UUID.randomUUID();
-        // 입금(양수) → 높은 한도 0.75
-        StrategyVrDetail d1 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 200);
-        assertThat(d1.poolLimitRate()).isEqualByComparingTo("0.75");
+        // 입금(양수) 관례 → 높은 한도 0.75
+        StrategyVrDetail d1 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+        assertThat(d1.poolLimitRateAt(0)).isEqualByComparingTo("0.75");
 
-        // 없음(0) → 기본 한도 0.50
-        StrategyVrDetail d2 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 0);
-        assertThat(d2.poolLimitRate()).isEqualByComparingTo("0.50");
+        // 없음(0) 관례 → 기본 한도 0.50
+        StrategyVrDetail d2 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        assertThat(d2.poolLimitRateAt(0)).isEqualByComparingTo("0.50");
 
-        // 인출(음수) → 낮은 한도 0.25
-        StrategyVrDetail d3 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), -100);
-        assertThat(d3.poolLimitRate()).isEqualByComparingTo("0.25");
+        // 인출(음수) 관례 → 낮은 한도 0.25
+        StrategyVrDetail d3 = new StrategyVrDetail(vid, 4, new BigDecimal("15.00"), -100,
+                20, 52, 26, 20, new BigDecimal("0.25"), 52, 26, new BigDecimal("0.25"));
+        assertThat(d3.poolLimitRateAt(0)).isEqualByComparingTo("0.25");
     }
 
     // ── pool() / holdings() 위임 ────────────────────────────────────────────

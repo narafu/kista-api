@@ -586,7 +586,8 @@ class TradingServiceTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
         StrategyVrDetail vrDetail = new StrategyVrDetail(
-                vrCycle.strategyVersionId(), 4, new BigDecimal("15.00"), 0);
+                vrCycle.strategyVersionId(), 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(
@@ -1601,7 +1602,8 @@ class TradingServiceTest {
         // VR 사이클·버전 상세 — CycleOrderComputer에서 VrInputs 조립 시 조회됨
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
-        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문만 반환 (매수 1주 + 매도 1주)
         Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,

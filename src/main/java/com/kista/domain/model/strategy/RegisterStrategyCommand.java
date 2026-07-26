@@ -17,5 +17,14 @@ public record RegisterStrategyCommand(
         Integer intervalWeeks,                       // 리밸런싱 주기 (주 단위, 1 이상, VR 전용)
         BigDecimal bandWidth,                         // 매수·매도 사다리 밴드 폭 (%, VR 전용)
         Integer recurringAmount,                      // 주기당 추가 예수금 (USD, 음수=인출, VR 전용)
+        // VR 램프 파라미터 (미지정 시 서비스에서 정규화된 기본값 적용, VR 전용)
+        Integer initialGradient,                      // 램프 시작 시점(경과 0주)의 gradient(G) 값
+        Integer gGraceWeeks,                          // gradient 램프 시작 전 유예 주수
+        Integer gStepWeeks,                           // gradient가 한 단계 상승하는 주기 (주 단위)
+        Integer gMax,                                 // gradient 램프의 상한값
+        BigDecimal initialPoolLimitRate,               // 램프 시작 시점(경과 0주)의 poolLimitRate 값
+        Integer pGraceWeeks,                          // poolLimitRate 램프 시작 전 유예 주수
+        Integer pStepWeeks,                           // poolLimitRate가 한 단계 하강하는 주기 (주 단위)
+        BigDecimal poolLimitFloor,                     // poolLimitRate 램프의 하한값
         LocalDate scheduledStartDate                  // 시작예정일 (null이면 오늘, 과거 거부)
 ) {}

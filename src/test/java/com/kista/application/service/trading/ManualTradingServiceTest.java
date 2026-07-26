@@ -217,7 +217,8 @@ class ManualTradingServiceTest {
         // VR 사이클·버전 상세
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
-        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
         Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,

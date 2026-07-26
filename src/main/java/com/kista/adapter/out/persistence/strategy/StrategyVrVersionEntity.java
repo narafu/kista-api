@@ -32,4 +32,28 @@ class StrategyVrVersionEntity extends BaseAuditEntity {
 
     @Column(name = "recurring_amount", nullable = false)
     private int recurringAmount; // VR 전략 정기 적립금액
+
+    @Column(name = "initial_gradient", nullable = false)
+    private int initialGradient; // 램프 시작 시점(경과 0주)의 gradient(G) 값
+
+    @Column(name = "g_grace_weeks", nullable = false)
+    private int gGraceWeeks; // gradient 램프 유예 주수
+
+    @Column(name = "g_step_weeks", nullable = false)
+    private int gStepWeeks; // gradient 램프 단계 주기(주)
+
+    @Column(name = "g_max", nullable = false)
+    private int gMax; // gradient 램프 상한값
+
+    @Column(name = "initial_pool_limit_rate", nullable = false, precision = 6, scale = 4)
+    private BigDecimal initialPoolLimitRate; // 램프 시작 시점(경과 0주)의 poolLimitRate 값
+
+    @Column(name = "p_grace_weeks", nullable = false)
+    private int pGraceWeeks; // poolLimitRate 램프 유예 주수
+
+    @Column(name = "p_step_weeks", nullable = false)
+    private int pStepWeeks; // poolLimitRate 램프 단계 주기(주)
+
+    @Column(name = "pool_limit_floor", nullable = false, precision = 6, scale = 4)
+    private BigDecimal poolLimitFloor; // poolLimitRate 램프 하한값
 }

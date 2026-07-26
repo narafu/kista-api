@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 // VR 전략: N주 경과 시 V′ 계산 후 사이클 롤오버
 // package-private — application/service 패키지 전용
@@ -62,12 +63,18 @@ class VrCycleRolloverService {
             return;
         }
 
-        // V′ 계산: evaluation = holdings × 종가
+        // 램프 재계산 기준: 전략 최초 사이클 시작일로부터 경과한 주수 (스냅샷 이월 아닌 매 롤오버 시점 재계산)
+        LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategy.id())
+                .orElseThrow(() -> new IllegalStateException("VR 최초 사이클 없음: strategyId=" + strategy.id()))
+                .startDate();
+        long weeks = ChronoUnit.WEEKS.between(firstStart, today);
+
+        // V′ 계산: evaluation = holdings × 종가, gradient는 경과 주수 기준 램프 재계산값 사용
         BigDecimal evaluation = BigDecimal.valueOf(postBalance.holdings()).multiply(closingPrice);
         BigDecimal newValue = VrPosition.nextValue(
                 cycleVr.value(),
                 postBalance.usdDeposit(),
-                cycleVr.gradient(),
+                detail.gradientAt(weeks),
                 detail.recurringAmount(),
                 evaluation
         );
@@ -93,11 +100,8 @@ class VrCycleRolloverService {
         strategyCyclePort.markEnded(cycle.id(), postBalance.usdDeposit(), today);
         log.info("[strategyId={}] VR 사이클 종료 완료: cycleId={}", strategy.id(), cycle.id());
 
-        // 새 poolLimit 계산: 새 pool(postBalance.usdDeposit) × poolLimitRate, scale=2 HALF_UP
-        BigDecimal poolLimitRate = detail.poolLimitRate();
-        BigDecimal newPoolLimit = postBalance.usdDeposit()
-                .multiply(poolLimitRate)
-                .setScale(2, RoundingMode.HALF_UP);
+        // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 startAmount×rate로 수행)
+        BigDecimal newPoolLimitRate = detail.poolLimitRateAt(weeks);
 
         // 새 사이클 + holdings 승계 스냅샷 원자 생성
         cycleSnapshotCreator.createVrCycleAndSnapshot(
@@ -106,10 +110,10 @@ class VrCycleRolloverService {
                 postBalance,
                 closingPrice,
                 newValue,
-                cycleVr.gradient(),    // gradient 이월
-                newPoolLimit
+                detail.gradientAt(weeks),  // 램프 재계산 G (스냅샷 이월 폐기)
+                newPoolLimitRate
         );
-        log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimit={}", strategy.id(), newValue, newPoolLimit);
+        log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimitRate={}", strategy.id(), newValue, newPoolLimitRate);
 
         // 사용자에게 새 사이클 시작 알림
         userNotificationPort.notifyNewCycleStarted(ctx.user(), ctx.account(), strategy, postBalance.usdDeposit());

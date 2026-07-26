@@ -70,7 +70,7 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
     void save_andFindByCycleId_roundTrip() {
         StrategyCycle cycle = createCycle();
         StrategyCycleVrDetail detail = new StrategyCycleVrDetail(
-                cycle.id(), new BigDecimal("5000.00"), 10, new BigDecimal("3000.00"));
+                cycle.id(), new BigDecimal("5000.00"), 10, new BigDecimal("0.75"));
 
         // RED → GREEN: save 후 findByCycleId 왕복 검증
         StrategyCycleVrDetail saved = cycleVrAdapter.save(detail);
@@ -79,7 +79,7 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(saved.strategyCycleId()).isEqualTo(cycle.id());
         assertThat(saved.value()).isEqualByComparingTo(new BigDecimal("5000.00"));
         assertThat(saved.gradient()).isEqualTo(10);
-        assertThat(saved.poolLimit()).isEqualByComparingTo(new BigDecimal("3000.00"));
+        assertThat(saved.poolLimitRate()).isEqualByComparingTo(new BigDecimal("0.75"));
         assertThat(found).isPresent();
         assertThat(found.get()).isEqualTo(saved);
     }
@@ -97,10 +97,10 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
         // 동일 strategyCycleId로 재저장 시 upsert(update) 동작 — value 변경
         StrategyCycle cycle = createCycle();
         cycleVrAdapter.save(new StrategyCycleVrDetail(
-                cycle.id(), new BigDecimal("5000.00"), 10, new BigDecimal("3000.00")));
+                cycle.id(), new BigDecimal("5000.00"), 10, new BigDecimal("0.75")));
 
         StrategyCycleVrDetail updated = cycleVrAdapter.save(new StrategyCycleVrDetail(
-                cycle.id(), new BigDecimal("6000.00"), 20, new BigDecimal("4000.00")));
+                cycle.id(), new BigDecimal("6000.00"), 20, new BigDecimal("0.50")));
 
         Optional<StrategyCycleVrDetail> found = cycleVrAdapter.findByCycleId(cycle.id());
         assertThat(found).isPresent();

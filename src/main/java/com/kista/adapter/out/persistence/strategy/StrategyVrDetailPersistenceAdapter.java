@@ -35,7 +35,15 @@ class StrategyVrDetailPersistenceAdapter implements StrategyVrDetailPort {
                 entity.getStrategyVersionId(),
                 entity.getIntervalWeeks(),
                 entity.getBandWidth(),
-                entity.getRecurringAmount()
+                entity.getRecurringAmount(),
+                entity.getInitialGradient(),
+                entity.getGGraceWeeks(),
+                entity.getGStepWeeks(),
+                entity.getGMax(),
+                entity.getInitialPoolLimitRate(),
+                entity.getPGraceWeeks(),
+                entity.getPStepWeeks(),
+                entity.getPoolLimitFloor()
         );
     }
 
@@ -47,6 +55,14 @@ class StrategyVrDetailPersistenceAdapter implements StrategyVrDetailPort {
         entity.setIntervalWeeks(detail.intervalWeeks());
         entity.setBandWidth(detail.bandWidth());
         entity.setRecurringAmount(detail.recurringAmount());
+        entity.setInitialGradient(detail.initialGradient());
+        entity.setGGraceWeeks(detail.gGraceWeeks());
+        entity.setGStepWeeks(detail.gStepWeeks());
+        entity.setGMax(detail.gMax());
+        entity.setInitialPoolLimitRate(detail.initialPoolLimitRate());
+        entity.setPGraceWeeks(detail.pGraceWeeks());
+        entity.setPStepWeeks(detail.pStepWeeks());
+        entity.setPoolLimitFloor(detail.poolLimitFloor());
         return entity;
     }
 }

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,7 +71,9 @@ class VrCycleRolloverServiceTest {
             Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.MAINTAIN);
 
     // 4주 주기, bandWidth=15, recurringAmount=0 → gradient=10, poolLimitRate=0.50
-    static final StrategyVrDetail DETAIL = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0);
+    // 램프 미개입(gMax=initialGradient, poolLimitFloor=initialPoolLimitRate) — 기존 "고정값" 테스트 전제 유지
+    static final StrategyVrDetail DETAIL = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+            10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
 
     // 사이클 VR 상세: value=55.00, gradient=10, poolLimit=500
     static final StrategyCycleVrDetail CYCLE_VR = new StrategyCycleVrDetail(
@@ -84,6 +87,9 @@ class VrCycleRolloverServiceTest {
                 strategyCycleVrPort, strategyVrDetailPort, strategyCyclePort,
                 cycleSnapshotCreator, notifyPort, userNotificationPort);
         ctx = new BatchContext(VR_STRATEGY, CYCLE, ACCOUNT, USER);
+        // 램프 재계산 기준 — 최초 사이클 시작일 조회 기본 stub (CYCLE 자신이 최초 사이클인 케이스)
+        // due 미도래·cycleVr 미존재 등 조기 return 테스트는 호출 자체가 없어 unnecessary stub 문제 없음(lenient)
+        lenient().when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
     }
 
     @Test
@@ -183,10 +189,10 @@ class VrCycleRolloverServiceTest {
     }
 
     @Test
-    @DisplayName("poolLimit 재계산 scale=2 — 새 pool × poolLimitRate (HALF_UP)")
-    void poolLimit_recalculatedWithScale2() {
-        // DETAIL.recurringAmount=0 → poolLimitRate=0.50
-        // poolLimit = 1000.00 × 0.50 = 500.00 (scale=2)
+    @DisplayName("poolLimitRate 전달 — 새 사이클에 detail.poolLimitRateAt(weeks) 값이 그대로 전달된다 (달러 파생은 조회 시점으로 이동)")
+    void poolLimitRate_passedThroughToNewCycle() {
+        // DETAIL.recurringAmount=0 → poolLimitRate=0.50, 램프 미개입(gMax=initial, floor=initial)이라 weeks=4에도 그대로 0.50
+        // poolLimit(달러) 파생은 더 이상 이 서비스가 계산하지 않음 — CycleOrderComputer/buildSummary가 startAmount×poolLimitRate로 조회 시점에 파생
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
@@ -196,12 +202,10 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        ArgumentCaptor<BigDecimal> poolLimitCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<BigDecimal> poolLimitRateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), anyInt(), poolLimitCaptor.capture());
-        // 1000.00 × 0.50 = 500.00
-        assertThat(poolLimitCaptor.getValue()).isEqualByComparingTo(new BigDecimal("500.00"));
-        assertThat(poolLimitCaptor.getValue().scale()).isEqualTo(2);
+                any(), any(), any(), any(), any(), anyInt(), poolLimitRateCaptor.capture());
+        assertThat(poolLimitRateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.50"));
     }
 
     @Test
@@ -213,8 +217,9 @@ class VrCycleRolloverServiceTest {
         // V′ = 55 + 1/10 + (-9999) + (0-55)/(2×√10) ≈ 55 + 0.1 - 9999 + ... 음수
         StrategyCycleVrDetail negVrDetail = new StrategyCycleVrDetail(
                 CYCLE_ID, new BigDecimal("55.00"), 10, new BigDecimal("500.00"));
-        // recurringAmount=-9999 → gradient=20, poolLimitRate=0.25
-        StrategyVrDetail negDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), -9999);
+        // recurringAmount=-9999 → gradient=20, poolLimitRate=0.25 (램프 미개입 고정값)
+        StrategyVrDetail negDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), -9999,
+                20, 52, 26, 20, new BigDecimal("0.25"), 52, 26, new BigDecimal("0.25"));
 
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(negVrDetail));
@@ -234,7 +239,8 @@ class VrCycleRolloverServiceTest {
         StrategyCycleVrDetail zeroCycleVr = new StrategyCycleVrDetail(
                 CYCLE_ID, BigDecimal.ZERO, 10, BigDecimal.ZERO);
         StrategyVrDetail depositDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200);
+                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
         AccountBalance postBalance = new AccountBalance(0, null, BigDecimal.ZERO);
         LocalDate today = CYCLE_START.plusWeeks(2);
 
@@ -244,9 +250,10 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, postBalance, CLOSING_PRICE, today);
 
         verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(BigDecimal.ZERO), eq(today));
+        // poolLimitRate는 달러 파생 없이 그대로 전달 — depositDetail은 램프 미개입(gMax/floor=initial)이라 initialPoolLimitRate(0.75) 그대로
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(postBalance), eq(CLOSING_PRICE),
-                eq(BigDecimal.ZERO.setScale(2)), eq(10), eq(BigDecimal.ZERO.setScale(2)));
+                eq(BigDecimal.ZERO.setScale(2)), eq(10), eq(new BigDecimal("0.75")));
         verify(userNotificationPort, never()).notifyError(eq(USER), any(IllegalStateException.class));
     }
 
@@ -312,5 +319,98 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         verify(userNotificationPort).notifyNewCycleStarted(eq(USER), eq(ACCOUNT), eq(VR_STRATEGY), eq(USD_DEPOSIT));
+    }
+
+    // ── 경과주수 기반 램프 재계산 검증 (신규 기능 핵심 회귀) ──────────────────────────
+
+    @Test
+    @DisplayName("gradient 램프 재계산 — 유예기간을 넘긴 경과주수면 스냅샷(cycleVr.gradient())이 아닌 detail.gradientAt(weeks) 사용")
+    void gradient_recalculatedFromRamp_notSnapshot() {
+        // 최초 사이클 시작일을 훨씬 과거로 설정 — 유예기간(52주)을 넘긴 경과주수를 만든다 (스냅샷 이월이면 gradient=10 그대로일 것)
+        LocalDate firstStart = CYCLE_START.minusWeeks(150);
+        StrategyCycle firstCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                new BigDecimal("500.00"), null, firstStart, null, Instant.now(), null);
+        // 램프 활성 detail: initialGradient=10, 52주 유예 후 26주마다 +1, 상한 20
+        StrategyVrDetail rampingDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        LocalDate today = CYCLE_START.plusWeeks(4); // 현재 사이클(CYCLE)의 due는 그대로 충족
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR)); // 스냅샷 gradient=10
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
+        when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+                .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                        USD_DEPOSIT, null, today, null, Instant.now(), null));
+
+        long expectedWeeks = ChronoUnit.WEEKS.between(firstStart, today);
+        int expectedGradient = rampingDetail.gradientAt(expectedWeeks);
+        // 테스트 픽스처 유효성 자체 검증 — 실제로 유예기간을 넘겨 상승했는지 확인
+        assertThat(expectedGradient).isGreaterThan(CYCLE_VR.gradient());
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        ArgumentCaptor<Integer> gradientCaptor = ArgumentCaptor.forClass(Integer.class);
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), any(), any(), any(), gradientCaptor.capture(), any());
+        // 스냅샷(cycleVr.gradient()=10)이 아니라 램프 재계산값이 사용돼야 함
+        assertThat(gradientCaptor.getValue()).isEqualTo(expectedGradient);
+        assertThat(gradientCaptor.getValue()).isNotEqualTo(CYCLE_VR.gradient());
+    }
+
+    @Test
+    @DisplayName("poolLimitRate 램프 재계산 — 새 사이클에 detail.poolLimitRateAt(weeks) 저장 (하강 확인)")
+    void poolLimitRate_recalculatedFromRamp() {
+        LocalDate firstStart = CYCLE_START.minusWeeks(150);
+        StrategyCycle firstCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                new BigDecimal("500.00"), null, firstStart, null, Instant.now(), null);
+        // poolLimitRate 램프만 활성 — gradient는 no-op(gMax=initialGradient)로 고정
+        StrategyVrDetail rampingDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+        LocalDate today = CYCLE_START.plusWeeks(4);
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
+        when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+                .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                        USD_DEPOSIT, null, today, null, Instant.now(), null));
+
+        long expectedWeeks = ChronoUnit.WEEKS.between(firstStart, today);
+        BigDecimal expectedRate = rampingDetail.poolLimitRateAt(expectedWeeks);
+        assertThat(expectedRate).isLessThan(rampingDetail.initialPoolLimitRate()); // 실제로 하강했는지 픽스처 유효성 확인
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        ArgumentCaptor<BigDecimal> rateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), any(), any(), any(), anyInt(), rateCaptor.capture());
+        assertThat(rateCaptor.getValue()).isEqualByComparingTo(expectedRate);
+    }
+
+    @Test
+    @DisplayName("경과주수 0(등록 당일 롤오버) — initialGradient/initialPoolLimitRate 그대로 사용")
+    void weeksZero_usesInitialRampValues() {
+        // 최초 사이클 시작일 = today → 경과 0주
+        LocalDate today = CYCLE_START.plusWeeks(4);
+        StrategyCycle firstCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                new BigDecimal("500.00"), null, today, null, Instant.now(), null);
+        StrategyVrDetail rampingDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
+        when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+                .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                        USD_DEPOSIT, null, today, null, Instant.now(), null));
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        ArgumentCaptor<Integer> gradientCaptor = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<BigDecimal> rateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), any(), any(), any(), gradientCaptor.capture(), rateCaptor.capture());
+        assertThat(gradientCaptor.getValue()).isEqualTo(10); // initialGradient
+        assertThat(rateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.75")); // initialPoolLimitRate
     }
 }

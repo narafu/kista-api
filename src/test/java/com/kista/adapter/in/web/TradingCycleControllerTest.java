@@ -12,6 +12,7 @@ import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
+import com.kista.domain.port.in.VrReconfigureUseCase;
 import com.kista.domain.port.out.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -53,6 +54,7 @@ class TradingCycleControllerTest {
     @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean AccountStatisticsUseCase accountStatistics;
     @MockitoBean TradingExecutionUseCase tradingExecution;
+    @MockitoBean VrReconfigureUseCase vrReconfigure;
 
     private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -306,7 +308,9 @@ class TradingCycleControllerTest {
                 Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
         StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
                 new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
-                new BigDecimal("1000.00"), 10);
+                new BigDecimal("1000.00"), 10,
+                10, 52, 26, 10,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
         StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
@@ -348,5 +352,43 @@ class TradingCycleControllerTest {
 
         verify(tradingCycle).register(eq(USER_ID), eq(ACCOUNT_ID),
                 argThat((RegisterStrategyCommand command) -> command.divisionCount() == 0));
+    }
+
+    @Test
+    void reconfigureVr_success_returns200WithUpdatedVrField() throws Exception {
+        // VR 전략 운영 중 재설정 — PUT /api/trading-cycles/{id}/vr-config 200 케이스
+        Strategy vrStrategy = new Strategy(CYCLE_ID, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
+                new BigDecimal("3000"), new BigDecimal("20.00"), 8, 0,
+                new BigDecimal("1500.00"), 12,
+                12, 52, 26, 20,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
+        when(vrReconfigure.reconfigure(eq(CYCLE_ID), any(), any())).thenReturn(detail);
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "bandWidth": 20.00,
+                                  "intervalWeeks": 8,
+                                  "gMax": 20
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vr.bandWidth").value(20.00))
+                .andExpect(jsonPath("$.vr.intervalWeeks").value(8))
+                .andExpect(jsonPath("$.vr.gMax").value(20));
+    }
+
+    @Test
+    void reconfigureVr_anonymous_returns401() throws Exception {
+        mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
     }
 }

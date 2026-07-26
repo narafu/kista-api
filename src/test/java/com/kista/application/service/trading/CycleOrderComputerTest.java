@@ -96,7 +96,8 @@ class CycleOrderComputerTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 VR_CYCLE.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
         // VR 전략 버전 상세 (bandWidth)
-        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
         BigDecimal poolUsed = new BigDecimal("300.00");
 
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
@@ -180,7 +181,8 @@ class CycleOrderComputerTest {
         AccountBalance balance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00"));
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 VR_CYCLE.id(), new BigDecimal("10000.00"), 10, new BigDecimal("5000.00"));
-        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
@@ -205,7 +207,8 @@ class CycleOrderComputerTest {
     void compute_vrStrategy_nullCurrentPrice_passesNullToBuildOrders() {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 VR_CYCLE.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
-        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
@@ -229,7 +232,8 @@ class CycleOrderComputerTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 firstCycle.id(), BigDecimal.ZERO, 10, BigDecimal.ZERO);
         StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200);
+                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
         when(strategyCycleVrPort.findByCycleId(firstCycle.id())).thenReturn(Optional.of(cycleVr));
@@ -258,7 +262,8 @@ class CycleOrderComputerTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 firstCycle.id(), BigDecimal.ZERO, 10, BigDecimal.ZERO);
         StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200);
+                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
         when(strategyCycleVrPort.findByCycleId(firstCycle.id())).thenReturn(Optional.of(cycleVr));
@@ -287,7 +292,8 @@ class CycleOrderComputerTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 rolloverCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("500.00"));
         StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 0);
+                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
         when(strategyCycleVrPort.findByCycleId(rolloverCycle.id())).thenReturn(Optional.of(cycleVr));
