@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,7 @@ import java.util.function.BiFunction;
 class TradingPriceFetcher {
 
     private final BrokerAdapterRegistry registry;
-    private final NotifyPort notifyPort;
+    private final NotifyPort notifyPort; // 일괄+단건 fallback 모두 실패한 종목을 관리자에게 통지
 
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<Ticker, BigDecimal> fetchPrices(List<Ticker> tickers, Account account) {
@@ -65,17 +66,23 @@ class TradingPriceFetcher {
             log.warn("복수종목 {} 일괄 조회 실패, 단건 fallback 사용: {}", label, e.getMessage());
             result = new HashMap<>();
         }
+        // 일괄+단건 fallback 모두 실패한 종목을 모아 알림 1건으로 통지 (실패 종목 수만큼 알림이 반복 발송되는 것 방지)
+        List<String> failedTickers = new ArrayList<>();
+        Exception lastFailure = null;
         for (Ticker ticker : tickers) {
             if (!result.containsKey(ticker)) {
                 try {
                     result.put(ticker, singleFetch.apply(ticker, account));
                 } catch (Exception e) {
                     log.warn("[{}] 단건 {} 조회 실패: {}", ticker.name(), label, e.getMessage());
-                    // 일괄+단건 fallback 모두 실패 — 해당 ticker가 결과에서 조용히 누락되지 않도록 관리자에게 알림
-                    notifyPort.notifyError(new IllegalStateException(
-                            "[" + ticker.name() + "] " + label + " 조회 실패(일괄+단건 모두 실패)", e));
+                    failedTickers.add(ticker.name());
+                    lastFailure = e;
                 }
             }
+        }
+        if (!failedTickers.isEmpty()) {
+            notifyPort.notifyError(new IllegalStateException(
+                    failedTickers + " " + label + " 조회 실패(일괄+단건 모두 실패)", lastFailure));
         }
         return result;
     }

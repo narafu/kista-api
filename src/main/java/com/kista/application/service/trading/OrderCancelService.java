@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.OrderCancelFailedEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
@@ -8,17 +9,18 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -34,7 +36,7 @@ class OrderCancelService {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
-    private final NotifyPort notifyPort;
+    private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
@@ -59,6 +61,7 @@ class OrderCancelService {
         List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), tradeDate);
         int cancelledCount = plannedDeleted;
         int failedCount = 0;
+        List<String> failures = new ArrayList<>(); // 취소 실패 건 요약 — 커밋 후 알림 1건으로 통지
 
         for (Order order : placedOrders) {
             try {
@@ -68,11 +71,15 @@ class OrderCancelService {
             } catch (Exception e) {
                 log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
                         order.id(), order.externalOrderId(), e.getMessage());
-                // best-effort 실패도 관리자가 인지할 수 있도록 app_error_logs·텔레그램에 남김
-                notifyPort.notifyError(new IllegalStateException(
-                        "주문 취소 실패 — orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId(), e));
+                failures.add("orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId()
+                        + ": " + e.getMessage());
                 failedCount++;
             }
+        }
+
+        // best-effort 실패도 관리자가 인지할 수 있도록 알림 — 트랜잭션 커밋 후 발행(@Transactional 내부 외부 API 호출 금지)
+        if (!failures.isEmpty()) {
+            eventPublisher.publishEvent(new OrderCancelFailedEvent(strategyId, failedCount, String.join("; ", failures)));
         }
 
         return new CancelResult(cancelledCount, failedCount);

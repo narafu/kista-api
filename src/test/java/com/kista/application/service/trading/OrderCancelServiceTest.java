@@ -8,8 +8,8 @@ import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.application.event.OrderCancelFailedEvent;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -19,9 +19,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,7 +48,7 @@ class OrderCancelServiceTest {
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
-    @Mock NotifyPort notifyPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
@@ -94,6 +96,7 @@ class OrderCancelServiceTest {
         verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
         verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount));
         verify(orderPort, times(2)).markCancelled(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -117,7 +120,12 @@ class OrderCancelServiceTest {
         assertThat(result.failedCount()).isEqualTo(1);
         verify(orderPort, times(1)).markCancelled(order1.id());
         verify(orderPort, never()).markCancelled(order2.id());
-        verify(notifyPort).notifyError(any());
+
+        ArgumentCaptor<OrderCancelFailedEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelFailedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().strategyId()).isEqualTo(cycleId);
+        assertThat(eventCaptor.getValue().failedCount()).isEqualTo(1);
+        assertThat(eventCaptor.getValue().summary()).contains(order2.id().toString());
     }
 
     @Test

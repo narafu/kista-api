@@ -40,7 +40,7 @@ class ManualTradingService {
     private final TradingOrderPlanner orderPlanner;
     private final TradingOrderExecutor orderExecutor;
     private final BrokerAdapterRegistry registry;
-    private final NotifyPort notifyPort;
+    private final NotifyPort notifyPort; // live 잔고 조회 실패 시 관리자 알림 (4xx라 GlobalExceptionHandler가 미기록)
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
@@ -104,9 +104,9 @@ class ManualTradingService {
                     priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
             return PriceSnapshot.prevCloseOrNull(snapshots.get(strategy.ticker()));
         } catch (Exception e) {
+            // priceFetcher.fetchPriceSnapshots는 내부에서 실패를 흡수하고 절대 던지지 않으므로(TradingPriceFetcher가 자체 notifyError 처리)
+            // 이 catch는 도달하지 않음 — 인터페이스 계약 방어용으로만 유지
             log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
-            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
-            notifyPort.notifyError(e);
             throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }

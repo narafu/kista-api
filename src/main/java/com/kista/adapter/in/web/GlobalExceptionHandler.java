@@ -110,7 +110,10 @@ public class GlobalExceptionHandler {
         // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용
         Mapping m = resolveMapping(ex);
         if (m != null) {
-            // 4xx 예외: saveErrorLog 없이 응답 — 기존 handleMapped 동작 보존
+            // 4xx 예외라도 원인이 실제 브로커 API 실패(BrokerCallGuard.wrap 등이 감싼 경우 포함)면 기록 — 그 외 4xx는 saveErrorLog 없이 응답
+            if (ex.getCause() instanceof KisApiException || ex.getCause() instanceof TossApiException) {
+                saveErrorLog(ex);
+            }
             return problem(m.status(), m.title(), ex.getMessage());
         }
         // 매핑 없는 미처리 예외 — saveErrorLog + log.error + 500
