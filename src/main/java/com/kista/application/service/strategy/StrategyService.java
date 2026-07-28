@@ -282,13 +282,15 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-    // startAmount = 현금 + 시장가×보유수량 (세 전략 공통 — 중간부터 시작해도 등록 직후 미실현손익 0)
+    // startAmount = VR은 USD pool, 그 외 전략은 현금 + 시장가×보유수량
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
             BigDecimal initialStockValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
         BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
-        BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
+        BigDecimal startAmount = saved.isVr()
+                ? normalizedInitialUsdDeposit
+                : normalizedInitialUsdDeposit.add(initialStockValue);
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount, scheduledStart));
 
         CyclePosition initialPosition = initialHoldings > 0

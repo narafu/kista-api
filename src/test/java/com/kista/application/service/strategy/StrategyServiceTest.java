@@ -1278,9 +1278,6 @@ class StrategyServiceTest {
         UUID vrCycleId = UUID.randomUUID();
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
-        StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
-
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
                 5, new BigDecimal("100"), 4, new BigDecimal("15.00"), 0,
@@ -1296,13 +1293,20 @@ class StrategyServiceTest {
         when(registry.require(account, BrokerPricePort.class)).thenReturn(brokerPricePort);
         when(brokerPricePort.getPrevClose(Strategy.Ticker.TQQQ, account)).thenReturn(new BigDecimal("120"));
         when(strategyPort.save(any())).thenReturn(savedVrStrategy);
-        when(strategyCyclePort.save(any())).thenReturn(savedCycle);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(invocation -> {
+            StrategyCycle cycle = invocation.getArgument(0);
+            return new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
+                    cycle.startAmount(), null, cycle.startDate(), null, null, null);
+        });
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+        StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         // V = 시장가 120 × 보유수량 5 = 600.00
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
+        assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
+        assertThat(result.vr().value()).isEqualByComparingTo("600.00");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("500.00");
         // VR live 잔고 조회는 완전히 제거됨 — BrokerPricePort 시장가 조회 1회로만 V가 계산된다
         verify(registry, times(1)).require(account, BrokerPricePort.class);
     }
