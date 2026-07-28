@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -160,6 +161,8 @@ class BuyOrderPriceCapperTest {
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
+        // 사이클 락은 조회 전에 항상 선행 — 보정 대상 없음과 무관하게 호출됨
+        verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
@@ -173,6 +176,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
+        verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
@@ -189,9 +193,15 @@ class BuyOrderPriceCapperTest {
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
+        // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증 (동시성 직렬화 의도 반영)
+        InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
+        inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
+        inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+        inOrder.verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null
+        inOrder.verify(orderPlanner).savePlannedOrders(any(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
+
         verify(infiniteStrategy).buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(buyOrders), capCaptor.capture());
         assertThat(capCaptor.getValue()).isEqualByComparingTo("52.50");
-        verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         assertThat(ordersCaptor.getValue()).isEqualTo(capped);
     }
@@ -205,6 +215,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
+        verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -218,6 +229,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
 
+        verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -230,6 +242,7 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
 
+        verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -243,8 +256,14 @@ class BuyOrderPriceCapperTest {
 
         capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("30.00"));
 
+        // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증
+        InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
+        inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
+        inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
         // cap 초과 주문(40.00) 1건만 CANCELLED, cap 이하(28.00)는 건드리지 않음
-        verify(orderPort, times(1)).markCancelled(isNull());
+        inOrder.verify(orderPort, times(1)).markCancelled(isNull());
+        inOrder.verify(orderPlanner).savePlannedOrders(any(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
+
         ArgumentCaptor<List<Order>> captor = ArgumentCaptor.forClass(List.class);
         verify(orderPlanner).savePlannedOrders(captor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = captor.getValue();
