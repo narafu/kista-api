@@ -22,6 +22,7 @@ import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.broker.BrokerPricePort;
@@ -54,6 +55,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
     private final UserNotificationPort userNotificationPort;
+    private final NotifyPort notifyPort;                     // 사용자 알림 실패 시 관리자 알림
     private final StrategyUseCase strategyUseCase; // 재설정 후 최신 StrategyDetail 응답 조립에 재사용
 
     @Override
@@ -126,6 +128,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
             userNotificationPort.notifyNewCycleStarted(user, account, strategy, postBalance.usdDeposit());
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
+            notifyPort.notifyError(e);
         }
 
         return strategyUseCase.getById(strategyId, requesterId);

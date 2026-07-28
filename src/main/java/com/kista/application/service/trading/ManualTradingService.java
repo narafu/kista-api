@@ -40,6 +40,7 @@ class ManualTradingService {
     private final TradingOrderPlanner orderPlanner;
     private final TradingOrderExecutor orderExecutor;
     private final BrokerAdapterRegistry registry;
+    private final NotifyPort notifyPort;
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
         // 동기 검증: 소유권·상태
@@ -104,6 +105,8 @@ class ManualTradingService {
             return PriceSnapshot.prevCloseOrNull(snapshots.get(strategy.ticker()));
         } catch (Exception e) {
             log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
+            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+            notifyPort.notifyError(e);
             throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }
@@ -118,6 +121,8 @@ class ManualTradingService {
         } catch (Exception e) {
             log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.id(), strategy.ticker().name(), e.getMessage());
+            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+            notifyPort.notifyError(e);
             throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }

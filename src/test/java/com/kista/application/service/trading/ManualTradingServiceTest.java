@@ -55,6 +55,7 @@ class ManualTradingServiceTest {
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
     @Mock MarketCalendarPort marketCalendarPort; // VR 첫 사이클 거래일 계산용
     @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
+    @Mock NotifyPort notifyPort; // 4xx 예외라 GlobalExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
 
     ManualTradingService service;
 
@@ -98,11 +99,11 @@ class ManualTradingServiceTest {
         // LiveBalancePort: 필드 mock 직접 연결
         doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(Account.class), eq(LiveBalancePort.class));
 
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry, notifyPort);
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 userPort, privacyTradePort, priceFetcher, balanceLoader,
-                orderComputer, orderPlanner, orderExecutor, brokerAdapterRegistry);
+                orderComputer, orderPlanner, orderExecutor, brokerAdapterRegistry, notifyPort);
 
         // getSellableQuantity 기본 stub — BUY 전용 테스트에서 SELL 체크가 0>충분값으로 통과
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
@@ -146,6 +147,25 @@ class ManualTradingServiceTest {
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessageContaining("보유 수량이 부족합니다");
+    }
+
+    @Test
+    void execute_liveBalanceFetchFails_notifiesAdminAndThrowsManualTradingException() {
+        // 브로커 API 실패는 4xx(ManualTradingException)로 승격되지만, GlobalExceptionHandler가
+        // 4xx는 app_error_logs에 남기지 않으므로 서비스가 직접 notifyPort.notifyError를 호출해야 함
+        Order buyOrder = new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN,
+                Order.OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyOrder));
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+                .thenThrow(new RuntimeException("Toss API 오류"));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class);
+
+        verify(notifyPort).notifyError(any());
     }
 
     @Test

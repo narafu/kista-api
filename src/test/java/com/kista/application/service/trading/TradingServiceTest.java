@@ -144,7 +144,7 @@ class TradingServiceTest {
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(Account.class), eq(SellableQuantityPort.class));
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, notifyPort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         VrCycleRolloverService vrRolloverService = mock(VrCycleRolloverService.class); // VR 롤오버 mock

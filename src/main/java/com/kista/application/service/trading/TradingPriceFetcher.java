@@ -4,6 +4,7 @@ import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.util.function.BiFunction;
 class TradingPriceFetcher {
 
     private final BrokerAdapterRegistry registry;
+    private final NotifyPort notifyPort;
 
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<Ticker, BigDecimal> fetchPrices(List<Ticker> tickers, Account account) {
@@ -69,6 +71,9 @@ class TradingPriceFetcher {
                     result.put(ticker, singleFetch.apply(ticker, account));
                 } catch (Exception e) {
                     log.warn("[{}] 단건 {} 조회 실패: {}", ticker.name(), label, e.getMessage());
+                    // 일괄+단건 fallback 모두 실패 — 해당 ticker가 결과에서 조용히 누락되지 않도록 관리자에게 알림
+                    notifyPort.notifyError(new IllegalStateException(
+                            "[" + ticker.name() + "] " + label + " 조회 실패(일괄+단건 모두 실패)", e));
                 }
             }
         }

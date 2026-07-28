@@ -17,6 +17,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.CyclePositionPort;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
@@ -67,6 +68,7 @@ class VrReconfigureServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock OrderCancelService orderCancelService;
     @Mock UserNotificationPort userNotificationPort;
+    @Mock NotifyPort notifyPort;
     @Mock StrategyUseCase strategyUseCase;
     @Mock BrokerPricePort pricePort; // registry.require(account, BrokerPricePort.class) 반환값
 
@@ -245,6 +247,21 @@ class VrReconfigureServiceTest {
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(expectedAvgPrice);
         // V += 5 × 120.00 = 600.00 → 1000.00 + 600.00 = 1600.00
         assertThat(captured.newValue()).isEqualByComparingTo("1600.00");
+    }
+
+    @Test
+    @DisplayName("사용자 알림 실패해도 재설정 결과는 반환되고, 관리자에게 notifyError로 별도 기록됨")
+    void reconfigure_userNotificationFails_stillReturnsResultButNotifiesAdmin() {
+        stubHappyPathChain();
+        org.mockito.Mockito.doThrow(new RuntimeException("텔레그램 발송 실패"))
+                .when(userNotificationPort).notifyNewCycleStarted(any(), any(), any(), any());
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
+                null, null, null, null, null, null, null);
+
+        StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
+
+        assertThat(result).isEqualTo(expectedDetail);
+        verify(notifyPort).notifyError(any());
     }
 
     // --- 3) 예수금 주입 ---
