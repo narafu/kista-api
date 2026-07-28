@@ -8,6 +8,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.strategy.DstInfo;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -33,6 +34,7 @@ class OrderCancelService {
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
+    private final NotifyPort notifyPort;
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
@@ -66,6 +68,9 @@ class OrderCancelService {
             } catch (Exception e) {
                 log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
                         order.id(), order.externalOrderId(), e.getMessage());
+                // best-effort 실패도 관리자가 인지할 수 있도록 app_error_logs·텔레그램에 남김
+                notifyPort.notifyError(new IllegalStateException(
+                        "주문 취소 실패 — orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId(), e));
                 failedCount++;
             }
         }

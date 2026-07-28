@@ -9,6 +9,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.AccountPort;
+import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
@@ -45,6 +46,7 @@ class OrderCancelServiceTest {
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
+    @Mock NotifyPort notifyPort;
     @InjectMocks OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
@@ -115,6 +117,7 @@ class OrderCancelServiceTest {
         assertThat(result.failedCount()).isEqualTo(1);
         verify(orderPort, times(1)).markCancelled(order1.id());
         verify(orderPort, never()).markCancelled(order2.id());
+        verify(notifyPort).notifyError(any());
     }
 
     @Test
