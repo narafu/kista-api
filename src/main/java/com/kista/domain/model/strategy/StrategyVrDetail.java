@@ -36,8 +36,9 @@ public record StrategyVrDetail(
     }
 
     // poolLimitRateAt: 경과 주수(weeks) 기준 poolLimitRate 값 — 유예 주수 이후 pStepWeeks마다 POOL_LIMIT_STEP씩 하강, poolLimitFloor에서 하한
+    // pStepWeeks<=0은 poolLimitRate 램프 비활성화를 의미 — initialPoolLimitRate에 고정(poolLimitFloor/pGraceWeeks 무관)
     public BigDecimal poolLimitRateAt(long weeks) {
-        if (weeks < pGraceWeeks) {
+        if (pStepWeeks <= 0 || weeks < pGraceWeeks) {
             return initialPoolLimitRate.setScale(2, RoundingMode.HALF_UP);
         }
         long pSteps = (weeks - pGraceWeeks) / pStepWeeks + 1;

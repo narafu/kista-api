@@ -200,17 +200,20 @@ class VrReconfigureService implements VrReconfigureUseCase {
         if (gMax < initialGradient) {
             throw new IllegalArgumentException("VR 전략의 gradient 상한(gMax)은 initialGradient 이상이어야 합니다");
         }
-        if (pStepWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0보다 커야 합니다");
+        if (pStepWeeks < 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0 이상이어야 합니다");
         }
         if (pGraceWeeks < 0) {
             throw new IllegalArgumentException("VR 전략의 poolLimitRate 유예 주수(pGraceWeeks)는 0 이상이어야 합니다");
         }
-        if (poolLimitFloor == null || poolLimitFloor.signum() <= 0
-                || poolLimitFloor.compareTo(initialPoolLimitRate) > 0
-                || initialPoolLimitRate.compareTo(BigDecimal.ONE) > 0) {
+        if (initialPoolLimitRate.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 poolLimitRate(initialPoolLimitRate)는 1 이하여야 합니다");
+        }
+        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — poolLimitFloor 무관
+        if (pStepWeeks > 0 && (poolLimitFloor == null || poolLimitFloor.signum() <= 0
+                || poolLimitFloor.compareTo(initialPoolLimitRate) > 0)) {
             throw new IllegalArgumentException(
-                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate <= 1 이어야 합니다");
+                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate 이어야 합니다");
         }
     }
 

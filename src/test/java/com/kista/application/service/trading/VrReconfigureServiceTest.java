@@ -371,6 +371,21 @@ class VrReconfigureServiceTest {
                 any(), any(), any(), anyLong());
     }
 
+    @Test
+    @DisplayName("pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 하한 검증 없이 통과")
+    void reconfigure_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, 0, 0, BigDecimal.ZERO, null, null, null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.pStepWeeks()).isEqualTo(0);
+        assertThat(captured.pGraceWeeks()).isEqualTo(0);
+        assertThat(captured.poolLimitFloor()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     // --- 8) 주식 주입인데 단가 누락 ---
 
     @Test

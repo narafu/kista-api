@@ -112,4 +112,13 @@ class StrategyVrDetailTest {
         assertThat(detail.poolLimitRateAt(78).scale()).isEqualTo(2);
         assertThat(detail.poolLimitRateAt(0).scale()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("pStepWeeks=0 → poolLimitRate 램프 비활성화, 경과주수와 무관하게 initialPoolLimitRate 고정")
+    void pStepWeeksZero_disablesRamp_staysAtInitialValue() {
+        StrategyVrDetail detail = detail(52, 26, 52, 0);
+
+        assertThat(detail.poolLimitRateAt(0)).isEqualByComparingTo("0.75");
+        assertThat(detail.poolLimitRateAt(10_000)).isEqualByComparingTo("0.75");
+    }
 }

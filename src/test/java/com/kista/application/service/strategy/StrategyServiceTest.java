@@ -1036,6 +1036,24 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(하한 검증 생략)")
+    void register_vr_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
+        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                null, null, 4, new BigDecimal("15.00"), 0,
+                null, null, null, null,
+                new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO,
+                null);
+
+        strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        verify(strategyVrDetailPort).save(argThat(d ->
+                d.pStepWeeks() == 0 && d.pGraceWeeks() == 0
+                        && d.poolLimitFloor().compareTo(BigDecimal.ZERO) == 0));
+    }
+
+    @Test
     @DisplayName("VR register() gMax < initialGradient이면 IllegalArgumentException")
     void register_vr_gMaxLessThanInitialGradient_throws() {
         Account account = ownerAccount();

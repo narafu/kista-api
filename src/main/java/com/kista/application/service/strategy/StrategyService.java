@@ -192,17 +192,20 @@ class StrategyService implements StrategyUseCase {
         if (ramp.gMax() < ramp.initialGradient()) {
             throw new IllegalArgumentException("VR 전략의 gradient 상한(gMax)은 initialGradient 이상이어야 합니다");
         }
-        if (ramp.pStepWeeks() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0보다 커야 합니다");
+        if (ramp.pStepWeeks() < 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0 이상이어야 합니다");
         }
         if (ramp.pGraceWeeks() < 0) {
             throw new IllegalArgumentException("VR 전략의 poolLimitRate 유예 주수(pGraceWeeks)는 0 이상이어야 합니다");
         }
-        if (ramp.poolLimitFloor().signum() <= 0
-                || ramp.poolLimitFloor().compareTo(ramp.initialPoolLimitRate()) > 0
-                || ramp.initialPoolLimitRate().compareTo(BigDecimal.ONE) > 0) {
+        if (ramp.initialPoolLimitRate().compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 poolLimitRate(initialPoolLimitRate)는 1 이하여야 합니다");
+        }
+        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — poolLimitFloor 무관
+        if (ramp.pStepWeeks() > 0 && (ramp.poolLimitFloor().signum() <= 0
+                || ramp.poolLimitFloor().compareTo(ramp.initialPoolLimitRate()) > 0)) {
             throw new IllegalArgumentException(
-                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate <= 1 이어야 합니다");
+                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate 이어야 합니다");
         }
     }
 
