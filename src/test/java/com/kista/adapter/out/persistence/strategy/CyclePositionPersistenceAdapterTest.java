@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -147,6 +148,19 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findFirstOne_returnsOpeningPositionForCycle() {
+        Instant openingAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+        UUID openingId = insertPosition(cycleId, new BigDecimal("1000.00"), openingAt, false);
+        insertPosition(cycleId, new BigDecimal("900.00"), openingAt.plus(1, ChronoUnit.HOURS), false);
+
+        Optional<CyclePosition> result = cyclePositionAdapter.findFirstOne(cycleId);
+
+        assertThat(result).containsInstanceOf(CyclePosition.class);
+        assertThat(result).get().extracting(CyclePosition::id).isEqualTo(openingId);
+    }
+
+    @Test
     void cyclePositionInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
@@ -207,12 +221,14 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         return cycleId;
     }
 
-    private void insertPosition(UUID cycleId, BigDecimal usdDeposit, Instant createdAt, boolean deleted) {
+    private UUID insertPosition(UUID cycleId, BigDecimal usdDeposit, Instant createdAt, boolean deleted) {
+        UUID positionId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(), cycleId, usdDeposit, 0,
+                positionId, cycleId, usdDeposit, 0,
                 Timestamp.from(createdAt), deleted ? Timestamp.from(createdAt) : null);
+        return positionId;
     }
 
     @Test

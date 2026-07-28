@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,6 +16,9 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // strategy_cycle_id 기준 최신 N건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
     List<CyclePositionEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
+
+    // strategy_cycle_id 기준 개장 포지션 1건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
+    Optional<CyclePositionEntity> findTop1ByStrategyCycleIdOrderByCreatedAtAsc(UUID strategyCycleId);
 
     // 전략 ID 기준 날짜 범위 조회 (strategy_cycle 경유 JOIN — native)
     @Query(value = """

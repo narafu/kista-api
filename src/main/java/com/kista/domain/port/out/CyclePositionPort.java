@@ -26,6 +26,9 @@ public interface CyclePositionPort {
         return findLatestByCycleId(cycleId, 1).stream().findFirst();
     }
 
+    // 사이클 ID 기준 개장 포지션 1건 — 생성일이 가장 오래된 활성 포지션
+    Optional<CyclePosition> findFirstOne(UUID cycleId);
+
     // 전략 ID 기준 최신 포지션 1건 — findLatestByStrategyId(id, 1).stream().findFirst() 축약
     default Optional<CyclePosition> findLatestOneByStrategyId(UUID strategyId) {
         return findLatestByStrategyId(strategyId, 1).stream().findFirst();

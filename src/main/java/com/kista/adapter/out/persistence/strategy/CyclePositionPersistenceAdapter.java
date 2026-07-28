@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,6 +50,12 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<CyclePosition> findFirstOne(UUID cycleId) {
+        return positionRepo.findTop1ByStrategyCycleIdOrderByCreatedAtAsc(cycleId)
+                .map(this::toDomain);
     }
 
     @Override
