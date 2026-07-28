@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
-// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 InfiniteStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
+// BUY PLANNED 가격이 currentPrice × 1.05 초과 시 InfiniteStrategy에 위임 후 영속화 — I/O 오케스트레이션만 검증
 // 캡 가격 재산정 공식(병합/보정 등)은 InfiniteStrategyTypeTest.buildCappedBuyOrders 참고
 // PRIVACY: position 없이 단순 가격 캡만 적용 (capPrivacyIfNeeded)
 @ExtendWith(MockitoExtension.class)
@@ -72,10 +72,10 @@ class BuyOrderPriceCapperTest {
     @Test
     void prepareForAllocation_infiniteCap_returnsCappedBuysAndCorrectionsWithoutPersistence() {
         Order originalBuy = buy("60.00", 1, "INFINITE_LATE_REF_BUY");
-        Order cappedBuy = buy("55.00", 9, "INFINITE_LATE_REF_BUY");
+        Order cappedBuy = buy("52.50", 9, "INFINITE_LATE_REF_BUY");
         Order correction = buy("50.00", 1, "INFINITE_CORRECTION_01");
         when(infiniteStrategy.buildCappedBuyOrders(
-                POSITION, TODAY, List.of(originalBuy), new BigDecimal("55.00")))
+                POSITION, TODAY, List.of(originalBuy), new BigDecimal("52.50")))
                 .thenReturn(List.of(cappedBuy, correction));
 
         List<Order> prepared = capper().prepareForAllocation(
@@ -86,7 +86,7 @@ class BuyOrderPriceCapperTest {
         assertThat(prepared).extracting(Order::orderLeg)
                 .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01");
         verify(infiniteStrategy).buildCappedBuyOrders(
-                POSITION, TODAY, List.of(originalBuy), new BigDecimal("55.00"));
+                POSITION, TODAY, List.of(originalBuy), new BigDecimal("52.50"));
         verifyNoInteractions(orderPort, orderPlanner);
     }
 
@@ -100,7 +100,7 @@ class BuyOrderPriceCapperTest {
                 List.of(exceedingBuy, sell, withinCapBuy), new BigDecimal("30.00"), null,
                 CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, TODAY);
 
-        assertThat(prepared.get(0).price()).isEqualByComparingTo("33.00");
+        assertThat(prepared.get(0).price()).isEqualByComparingTo("31.50");
         assertThat(prepared.get(0).quantity()).isEqualTo(5);
         assertThat(prepared.get(1)).isSameAs(sell);
         assertThat(prepared.get(2)).isSameAs(withinCapBuy);
@@ -113,11 +113,11 @@ class BuyOrderPriceCapperTest {
         Order firstSell = sell("70.00", 1);
         Order secondBuy = buy("52.00", 1);
         Order secondSell = sell("75.00", 2);
-        Order firstCappedBuy = buy("55.00", 9);
+        Order firstCappedBuy = buy("52.50", 9);
         Order secondCappedBuy = buy("52.00", 9);
         Order correction = buy("50.00", 1);
         when(infiniteStrategy.buildCappedBuyOrders(
-                POSITION, TODAY, List.of(firstBuy, secondBuy), new BigDecimal("55.00")))
+                POSITION, TODAY, List.of(firstBuy, secondBuy), new BigDecimal("52.50")))
                 .thenReturn(List.of(firstCappedBuy, secondCappedBuy, correction));
 
         List<Order> prepared = capper().prepareForAllocation(
@@ -165,7 +165,7 @@ class BuyOrderPriceCapperTest {
 
     @Test
     void allBuysWithinCap_doesNothing() {
-        // cap = 50 × 1.10 = 55.00 — 모든 BUY가 cap 이하라 보정 불필요
+        // cap = 50 × 1.05 = 52.50 — 모든 BUY가 cap 이하라 보정 불필요
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("50.00", 18)));
 
@@ -178,17 +178,17 @@ class BuyOrderPriceCapperTest {
 
     @Test
     void buysExceedCap_delegatesToStrategyAndPersistsResult() {
-        // cap = 50 × 1.10 = 55.00
+        // cap = 50 × 1.05 = 52.50
         List<Order> buyOrders = List.of(buy("60.00", 1), buy("52.00", 1));
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
-        List<Order> capped = List.of(buy("55.00", 9), buy("52.00", 11));
+        List<Order> capped = List.of(buy("52.50", 9), buy("52.00", 11));
         when(infiniteStrategy.buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(buyOrders), any()))
                 .thenReturn(capped);
 
         capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
 
         verify(infiniteStrategy).buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(buyOrders), capCaptor.capture());
-        assertThat(capCaptor.getValue()).isEqualByComparingTo("55.00");
+        assertThat(capCaptor.getValue()).isEqualByComparingTo("52.50");
         verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         assertThat(ordersCaptor.getValue()).isEqualTo(capped);
@@ -222,7 +222,7 @@ class BuyOrderPriceCapperTest {
 
     @Test
     void capPrivacyIfNeeded_allBuysWithinCap_doesNothing() {
-        // cap = 50 × 1.10 = 55.00 — BUY 가격 50.00 ≤ 55.00 → 보정 불필요
+        // cap = 50 × 1.05 = 52.50 — BUY 가격 50.00 ≤ 52.50 → 보정 불필요
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("50.00", 5)));
 
@@ -234,8 +234,8 @@ class BuyOrderPriceCapperTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void capPrivacyIfNeeded_buysExceedCap_capsToCurrentPriceX110KeepingQuantity() {
-        // currentPrice=30, cap=33.00 — FIDA 가격 40.00만 cap 초과, 28.00은 cap 이하라 그대로 유지
+    void capPrivacyIfNeeded_buysExceedCap_capsToCurrentPriceX105KeepingQuantity() {
+        // currentPrice=30, cap=31.50 — FIDA 가격 40.00만 cap 초과, 28.00은 cap 이하라 그대로 유지
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("40.00", 5), buy("28.00", 3)));
 
@@ -246,9 +246,9 @@ class BuyOrderPriceCapperTest {
         ArgumentCaptor<List<Order>> captor = ArgumentCaptor.forClass(List.class);
         verify(orderPlanner).savePlannedOrders(captor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<Order> saved = captor.getValue();
-        // 40.00 → 33.00으로 보정, 수량 5 유지 (1건만 재저장)
+        // 40.00 → 31.50으로 보정, 수량 5 유지 (1건만 재저장)
         assertThat(saved).hasSize(1);
-        assertThat(saved.get(0).price()).isEqualByComparingTo("33.00");
+        assertThat(saved.get(0).price()).isEqualByComparingTo("31.50");
         assertThat(saved.get(0).quantity()).isEqualTo(5);
     }
 }

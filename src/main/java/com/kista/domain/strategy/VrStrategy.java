@@ -82,10 +82,8 @@ public class VrStrategy {
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
     private List<Order> buildBuyOrders(VrPosition position, Strategy.Ticker ticker,
                                        BigDecimal currentPrice, LocalDate tradeDate) {
-        // 가격 캡 = currentPrice × 1.10, null이면 캡 없음
-        BigDecimal cap = currentPrice != null
-                ? currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP)
-                : null;
+        // 가격 캡 = PriceCapPolicy 기준, null이면 캡 없음
+        BigDecimal cap = currentPrice != null ? PriceCapPolicy.capFor(currentPrice) : null;
 
         // pool 사용 가능 잔여액 (poolLimit − poolUsed)
         BigDecimal poolBudget = position.poolLimit().subtract(position.poolUsed());
@@ -101,9 +99,9 @@ public class VrStrategy {
             // 기본 단가 = lowerBand / divisor
             BigDecimal price = position.buyPrice(m);
 
-            // 가격 캡 적용 — currentPrice × 1.10 초과 시 캡 가격으로 교체
-            if (cap != null && price.compareTo(cap) > 0) {
-                price = cap;
+            // 가격 캡 적용 — PriceCapPolicy 초과 시 캡 가격으로 교체
+            if (cap != null) {
+                price = PriceCapPolicy.applyCap(price, cap);
             }
 
             // poolLimit 초과 시 이후 단 전량 제외 (누적 금액 > poolBudget)

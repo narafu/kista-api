@@ -286,21 +286,21 @@ class VrStrategyTypeTest {
     // ── 가격 캡 시나리오 ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("가격 캡: rung 단가 > currentPrice×1.10 시 cap으로 교체")
+    @DisplayName("가격 캡: rung 단가 > currentPrice×1.05 시 cap으로 교체")
     void priceCap_clampsToCap() {
         // holdings=1, V=10000, bandWidth=15%
         // lowerBand=8500, buyPrice(1)=8500/1=8500, buyPrice(2)=8500/2=4250
-        // currentPrice=500 → cap=500×1.10=550.00
-        // m=1: 8500 > cap(550) → price=550
-        // m=2: 4250 > cap(550) → price=550 (같은 가격 → 병합)
+        // currentPrice=500 → cap=500×1.05=525.00
+        // m=1: 8500 > cap(525) → price=525
+        // m=2: 4250 > cap(525) → price=525 (같은 가격 → 병합)
         // ... 계속 캡 적용 후 poolLimit/pool 제한
         // poolLimit=1200, pool=1200
-        // m=1: price=550, cumBuy=550 ≤1200 OK
-        // m=2: price=550, cumBuy=1100 ≤1200 OK
-        // m=3: price=550(or less?), cumBuy=1650 > poolLimit(1200) → break
-        // Actually buyPrice(3) = 8500/(1+3-1) = 8500/3 = 2833.33 > cap(550) → price=550
-        // cumBuy after m=2 = 1100, add 550 → 1650 > 1200 → break
-        // → 2개 rung, 같은 가격 550 → 병합 → 1건(qty=2)
+        // m=1: price=525, cumBuy=525 ≤1200 OK
+        // m=2: price=525, cumBuy=1050 ≤1200 OK
+        // m=3: price=525(or less?), cumBuy=1575 > poolLimit(1200) → break
+        // Actually buyPrice(3) = 8500/(1+3-1) = 8500/3 = 2833.33 > cap(525) → price=525
+        // cumBuy after m=2 = 1050, add 525 → 1575 > 1200 → break
+        // → 2개 rung, 같은 가격 525 → 병합 → 1건(qty=2)
         VrPosition position = pos(1, new BigDecimal("1200"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("1200.00"));
 
@@ -309,7 +309,7 @@ class VrStrategyTypeTest {
 
         // 2개 rung이 같은 cap 가격 → 병합 → 1건, qty=2
         assertThat(buys).hasSize(1);
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("550.00");
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("525.00");
         assertThat(buys.getFirst().quantity()).isEqualTo(2);
     }
 
@@ -318,7 +318,7 @@ class VrStrategyTypeTest {
     void priceCap_differentPrices_notMerged() {
         // holdings=10, V=10000, bandWidth=15%
         // lowerBand=8500, buyPrice(m=1)=8500/10=850, buyPrice(m=2)=8500/11=772.73, ...
-        // currentPrice=1000 → cap=1100
+        // currentPrice=1000 → cap=1050
         // m=1: 850 ≤ cap → price=850 (캡 미적용)
         // m=2: 772.73 ≤ cap → price=772.73
         // → 서로 다른 가격 → 병합 안 됨

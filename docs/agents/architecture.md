@@ -38,6 +38,7 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
                    CycleOrderStrategy (인터페이스 + Infinite/Privacy/VrCycleOrderStrategy 구현): 최소시드·capability SSOT (아래 "CycleOrderStrategy Capability 패턴")
                    CycleOrderStrategies (@Component 라우터): Map<Strategy.Type, CycleOrderStrategy> 자동 수집
                    StrategyCreationResolver (인터페이스 + Infinite/Privacy/VrCreationResolver 구현 + StrategyCreationResolvers 라우터): 전략 등록 시 런타임 설정(StrategyCreationSettings) 기반 필드 해석·검증
+                   PriceCapPolicy (순수 정적 유틸): 매수 가격 캡 배수(currentPrice×1.05) 단일 SSOT — application의 BuyOrderPriceCapper(INFINITE/PRIVACY)와 domain의 VrStrategy 매수 사다리가 공용
   port/in/       ← UseCase 인터페이스 (인바운드 포트)
   port/out/      ← 아웃바운드 포트 인터페이스 (*Port)
                    RuntimeSettingsPort — 전역 런타임 설정 전체 조회/저장

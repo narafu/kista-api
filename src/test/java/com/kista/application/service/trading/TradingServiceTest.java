@@ -536,7 +536,7 @@ class TradingServiceTest {
                 Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("45.00"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
         Order cappedBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("55.00"),
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("52.50"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -546,7 +546,7 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(originalBuy, sell));
         when(infiniteStrategy.buildCappedBuyOrders(any(InfinitePosition.class), any(LocalDate.class),
-                eq(List.of(originalBuy)), eq(new BigDecimal("55.00"))))
+                eq(List.of(originalBuy)), eq(new BigDecimal("52.50"))))
                 .thenReturn(List.of(cappedBuy));
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("80.00")));
@@ -709,7 +709,7 @@ class TradingServiceTest {
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, 1, new BigDecimal("35.00"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_CLOSE_SELL");
         Order cappedBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("24.20"),
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("23.10"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
         Order correction = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("10.00"),
@@ -723,11 +723,11 @@ class TradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(originalBuy, sell));
         when(infiniteStrategy.buildCappedBuyOrders(any(InfinitePosition.class), any(LocalDate.class),
-                eq(List.of(originalBuy)), eq(new BigDecimal("24.20"))))
+                eq(List.of(originalBuy)), eq(new BigDecimal("23.10"))))
                 .thenReturn(List.of(cappedBuy, correction));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of());
-        // 원본 BUY $30은 통과하지만 준비된 BUY $58.40은 가용 예산 $50을 초과한다.
+        // 원본 BUY $30은 통과하지만 준비된 BUY $56.20(23.10×2+10.00)은 가용 예산 $50을 초과한다.
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("50.00")));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());

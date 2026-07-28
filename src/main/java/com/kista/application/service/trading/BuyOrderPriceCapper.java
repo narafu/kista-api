@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
+import com.kista.domain.strategy.PriceCapPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,17 +19,13 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
-import static java.math.RoundingMode.HALF_UP;
 
-// BUY PLANNED 가격이 currentPrice × 1.10 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
+// BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
 // 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class BuyOrderPriceCapper {
-
-    // 가격 캡 배수: currentPrice × 1.10 초과 시 보정 대상
-    private static final BigDecimal PRICE_CAP_MULTIPLIER = new BigDecimal("1.10");
 
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
@@ -39,7 +36,7 @@ class BuyOrderPriceCapper {
                                      CycleOrderStrategy.PriceCapMode mode, LocalDate tradeDate) {
         if (mode == null || mode == CycleOrderStrategy.PriceCapMode.NONE || currentPrice == null) return orders;
 
-        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
         List<Order> buyOrders = orders.stream().filter(order -> order.direction() == BUY).toList();
         if (buyOrders.stream().noneMatch(order -> order.price().compareTo(cap) > 0)) return orders;
 
@@ -77,7 +74,7 @@ class BuyOrderPriceCapper {
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
 
-        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
         List<Order> exceeding = buyOrders.stream().filter(o -> o.price().compareTo(cap) > 0).toList();
         if (exceeding.isEmpty()) return;
 
@@ -104,7 +101,7 @@ class BuyOrderPriceCapper {
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
 
-        BigDecimal cap = currentPrice.multiply(PRICE_CAP_MULTIPLIER).setScale(2, HALF_UP);
+        BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
         if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;
 
         log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap, describeOrders(buyOrders));
