@@ -212,13 +212,14 @@ class VrReconfigureService implements VrReconfigureUseCase {
         if (initialGradient <= 0) {
             throw new IllegalArgumentException("VR 전략의 초기 gradient(initialGradient)는 0보다 커야 합니다");
         }
-        if (gStepWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 gradient 스텝 주기(gStepWeeks)는 0보다 커야 합니다");
+        if (gStepWeeks < 0) {
+            throw new IllegalArgumentException("VR 전략의 gradient 스텝 주기(gStepWeeks)는 0 이상이어야 합니다");
         }
         if (gGraceWeeks < 0) {
             throw new IllegalArgumentException("VR 전략의 gradient 유예 주수(gGraceWeeks)는 0 이상이어야 합니다");
         }
-        if (gMax < initialGradient) {
+        // gStepWeeks=0은 gradient 램프 비활성화 — 이때 gMax는 계산에 사용되지 않으므로 0을 허용
+        if (gStepWeeks > 0 && gMax < initialGradient) {
             throw new IllegalArgumentException("VR 전략의 gradient 상한(gMax)은 initialGradient 이상이어야 합니다");
         }
         if (pStepWeeks < 0) {

@@ -117,6 +117,30 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void save_andFindByVersionId_roundTrip_withDisabledGradientRamp() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyVersion version = strategyVersionAdapter.save(
+                new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyVrDetail detail = new StrategyVrDetail(
+                version.id(), 4, new BigDecimal("15.00"), 100,
+                10, 0, 0, 0,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+
+        StrategyVrDetail saved = vrDetailAdapter.save(detail);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(saved.gStepWeeks()).isZero();
+        assertThat(vrDetailAdapter.findByStrategyVersionId(version.id()))
+                .get()
+                .extracting(StrategyVrDetail::gGraceWeeks, StrategyVrDetail::gStepWeeks, StrategyVrDetail::gMax)
+                .containsExactly(0, 0, 0);
+    }
+
+    @Test
     void findByStrategyVersionId_returnsEmptyIfNotExists() {
         // 존재하지 않는 버전 ID → Optional.empty
         Optional<StrategyVrDetail> result = vrDetailAdapter.findByStrategyVersionId(UUID.randomUUID());

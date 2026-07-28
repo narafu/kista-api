@@ -121,4 +121,16 @@ class StrategyVrDetailTest {
         assertThat(detail.poolLimitRateAt(0)).isEqualByComparingTo("0.75");
         assertThat(detail.poolLimitRateAt(10_000)).isEqualByComparingTo("0.75");
     }
+
+    @Test
+    @DisplayName("gStepWeeks=0 → gradient 램프 비활성화, 경과주수와 무관하게 initialGradient 고정")
+    void gStepWeeksZero_disablesRamp_staysAtInitialValue() {
+        StrategyVrDetail detail = new StrategyVrDetail(
+                UUID.randomUUID(), 4, new BigDecimal("15.00"), 0,
+                10, 0, 0, 0,
+                new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
+
+        assertThat(detail.gradientAt(0)).isEqualTo(10);
+        assertThat(detail.gradientAt(10_000)).isEqualTo(10);
+    }
 }

@@ -27,8 +27,9 @@ public record StrategyVrDetail(
     public static final BigDecimal POOL_LIMIT_STEP = new BigDecimal("0.05");
 
     // gradientAt: 경과 주수(weeks) 기준 gradient(G) 값 — 유예 주수 이후 gStepWeeks마다 G_STEP씩 상승, gMax에서 상한
+    // gStepWeeks<=0은 gradient 램프 비활성화를 의미 — initialGradient에 고정(gMax/gGraceWeeks 무관)
     public int gradientAt(long weeks) {
-        if (weeks < gGraceWeeks) {
+        if (gStepWeeks <= 0 || weeks < gGraceWeeks) {
             return initialGradient;
         }
         long gSteps = (weeks - gGraceWeeks) / gStepWeeks + 1;

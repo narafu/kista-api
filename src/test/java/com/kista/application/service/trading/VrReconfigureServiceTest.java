@@ -478,6 +478,21 @@ class VrReconfigureServiceTest {
     }
 
     @Test
+    @DisplayName("gStepWeeks=0 — gradient 램프 비활성화, gGraceWeeks=0·gMax=0을 검증 없이 통과")
+    void reconfigure_gStepWeeksZero_disablesRampAndSkipsMaxValidation() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, 0, 0, 0,
+                null, null, null, null, null, null, null, null, null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.gStepWeeks()).isEqualTo(0);
+        assertThat(captured.gGraceWeeks()).isEqualTo(0);
+        assertThat(captured.gMax()).isEqualTo(0);
+    }
+
+    @Test
     @DisplayName("pStepWeeks=0이어도 poolLimitFloor > initialPoolLimitRate이면 IllegalArgumentException (DB CHECK 위반으로 새는 것 방지)")
     void reconfigure_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
         stubHappyPathChain();
