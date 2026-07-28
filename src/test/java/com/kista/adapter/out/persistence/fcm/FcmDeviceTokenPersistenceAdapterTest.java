@@ -3,7 +3,6 @@ package com.kista.adapter.out.persistence.fcm;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,18 +28,30 @@ class FcmDeviceTokenPersistenceAdapterTest {
     }
 
     @Test
-    void save_normalizesPlatformBeforeReplacingToken() {
+    void save_preservesExistingTokensOnSamePlatform() {
         UUID userId = UUID.randomUUID();
         when(repository.findByUserIdAndToken(userId, "token-new")).thenReturn(Optional.empty());
 
         adapter.save(userId, "token-new", " web ");
 
-        InOrder inOrder = inOrder(repository);
-        inOrder.verify(repository).deleteByUserIdAndPlatform(userId, "WEB");
-        inOrder.verify(repository).flush();
         ArgumentCaptor<FcmDeviceTokenEntity> captor = ArgumentCaptor.forClass(FcmDeviceTokenEntity.class);
+        verify(repository).deleteByToken("token-new");
+        verify(repository).flush();
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getPlatform()).isEqualTo("WEB");
+    }
+
+    @Test
+    void save_existingUserTokenIsIdempotent() {
+        UUID userId = UUID.randomUUID();
+        when(repository.findByUserIdAndToken(userId, "token-existing"))
+                .thenReturn(Optional.of(FcmDeviceTokenEntity.of(userId, "token-existing", "WEB")));
+
+        adapter.save(userId, "token-existing", "WEB");
+
+        verify(repository, never()).deleteByToken(any());
+        verify(repository, never()).flush();
+        verify(repository, never()).save(any());
     }
 
     @Test
