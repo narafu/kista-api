@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Preserve all unrelated uncommitted gradient-ramp changes in the worktree.
+- Preserve the unrelated gradient-ramp changes from commit `a3d96fda`.
 - Do not add a database column or migration.
 - Do not change INFINITE or PRIVACY initial cycle behavior.
 - Derive VR `poolLimit` as `initialUsdDeposit * poolLimitRate`.
@@ -109,4 +109,4 @@ git diff -- src/main/java/com/kista/application/service/strategy/StrategyService
 git status --short
 ```
 
-Expected: the pool-basis changes are present alongside, but do not overwrite, the user's existing gradient-ramp edits. Do not commit unless separately requested.
+Expected: the pool-basis changes are present without overwriting the gradient-ramp changes from commit `a3d96fda`. Commit only when separately requested.
