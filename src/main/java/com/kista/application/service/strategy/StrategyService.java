@@ -201,11 +201,15 @@ class StrategyService implements StrategyUseCase {
         if (ramp.initialPoolLimitRate().compareTo(BigDecimal.ONE) > 0) {
             throw new IllegalArgumentException("VR 전략의 초기 poolLimitRate(initialPoolLimitRate)는 1 이하여야 합니다");
         }
-        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — poolLimitFloor 무관
-        if (ramp.pStepWeeks() > 0 && (ramp.poolLimitFloor().signum() <= 0
-                || ramp.poolLimitFloor().compareTo(ramp.initialPoolLimitRate()) > 0)) {
+        // poolLimitFloor 범위는 pStepWeeks와 무관하게 항상 검증 — DB CHECK(pool_limit_floor <= initial_pool_limit_rate)와
+        // 어긋나는 값이 여기서 걸러지지 않으면 INSERT 시 매핑되지 않은 DataIntegrityViolationException → 500으로 새는 것을 방지
+        if (ramp.poolLimitFloor().signum() < 0 || ramp.poolLimitFloor().compareTo(ramp.initialPoolLimitRate()) > 0) {
             throw new IllegalArgumentException(
-                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate 이어야 합니다");
+                    "VR 전략의 poolLimitRate 하한(poolLimitFloor)은 0 이상 initialPoolLimitRate 이하여야 합니다");
+        }
+        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — 이때는 poolLimitFloor=0도 허용
+        if (ramp.pStepWeeks() > 0 && ramp.poolLimitFloor().signum() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 램프는 poolLimitFloor가 0보다 커야 합니다");
         }
     }
 

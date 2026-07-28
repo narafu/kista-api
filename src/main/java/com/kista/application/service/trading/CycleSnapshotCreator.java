@@ -65,10 +65,15 @@ class CycleSnapshotCreator {
                                       int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
                                       BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks, BigDecimal poolLimitFloor,
                                       AccountBalance postBalance, BigDecimal closingPrice, BigDecimal newValue, long weeks) {
+        // nextVersionNo는 반드시 소프트 삭제보다 먼저 계산한다 — StrategyVersionEntity에 걸린
+        // @SQLRestriction("deleted_at IS NULL")이 커스텀 @Query(findMaxVersionNoByStrategyId)에도
+        // 자동 적용되므로, 활성 버전을 먼저 소프트 삭제하면 MAX(versionNo)가 그 버전을 제외해버려
+        // 방금 삭제한 버전과 동일한 번호를 다시 계산 → uq_strategy_version_strategy_version_no 위반
+        int nextVersionNo = strategyVersionPort.nextVersionNo(strategyId);
         // 기존 활성 버전 소프트 삭제 후 새 버전 발급 (버전 이력은 계속 누적)
         strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now());
         StrategyVersion newVersion = strategyVersionPort.save(
-                new StrategyVersion(null, strategyId, strategyVersionPort.nextVersionNo(strategyId), null, null));
+                new StrategyVersion(null, strategyId, nextVersionNo, null, null));
         // 새 램프 파라미터로 VR 버전 상세 저장
         StrategyVrDetail newDetail = vrStrategyLifecycle.saveVersionDetail(newVersion.id(), intervalWeeks, bandWidth, recurringAmount,
                 initialGradient, gGraceWeeks, gStepWeeks, gMax, initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);

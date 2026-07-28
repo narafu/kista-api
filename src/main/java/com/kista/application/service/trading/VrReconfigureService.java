@@ -93,8 +93,8 @@ class VrReconfigureService implements VrReconfigureUseCase {
         validateRampParams(intervalWeeks, bandWidth, initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
 
-        // 자본 주입 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
-        AccountBalance postBalance = applyCapitalInjection(cmd, latestPosition);
+        // 자본 주입/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
+        AccountBalance postBalance = applyCapitalAdjustment(cmd, latestPosition);
 
         // 현재가 조회 — 수량 주입 시 V 증분·holdings 승계 스냅샷 종가 기준 (구조적 검증 통과 후에만 호출, 실패 시 불필요한 API 호출 방지)
         BigDecimal currentPrice = BrokerCallGuard.wrap("현재가 조회",
@@ -134,9 +134,11 @@ class VrReconfigureService implements VrReconfigureUseCase {
         return strategyUseCase.getById(strategyId, requesterId);
     }
 
-    // 자본 주입 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X
-    // 둘 다 없으면 holdings·avgPrice·usdDeposit 그대로 이월(순수 파라미터 수정)
-    private AccountBalance applyCapitalInjection(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
+    // 자본 주입/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X
+    // withdrawShares>0: holdings-=N(보유량 초과 불가, 평단가는 그대로 유지 — 잔여 수량의 원가는 불변) / withdrawDeposit: usdDeposit-=X(보유 예수금 초과 불가)
+    // 인출을 먼저 반영한 뒤(잔여 수량 기준) 주입의 가중평균을 계산 — 같은 요청에서 인출+주입이 함께 와도 순서가 명확하도록
+    // 아무것도 없으면 holdings·avgPrice·usdDeposit 그대로 이월(순수 파라미터 수정)
+    private AccountBalance applyCapitalAdjustment(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
         int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
         if (injectShares < 0) {
             throw new IllegalArgumentException("주입 주식 수(injectShares)는 0 이상이어야 합니다");
@@ -145,36 +147,55 @@ class VrReconfigureService implements VrReconfigureUseCase {
         if (injectDeposit.signum() < 0) {
             throw new IllegalArgumentException("주입 예수금(injectDeposit)은 0 이상이어야 합니다");
         }
+        int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
+        if (withdrawShares < 0) {
+            throw new IllegalArgumentException("인출 주식 수(withdrawShares)는 0 이상이어야 합니다");
+        }
+        if (withdrawShares > latestPosition.holdings()) {
+            throw new IllegalArgumentException(
+                    "인출 주식 수(withdrawShares)는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다");
+        }
+        BigDecimal withdrawDeposit = cmd.withdrawDeposit() != null ? cmd.withdrawDeposit() : BigDecimal.ZERO;
+        if (withdrawDeposit.signum() < 0) {
+            throw new IllegalArgumentException("인출 예수금(withdrawDeposit)은 0 이상이어야 합니다");
+        }
+        if (withdrawDeposit.compareTo(latestPosition.usdDeposit()) > 0) {
+            throw new IllegalArgumentException(
+                    "인출 예수금(withdrawDeposit)은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다");
+        }
 
-        int newHoldings = latestPosition.holdings() + injectShares;
+        int holdingsAfterWithdrawal = latestPosition.holdings() - withdrawShares;
+        int newHoldings = holdingsAfterWithdrawal + injectShares;
         BigDecimal newAvgPrice;
         if (injectShares > 0) {
             if (cmd.injectSharePrice() == null || cmd.injectSharePrice().signum() <= 0) {
                 throw new IllegalArgumentException("주식 주입 시 매수단가(injectSharePrice)는 0보다 커야 합니다");
             }
             BigDecimal existingCost = latestPosition.avgPrice() != null
-                    ? latestPosition.avgPrice().multiply(BigDecimal.valueOf(latestPosition.holdings()))
+                    ? latestPosition.avgPrice().multiply(BigDecimal.valueOf(holdingsAfterWithdrawal))
                     : BigDecimal.ZERO;
             BigDecimal injectedCost = cmd.injectSharePrice().multiply(BigDecimal.valueOf(injectShares));
             newAvgPrice = newHoldings == 0
                     ? null
                     : existingCost.add(injectedCost).divide(BigDecimal.valueOf(newHoldings), 4, RoundingMode.HALF_UP);
         } else {
-            newAvgPrice = latestPosition.avgPrice();
+            newAvgPrice = newHoldings == 0 ? null : latestPosition.avgPrice();
         }
 
-        BigDecimal newUsdDeposit = latestPosition.usdDeposit().add(injectDeposit);
+        BigDecimal newUsdDeposit = latestPosition.usdDeposit().add(injectDeposit).subtract(withdrawDeposit);
         return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
     }
 
     // V 증분 — 수량 주입 시 V += N×현재가, 없으면 V 이월(순수 파라미터 수정)
     private BigDecimal computeNewValue(ReconfigureVrCommand cmd, StrategyCycleVrDetail currentCycleVr, BigDecimal currentPrice) {
         int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
-        if (injectShares == 0) {
+        int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
+        int netShares = injectShares - withdrawShares;
+        if (netShares == 0) {
             return currentCycleVr.value();
         }
         return currentCycleVr.value()
-                .add(BigDecimal.valueOf(injectShares).multiply(currentPrice))
+                .add(BigDecimal.valueOf(netShares).multiply(currentPrice))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -209,11 +230,15 @@ class VrReconfigureService implements VrReconfigureUseCase {
         if (initialPoolLimitRate.compareTo(BigDecimal.ONE) > 0) {
             throw new IllegalArgumentException("VR 전략의 초기 poolLimitRate(initialPoolLimitRate)는 1 이하여야 합니다");
         }
-        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — poolLimitFloor 무관
-        if (pStepWeeks > 0 && (poolLimitFloor == null || poolLimitFloor.signum() <= 0
-                || poolLimitFloor.compareTo(initialPoolLimitRate) > 0)) {
+        // poolLimitFloor 범위는 pStepWeeks와 무관하게 항상 검증 — DB CHECK(pool_limit_floor <= initial_pool_limit_rate)와
+        // 어긋나는 값이 여기서 걸러지지 않으면 INSERT 시 매핑되지 않은 DataIntegrityViolationException → 500으로 새는 것을 방지
+        if (poolLimitFloor == null || poolLimitFloor.signum() < 0 || poolLimitFloor.compareTo(initialPoolLimitRate) > 0) {
             throw new IllegalArgumentException(
-                    "VR 전략의 poolLimitRate 램프는 0 < poolLimitFloor <= initialPoolLimitRate 이어야 합니다");
+                    "VR 전략의 poolLimitRate 하한(poolLimitFloor)은 0 이상 initialPoolLimitRate 이하여야 합니다");
+        }
+        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — 이때는 poolLimitFloor=0도 허용
+        if (pStepWeeks > 0 && poolLimitFloor.signum() <= 0) {
+            throw new IllegalArgumentException("VR 전략의 poolLimitRate 램프는 poolLimitFloor가 0보다 커야 합니다");
         }
     }
 

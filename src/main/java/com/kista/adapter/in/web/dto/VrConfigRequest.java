@@ -35,12 +35,17 @@ public record VrConfigRequest(
         @Schema(description = "자본 주입: 위 주식의 매수단가 (injectShares>0이면 필수)", example = "45.50")
         BigDecimal injectSharePrice,
         @Schema(description = "자본 주입: 추가 예수금 (USD, null/0=주입 없음)", example = "500.00")
-        BigDecimal injectDeposit
+        BigDecimal injectDeposit,
+        @Schema(description = "자본 인출: 보유 수량에서 차감할 주식 수 (null=인출 없음, 보유 수량 초과 불가)", example = "5")
+        @Min(0) Integer withdrawShares,
+        @Schema(description = "자본 인출: 예수금 차감액 (USD, null/0=인출 없음, 보유 예수금 초과 불가)", example = "200.00")
+        BigDecimal withdrawDeposit
 ) {
     public ReconfigureVrCommand toCommand() {
         return new ReconfigureVrCommand(bandWidth, intervalWeeks, recurringAmount,
                 initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
-                injectShares, injectSharePrice, injectDeposit);
+                injectShares, injectSharePrice, injectDeposit,
+                withdrawShares, withdrawDeposit);
     }
 }

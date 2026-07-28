@@ -143,10 +143,10 @@ class VrReconfigureServiceTest {
         stubHappyPathChain(today.minusWeeks(10));
     }
 
-    // cmd의 15개(실제 14개) 필드 전부 null인 기본 커맨드 — 필요한 필드만 override해서 사용
+    // cmd의 16개 필드 전부 null인 기본 커맨드 — 필요한 필드만 override해서 사용
     private ReconfigureVrCommand allNullCmd() {
         return new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
     }
 
     // cycleSnapshotCreator.reconfigureVrCycle(...) 호출 인자 전체를 캡처해 검증하기 위한 홀더
@@ -200,7 +200,7 @@ class VrReconfigureServiceTest {
     void reconfigure_pureParamChange_carriesOverBalanceAndValue() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
 
@@ -234,7 +234,7 @@ class VrReconfigureServiceTest {
     void reconfigure_injectShares_updatesHoldingsAvgPriceAndValue() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, 5, new BigDecimal("60.00"), null);
+                null, null, null, null, 5, new BigDecimal("60.00"), null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -256,7 +256,7 @@ class VrReconfigureServiceTest {
         org.mockito.Mockito.doThrow(new RuntimeException("텔레그램 발송 실패"))
                 .when(userNotificationPort).notifyNewCycleStarted(any(), any(), any(), any());
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
 
@@ -271,7 +271,7 @@ class VrReconfigureServiceTest {
     void reconfigure_injectDeposit_updatesDepositOnly() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, new BigDecimal("200.00"));
+                null, null, null, null, null, null, new BigDecimal("200.00"), null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -281,6 +281,97 @@ class VrReconfigureServiceTest {
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         // 수량 주입 없으므로 V 이월 (증분 없음)
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
+    }
+
+    // --- 3-1) 자본 인출 ---
+
+    @Test
+    @DisplayName("수량 인출: holdings 감소, 평단가는 그대로 유지, V -= 인출수량×현재가")
+    void reconfigure_withdrawShares_reducesHoldingsKeepsAvgPriceReducesValue() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, 4, null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        // newHoldings = 기존 10 - 4 = 6
+        assertThat(captured.postBalance().holdings()).isEqualTo(6);
+        // 인출은 잔여 수량의 원가를 바꾸지 않음 — 평단가 그대로
+        assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
+        // V -= 4 × 120.00 = 480.00 → 1000.00 - 480.00 = 520.00
+        assertThat(captured.newValue()).isEqualByComparingTo("520.00");
+    }
+
+    @Test
+    @DisplayName("예수금 인출: usdDeposit 감소, holdings/avgPrice 불변, V 이월")
+    void reconfigure_withdrawDeposit_reducesDepositOnly() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, new BigDecimal("150.00"));
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("350.00"); // 500.00 - 150.00
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
+        assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
+    }
+
+    @Test
+    @DisplayName("인출 주식 수가 보유 수량을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    void reconfigure_withdrawSharesExceedsHoldings_throws() {
+        stubHappyPathChain();
+        // latestPosition.holdings() == 10
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, 11, null);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("인출 예수금이 보유 예수금을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    void reconfigure_withdrawDepositExceedsBalance_throws() {
+        stubHappyPathChain();
+        // latestPosition.usdDeposit() == 500.00
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, new BigDecimal("500.01"));
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("인출 후 주입: 잔여 수량 기준으로 평단가 가중평균 재계산")
+    void reconfigure_withdrawThenInject_recomputesAvgPriceFromRemainingShares() {
+        stubHappyPathChain();
+        // 기존 10주(평단가 50.00) 중 4주 인출 → 잔여 6주(원가 300.00), 이후 3주를 60.00에 주입
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, null, null, null, 3, new BigDecimal("60.00"), null, 4, null);
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        CapturedCall captured = captureReconfigureCall();
+        // newHoldings = (10 - 4) + 3 = 9
+        assertThat(captured.postBalance().holdings()).isEqualTo(9);
+        // 가중평균: (50.00×6 + 60.00×3) / 9 = (300.00+180.00)/9 = 480.00/9
+        BigDecimal expectedAvgPrice = new BigDecimal("300.00").add(new BigDecimal("180.00"))
+                .divide(BigDecimal.valueOf(9), 4, java.math.RoundingMode.HALF_UP);
+        assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(expectedAvgPrice);
     }
 
     // --- 4) 비-VR 전략 ---
@@ -323,7 +414,7 @@ class VrReconfigureServiceTest {
         stubHappyPathChain(today.minusWeeks(60));
         // initialGradient를 새 값(12, gMax=15 이내)으로 재지정해도 weeks 계산 자체는 firstStart 기준 그대로여야 함
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 12, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -342,7 +433,7 @@ class VrReconfigureServiceTest {
     void reconfigure_invalidRamp_gMaxLessThanInitialGradient_throws() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 20, null, null, 15,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -359,7 +450,7 @@ class VrReconfigureServiceTest {
     void reconfigure_invalidRamp_poolLimitFloorGreaterThanInitial_throws() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                new BigDecimal("0.60"), null, null, new BigDecimal("0.70"), null, null, null);
+                new BigDecimal("0.60"), null, null, new BigDecimal("0.70"), null, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -376,7 +467,7 @@ class VrReconfigureServiceTest {
     void reconfigure_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, 0, 0, BigDecimal.ZERO, null, null, null);
+                null, 0, 0, BigDecimal.ZERO, null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -386,6 +477,24 @@ class VrReconfigureServiceTest {
         assertThat(captured.poolLimitFloor()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    @Test
+    @DisplayName("pStepWeeks=0이어도 poolLimitFloor > initialPoolLimitRate이면 IllegalArgumentException (DB CHECK 위반으로 새는 것 방지)")
+    void reconfigure_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
+        stubHappyPathChain();
+        // currentDetail.initialPoolLimitRate() == 0.75 (상속) — poolLimitFloor=0.90은 이를 초과
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
+                null, 0, 0, new BigDecimal("0.90"), null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
+                any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyInt(), anyInt(),
+                any(), anyInt(), anyInt(), any(),
+                any(), any(), any(), anyLong());
+    }
+
     // --- 8) 주식 주입인데 단가 누락 ---
 
     @Test
@@ -393,7 +502,7 @@ class VrReconfigureServiceTest {
     void reconfigure_injectSharesWithoutPrice_throws() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, 5, null, null);
+                null, null, null, null, 5, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);

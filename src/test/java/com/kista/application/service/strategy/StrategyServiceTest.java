@@ -1036,7 +1036,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(하한 검증 생략)")
+    @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(0 초과 요구만 생략)")
     void register_vr_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
         stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
@@ -1051,6 +1051,31 @@ class StrategyServiceTest {
         verify(strategyVrDetailPort).save(argThat(d ->
                 d.pStepWeeks() == 0 && d.pGraceWeeks() == 0
                         && d.poolLimitFloor().compareTo(BigDecimal.ZERO) == 0));
+    }
+
+    @Test
+    @DisplayName("VR register() pStepWeeks=0이어도 poolLimitFloor > initialPoolLimitRate이면 IllegalArgumentException (DB CHECK 위반으로 새는 것 방지)")
+    void register_vr_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
+        Account account = ownerAccount();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
+        when(registry.require(account, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account)).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                null, null, 4, new BigDecimal("15.00"), 0,
+                null, null, null, null,
+                new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90"),
+                null);
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("poolLimitFloor");
+
+        verify(strategyPort, never()).save(any());
     }
 
     @Test
