@@ -1,6 +1,8 @@
 package com.kista.adapter.out.persistence.strategy;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, UUID> {
+
+    // 사이클 단위 동시 실행 직렬화용 row lock — 트랜잭션 종료까지 보유 (BuyOrderPriceCapper 등)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sc FROM StrategyCycleEntity sc WHERE sc.id = :id")
+    Optional<StrategyCycleEntity> lockById(@Param("id") UUID id);
 
     // 전략의 현재 사이클 — deleted_at IS NULL(@SQLRestriction) 중 createdAt 최신 1건
     Optional<StrategyCycleEntity> findTop1ByStrategyIdOrderByCreatedAtDesc(UUID strategyId);

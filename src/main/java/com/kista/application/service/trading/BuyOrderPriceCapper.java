@@ -4,12 +4,14 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
 import com.kista.domain.strategy.PriceCapPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,6 +24,8 @@ import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
 // 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
+// capIfNeeded/capPrivacyIfNeeded는 브로커 호출 없이 DB만 다루므로 @Transactional 허용 (constraints.md 외부 호출 금지 규칙과 무충돌)
+// — 사이클 row lock(StrategyCyclePort.lockForUpdate)으로 동시 호출을 직렬화해 read-cancel-write 경합에 의한 부분 저장을 방지한다
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -30,6 +34,7 @@ class BuyOrderPriceCapper {
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
     private final InfiniteStrategy infiniteStrategy;
+    private final StrategyCyclePort strategyCyclePort;
 
     // 신규 후보의 최종 BUY를 allocator 입력 전에 계산하며 영속화는 수행하지 않는다
     List<Order> prepareForAllocation(List<Order> orders, BigDecimal currentPrice, InfinitePosition position,
@@ -69,7 +74,9 @@ class BuyOrderPriceCapper {
     }
 
     // PRIVACY 전용: cap 초과 주문만 CANCELLED → cap 가격으로 재저장 (cap 이하 주문은 그대로 유지)
+    @Transactional
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
@@ -87,8 +94,10 @@ class BuyOrderPriceCapper {
     }
 
     // INFINITE 전용: position 기반 수량 재산정 + 보정 주문 포함
+    @Transactional
     void capIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
                 (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
     }

@@ -12,6 +12,9 @@ import java.util.UUID;
 public interface StrategyCyclePort {
     StrategyCycle save(StrategyCycle cycle);
 
+    // 사이클 단위 동시 실행 직렬화 — 현재 트랜잭션 종료(커밋/롤백)까지 row lock 보유
+    void lockForUpdate(UUID cycleId);
+
     // 전략의 현재 사이클 — deleted_at IS NULL 중 createdAt 최신 1건
     Optional<StrategyCycle> findLatestByStrategyId(UUID strategyId);
 

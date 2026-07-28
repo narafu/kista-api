@@ -143,7 +143,7 @@ class TradingServiceTest {
         // SellableQuantityPort: BUY 예산과 독립적인 SELL 판매가능수량 검증
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(Account.class), eq(SellableQuantityPort.class));
 
-        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)

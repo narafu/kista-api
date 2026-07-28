@@ -6,6 +6,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
+import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class BuyOrderPriceCapperTest {
     @Mock OrderPort orderPort;
     @Mock TradingOrderPlanner orderPlanner;
     @Mock InfiniteStrategy infiniteStrategy;
+    @Mock StrategyCyclePort strategyCyclePort;
     @Captor ArgumentCaptor<List<Order>> ordersCaptor;
     @Captor ArgumentCaptor<BigDecimal> capCaptor;
 
@@ -51,7 +53,7 @@ class BuyOrderPriceCapperTest {
             new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
 
     private BuyOrderPriceCapper capper() {
-        return new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy);
+        return new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, strategyCyclePort);
     }
 
     private Order buy(String price, int quantity) {

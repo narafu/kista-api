@@ -26,6 +26,12 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public void lockForUpdate(UUID cycleId) {
+        // 존재 여부와 무관하게 잠금만 목적 — 호출부가 활성 트랜잭션 안에서 호출해야 잠금이 커밋까지 유지됨
+        jpaRepository.lockById(cycleId);
+    }
+
+    @Override
     public Optional<StrategyCycle> findLatestByStrategyId(UUID strategyId) {
         // @SQLRestriction 적용 — deleted_at IS NULL 중 createdAt 최신 1건
         return jpaRepository.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
