@@ -87,8 +87,10 @@ class CycleOrderComputer {
             boolean firstCycle = isFirstOpenCycle(currentCycle);
             boolean cycleDue = !tradeDate.isBefore(dueDate);
             int remainingTradingDays = tradingDayCounter.countOpenDaysInclusive(tradeDate, dueDate);
-            // poolLimit(달러)은 더 이상 저장값이 아닌 파생값 — 현재 사이클 시작 시드(startAmount) × 고정 poolLimitRate 스냅샷
-            BigDecimal poolLimit = currentCycle.startAmount()
+            // poolLimit(달러)은 개장 포지션의 예수금 × 고정 poolLimitRate 스냅샷
+            CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
+                    .orElseThrow(() -> new IllegalStateException("VR 시작 포지션 없음: cycleId=" + currentCycle.id()));
+            BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(

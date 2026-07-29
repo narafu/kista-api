@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -47,9 +48,12 @@ class CycleSnapshotCreator {
     StrategyCycle createVrCycleAndSnapshot(UUID strategyId, UUID strategyVersionId,
                                            AccountBalance postBalance, BigDecimal closingPrice,
                                            BigDecimal newValue, int gradient, BigDecimal poolLimitRate) {
-        // 새 사이클 생성 — 시드(startAmount)는 롤오버 후 예수금
+        // 새 사이클 생성 — 시드(startAmount)는 롤오버 후 예수금과 보유 주식 평가액의 합계
+        BigDecimal startAmount = postBalance.usdDeposit()
+                .add(closingPrice.multiply(BigDecimal.valueOf(postBalance.holdings())))
+                .setScale(2, RoundingMode.HALF_UP);
         StrategyCycle newCycle = strategyCyclePort.save(
-                StrategyCycle.start(strategyId, strategyVersionId, postBalance.usdDeposit()));
+                StrategyCycle.start(strategyId, strategyVersionId, startAmount));
         // holdings 승계 스냅샷: 이전 사이클 보유량·평단가·예수금·종가 그대로 기록
         cyclePositionPort.save(CyclePosition.tradeSnapshot(newCycle.id(), postBalance, closingPrice));
         // VR 사이클 상세 저장 — V′·gradient·poolLimitRate 스냅샷
