@@ -93,9 +93,11 @@ class CycleOrderComputer {
             BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);
+            // referencePrice: BUY bootstrap 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
+            // currentPrice: SELL bootstrap 전용 — 실시간 현재가만 허용, fallback 없음(갭 하락 과매도 방지)
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
-                    cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, vrReferencePrice,
+                    cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, vrReferencePrice, currentPrice,
                     firstCycle, cycleDue, remainingTradingDays, vrDetail.recurringAmount());
         }
 

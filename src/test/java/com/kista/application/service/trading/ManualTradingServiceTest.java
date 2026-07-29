@@ -270,8 +270,9 @@ class ManualTradingServiceTest {
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
-        // buildOrders: LIMIT + AT_OPEN 주문 반환
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), isNull(), any()))
+        // buildOrders: LIMIT + AT_OPEN 주문 반환 — 수동실행은 currentPrice=null 전달하지만
+        // setUp()의 전역 kisPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(new BigDecimal("20.00")), isNull(), any()))
                 .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
         // live 잔고 검증 — BUY $22 << usdDeposit $10,000
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))

@@ -143,7 +143,7 @@ class TradingServiceTest {
         // SellableQuantityPort: BUY 예산과 독립적인 SELL 판매가능수량 검증
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(Account.class), eq(SellableQuantityPort.class));
 
-        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, strategyCyclePort);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, notifyPort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
@@ -604,8 +604,15 @@ class TradingServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionId(vrCycle.strategyVersionId()))
                 .thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(), any()))
-                .thenReturn(List.of(buyTemplate(Ticker.TQQQ, "1500.00", Order.OrderTiming.AT_OPEN)));
+        // VR도 이제 priceCapMode()=VR_POSITION이라 prepareForAllocation이 cap(PRICE×1.05=23.10)을 검사한다.
+        // 이 테스트는 계좌별 예산 우선순위 배정(총액 $1500 소비)을 검증하는 것이 목적이므로,
+        // 단가는 cap 이하(20.00)로 낮추고 수량을 75주로 늘려 원래 의도한 소비 총액($1500)을 유지한다.
+        Order vrBuyOrder = new Order(null, null, null, LocalDate.now(), Ticker.TQQQ, Order.OrderType.LIMIT,
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 75, new BigDecimal("20.00"),
+                Order.OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_TQQQ_AT_OPEN_BUY_20_00");
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(), any(), any()))
+                .thenReturn(List.of(vrBuyOrder));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate(Ticker.SOXL, "1000.00", Order.OrderTiming.AT_CLOSE)));
         when(privacyStrategy.buildOrders(any(), any(), any()))
@@ -1631,7 +1638,7 @@ class TradingServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
         // buildOrders: VR 전략은 LIMIT + AT_OPEN 주문만 반환
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
                 .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
 
         service.executeBatch(List.of(new BatchContext(vrStrat, vrCycle, ACCOUNT, USER)), PAST_DST);

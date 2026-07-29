@@ -39,11 +39,11 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.supportsReverseMode()).isFalse();
         assertThat(vr.availableDivisionCounts()).isEmpty();
         assertThat(vr.requiresPrivacyBase()).isFalse();
-        assertThat(vr.requiresPrevClose()).isFalse();
+        assertThat(vr.requiresPrevClose()).isTrue();
         assertThat(vr.endsCycleOnLiquidation()).isFalse(); // VR만 false — 전량 청산 후에도 사이클 유지
         assertThat(vr.tracksReverseMode()).isFalse(); // 기본값
         assertThat(vr.requiresRolloverCheck()).isTrue();
-        assertThat(vr.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.NONE); // 기본값
+        assertThat(vr.priceCapMode()).isEqualTo(com.kista.domain.strategy.CycleOrderStrategy.PriceCapMode.VR_POSITION);
         assertThat(vr.allocationPriority()).isZero();
     }
 }

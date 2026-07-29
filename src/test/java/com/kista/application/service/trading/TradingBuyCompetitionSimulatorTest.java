@@ -112,7 +112,7 @@ class TradingBuyCompetitionSimulatorTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
-                null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
+                null, null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
 
         when(depositCache.getUsdDeposit(account, Ticker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
@@ -191,7 +191,7 @@ class TradingBuyCompetitionSimulatorTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
-                null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
+                null, null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
 
         when(depositCache.getUsdDeposit(account, Ticker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));

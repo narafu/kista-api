@@ -140,7 +140,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
                 position.unitAmount(), orders.size());
-        return Optional.of(new OrderPlan(position, orders));
+        return Optional.of(new OrderPlan(position, null, orders));
     }
 
     // 리버스모드 — 별지점 기준 매도/쿼터매수
@@ -162,7 +162,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         log.info("[{}] 전략 계산(리버스모드): isFirstDay={}, holdings={}, starPointPrice={}, orders={}",
                 ctx.label(), position.isFirstDay(), position.holdings(), position.starPointPrice(), orders.size());
         // 리버스모드에서 InfinitePosition은 null (OrderPlan.position()은 일반모드 전용)
-        return Optional.of(new OrderPlan(null, orders));
+        return Optional.of(new OrderPlan(null, null, orders));
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.VrPosition;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,9 +48,10 @@ public interface CycleOrderStrategy {
     // 포지션 저장 후 N주 롤오버 판정을 수행할지 여부 (VR만 true)
     default boolean requiresRolloverCheck() { return false; }
 
-    // BUY 가격 사후 보정(post-hoc cap) 방식 — NONE: 미적용, INFINITE_POSITION: InfinitePosition 기반, PRIVACY_SIMPLE: 단순 가격 치환
-    // VR은 buildOrders 단계에서 이미 캡을 적용하므로 NONE(기본값)
-    enum PriceCapMode { NONE, INFINITE_POSITION, PRIVACY_SIMPLE }
+    // BUY 가격 사후 보정(post-hoc cap) 방식 — NONE: 미적용, INFINITE_POSITION: InfinitePosition 기반,
+    // PRIVACY_SIMPLE: 단순 가격 치환, VR_POSITION: VrPosition 기반 사다리 재산정
+    // VR도 생성 시점 cap을 제거하고 접수 전 BuyOrderPriceCapper가 보정하므로 기본값 아님
+    enum PriceCapMode { NONE, INFINITE_POSITION, PRIVACY_SIMPLE, VR_POSITION }
     default PriceCapMode priceCapMode() { return PriceCapMode.NONE; }
 
     // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
@@ -102,13 +104,15 @@ public interface CycleOrderStrategy {
         // bandWidth: 밴드 폭 % (StrategyVrDetail.bandWidth)
         // poolLimit: 개장 USD pool×StrategyCycleVrDetail.poolLimitRate로 파생한 pool 상한 금액
         // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
-        // currentPrice: 스케쥴러 시작 시점 현재가 — 가격 캡(×1.10) 적용용, null이면 캡 미적용
+        // referencePrice: BUY bootstrap(×1.10) 기준가 — currentPrice 없으면 전일종가로 대체(fallback 허용)
+        // currentPrice: 스케쥴러 시작 시점 실시간 현재가 — SELL bootstrap(×0.90) 전용, fallback 없음(null이면 SELL bootstrap 미생성)
         // firstCycle/cycleDue/remainingTradingDays/recurringAmount: 첫 사이클 LOC bootstrap 제어값
         public record VrInputs(
                 BigDecimal value,
                 BigDecimal bandWidth,
                 BigDecimal poolLimit,
                 BigDecimal poolUsed,
+                BigDecimal referencePrice,
                 BigDecimal currentPrice,
                 boolean firstCycle,
                 boolean cycleDue,
@@ -117,6 +121,7 @@ public interface CycleOrderStrategy {
         ) {}
     }
 
-    // 전략 계산 결과 — position은 INFINITE만 non-null (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존)
-    record OrderPlan(InfinitePosition position, List<Order> orders) {}
+    // 전략 계산 결과 — position은 INFINITE만 non-null, vrPosition은 VR만 non-null
+    // (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존 — BuyOrderPriceCapper 접수 전 보정에 재사용)
+    record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<Order> orders) {}
 }

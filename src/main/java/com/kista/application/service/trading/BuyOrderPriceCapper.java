@@ -3,11 +3,14 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.VrPosition;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
 import com.kista.domain.strategy.PriceCapPolicy;
+import com.kista.domain.strategy.VrStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,10 +37,13 @@ class BuyOrderPriceCapper {
     private final OrderPort orderPort;
     private final TradingOrderPlanner orderPlanner;
     private final InfiniteStrategy infiniteStrategy;
+    private final VrStrategy vrStrategy;
     private final StrategyCyclePort strategyCyclePort;
 
     // 신규 후보의 최종 BUY를 allocator 입력 전에 계산하며 영속화는 수행하지 않는다
+    // ticker: VR 전용 — VrPosition은 ticker를 보유하지 않아 별도 전달 필요 (INFINITE_POSITION/PRIVACY_SIMPLE은 무시)
     List<Order> prepareForAllocation(List<Order> orders, BigDecimal currentPrice, InfinitePosition position,
+                                     VrPosition vrPosition, Strategy.Ticker ticker,
                                      CycleOrderStrategy.PriceCapMode mode, LocalDate tradeDate) {
         if (mode == null || mode == CycleOrderStrategy.PriceCapMode.NONE || currentPrice == null) return orders;
 
@@ -51,6 +57,11 @@ class BuyOrderPriceCapper {
                             ? order.withPrice(cap)
                             : order)
                     .toList();
+        }
+        if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION) {
+            if (vrPosition == null) return orders;
+            List<Order> cappedBuys = vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
+            return replaceBuysPreservingOrder(orders, cappedBuys);
         }
         if (position == null) return orders;
 
@@ -100,6 +111,16 @@ class BuyOrderPriceCapper {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
                 (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
+    }
+
+    // VR 전용: vrPosition 기반 매수 사다리 전체 재산정 — 기존 buyOrders 인자는 사용하지 않는다
+    // (VR 사다리는 position+cap만으로 자기완결적으로 재생성되며, poolLimit·pool 한도 내로 자연스럽게 재수렴한다)
+    @Transactional
+    void capVrIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
+                       BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
+        applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
+                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap));
     }
 
     // 공통 cap 적용 골격: PLANNED BUY 조회 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장

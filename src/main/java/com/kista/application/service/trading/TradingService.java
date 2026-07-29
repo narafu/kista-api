@@ -57,7 +57,8 @@ class TradingService {
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
-            BigDecimal startPrice,          // 공통 — INFINITE: BuyOrderPriceCapper / PRIVACY: capPrivacyIfNeeded
+            VrPosition vrPosition,          // VR만 non-null (신규 계산 시 — BuyOrderPriceCapper VR_POSITION 보정용)
+            BigDecimal startPrice,          // 공통 — INFINITE: BuyOrderPriceCapper / PRIVACY: capPrivacyIfNeeded / VR: capVrIfNeeded
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
@@ -161,7 +162,7 @@ class TradingService {
             runSafely("증권사 접수", state.ctx(), () -> {
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
-                        state.startPrice(), state.position(), state.ctx().strategy());
+                        state.startPrice(), state.position(), state.vrPosition(), state.ctx().strategy());
                 // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
                 // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
                 Set<UUID> mainOrderIds = mainOrders.stream()
@@ -249,13 +250,13 @@ class TradingService {
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
         List<Order> preparedOrders = priceCapper.prepareForAllocation(
-                planOpt.get().orders(), price, planOpt.get().position(),
+                planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
                 cycleOrderStrategies.of(strategy.type()).priceCapMode(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<Order> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), price, privacyBaseForState);
+        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
         return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
     }
 
@@ -284,12 +285,13 @@ class TradingService {
             InfinitePosition recalcPos = orderComputer.compute(
                     balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname(), price)
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
-            return new CycleState(ctx, balance, recalcPos, price, null);
+            return new CycleState(ctx, balance, recalcPos, null, price, null);
         }
         // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
         // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
+        // VR은 canSkipOrderComputation()이 항상 false라 이 메서드에 도달하지 않음 — vrPosition은 항상 null로 둔다
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        return new CycleState(ctx, balance, null, price, privacyBaseForState);
+        return new CycleState(ctx, balance, null, null, price, privacyBaseForState);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)

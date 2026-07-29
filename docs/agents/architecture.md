@@ -193,7 +193,7 @@ adapter/out/
   - `canSkipOrderComputation(existingOrders, creatableTimings)` — scheduler compute skip capability. 기본 false이며 INFINITE만 complete concrete leg 또는 direction-aware legacy UNKNOWN 점유를 보수적으로 판단한다.
   - `tracksReverseMode()` — 리버스모드 detail 저장 여부 (INFINITE만 true)
   - `requiresRolloverCheck()` — 포지션 저장 후 롤오버 판정 수행 여부 (VR만 true)
-  - `priceCapMode()` — BUY 가격 사후 보정 방식 (`PriceCapMode` enum: NONE / INFINITE_POSITION / PRIVACY_SIMPLE)
+  - `priceCapMode()` — BUY 가격 사후 보정 방식 (`PriceCapMode` enum: NONE / INFINITE_POSITION / PRIVACY_SIMPLE / VR_POSITION). VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrStrategy.buildCappedBuyOrders()`로 보정한다
 - `CycleOrderStrategies`: `Map<Strategy.Type, CycleOrderStrategy>` 라우터 — `of(type)` 으로 구현체 조회
 - **프론트 capability 소비**: `GET /api/meta`의 `StrategyTypeMeta`에 capability 7필드(code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts) 직렬화 → 프론트는 `isInfinite` 휴리스틱 대신 `divisionCounts`/`requiresPrivacyBase` 직접 소비
 - **최소시드 미리보기**: `GET /api/accounts/{id}/strategy-seed-preview?type=&ticker=&divisionCount=` → `StrategySeedPreviewResponse { ticker, basePrice, minSeed, skipReason }`

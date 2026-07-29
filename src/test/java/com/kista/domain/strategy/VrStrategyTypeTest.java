@@ -46,7 +46,7 @@ class VrStrategyTypeTest {
     // ── 첫 사이클 bootstrap ───────────────────────────────────────────────────
 
     @Test
-    @DisplayName("첫 사이클 V만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매도한다")
+    @DisplayName("첫 사이클 V만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매도한다 (livePrice 필요)")
     void firstCycle_valueOnly_sellsPoolLimitAcrossRemainingDays() {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("100"), BigDecimal.ZERO);
         VrPosition position = new VrPosition(
@@ -54,7 +54,8 @@ class VrStrategyTypeTest {
                 new BigDecimal("5000.00"), BigDecimal.ZERO,
                 true, false, 10, 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+        // SELL bootstrap은 livePrice(실시간 현재가)만 사용 — referencePrice는 무시됨
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, new BigDecimal("100.00"), TODAY);
         Order sell = orders.getFirst();
 
         assertThat(orders).hasSize(1);
@@ -67,7 +68,22 @@ class VrStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("첫 사이클 시드만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매수한다")
+    @DisplayName("SELL bootstrap은 livePrice가 없으면 전일종가로 대체하지 않고 빈 주문을 반환한다 (갭 하락 과매도 방지)")
+    void firstCycle_valueOnly_noLivePrice_returnsEmpty() {
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("100"), BigDecimal.ZERO);
+        VrPosition position = new VrPosition(
+                balance, new BigDecimal("10000"), new BigDecimal("15.00"),
+                new BigDecimal("5000.00"), BigDecimal.ZERO,
+                true, false, 10, 0);
+
+        // referencePrice(전일종가 대체값)만 있고 livePrice(실시간)는 없는 preview/수동실행 상황 재현
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+
+        assertThat(orders).isEmpty();
+    }
+
+    @Test
+    @DisplayName("첫 사이클 시드만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매수한다 (referencePrice로 전일종가 대체 가능)")
     void firstCycle_seedOnly_buysPoolLimitAcrossRemainingDays() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
         VrPosition position = new VrPosition(
@@ -75,7 +91,8 @@ class VrStrategyTypeTest {
                 new BigDecimal("5000.00"), BigDecimal.ZERO,
                 true, false, 10, 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+        // BUY bootstrap은 referencePrice만으로도 생성 가능 — livePrice=null(preview/수동실행)이어도 전일종가 대체값으로 진행
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
         Order buy = orders.getFirst();
 
         assertThat(orders).hasSize(1);
@@ -88,7 +105,7 @@ class VrStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("적립식 첫 사이클은 due date 당일에 recurringAmount만큼 LOC 매수한다")
+    @DisplayName("적립식 첫 사이클은 due date 당일에 recurringAmount만큼 LOC 매수한다 (referencePrice 대체 가능)")
     void firstCycle_recurringOnly_dueDate_buysRecurringAmount() {
         AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
         VrPosition position = new VrPosition(
@@ -96,7 +113,7 @@ class VrStrategyTypeTest {
                 BigDecimal.ZERO, BigDecimal.ZERO,
                 true, true, 1, 200);
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY)
+        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         assertThat(buys).hasSize(1);
@@ -115,7 +132,7 @@ class VrStrategyTypeTest {
                 BigDecimal.ZERO, BigDecimal.ZERO,
                 true, false, 5, 200);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
 
         assertThat(orders).isEmpty();
     }
@@ -131,7 +148,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         assertThat(orders).isNotEmpty();
         assertThat(orders).allMatch(o -> o.orderType() == LIMIT);
@@ -154,7 +171,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(0, new BigDecimal("9000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("8500.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         // 매도 없음
         assertThat(orders).noneMatch(o -> o.direction() == SELL);
@@ -176,7 +193,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("2000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         assertThat(buys).hasSize(1);
@@ -189,7 +206,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("3200.00"));
 
-        List<Order> buyOrders = strategy.buildOrders(position, TQQQ, null, TODAY)
+        List<Order> buyOrders = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         assertThat(buyOrders).extracting(Order::orderLeg)
@@ -207,7 +224,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("1500"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("10000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         // 첫 단가(1700) > pool(1500) → 매수 없음
@@ -229,7 +246,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(3, new BigDecimal("5000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("2000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, TODAY);
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         List<Order> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
@@ -259,7 +276,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(25, new BigDecimal("10000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("10000.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, TODAY)
+        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).hasSize(20);
@@ -276,76 +293,29 @@ class VrStrategyTypeTest {
         VrPosition position = pos(20, new BigDecimal("10000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("10000.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, TODAY)
+        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).hasSize(20);
         assertThat(sells).allMatch(o -> o.quantity() == 1); // 모두 1주
     }
 
-    // ── 가격 캡 시나리오 ────────────────────────────────────────────────────────
+    // ── 생성 시점 가격 캡 미적용 검증 (Task 2) ──────────────────────────────────
+    // BUY 사다리 생성(buildOrders/buildBuyOrders)은 더 이상 가격 캡을 적용하지 않는다.
+    // 캡은 접수 직전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 별도 재산정한다.
 
     @Test
-    @DisplayName("가격 캡: rung 단가 > currentPrice×1.05 시 cap으로 교체")
-    void priceCap_clampsToCap() {
-        // holdings=1, V=10000, bandWidth=15%
-        // lowerBand=8500, buyPrice(1)=8500/1=8500, buyPrice(2)=8500/2=4250
-        // currentPrice=500 → cap=500×1.05=525.00
-        // m=1: 8500 > cap(525) → price=525
-        // m=2: 4250 > cap(525) → price=525 (같은 가격 → 병합)
-        // ... 계속 캡 적용 후 poolLimit/pool 제한
-        // poolLimit=1200, pool=1200
-        // m=1: price=525, cumBuy=525 ≤1200 OK
-        // m=2: price=525, cumBuy=1050 ≤1200 OK
-        // m=3: price=525(or less?), cumBuy=1575 > poolLimit(1200) → break
-        // Actually buyPrice(3) = 8500/(1+3-1) = 8500/3 = 2833.33 > cap(525) → price=525
-        // cumBuy after m=2 = 1050, add 525 → 1575 > 1200 → break
-        // → 2개 rung, 같은 가격 525 → 병합 → 1건(qty=2)
-        VrPosition position = pos(1, new BigDecimal("1200"), new BigDecimal("10000"),
-                new BigDecimal("15.00"), new BigDecimal("1200.00"));
+    @DisplayName("buildOrders는 생성 시점에 가격 캡을 적용하지 않는다 — rung 단가가 원가 그대로 유지된다")
+    void buildOrders_doesNotCapAtCreationTime() {
+        // holdings=1, V=10000, bandWidth=15% → lowerBand=8500, buyPrice(1)=8500
+        // pool·poolLimit을 충분히 크게 둬 예산 컷이 아닌 순수 cap 미적용 여부만 검증
+        VrPosition position = pos(1, new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("100000.00"));
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("500.00"), TODAY)
+        List<Order> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
-        // 2개 rung이 같은 cap 가격 → 병합 → 1건, qty=2
-        assertThat(buys).hasSize(1);
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("525.00");
-        assertThat(buys.getFirst().quantity()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("가격 캡 후 이종 가격 연속 시 병합 안 됨")
-    void priceCap_differentPrices_notMerged() {
-        // holdings=10, V=10000, bandWidth=15%
-        // lowerBand=8500, buyPrice(m=1)=8500/10=850, buyPrice(m=2)=8500/11=772.73, ...
-        // currentPrice=1000 → cap=1050
-        // m=1: 850 ≤ cap → price=850 (캡 미적용)
-        // m=2: 772.73 ≤ cap → price=772.73
-        // → 서로 다른 가격 → 병합 안 됨
-        VrPosition position = pos(10, new BigDecimal("5000"), new BigDecimal("10000"),
-                new BigDecimal("15.00"), new BigDecimal("5000.00"));
-
-        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("1000.00"), TODAY)
-                .stream().filter(o -> o.direction() == BUY).toList();
-
-        // 각 rung 가격이 다르므로 병합 없음 — 첫 두 단 가격 확인
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("850.00");
-        assertThat(buys.get(1).price()).isEqualByComparingTo("772.73");
-        assertThat(buys).allMatch(o -> o.quantity() == 1); // 병합 없으므로 각 1주
-    }
-
-    @Test
-    @DisplayName("currentPrice=null이면 가격 캡 미적용")
-    void priceCap_nullCurrentPrice_noCap() {
-        // holdings=1, V=10000, bandWidth=15%, buyPrice(1)=8500
-        // currentPrice=null → 캡 없음 → 원래 가격 그대로
-        VrPosition position = pos(1, new BigDecimal("10000"), new BigDecimal("10000"),
-                new BigDecimal("15.00"), new BigDecimal("10000.00"));
-
-        List<Order> buys = strategy.buildOrders(position, TQQQ, null, TODAY)
-                .stream().filter(o -> o.direction() == BUY).toList();
-
-        // buyPrice(1) = 8500/1 = 8500.00 (캡 미적용)
+        // 캡이 있었다면(예: currentPrice=500 → cap=525) 525로 클램프됐겠지만, 이제는 원가 8500 그대로 나온다
         assertThat(buys.getFirst().price()).isEqualByComparingTo("8500.00");
     }
 
@@ -357,7 +327,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(0, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, TODAY)
+        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).isEmpty();
@@ -377,12 +347,74 @@ class VrStrategyTypeTest {
         VrPosition partial = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000.00"), new BigDecimal("4000.00"));
 
-        List<Order> fullBuys = strategy.buildOrders(full, TQQQ, null, TODAY)
+        List<Order> fullBuys = strategy.buildOrders(full, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
-        List<Order> partialBuys = strategy.buildOrders(partial, TQQQ, null, TODAY)
+        List<Order> partialBuys = strategy.buildOrders(partial, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // poolUsed가 클수록 사용 가능 예산이 줄어 매수 단 수 감소
         assertThat(partialBuys.size()).isLessThan(fullBuys.size());
+    }
+
+    // ── 접수 전 가격 캡 재산정 (buildCappedBuyOrders — BuyOrderPriceCapper VR_POSITION 전용) ──────
+
+    @Test
+    @DisplayName("buildCappedBuyOrders: rung 단가 > cap 시 cap으로 교체")
+    void buildCappedBuyOrders_clampsToCap() {
+        // holdings=1, V=10000, bandWidth=15%
+        // lowerBand=8500, buyPrice(1)=8500/1=8500, buyPrice(2)=8500/2=4250
+        // cap=525.00 (currentPrice=500 × 1.05 가정)
+        // m=1: 8500 > cap(525) → price=525
+        // m=2: 4250 > cap(525) → price=525 (같은 가격 → 병합)
+        // poolLimit=1200, pool=1200
+        // m=1: price=525, cumBuy=525 ≤1200 OK
+        // m=2: price=525, cumBuy=1050 ≤1200 OK
+        // m=3: buyPrice(3)=8500/3=2833.33 > cap(525) → price=525, cumBuy=1575 > poolLimit(1200) → break
+        // → 2개 rung, 같은 가격 525 → 병합 → 1건(qty=2)
+        VrPosition position = pos(1, new BigDecimal("1200"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("1200.00"));
+
+        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("525.00"))
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        // 2개 rung이 같은 cap 가격 → 병합 → 1건, qty=2
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("525.00");
+        assertThat(buys.getFirst().quantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders: 캡 이하 이종 가격 연속 시 병합 안 됨")
+    void buildCappedBuyOrders_differentPrices_notMerged() {
+        // holdings=10, V=10000, bandWidth=15%
+        // lowerBand=8500, buyPrice(m=1)=8500/10=850, buyPrice(m=2)=8500/11=772.73, ...
+        // cap=1050.00 (currentPrice=1000 × 1.05 가정)
+        // m=1: 850 ≤ cap → price=850 (캡 미적용)
+        // m=2: 772.73 ≤ cap → price=772.73
+        // → 서로 다른 가격 → 병합 안 됨
+        VrPosition position = pos(10, new BigDecimal("5000"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("5000.00"));
+
+        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1050.00"))
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        // 각 rung 가격이 다르므로 병합 없음 — 첫 두 단 가격 확인
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("850.00");
+        assertThat(buys.get(1).price()).isEqualByComparingTo("772.73");
+        assertThat(buys).allMatch(o -> o.quantity() == 1); // 병합 없으므로 각 1주
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders: cap=null이면 buildOrders와 동일하게 캡 미적용")
+    void buildCappedBuyOrders_nullCap_noCap() {
+        // holdings=1, V=10000, bandWidth=15%, buyPrice(1)=8500
+        VrPosition position = pos(1, new BigDecimal("10000"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("10000.00"));
+
+        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, null)
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        // buyPrice(1) = 8500/1 = 8500.00 (캡 미적용)
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("8500.00");
     }
 }
