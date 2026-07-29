@@ -192,7 +192,7 @@ class VrCycleRolloverServiceTest {
     @DisplayName("poolLimitRate 전달 — 새 사이클에 detail.poolLimitRateAt(weeks) 값이 그대로 전달된다 (달러 파생은 조회 시점으로 이동)")
     void poolLimitRate_passedThroughToNewCycle() {
         // DETAIL.recurringAmount=0 → poolLimitRate=0.50, 램프 미개입(gMax=initial, floor=initial)이라 weeks=4에도 그대로 0.50
-        // poolLimit(달러) 파생은 더 이상 이 서비스가 계산하지 않음 — CycleOrderComputer/buildSummary가 startAmount×poolLimitRate로 조회 시점에 파생
+        // poolLimit(달러) 파생은 더 이상 이 서비스가 계산하지 않음 — CycleOrderComputer/buildSummary가 개장 pool×poolLimitRate로 조회 시점에 파생
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));

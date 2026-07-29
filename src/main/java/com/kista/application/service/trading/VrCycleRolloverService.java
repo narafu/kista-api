@@ -100,7 +100,7 @@ class VrCycleRolloverService {
         strategyCyclePort.markEnded(cycle.id(), postBalance.usdDeposit(), today);
         log.info("[strategyId={}] VR 사이클 종료 완료: cycleId={}", strategy.id(), cycle.id());
 
-        // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 startAmount×rate로 수행)
+        // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 개장 pool×rate로 수행)
         BigDecimal newPoolLimitRate = detail.poolLimitRateAt(weeks);
 
         // 새 사이클 + holdings 승계 스냅샷 원자 생성

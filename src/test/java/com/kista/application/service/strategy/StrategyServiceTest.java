@@ -670,7 +670,7 @@ class StrategyServiceTest {
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, 0, null, null);
-        // recurringAmount=0 → 기본 poolLimitRate=0.50 (거치식) — poolLimit 달러 파생은 startAmount(2000)×0.50=1000.00
+        // recurringAmount=0 → 기본 poolLimitRate=0.50 (거치식) — poolLimit 달러 파생은 개장 pool(2000)×0.50=1000.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
                 vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.50"));
 
@@ -763,7 +763,7 @@ class StrategyServiceTest {
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 BigDecimal.ZERO, null, null, 0, null, null);
-        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75, 단 startAmount=0이므로 파생 poolLimit은 0.00
+        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75, 단 개장 pool=0이므로 파생 poolLimit은 0.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
                 vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
 
@@ -868,7 +868,7 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
-        // recurringAmount=0(거치식) → 기본 poolLimitRate=0.50, poolLimit 달러 파생값 = startAmount(2000)×0.50 = 1000.00
+        // recurringAmount=0(거치식) → 기본 poolLimitRate=0.50, poolLimit 달러 파생값 = 개장 pool(2000)×0.50 = 1000.00
         verify(strategyCycleVrPort).save(argThat(cv ->
                 cv.poolLimitRate().compareTo(new BigDecimal("0.50")) == 0
                         && cv.gradient() == 10));
@@ -932,7 +932,7 @@ class StrategyServiceTest {
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75 (startAmount=0이라 달러 파생 poolLimit은 0이지만 저장 비율 자체는 0.75)
+        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75 (개장 pool=0이라 달러 파생 poolLimit은 0이지만 저장 비율 자체는 0.75)
         verify(strategyCycleVrPort).save(argThat(cv -> cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0));
         verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
     }
@@ -970,7 +970,7 @@ class StrategyServiceTest {
         verify(strategyCycleVrPort).save(argThat(cv ->
                 cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0
                         && cv.gradient() == 10));
-        // poolLimit(달러) 파생값 검증 — startAmount(1000) × poolLimitRate(0.75) = 750.00, scale=2 HALF_UP
+        // poolLimit(달러) 파생값 검증 — 개장 pool(1000) × poolLimitRate(0.75) = 750.00, scale=2 HALF_UP
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
     }
 

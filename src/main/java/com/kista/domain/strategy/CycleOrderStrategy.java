@@ -100,7 +100,7 @@ public interface CycleOrderStrategy {
         // VR 전략 전용 입력 묶음
         // value: 현재 V값 (사이클 시작 시 StrategyCycleVrDetail.value 스냅샷에서 로드)
         // bandWidth: 밴드 폭 % (StrategyVrDetail.bandWidth)
-        // poolLimit: pool 상한 금액 (StrategyCycleVrDetail.poolLimit 스냅샷)
+        // poolLimit: 개장 USD pool×StrategyCycleVrDetail.poolLimitRate로 파생한 pool 상한 금액
         // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
         // currentPrice: 스케쥴러 시작 시점 현재가 — 가격 캡(×1.10) 적용용, null이면 캡 미적용
         // firstCycle/cycleDue/remainingTradingDays/recurringAmount: 첫 사이클 LOC bootstrap 제어값

@@ -94,7 +94,7 @@ class CycleOrderComputerTest {
     @Test
     @DisplayName("VR 전략 — VrInputs 4필드 모두 조립 후 buildOrders까지 전달")
     void compute_vrStrategy_assemblesVrInputsCorrectly() {
-        // VR 사이클 상세 (value·poolLimit)
+        // VR 사이클 상세 (value·poolLimitRate)
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 VR_CYCLE.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
         // VR 전략 버전 상세 (bandWidth)
