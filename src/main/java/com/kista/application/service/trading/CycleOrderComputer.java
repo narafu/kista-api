@@ -44,7 +44,7 @@ class CycleOrderComputer {
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
-    // currentPrice: PRIVACY allocateRemainingBudget 분모 산출용 — preview/수동실행 시 null
+    // currentPrice: PRIVACY allocateRemainingBudget 분모 산출용, VR 실주문 기준가격 — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
@@ -93,8 +93,9 @@ class CycleOrderComputer {
             BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
-                    cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, currentPrice,
+                    cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, vrReferencePrice,
                     firstCycle, cycleDue, remainingTradingDays, vrDetail.recurringAmount());
         }
 

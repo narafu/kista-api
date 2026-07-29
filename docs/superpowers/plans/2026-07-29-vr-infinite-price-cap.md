@@ -30,20 +30,20 @@
 - Consumes: `CycleOrderStrategy.requiresPrevClose()`
 - Produces: VR first-cycle BUY preview can be generated when current price is not passed from UI.
 
-- [ ] **Step 1: Write failing preview test**
+- [x] **Step 1: Write failing preview test**
 
 Add a test showing VR preview calls previous-close lookup and returns bootstrap BUY when current price is absent.
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [x] **Step 2: Run focused test and verify RED**
 
 Run: `./gradlew test --tests 'com.kista.application.service.trading.StrategyOrderPlanBuilderTest'`
 Expected: FAIL because VR does not require previous close or still passes `null` to bootstrap.
 
-- [ ] **Step 3: Implement reference price path**
+- [x] **Step 3: Implement reference price path**
 
 Set VR `requiresPrevClose()` to true and pass previous close into VR order inputs as the BUY reference price.
 
-- [ ] **Step 4: Run focused test and verify GREEN**
+- [x] **Step 4: Run focused test and verify GREEN**
 
 Run: `./gradlew test --tests 'com.kista.application.service.trading.StrategyOrderPlanBuilderTest'`
 Expected: PASS.

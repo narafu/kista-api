@@ -298,6 +298,26 @@ class CycleOrderComputerTest {
     }
 
     @Test
+    @DisplayName("VR preview — currentPrice가 없으면 prevClosePrice를 주문 기준가격으로 전달한다")
+    void compute_vrStrategy_previewUsesPrevCloseAsReferencePrice() {
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                VR_CYCLE.id(), BigDecimal.ZERO, 10, BigDecimal.ZERO);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 200,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+        BigDecimal prevClosePrice = new BigDecimal("100.00");
+
+        when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
+        when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(BigDecimal.ZERO);
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), nullable(BigDecimal.class), any()))
+                .thenReturn(List.of());
+
+        computer.compute(BALANCE, VR_STRATEGY, prevClosePrice, LocalDate.now(), VR_CYCLE, null, "preview", null);
+
+        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(prevClosePrice), any(LocalDate.class));
+    }
+
+    @Test
     @DisplayName("VR 전략 — 첫 사이클 bootstrap 메타데이터를 VrPosition에 전달한다")
     void compute_vrStrategy_passesInitialBootstrapMetadata() {
         StrategyCycle firstCycle = new StrategyCycle(

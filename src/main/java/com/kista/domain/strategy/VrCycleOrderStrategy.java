@@ -34,7 +34,7 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     public boolean requiresPrivacyBase() { return false; }
 
     @Override
-    public boolean requiresPrevClose() { return false; }
+    public boolean requiresPrevClose() { return true; }
 
     // VR은 전량 청산 후에도 사이클을 유지하며 다시 매수 사다리를 생성
     @Override
