@@ -1157,6 +1157,8 @@ class StrategyServiceTest {
         StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
                 new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
+                new BigDecimal("700"), null, null, 0, null, null);
+        CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("1000"), null, null, 0, null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
@@ -1168,7 +1170,7 @@ class StrategyServiceTest {
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrategyId)).thenReturn(Optional.of(latestPos));
-        when(cyclePositionPort.findFirstOne(vrCycleId)).thenReturn(Optional.of(latestPos));
+        when(cyclePositionPort.findFirstOne(vrCycleId)).thenReturn(Optional.of(openingPosition));
         when(strategyVrDetailPort.findActiveByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(cycleVr));
 

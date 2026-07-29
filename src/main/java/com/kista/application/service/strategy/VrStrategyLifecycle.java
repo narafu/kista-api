@@ -1,5 +1,6 @@
 package com.kista.application.service.strategy;
 
+import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
@@ -51,8 +52,9 @@ public class VrStrategyLifecycle {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
-                                .flatMap(cycleVr -> cyclePositionPort.findFirstOne(cycle.id())
-                                        .map(openingPosition -> buildSummary(vrDetail, cycleVr, openingPosition.usdDeposit())))));
+                                .map(cycleVr -> buildSummary(vrDetail, cycleVr,
+                                        cyclePositionPort.findFirstOne(cycle.id())
+                                                .map(CyclePosition::usdDeposit).orElse(null)))));
     }
 
     // openingPool: 조회 대상 사이클 개장 포지션의 USD pool — poolLimit 달러 파생(openingPool × poolLimitRate)에 사용

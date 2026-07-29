@@ -117,6 +117,29 @@ class VrStrategyLifecycleTest {
     }
 
     @Test
+    @DisplayName("findSummary() 개장 포지션이 없어도 VR 상세는 반환하고 poolLimit만 null로 둔다")
+    void findSummary_missingOpeningPosition_preservesSummaryWithNullPoolLimit() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        StrategyCycle latestCycle = new StrategyCycle(
+                cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                cycleId, new BigDecimal("600"), 10, new BigDecimal("0.50"));
+        when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
+        when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
+
+        Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
+                strategyId, Optional.of(latestCycle));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().value()).isEqualByComparingTo("600");
+        assertThat(result.get().poolLimit()).isNull();
+    }
+
+    @Test
     @DisplayName("buildSummary() openingPool null이면 poolLimit도 null (개장 포지션 미존재 등 방어)")
     void buildSummary_nullOpeningPool_yieldsNullPoolLimit() {
         UUID versionId = UUID.randomUUID();
