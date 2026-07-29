@@ -48,6 +48,9 @@ docker-compose.override.yml
 # Codex 로컬 설정
 .codex/
 
+# Git worktrees
+.worktrees/
+
 # superpowers subagent-driven-development 진행 원장 (스크래치)
 .superpowers/
 
