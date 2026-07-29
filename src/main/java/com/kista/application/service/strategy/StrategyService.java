@@ -386,6 +386,9 @@ class StrategyService implements StrategyUseCase {
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        if (strategy.isVr() && cmd.newSeed() != null) {
+            throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
+        }
 
         Strategy.CycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
@@ -432,11 +435,13 @@ class StrategyService implements StrategyUseCase {
         log.info("시드 수정: strategyId={}, newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
     }
 
-    // 현재 StrategyCycle의 startAmount를 묶고, 리버스모드는 cycle_position 최신 행에서 판단
+    // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다.
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         Optional<CyclePosition> openingPosition = strategy.isVr()
-                ? latestCycle.flatMap(cycle -> cyclePositionPort.findFirstOne(cycle.id()))
+                ? latestCycle.map(cycle -> cyclePositionPort.findFirstOne(cycle.id())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "VR 시작 포지션 없음: cycleId=" + cycle.id())))
                 : Optional.empty();
         BigDecimal initialUsdDeposit = strategy.isVr()
                 ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)

@@ -14,8 +14,8 @@ public record StrategyCycle(
         UUID id,                          // PK (null이면 @GeneratedValue)
         UUID strategyId,                  // FK → strategy.id
         UUID strategyVersionId,           // FK → strategy_version.id
-        BigDecimal startAmount,           // 사이클 시작금액 (USD 시드)
-        BigDecimal endAmount,             // 사이클 종료금액 (청산 후 USD, 진행 중이면 null)
+        BigDecimal startAmount,           // 사이클 개장 총자산 (USD)
+        BigDecimal endAmount,             // 사이클 종료 총자산 (USD, 진행 중이면 null)
         LocalDate startDate,              // 사이클 시작일자 (KST)
         LocalDate endDate,                // 사이클 종료일자 (KST, 진행 중이면 null)
         Instant createdAt,                // 생성 시각 (null이면 DB DEFAULT)

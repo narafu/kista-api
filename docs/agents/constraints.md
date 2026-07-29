@@ -31,7 +31,7 @@
 - `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
 - `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지)
 - 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드)
-- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; 모든 전략의 `startAmount`=개장 예수금+개장 보유분 시장가)은 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
+- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; 모든 전략의 `startAmount`=개장 예수금+개장 보유분 시장가)은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `VrSummary` nested(VR 외 null)
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
@@ -133,6 +133,8 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 거치식/인출식(`recurringAmount <= 0`): `initialValue + initialUsdDeposit > 0` 필수
 - 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수 — 운영 중 재설정으로 `recurringAmount`를 인출식으로 바꾸는 경우도 `VrReconfigureService`가 동일 규칙 재검증
 - **개장 금액 계약**: `initialUsdDeposit` = 사이클 개장 USD pool(개장 `CyclePosition.usdDeposit`), `startAmount` = 개장 예수금 + 개장 보유분 시장가(모든 전략), `poolLimit` = 개장 pool × `poolLimitRate` (scale=2 HALF_UP). 보유분 시장가를 pool에 포함하지 않는다.
+- **종료 금액 계약**: VR 롤오버 `endAmount` = 마감 예수금 + 보유분 종가 평가액(scale=2 HALF_UP). 재설정은 이전 사이클을 자본 조정 전 포지션의 총자산으로 종료하고 새 사이클을 자본 조정 후 총자산으로 시작해 주입/인출을 이전 사이클 손익에 포함하지 않는다.
+- **레거시 통계 호환**: Stats는 VR 개장 포지션의 `usdDeposit + holdings × closingPrice`를 개장 원금으로 사용한다. 개장 holdings가 양수인데 `closingPrice`가 null이면 시장가 복원이 불가능하므로 저장된 `startAmount`를 유지한다. 비-VR 계산은 저장된 `startAmount`를 그대로 사용한다.
 - **`strategy_cycle_vr.pool_limit_rate`**(비율, 달러 아님)를 스냅샷 저장. poolLimit(달러)은 저장하지 않고 조회 시점에 개장 `CyclePosition.usdDeposit × poolLimitRate`로 파생 — 첫 사이클은 `poolLimitRateAt(0)`, 롤오버·재설정 사이클은 `poolLimitRateAt(weeks)`를 저장
 - 첫 사이클 bootstrap(`initialValue`=기존 TQQQ 평가금, `initialUsdDeposit`=초기 USD pool): V만 있으면 poolLimit LOC+AT_CLOSE 분할매도, pool만 있으면 poolLimit LOC+AT_CLOSE 분할매수 — 각각 poolLimit 금액을 남은 거래일로 분할, 적립식 V=0/pool=0이면 due date 당일 recurringAmount LOC+AT_CLOSE 매수
 - bootstrap LOC 가격: 매수 `currentPrice × 1.10`, 매도 `currentPrice × 0.90`; 주문 수량은 예산/가격 내림 정수
@@ -141,9 +143,9 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림
 - 단, 적립식 bootstrap 매수 실패(`recurringAmount>0`, 기존 V=0, holdings=0)는 V=0 새 사이클로 롤오버해 다음 due date에 다시 recurringAmount LOC 매수를 시도
-- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
+- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
   - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
-  - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 예수금 주입 +$X: `usdDeposit+=X`, V 불변
+  - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 수량 인출 -N주: holdings·V 감소, 잔여 평단가 유지. 예수금 주입/인출은 usdDeposit만 증감하고 V는 불변
   - 검증 순서: 램프 파라미터·자본 주입 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
 
 ### 계좌번호 마스킹 (AccountNumberMasker)

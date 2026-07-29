@@ -45,13 +45,13 @@ class StatsService implements UserStatsUseCase {
             new HousingBenchmarkComparisonBuilder();
 
     // 사이클 + 소속 전략 조인 뷰
-    private record CycleView(StrategyCycle cycle, Strategy strategy) {
+    private record CycleView(StrategyCycle cycle, Strategy strategy, BigDecimal effectiveStartAmount) {
         boolean closed() {
             return cycle.endAmount() != null && cycle.endDate() != null;
         }
 
         BigDecimal realizedPnl() {
-            return cycle.endAmount().subtract(cycle.startAmount());
+            return cycle.endAmount().subtract(effectiveStartAmount);
         }
     }
 
@@ -71,7 +71,7 @@ class StatsService implements UserStatsUseCase {
         BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
         BigDecimal totalUnrealized = sum(typeStats.stream().map(StrategyTypeStats::unrealizedPnl));
         BigDecimal activePrincipal = sum(cycles.stream()
-                .filter(v -> !v.closed()).map(v -> v.cycle().startAmount()));
+                .filter(v -> !v.closed()).map(CycleView::effectiveStartAmount));
 
         return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats);
     }
@@ -244,8 +244,29 @@ class StatsService implements UserStatsUseCase {
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
         return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()
-                .map(c -> new CycleView(c, strategies.get(c.strategyId())))
+                .map(c -> toCycleView(c, strategies.get(c.strategyId())))
                 .toList();
+    }
+
+    private CycleView toCycleView(StrategyCycle cycle, Strategy strategy) {
+        BigDecimal effectiveStartAmount = cycle.startAmount();
+        if (strategy.isVr()) {
+            effectiveStartAmount = cyclePositionPort.findFirstOne(cycle.id())
+                    .map(opening -> compatibleVrStartAmount(cycle, opening))
+                    .orElse(cycle.startAmount());
+        }
+        return new CycleView(cycle, strategy, effectiveStartAmount);
+    }
+
+    // 종가 없는 양수 보유분은 개장 시장가를 복원할 수 없으므로 저장된 startAmount를 유지한다.
+    private static BigDecimal compatibleVrStartAmount(StrategyCycle cycle, CyclePosition opening) {
+        if (opening.holdings() > 0 && opening.closingPrice() == null) {
+            return cycle.startAmount();
+        }
+        BigDecimal holdingsValue = opening.holdings() == 0
+                ? BigDecimal.ZERO
+                : opening.closingPrice().multiply(BigDecimal.valueOf(opening.holdings()));
+        return opening.usdDeposit().add(holdingsValue).setScale(2, RoundingMode.HALF_UP);
     }
 
     private static void validateComparisonRequest(
@@ -324,13 +345,13 @@ class StatsService implements UserStatsUseCase {
         }
     }
 
-    // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 − startAmount (스냅샷 없으면 제외)
+    // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 - 호환 개장금액 (스냅샷 없으면 제외)
     private Map<UUID, BigDecimal> unrealizedByCycle(List<CycleView> cycles) {
         Map<UUID, BigDecimal> result = new HashMap<>();
         for (CycleView v : cycles) {
             if (v.closed()) continue;
             cyclePositionPort.findLatestOne(v.cycle().id()).ifPresent(pos ->
-                    result.put(v.cycle().id(), assetOf(pos).subtract(v.cycle().startAmount())));
+                    result.put(v.cycle().id(), assetOf(pos).subtract(v.effectiveStartAmount())));
         }
         return result;
     }
@@ -351,13 +372,13 @@ class StatsService implements UserStatsUseCase {
             long wins = closed.stream().filter(v -> v.realizedPnl().signum() > 0).count();
             winRate = BigDecimal.valueOf(wins)
                     .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
-            // startAmount=0인 사이클(VR 적립식 등)은 수익률 계산에서 제외 — 0으로 나눌 수 없음
+            // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률 계산에서 제외한다.
             List<CycleView> returnable = closed.stream()
-                    .filter(v -> v.cycle().startAmount().signum() != 0)
+                    .filter(v -> v.effectiveStartAmount().signum() != 0)
                     .toList();
             if (!returnable.isEmpty()) {
                 avgReturnRate = returnable.stream()
-                        .map(v -> v.realizedPnl().divide(v.cycle().startAmount(), 6, RoundingMode.HALF_UP))
+                        .map(v -> v.realizedPnl().divide(v.effectiveStartAmount(), 6, RoundingMode.HALF_UP))
                         .reduce(BigDecimal.ZERO, BigDecimal::add)
                         .divide(BigDecimal.valueOf(returnable.size()), 4, RoundingMode.HALF_UP);
             }
@@ -401,7 +422,7 @@ class StatsService implements UserStatsUseCase {
                 LocalDate endDate = view.cycle().endDate();
                 if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
                 asset = asset.add(assetOf(posEntry.getValue()));
-                principal = principal.add(view.cycle().startAmount());
+                principal = principal.add(view.effectiveStartAmount());
             }
             points.add(new EquityPoint(date,
                     asset.setScale(2, RoundingMode.HALF_UP),
@@ -421,13 +442,13 @@ class StatsService implements UserStatsUseCase {
         StrategyCycle c = v.cycle();
         BigDecimal endAmount = v.closed() ? c.endAmount()
                 : cyclePositionPort.findLatestOne(c.id()).map(StatsService::assetOf).orElse(null);
-        BigDecimal pnl = endAmount != null ? endAmount.subtract(c.startAmount()) : null;
-        // startAmount=0인 사이클(VR 적립식 등)은 수익률이 정의되지 않음 — 0으로 나눌 수 없음
-        BigDecimal returnRate = (pnl != null && c.startAmount().signum() != 0)
-                ? pnl.divide(c.startAmount(), 4, RoundingMode.HALF_UP) : null;
+        BigDecimal pnl = endAmount != null ? endAmount.subtract(v.effectiveStartAmount()) : null;
+        // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
+        BigDecimal returnRate = (pnl != null && v.effectiveStartAmount().signum() != 0)
+                ? pnl.divide(v.effectiveStartAmount(), 4, RoundingMode.HALF_UP) : null;
         LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
         return new CyclePerformance(c.id(), v.strategy().type(), v.strategy().ticker(),
-                c.startDate(), c.endDate(), c.startAmount(), endAmount, pnl, returnRate,
+                c.startDate(), c.endDate(), v.effectiveStartAmount(), endAmount, pnl, returnRate,
                 (int) ChronoUnit.DAYS.between(c.startDate(), durationEnd), v.closed(), c.createdAt());
     }
 

@@ -313,6 +313,31 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("update() VR 시드 수정은 저장 전에 거절하고 VR 재설정을 안내한다")
+    void update_vrSeed_throwsBeforePersistenceMutation() {
+        Strategy vrStrategy = new Strategy(
+                STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        CyclePosition opening = new CyclePosition(
+                UUID.randomUUID(), CYCLE_ID, new BigDecimal("1000.00"),
+                null, null, 0, null, null);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(vrStrategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        lenient().when(strategyPort.save(any(Strategy.class))).thenReturn(vrStrategy);
+        lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
+        lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(opening));
+
+        assertThatThrownBy(() -> strategyService.update(
+                STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000.00"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("VR 재설정");
+
+        verify(strategyPort, never()).save(any());
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+    }
+
+    @Test
     @DisplayName("update() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void update_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
@@ -1189,6 +1214,27 @@ class StrategyServiceTest {
         assertThat(detail.vr().poolLimit()).isEqualByComparingTo("500.00");
         assertThat(detail.vr().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(detail.vr().gradient()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("toDetail() VR 개장 포지션이 없으면 잘못된 저장 상태로 즉시 실패한다")
+    void toDetail_vrMissingOpeningPosition_throwsIllegalState() {
+        UUID vrStrategyId = UUID.randomUUID();
+        UUID vrCycleId = UUID.randomUUID();
+        Strategy vrStrategy = new Strategy(
+                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(
+                vrCycleId, vrStrategyId, UUID.randomUUID(), new BigDecimal("1600.00"),
+                null, LocalDate.now(), null, null, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
+
+        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("VR 시작 포지션 없음")
+                .hasMessageContaining(vrCycleId.toString());
     }
 
     // --- register() 중간부터 시작 (bootstrap position) ---

@@ -161,6 +161,28 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findFirstOne_returnsEmptyWhenCycleHasNoPositions() {
+        UUID cycleId = insertCycleChain(accountId, false, false);
+
+        Optional<CyclePosition> result = cyclePositionAdapter.findFirstOne(cycleId);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findFirstOne_skipsSoftDeletedOpeningPosition() {
+        Instant openingAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+        insertPosition(cycleId, new BigDecimal("1000.00"), openingAt, true);
+        UUID firstActiveId = insertPosition(
+                cycleId, new BigDecimal("900.00"), openingAt.plus(1, ChronoUnit.HOURS), false);
+
+        Optional<CyclePosition> result = cyclePositionAdapter.findFirstOne(cycleId);
+
+        assertThat(result).get().extracting(CyclePosition::id).isEqualTo(firstActiveId);
+    }
+
+    @Test
     void cyclePositionInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name

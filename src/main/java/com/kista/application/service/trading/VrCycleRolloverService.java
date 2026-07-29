@@ -96,8 +96,10 @@ class VrCycleRolloverService {
             return;
         }
 
-        // 사이클 종료 — 종료금액=마감 후 통합주문가능금액, 종료일자=KST 매매일
-        strategyCyclePort.markEnded(cycle.id(), postBalance.usdDeposit(), today);
+        // 사이클 종료 — 종료금액=마감 후 예수금+보유분 종가 평가액, 종료일자=KST 매매일
+        BigDecimal endAmount = postBalance.usdDeposit().add(evaluation)
+                .setScale(2, RoundingMode.HALF_UP);
+        strategyCyclePort.markEnded(cycle.id(), endAmount, today);
         log.info("[strategyId={}] VR 사이클 종료 완료: cycleId={}", strategy.id(), cycle.id());
 
         // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 개장 pool×rate로 수행)

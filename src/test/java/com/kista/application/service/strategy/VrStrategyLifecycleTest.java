@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,8 +118,8 @@ class VrStrategyLifecycleTest {
     }
 
     @Test
-    @DisplayName("findSummary() 개장 포지션이 없어도 VR 상세는 반환하고 poolLimit만 null로 둔다")
-    void findSummary_missingOpeningPosition_preservesSummaryWithNullPoolLimit() {
+    @DisplayName("findSummary() 개장 포지션이 없으면 잘못된 저장 상태로 즉시 실패한다")
+    void findSummary_missingOpeningPosition_throwsIllegalState() {
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
@@ -131,17 +132,15 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
-                strategyId, Optional.of(latestCycle));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().value()).isEqualByComparingTo("600");
-        assertThat(result.get().poolLimit()).isNull();
+        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(strategyId, Optional.of(latestCycle)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("VR 시작 포지션 없음")
+                .hasMessageContaining(cycleId.toString());
     }
 
     @Test
-    @DisplayName("buildSummary() openingPool null이면 poolLimit도 null (개장 포지션 미존재 등 방어)")
-    void buildSummary_nullOpeningPool_yieldsNullPoolLimit() {
+    @DisplayName("buildSummary() openingPool null이면 잘못된 저장 상태로 즉시 실패한다")
+    void buildSummary_nullOpeningPool_throwsIllegalState() {
         UUID versionId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
@@ -149,8 +148,8 @@ class VrStrategyLifecycleTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
-        StrategyDetail.VrSummary result = vrStrategyLifecycle.buildSummary(vrDetail, cycleVr, null);
-
-        assertThat(result.poolLimit()).isNull();
+        assertThatThrownBy(() -> vrStrategyLifecycle.buildSummary(vrDetail, cycleVr, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("VR 시작 포지션 없음");
     }
 }

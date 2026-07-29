@@ -107,7 +107,7 @@ class VrCycleRolloverServiceTest {
     }
 
     @Test
-    @DisplayName("due 당일 도래 — markEnded + 새 사이클 생성")
+    @DisplayName("due 당일 도래 — 기존 자산 그대로 종료하고 새 사이클로 이월")
     void due_onDueDate_rollsOver() {
         // dueDate = CYCLE_START + 4주 = 당일
         LocalDate today = CYCLE_START.plusWeeks(4);
@@ -119,7 +119,8 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        verify(strategyCyclePort).markEnded(CYCLE_ID, USD_DEPOSIT, today);
+        // 기존 자산 = 예수금 1000 + 보유 10주 x 종가 50 = 1500
+        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("1500.00"), today);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID),
                 eq(POST_BALANCE), eq(CLOSING_PRICE),
@@ -139,7 +140,7 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        verify(strategyCyclePort).markEnded(CYCLE_ID, USD_DEPOSIT, today);
+        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("1500.00"), today);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any());
     }
 
@@ -249,7 +250,7 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, postBalance, CLOSING_PRICE, today);
 
-        verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(BigDecimal.ZERO), eq(today));
+        verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("0.00")), eq(today));
         // poolLimitRate는 달러 파생 없이 그대로 전달 — depositDetail은 램프 미개입(gMax/floor=initial)이라 initialPoolLimitRate(0.75) 그대로
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(postBalance), eq(CLOSING_PRICE),

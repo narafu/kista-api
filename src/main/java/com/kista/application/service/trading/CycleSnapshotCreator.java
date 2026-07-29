@@ -49,9 +49,7 @@ class CycleSnapshotCreator {
                                            AccountBalance postBalance, BigDecimal closingPrice,
                                            BigDecimal newValue, int gradient, BigDecimal poolLimitRate) {
         // 새 사이클 생성 — 시드(startAmount)는 롤오버 후 예수금과 보유 주식 평가액의 합계
-        BigDecimal startAmount = postBalance.usdDeposit()
-                .add(closingPrice.multiply(BigDecimal.valueOf(postBalance.holdings())))
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal startAmount = totalAssets(postBalance, closingPrice);
         StrategyCycle newCycle = strategyCyclePort.save(
                 StrategyCycle.start(strategyId, strategyVersionId, startAmount));
         // holdings 승계 스냅샷: 이전 사이클 보유량·평단가·예수금·종가 그대로 기록
@@ -81,10 +79,19 @@ class CycleSnapshotCreator {
         // 새 램프 파라미터로 VR 버전 상세 저장
         StrategyVrDetail newDetail = vrStrategyLifecycle.saveVersionDetail(newVersion.id(), intervalWeeks, bandWidth, recurringAmount,
                 initialGradient, gGraceWeeks, gStepWeeks, gMax, initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
-        // 현재 사이클 강제 종료 — 종료금액=주입 반영 후 예수금, 종료일자=오늘(KST)
-        strategyCyclePort.markEnded(currentCycleId, postBalance.usdDeposit(), today);
+        // 현재 사이클은 자본 조정 전 포지션을 종가로 평가해 종료한다.
+        AccountBalance preAdjustmentBalance = cyclePositionPort.findLatestOne(currentCycleId)
+                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션 없음: cycleId=" + currentCycleId))
+                .toBalance();
+        strategyCyclePort.markEnded(currentCycleId, totalAssets(preAdjustmentBalance, closingPrice), today);
         // 새 사이클 + holdings 승계 스냅샷 원자 생성 — 램프 시계(weeks) 기준 gradient/poolLimitRate 재계산 스냅샷
         return createVrCycleAndSnapshot(strategyId, newVersion.id(), postBalance, closingPrice, newValue,
                 newDetail.gradientAt(weeks), newDetail.poolLimitRateAt(weeks));
+    }
+
+    private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {
+        return balance.usdDeposit()
+                .add(closingPrice.multiply(BigDecimal.valueOf(balance.holdings())))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

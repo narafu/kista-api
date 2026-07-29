@@ -52,17 +52,23 @@ public class VrStrategyLifecycle {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
-                                .map(cycleVr -> buildSummary(vrDetail, cycleVr,
-                                        cyclePositionPort.findFirstOne(cycle.id())
-                                                .map(CyclePosition::usdDeposit).orElse(null)))));
+                                .map(cycleVr -> {
+                                    BigDecimal openingPool = cyclePositionPort.findFirstOne(cycle.id())
+                                            .map(CyclePosition::usdDeposit)
+                                            .orElseThrow(() -> new IllegalStateException(
+                                                    "VR 시작 포지션 없음: cycleId=" + cycle.id()));
+                                    return buildSummary(vrDetail, cycleVr, openingPool);
+                                })));
     }
 
     // openingPool: 조회 대상 사이클 개장 포지션의 USD pool — poolLimit 달러 파생(openingPool × poolLimitRate)에 사용
     StrategyDetail.VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr, BigDecimal openingPool) {
         if (vrDetail == null || cycleVr == null) return null;
-        BigDecimal poolLimit = openingPool != null
-                ? openingPool.multiply(cycleVr.poolLimitRate()).setScale(2, RoundingMode.HALF_UP)
-                : null;
+        if (openingPool == null) {
+            throw new IllegalStateException("VR 시작 포지션 없음: openingPool=null");
+        }
+        BigDecimal poolLimit = openingPool.multiply(cycleVr.poolLimitRate())
+                .setScale(2, RoundingMode.HALF_UP);
         return new StrategyDetail.VrSummary(
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
                 vrDetail.recurringAmount(), poolLimit, cycleVr.poolLimitRate(), cycleVr.gradient(),

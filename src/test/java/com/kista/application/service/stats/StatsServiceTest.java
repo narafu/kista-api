@@ -160,6 +160,100 @@ class StatsServiceTest {
     }
 
     @Test
+    void 레거시_VR_진행_사이클은_개장_포지션_총자산으로_원금과_미실현손익을_복원한다() {
+        UUID vrStrategyId = UUID.randomUUID();
+        Strategy vrStrategy = new Strategy(
+                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(
+                UUID.randomUUID(), vrStrategyId, null,
+                new BigDecimal("1000.00"), null,
+                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
+        CyclePosition opening = new CyclePosition(
+                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
+                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
+        CyclePosition latest = new CyclePosition(
+                UUID.randomUUID(), cycle.id(), new BigDecimal("800.00"),
+                new BigDecimal("180.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findFirstOne(cycle.id())).thenReturn(Optional.of(opening));
+        when(cyclePositionPort.findLatestOne(cycle.id())).thenReturn(Optional.of(latest));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+
+        assertThat(summary.activePrincipal()).isEqualByComparingTo("1600.00");
+        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
+        assertThat(summary.byType()).singleElement().satisfies(stats -> {
+            assertThat(stats.type()).isEqualTo(Strategy.Type.VR);
+            assertThat(stats.unrealizedPnl()).isEqualByComparingTo("100.00");
+        });
+    }
+
+    @Test
+    void 레거시_VR_개장_보유분에_종가가_없으면_저장된_startAmount를_유지한다() {
+        UUID vrStrategyId = UUID.randomUUID();
+        Strategy vrStrategy = new Strategy(
+                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(
+                UUID.randomUUID(), vrStrategyId, null,
+                new BigDecimal("1500.00"), null,
+                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
+        CyclePosition openingWithoutClosingPrice = new CyclePosition(
+                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
+                null, new BigDecimal("80.00"), 5, Instant.now(), null);
+        CyclePosition latest = new CyclePosition(
+                UUID.randomUUID(), cycle.id(), new BigDecimal("900.00"),
+                new BigDecimal("140.00"), new BigDecimal("80.00"), 5, Instant.now(), null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findFirstOne(cycle.id()))
+                .thenReturn(Optional.of(openingWithoutClosingPrice));
+        when(cyclePositionPort.findLatestOne(cycle.id())).thenReturn(Optional.of(latest));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+
+        assertThat(summary.activePrincipal()).isEqualByComparingTo("1500.00");
+        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void 레거시_VR_종료_사이클은_개장_포지션_총자산으로_실현손익과_성과를_복원한다() {
+        UUID vrStrategyId = UUID.randomUUID();
+        Strategy vrStrategy = new Strategy(
+                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
+                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(
+                UUID.randomUUID(), vrStrategyId, null,
+                new BigDecimal("1000.00"), new BigDecimal("1800.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
+                Instant.parse("2026-01-01T00:00:00Z"), null);
+        CyclePosition opening = new CyclePosition(
+                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
+                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findFirstOne(cycle.id())).thenReturn(Optional.of(opening));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+        CyclePerformance performance = statsService
+                .getCyclePerformances(USER_ID, Strategy.Type.VR, null, 10)
+                .items().getFirst();
+
+        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("200.00");
+        assertThat(summary.byType()).singleElement().satisfies(stats ->
+                assertThat(stats.avgReturnRate()).isEqualByComparingTo("0.1250"));
+        assertThat(performance.startAmount()).isEqualByComparingTo("1600.00");
+        assertThat(performance.endAmount()).isEqualByComparingTo("1800.00");
+        assertThat(performance.pnl()).isEqualByComparingTo("200.00");
+        assertThat(performance.returnRate()).isEqualByComparingTo("0.1250");
+    }
+
+    @Test
     void equity_curve는_같은_날_같은_사이클의_최신_스냅샷만_합산한다() {
         stubUserWithStrategy();
         StrategyCycle active = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,

@@ -218,4 +218,4 @@ adapter/out/
 - 주문 생성: `CycleOrderComputer` → `VrCycleOrderStrategy.plan()` → `VrStrategy.buildOrders()` → 매수·매도 사다리 LIMIT+AT_OPEN 주문 생성 (bootstrap은 LOC+AT_CLOSE)
 - **holdings=0에도 사이클 유지** — `endsCycleOnLiquidation()=false`, `CyclePositionPersistor`가 종료 미발동
 - **N주 롤오버**: `VrCycleRolloverService.rollIfDue()` — `CyclePositionPersistor`의 포지션 저장 직후 매일 판정, due이면 V′ 계산 후 기존 사이클 종료 + 새 사이클 원자 생성 (V′≤0 보류 등 규칙 → constraints.md). gradient·poolLimitRate는 스냅샷 이월이 아닌 전략 최초 사이클 startDate 기준 경과주수로 매번 재계산
-- **운영 중 재설정**: `VrReconfigureService`(`application/service/trading`, package-private) + `VrReconfigureUseCase` — `PUT /api/trading-cycles/{id}/vr-config`로 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입(수량/예수금)을 새 버전 발급+강제 롤오버 1회로 처리. 상세 규칙 → constraints.md "VR 공식"
+- **운영 중 재설정**: `VrReconfigureService`(`application/service/trading`, package-private) + `VrReconfigureUseCase` — `PUT /api/trading-cycles/{id}/vr-config`로 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입/인출(수량/예수금)을 새 버전 발급+강제 롤오버 1회로 처리. 상세 규칙 → constraints.md "VR 공식"

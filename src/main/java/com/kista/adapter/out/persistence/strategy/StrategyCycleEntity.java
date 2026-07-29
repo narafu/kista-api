@@ -33,10 +33,10 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
     private UUID strategyVersionId; // FK → strategy_version.id (ON DELETE CASCADE)
 
     @Column(name = "start_amount", nullable = false, precision = 20, scale = 2)
-    private BigDecimal startAmount; // 사이클 시작금액 (USD 시드)
+    private BigDecimal startAmount; // 사이클 개장 총자산 (USD)
 
     @Column(name = "end_amount", precision = 20, scale = 2)
-    private BigDecimal endAmount; // 사이클 종료금액 (청산 후 USD, 진행 중이면 null)
+    private BigDecimal endAmount; // 사이클 종료 총자산 (USD, 진행 중이면 null)
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate; // 사이클 시작일자 (KST)
