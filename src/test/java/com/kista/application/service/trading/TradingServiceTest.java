@@ -577,6 +577,8 @@ class TradingServiceTest {
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), 10, null, null);
+        CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
+                vrCycle.id(), new BigDecimal("1000.00"), PRICE);
         CyclePosition infiniteHistory = new CyclePosition(null, infiniteCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), 10, null, null);
         CyclePosition privacyHistory = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
@@ -594,6 +596,7 @@ class TradingServiceTest {
                 Ticker.SOXL, new PriceSnapshot(new BigDecimal("1000.00"), new BigDecimal("19.00")),
                 Ticker.TQQQ, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
+        when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
         when(cycleHistoryPort.findLatestOneByStrategyId(infinite.id())).thenReturn(Optional.of(infiniteHistory));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(privacyHistory));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(privacyBase));
@@ -1598,6 +1601,8 @@ class TradingServiceTest {
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
                 new BigDecimal("20.00"), 5, null, null);
+        CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
+                vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"));
 
         // VR 사이클·버전 상세 — CycleOrderComputer에서 VrInputs 조립 시 조회됨
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
@@ -1619,6 +1624,7 @@ class TradingServiceTest {
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         // 잔고: VR도 cycle_position DB 이력에서 로드 (TradingBalanceLoader.loadBalanceOrThrow)
         when(cycleHistoryPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
+        when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any())).thenReturn(List.of());
         // VR 전용 포트 — CycleOrderComputer가 VrInputs 조립 시 호출
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));

@@ -233,6 +233,8 @@ class ManualTradingServiceTest {
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
                 new BigDecimal("20.00"), 5, null, null);
+        CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
+                vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"));
 
         // VR 사이클·버전 상세
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
@@ -263,6 +265,7 @@ class ManualTradingServiceTest {
                 .thenReturn(List.of(), List.of(vrBuyPlanned, vrSellPlanned));
         // 잔고: cycle_position 이력에서 로드
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
+        when(cyclePositionPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
         // VR 전용 포트 — CycleOrderComputer VrInputs 조립
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));

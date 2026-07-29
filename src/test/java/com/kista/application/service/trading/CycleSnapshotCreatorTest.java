@@ -54,4 +54,25 @@ class CycleSnapshotCreatorTest {
         assertThat(positionCaptor.getValue().usdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(positionCaptor.getValue().holdings()).isEqualTo(5);
     }
+
+    @Test
+    void createVrCycleAndSnapshot_roundsFractionalCentStartAmountHalfUp() {
+        UUID strategyId = UUID.randomUUID();
+        UUID strategyVersionId = UUID.randomUUID();
+        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"));
+        AccountBalance postBalance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("1000.00"));
+
+        when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
+
+        CycleSnapshotCreator creator = new CycleSnapshotCreator(
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
+        creator.createVrCycleAndSnapshot(strategyId, strategyVersionId, postBalance, new BigDecimal("600.005"),
+                new BigDecimal("900.00"), 10, new BigDecimal("0.50"));
+
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1600.01");
+        assertThat(cycleCaptor.getValue().startAmount().scale()).isEqualTo(2);
+    }
 }

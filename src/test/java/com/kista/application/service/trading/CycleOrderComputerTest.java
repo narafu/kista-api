@@ -146,6 +146,34 @@ class CycleOrderComputerTest {
     }
 
     @Test
+    @DisplayName("VR 전략 — opening pool limit의 0.005 센트를 HALF_UP으로 반올림한다")
+    void compute_vrStrategy_roundsFractionalCentPoolLimitHalfUp() {
+        StrategyCycle rolloverCycle = new StrategyCycle(
+                UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1600.00"), null, VR_START_DATE, null, null, null);
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                rolloverCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("0.50"));
+        StrategyVrDetail vrDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+        CyclePosition openingPosition = CyclePosition.cycleStartSnapshot(
+                rolloverCycle.id(), new BigDecimal("1000.01"), new BigDecimal("120.00"));
+
+        when(strategyCycleVrPort.findByCycleId(rolloverCycle.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
+        when(cyclePositionPort.findFirstOne(rolloverCycle.id())).thenReturn(Optional.of(openingPosition));
+        when(orderPort.sumFilledBuyAmountByCycleId(rolloverCycle.id())).thenReturn(BigDecimal.ZERO);
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(CURRENT_PRICE), any()))
+                .thenReturn(List.of());
+
+        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
+        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
+        assertThat(captor.getValue().poolLimit()).isEqualByComparingTo("500.01");
+        assertThat(captor.getValue().poolLimit().scale()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("VR 전략 — opening position이 없으면 pool limit을 계산하지 않고 실패한다")
     void compute_vrStrategy_openingPositionMissing_throwsIllegalState() {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
