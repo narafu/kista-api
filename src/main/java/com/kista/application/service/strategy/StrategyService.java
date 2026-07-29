@@ -98,11 +98,11 @@ class StrategyService implements StrategyUseCase {
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
-        // VR 응답 조립 — VrSummary (poolLimit 달러 파생을 위해 startAmount 전달)
+        // VR 응답은 개장 포지션의 USD pool을 기준으로 조립한다.
         if (persisted.strategy().isVr()) {
             StrategyDetail.VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
-                    persisted.vrDetail(), initialResult.cycleVr(), initialResult.cycle().startAmount());
-            return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
+                    persisted.vrDetail(), initialResult.cycleVr(), initialResult.initialPosition().usdDeposit());
+            return new StrategyDetail(persisted.strategy(), initialResult.initialPosition().usdDeposit(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
         }
         return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
     }
@@ -282,15 +282,13 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-    // startAmount = VR은 USD pool, 그 외 전략은 현금 + 시장가×보유수량
+    // startAmount = 현금 + 시장가×보유수량 — VR도 총 시작자산을 동일하게 보존한다.
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
             BigDecimal initialStockValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
         BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
-        BigDecimal startAmount = saved.isVr()
-                ? normalizedInitialUsdDeposit
-                : normalizedInitialUsdDeposit.add(initialStockValue);
+        BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount, scheduledStart));
 
         CyclePosition initialPosition = initialHoldings > 0
@@ -300,22 +298,23 @@ class StrategyService implements StrategyUseCase {
 
         if (saved.isInfinite()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
-            return new InitialCycleResult(cycle, null);
+            return new InitialCycleResult(cycle, initialPosition, null);
         } else if (saved.isVr()) {
             StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
                     cycle.id(), normalizedInitialUsdDeposit, initialStockValue, vrDetail);
-            return new InitialCycleResult(cycle, savedCycleVr);
+            return new InitialCycleResult(cycle, initialPosition, savedCycleVr);
         } else {
             // PRIVACY
-            return new InitialCycleResult(cycle, null);
+            return new InitialCycleResult(cycle, initialPosition, null);
         }
     }
 
     // 전략 저장 후 버전 ID + VR 상세를 함께 전달하기 위한 내부 전달 객체
     private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version, StrategyVrDetail vrDetail) {}
 
-    // 초기 사이클·포지션 저장 결과 — cycle + VR 전용 cycleVr (VR 외 전략은 null)
-    private record InitialCycleResult(StrategyCycle cycle, StrategyCycleVrDetail cycleVr) {}
+    // 초기 사이클·개장 포지션·VR 전용 cycleVr 저장 결과 — VR 외 cycleVr는 null
+    private record InitialCycleResult(StrategyCycle cycle, CyclePosition initialPosition,
+                                      StrategyCycleVrDetail cycleVr) {}
 
     // VR 램프 파라미터 정규화 결과 — 8필드 모두 non-null(int/BigDecimal), normalizeVrRampParams()의 반환 묶음
     private record VrRampParams(int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
@@ -436,7 +435,12 @@ class StrategyService implements StrategyUseCase {
     // 현재 StrategyCycle의 startAmount를 묶고, 리버스모드는 cycle_position 최신 행에서 판단
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
-        BigDecimal initialUsdDeposit = latestCycle.map(StrategyCycle::startAmount).orElse(null);
+        Optional<CyclePosition> openingPosition = strategy.isVr()
+                ? latestCycle.flatMap(cycle -> cyclePositionPort.findFirstOne(cycle.id()))
+                : Optional.empty();
+        BigDecimal initialUsdDeposit = strategy.isVr()
+                ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
+                : latestCycle.map(StrategyCycle::startAmount).orElse(null);
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         Integer divisionCount = strategy.isInfinite()

@@ -87,7 +87,8 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
-        VrStrategyLifecycle vrStrategyLifecycle = new VrStrategyLifecycle(strategyVrDetailPort, strategyCycleVrPort);
+        VrStrategyLifecycle vrStrategyLifecycle = new VrStrategyLifecycle(
+                strategyVrDetailPort, strategyCycleVrPort, cyclePositionPort);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -1154,12 +1155,12 @@ class StrategyServiceTest {
         Strategy vrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
                 Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
-                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("2000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, 0, null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
-        // poolLimitRate=0.50 — vrCycle.startAmount()(2000) × 0.50 = 1000.00 (아래 poolLimit 파생 검증과 정합)
+        // 총 시작금액 1600과 개장 USD pool 1000은 분리된다. poolLimit은 1000 × 0.50 = 500.00이다.
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
@@ -1167,6 +1168,7 @@ class StrategyServiceTest {
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrategyId)).thenReturn(Optional.of(latestPos));
+        when(cyclePositionPort.findFirstOne(vrCycleId)).thenReturn(Optional.of(latestPos));
         when(strategyVrDetailPort.findActiveByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(cycleVr));
 
@@ -1178,10 +1180,11 @@ class StrategyServiceTest {
         assertThat(detail.currentRound()).isNull();
         // toDetail()이 조립하는 startDate는 findLatestByStrategyId로 조회한 사이클의 startDate와 일치해야 함
         assertThat(detail.startDate()).isEqualTo(vrCycle.startDate());
+        assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(detail.vr()).isNotNull();
         assertThat(detail.vr().intervalWeeks()).isEqualTo(4);
         assertThat(detail.vr().bandWidth()).isEqualByComparingTo("15.00");
-        assertThat(detail.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(detail.vr().poolLimit()).isEqualByComparingTo("500.00");
         assertThat(detail.vr().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(detail.vr().gradient()).isEqualTo(10);
     }
@@ -1302,7 +1305,8 @@ class StrategyServiceTest {
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // V = 시장가 120 × 보유수량 5 = 600.00
+        // startAmount = USD pool 1000 + 시장가 120 × 보유수량 5 = 1600.00, V = 600.00
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0));
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");

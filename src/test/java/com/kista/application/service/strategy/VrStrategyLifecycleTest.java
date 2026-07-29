@@ -1,9 +1,11 @@
 package com.kista.application.service.strategy;
 
+import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +31,7 @@ class VrStrategyLifecycleTest {
 
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
+    @Mock CyclePositionPort cyclePositionPort;
 
     @InjectMocks VrStrategyLifecycle vrStrategyLifecycle;
 
@@ -85,34 +88,37 @@ class VrStrategyLifecycleTest {
     }
 
     @Test
-    @DisplayName("findSummary() 활성 VR 상세와 최신 사이클 상세를 합산 — poolLimit은 startAmount×poolLimitRate 파생값")
+    @DisplayName("findSummary() 활성 VR 상세와 최신 사이클 상세를 합산 — poolLimit은 개장 USD pool×poolLimitRate 파생값")
     void findSummary_combinesActiveDetailAndCycleDetail() {
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         StrategyCycle latestCycle = new StrategyCycle(
-                cycleId, strategyId, versionId, new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+                cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
+        CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("1000"), null, null, 0, null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
-        // poolLimitRate=0.50 — latestCycle.startAmount()(2000) × 0.50 = 1000.00 파생 검증
+        // 총 시작금액 1600과 개장 USD pool 1000은 분리된다. poolLimit은 1000 × 0.50 = 500.00이다.
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
+        when(cyclePositionPort.findFirstOne(cycleId)).thenReturn(Optional.of(openingPosition));
 
         Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
                 strategyId, Optional.of(latestCycle));
 
         assertThat(result).isPresent();
         assertThat(result.get().intervalWeeks()).isEqualTo(4);
-        assertThat(result.get().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.get().poolLimit()).isEqualByComparingTo("500.00");
         assertThat(result.get().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(result.get().gradient()).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("buildSummary() startAmount null이면 poolLimit도 null (사이클 미존재 등 방어)")
-    void buildSummary_nullStartAmount_yieldsNullPoolLimit() {
+    @DisplayName("buildSummary() openingPool null이면 poolLimit도 null (개장 포지션 미존재 등 방어)")
+    void buildSummary_nullOpeningPool_yieldsNullPoolLimit() {
         UUID versionId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,

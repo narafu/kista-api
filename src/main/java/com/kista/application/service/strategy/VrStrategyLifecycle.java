@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class VrStrategyLifecycle {
 
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;
+    private final CyclePositionPort cyclePositionPort;
 
     // 램프 8필드는 호출측(StrategyService)이 이미 null 정규화를 마친 값이라고 가정한다
     public StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
@@ -49,14 +51,15 @@ public class VrStrategyLifecycle {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
-                                .map(cycleVr -> buildSummary(vrDetail, cycleVr, cycle.startAmount()))));
+                                .flatMap(cycleVr -> cyclePositionPort.findFirstOne(cycle.id())
+                                        .map(openingPosition -> buildSummary(vrDetail, cycleVr, openingPosition.usdDeposit())))));
     }
 
-    // startAmount: 조회 대상 사이클의 시작 시드 — poolLimit 달러 파생(startAmount × poolLimitRate)에 사용
-    StrategyDetail.VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr, BigDecimal startAmount) {
+    // openingPool: 조회 대상 사이클 개장 포지션의 USD pool — poolLimit 달러 파생(openingPool × poolLimitRate)에 사용
+    StrategyDetail.VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr, BigDecimal openingPool) {
         if (vrDetail == null || cycleVr == null) return null;
-        BigDecimal poolLimit = startAmount != null
-                ? startAmount.multiply(cycleVr.poolLimitRate()).setScale(2, RoundingMode.HALF_UP)
+        BigDecimal poolLimit = openingPool != null
+                ? openingPool.multiply(cycleVr.poolLimitRate()).setScale(2, RoundingMode.HALF_UP)
                 : null;
         return new StrategyDetail.VrSummary(
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
