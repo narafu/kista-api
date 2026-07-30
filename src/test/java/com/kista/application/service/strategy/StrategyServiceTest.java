@@ -371,8 +371,8 @@ class StrategyServiceTest {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(accountA, accountB));
         when(strategyPort.findByAccountIds(List.of(accountAId, accountBId)))
                 .thenReturn(Map.of(accountAId, List.of(strategyA), accountBId, List.of(strategyB)));
-        when(strategyCyclePort.findLatestByStrategyId(strategyAId)).thenReturn(Optional.of(CYCLE));
-        when(strategyCyclePort.findLatestByStrategyId(strategyBId)).thenReturn(Optional.of(CYCLE));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyAId, strategyBId)))
+                .thenReturn(Map.of(strategyAId, CYCLE, strategyBId, CYCLE));
 
         List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
 
@@ -1314,13 +1314,16 @@ class StrategyServiceTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
+        StrategyVersion vrVersion = new StrategyVersion(vrVersionId, vrStrategyId, 1, null, null);
+
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
-        when(cyclePositionPort.findLatestOneByStrategyId(vrStrategyId)).thenReturn(Optional.of(latestPos));
-        when(cyclePositionPort.findFirstOne(vrCycleId)).thenReturn(Optional.of(openingPosition));
-        when(strategyVrDetailPort.findActiveByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrDetail));
-        when(strategyCycleVrPort.findByCycleId(vrCycleId)).thenReturn(Optional.of(cycleVr));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrCycle));
+        when(cyclePositionPort.findLatestByCycleIds(List.of(vrCycleId))).thenReturn(Map.of(vrCycleId, latestPos));
+        when(cyclePositionPort.findFirstByCycleIds(List.of(vrCycleId))).thenReturn(Map.of(vrCycleId, openingPosition));
+        when(strategyVersionPort.findActiveByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrVersion));
+        when(strategyVrDetailPort.findByStrategyVersionIds(List.of(vrVersionId))).thenReturn(Map.of(vrVersionId, vrDetail));
+        when(strategyCycleVrPort.findByCycleIds(List.of(vrCycleId))).thenReturn(Map.of(vrCycleId, cycleVr));
 
         List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
 
@@ -1352,12 +1355,237 @@ class StrategyServiceTest {
                 null, LocalDate.now(), null, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrCycle));
+        // cyclePositionPort.findFirstByCycleIds는 stub하지 않음 — 빈 Map 기본값으로 개장 포지션 누락을 재현
 
         assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음")
                 .hasMessageContaining(vrCycleId.toString());
+    }
+
+    // --- 단건↔배치 동등성 (toDetail vs toDetails) — 목록 조립 리팩토링이 단건 응답과 동일 결과를 내는지 검증 ---
+
+    @Test
+    @DisplayName("동등성: INFINITE(리버스모드 ON, divisionCount 커스텀) — getById와 listByUserId 결과가 같다")
+    void equivalence_infiniteWithReverseModeAndCustomDivisionCount() {
+        UUID strategyId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        UUID positionId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
+                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        CyclePosition position = new CyclePosition(positionId, cycleId,
+                new BigDecimal("500.00"), null, new BigDecimal("20.00"), 10, null, null);
+        StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
+        StrategyInfiniteDetail infiniteDetail = new StrategyInfiniteDetail(versionId, 30);
+        CyclePositionInfiniteDetail reverseDetail = new CyclePositionInfiniteDetail(positionId, true);
+
+        // 단건 경로(getById) stub
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
+        when(strategyInfiniteDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(infiniteDetail));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.of(position));
+        when(cyclePositionInfiniteDetailPort.findByCyclePositionId(positionId)).thenReturn(Optional.of(reverseDetail));
+
+        StrategyDetail single = strategyService.getById(strategyId, USER_ID);
+
+        // 배치 경로(listByUserId) stub — 동일 데이터를 배치 메서드로 제공
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
+        when(cyclePositionPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, position));
+        when(strategyVersionPort.findActiveByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, version));
+        when(strategyInfiniteDetailPort.findByStrategyVersionIds(List.of(versionId))).thenReturn(Map.of(versionId, infiniteDetail));
+        when(cyclePositionInfiniteDetailPort.findByCyclePositionIds(List.of(positionId))).thenReturn(Map.of(positionId, reverseDetail));
+
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+
+        assertThat(batch).hasSize(1);
+        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(single.divisionCount()).isEqualTo(30);
+        assertThat(single.isReverseMode()).isTrue();
+    }
+
+    @Test
+    @DisplayName("동등성: VR 정상 — getById와 listByUserId 결과가 같다")
+    void equivalence_vrNormal() {
+        UUID strategyId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
+                new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
+        CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("1000.00"), null, null, 0, null, null);
+        StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(cycleId, new BigDecimal("3000.00"), 10, new BigDecimal("0.50"));
+
+        // 단건 경로
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
+        when(cyclePositionPort.findFirstOne(cycleId)).thenReturn(Optional.of(openingPosition));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.empty());
+        when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
+        when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
+
+        StrategyDetail single = strategyService.getById(strategyId, USER_ID);
+
+        // 배치 경로
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
+        when(cyclePositionPort.findFirstByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, openingPosition));
+        when(strategyVersionPort.findActiveByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, version));
+        when(strategyVrDetailPort.findByStrategyVersionIds(List.of(versionId))).thenReturn(Map.of(versionId, vrDetail));
+        when(strategyCycleVrPort.findByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, cycleVr));
+
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+
+        assertThat(batch).hasSize(1);
+        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(single.vr()).isNotNull();
+        assertThat(single.divisionCount()).isNull();
+        assertThat(single.currentRound()).isNull();
+    }
+
+    @Test
+    @DisplayName("동등성: PRIVACY — getById와 listByUserId 결과가 같다")
+    void equivalence_privacy() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        UUID positionId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.PRIVACY,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
+        CyclePosition position = new CyclePosition(positionId, cycleId,
+                new BigDecimal("1500.00"), null, new BigDecimal("30.00"), 15, null, null);
+
+        // 단건 경로
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.of(position));
+
+        StrategyDetail single = strategyService.getById(strategyId, USER_ID);
+
+        // 배치 경로
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
+        when(cyclePositionPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, position));
+
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+
+        assertThat(batch).hasSize(1);
+        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(single.divisionCount()).isNull();
+        assertThat(single.vr()).isNull();
+    }
+
+    @Test
+    @DisplayName("동등성: 사이클 없는 신규 전략 — getById와 listByUserId 결과가 같다 (모두 null 필드)")
+    void equivalence_newStrategyWithoutCycle() {
+        UUID strategyId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+
+        // 단건 경로 — 사이클 없음(Optional.empty), 다른 stub 없이도 lenient 기본값(빈 Optional/Map)으로 처리됨
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.empty());
+        when(strategyInfiniteDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.empty());
+        when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.empty());
+
+        StrategyDetail single = strategyService.getById(strategyId, USER_ID);
+
+        // 배치 경로 — 빈 Map 기본값(Mockito 기본 응답)에 의존
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+
+        assertThat(batch).hasSize(1);
+        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(single.startDate()).isNull();
+        assertThat(single.initialUsdDeposit()).isNull();
+        assertThat(single.divisionCount()).isEqualTo(Strategy.DEFAULT_DIVISION_COUNT);
+        assertThat(single.currentRound()).isNull();
+        assertThat(single.currentHoldings()).isNull();
+    }
+
+    @Test
+    @DisplayName("동등성: VR 개장 포지션 없음 — getById와 listByUserId 모두 동일한 IllegalStateException을 던진다")
+    void equivalence_vrMissingOpeningPosition_bothThrowSameException() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, UUID.randomUUID(),
+                new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
+
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
+        // cyclePositionPort.findFirstOne은 stub하지 않음 — Optional.empty() 기본값으로 개장 포지션 누락 재현
+
+        assertThatThrownBy(() -> strategyService.getById(strategyId, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("VR 시작 포지션 없음")
+                .hasMessageContaining(cycleId.toString());
+
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
+        // cyclePositionPort.findFirstByCycleIds도 stub하지 않음 — 빈 Map 기본값
+
+        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("VR 시작 포지션 없음")
+                .hasMessageContaining(cycleId.toString());
+    }
+
+    @Test
+    @DisplayName("N+1 재발 방지: listByUserId는 전략 수와 무관하게 단건 조회 port 메서드를 호출하지 않는다")
+    void listByUserId_neverCallsSingleItemPortMethods() {
+        UUID strategyAId = UUID.randomUUID();
+        UUID strategyBId = UUID.randomUUID();
+        UUID cycleAId = UUID.randomUUID();
+        UUID cycleBId = UUID.randomUUID();
+        Strategy strategyA = new Strategy(strategyAId, ACCOUNT_ID, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategyB = new Strategy(strategyBId, ACCOUNT_ID, Strategy.Type.PRIVACY,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyCycle cycleA = new StrategyCycle(cycleAId, strategyAId, STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        StrategyCycle cycleB = new StrategyCycle(cycleBId, strategyBId, STRATEGY_VERSION_ID,
+                new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
+
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID)))
+                .thenReturn(Map.of(ACCOUNT_ID, List.of(strategyA, strategyB)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyAId, strategyBId)))
+                .thenReturn(Map.of(strategyAId, cycleA, strategyBId, cycleB));
+
+        strategyService.listByUserId(USER_ID);
+
+        verify(strategyPort, never()).findByAccountId(any());
+        verify(strategyCyclePort, never()).findLatestByStrategyId(any());
+        verify(cyclePositionPort, never()).findLatestOneByStrategyId(any());
+        verify(cyclePositionPort, never()).findFirstOne(any());
+        verify(strategyVersionPort, never()).findActiveByStrategyId(any());
+        verify(strategyInfiniteDetailPort, never()).findActiveByStrategyId(any());
+        verify(strategyVrDetailPort, never()).findActiveByStrategyId(any());
+        verify(strategyCycleVrPort, never()).findByCycleId(any());
+        verify(cyclePositionInfiniteDetailPort, never()).findByCyclePositionId(any());
     }
 
     // --- register() 중간부터 시작 (bootstrap position) ---

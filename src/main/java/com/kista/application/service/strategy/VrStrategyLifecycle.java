@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,6 +61,15 @@ public class VrStrategyLifecycle {
                                                     "VR 시작 포지션 없음: cycleId=" + cycle.id()));
                                     return buildSummary(vrDetail, cycleVr, openingPool);
                                 })));
+    }
+
+    // 목록 조립(StrategyService.toDetails) 전용 배치 조회 — Port를 직접 노출하지 않고 이 계층을 경유한다
+    Map<UUID, StrategyVrDetail> findVrDetailsByVersionIds(Collection<UUID> strategyVersionIds) {
+        return strategyVrDetailPort.findByStrategyVersionIds(strategyVersionIds);
+    }
+
+    Map<UUID, StrategyCycleVrDetail> findCycleVrDetailsByCycleIds(Collection<UUID> cycleIds) {
+        return strategyCycleVrPort.findByCycleIds(cycleIds);
     }
 
     // openingPool: 조회 대상 사이클 개장 포지션의 USD pool — poolLimit 달러 파생(openingPool × poolLimitRate)에 사용
