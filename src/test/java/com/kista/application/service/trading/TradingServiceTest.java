@@ -215,6 +215,9 @@ class TradingServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
+        // 접수 직전 재조회 — 시작가와 동일값으로 스텁해 기존 캡 판단 결과를 그대로 유지
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, startPrice));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT)))
                 .thenReturn(Map.of(Ticker.SOXL, PRICE)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -235,6 +238,7 @@ class TradingServiceTest {
         verify(kisPricePort, never()).getPriceSnapshot(any(), any()); // 단건 fallback 없음 — getPriceSnapshots 성공
         verify(kisPricePort, never()).getPrice(any(), any());         // 단건 fallback 없음
         verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
+        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT)); // 접수 직전 재조회(Placement) 1회
         verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort, atLeastOnce()).findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
@@ -1376,8 +1380,8 @@ class TradingServiceTest {
     // ── executeBatch 테스트 ────────────────────────────────────────────────────
 
     @Test
-    void executeBatch_fetchesPricesTwice_startAndClose_notPerCycle() throws InterruptedException {
-        // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getClosingPrices() 1회(종가), 단건 fallback 없음
+    void executeBatch_fetchesPricesThreeTimes_startPlacementAndClose_notPerCycle() throws InterruptedException {
+        // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(접수 직전 재조회), getClosingPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -1387,6 +1391,7 @@ class TradingServiceTest {
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT))).thenReturn(Map.of(Ticker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -1404,9 +1409,55 @@ class TradingServiceTest {
         ), PAST_DST);
 
         verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT)); // 시작가(Phase A) 1회
+        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT)); // 접수 직전 재조회(Placement) 1회 — ticker당 1회, 사이클별 아님
         verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT));         // 종가(PostClose) 1회
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(kisPricePort, never()).getPriceSnapshot(any(), any());
+    }
+
+    @Test
+    void executeBatch_placementCapUsesRefreshedPrice_notStaleStartPrice() throws InterruptedException {
+        // 계획 시점 시작가는 높게(cap 미초과) 두고, 접수 직전 재조회 가격은 낮게(cap 초과) 둬서
+        // BUY cap 보정이 대기 전 startPrice가 아닌 대기 후 재조회 가격 기준으로 수행됨을 검증한다.
+        BigDecimal startPrice = new BigDecimal("50.00");       // 계획 시점 시작가 — cap 52.50, 초과 없음
+        BigDecimal prevClose = new BigDecimal("45.00");
+        BigDecimal placementPrice = new BigDecimal("10.00");   // 접수 직전 재조회 가격 — cap 10.50
+        BigDecimal plannedBuyPrice = new BigDecimal("40.00");  // startPrice cap은 통과하지만 placementPrice cap은 초과
+
+        Order template = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, plannedBuyPrice, Order.OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_REFRESH_BUY");
+        UUID plannedId = UUID.randomUUID();
+        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, plannedBuyPrice,
+                Order.OrderStatus.PLANNED, null, null, null);
+        Order placedOrder = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, plannedBuyPrice, Order.OrderStatus.PLACED, "ORD-REFRESH", null, null);
+
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(startPrice, prevClose)));
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, placementPrice)); // 접수 직전 재조회
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, PRICE));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(template));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
+                .thenReturn(List.of(planned));
+        when(brokerOrderPort.place(any(), eq(ACCOUNT))).thenReturn(placedOrder);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT))).thenReturn(List.of());
+
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+
+        // ticker당 1회만 재조회
+        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT));
+        // cap 보정이 시작가(50.00×1.05=52.50)가 아닌 재조회된 현재가(10.00×1.05=10.50) 기준으로 수행됨
+        verify(infiniteStrategy).buildCappedBuyOrders(any(), any(), anyList(), eq(new BigDecimal("10.50")));
     }
 
     @Test

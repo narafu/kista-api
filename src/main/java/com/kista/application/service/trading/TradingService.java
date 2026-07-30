@@ -58,7 +58,7 @@ class TradingService {
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
             VrPosition vrPosition,          // VR만 non-null (신규 계산 시 — BuyOrderPriceCapper VR_POSITION 보정용)
-            BigDecimal startPrice,          // 공통 — INFINITE: BuyOrderPriceCapper / PRIVACY: capPrivacyIfNeeded / VR: capVrIfNeeded
+            BigDecimal startPrice,          // 배치 시작 시점 가격 — placeAll()에서 접수 직전 재조회(reloadPlacementPrices) 실패 시 폴백으로만 사용
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
@@ -157,12 +157,19 @@ class TradingService {
 
     // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리)
     private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
+        // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+        // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
+        // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
+        Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(states);
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             runSafely("증권사 접수", state.ctx(), () -> {
+                // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
+                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                        .orElse(state.startPrice());
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
-                        state.startPrice(), state.position(), state.vrPosition(), state.ctx().strategy());
+                        placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
                 // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
                 // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
                 Set<UUID> mainOrderIds = mainOrders.stream()
@@ -431,6 +438,16 @@ class TradingService {
             throw e;
         }
         log.info("{} 도달", label);
+    }
+
+    // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — TradingPriceFetcher.fetchPrices가 ticker당 1회 배치 조회를 보장
+    // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) fetchPriceSnapshots가 아닌 fetchPrices 사용
+    private Map<Ticker, BigDecimal> reloadPlacementPrices(List<CycleState> states) {
+        List<Ticker> tickers = states.stream()
+                .map(state -> state.ctx().strategy().ticker())
+                .distinct().toList();
+        Account priceAccount = selectPriceAccount(states.stream().map(CycleState::ctx).toList());
+        return priceFetcher.fetchPrices(tickers, priceAccount);
     }
 
     // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)
