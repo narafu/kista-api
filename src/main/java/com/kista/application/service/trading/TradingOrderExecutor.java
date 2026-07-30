@@ -5,6 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.VrPosition;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
@@ -32,25 +33,45 @@ class TradingOrderExecutor {
     private final NotifyPort notifyPort;
     private final CycleOrderStrategies cycleOrderStrategies;
 
-    // 지정된 주문 목록만 증권사 접수 (장 개시 스케쥴러 매도 선접수용 — BUY 보정 없음)
-    List<Order> placeGiven(List<Order> orders, Account account) {
-        if (orders.isEmpty()) return List.of();
-        List<Order> placed = placeEach(orders, account);
-        log.info("[{}] 주문 {}건 선접수 (성공)", account.nickname(), placed.size());
+    // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
+    // BUY cap 보정을 AT_OPEN 스코프(capIfNeededAtOpen/capPrivacyIfNeededAtOpen/capVrIfNeededAtOpen)로 적용한 뒤
+    // AT_OPEN PLANNED만 재조회해 접수한다 — 동일 사이클에 공존 가능한 AT_CLOSE PLANNED(미도래)는 건드리지 않는다
+    // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
+    List<Order> placeAtOpenOrders(LocalDate tradeDate, Account account, UUID strategyCycleId,
+                                  BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+        if (currentPrice != null) {
+            CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
+            if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
+                buyOrderPriceCapper.capIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice, position);
+            } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
+                buyOrderPriceCapper.capPrivacyIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice);
+            } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition != null) {
+                buyOrderPriceCapper.capVrIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
+            }
+        }
+        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate);
+        if (atOpenOrders.isEmpty()) {
+            log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
+            return List.of();
+        }
+        List<Order> placed = placeEach(atOpenOrders, account);
+        log.info("[{}] 개장 주문 {}건 선접수 (성공/{} 시도)", account.nickname(), placed.size(), atOpenOrders.size());
         return placed;
     }
 
-    // capIfNeeded/capPrivacyIfNeeded 적용 여부는 전략의 priceCapMode()로 결정
+    // capIfNeeded/capPrivacyIfNeeded/capVrIfNeeded 적용 여부는 전략의 priceCapMode()로 결정
     // INFINITE_POSITION이어도 position이 null(재계산 skip 케이스)이면 캡 미적용 — 기존 동작 그대로
-    // VR: 가격 캡은 buildOrders 단계에서 이미 적용 — priceCapMode()가 NONE이라 post-hoc 캡 불필요
+    // VR_POSITION이어도 vrPosition이 null(재계산 skip 케이스)이면 캡 미적용 — 동일 원칙
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
-                            BigDecimal currentPrice, InfinitePosition position, Strategy strategy) {
+                            BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         if (currentPrice != null) {
             CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
             if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
                 buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
             } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
                 buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
+            } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition != null) {
+                buyOrderPriceCapper.capVrIfNeeded(today, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
             }
         }
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
