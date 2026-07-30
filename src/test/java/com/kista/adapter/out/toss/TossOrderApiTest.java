@@ -8,8 +8,6 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
-import org.springframework.web.client.HttpClientErrorException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -137,27 +134,25 @@ class TossOrderApiTest {
     }
 
     @Test
-    @DisplayName("취소 대상이 이미 체결/만료(404 not-found) → 예외 없이 흡수")
-    void cancel_alreadyResolved_swallows404() {
-        Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
-            Order.OrderStatus.PLACED, "toss-oid-404", null, null);
-        HttpClientErrorException notFound = HttpClientErrorException.create(
-            org.springframework.http.HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY,
-            "{}".getBytes(StandardCharsets.UTF_8), null);
-        doThrow(new TossApiException("Toss API 오류: 404 NOT_FOUND", notFound))
-            .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
-
-        assertThatCode(() -> tossOrderApi.cancel(order, ACCOUNT)).doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("취소 실패가 404 아닌 다른 오류면 그대로 전파")
-    void cancel_otherError_rethrows() {
+    @DisplayName("취소 실패(500)는 그대로 전파된다")
+    void cancel_serverError_rethrows() {
         Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
             Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLACED, "toss-oid-500", null, null);
         doThrow(new TossApiException("Toss API 요청 실패: 500", new RuntimeException("boom")))
+            .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
+
+        assertThatThrownBy(() -> tossOrderApi.cancel(order, ACCOUNT))
+            .isInstanceOf(TossApiException.class);
+    }
+
+    @Test
+    @DisplayName("취소 실패(404)도 이미 체결/만료로 추정하지 않고 그대로 전파된다")
+    void cancel_notFound_rethrows() {
+        Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
+            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
+            Order.OrderStatus.PLACED, "toss-oid-404", null, null);
+        doThrow(new TossApiException("Toss API 오류: 404 NOT_FOUND", new RuntimeException("not found")))
             .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
         assertThatThrownBy(() -> tossOrderApi.cancel(order, ACCOUNT))

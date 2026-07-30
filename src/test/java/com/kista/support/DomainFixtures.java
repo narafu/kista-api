@@ -53,4 +53,9 @@ public final class DomainFixtures {
     public static Account kisAccount(UUID id, UUID userId) {
         return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Account.Broker.KIS, null);
     }
+
+    // 기본 Toss 계좌 (accountNo/appKey/secretKey/brokerAccountCode 기본값 고정)
+    public static Account tossAccount(UUID id, UUID userId) {
+        return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Account.Broker.TOSS, null);
+    }
 }

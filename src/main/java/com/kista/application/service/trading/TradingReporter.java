@@ -81,7 +81,10 @@ class TradingReporter {
 
     // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 이미 체결된 주문의 취소는 브로커가 거부(무시)한다.
     // 실패해도 흐름은 계속되며(다음 getExecutions로 실제 상태를 확정), 취소 자체 실패만 관리자에게 알린다.
+    // Toss 전용 — 정규장 지정가 주문이 애프터장까지 이어져 다음날 09:00 KST에야 자동 취소되므로 명시적 취소가 필요.
+    // KIS는 정규장 종료 시 자동 취소되어 이 호출이 불필요 — 스킵해 마감 시점 KIS API 호출량(rate-limit 위험)도 함께 줄인다.
     private void cancelUnresolvedOrders(List<Order> mainOrders, Account account) {
+        if (account.broker() != Account.Broker.TOSS) return;
         for (Order order : mainOrders) {
             if (order.status() != Order.OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {

@@ -65,19 +65,43 @@ class TradingReporterTest {
     static final BatchContext CTX = new BatchContext(STRATEGY, CYCLE, ACCOUNT, USER);
     static final AccountBalance BALANCE = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
+    // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
+    static final Account TOSS_ACCOUNT = DomainFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Strategy TOSS_STRATEGY = new Strategy(
+            UUID.randomUUID(), TOSS_ACCOUNT.id(), Strategy.Type.INFINITE,
+            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
+    );
+    static final StrategyCycle TOSS_CYCLE = new StrategyCycle(
+            UUID.randomUUID(), TOSS_STRATEGY.id(), UUID.randomUUID(),
+            new BigDecimal("1000.00"), null, TODAY, null, null, null
+    );
+    static final User TOSS_USER = DomainFixtures.activeUserWithTelegram(TOSS_ACCOUNT.userId());
+    static final BatchContext TOSS_CTX = new BatchContext(TOSS_STRATEGY, TOSS_CYCLE, TOSS_ACCOUNT, TOSS_USER);
+
     @BeforeEach
     void setUp() {
         reporter = new TradingReporter(registry, orderPort, userNotificationPort,
                 realtimeNotificationPort, userSettingsPort, cyclePositionPersistor, notifyPort);
-        when(registry.require(ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
-        lenient().when(registry.require(ACCOUNT, BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderPort);
+        lenient().when(registry.require(ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
+        lenient().when(registry.require(TOSS_ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
+        lenient().when(registry.require(TOSS_ACCOUNT, BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderPort);
         lenient().when(userSettingsPort.findOrDefault(USER.id()))
                 .thenReturn(UserSettings.defaultFor(USER.id())); // TRADING_ALERT 기본 활성
+        lenient().when(userSettingsPort.findOrDefault(TOSS_USER.id()))
+                .thenReturn(UserSettings.defaultFor(TOSS_USER.id()));
     }
 
-    // PLACED 주문 픽스처 — id·externalOrderId 지정
+    // PLACED 주문 픽스처 — id·externalOrderId 지정 (KIS 계좌/사이클 기준)
     private static Order placedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, ACCOUNT.id(), CYCLE.id(), TODAY, Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
+                quantity, new BigDecimal("20.00"), Order.OrderStatus.PLACED,
+                externalOrderId, null, null);
+    }
+
+    // PLACED 주문 픽스처 — Toss 계좌/사이클 기준 (취소 로직 테스트 전용)
+    private static Order tossPlacedOrder(UUID id, String externalOrderId, int quantity) {
+        return new Order(id, TOSS_ACCOUNT.id(), TOSS_CYCLE.id(), TODAY, Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
                 quantity, new BigDecimal("20.00"), Order.OrderStatus.PLACED,
                 externalOrderId, null, null);
@@ -153,29 +177,40 @@ class TradingReporterTest {
     }
 
     @Test
-    void 마감_리포트는_체결_조회_전에_잔여_PLACED_주문을_취소한다() {
+    void 마감_리포트는_체결_조회_전에_Toss_잔여_PLACED_주문을_취소한다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = tossPlacedOrder(orderId, "E1", 5);
+        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, TOSS_ACCOUNT)).thenReturn(List.of());
+
+        reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
+
+        InOrder inOrder = inOrder(brokerOrderPort, executionPort);
+        inOrder.verify(brokerOrderPort).cancel(order, TOSS_ACCOUNT);
+        inOrder.verify(executionPort).getExecutions(TODAY, TODAY, Ticker.SOXL, TOSS_ACCOUNT);
+    }
+
+    @Test
+    void Toss_취소_실패는_격리되고_관리자_알림으로_표면화되며_체결조회는_계속된다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = tossPlacedOrder(orderId, "E1", 5);
+        doThrow(new RuntimeException("이미 체결된 주문")).when(brokerOrderPort).cancel(order, TOSS_ACCOUNT);
+        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, TOSS_ACCOUNT))
+                .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
+
+        reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
+
+        verify(notifyPort).notifyError(any());
+        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), Order.OrderStatus.FILLED);
+    }
+
+    @Test
+    void KIS_계좌는_정규장_자동취소되므로_잔여_PLACED_주문_취소_호출을_생략한다() {
         UUID orderId = UUID.randomUUID();
         Order order = placedOrder(orderId, "E1", 5);
         when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT)).thenReturn(List.of());
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
 
-        InOrder inOrder = inOrder(brokerOrderPort, executionPort);
-        inOrder.verify(brokerOrderPort).cancel(order, ACCOUNT);
-        inOrder.verify(executionPort).getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT);
-    }
-
-    @Test
-    void 취소_실패는_격리되고_관리자_알림으로_표면화되며_체결조회는_계속된다() {
-        UUID orderId = UUID.randomUUID();
-        Order order = placedOrder(orderId, "E1", 5);
-        doThrow(new RuntimeException("이미 체결된 주문")).when(brokerOrderPort).cancel(order, ACCOUNT);
-        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, ACCOUNT))
-                .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
-
-        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
-
-        verify(notifyPort).notifyError(any());
-        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), Order.OrderStatus.FILLED);
+        verify(brokerOrderPort, never()).cancel(any(), any());
     }
 }
