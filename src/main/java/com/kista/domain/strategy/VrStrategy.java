@@ -92,6 +92,10 @@ public class VrStrategy {
 
     // 접수 직전 가격 캡 보정 — BuyOrderPriceCapper(VR_POSITION)가 최신 현재가 기준 cap으로 사다리를 다시 만든다
     // position은 plan() 시점과 동일 스냅샷(pool·poolUsed·holdings 등) 재사용, cap만 최신 가격 기준으로 교체
+    // 주의: 사다리(LIMIT+AT_OPEN) 전용 재산정이다 — bootstrap(LOC+AT_CLOSE, referencePrice×1.10) 주문에는
+    // 호출하면 안 된다. bootstrap은 value=0인 경우가 많아 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
+    // 무의미해지고, 원래의 1.10배 여유폭 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
+    // orderType(LOC vs LIMIT)으로 bootstrap 배치를 가려내 이 함수 호출 자체를 막는다.
     public List<Order> buildCappedBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
         return buildBuyLadder(position, ticker, tradeDate, cap);
     }

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
 
@@ -60,6 +61,8 @@ class BuyOrderPriceCapper {
         }
         if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION) {
             if (vrPosition == null) return orders;
+            // bootstrap 주문(LOC+AT_CLOSE)은 사다리 재산정(buildCappedBuyOrders) 대상이 아니다 — 아래 isVrBootstrapShaped() 참고
+            if (isVrBootstrapShaped(buyOrders)) return orders;
             List<Order> cappedBuys = vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
             return replaceBuysPreservingOrder(orders, cappedBuys);
         }
@@ -115,21 +118,44 @@ class BuyOrderPriceCapper {
 
     // VR 전용: vrPosition 기반 매수 사다리 전체 재산정 — 기존 buyOrders 인자는 사용하지 않는다
     // (VR 사다리는 position+cap만으로 자기완결적으로 재생성되며, poolLimit·pool 한도 내로 자연스럽게 재수렴한다)
+    // bootstrap(LOC+AT_CLOSE) 주문은 사다리 재산정 대상이 아니므로 skip한다 (isVrBootstrapShaped 참고)
     @Transactional
     void capVrIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                        BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
-                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap));
+                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap),
+                BuyOrderPriceCapper::isVrBootstrapShaped);
     }
 
-    // 공통 cap 적용 골격: PLANNED BUY 조회 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
+    // VR bootstrap 주문(LOC+AT_CLOSE)인지 판별 — VrStrategy.buildOrders()는 firstCycle일 때 bootstrap 주문만
+    // 단독으로 반환하고(사다리와 섞이지 않음) 사다리 매수는 항상 LIMIT+AT_OPEN이므로, BUY 중 하나라도
+    // LOC이면 이번 배치 전체가 bootstrap이라는 뜻이다. bootstrap 가격(referencePrice×1.10)은 사다리의
+    // buyPrice(m) 공식과 무관한 별도 산정식이라 buildCappedBuyOrders(사다리 전용)로 재계산하면 안 된다.
+    private static boolean isVrBootstrapShaped(List<Order> buyOrders) {
+        return buyOrders.stream().anyMatch(o -> o.orderType() == Order.OrderType.LOC);
+    }
+
+    // 공통 cap 적용 골격 (skip 조건 없음) — INFINITE_POSITION/PRIVACY_SIMPLE 등 기본 경로
     private void applyCapIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                                   BigDecimal currentPrice,
                                   BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
+        applyCapIfNeeded(today, account, strategyCycleId, currentPrice, correctFn, orders -> false);
+    }
+
+    // 공통 cap 적용 골격: PLANNED BUY 조회 → skip 대상 여부 확인 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
+    // skipIf: 조회된 buyOrders가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문)
+    private void applyCapIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
+                                  BigDecimal currentPrice,
+                                  BiFunction<List<Order>, BigDecimal, List<Order>> correctFn,
+                                  Predicate<List<Order>> skipIf) {
         List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
                 .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
+        if (skipIf.test(buyOrders)) {
+            log.info("[{}] BUY 보정 대상 아님(예: VR bootstrap) — post-hoc 캡 제외", account.nickname());
+            return;
+        }
 
         BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
         if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;

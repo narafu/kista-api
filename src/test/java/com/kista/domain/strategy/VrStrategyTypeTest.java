@@ -417,4 +417,25 @@ class VrStrategyTypeTest {
         // buyPrice(1) = 8500/1 = 8500.00 (캡 미적용)
         assertThat(buys.getFirst().price()).isEqualByComparingTo("8500.00");
     }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders는 사다리 전용이다 — bootstrap(value=0) 포지션에 호출하면 0원짜리 사다리가 나온다 " +
+            "(BuyOrderPriceCapper가 orderType으로 bootstrap 배치를 가려 이 함수 호출 자체를 막아야 하는 이유)")
+    void buildCappedBuyOrders_onBootstrapPosition_producesDegenerateLadder_notBootstrapPrice() {
+        // value=0인 bootstrap 포지션 — lowerBand=0이라 buyPrice(m)=0. bootstrap의 실제 가격(referencePrice×1.10)과는
+        // 완전히 무관한 산정식이므로, 이 포지션에 buildCappedBuyOrders를 호출하는 것 자체가 잘못이다.
+        VrPosition bootstrapPosition = pos(0, new BigDecimal("10000"), BigDecimal.ZERO,
+                new BigDecimal("15.00"), new BigDecimal("5000.00"));
+
+        List<Order> buys = strategy.buildCappedBuyOrders(bootstrapPosition, TQQQ, TODAY, new BigDecimal("105.00"))
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        // 사다리 공식으로는 0원 주문만 나온다 — bootstrap가 실제로 생성했을 110.00(referencePrice×1.10)과 무관
+        assertThat(buys).isNotEmpty();
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("0.00");
+        // 사다리는 항상 LIMIT+AT_OPEN — bootstrap의 LOC+AT_CLOSE와 형태가 다르다는 것이
+        // BuyOrderPriceCapper가 이 둘을 구분하는 근거(orderType==LOC 여부)
+        assertThat(buys.getFirst().timing()).isEqualTo(AT_OPEN);
+        assertThat(buys.getFirst().orderType()).isEqualTo(LIMIT);
+    }
 }
