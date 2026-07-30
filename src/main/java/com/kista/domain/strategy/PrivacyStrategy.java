@@ -150,6 +150,9 @@ public class PrivacyStrategy {
             }
         }
 
+        // 버림 결과 quantity=0인 SELL 제거 — BUY의 qty>0 필터(line 86)와 대칭
+        result = new ArrayList<>(result.stream().filter(o -> o.quantity() > 0).toList());
+
         // 명시 SELL 합이 실제 보유수량을 초과하면 가장 싼 SELL부터 차례로 차감 — BUY의 adjustBuyQuantities(보유
         // 초과 시 가장 비싼 BUY부터 차감)와 대칭으로, 보유하지 않은 수량을 매도 시도해 판매가능수량 부족으로
         // 전량 거절되는 상황을 방지한다

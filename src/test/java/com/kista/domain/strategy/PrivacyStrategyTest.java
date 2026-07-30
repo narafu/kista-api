@@ -265,6 +265,36 @@ class PrivacyStrategyTest {
         assertThat(sellOrders(orders)).extracting(Order::quantity).containsExactly(75);
     }
 
+    // ── SELL 버림 결과 quantity=0 필터 ───────────────────────────────────────
+
+    @Test
+    @DisplayName("SELL 버림 후 quantity=0 — 버림 보정 미적용 항목은 결과에서 제외 (BUY qty>0 필터와 대칭)")
+    void zeroQuantitySellExcludedAfterFloor() {
+        // multiple=0.10 — 8/10/9주 → floor 0/1/0 → 버림 보정 bonus=1(가장 비싼 113.94에 가산) → 최종 0/1/1
+        // quantity=0(98.30)은 제외되고 나머지 2건만 반환
+        BigDecimal initialUsdDeposit = new BigDecimal("100"); // 100/1000 = 0.10
+        PrivacyTradeBase base = base(0, List.of(
+                sell(8, "98.30"), sell(10, "101.39"), sell(9, "113.94")));
+        List<Order> orders = strategy.buildOrders(balance(91), initialUsdDeposit, base);
+
+        assertThat(sellOrders(orders)).hasSize(2);
+        assertThat(sellOrders(orders)).extracting(Order::price, Order::quantity)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("101.39"), 1),
+                        org.assertj.core.groups.Tuple.tuple(new BigDecimal("113.94"), 1));
+    }
+
+    @Test
+    @DisplayName("SELL 버림 후 quantity=0 — 버림 보정도 없는 단건은 결과에서 완전히 제외")
+    void zeroQuantitySellExcludedWithoutBonus() {
+        // multiple=0.20 — 3주 → 0.6 → floor=0, totalFraction=0.6<1 → bonus=0 → 결과 없음
+        BigDecimal initialUsdDeposit = new BigDecimal("200"); // 200/1000 = 0.20
+        PrivacyTradeBase base = base(0, List.of(sell(3, "10")));
+        List<Order> orders = strategy.buildOrders(balance(0), initialUsdDeposit, base);
+
+        assertThat(sellOrders(orders)).isEmpty();
+    }
+
     // ── SELL null quantity = "잔량 전부 매도" ───────────────────────────────
 
     @Test
