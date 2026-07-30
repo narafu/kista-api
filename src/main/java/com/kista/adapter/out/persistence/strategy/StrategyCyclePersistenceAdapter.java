@@ -11,8 +11,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -69,6 +71,14 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         if (strategyIds.isEmpty()) return List.of();
         return jpaRepository.findByStrategyIdInAndDeletedAtIsNullOrderByCreatedAtAsc(strategyIds)
                 .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Map<UUID, StrategyCycle> findLatestByStrategyIds(Collection<UUID> strategyIds) {
+        if (strategyIds.isEmpty()) return Map.of();
+        return jpaRepository.findLatestByStrategyIdIn(strategyIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(StrategyCycle::strategyId, c -> c));
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.strategy;
 
+import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,12 +27,13 @@ class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired StrategyVersionPersistenceAdapter versionAdapter;
 
+    private UUID accountId;
     private UUID strategyId;
 
     @BeforeEach
     void setUp() {
         UUID userId = UUID.randomUUID();
-        UUID accountId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
         strategyId = UUID.randomUUID();
 
         jdbcTemplate.update(
@@ -41,6 +45,15 @@ class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
                 strategyId, accountId, "VR", "TQQQ", "ACTIVE", "NONE");
+    }
+
+    // 배치 조회 테스트 전용 — 계좌 내 추가 전략 삽입 (DB 레벨 계좌당 종목 유니크 제약 없음)
+    private UUID insertStrategy() {
+        UUID newStrategyId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
+                newStrategyId, accountId, "VR", "TQQQ", "ACTIVE", "NONE");
+        return newStrategyId;
     }
 
     @Test
@@ -70,5 +83,44 @@ class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
         versionAdapter.softDeleteActiveByStrategyId(strategyId, Instant.now());
 
         assertThat(versionAdapter.nextVersionNo(strategyId)).isEqualTo(1);
+    }
+
+    @Test
+    void findActiveByStrategyIds_returnsHighestVersionNoPerStrategyExcludingDeleted() {
+        UUID strategyB = insertStrategy();
+        UUID otherStrategy = insertStrategy(); // 조회 대상 아님
+
+        UUID v1 = UUID.randomUUID();
+        UUID v2 = UUID.randomUUID(); // strategyId의 활성 최신 버전
+        UUID deletedLatestB = UUID.randomUUID(); // strategyB의 더 큰 버전번호지만 삭제됨 — 제외
+        UUID activeB = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                v1, strategyId, 1);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                v2, strategyId, 2);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                activeB, strategyB, 1);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at, deleted_at) VALUES (?, ?, ?, now(), now())",
+                deletedLatestB, strategyB, 2);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                UUID.randomUUID(), otherStrategy, 1);
+
+        Map<UUID, StrategyVersion> result = versionAdapter.findActiveByStrategyIds(List.of(strategyId, strategyB));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(strategyId).id()).isEqualTo(v2);
+        assertThat(result.get(strategyB).id()).isEqualTo(activeB);
+        assertThat(result).doesNotContainKey(otherStrategy);
+    }
+
+    @Test
+    void findActiveByStrategyIds_emptyCollection_returnsEmptyMap() {
+        assertThat(versionAdapter.findActiveByStrategyIds(List.of())).isEmpty();
     }
 }

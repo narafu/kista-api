@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,5 +95,37 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByStrategyIds_emptyCollection_returnsEmptyList() {
         assertThat(cycleAdapter.findByStrategyIds(List.of())).isEmpty();
+    }
+
+    @Test
+    void findLatestByStrategyIds_returnsOneLatestCyclePerStrategyExcludingDeleted() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+        UUID strategyA = insertStrategy();
+        UUID strategyB = insertStrategy();
+        UUID otherStrategy = insertStrategy(); // 조회 대상에 포함되지 않는 전략
+
+        UUID cycleA1 = UUID.randomUUID();
+        UUID cycleA2 = UUID.randomUUID(); // strategyA의 최신 사이클
+        UUID cycleB1 = UUID.randomUUID();
+        UUID deletedLatestB = UUID.randomUUID(); // strategyB의 더 최신이지만 삭제됨 — 제외되어야 함
+        UUID otherCycle = UUID.randomUUID();
+
+        insertCycle(cycleA1, strategyA, base, false);
+        insertCycle(cycleA2, strategyA, base.plus(2, ChronoUnit.HOURS), false);
+        insertCycle(cycleB1, strategyB, base.plus(1, ChronoUnit.HOURS), false);
+        insertCycle(deletedLatestB, strategyB, base.plus(3, ChronoUnit.HOURS), true);
+        insertCycle(otherCycle, otherStrategy, base, false);
+
+        Map<UUID, StrategyCycle> result = cycleAdapter.findLatestByStrategyIds(List.of(strategyA, strategyB));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(strategyA).id()).isEqualTo(cycleA2);
+        assertThat(result.get(strategyB).id()).isEqualTo(cycleB1);
+        assertThat(result).doesNotContainKey(otherStrategy);
+    }
+
+    @Test
+    void findLatestByStrategyIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cycleAdapter.findLatestByStrategyIds(List.of())).isEmpty();
     }
 }

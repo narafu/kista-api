@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -28,6 +31,14 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
                 .stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Map<UUID, CyclePositionInfiniteDetail> findByCyclePositionIds(Collection<UUID> cyclePositionIds) {
+        if (cyclePositionIds.isEmpty()) return Map.of();
+        return jpaRepository.findAllById(cyclePositionIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(CyclePositionInfiniteDetail::cyclePositionId, d -> d));
     }
 
     @Override

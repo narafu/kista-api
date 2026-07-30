@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,6 +20,24 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // strategy_cycle_id 기준 개장 포지션 1건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
     Optional<CyclePositionEntity> findTop1ByStrategyCycleIdOrderByCreatedAtAsc(UUID strategyCycleId);
+
+    // 여러 사이클의 개장 포지션 배치 조회 (목록 조회 N+1 방지) — cycle별 createdAt 가장 오래된 1건 (id ASC tie-break)
+    @Query(value = """
+            SELECT DISTINCT ON (strategy_cycle_id) *
+            FROM cycle_position
+            WHERE strategy_cycle_id IN (:cycleIds) AND deleted_at IS NULL
+            ORDER BY strategy_cycle_id, created_at ASC, id ASC
+            """, nativeQuery = true)
+    List<CyclePositionEntity> findFirstByStrategyCycleIdIn(@Param("cycleIds") Collection<UUID> cycleIds);
+
+    // 여러 사이클의 최신 포지션 배치 조회 (목록 조회 N+1 방지) — cycle별 createdAt 최신 1건 (id DESC tie-break)
+    @Query(value = """
+            SELECT DISTINCT ON (strategy_cycle_id) *
+            FROM cycle_position
+            WHERE strategy_cycle_id IN (:cycleIds) AND deleted_at IS NULL
+            ORDER BY strategy_cycle_id, created_at DESC, id DESC
+            """, nativeQuery = true)
+    List<CyclePositionEntity> findLatestByStrategyCycleIdIn(@Param("cycleIds") Collection<UUID> cycleIds);
 
     // 전략 ID 기준 날짜 범위 조회 (strategy_cycle 경유 JOIN — native)
     @Query(value = """

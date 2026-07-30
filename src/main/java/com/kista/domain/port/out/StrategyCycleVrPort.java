@@ -2,6 +2,8 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +14,7 @@ public interface StrategyCycleVrPort {
 
     // 사이클 ID 기준 단건 조회
     Optional<StrategyCycleVrDetail> findByCycleId(UUID strategyCycleId);
+
+    // 여러 사이클의 VR 상세 배치 조회 (목록 조회 N+1 방지) — PK(strategyCycleId) IN 조회
+    Map<UUID, StrategyCycleVrDetail> findByCycleIds(Collection<UUID> cycleIds);
 }

@@ -30,6 +30,15 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
     List<StrategyCycleEntity> findByStrategyIdInAndDeletedAtIsNullOrderByCreatedAtAsc(
             Collection<UUID> strategyIds);
 
+    // 여러 전략의 현재 사이클 배치 조회 (목록 조회 N+1 방지) — strategy_id별 createdAt 최신 1건 (id DESC tie-break)
+    @Query(value = """
+            SELECT DISTINCT ON (strategy_id) *
+            FROM strategy_cycle
+            WHERE strategy_id IN (:strategyIds) AND deleted_at IS NULL
+            ORDER BY strategy_id, created_at DESC, id DESC
+            """, nativeQuery = true)
+    List<StrategyCycleEntity> findLatestByStrategyIdIn(@Param("strategyIds") Collection<UUID> strategyIds);
+
     @Modifying
     @Query("UPDATE StrategyCycleEntity sc SET sc.deletedAt = :now WHERE sc.strategyId = :strategyId AND sc.deletedAt IS NULL")
     void softDeleteByStrategyId(@Param("strategyId") UUID strategyId, @Param("now") Instant now);

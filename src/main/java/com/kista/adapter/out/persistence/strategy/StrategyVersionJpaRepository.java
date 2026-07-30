@@ -6,12 +6,23 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEntity, UUID> {
 
     Optional<StrategyVersionEntity> findTop1ByStrategyIdAndDeletedAtIsNullOrderByVersionNoDesc(UUID strategyId);
+
+    // 여러 전략의 활성 버전 배치 조회 (목록 조회 N+1 방지) — strategy_id별 version_no 최대 1건 (id DESC tie-break)
+    @Query(value = """
+            SELECT DISTINCT ON (strategy_id) *
+            FROM strategy_version
+            WHERE strategy_id IN (:strategyIds) AND deleted_at IS NULL
+            ORDER BY strategy_id, version_no DESC, id DESC
+            """, nativeQuery = true)
+    List<StrategyVersionEntity> findActiveByStrategyIdIn(@Param("strategyIds") Collection<UUID> strategyIds);
 
     @Query("""
             SELECT COALESCE(MAX(sv.versionNo), 0)

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +57,22 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     public Optional<CyclePosition> findFirstOne(UUID cycleId) {
         return positionRepo.findTop1ByStrategyCycleIdOrderByCreatedAtAsc(cycleId)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public Map<UUID, CyclePosition> findFirstByCycleIds(Collection<UUID> cycleIds) {
+        if (cycleIds.isEmpty()) return Map.of();
+        return positionRepo.findFirstByStrategyCycleIdIn(cycleIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(CyclePosition::strategyCycleId, p -> p));
+    }
+
+    @Override
+    public Map<UUID, CyclePosition> findLatestByCycleIds(Collection<UUID> cycleIds) {
+        if (cycleIds.isEmpty()) return Map.of();
+        return positionRepo.findLatestByStrategyCycleIdIn(cycleIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(CyclePosition::strategyCycleId, p -> p));
     }
 
     @Override

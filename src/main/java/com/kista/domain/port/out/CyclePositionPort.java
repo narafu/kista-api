@@ -6,7 +6,9 @@ import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +35,12 @@ public interface CyclePositionPort {
     default Optional<CyclePosition> findLatestOneByStrategyId(UUID strategyId) {
         return findLatestByStrategyId(strategyId, 1).stream().findFirst();
     }
+
+    // 여러 사이클의 개장 포지션 배치 조회 (목록 조회 N+1 방지) — cycleId 기준 가장 오래된 1건씩
+    Map<UUID, CyclePosition> findFirstByCycleIds(Collection<UUID> cycleIds);
+
+    // 여러 사이클의 최신 포지션 배치 조회 (목록 조회 N+1 방지) — cycleId 기준 최신 1건씩
+    Map<UUID, CyclePosition> findLatestByCycleIds(Collection<UUID> cycleIds);
 
     // 계좌 ID 기준 이력 조회 (ticker 포함, 날짜 범위 필터)
     List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to);

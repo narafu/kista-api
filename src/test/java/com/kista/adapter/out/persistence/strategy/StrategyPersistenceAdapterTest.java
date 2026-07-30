@@ -82,6 +82,32 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findByStrategyVersionIds_returnsDetailsKeyedByVersionId() {
+        Strategy strategyA = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE));
+        Strategy strategyB = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE));
+        StrategyVersion versionA = strategyVersionAdapter.save(new StrategyVersion(null, strategyA.id(), 1, null, null));
+        StrategyVersion versionB = strategyVersionAdapter.save(new StrategyVersion(null, strategyB.id(), 1, null, null));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionA.id(), 20));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionB.id(), 30));
+
+        var result = strategyInfiniteDetailAdapter.findByStrategyVersionIds(
+                java.util.List.of(versionA.id(), versionB.id(), UUID.randomUUID()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(versionA.id()).divisionCount()).isEqualTo(20);
+        assertThat(result.get(versionB.id()).divisionCount()).isEqualTo(30);
+    }
+
+    @Test
+    void findByStrategyVersionIds_emptyCollection_returnsEmptyMap() {
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionIds(java.util.List.of())).isEmpty();
+    }
+
+    @Test
     void deleteByStrategyId_removesInfiniteDetailRowOnly() {
         Strategy saved = strategyAdapter.save(new Strategy(
                 null, accountId, Strategy.Type.INFINITE,
