@@ -73,7 +73,7 @@ class TradingPreviewServiceTest {
     void preview_returnsOrdersWithoutCompetition_whenPlanHasNoBuyOrders() {
         Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
@@ -89,7 +89,7 @@ class TradingPreviewServiceTest {
     void preview_returnsSellSufficiencyNull_whenPlanHasNoSellOrders() {
         Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buyOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
@@ -103,7 +103,7 @@ class TradingPreviewServiceTest {
     void preview_callsSellSufficiencySimulator_whenPlanHasSellOrders() {
         Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         com.kista.domain.model.order.SellSufficiencyPreview sellSufficiency =
@@ -128,7 +128,7 @@ class TradingPreviewServiceTest {
 
         Order recomputedSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(recomputedSell));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(recomputedSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
@@ -150,7 +150,7 @@ class TradingPreviewServiceTest {
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
         Order newSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 5, new BigDecimal("61.00"), Order.OrderTiming.AT_OPEN, "LEG_B");
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sameRecomputedSell, newSell));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sameRecomputedSell, newSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         com.kista.domain.model.order.SellSufficiencyPreview sellSufficiency =
@@ -167,7 +167,7 @@ class TradingPreviewServiceTest {
     void preview_callsCompetitionSimulator_whenPlanHasBuyOrders() {
         Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buyOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         BuyCompetitionPreview competition = new BuyCompetitionPreview(
@@ -193,7 +193,7 @@ class TradingPreviewServiceTest {
 
         Order newBuyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 2, new BigDecimal("20.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(newBuyOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(newBuyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         BuyCompetitionPreview competition = new BuyCompetitionPreview(
@@ -244,7 +244,7 @@ class TradingPreviewServiceTest {
     void previewBatch_returnsPreviewPerStrategy_keyedByStrategyId() {
         Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -269,7 +269,7 @@ class TradingPreviewServiceTest {
     void previewBatch_fetchesPrevClosesOnceInBulk_andPassesCacheToPlanBuilder() {
         Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
-        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         Map<Ticker, BigDecimal> prevCloseCache = Map.of(Ticker.SOXL, new BigDecimal("22.00"));
         when(priceFetcher.fetchPrevCloses(List.of(Ticker.SOXL), ACCOUNT)).thenReturn(prevCloseCache);
@@ -299,7 +299,7 @@ class TradingPreviewServiceTest {
             when(strategyCyclePort.findLatestByStrategyId(s.id())).thenReturn(Optional.of(cycle));
             Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LIMIT,
                     Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
-            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(sellOrder));
+            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }
@@ -341,7 +341,7 @@ class TradingPreviewServiceTest {
 
             Order buy = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LOC,
                     Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
-            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, List.of(buy));
+            CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buy));
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }

@@ -57,7 +57,8 @@ class TradingService {
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
-            BigDecimal startPrice,          // 공통 — INFINITE: BuyOrderPriceCapper / PRIVACY: capPrivacyIfNeeded
+            VrPosition vrPosition,          // VR만 non-null (신규 계산 시 — BuyOrderPriceCapper VR_POSITION 보정용)
+            BigDecimal startPrice,          // 배치 시작 시점 가격 — placeAll()에서 접수 직전 재조회(reloadPlacementPrices) 실패 시 폴백으로만 사용
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
 
@@ -156,12 +157,19 @@ class TradingService {
 
     // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리)
     private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
+        // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+        // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
+        // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
+        Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(states);
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (CycleState state : states) {
             runSafely("증권사 접수", state.ctx(), () -> {
+                // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
+                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                        .orElse(state.startPrice());
                 List<Order> mainOrders = orderExecutor.placeOrders(today,
                         state.ctx().account(), state.ctx().currentCycle().id(),
-                        state.startPrice(), state.position(), state.ctx().strategy());
+                        placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
                 // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
                 // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
                 Set<UUID> mainOrderIds = mainOrders.stream()
@@ -249,13 +257,13 @@ class TradingService {
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
         List<Order> preparedOrders = priceCapper.prepareForAllocation(
-                planOpt.get().orders(), price, planOpt.get().position(),
+                planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
                 cycleOrderStrategies.of(strategy.type()).priceCapMode(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<Order> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), price, privacyBaseForState);
+        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
         return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
     }
 
@@ -284,12 +292,13 @@ class TradingService {
             InfinitePosition recalcPos = orderComputer.compute(
                     balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname(), price)
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
-            return new CycleState(ctx, balance, recalcPos, price, null);
+            return new CycleState(ctx, balance, recalcPos, null, price, null);
         }
         // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
         // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
+        // VR은 canSkipOrderComputation()이 항상 false라 이 메서드에 도달하지 않음 — vrPosition은 항상 null로 둔다
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
-        return new CycleState(ctx, balance, null, price, privacyBaseForState);
+        return new CycleState(ctx, balance, null, null, price, privacyBaseForState);
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
@@ -337,17 +346,26 @@ class TradingService {
         }
 
         SaveAllocationResult result = saveAllocatedOrders(candidates, tradeDate);
-        Set<BatchContext> placeableContexts = candidates.stream()
+        // position/vrPosition/시작가까지 담긴 CycleState 그대로 접수 단계로 전달 — BatchContext만 넘기면
+        // VR_POSITION 등 BUY cap 보정에 필요한 정보가 유실된다 (planAll()과 동일 패턴)
+        List<CycleState> placeableStates = candidates.stream()
                 .filter(candidate -> candidate.hasExistingOrders()
                         || result.savedContexts().contains(candidate.state().ctx()))
-                .map(candidate -> candidate.state().ctx())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .map(CyclePlanCandidate::state)
+                .toList();
 
-        for (BatchContext ctx : placeableContexts) {
-            runSafely("개장 AT_OPEN 접수", ctx, () -> {
-                placeAtOpenPlannedOrders(ctx.account(), ctx.currentCycle().id(), tradeDate);
-                return null;
-            });
+        if (!placeableStates.isEmpty()) {
+            // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+            // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
+            Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
+            for (CycleState state : placeableStates) {
+                runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
+                    BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                            .orElse(state.startPrice());
+                    placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
+                    return null;
+                });
+            }
         }
 
         log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
@@ -406,14 +424,10 @@ class TradingService {
         return new SaveAllocationResult(Set.copyOf(savedContexts));
     }
 
-    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다
-    private void placeAtOpenPlannedOrders(Account account, UUID cycleId, LocalDate tradeDate) {
-        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, tradeDate);
-        if (atOpenOrders.isEmpty()) {
-            log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
-            return;
-        }
-        orderExecutor.placeGiven(atOpenOrders, account);
+    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
+    private void placeAtOpenPlannedOrders(CycleState state, BigDecimal placementPrice, LocalDate tradeDate) {
+        orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle().id(),
+                placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그
@@ -429,6 +443,16 @@ class TradingService {
             throw e;
         }
         log.info("{} 도달", label);
+    }
+
+    // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — TradingPriceFetcher.fetchPrices가 ticker당 1회 배치 조회를 보장
+    // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) fetchPriceSnapshots가 아닌 fetchPrices 사용
+    private Map<Ticker, BigDecimal> reloadPlacementPrices(List<CycleState> states) {
+        List<Ticker> tickers = states.stream()
+                .map(state -> state.ctx().strategy().ticker())
+                .distinct().toList();
+        Account priceAccount = selectPriceAccount(states.stream().map(CycleState::ctx).toList());
+        return priceFetcher.fetchPrices(tickers, priceAccount);
     }
 
     // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)

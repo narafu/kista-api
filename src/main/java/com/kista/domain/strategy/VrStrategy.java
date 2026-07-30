@@ -27,41 +27,46 @@ public class VrStrategy {
 
     // 주문 목록 생성 — 매수 사다리(pool 허용 범위) + 매도 사다리(보유 수량 범위)
     // ticker: 주문에 기록할 거래 종목 (VrPosition은 ticker를 직접 보유하지 않음)
-    // currentPrice: null이면 가격 캡 미적용
+    // referencePrice: BUY bootstrap(×1.10) 기준가 — currentPrice 없으면 전일종가로 대체 가능
+    // livePrice: SELL bootstrap(×0.90) 전용 실시간 현재가 — fallback 없음(null이면 SELL bootstrap 미생성)
+    // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
     public List<Order> buildOrders(VrPosition position, Strategy.Ticker ticker,
-                                   BigDecimal currentPrice, LocalDate tradeDate) {
+                                   BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
         if (position.firstCycle()) {
-            List<Order> bootstrapOrders = buildBootstrapOrders(position, ticker, currentPrice, tradeDate);
+            List<Order> bootstrapOrders = buildBootstrapOrders(position, ticker, referencePrice, livePrice, tradeDate);
             if (bootstrapOrders != null) return bootstrapOrders;
         }
 
         List<Order> orders = new ArrayList<>();
-        orders.addAll(buildBuyOrders(position, ticker, currentPrice, tradeDate));
+        orders.addAll(buildBuyOrders(position, ticker, tradeDate));
         orders.addAll(buildSellOrders(position, ticker, tradeDate));
         return orders;
     }
 
     // 첫 사이클 bootstrap — 기존 보유/현금 상태를 LOC 분할 주문으로 poolLimit에 맞춤
+    // BUY(시드만 있음/적립식)는 referencePrice(전일종가 대체 허용), SELL(V만 있음)은 livePrice(실시간 필수, 대체 불가)
+    // — 갭 하락일에 전일종가 기준 과매도 LOC가 나가는 것을 막기 위해 SELL은 fallback을 두지 않는다
     private List<Order> buildBootstrapOrders(VrPosition position, Strategy.Ticker ticker,
-                                             BigDecimal currentPrice, LocalDate tradeDate) {
-        if (currentPrice == null || currentPrice.signum() <= 0) return List.of();
-
+                                             BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
         boolean hasValue = position.value().signum() > 0;
         boolean hasPool = position.pool().signum() > 0;
 
         if (hasValue && !hasPool) {
-            BigDecimal price = currentPrice.multiply(new BigDecimal("0.90")).setScale(2, HALF_UP);
+            if (livePrice == null || livePrice.signum() <= 0) return List.of();
+            BigDecimal price = livePrice.multiply(new BigDecimal("0.90")).setScale(2, HALF_UP);
             return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
                     price, ticker, tradeDate, SELL);
         }
         if (!hasValue && hasPool) {
-            BigDecimal price = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
+            if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
+            BigDecimal price = referencePrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
             return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
                     price, ticker, tradeDate, BUY);
         }
         if (!hasValue && !hasPool && position.recurringAmount() > 0) {
             if (!position.cycleDue()) return List.of();
-            BigDecimal price = currentPrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
+            if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
+            BigDecimal price = referencePrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
             return buildDailyLocOrder(BigDecimal.valueOf(position.recurringAmount()), 1,
                     price, ticker, tradeDate, BUY);
         }
@@ -80,11 +85,23 @@ public class VrStrategy {
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
-    private List<Order> buildBuyOrders(VrPosition position, Strategy.Ticker ticker,
-                                       BigDecimal currentPrice, LocalDate tradeDate) {
-        // 가격 캡 = PriceCapPolicy 기준, null이면 캡 없음
-        BigDecimal cap = currentPrice != null ? PriceCapPolicy.capFor(currentPrice) : null;
+    // 생성 시점 가격 캡은 적용하지 않는다(cap=null) — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 재산정
+    private List<Order> buildBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate) {
+        return buildBuyLadder(position, ticker, tradeDate, null);
+    }
 
+    // 접수 직전 가격 캡 보정 — BuyOrderPriceCapper(VR_POSITION)가 최신 현재가 기준 cap으로 사다리를 다시 만든다
+    // position은 plan() 시점과 동일 스냅샷(pool·poolUsed·holdings 등) 재사용, cap만 최신 가격 기준으로 교체
+    // 주의: 사다리(LIMIT+AT_OPEN) 전용 재산정이다 — bootstrap(LOC+AT_CLOSE, referencePrice×1.10) 주문에는
+    // 호출하면 안 된다. bootstrap은 value=0인 경우가 많아 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
+    // 무의미해지고, 원래의 1.10배 여유폭 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
+    // orderType(LOC vs LIMIT)으로 bootstrap 배치를 가려내 이 함수 호출 자체를 막는다.
+    public List<Order> buildCappedBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
+        return buildBuyLadder(position, ticker, tradeDate, cap);
+    }
+
+    // 매수 사다리 공통 생성 로직 — cap이 null이면 원가 그대로(계획 생성), 비-null이면 캡 적용(접수 전 보정)
+    private List<Order> buildBuyLadder(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
         // pool 사용 가능 잔여액 (poolLimit − poolUsed)
         BigDecimal poolBudget = position.poolLimit().subtract(position.poolUsed());
 

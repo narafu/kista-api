@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -219,11 +220,11 @@ class ManualTradingServiceTest {
         assertThat(orders).hasSize(1);
     }
 
-    @Test
-    void execute_vrStrategy_savesLimitAtOpenOrders_andPlacesAtOpenIfMarketOpen() {
-        // VR 전략 수동 실행 — LIMIT + AT_OPEN 주문이 저장되고, 개장 후이면 즉시 접수됨
-        // AT_OPEN 즉시 접수(placeAtOpenOrdersIfMarketOpen)는 실시간 DstInfo 의존적이므로
-        // orderExecutor.placeGiven() 호출 여부는 atMostOnce()로 허용 (개장 전/후 모두 통과)
+    // VR 수동 실행 공용 테스트 픽스처 — 개장 전/후 분기를 나누는 두 테스트가 공유
+    private record VrFixture(Strategy vrStrat, StrategyCycle vrCycle, UUID vrVersionId,
+                              Order vrBuyPlanned, Order vrSellPlanned) {}
+
+    private VrFixture setUpVrManualExecution() {
         Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.VR,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
@@ -270,29 +271,70 @@ class ManualTradingServiceTest {
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
-        // buildOrders: LIMIT + AT_OPEN 주문 반환
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), isNull(), any()))
+        // buildOrders: LIMIT + AT_OPEN 주문 반환 — 수동실행은 currentPrice=null 전달하지만
+        // setUp()의 전역 kisPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(new BigDecimal("20.00")), isNull(), any()))
                 .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
         // live 잔고 검증 — BUY $22 << usdDeposit $10,000
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
                 .thenReturn(new AccountBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
-        // AT_OPEN 즉시 접수 준비 (placeAtOpenOrdersIfMarketOpen — 개장 후에만 호출, lenient)
-        lenient().when(orderPort.findAtOpenPlannedByCycleAndDate(eq(vrCycle.id()), any()))
-                .thenReturn(List.of(vrBuyPlanned, vrSellPlanned));
 
-        List<Order> result = service.execute(vrStrat.id(), REQUESTER_ID);
+        return new VrFixture(vrStrat, vrCycle, vrVersionId, vrBuyPlanned, vrSellPlanned);
+    }
+
+    @Test
+    void execute_vrStrategy_savesLimitAtOpenOrders() {
+        // VR 전략 수동 실행 — LIMIT + AT_OPEN 주문이 저장되는지만 검증 (AT_OPEN 즉시 접수 분기는 별도 테스트)
+        VrFixture fx = setUpVrManualExecution();
+        lenient().when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
+                .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
+
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID);
 
         // VR 전용 포트 호출 검증
-        verify(strategyCycleVrPort).findByCycleId(vrCycle.id());
-        verify(strategyVrDetailPort).findByStrategyVersionId(vrVersionId);
-        verify(orderPort).sumFilledBuyAmountByCycleId(vrCycle.id());
+        verify(strategyCycleVrPort).findByCycleId(fx.vrCycle().id());
+        verify(strategyVrDetailPort).findByStrategyVersionId(fx.vrVersionId());
+        verify(orderPort).sumFilledBuyAmountByCycleId(fx.vrCycle().id());
         // LIMIT + AT_OPEN 주문이 저장됨
         verify(orderPort).saveAll(argThat(orders -> orders.stream().allMatch(o ->
                 o.orderType() == Order.OrderType.LIMIT && o.timing() == Order.OrderTiming.AT_OPEN)));
         // 최종 반환 주문 확인
         assertThat(result).hasSize(2);
-        // 개장 후 수동 실행 시 AT_OPEN 주문 placeGiven 경로 — 실시간 DstInfo 의존적이므로 atMostOnce
-        verify(orderExecutor, atMostOnce()).placeGiven(anyList(), eq(ACCOUNT));
+    }
+
+    @Test
+    void execute_vrStrategy_marketOpen_placesAtOpenOrdersWithCorrectArguments() {
+        // 개장 후 수동 실행 — DstInfo.immediateOpen()으로 marketOpen을 과거로 고정해
+        // placeAtOpenOrdersIfMarketOpen의 개장 분기를 결정론적으로 강제한다 (실시간 시각 의존 제거)
+        VrFixture fx = setUpVrManualExecution();
+        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
+                .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
+        // BUY cap 판단용 최신 현재가 재조회 — placeAtOpenOrdersIfMarketOpen 내부에서 fetchPrices 호출
+        when(kisPricePort.getPrices(eq(List.of(Ticker.SOXL)), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, new BigDecimal("21.00")));
+
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen());
+
+        assertThat(result).hasSize(2);
+        // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null,
+        // currentPrice는 위에서 재조회한 21.00, cycleId/account/strategy도 실제 값과 일치해야 한다
+        verify(orderExecutor, times(1)).placeAtOpenOrders(
+                any(LocalDate.class), eq(ACCOUNT), eq(fx.vrCycle().id()),
+                eq(new BigDecimal("21.00")), isNull(), any(VrPosition.class), eq(fx.vrStrat()));
+    }
+
+    @Test
+    void execute_vrStrategy_marketClosed_doesNotPlaceAtOpenOrders() {
+        // 개장 전 수동 실행 — marketOpen을 미래로 설정해 개장 분기를 결정론적으로 회피한다
+        VrFixture fx = setUpVrManualExecution();
+        Instant future = Instant.now().plusSeconds(3600);
+        DstInfo marketClosed = new DstInfo(false, future, future, future);
+
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, marketClosed);
+
+        assertThat(result).hasSize(2);
+        // 개장 전이므로 AT_OPEN 즉시 접수가 호출되지 않아야 함 — 개장 스케쥴러가 담당
+        verify(orderExecutor, never()).placeAtOpenOrders(any(), any(), any(), any(), any(), any(), any());
     }
 }

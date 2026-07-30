@@ -38,7 +38,7 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
                    CycleOrderStrategy (인터페이스 + Infinite/Privacy/VrCycleOrderStrategy 구현): 최소시드·capability SSOT (아래 "CycleOrderStrategy Capability 패턴")
                    CycleOrderStrategies (@Component 라우터): Map<Strategy.Type, CycleOrderStrategy> 자동 수집
                    StrategyCreationResolver (인터페이스 + Infinite/Privacy/VrCreationResolver 구현 + StrategyCreationResolvers 라우터): 전략 등록 시 런타임 설정(StrategyCreationSettings) 기반 필드 해석·검증
-                   PriceCapPolicy (순수 정적 유틸): 매수 가격 캡 배수(currentPrice×1.05) 단일 SSOT — application의 BuyOrderPriceCapper(INFINITE/PRIVACY)와 domain의 VrStrategy 매수 사다리가 공용
+                   PriceCapPolicy (순수 정적 유틸): 매수 가격 캡 배수(currentPrice×1.05) 단일 SSOT — application의 BuyOrderPriceCapper(INFINITE/PRIVACY/VR 접수 전 보정)와 domain의 VrStrategy 매수 사다리(`buildCappedBuyOrders`)가 공용
   port/in/       ← UseCase 인터페이스 (인바운드 포트)
   port/out/      ← 아웃바운드 포트 인터페이스 (*Port)
                    RuntimeSettingsPort — 전역 런타임 설정 전체 조회/저장
@@ -193,7 +193,7 @@ adapter/out/
   - `canSkipOrderComputation(existingOrders, creatableTimings)` — scheduler compute skip capability. 기본 false이며 INFINITE만 complete concrete leg 또는 direction-aware legacy UNKNOWN 점유를 보수적으로 판단한다.
   - `tracksReverseMode()` — 리버스모드 detail 저장 여부 (INFINITE만 true)
   - `requiresRolloverCheck()` — 포지션 저장 후 롤오버 판정 수행 여부 (VR만 true)
-  - `priceCapMode()` — BUY 가격 사후 보정 방식 (`PriceCapMode` enum: NONE / INFINITE_POSITION / PRIVACY_SIMPLE)
+  - `priceCapMode()` — BUY 가격 사후 보정 방식 (`PriceCapMode` enum: NONE / INFINITE_POSITION / PRIVACY_SIMPLE / VR_POSITION). VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrStrategy.buildCappedBuyOrders()`로 보정한다
 - `CycleOrderStrategies`: `Map<Strategy.Type, CycleOrderStrategy>` 라우터 — `of(type)` 으로 구현체 조회
 - **프론트 capability 소비**: `GET /api/meta`의 `StrategyTypeMeta`에 capability 7필드(code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts) 직렬화 → 프론트는 `isInfinite` 휴리스틱 대신 `divisionCounts`/`requiresPrivacyBase` 직접 소비
 - **최소시드 미리보기**: `GET /api/accounts/{id}/strategy-seed-preview?type=&ticker=&divisionCount=` → `StrategySeedPreviewResponse { ticker, basePrice, minSeed, skipReason }`
