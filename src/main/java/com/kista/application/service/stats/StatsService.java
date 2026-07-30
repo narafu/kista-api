@@ -1,6 +1,7 @@
 package com.kista.application.service.stats;
 
 import com.kista.common.TimeZones;
+import com.kista.domain.model.account.Account;
 import com.kista.domain.model.stats.*;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
@@ -193,7 +194,9 @@ class StatsService implements UserStatsUseCase {
             accountPort.findByIdOrThrow(selectedStrategy.accountId()).verifyOwnedBy(userId);
             strategies = List.of(selectedStrategy);
         } else {
+            // 벤치마크 "전체 포트폴리오"는 실제 투자 성과 비교 목적이므로 모의계좌(MOCK)를 제외한다
             strategies = accountPort.findByUserId(userId).stream()
+                    .filter(account -> account.broker() != Account.Broker.MOCK)
                     .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
                     .toList();
         }

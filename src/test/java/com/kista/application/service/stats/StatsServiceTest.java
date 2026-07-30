@@ -524,6 +524,31 @@ class StatsServiceTest {
     }
 
     @Test
+    void 벤치마크_전체_포트폴리오는_모의계좌를_제외한다() {
+        UUID mockAccountId = UUID.randomUUID();
+        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
+                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        ArgumentCaptor<Set<UUID>> strategyIdsCaptor = ArgumentCaptor.forClass(Set.class);
+        when(strategyCyclePort.findByStrategyIds(strategyIdsCaptor.capture())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "100.00", "2026-01-31T01:00:00Z"),
+                depositSnapshot(cycle.id(), "184.20", "2026-02-28T01:00:00Z")));
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenReturn(benchmarkPrices());
+
+        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, TO);
+
+        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(strategyIdsCaptor.getValue()).containsExactly(STRATEGY_ID);
+        verify(strategyPort, never()).findByAccountId(mockAccountId);
+    }
+
+    @Test
     void 투자와_아파트가_처음_함께_존재하는_월을_각각_100으로_재설정한다() {
         stubUserWithStrategy();
         StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
