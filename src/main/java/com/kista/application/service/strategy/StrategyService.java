@@ -73,10 +73,13 @@ class StrategyService implements StrategyUseCase {
         // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리) — V값은 시장가×보유수량 기준
         // 램프 파라미터(gradient/poolLimitRate 경과주수 함수)는 RuntimeSettings 정책 밖 — 요청값 정규화 후 여기서 직접 검증
         VrRampParams ramp = null;
+        BigDecimal vrValue = null;
         if (cmd.type() == Strategy.Type.VR) {
             int normalizedRecurringAmount = resolved.recurringAmount() != null ? resolved.recurringAmount() : 0;
+            vrValue = resolveVrValue(cmd, initialStockValue);
             ramp = normalizeVrRampParams(cmd, normalizedRecurringAmount);
-            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), initialStockValue, ramp);
+            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(),
+                    vrValue, initialStockValue, ramp);
         }
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
@@ -93,8 +96,8 @@ class StrategyService implements StrategyUseCase {
         // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
         InitialCycleResult initialResult = saveInitialCycleAndPosition(
                 persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
-                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, persisted.vrDetail(),
-                scheduledStart);
+                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, vrValue,
+                persisted.vrDetail(), scheduledStart);
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
@@ -122,6 +125,16 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)는 0보다 커야 합니다");
         }
         return normalizedHoldings;
+    }
+
+    // VR V값 우선순위 — 초기 V 직접 입력(>0)이 있으면 그 값을, 없으면 평가금(전일종가×보유수량)을 사용한다.
+    // 실제 포지션(CyclePosition)·startAmount는 이 override와 무관하게 항상 evaluatedStockValue(실제 시장가) 기준을 유지한다.
+    private BigDecimal resolveVrValue(RegisterStrategyCommand cmd, BigDecimal evaluatedStockValue) {
+        BigDecimal explicit = cmd.initialVrValue();
+        if (explicit != null && explicit.signum() < 0) {
+            throw new IllegalArgumentException("VR 전략의 초기 V값(initialVrValue)은 0 이상이어야 합니다");
+        }
+        return explicit != null && explicit.signum() > 0 ? explicit : evaluatedStockValue;
     }
 
     // 시작예정일 — 기본값 오늘(KST), 과거 거부. 상한 없음
@@ -152,9 +165,11 @@ class StrategyService implements StrategyUseCase {
     }
 
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
-    // initialValue: 시장가×보유수량으로 계산된 V값 (register()에서 전달, null 아님)
+    // vrValue: register()에서 override 우선순위로 해석된 V값(게이트 판정용) — resolveVrValue() 참고
+    // evaluatedStockValue: 실제 시장가 기준 평가금(전일종가×보유수량) — 인출식 최소자산 검증은 이 값만 사용해 override로 우회할 수 없게 한다
     private void validateVrCommand(RegisterStrategyCommand cmd, Integer intervalWeeks,
-                                   BigDecimal bandWidth, Integer recurringAmount, BigDecimal initialValue,
+                                   BigDecimal bandWidth, Integer recurringAmount,
+                                   BigDecimal vrValue, BigDecimal evaluatedStockValue,
                                    VrRampParams ramp) {
         if (intervalWeeks == null || intervalWeeks <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
@@ -164,7 +179,7 @@ class StrategyService implements StrategyUseCase {
         }
         BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
-        BigDecimal initialAssets = initialValue.add(initialUsdDeposit);
+        BigDecimal initialAssets = vrValue.add(initialUsdDeposit);
 
         if (normalizedRecurringAmount <= 0 && initialAssets.signum() <= 0) {
             throw new IllegalArgumentException("VR 거치식/인출식은 초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");
@@ -174,7 +189,8 @@ class StrategyService implements StrategyUseCase {
                     .multiply(BigDecimal.valueOf(100))
                     .multiply(BigDecimal.valueOf(4))
                     .divide(BigDecimal.valueOf(intervalWeeks), 2, RoundingMode.HALF_UP);
-            if (initialAssets.compareTo(required) < 0) {
+            BigDecimal evaluatedAssets = evaluatedStockValue.add(initialUsdDeposit);
+            if (evaluatedAssets.compareTo(required) < 0) {
                 throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 " + required + " 이상이어야 합니다");
             }
         }
@@ -282,11 +298,12 @@ class StrategyService implements StrategyUseCase {
     }
 
     // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-    // startAmount = 현금 + 시장가×보유수량 — VR도 총 시작자산을 동일하게 보존한다.
+    // startAmount = 현금 + 시장가×보유수량 — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관).
+    // vrValue: VR V값 저장용(override 우선순위 반영, resolveVrValue() 참고) — 비VR은 null
     private InitialCycleResult saveInitialCycleAndPosition(
             Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
             int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
-            BigDecimal initialStockValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
+            BigDecimal initialStockValue, BigDecimal vrValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
         BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
         BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount, scheduledStart));
@@ -301,7 +318,7 @@ class StrategyService implements StrategyUseCase {
             return new InitialCycleResult(cycle, initialPosition, null);
         } else if (saved.isVr()) {
             StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
-                    cycle.id(), normalizedInitialUsdDeposit, initialStockValue, vrDetail);
+                    cycle.id(), normalizedInitialUsdDeposit, vrValue, vrDetail);
             return new InitialCycleResult(cycle, initialPosition, savedCycleVr);
         } else {
             // PRIVACY
