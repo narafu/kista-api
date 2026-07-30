@@ -5,7 +5,6 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
-import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +23,6 @@ public class VrStrategyLifecycle {
 
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;
-    private final CyclePositionPort cyclePositionPort;
 
     // 램프 8필드는 호출측(StrategyService)이 이미 null 정규화를 마친 값이라고 가정한다
     public StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
@@ -48,12 +46,14 @@ public class VrStrategyLifecycle {
                 new StrategyCycleVrDetail(cycleId, initialV, vrDetail.gradientAt(0), vrDetail.poolLimitRateAt(0)));
     }
 
-    Optional<StrategyDetail.VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle) {
+    // openingPosition: 호출측(StrategyService.toDetail)이 이미 조회한 개장 포지션 — 여기서 재조회하지 않는다
+    Optional<StrategyDetail.VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
+                                                    Optional<CyclePosition> openingPosition) {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
                                 .map(cycleVr -> {
-                                    BigDecimal openingPool = cyclePositionPort.findFirstOne(cycle.id())
+                                    BigDecimal openingPool = openingPosition
                                             .map(CyclePosition::usdDeposit)
                                             .orElseThrow(() -> new IllegalStateException(
                                                     "VR 시작 포지션 없음: cycleId=" + cycle.id()));

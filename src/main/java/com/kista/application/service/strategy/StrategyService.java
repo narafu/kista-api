@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -376,8 +377,10 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByUserId(UUID userId) {
-        return accountPort.findByUserId(userId).stream()
-                .flatMap(acc -> strategyPort.findByAccountId(acc.id()).stream())
+        List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
+        Map<UUID, List<Strategy>> strategiesByAccount = strategyPort.findByAccountIds(accountIds);
+        return accountIds.stream()
+                .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
                 .map(this::toDetail)
                 .toList();
     }
@@ -466,8 +469,7 @@ class StrategyService implements StrategyUseCase {
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         Integer divisionCount = strategy.isInfinite()
-                ? strategyVersionPort.findActiveByStrategyId(strategy.id())
-                        .flatMap(version -> strategyInfiniteDetailPort.findByStrategyVersionId(version.id()))
+                ? strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                         .map(StrategyInfiniteDetail::divisionCount)
                         .orElse(Strategy.DEFAULT_DIVISION_COUNT)
                 : null;
@@ -487,9 +489,9 @@ class StrategyService implements StrategyUseCase {
 
         Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
 
-        // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산
+        // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition은 위에서 이미 조회한 값 재사용
         StrategyDetail.VrSummary vrSummary = strategy.isVr()
-                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle).orElse(null)
+                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition).orElse(null)
                 : null;
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);

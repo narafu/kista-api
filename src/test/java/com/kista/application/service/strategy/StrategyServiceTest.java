@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -88,7 +89,7 @@ class StrategyServiceTest {
     @BeforeEach
     void setUp() {
         VrStrategyLifecycle vrStrategyLifecycle = new VrStrategyLifecycle(
-                strategyVrDetailPort, strategyCycleVrPort, cyclePositionPort);
+                strategyVrDetailPort, strategyCycleVrPort);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -368,8 +369,8 @@ class StrategyServiceTest {
         Strategy strategyB = new Strategy(strategyBId, accountBId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(accountA, accountB));
-        when(strategyPort.findByAccountId(accountAId)).thenReturn(List.of(strategyA));
-        when(strategyPort.findByAccountId(accountBId)).thenReturn(List.of(strategyB));
+        when(strategyPort.findByAccountIds(List.of(accountAId, accountBId)))
+                .thenReturn(Map.of(accountAId, List.of(strategyA), accountBId, List.of(strategyB)));
         when(strategyCyclePort.findLatestByStrategyId(strategyAId)).thenReturn(Optional.of(CYCLE));
         when(strategyCyclePort.findLatestByStrategyId(strategyBId)).thenReturn(Optional.of(CYCLE));
 
@@ -1314,7 +1315,7 @@ class StrategyServiceTest {
                 vrCycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrategyId)).thenReturn(Optional.of(latestPos));
         when(cyclePositionPort.findFirstOne(vrCycleId)).thenReturn(Optional.of(openingPosition));
@@ -1350,7 +1351,7 @@ class StrategyServiceTest {
                 vrCycleId, vrStrategyId, UUID.randomUUID(), new BigDecimal("1600.00"),
                 null, LocalDate.now(), null, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategyId)).thenReturn(Optional.of(vrCycle));
 
         assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
