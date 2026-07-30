@@ -968,4 +968,62 @@ class StatsServiceTest {
 
         verify(exchangeRatePort, times(4)).getExchangeRate();
     }
+
+    @Test
+    void 요약_전략유형비교는_모의계좌_사이클을_제외한다() {
+        UUID mockAccountId = UUID.randomUUID();
+        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
+                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+
+        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("100.00");
+        assertThat(summary.byType()).hasSize(1);
+        verify(strategyPort, never()).findByAccountId(mockAccountId);
+    }
+
+    @Test
+    void 누적자산추이는_모의계좌_사이클을_제외한다() {
+        UUID mockAccountId = UUID.randomUUID();
+        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
+                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        StrategyCycle active = activeCycle("1000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
+
+        EquityCurve curve = statsService.getEquityCurve(
+                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(curve.points()).hasSize(1);
+        verify(strategyPort, never()).findByAccountId(mockAccountId);
+    }
+
+    @Test
+    void 사이클_성과_목록은_모의계좌_사이클도_포함한다() {
+        UUID mockAccountId = UUID.randomUUID();
+        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
+                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+        UUID mockStrategyId = UUID.randomUUID();
+        Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategyId, null,
+                new BigDecimal("500.00"), new BigDecimal("600.00"),
+                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"),
+                Instant.parse("2026-01-01T00:00:00Z"), null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyPort.findByAccountId(mockAccountId)).thenReturn(List.of(mockStrategy));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(mockCycle));
+
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
+
+        assertThat(page.items()).extracting(CyclePerformance::accountId).containsExactly(mockAccountId);
+    }
 }

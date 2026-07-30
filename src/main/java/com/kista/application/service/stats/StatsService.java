@@ -58,7 +58,7 @@ class StatsService implements UserStatsUseCase {
 
     @Override
     public StatsSummary getSummary(UUID userId) {
-        List<CycleView> cycles = loadCycles(userId);
+        List<CycleView> cycles = loadCycles(userId, true);
         Map<UUID, BigDecimal> unrealizedByCycle = unrealizedByCycle(cycles);
 
         Map<Strategy.Type, List<CycleView>> byType = cycles.stream()
@@ -85,11 +85,11 @@ class StatsService implements UserStatsUseCase {
         Instant fromInstant = Instant.EPOCH;
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 — 04:30 배치 스냅샷이 해당 KST 일자에 속함
 
-        List<CycleView> cycles = loadCycles(userId).stream()
+        List<CycleView> cycles = loadCycles(userId, true).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
                 .toList();
         Set<UUID> cycleIds = cycles.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
-        // userId 스코프는 loadCycles(userId)가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
+        // userId 스코프는 loadCycles(userId, true)가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
         List<CyclePosition> positions = cyclePositionPort.findByCycleIdsAndRange(cycleIds, fromInstant, toInstant);
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
         return new EquityCurve(points);
@@ -242,7 +242,14 @@ class StatsService implements UserStatsUseCase {
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 
     private List<CycleView> loadCycles(UUID userId) {
+        return loadCycles(userId, false);
+    }
+
+    // excludeMock=true: 누적자산추이·전략유형비교처럼 실제 투자 성과 집계 목적인 조회에서 모의계좌(MOCK) 제외.
+    // 사이클 성과 목록은 계좌별 이력 확인이 목적이라 모의계좌도 포함(excludeMock=false)한다.
+    private List<CycleView> loadCycles(UUID userId, boolean excludeMock) {
         Map<UUID, Strategy> strategies = accountPort.findByUserId(userId).stream()
+                .filter(a -> !excludeMock || a.broker() != Account.Broker.MOCK)
                 .flatMap(a -> strategyPort.findByAccountId(a.id()).stream())
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
