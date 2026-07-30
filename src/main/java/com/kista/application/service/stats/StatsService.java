@@ -450,7 +450,7 @@ class StatsService implements UserStatsUseCase {
         BigDecimal returnRate = (pnl != null && v.effectiveStartAmount().signum() != 0)
                 ? pnl.divide(v.effectiveStartAmount(), 4, RoundingMode.HALF_UP) : null;
         LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
-        return new CyclePerformance(c.id(), v.strategy().type(), v.strategy().ticker(),
+        return new CyclePerformance(c.id(), v.strategy().accountId(), v.strategy().type(), v.strategy().ticker(),
                 c.startDate(), c.endDate(), v.effectiveStartAmount(), endAmount, pnl, returnRate,
                 (int) ChronoUnit.DAYS.between(c.startDate(), durationEnd), v.closed(), c.createdAt());
     }

@@ -15,13 +15,13 @@ public record CyclePerformancePageResponse(
         boolean hasMore
 ) {
     public record Item(
-            UUID cycleId, String strategyType, String ticker,
+            UUID cycleId, UUID accountId, String strategyType, String ticker,
             LocalDate startDate, LocalDate endDate,
             BigDecimal startAmount, BigDecimal endAmount,
             BigDecimal pnl, BigDecimal returnRate, Integer durationDays, boolean closed
     ) {
         static Item from(CyclePerformance p) {
-            return new Item(p.cycleId(), p.strategyType().name(),
+            return new Item(p.cycleId(), p.accountId(), p.strategyType().name(),
                     p.ticker() != null ? p.ticker().name() : null,
                     p.startDate(), p.endDate(), p.startAmount(), p.endAmount(),
                     p.pnl(), p.returnRate(), p.durationDays(), p.closed());

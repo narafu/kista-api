@@ -13,6 +13,7 @@ import java.util.UUID;
 // 확인되지 않았다(Step 0 grep 결과) — 다만 향후 그런 경로가 추가되면 pnl이 과대평가될 수 있음
 public record CyclePerformance(
         UUID cycleId,
+        UUID accountId,
         Strategy.Type strategyType,
         Strategy.Ticker ticker,
         LocalDate startDate,

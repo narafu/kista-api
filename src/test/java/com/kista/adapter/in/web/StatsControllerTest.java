@@ -98,7 +98,7 @@ class StatsControllerTest {
         var createdAt = java.time.Instant.parse("2026-02-01T00:00:00Z");
         when(userStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), eq(50)))
                 .thenReturn(new CyclePerformancePage(
-                        List.of(new CyclePerformance(UUID.randomUUID(), Strategy.Type.INFINITE,
+                        List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.INFINITE,
                                 Strategy.Ticker.SOXL, LocalDate.parse("2026-01-01"),
                                 LocalDate.parse("2026-01-31"), new BigDecimal("1000.00"),
                                 new BigDecimal("1100.00"), new BigDecimal("100.00"),
