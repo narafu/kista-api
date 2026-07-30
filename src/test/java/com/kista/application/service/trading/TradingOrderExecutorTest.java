@@ -187,6 +187,80 @@ class TradingOrderExecutorTest {
         verify(orderPort, never()).markPlaced(any(), any());
     }
 
+    // ─── placeAtOpenOrders (Task 4: AT_OPEN 접수도 동일 BUY cap 정책 적용) ──────────
+
+    @Test
+    @DisplayName("VR + vrPosition 있음 → AT_OPEN 접수 전 VR 매수 사다리 가격 보정(capVrIfNeededAtOpen) 호출")
+    void placeAtOpenOrders_vrWithVrPosition_appliesVrCapAtOpenScope() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-VR-OPEN-001"));
+
+        List<Order> result = executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
+
+        // AT_OPEN 스코프 전용 보정(capVrIfNeededAtOpen) 호출 — 접수 전 자리에서 findPlannedByCycleAndDate(전체 PLANNED)를
+        // 쓰는 capVrIfNeeded는 절대 호출되지 않아야 한다 (동일 사이클의 AT_CLOSE PLANNED 오염 방지가 이 태스크의 핵심)
+        verify(buyOrderPriceCapper).capVrIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, VR_POSITION, VR_STRATEGY.ticker());
+        verify(buyOrderPriceCapper, never()).capVrIfNeeded(any(), any(), any(), any(), any(), any());
+        verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().externalOrderId()).isEqualTo("KIS-VR-OPEN-001");
+    }
+
+    @Test
+    @DisplayName("AT_OPEN + currentPrice 없으면 가격 보정 생략")
+    void placeAtOpenOrders_withoutCurrentPrice_skipsCapping() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-VR-OPEN-002"));
+
+        executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, null, VR_POSITION, VR_STRATEGY);
+
+        verify(buyOrderPriceCapper, never()).capVrIfNeededAtOpen(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("INFINITE + position 있음 → AT_OPEN 스코프 보정(capIfNeededAtOpen) 호출")
+    void placeAtOpenOrders_infiniteWithPosition_appliesInfiniteCapAtOpenScope() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-INF-OPEN-001"));
+
+        executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        verify(buyOrderPriceCapper).capIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
+    }
+
+    @Test
+    @DisplayName("PRIVACY → AT_OPEN 스코프 보정(capPrivacyIfNeededAtOpen) 호출")
+    void placeAtOpenOrders_privacy_appliesPrivacyCapAtOpenScope() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(plannedOrder, ACCOUNT)).thenReturn(kisResponse("KIS-PRIV-OPEN-001"));
+
+        executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
+
+        verify(buyOrderPriceCapper).capPrivacyIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE);
+        verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
+    }
+
+    @Test
+    @DisplayName("AT_OPEN 계획 주문이 없으면 빈 목록 반환 + KIS 접수 호출 없음")
+    void placeAtOpenOrders_noPlannedOrders_returnsEmpty() {
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        List<Order> result = executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).isEmpty();
+        verify(brokerPort, never()).place(any(), any());
+        verify(orderPort, never()).markPlaced(any(), any());
+    }
+
     @Test
     @DisplayName("복수 계획 주문을 순서대로 접수하고 각각 PLACED 마킹")
     void placeOrders_multiplePlannedOrders_placesAllInOrder() {

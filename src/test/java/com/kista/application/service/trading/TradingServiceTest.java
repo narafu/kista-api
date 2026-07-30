@@ -639,6 +639,89 @@ class TradingServiceTest {
                 eq(USER), eq(ACCOUNT), eq(Strategy.Type.PRIVACY), eq(Ticker.SOXL));
     }
 
+    // Task 4: AT_OPEN 접수 경로(placeOpenOrders)도 AT_CLOSE 접수(placeAll)와 동일한 BUY cap 정책을 적용해야 한다.
+    // 시나리오: 최초 계획 시점(currentPrice=100.00, cap=105.00)엔 사다리 BUY(90.00)가 cap 이하라 그대로 PLANNED 저장되지만,
+    // 개장 대기 이후 재조회한 최신가(80.00)로 cap이 84.00까지 좁아져 저장돼 있던 90.00 주문이 새로 cap을 초과하게 된다.
+    // 이 staleness를 orderExecutor.placeAtOpenOrders()의 AT_OPEN 스코프 보정(capVrIfNeededAtOpen)이 잡아야 한다
+    // (수정 전에는 placeGiven()이 캡 보정 없이 그대로 접수해 89.00 초과 주문이 그대로 증권사에 나갔다).
+    @Test
+    void placeOpenOrders_vrLadderBuyStalePrice_appliesCapAtOpenBeforePlacing() throws InterruptedException {
+        Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
+                new BigDecimal("100.00"), new BigDecimal("100.00"), 10, null, null);
+        CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
+                vrCycle.id(), new BigDecimal("1000.00"), new BigDecimal("100.00"));
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                vrCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("2500.00"));
+        StrategyVrDetail vrDetail = new StrategyVrDetail(
+                vrCycle.strategyVersionId(), 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        // 계획 시점 시작가=100.00 → cap=105.00 (사다리 BUY 90.00은 이 시점엔 cap 이하 — prepareForAllocation 무보정)
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.TQQQ, new PriceSnapshot(new BigDecimal("100.00"), new BigDecimal("95.00"))));
+        // 개장 대기 이후 재조회한 최신가=80.00 → cap=84.00으로 좁아짐 (Task 3 reloadPlacementPrices와 동일 메커니즘)
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.TQQQ, new BigDecimal("80.00")));
+        when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
+        when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
+        when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
+        when(strategyVrDetailPort.findByStrategyVersionId(vrCycle.strategyVersionId()))
+                .thenReturn(Optional.of(vrDetail));
+        when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
+
+        // 사다리 BUY 원본: 90.00 — 계획 시점 cap(105.00) 이하라 그대로 PLANNED 저장됨
+        Order originalBuy = new Order(null, null, null, LocalDate.now(), Ticker.TQQQ, Order.OrderType.LIMIT,
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 1, new BigDecimal("90.00"),
+                Order.OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_VR_LADDER_BUY_STALE");
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(), any(), any()))
+                .thenReturn(List.of(originalBuy));
+
+        // DB에 저장된(것으로 가정하는) PLANNED BUY — 개장 접수 전 캡 재평가 대상
+        UUID staleBuyId = UUID.randomUUID();
+        Order stalePlanned = new Order(staleBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.TQQQ,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 1, new BigDecimal("90.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+
+        // AT_OPEN 스코프 보정(capVrIfNeededAtOpen)의 재산정 결과 — cap(84.00)로 재산정된 사다리
+        Order cappedTemplate = new Order(null, null, null, LocalDate.now(), Ticker.TQQQ, Order.OrderType.LIMIT,
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 2, new BigDecimal("84.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        when(vrStrategy.buildCappedBuyOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00"))))
+                .thenReturn(List.of(cappedTemplate));
+
+        UUID cappedOrderId = UUID.randomUUID();
+        Order cappedPlanned = new Order(cappedOrderId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), Ticker.TQQQ,
+                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 2, new BigDecimal("84.00"),
+                Order.OrderStatus.PLANNED, null, null, null);
+        // 1번째 조회(capVrIfNeededAtOpen 내부, 캡 초과 확인) → stale 90.00 주문 / 2번째 조회(보정 이후 접수 대상) → capped 84.00 주문
+        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(vrCycle.id()), any()))
+                .thenReturn(List.of(stalePlanned))
+                .thenReturn(List.of(cappedPlanned));
+        Order placedResponse = new Order(null, null, null, LocalDate.now(), Ticker.TQQQ, Order.OrderType.LIMIT,
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 2, new BigDecimal("84.00"),
+                Order.OrderStatus.PLACED, "ORD-VR-OPEN-CAP", null, null);
+        when(brokerOrderPort.place(eq(cappedPlanned), eq(ACCOUNT))).thenReturn(placedResponse);
+
+        service.placeOpenOrders(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);
+
+        // 접수 전 AT_OPEN 스코프 캡 재산정이 새 cap(84.00)으로 호출됐는지 확인 — stale 90.00 주문을 잡아낸 증거
+        verify(vrStrategy).buildCappedBuyOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00")));
+        // stale 주문은 CANCELLED
+        verify(orderPort).markCancelled(staleBuyId);
+        // 최초 계획 저장(saveAll #1) + 보정 재저장(saveAll #2) — 총 2회
+        verify(orderPort, times(2)).saveAll(anyList());
+        // 최종 접수는 반드시 보정된(84.00) 주문으로 수행 — stale 90.00 주문은 접수되지 않음
+        verify(brokerOrderPort).place(eq(cappedPlanned), eq(ACCOUNT));
+        verify(brokerOrderPort, never()).place(eq(stalePlanned), any());
+        verify(orderPort).markPlaced(eq(cappedOrderId), eq("ORD-VR-OPEN-CAP"));
+    }
+
     @Test
     void placeOpenOrders_noSellOrders_skipsKisPlace() throws InterruptedException {
         // 후반 최종회차 등 SELL 없음 — KIS 접수 0건 (정상)

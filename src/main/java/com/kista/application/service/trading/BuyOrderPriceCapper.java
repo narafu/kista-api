@@ -91,8 +91,18 @@ class BuyOrderPriceCapper {
     @Transactional
     void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
-                .stream().filter(o -> o.direction() == BUY).toList();
+        applyPrivacyCap(account, strategyCycleId, currentPrice, loadBuyOrders(strategyCycleId, today, false));
+    }
+
+    // PRIVACY 전용 AT_OPEN 스코프: PRIVACY BUY는 항상 AT_CLOSE라 실제로는 no-op이지만
+    // priceCapMode() 분기 대칭성(INFINITE_POSITION/VR_POSITION과 동일한 AT_OPEN 스코프 계약) 유지를 위해 제공한다
+    @Transactional
+    void capPrivacyIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
+        applyPrivacyCap(account, strategyCycleId, currentPrice, loadBuyOrders(strategyCycleId, tradeDate, true));
+    }
+
+    private void applyPrivacyCap(Account account, UUID strategyCycleId, BigDecimal currentPrice, List<Order> buyOrders) {
         if (buyOrders.isEmpty()) return;
 
         BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
@@ -112,8 +122,21 @@ class BuyOrderPriceCapper {
     void capIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
+        List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
+        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
                 (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
+    }
+
+    // INFINITE 전용 AT_OPEN 스코프: 개장 스케쥴러 선접수·개장 후 수동실행 경로에서 사용
+    // findAtOpenPlannedByCycleAndDate로 AT_OPEN PLANNED만 조회해 동일 사이클의 AT_CLOSE PLANNED(미도래)를 건드리지 않는다
+    // (INFINITE는 BUY가 항상 AT_CLOSE라 실제로는 no-op이지만 priceCapMode() 분기 대칭성을 위해 유지)
+    @Transactional
+    void capIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId,
+                          BigDecimal currentPrice, InfinitePosition position) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
+        List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
+        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
+                (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, tradeDate, orders, cap));
     }
 
     // VR 전용: vrPosition 기반 매수 사다리 전체 재산정 — 기존 buyOrders 인자는 사용하지 않는다
@@ -123,8 +146,21 @@ class BuyOrderPriceCapper {
     void capVrIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
                        BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        applyCapIfNeeded(today, account, strategyCycleId, currentPrice,
+        List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
+        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
                 (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap),
+                BuyOrderPriceCapper::isVrBootstrapShaped);
+    }
+
+    // VR 전용 AT_OPEN 스코프: 사다리(LIMIT+AT_OPEN) BUY만 조회해 보정한다 — 개장 스케쥴러 선접수·개장 후 수동실행 경로 전용
+    // AT_CLOSE PLANNED(bootstrap 또는 아직 접수 전인 마감 주문)는 findAtOpenPlannedByCycleAndDate 스코프 밖이라 자연히 제외된다
+    @Transactional
+    void capVrIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId,
+                            BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
+        List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
+        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
+                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap),
                 BuyOrderPriceCapper::isVrBootstrapShaped);
     }
 
@@ -136,21 +172,29 @@ class BuyOrderPriceCapper {
         return buyOrders.stream().anyMatch(o -> o.orderType() == Order.OrderType.LOC);
     }
 
-    // 공통 cap 적용 골격 (skip 조건 없음) — INFINITE_POSITION/PRIVACY_SIMPLE 등 기본 경로
-    private void applyCapIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
-                                  BigDecimal currentPrice,
-                                  BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
-        applyCapIfNeeded(today, account, strategyCycleId, currentPrice, correctFn, orders -> false);
+    // 스코프별 PLANNED BUY 조회 — atOpenOnly=false면 사이클+거래일 전체 PLANNED(AT_CLOSE 접수 경로 기존 계약 유지),
+    // true면 findAtOpenPlannedByCycleAndDate로 AT_OPEN PLANNED만 조회(개장 접수 경로가 동일 사이클의 AT_CLOSE PLANNED를 건드리지 않도록)
+    private List<Order> loadBuyOrders(UUID strategyCycleId, LocalDate tradeDate, boolean atOpenOnly) {
+        List<Order> planned = atOpenOnly
+                ? orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate)
+                : orderPort.findPlannedByCycleAndDate(strategyCycleId, tradeDate);
+        return planned.stream().filter(o -> o.direction() == BUY).toList();
     }
 
-    // 공통 cap 적용 골격: PLANNED BUY 조회 → skip 대상 여부 확인 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
+    // 공통 cap 적용 골격 (skip 조건 없음) — INFINITE_POSITION/PRIVACY_SIMPLE 등 기본 경로
+    private void applyCapIfNeeded(Account account, UUID strategyCycleId, List<Order> buyOrders,
+                                  BigDecimal currentPrice,
+                                  BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
+        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice, correctFn, orders -> false);
+    }
+
+    // 공통 cap 적용 골격: skip 대상 여부 확인 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
+    // buyOrders: 호출측이 스코프(전체 PLANNED vs AT_OPEN 전용)를 결정해 미리 조회한 목록
     // skipIf: 조회된 buyOrders가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문)
-    private void applyCapIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
+    private void applyCapIfNeeded(Account account, UUID strategyCycleId, List<Order> buyOrders,
                                   BigDecimal currentPrice,
                                   BiFunction<List<Order>, BigDecimal, List<Order>> correctFn,
                                   Predicate<List<Order>> skipIf) {
-        List<Order> buyOrders = orderPort.findPlannedByCycleAndDate(strategyCycleId, today)
-                .stream().filter(o -> o.direction() == BUY).toList();
         if (buyOrders.isEmpty()) return;
         if (skipIf.test(buyOrders)) {
             log.info("[{}] BUY 보정 대상 아님(예: VR bootstrap) — post-hoc 캡 제외", account.nickname());

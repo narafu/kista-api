@@ -346,17 +346,26 @@ class TradingService {
         }
 
         SaveAllocationResult result = saveAllocatedOrders(candidates, tradeDate);
-        Set<BatchContext> placeableContexts = candidates.stream()
+        // position/vrPosition/시작가까지 담긴 CycleState 그대로 접수 단계로 전달 — BatchContext만 넘기면
+        // VR_POSITION 등 BUY cap 보정에 필요한 정보가 유실된다 (planAll()과 동일 패턴)
+        List<CycleState> placeableStates = candidates.stream()
                 .filter(candidate -> candidate.hasExistingOrders()
                         || result.savedContexts().contains(candidate.state().ctx()))
-                .map(candidate -> candidate.state().ctx())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .map(CyclePlanCandidate::state)
+                .toList();
 
-        for (BatchContext ctx : placeableContexts) {
-            runSafely("개장 AT_OPEN 접수", ctx, () -> {
-                placeAtOpenPlannedOrders(ctx.account(), ctx.currentCycle().id(), tradeDate);
-                return null;
-            });
+        if (!placeableStates.isEmpty()) {
+            // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+            // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
+            Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
+            for (CycleState state : placeableStates) {
+                runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
+                    BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                            .orElse(state.startPrice());
+                    placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
+                    return null;
+                });
+            }
         }
 
         log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
@@ -415,14 +424,10 @@ class TradingService {
         return new SaveAllocationResult(Set.copyOf(savedContexts));
     }
 
-    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다
-    private void placeAtOpenPlannedOrders(Account account, UUID cycleId, LocalDate tradeDate) {
-        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, tradeDate);
-        if (atOpenOrders.isEmpty()) {
-            log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
-            return;
-        }
-        orderExecutor.placeGiven(atOpenOrders, account);
+    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
+    private void placeAtOpenPlannedOrders(CycleState state, BigDecimal placementPrice, LocalDate tradeDate) {
+        orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle().id(),
+                placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep, 도달 로그

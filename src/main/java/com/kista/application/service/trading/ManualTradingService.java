@@ -91,7 +91,8 @@ class ManualTradingService {
         orderPlanner.savePlannedOrders(plan.orders(), account, currentCycle.id());
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
-        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today);
+        // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
+        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today, plan.position(), plan.vrPosition());
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -143,16 +144,18 @@ class ManualTradingService {
     }
 
     // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
-    // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수
+    // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
-    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today) {
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today,
+                                               InfinitePosition position, VrPosition vrPosition) {
         DstInfo dst = DstInfo.calculate();
         if (Instant.now().isAfter(dst.marketOpen())) {
-            List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today);
-            if (!atOpenOrders.isEmpty()) {
-                log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 {}건 즉시 접수", account.nickname(), atOpenOrders.size());
-                orderExecutor.placeGiven(atOpenOrders, account);
-            }
+            // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
+            if (orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today).isEmpty()) return;
+            // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
+            BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account).get(strategy.ticker());
+            log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
+            orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
         }
     }
 }

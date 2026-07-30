@@ -223,7 +223,7 @@ class ManualTradingServiceTest {
     void execute_vrStrategy_savesLimitAtOpenOrders_andPlacesAtOpenIfMarketOpen() {
         // VR 전략 수동 실행 — LIMIT + AT_OPEN 주문이 저장되고, 개장 후이면 즉시 접수됨
         // AT_OPEN 즉시 접수(placeAtOpenOrdersIfMarketOpen)는 실시간 DstInfo 의존적이므로
-        // orderExecutor.placeGiven() 호출 여부는 atMostOnce()로 허용 (개장 전/후 모두 통과)
+        // orderExecutor.placeAtOpenOrders() 호출 여부는 atMostOnce()로 허용 (개장 전/후 모두 통과)
         Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.VR,
                 Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
@@ -293,7 +293,9 @@ class ManualTradingServiceTest {
                 o.orderType() == Order.OrderType.LIMIT && o.timing() == Order.OrderTiming.AT_OPEN)));
         // 최종 반환 주문 확인
         assertThat(result).hasSize(2);
-        // 개장 후 수동 실행 시 AT_OPEN 주문 placeGiven 경로 — 실시간 DstInfo 의존적이므로 atMostOnce
-        verify(orderExecutor, atMostOnce()).placeGiven(anyList(), eq(ACCOUNT));
+        // 개장 후 수동 실행 시 AT_OPEN 주문 placeAtOpenOrders 경로 — 실시간 DstInfo 의존적이므로 atMostOnce
+        // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null이어야 한다
+        verify(orderExecutor, atMostOnce()).placeAtOpenOrders(
+                any(LocalDate.class), eq(ACCOUNT), eq(vrCycle.id()), any(), isNull(), any(VrPosition.class), eq(vrStrat));
     }
 }
