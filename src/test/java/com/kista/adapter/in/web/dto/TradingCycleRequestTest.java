@@ -3,6 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.domain.model.strategy.Strategy;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,7 +16,7 @@ class TradingCycleRequestTest {
                 Strategy.Type.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null);
+                null, null);
 
         assertThat(request.toRegisterCommand().divisionCount()).isZero();
     }
@@ -27,8 +28,19 @@ class TradingCycleRequestTest {
                 Strategy.Type.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                scheduledStartDate);
+                scheduledStartDate, null);
 
         assertThat(request.toRegisterCommand().scheduledStartDate()).isEqualTo(scheduledStartDate);
+    }
+
+    @Test
+    void initialVrValueIsPassedThroughToRegisterCommand() {
+        TradingCycleRequest request = new TradingCycleRequest(
+                Strategy.Type.VR, null, null, null, null,
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, new BigDecimal("5000.00"));
+
+        assertThat(request.toRegisterCommand().initialVrValue()).isEqualByComparingTo("5000.00");
     }
 }

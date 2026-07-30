@@ -26,5 +26,18 @@ public record RegisterStrategyCommand(
         Integer pGraceWeeks,                          // poolLimitRate 램프 시작 전 유예 주수
         Integer pStepWeeks,                           // poolLimitRate가 한 단계 하강하는 주기 (주 단위)
         BigDecimal poolLimitFloor,                     // poolLimitRate 램프의 하한값
-        LocalDate scheduledStartDate                  // 시작예정일 (null이면 오늘, 과거 거부)
-) {}
+        LocalDate scheduledStartDate,                  // 시작예정일 (null이면 오늘, 과거 거부)
+        // VR: 초기 V값 직접 지정 (VR 전용, null/0 이하면 미지정 취급 — 평가금 기준으로 대체)
+        BigDecimal initialVrValue
+) {
+    // 기존 19개 필드 호출부(테스트 등) 호환용 — initialVrValue 생략 시 null(미지정)
+    public RegisterStrategyCommand(Strategy.Type type, Strategy.Ticker ticker, BigDecimal initialUsdDeposit,
+            Strategy.CycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
+            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, Integer initialGradient,
+            Integer gGraceWeeks, Integer gStepWeeks, Integer gMax, BigDecimal initialPoolLimitRate,
+            Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate) {
+        this(type, ticker, initialUsdDeposit, cycleSeedType, divisionCount, initialHoldings, initialAvgPrice,
+                intervalWeeks, bandWidth, recurringAmount, initialGradient, gGraceWeeks, gStepWeeks, gMax,
+                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor, scheduledStartDate, null);
+    }
+}
