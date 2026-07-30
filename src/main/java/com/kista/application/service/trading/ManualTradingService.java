@@ -43,6 +43,11 @@ class ManualTradingService {
     private final NotifyPort notifyPort; // live 잔고 조회 실패 시 관리자 알림 (4xx라 GlobalExceptionHandler가 미기록)
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
+        return execute(strategyId, requesterId, DstInfo.calculate());
+    }
+
+    // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
+    List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
@@ -92,7 +97,7 @@ class ManualTradingService {
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
-        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today, plan.position(), plan.vrPosition());
+        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today, plan.position(), plan.vrPosition(), dst);
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -146,9 +151,9 @@ class ManualTradingService {
     // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
+    // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
     private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today,
-                                               InfinitePosition position, VrPosition vrPosition) {
-        DstInfo dst = DstInfo.calculate();
+                                               InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
             if (orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today).isEmpty()) return;
