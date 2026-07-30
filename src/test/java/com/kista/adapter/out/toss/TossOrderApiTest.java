@@ -125,15 +125,15 @@ class TossOrderApiTest {
     }
 
     @Test
-    @DisplayName("취소: DELETE /api/v1/orders/{externalOrderId}")
-    void cancel_callsDeleteWithOrderId() {
+    @DisplayName("취소: POST /api/v1/orders/{externalOrderId}/cancel")
+    void cancel_callsPostCancelWithOrderId() {
         Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
             Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLACED, "toss-oid-123", null, null);
 
         tossOrderApi.cancel(order, ACCOUNT);
 
-        verify(tossHttpClient).delete(eq("/api/v1/orders/toss-oid-123"), any());
+        verify(tossHttpClient).post(eq("/api/v1/orders/toss-oid-123/cancel"), any(), any(), eq(Void.class));
     }
 
     @Test
@@ -146,7 +146,7 @@ class TossOrderApiTest {
             org.springframework.http.HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY,
             "{}".getBytes(StandardCharsets.UTF_8), null);
         doThrow(new TossApiException("Toss API 오류: 404 NOT_FOUND", notFound))
-            .when(tossHttpClient).delete(anyString(), any());
+            .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
         assertThatCode(() -> tossOrderApi.cancel(order, ACCOUNT)).doesNotThrowAnyException();
     }
@@ -158,7 +158,7 @@ class TossOrderApiTest {
             Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
             Order.OrderStatus.PLACED, "toss-oid-500", null, null);
         doThrow(new TossApiException("Toss API 요청 실패: 500", new RuntimeException("boom")))
-            .when(tossHttpClient).delete(anyString(), any());
+            .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
         assertThatThrownBy(() -> tossOrderApi.cancel(order, ACCOUNT))
             .isInstanceOf(TossApiException.class);

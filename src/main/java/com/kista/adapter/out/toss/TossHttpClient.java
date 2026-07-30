@@ -100,17 +100,6 @@ class TossHttpClient {
         ).getBody());
     }
 
-    // DELETE 요청 — 주문 취소 등 (응답 body 없음)
-    public void delete(String path, Account account) {
-        executeWithRetry(account, path, token -> {
-            tossRestTemplate.exchange(
-                    baseUrl + path, HttpMethod.DELETE,
-                    new HttpEntity<>(buildHeaders(account, token)), Void.class
-            );
-            return null;
-        });
-    }
-
     // ── private helpers ────────────────────────────────────────────────────────
 
     private <T> T executeGet(String path, Account account, MultiValueMap<String, String> params,

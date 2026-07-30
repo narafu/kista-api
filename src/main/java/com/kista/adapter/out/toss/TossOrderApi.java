@@ -58,9 +58,9 @@ class TossOrderApi {
     }
 
     public void cancel(Order order, Account account) {
-        // DELETE /api/v1/orders/{externalOrderId}
+        // POST /api/v1/orders/{externalOrderId}/cancel — DELETE 아님 (Toss 공식 스펙, cancelOrder)
         try {
-            tossHttpClient.delete(ORDER_PATH + "/" + order.externalOrderId(), account);
+            tossHttpClient.post(ORDER_PATH + "/" + order.externalOrderId() + "/cancel", account, Map.of(), Void.class);
         } catch (TossApiException e) {
             // 이미 체결/만료된 주문은 Toss가 404(not-found)로 응답 — KIS는 이 경우 예외 없이 조용히 무시하므로 동일하게 흡수
             if (e.getCause() instanceof HttpClientErrorException.NotFound) {
