@@ -42,6 +42,11 @@ class UserPersistenceAdapterTest {
                 telegramBotToken, "chat-1", "bot-username", null, null, User.NotificationChannel.TELEGRAM);
     }
 
+    private User newUserWithEmail(String email) {
+        return new User(UUID.randomUUID(), "kakao-1", "닉네임", email, User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, null, User.NotificationChannel.TELEGRAM);
+    }
+
     @Test
     @DisplayName("save 시 telegramBotToken이 평문과 다르게 저장되고(암호화) 복호화하면 평문이 복원된다")
     void save_encrypts_telegram_bot_token() {
@@ -84,5 +89,49 @@ class UserPersistenceAdapterTest {
         User saved = adapter.save(user);
 
         assertThat(saved.telegramBotToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("save 시 email이 평문과 다르게 저장되고(암호화) 복호화하면 평문이 복원된다")
+    void save_encrypts_email() {
+        String plainEmail = "user@example.com";
+        User user = newUserWithEmail(plainEmail);
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        adapter.save(user);
+
+        verify(jpaRepository).save(captor.capture());
+        UserEntity saved = captor.getValue();
+        assertThat(saved.getEmail()).isNotEqualTo(plainEmail); // 암호화되어 저장됨
+        assertThat(crypto.decrypt(saved.getEmail())).isEqualTo(plainEmail); // 복호화하면 원본 복원
+    }
+
+    @Test
+    @DisplayName("findById 시 엔티티의 email 암호문이 도메인 User에서 평문으로 복호화된다")
+    void findById_decrypts_email() {
+        String plainEmail = "user@example.com";
+        String encryptedEmail = crypto.encrypt(plainEmail);
+        UUID userId = UUID.randomUUID();
+        UserEntity entity = UserEntity.fromModel(new User(userId, "kakao-1", "닉네임", encryptedEmail,
+                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null, null,
+                User.NotificationChannel.TELEGRAM));
+        when(jpaRepository.findById(userId)).thenReturn(Optional.of(entity));
+
+        Optional<User> result = adapter.findById(userId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().email()).isEqualTo(plainEmail); // 복호화되어 평문 반환
+    }
+
+    @Test
+    @DisplayName("email이 null인 사용자는 null 그대로 왕복된다 (이메일 동의 미완료)")
+    void null_email_round_trips_as_null() {
+        User user = newUserWithEmail(null);
+        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User saved = adapter.save(user);
+
+        assertThat(saved.email()).isNull();
     }
 }

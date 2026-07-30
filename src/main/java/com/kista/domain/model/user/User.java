@@ -8,7 +8,7 @@ public record User(
         UUID id,                        // 카카오 OAuth UID (앱에서 할당)
         String kakaoId,                 // 카카오 고유 ID
         String nickname,                // 카카오 닉네임
-        String email,                   // 카카오 계정 이메일 (이메일 동의 안 하면 null 가능)
+        String email,                   // 카카오 계정 이메일 (AES-256 암호화 저장, 이메일 동의 안 하면 null 가능)
         UserStatus status,              // 계정 상태
         UserRole role,                  // 사용자 권한 (USER / ADMIN)
         String telegramBotToken,        // 전체 계좌 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
@@ -108,6 +108,13 @@ public record User(
 
     // 닉네임 교체
     public User withNickname(String nickname) {
+        return new User(id, kakaoId, nickname, email, status, role,
+                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
+                lastReappliedAt, notificationChannel);
+    }
+
+    // 이메일 교체 — persistence 경계에서 암호화/복호화 왕복 전용
+    public User withEmail(String email) {
         return new User(id, kakaoId, nickname, email, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 lastReappliedAt, notificationChannel);

@@ -69,16 +69,28 @@ public class UserPersistenceAdapter implements UserPort {
         jpaRepository.softDeleteById(id, Instant.now());
     }
 
-    // persistence 경계에서 telegramBotToken 암호화
+    // persistence 경계에서 telegramBotToken·email 암호화
     private User encrypt(User user) {
-        if (user.telegramBotToken() == null) return user;
-        return user.withTelegram(crypto.encrypt(user.telegramBotToken()), user.telegramChatId(), user.telegramBotUsername());
+        User encrypted = user;
+        if (encrypted.telegramBotToken() != null) {
+            encrypted = encrypted.withTelegram(crypto.encrypt(encrypted.telegramBotToken()),
+                    encrypted.telegramChatId(), encrypted.telegramBotUsername());
+        }
+        if (encrypted.email() != null) {
+            encrypted = encrypted.withEmail(crypto.encrypt(encrypted.email()));
+        }
+        return encrypted;
     }
 
-    // persistence 경계에서 telegramBotToken 복호화
+    // persistence 경계에서 telegramBotToken·email 복호화
     private User toDomain(UserEntity e) {
         User raw = e.toModel();
-        if (raw.telegramBotToken() == null) return raw;
-        return raw.withTelegram(crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername());
+        if (raw.telegramBotToken() != null) {
+            raw = raw.withTelegram(crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername());
+        }
+        if (raw.email() != null) {
+            raw = raw.withEmail(crypto.decrypt(raw.email()));
+        }
+        return raw;
     }
 }
