@@ -68,7 +68,7 @@ class UserService implements UserUseCase {
             // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
             // 외부 OAuth 호출이 끝난 뒤 프록시를 통해 가입 트랜잭션만 시작한다.
             user = userUseCaseProvider.getObject()
-                    .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID());
+                    .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID(), kakaoUser.email());
         } catch (DataIntegrityViolationException e) {
             // 동시 가입 경쟁 조건 → 기존 사용자 직접 조회 (self-invocation 방지)
             log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());
@@ -84,7 +84,7 @@ class UserService implements UserUseCase {
     }
 
     @Override
-    public User register(String kakaoId, String nickname, UUID userId) {
+    public User register(String kakaoId, String nickname, UUID userId, String email) {
         // 기존 사용자면 반환, 신규이면 역할/상태 결정 후 저장 + 관리자 알림
         return userPort.findByKakaoId(kakaoId).orElseGet(() -> {
             // ADMIN seed 여부에 따라 역할/상태 결정
@@ -98,7 +98,7 @@ class UserService implements UserUseCase {
             User.UserStatus status = isAdminSeed || !approvalRequired
                     ? User.UserStatus.ACTIVE
                     : User.UserStatus.PENDING;
-            User newUser = new User(userId, kakaoId, nickname, status, role,
+            User newUser = new User(userId, kakaoId, nickname, email, status, role,
                     null, null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);

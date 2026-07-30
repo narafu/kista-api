@@ -60,21 +60,27 @@ public class KakaoOAuthAdapter implements KakaoOAuthPort {
         }
 
         Map<?, ?> responseBody = response.getBody();
+        Map<?, ?> account = (Map<?, ?>) responseBody.get("kakao_account");
         String kakaoId = String.valueOf(responseBody.get("id"));
-        String nickname = extractNickname(responseBody);
-        return new KakaoUserInfo(kakaoId, nickname);
+        String nickname = extractNickname(responseBody, account);
+        String email = extractEmail(account);
+        return new KakaoUserInfo(kakaoId, nickname, email);
     }
 
-    @SuppressWarnings("unchecked")
-    private String extractNickname(Map<?, ?> body) {
+    private String extractNickname(Map<?, ?> body, Map<?, ?> account) {
         Map<?, ?> properties = (Map<?, ?>) body.get("properties");
         if (properties != null && properties.get("nickname") instanceof String n) return n;
 
-        Map<?, ?> account = (Map<?, ?>) body.get("kakao_account");
         if (account != null) {
             Map<?, ?> profile = (Map<?, ?>) account.get("profile");
             if (profile != null && profile.get("nickname") instanceof String n) return n;
         }
         return "사용자";
+    }
+
+    // 이메일 동의를 하지 않은 사용자는 kakao_account.email 자체가 없어 null 반환
+    private String extractEmail(Map<?, ?> account) {
+        if (account != null && account.get("email") instanceof String email) return email;
+        return null;
     }
 }

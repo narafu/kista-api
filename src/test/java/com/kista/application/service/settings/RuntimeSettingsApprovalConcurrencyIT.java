@@ -77,7 +77,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
         assertThat(gateHeld.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
 
         Future<User> signup = executor.submit(() ->
-                userUseCase.register("signup-" + signupId, "signup", signupId));
+                userUseCase.register("signup-" + signupId, "signup", signupId, null));
         awaitWaitingAdvisoryLock();
 
         RuntimeSettings defaults = RuntimeSettings.defaults();

@@ -40,7 +40,7 @@ public final class DomainFixtures {
     // 전체 파라미터화 — kakaoId/nickname은 "kakao-1"/"홍길동" 기본값 고정, 나머지 필드 커스터마이즈
     public static User userWithStatus(UUID id, User.UserStatus status, User.UserRole role,
                                        NotificationChannel channel, Instant lastReappliedAt) {
-        return new User(id, "kakao-1", "홍길동", status, role,
+        return new User(id, "kakao-1", "홍길동", null, status, role,
                 null, null, null, null, lastReappliedAt, channel);
     }
 

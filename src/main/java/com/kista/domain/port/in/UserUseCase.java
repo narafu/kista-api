@@ -13,7 +13,7 @@ public interface UserUseCase {
     User login(String code, String redirectUri);
 
     // --- 회원가입 ---
-    User register(String kakaoId, String nickname, UUID userId);
+    User register(String kakaoId, String nickname, UUID userId, String email);
 
     // --- 승인 ---
     void approve(UUID userId);

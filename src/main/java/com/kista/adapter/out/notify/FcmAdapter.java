@@ -32,6 +32,11 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
+    public void notifyAutoApprovedUser(User user) {
+        // 신규 가입 알림은 관리자 전용 — CompositeAdapter에서 항상 Telegram 경유
+    }
+
+    @Override
     public void notifyApproved(User user) {
         send(user.id(), "KISTA 알림", "✅ 가입이 승인되었습니다.");
     }

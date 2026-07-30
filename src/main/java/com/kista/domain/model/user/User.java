@@ -8,6 +8,7 @@ public record User(
         UUID id,                        // 카카오 OAuth UID (앱에서 할당)
         String kakaoId,                 // 카카오 고유 ID
         String nickname,                // 카카오 닉네임
+        String email,                   // 카카오 계정 이메일 (이메일 동의 안 하면 null 가능)
         UserStatus status,              // 계정 상태
         UserRole role,                  // 사용자 권한 (USER / ADMIN)
         String telegramBotToken,        // 전체 계좌 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
@@ -66,48 +67,48 @@ public record User(
 
     // 상태만 교체 — 나머지 필드 보존
     public User withStatus(UserStatus newStatus) {
-        return new User(id, kakaoId, nickname, newStatus, role,
+        return new User(id, kakaoId, nickname, email, newStatus, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 lastReappliedAt, notificationChannel);
     }
 
     // 상태 + lastReappliedAt 동시 교체 (reject/reapply 용)
     public User withStatus(UserStatus newStatus, Instant newLastReappliedAt) {
-        return new User(id, kakaoId, nickname, newStatus, role,
+        return new User(id, kakaoId, nickname, email, newStatus, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 newLastReappliedAt, notificationChannel);
     }
 
     // 거절 전용 — REJECTED 전환 + 사유 세팅(덮어쓰기) + lastReappliedAt 갱신(24h 카운트다운 시작)
     public User withRejection(String reason) {
-        return new User(id, kakaoId, nickname, UserStatus.REJECTED, role,
+        return new User(id, kakaoId, nickname, email, UserStatus.REJECTED, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, reason,
                 Instant.now(), notificationChannel);
     }
 
     // 텔레그램 설정 교체
     public User withTelegram(String botToken, String chatId, String botUsername) {
-        return new User(id, kakaoId, nickname, status, role,
+        return new User(id, kakaoId, nickname, email, status, role,
                 botToken, chatId, botUsername, rejectReason, lastReappliedAt, notificationChannel);
     }
 
     // 알림 채널 교체
     public User withNotificationChannel(NotificationChannel channel) {
-        return new User(id, kakaoId, nickname, status, role,
+        return new User(id, kakaoId, nickname, email, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 lastReappliedAt, channel);
     }
 
     // 역할만 교체 — AdminService.changeRole 전용
     public User withRole(UserRole newRole) {
-        return new User(id, kakaoId, nickname, status, newRole,
+        return new User(id, kakaoId, nickname, email, status, newRole,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 lastReappliedAt, notificationChannel);
     }
 
     // 닉네임 교체
     public User withNickname(String nickname) {
-        return new User(id, kakaoId, nickname, status, role,
+        return new User(id, kakaoId, nickname, email, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
                 lastReappliedAt, notificationChannel);
     }

@@ -1,5 +1,6 @@
 package com.kista.adapter.out.notify;
 
+import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.TradingReport;
@@ -111,6 +112,38 @@ class TelegramUserNotificationAdapterTest {
         verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
         String text = bodyCaptor.getValue().get("text");
         assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.");
+    }
+
+    @Test
+    void onNewUserRegistered_pending_sendsApprovalRequestWithButtons() {
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.PENDING);
+
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+
+        verify(restTemplate).postForObject(contains("/sendMessage"), any(), eq(String.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void onNewUserRegistered_activeNonAdmin_sendsAutoApprovedInfoMessage() {
+        // 승인 불필요 설정으로 즉시 ACTIVE 등록된 일반 사용자 — 관리자에게 정보성 알림
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.USER);
+        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+
+        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
+        assertThat(bodyCaptor.getValue().get("text")).contains("자동 승인");
+    }
+
+    @Test
+    void onNewUserRegistered_activeAdmin_skipsNotification() {
+        // 관리자 seed 부트스트랩 — 알림 불필요
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.ADMIN);
+
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+
+        verify(restTemplate, never()).postForObject(any(), any(), any());
     }
 
     // TradingReport 생성 헬퍼

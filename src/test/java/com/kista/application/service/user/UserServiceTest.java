@@ -85,7 +85,7 @@ class UserServiceTest {
         when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.empty());
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        User result = userService.register("kakao-123", "홍길동", uid);
+        User result = userService.register("kakao-123", "홍길동", uid, null);
 
         assertThat(result.status()).isEqualTo(User.UserStatus.PENDING);
         assertThat(result.id()).isEqualTo(uid);
@@ -101,7 +101,7 @@ class UserServiceTest {
         when(userPort.findByKakaoId("kakao-active")).thenReturn(Optional.empty());
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        User result = userService.register("kakao-active", "즉시가입", uid);
+        User result = userService.register("kakao-active", "즉시가입", uid, null);
 
         assertThat(result.role()).isEqualTo(User.UserRole.USER);
         assertThat(result.status()).isEqualTo(User.UserStatus.ACTIVE);
@@ -115,7 +115,7 @@ class UserServiceTest {
         User existing = pendingUser(uid);
         when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.of(existing));
 
-        User result = userService.register("kakao-123", "홍길동", uid);
+        User result = userService.register("kakao-123", "홍길동", uid, null);
 
         assertThat(result).isEqualTo(existing);
         verify(userPort, never()).save(any());
@@ -338,7 +338,7 @@ class UserServiceTest {
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        User result = userService.register("12345", "adminName", uid);
+        User result = userService.register("12345", "adminName", uid, null);
 
         // then
         assertThat(result.role()).isEqualTo(User.UserRole.ADMIN);
@@ -355,7 +355,7 @@ class UserServiceTest {
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        User result = userService.register("99999", "userName", uid);
+        User result = userService.register("99999", "userName", uid, null);
 
         // then
         assertThat(result.role()).isEqualTo(User.UserRole.USER);
@@ -396,7 +396,7 @@ class UserServiceTest {
         UUID newUserId = UUID.randomUUID();
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
-        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "신규사용자"));
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "신규사용자", null));
         when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
         // register() 내부: findByKakaoId → empty → save 경로
         when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.empty());
@@ -427,11 +427,11 @@ class UserServiceTest {
         String kakaoId = "kakao-existing-001";
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
-        User existingUser = new User(existingId, kakaoId, "기존사용자", User.UserStatus.ACTIVE, User.UserRole.USER,
+        User existingUser = new User(existingId, kakaoId, "기존사용자", null, User.UserStatus.ACTIVE, User.UserRole.USER,
                 null, null, null, null, null, NotificationChannel.TELEGRAM);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
-        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자"));
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", null));
         when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
         // register() 내부: findByKakaoId → 기존 사용자 반환 → orElseGet 미실행
         when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
@@ -454,11 +454,11 @@ class UserServiceTest {
         String kakaoId = "kakao-race-001";
         String accessToken = "kakao-access-token";
         UUID existingId = UUID.randomUUID();
-        User existingUser = new User(existingId, kakaoId, "경쟁사용자", User.UserStatus.PENDING, User.UserRole.USER,
+        User existingUser = new User(existingId, kakaoId, "경쟁사용자", null, User.UserStatus.PENDING, User.UserRole.USER,
                 null, null, null, null, null, NotificationChannel.TELEGRAM);
 
         when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
-        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자"));
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자", null));
         when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
         // register() 내부: findByKakaoId → empty → save → DataIntegrityViolationException
         when(userPort.findByKakaoId(kakaoId))

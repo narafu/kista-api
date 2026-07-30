@@ -80,7 +80,7 @@ class DevAuthControllerTest {
 
     @Test
     void devToken_returns_token() throws Exception {
-        when(userUseCase.register(any(), any(), any())).thenReturn(MOCK_USER);
+        when(userUseCase.register(any(), any(), any(), any())).thenReturn(MOCK_USER);
         doNothing().when(userUseCase).approve(any());
         when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
 

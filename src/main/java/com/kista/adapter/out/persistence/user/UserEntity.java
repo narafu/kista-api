@@ -31,6 +31,9 @@ class UserEntity extends BaseAuditEntity {
     @Column(length = 100)
     private String nickname;
 
+    @Column(length = 255)
+    private String email; // 카카오 계정 이메일 — 이메일 동의 안 하면 null
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private User.UserStatus status;
@@ -66,6 +69,7 @@ class UserEntity extends BaseAuditEntity {
         e.id = user.id();
         e.kakaoId = user.kakaoId();
         e.nickname = user.nickname();
+        e.email = user.email();
         e.status = user.status();
         e.role = user.role();
         e.telegramBotToken = user.telegramBotToken();
@@ -78,7 +82,7 @@ class UserEntity extends BaseAuditEntity {
     }
 
     User toModel() {
-        return new User(id, kakaoId, nickname, status, role,
+        return new User(id, kakaoId, nickname, email, status, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, rejectReason, lastReappliedAt,
                 notificationChannel);
     }

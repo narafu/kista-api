@@ -29,10 +29,15 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNewUserRegistered(NewUserRegisteredEvent event) {
-        if (event.user().status() == User.UserStatus.ACTIVE) {
-            return; // 관리자 시드 등 이미 승인된 사용자는 알림 불필요
+        User user = event.user();
+        if (user.role() == User.UserRole.ADMIN) {
+            return; // 관리자 seed 부트스트랩은 알림 불필요
         }
-        notifyNewUser(event.user());
+        if (user.status() == User.UserStatus.ACTIVE) {
+            notifyAutoApprovedUser(user); // 승인 불필요 설정이라 즉시 활성화된 신규 가입 — 정보성 알림만
+        } else {
+            notifyNewUser(user); // 승인 대기 — 승인/거절 버튼 포함
+        }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -60,6 +65,14 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
                         Map.of("text", "✅ 승인", "callback_data", "approve:" + user.id()),
                         Map.of("text", "❌ 거절", "callback_data", "reject:" + user.id())
                 ));
+    }
+
+    @Override
+    public void notifyAutoApprovedUser(User user) {
+        // 승인 불필요 설정으로 즉시 활성화된 신규 가입 — 관리자 조치 불필요라 버튼 없이 정보만 전달
+        String text = String.format("🆕 <b>신규 가입 (자동 승인)</b>%n닉네임: %s%nUID: %s",
+                user.nickname(), user.id());
+        telegramHttpClient.sendMessage(props.chatId(), text, props.botToken());
     }
 
     @Override

@@ -4,5 +4,5 @@ public interface KakaoOAuthPort {
     String exchangeCodeForToken(String code, String redirectUri);
     KakaoUserInfo getUserInfo(String kakaoAccessToken);
 
-    record KakaoUserInfo(String kakaoId, String nickname) {}
+    record KakaoUserInfo(String kakaoId, String nickname, String email) {}
 }

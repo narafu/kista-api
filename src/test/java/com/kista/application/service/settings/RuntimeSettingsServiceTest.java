@@ -97,7 +97,7 @@ class RuntimeSettingsServiceTest {
     }
 
     private User user(User.UserStatus status) {
-        return new User(UUID.randomUUID(), "kakao", "nickname", status, User.UserRole.USER,
+        return new User(UUID.randomUUID(), "kakao", "nickname", null, status, User.UserRole.USER,
                 null, null, null, null, null, User.DEFAULT_CHANNEL);
     }
 }

@@ -25,6 +25,11 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
         telegram.notifyNewUser(user);
     }
 
+    @Override
+    public void notifyAutoApprovedUser(User user) {
+        telegram.notifyAutoApprovedUser(user);
+    }
+
     // 사용자 알림 — notificationChannel에 따라 라우팅
     @Override public void notifyApproved(User user)                                                     { route(user, p -> p.notifyApproved(user)); }
     @Override public void notifyRejected(User user)                                                     { route(user, p -> p.notifyRejected(user)); }

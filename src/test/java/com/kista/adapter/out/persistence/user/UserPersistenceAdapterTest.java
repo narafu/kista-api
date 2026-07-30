@@ -38,7 +38,7 @@ class UserPersistenceAdapterTest {
     }
 
     private User newUser(String telegramBotToken) {
-        return new User(UUID.randomUUID(), "kakao-1", "닉네임", User.UserStatus.ACTIVE, User.UserRole.USER,
+        return new User(UUID.randomUUID(), "kakao-1", "닉네임", null, User.UserStatus.ACTIVE, User.UserRole.USER,
                 telegramBotToken, "chat-1", "bot-username", null, null, User.NotificationChannel.TELEGRAM);
     }
 
@@ -64,7 +64,7 @@ class UserPersistenceAdapterTest {
         String plainToken = "plain-bot-token";
         String encryptedToken = crypto.encrypt(plainToken);
         UUID userId = UUID.randomUUID();
-        UserEntity entity = UserEntity.fromModel(new User(userId, "kakao-1", "닉네임", User.UserStatus.ACTIVE,
+        UserEntity entity = UserEntity.fromModel(new User(userId, "kakao-1", "닉네임", null, User.UserStatus.ACTIVE,
                 User.UserRole.USER, encryptedToken, "chat-1", "bot-username", null, null,
                 User.NotificationChannel.TELEGRAM));
         when(jpaRepository.findById(userId)).thenReturn(Optional.of(entity));

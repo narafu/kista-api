@@ -58,7 +58,7 @@ public class DevAuthController {
     @PostMapping("/dev-token")
     public TokenResponse devToken(HttpServletRequest request, HttpServletResponse response) {
         // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
-        User user = userUseCase.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID);
+        User user = userUseCase.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID, null);
         // ACTIVE 상태로 설정 (이미 ACTIVE여도 무해)
         userUseCase.approve(user.id());
         // RT 발급 후 HttpOnly 쿠키 설정
@@ -74,7 +74,7 @@ public class DevAuthController {
     public TokenResponse devAdminToken(HttpServletRequest request, HttpServletResponse response) {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userPort.findById(DEV_ADMIN_UUID).orElseGet(() ->
-                userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", User.UserStatus.ACTIVE, User.UserRole.ADMIN,
+                userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", null, User.UserStatus.ACTIVE, User.UserRole.ADMIN,
                         null, null, null, null, null, User.DEFAULT_CHANNEL)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != User.UserRole.ADMIN) {
