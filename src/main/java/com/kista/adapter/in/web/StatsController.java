@@ -15,18 +15,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Tag(name = "통계", description = "사용자 전략 수익 통계 (DB 근사 집계)")
 @RestController
 @RequestMapping("/api/stats")
 @RequiredArgsConstructor
 public class StatsController {
+
+    private static final CacheControl HOUSING_BENCHMARK_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
     private final UserStatsUseCase userStats;
 
@@ -98,7 +103,7 @@ public class StatsController {
     @Operation(summary = "KB 지역 5분위 가격 시계열",
             description = "KB 5분위 매매평균가격 원본 시계열 (regionCode 미지정 시 서울 기본값, 투자 성과와 무관).")
     @GetMapping("/housing-benchmark/series")
-    public HousingBenchmarkSeriesResponse getHousingBenchmarkSeries(
+    public ResponseEntity<HousingBenchmarkSeriesResponse> getHousingBenchmarkSeries(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
@@ -108,13 +113,15 @@ public class StatsController {
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
-        return HousingBenchmarkSeriesResponse.from(userStats.getHousingBenchmarkSeries(from, to, regionCode));
+        HousingBenchmarkSeriesResponse response = HousingBenchmarkSeriesResponse.from(userStats.getHousingBenchmarkSeries(from, to, regionCode));
+        return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
     }
 
     @Operation(summary = "서울 아파트 등 KB 지역 카탈로그",
             description = "5분위 시계열 조회에 사용 가능한 지역 코드·명 목록.")
     @GetMapping("/housing-benchmark/regions")
-    public HousingBenchmarkRegionsResponse getHousingBenchmarkRegions() {
-        return HousingBenchmarkRegionsResponse.from(userStats.getHousingBenchmarkRegions());
+    public ResponseEntity<HousingBenchmarkRegionsResponse> getHousingBenchmarkRegions() {
+        HousingBenchmarkRegionsResponse response = HousingBenchmarkRegionsResponse.from(userStats.getHousingBenchmarkRegions());
+        return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
     }
 }

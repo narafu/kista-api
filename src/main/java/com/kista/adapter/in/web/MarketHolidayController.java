@@ -9,12 +9,15 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Tag(name = "시장 캘린더", description = "미국 시장 휴장일 조회 및 세션 확인")
 @RestController
@@ -22,17 +25,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MarketHolidayController {
 
+    private static final CacheControl HOLIDAYS_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
+
     private final MarketUseCase marketUseCase;
 
     @Operation(summary = "월별 미국 시장 휴장일 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/holidays")
-    public List<String> getHolidays(
+    public ResponseEntity<List<String>> getHolidays(
             @Parameter(description = "연도", example = "2026") @RequestParam int year,
             @Parameter(description = "월 (1-12)", example = "6") @RequestParam int month) {
         // LocalDate → ISO 문자열 변환으로 직렬화 방식 명시
-        return marketUseCase.getMonthlyHolidays(year, month)
+        List<String> holidays = marketUseCase.getMonthlyHolidays(year, month)
                 .stream().map(Object::toString).toList();
+        return ResponseEntity.ok().cacheControl(HOLIDAYS_CACHE).body(holidays);
     }
 
     // 현재 시장 세션 조회 — UI 수동 실행 버튼 활성화 판단에 사용

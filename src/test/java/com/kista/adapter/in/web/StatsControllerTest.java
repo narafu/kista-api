@@ -277,6 +277,7 @@ class StatsControllerTest {
 
         mockMvc.perform(get("/api/stats/housing-benchmark/series").with(authentication(auth())))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"))
                 .andExpect(jsonPath("$.points[0].baseMonth").value("2026-01-01"))
                 .andExpect(jsonPath("$.points[0].firstQuintilePrice").value(10))
                 .andExpect(jsonPath("$.points[0].fifthQuintilePrice").value(160))
@@ -313,6 +314,7 @@ class StatsControllerTest {
 
         mockMvc.perform(get("/api/stats/housing-benchmark/regions").with(authentication(auth())))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"))
                 .andExpect(jsonPath("$.regions[0].code").value("1100000000"))
                 .andExpect(jsonPath("$.regions[0].name").value("서울"))
                 .andExpect(jsonPath("$.regions[1].code").value("2600000000"))

@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(MarketHolidayController.class)
@@ -59,6 +60,7 @@ class MarketHolidayControllerTest {
                         .param("month", "1")
                         .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"))
                 .andExpect(jsonPath("$[0]").value("2026-01-01"));
     }
 

@@ -29,6 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import com.kista.domain.port.out.AppErrorLogPort;
 
 @WebMvcTest(FearGreedController.class)
@@ -56,6 +57,7 @@ class FearGreedControllerTest {
                         .param("days", "90")
                         .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=600, public"))
                 .andExpect(jsonPath("$.cnn.current.value").value(72))
                 .andExpect(jsonPath("$.cnn.current.rating").value("GREED"))
                 .andExpect(jsonPath("$.cnn.history.length()").value(2))
