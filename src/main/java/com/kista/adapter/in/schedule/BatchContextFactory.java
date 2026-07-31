@@ -34,16 +34,21 @@ class BatchContextFactory {
 
     // 전략별 현재 사이클·계좌·사용자 조회 — 조회 실패한 전략은 skip + notifyError
     List<BatchContext> buildAll(List<Strategy> strategies) {
-        // 계좌·사용자는 전략 수만큼 개별 조회하지 않고 배치로 1회씩 조회해 N+1 제거
+        // 계좌·사용자·사이클은 전략 수만큼 개별 조회하지 않고 배치로 1회씩 조회해 N+1 제거
         Map<UUID, Account> accountsById = accountPort.findAll().stream()
                 .collect(Collectors.toMap(Account::id, a -> a));
         Map<UUID, User> usersById = userPort.findAll().stream()
                 .collect(Collectors.toMap(User::id, u -> u));
+        var strategyIds = strategies.stream().map(Strategy::id).toList();
+        Map<UUID, StrategyCycle> cyclesById = strategyCyclePort.findLatestByStrategyIds(strategyIds);
 
         List<BatchContext> contexts = new ArrayList<>();
         for (Strategy strategy : strategies) {
             try {
-                StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+                StrategyCycle currentCycle = cyclesById.get(strategy.id());
+                if (currentCycle == null) {
+                    throw new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id());
+                }
                 // 종료된 사이클 재선택 차단 — rotation 실패(잔고 조회 오류 등) 시 새 사이클 없이 종료 사이클만 남는 좀비 상태
                 if (currentCycle.endDate() != null) {
                     IllegalStateException zombie = new IllegalStateException(

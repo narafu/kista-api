@@ -142,7 +142,7 @@ class AdminServiceTest {
     void findUser_존재하는_사용자ID로_조회시_반환한다() {
         UUID targetId = UUID.randomUUID();
         AdminUserView view = new AdminUserView(targetId, "테스트", User.UserStatus.ACTIVE, User.UserRole.USER, Instant.now());
-        when(adminUserViewPort.findAll()).thenReturn(List.of(view));
+        when(adminUserViewPort.findById(targetId)).thenReturn(Optional.of(view));
 
         Optional<AdminUserView> result = adminService.findUser(targetId);
 
@@ -153,8 +153,7 @@ class AdminServiceTest {
     @Test
     void findUser_존재하지_않는_사용자ID로_조회시_empty를_반환한다() {
         UUID otherId = UUID.randomUUID();
-        AdminUserView view = new AdminUserView(UUID.randomUUID(), "다른사용자", User.UserStatus.ACTIVE, User.UserRole.USER, Instant.now());
-        when(adminUserViewPort.findAll()).thenReturn(List.of(view));
+        when(adminUserViewPort.findById(otherId)).thenReturn(Optional.empty());
 
         Optional<AdminUserView> result = adminService.findUser(otherId);
 

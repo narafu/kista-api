@@ -108,9 +108,7 @@ class AdminService implements AdminUserUseCase {
     @Override
     @Transactional(readOnly = true)
     public Optional<AdminUserView> findUser(UUID userId) {
-        // 전체 조회 후 ID 필터 — AdminUserViewPort에 단건 조회 미지원
-        return adminUserViewPort.findAll().stream()
-                .filter(v -> userId.equals(v.id()))
-                .findFirst();
+        // 단건 조회 — 전체 풀스캔 대신 ID 기반 직접 조회
+        return adminUserViewPort.findById(userId);
     }
 }

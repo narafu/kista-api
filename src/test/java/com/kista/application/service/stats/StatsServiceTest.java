@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -66,7 +67,7 @@ class StatsServiceTest {
 
     private void stubUserWithStrategy() {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
     }
 
     private static StrategyCycle closedCycle(String start, String end, String startDate, String endDate) {
@@ -149,7 +150,7 @@ class StatsServiceTest {
                 Instant.parse("2026-06-01T00:00:00Z"), null);
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
         // 자산 = 500 + 10 × 55.00 = 1050 → 미실현 +50
-        when(cyclePositionPort.findLatestOne(active.id())).thenReturn(Optional.of(
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(active.id()))).thenReturn(Map.of(active.id(),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("500.00"),
                         new BigDecimal("55.00"), new BigDecimal("50.00"), 10, Instant.now(), null)));
 
@@ -176,10 +177,10 @@ class StatsServiceTest {
                 UUID.randomUUID(), cycle.id(), new BigDecimal("800.00"),
                 new BigDecimal("180.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstOne(cycle.id())).thenReturn(Optional.of(opening));
-        when(cyclePositionPort.findLatestOne(cycle.id())).thenReturn(Optional.of(latest));
+        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
 
         StatsSummary summary = statsService.getSummary(USER_ID);
 
@@ -208,11 +209,11 @@ class StatsServiceTest {
                 UUID.randomUUID(), cycle.id(), new BigDecimal("900.00"),
                 new BigDecimal("140.00"), new BigDecimal("80.00"), 5, Instant.now(), null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstOne(cycle.id()))
-                .thenReturn(Optional.of(openingWithoutClosingPrice));
-        when(cyclePositionPort.findLatestOne(cycle.id())).thenReturn(Optional.of(latest));
+        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id())))
+                .thenReturn(Map.of(cycle.id(), openingWithoutClosingPrice));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
 
         StatsSummary summary = statsService.getSummary(USER_ID);
 
@@ -235,9 +236,9 @@ class StatsServiceTest {
                 UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
                 new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(vrStrategy));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstOne(cycle.id())).thenReturn(Optional.of(opening));
+        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
 
         StatsSummary summary = statsService.getSummary(USER_ID);
         CyclePerformance performance = statsService
@@ -279,7 +280,8 @@ class StatsServiceTest {
     @Test
     void equity_curve는_전략_type으로_사이클을_필터링한다() {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY, PRIVACY_STRATEGY));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID)))
+                .thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, PRIVACY_STRATEGY)));
         StrategyCycle infinite = activeCycle(STRATEGY_ID, "1000.00", "2026-06-01");
         StrategyCycle privacy = activeCycle(PRIVACY_STRATEGY_ID, "2000.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(infinite, privacy));
@@ -529,7 +531,7 @@ class StatsServiceTest {
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
                 "00000000", "key", "secret", null, Account.Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
         ArgumentCaptor<Set<UUID>> strategyIdsCaptor = ArgumentCaptor.forClass(Set.class);
         when(strategyCyclePort.findByStrategyIds(strategyIdsCaptor.capture())).thenReturn(List.of(cycle));
@@ -545,7 +547,8 @@ class StatsServiceTest {
 
         assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
         assertThat(strategyIdsCaptor.getValue()).containsExactly(STRATEGY_ID);
-        verify(strategyPort, never()).findByAccountId(mockAccountId);
+        // 배치 조회로 전환됐으므로 accountIds 목록에 모의계좌가 포함되지 않았는지로 제외를 검증한다
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
     }
 
     @Test
@@ -975,7 +978,7 @@ class StatsServiceTest {
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
                 "00000000", "key", "secret", null, Account.Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
                 closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
 
@@ -983,7 +986,7 @@ class StatsServiceTest {
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("100.00");
         assertThat(summary.byType()).hasSize(1);
-        verify(strategyPort, never()).findByAccountId(mockAccountId);
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
     }
 
     @Test
@@ -992,7 +995,7 @@ class StatsServiceTest {
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
                 "00000000", "key", "secret", null, Account.Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle active = activeCycle("1000.00", "2026-06-01");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
@@ -1002,7 +1005,7 @@ class StatsServiceTest {
                 USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
-        verify(strategyPort, never()).findByAccountId(mockAccountId);
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
     }
 
     @Test
@@ -1018,8 +1021,10 @@ class StatsServiceTest {
                 LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"),
                 Instant.parse("2026-01-01T00:00:00Z"), null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(STRATEGY));
-        when(strategyPort.findByAccountId(mockAccountId)).thenReturn(List.of(mockStrategy));
+        // 사이클 성과 목록(excludeMock=false)은 모의계좌 포함 전체 accountIds로 배치 조회한다
+        when(strategyPort.findByAccountIds(argThat(ids ->
+                ids.contains(ACCOUNT_ID) && ids.contains(mockAccountId))))
+                .thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY), mockAccountId, List.of(mockStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(mockCycle));
 
         CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);

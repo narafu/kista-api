@@ -1,6 +1,7 @@
 package com.kista.adapter.out.persistence.settings;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -8,4 +9,7 @@ import java.util.UUID;
 interface UserNotificationPrefJpaRepository extends JpaRepository<UserNotificationPrefJpaEntity, UserNotificationPrefId> {
     // userId 기준으로 해당 사용자의 모든 알림 선호도 조회
     List<UserNotificationPrefJpaEntity> findByUserId(UUID userId);
+
+    // 여러 사용자의 알림 선호도 배치 조회 (N+1 방지)
+    List<UserNotificationPrefJpaEntity> findByUserIdIn(Collection<UUID> userIds);
 }

@@ -6,6 +6,8 @@ import com.kista.domain.port.out.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,5 +42,37 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
         settings.notificationPrefs().forEach((type, enabled) ->
                 prefRepo.save(new UserNotificationPrefJpaEntity(settings.userId(), type.name(), enabled))
         );
+    }
+
+    @Override
+    public Map<UUID, UserSettings> findOrDefaultByUserIds(Collection<UUID> userIds) {
+        // 배치 조회 후 없는 사용자는 기본값으로 채운다 (N+1 방지)
+        Map<UUID, UserSettings> result = new HashMap<>();
+        Map<UUID, UserSettingsJpaEntity> entities = settingsRepo.findAllById(userIds).stream()
+                .collect(Collectors.toMap(UserSettingsJpaEntity::getUserId, e -> e));
+
+        // 모든 알림 선호도 한 번에 조회
+        Map<UUID, Map<NotificationType, Boolean>> prefsByUserId = prefRepo.findByUserIdIn(userIds).stream()
+                .collect(Collectors.groupingBy(
+                        UserNotificationPrefJpaEntity::getUserId,
+                        Collectors.toMap(
+                                p -> NotificationType.valueOf(p.getType()),
+                                UserNotificationPrefJpaEntity::isEnabled
+                        )
+                ));
+
+        // 사용자별 설정 구성
+        for (UUID userId : userIds) {
+            if (entities.containsKey(userId)) {
+                UserSettingsJpaEntity entity = entities.get(userId);
+                Map<NotificationType, Boolean> prefs = prefsByUserId.getOrDefault(userId, Map.of());
+                result.put(userId, new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs));
+            } else {
+                // 설정이 없는 사용자는 기본값으로 채운다
+                result.put(userId, UserSettings.defaultFor(userId));
+            }
+        }
+
+        return result;
     }
 }

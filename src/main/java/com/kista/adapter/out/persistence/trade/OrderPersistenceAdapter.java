@@ -10,10 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
@@ -64,6 +67,11 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<UUID> findDistinctAccountIdsByTradeDateBetween(LocalDate from, LocalDate to) {
+        return repository.findDistinctAccountIdsByTradeDateBetween(from, to);
+    }
+
+    @Override
     public Optional<Order> findById(UUID orderId) {
         return repository.findById(orderId).map(this::toDomain);
     }
@@ -82,6 +90,18 @@ public class OrderPersistenceAdapter implements OrderPort {
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
                 strategyCycleId, tradeDate,
                 List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)));
+    }
+
+    @Override
+    public Map<UUID, List<Order>> findPlannedOrPlacedByCycleIdsAndDate(
+            Collection<UUID> strategyCycleIds, LocalDate tradeDate) {
+        // 미리보기 배치 조회 — 계좌 내 전략 N개의 사이클마다 개별 조회하던 것을 1회로 축소
+        if (strategyCycleIds.isEmpty()) return Map.of();
+        return toDomainList(repository.findByStrategyCycleIdInAndTradeDateAndStatusIn(
+                strategyCycleIds, tradeDate,
+                List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)))
+                .stream()
+                .collect(Collectors.groupingBy(Order::strategyCycleId));
     }
 
     @Override

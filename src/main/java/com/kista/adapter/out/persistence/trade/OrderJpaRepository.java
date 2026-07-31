@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +24,10 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatusIn(
             UUID strategyCycleId, LocalDate tradeDate, List<Order.OrderStatus> statuses);
 
+    // 여러 사이클의 PLANNED 또는 PLACED 배치 조회 (미리보기 N+1 방지)
+    List<OrderEntity> findByStrategyCycleIdInAndTradeDateAndStatusIn(
+            Collection<UUID> strategyCycleIds, LocalDate tradeDate, List<Order.OrderStatus> statuses);
+
     // 관리자 거래내역 — 최신순 (동일 trade_date 내 created_at DESC 2차 정렬)
     @Query(value = """
             SELECT * FROM orders
@@ -30,6 +35,15 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             ORDER BY trade_date DESC, created_at DESC
             """, nativeQuery = true)
     List<OrderEntity> findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    // 기간 내 distinct accountId 목록 조회 (이상징후 감지용 N+1 방지)
+    @Query(value = """
+            SELECT DISTINCT account_id FROM orders
+            WHERE trade_date BETWEEN :from AND :to
+            """, nativeQuery = true)
+    List<UUID> findDistinctAccountIdsByTradeDateBetween(
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 

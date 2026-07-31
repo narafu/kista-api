@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +28,11 @@ class AdminUserViewAdapter implements AdminUserViewPort {
         return jpaRepository.findAllByStatusOrderByCreatedAtDesc(status).stream()
                 .map(this::toView)
                 .toList();
+    }
+
+    @Override
+    public Optional<AdminUserView> findById(UUID userId) {
+        return jpaRepository.findById(userId).map(this::toView);
     }
 
     // UserEntity에서 직접 읽어 createdAt 손실 없이 AdminUserView 생성
