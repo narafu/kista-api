@@ -1,5 +1,6 @@
 package com.kista.application.service.admin;
 
+import com.kista.application.event.CycleEndedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
@@ -22,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -48,6 +50,7 @@ class AdminTradeCorrectionServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
     @Mock AuditLogPort auditLogPort;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks AdminTradeCorrectionService service;
 
@@ -89,6 +92,8 @@ class AdminTradeCorrectionServiceTest {
         verify(orderPort).saveAll(any());
         verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("7200.05"), LocalDate.of(2026, 7, 1));
         verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == Strategy.Status.PAUSED));
+        // 청산 발생 → 사이클 종료 이벤트 발행
+        verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
 
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());
@@ -124,5 +129,7 @@ class AdminTradeCorrectionServiceTest {
 
         verify(orderPort, never()).saveAll(any());
         verify(cyclePositionPort, never()).save(any());
+        // 청산 미발생 — 사이클 종료 이벤트 미발행
+        verify(eventPublisher, never()).publishEvent(any(CycleEndedEvent.class));
     }
 }

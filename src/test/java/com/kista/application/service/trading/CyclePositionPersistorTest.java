@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.CycleCompletedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,7 +38,7 @@ class CyclePositionPersistorTest {
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleRotationService cycleRotationService;
-    @Mock UserNotificationPort userNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock VrCycleRolloverService vrCycleRolloverService;
 
     CyclePositionPersistor persistor;
@@ -83,7 +85,7 @@ class CyclePositionPersistorTest {
 
         persistor = new CyclePositionPersistor(
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, cycleRotationService, userNotificationPort,
+                strategyCyclePort, cycleRotationService, eventPublisher,
                 cycleOrderStrategies, vrCycleRolloverService);
     }
 
@@ -162,6 +164,8 @@ class CyclePositionPersistorTest {
         // INFINITE: markEnded + rotate 호출
         verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
         verify(cycleRotationService).rotate(strategy, cycle, ACCOUNT, USER, PRICE, null);
+        // 사이클 완료 이벤트 발행 검증
+        verify(eventPublisher).publishEvent(new CycleCompletedEvent(USER, ACCOUNT, strategy));
         // INFINITE가 아닌 VR이 아니므로 vrCycleRolloverService 미호출
         verifyNoInteractions(vrCycleRolloverService);
     }

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,7 +45,7 @@ class CycleRotationServiceTest {
     @Mock CyclePositionPort cyclePositionPort;           // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)
     @Mock CycleSnapshotCreator cycleSnapshotCreator;    // StrategyCycle + CyclePosition 원자적 저장
     @Mock NotifyPort notifyPort;
-    @Mock UserNotificationPort userNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock UserSettingsPort userSettingsPort;
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock PrivacyStrategy privacyStrategy;
@@ -69,7 +70,7 @@ class CycleRotationServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
         service = new CycleRotationService(registry, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
-                cyclePositionPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, userSettingsPort);
+                cyclePositionPort, cycleSnapshotCreator, notifyPort, eventPublisher, cycleStrategies, userSettingsPort);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any()))

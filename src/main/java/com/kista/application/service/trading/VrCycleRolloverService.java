@@ -1,9 +1,11 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.NewCycleStartedEvent;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,7 +25,8 @@ class VrCycleRolloverService {
     private final StrategyCyclePort strategyCyclePort;           // 사이클 종료 기록
     private final CycleSnapshotCreator cycleSnapshotCreator;     // 새 사이클 + 초기 포지션 원자 저장
     private final NotifyPort notifyPort;                         // 관리자 알림
-    private final UserNotificationPort userNotificationPort;     // 사용자 알림
+    private final UserNotificationPort userNotificationPort;     // 사용자 알림 (오류)
+    private final ApplicationEventPublisher eventPublisher;       // 새 사이클 시작 이벤트 발행
 
     // 마감 리포트(saveCyclePosition) 직후 호출 — due 도래 시 V′ 계산 후 사이클 교체
     void rollIfDue(BatchContext ctx, AccountBalance postBalance, BigDecimal closingPrice, LocalDate today) {
@@ -117,7 +120,7 @@ class VrCycleRolloverService {
         );
         log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimitRate={}", strategy.id(), newValue, newPoolLimitRate);
 
-        // 사용자에게 새 사이클 시작 알림
-        userNotificationPort.notifyNewCycleStarted(ctx.user(), ctx.account(), strategy, postBalance.usdDeposit());
+        // 사용자에게 새 사이클 시작 알림 이벤트 발행
+        eventPublisher.publishEvent(new NewCycleStartedEvent(ctx.user(), ctx.account(), strategy, postBalance.usdDeposit()));
     }
 }

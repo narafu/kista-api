@@ -1,10 +1,10 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.TradingReportReadyEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.toss.TossApiException;
@@ -16,6 +16,7 @@ import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -36,11 +37,10 @@ class TradingReporter {
 
     private final BrokerAdapterRegistry registry;
     private final OrderPort orderPort;                              // 주문 체결 상태 갱신
-    private final UserNotificationPort userNotificationPort;        // 리포트 알림 발송
-    private final RealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final UserSettingsPort userSettingsPort;                // TRADING_ALERT 알림 활성 여부 조회
     private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
     private final NotifyPort notifyPort;                            // 취소 실패 등 관리자 알림
+    private final ApplicationEventPublisher eventPublisher;        // 리포트/SSE 알림 이벤트 발행
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
@@ -61,23 +61,12 @@ class TradingReporter {
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
         markFilledOrders(mainOrders, executions);
 
-        // TRADING_ALERT 알림 활성 여부 확인 후 발송 (기본값 true)
+        // TRADING_ALERT 알림 활성 여부 확인(기본값 true) 후 리포트/SSE 알림 이벤트 발행 — 실제 발송은 TradingReportNotifier에 위임
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
         UserSettings settings = userSettingsPort.findOrDefault(user.id());
-        if (settings.isNotificationEnabled(NotificationType.TRADING_ALERT)) {
-            userNotificationPort.notifyTradingReport(user, account, report);
-            log.info("[{}] 리포트 발송 완료", account.nickname());
-        } else {
-            log.info("[{}] TRADING_ALERT 비활성 — 리포트 발송 생략", account.nickname());
-        }
-        // 체결 건별 SSE 실시간 알림
-        for (Execution e : executions) {
-            TradeEvent event = e.direction() == SELL
-                    ? TradeEvent.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
-                    : TradeEvent.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
-            realtimeNotificationPort.notifyTrade(user.id(), event);
-        }
-        log.info("[{}] SSE 매매 알림 {}건 발송 완료", account.nickname(), executions.size());
+        boolean reportEnabled = settings.isNotificationEnabled(NotificationType.TRADING_ALERT);
+        eventPublisher.publishEvent(new TradingReportReadyEvent(user, account, report, executions, reportEnabled));
+        log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
     }
 
     // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 이미 체결된 주문의 취소는 브로커가 거부(무시)한다.

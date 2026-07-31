@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.NewCycleStartedEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.application.service.broker.BrokerCallGuard;
 import com.kista.common.CycleLookups;
@@ -23,11 +24,11 @@ import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.port.out.NotifyPort;
-import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -54,7 +55,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final BrokerAdapterRegistry registry;
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
-    private final UserNotificationPort userNotificationPort;
+    private final ApplicationEventPublisher eventPublisher;   // 새 사이클 시작 이벤트 발행
     private final NotifyPort notifyPort;                     // 사용자 알림 실패 시 관리자 알림
     private final StrategyUseCase strategyUseCase; // 재설정 후 최신 StrategyDetail 응답 조립에 재사용
 
@@ -122,10 +123,12 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
                 postBalance, currentPrice, newValue, weeks);
 
-        // 사용자 알림 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
+        // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
+        // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 fallbackExecution 리스너를 즉시 동기 실행하므로 try/catch가 유효함
+        // (향후 @Transactional을 붙이면 리스너가 AFTER_COMMIT으로 지연 실행되어 이 try/catch가 무력화됨에 주의)
         try {
             User user = userPort.findByIdOrThrow(requesterId);
-            userNotificationPort.notifyNewCycleStarted(user, account, strategy, postBalance.usdDeposit());
+            eventPublisher.publishEvent(new NewCycleStartedEvent(user, account, strategy, postBalance.usdDeposit()));
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
             notifyPort.notifyError(e);

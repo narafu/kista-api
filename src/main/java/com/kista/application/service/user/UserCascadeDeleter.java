@@ -1,7 +1,9 @@
 package com.kista.application.service.user;
 
+import com.kista.application.event.UserDeletedEvent;
 import com.kista.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -19,6 +21,7 @@ public class UserCascadeDeleter {
     private final UserPort userPort;
     private final RefreshTokenPort refreshTokenPort; // 모든 RT 삭제
     private final BlacklistPort blacklistPort;        // 남은 AT 즉시 차단
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final Duration AT_TTL = Duration.ofMinutes(15); // AT 만료까지 차단 유지
 
@@ -32,5 +35,7 @@ public class UserCascadeDeleter {
         // 인증 정리 — RT 전체 삭제 후 AT 즉시 차단
         refreshTokenPort.deleteAllByUserId(userId);
         blacklistPort.add(userId, AT_TTL);
+        // 삭제 완료 이벤트 발행 (트랜잭션 커밋 후 리스너 실행)
+        eventPublisher.publishEvent(new UserDeletedEvent(userId));
     }
 }

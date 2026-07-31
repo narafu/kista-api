@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.TradingReportReadyEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.broker.Execution;
@@ -15,8 +16,6 @@ import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.RealtimeNotificationPort;
-import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserSettingsPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
@@ -24,15 +23,18 @@ import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -42,8 +44,7 @@ class TradingReporterTest {
     @Mock BrokerAdapterRegistry registry;
     @Mock ExecutionPort executionPort;
     @Mock OrderPort orderPort;
-    @Mock UserNotificationPort userNotificationPort;
-    @Mock RealtimeNotificationPort realtimeNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock UserSettingsPort userSettingsPort;
     @Mock CyclePositionPersistor cyclePositionPersistor;
     @Mock BrokerOrderCorrectionPort brokerOrderPort;
@@ -81,8 +82,8 @@ class TradingReporterTest {
 
     @BeforeEach
     void setUp() {
-        reporter = new TradingReporter(registry, orderPort, userNotificationPort,
-                realtimeNotificationPort, userSettingsPort, cyclePositionPersistor, notifyPort);
+        reporter = new TradingReporter(registry, orderPort, userSettingsPort,
+                cyclePositionPersistor, notifyPort, eventPublisher);
         lenient().when(registry.require(ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
         lenient().when(registry.require(TOSS_ACCOUNT, ExecutionPort.class)).thenReturn(executionPort);
         lenient().when(registry.require(TOSS_ACCOUNT, BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderPort);
@@ -164,7 +165,9 @@ class TradingReporterTest {
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
 
-        verify(userNotificationPort, never()).notifyTradingReport(any(), any(), any());
+        ArgumentCaptor<TradingReportReadyEvent> captor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().reportEnabled()).isFalse();
     }
 
     @Test
@@ -174,7 +177,9 @@ class TradingReporterTest {
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
 
-        verify(realtimeNotificationPort, times(2)).notifyTrade(eq(USER.id()), any());
+        ArgumentCaptor<TradingReportReadyEvent> captor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().executions()).hasSize(2);
     }
 
     @Test
