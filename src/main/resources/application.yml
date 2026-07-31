@@ -83,6 +83,8 @@ app:
   cookie:
     secure: true        # prod: HTTPS 쿠키
     same-site: "None"   # prod: 크로스 오리진(Vercel→Fly.io)
+  trading:
+    parallel-per-account: 2   # 계좌별 사이클 동시 실행 상한 (0 이하 = 순차)
 
 jwt:
   signing-key: ${JWT_SIGNING_KEY}
