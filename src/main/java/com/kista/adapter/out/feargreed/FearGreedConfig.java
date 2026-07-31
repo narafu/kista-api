@@ -3,6 +3,7 @@ package com.kista.adapter.out.feargreed;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
@@ -10,7 +11,11 @@ class FearGreedConfig {
 
     @Bean
     RestTemplate fearGreedRestTemplate() {
-        RestTemplate restTemplate = new RestTemplate();
+        // CNN Fear & Greed 지수 조회 API 응답 지연 대비 타임아웃 설정 — 미설정 시 OS 기본값(~60초)로 무한 대기 가능
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000); // 연결 타임아웃 3초
+        factory.setReadTimeout(7_000);    // 읽기 타임아웃 7초
+        RestTemplate restTemplate = new RestTemplate(factory);
         // CNN Cloudflare 봇 감지 우회 — User-Agent 외 Accept·Referer 등 브라우저 헤더 모방 필수
         restTemplate.getInterceptors().add((request, body, execution) -> {
             HttpHeaders headers = request.getHeaders();

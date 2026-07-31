@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
@@ -12,7 +13,11 @@ class KbLandConfig {
 
     @Bean
     RestTemplate kbLandRestTemplate() {
-        RestTemplate restTemplate = new RestTemplate();
+        // KB Land 아파트 벤치마크 조회 API 응답 지연 대비 타임아웃 설정 — 미설정 시 OS 기본값(~60초)로 무한 대기 가능
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000); // 연결 타임아웃 3초
+        factory.setReadTimeout(7_000);    // 읽기 타임아웃 7초
+        RestTemplate restTemplate = new RestTemplate(factory);
         // KB Land data-api는 프론트 내부 호출과 유사한 헤더가 없으면 400을 반환할 수 있다.
         restTemplate.getInterceptors().add((request, body, execution) -> {
             HttpHeaders headers = request.getHeaders();
