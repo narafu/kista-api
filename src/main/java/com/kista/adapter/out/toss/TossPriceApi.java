@@ -17,6 +17,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
     private final PrevCloseCache prevCloseCache = new PrevCloseCache();
+    private final TossStockInfoCache stockInfoCache = new TossStockInfoCache(Duration.ofHours(6), Instant::now);
 
     public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
         if (tickers.isEmpty()) return Map.of();
@@ -136,6 +138,12 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // ── TossStockInfoPort ──────────────────────────────────────────────────────
 
     public TossStockInfo getStockInfo(Ticker ticker) {
+        return stockInfoCache.getOrFetch(ticker.name(), () -> fetchStockInfoUncached(ticker))
+                .orElseGet(() -> new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", ""));
+    }
+
+    // stocks API 직접 호출 — 성공 응답만 Optional에 담아 캐싱, 실패/empty는 Optional.empty 반환
+    private Optional<TossStockInfo> fetchStockInfoUncached(Ticker ticker) {
         // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", ticker.name());
@@ -146,17 +154,17 @@ class TossPriceApi implements CommonMarketPriceFeed {
         List<StockItem> items = wrapper != null ? wrapper.result() : null;
         if (items == null || items.isEmpty()) {
             log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
-            return new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", "");
+            return Optional.empty();
         }
         StockItem s = items.get(0);
-        return new TossStockInfo(
+        return Optional.of(new TossStockInfo(
                 s.symbol(),
                 s.name()         != null ? s.name()         : ticker.name(),
                 s.englishName()  != null ? s.englishName()  : ticker.name(),
                 s.market()       != null ? s.market()       : "",
                 s.currency()     != null ? s.currency()     : "USD",
                 s.status()       != null ? s.status()       : ""
-        );
+        ));
     }
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────

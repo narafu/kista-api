@@ -183,4 +183,42 @@ class TossPriceApiTest {
         assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("25.50"));
         verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class));
     }
+
+    // ── TossStockInfo 캐시 테스트 ──────────────────────────────────────────────────
+
+    // 종목 기본정보 API 응답 헬퍼
+    private static TossResult<List<TossPriceApi.StockItem>> wrapStocks(TossPriceApi.StockItem... items) {
+        return new TossResult<>(List.of(items));
+    }
+
+    @Test
+    @DisplayName("getStockInfo: 같은 종목 재조회 시 HTTP 1회만 호출 (캐시 히트)")
+    void getStockInfo_sameSymbol_callsHttpOnce() {
+        var stockItem = new TossPriceApi.StockItem("SOXL", "Direxion Daily Leveraged Semiconductor Bull 3X",
+                                                     "Direxion Daily Semiconductor Bull 3X Shares",
+                                                     "NYSE ARCA", "USD", "NORMAL", "10000000");
+        when(tossHttpClient.getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrapStocks(stockItem));
+
+        // 첫 호출
+        tossPriceApi.getStockInfo(Ticker.SOXL);
+        // 두 번째 호출 (캐시 히트)
+        tossPriceApi.getStockInfo(Ticker.SOXL);
+
+        verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    @DisplayName("getStockInfo: 빈 응답은 폴백 반환 후 미캐싱 (매번 재조회)")
+    void getStockInfo_emptyResponse_returnsDefaultWithoutCaching() {
+        when(tossHttpClient.getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrapStocks()); // 빈 목록
+
+        // 첫 호출
+        tossPriceApi.getStockInfo(Ticker.SOXL);
+        // 두 번째 호출 (캐시 없음 → 재조회)
+        tossPriceApi.getStockInfo(Ticker.SOXL);
+
+        verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class));
+    }
 }
