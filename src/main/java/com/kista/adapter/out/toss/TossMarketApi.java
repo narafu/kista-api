@@ -12,10 +12,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 // Toss market-calendar API 스펙 (openapi.json 검증):
 // - GET /api/v1/market-calendar/US?date={YYYY-MM-DD} — 단건 조회 (date 미지정 시 오늘)
@@ -34,6 +37,8 @@ class TossMarketApi {
     private static final int MAX_RANGE_DAYS = 30;
 
     private final TossHttpClient tossHttpClient;
+    // 날짜별 캐시 — 과거(미국 동부 기준 오늘 이전) 확정 날짜는 영구, 오늘·미래는 15분 TTL (Spring bean 아님, PrevCloseCache 스타일)
+    private final TossMarketCalendarCache calendarCache = new TossMarketCalendarCache(Duration.ofMinutes(15), Instant::now);
 
     // ── TossMarketCalendarPort ─────────────────────────────────────────────────
 
@@ -44,12 +49,18 @@ class TossMarketApi {
         }
         List<TossMarketSession> sessions = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            sessions.add(fetchSession(date));
+            LocalDate current = date; // 람다 캡처용 final 복사
+            sessions.add(calendarCache.getOrFetch(current, () -> fetchSession(current))
+                    .orElseGet(() -> {
+                        log.warn("Toss market-calendar 응답 없음: date={}", current);
+                        // 응답 없으면 해당 날짜 휴장으로 처리 — 캐싱하지 않음(일시 장애 영구오염 방지)
+                        return new TossMarketSession(current, null, null, null);
+                    }));
         }
         return sessions;
     }
 
-    private TossMarketSession fetchSession(LocalDate date) {
+    private Optional<TossMarketSession> fetchSession(LocalDate date) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("date", date.toString()); // YYYY-MM-DD
 
@@ -60,17 +71,15 @@ class TossMarketApi {
         MarketCalendarResponse response = wrapper != null ? wrapper.result() : null;
 
         if (response == null || response.today() == null) {
-            log.warn("Toss market-calendar 응답 없음: date={}", date);
-            // 응답 없으면 해당 날짜 휴장으로 처리
-            return new TossMarketSession(date, null, null, null);
+            return Optional.empty();
         }
         MarketDay today = response.today();
-        return new TossMarketSession(
+        return Optional.of(new TossMarketSession(
                 date,
                 toSessionHours(today.preMarket()),
                 toSessionHours(today.regularMarket()),
                 toSessionHours(today.afterMarket())
-        );
+        ));
     }
 
     private SessionHours toSessionHours(SessionWindow w) {
