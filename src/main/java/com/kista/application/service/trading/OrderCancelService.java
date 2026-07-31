@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -25,10 +24,10 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+// 비-트랜잭션 서비스 — 브로커 취소 HTTP는 트랜잭션 밖에서 실행, DB 상태변경만 OrderCancelStateWriter의 짧은 트랜잭션으로 위임
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 class OrderCancelService {
 
     private final OrderPort orderPort;
@@ -37,6 +36,7 @@ class OrderCancelService {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
+    private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
@@ -53,7 +53,7 @@ class OrderCancelService {
         List<Order> plannedOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate);
         int plannedDeleted = plannedOrders.size();
         if (!plannedOrders.isEmpty()) {
-            orderPort.deletePlannedByCycleAndDate(currentCycle.id(), tradeDate);
+            stateWriter.deletePlanned(currentCycle.id(), tradeDate);
             log.info("PLANNED 주문 {}건 삭제 — cycleId={}", plannedDeleted, currentCycle.id());
         }
 
@@ -66,7 +66,7 @@ class OrderCancelService {
         for (Order order : placedOrders) {
             try {
                 registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
-                orderPort.markCancelled(order.id());
+                stateWriter.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
                 log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
@@ -94,7 +94,7 @@ class OrderCancelService {
 
         if (order.status() == Order.OrderStatus.PLANNED) {
             // 증권사 미접수 — DB에서만 취소 처리
-            orderPort.markCancelled(orderId);
+            stateWriter.markCancelled(orderId);
             return;
         }
 
@@ -104,7 +104,7 @@ class OrderCancelService {
         }
 
         registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
-        orderPort.markCancelled(orderId);
+        stateWriter.markCancelled(orderId);
     }
 
 }

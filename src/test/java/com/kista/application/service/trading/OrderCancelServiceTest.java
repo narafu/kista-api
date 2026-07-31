@@ -20,11 +20,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -49,7 +51,7 @@ class OrderCancelServiceTest {
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock ApplicationEventPublisher eventPublisher;
-    @InjectMocks OrderCancelService service;
+    OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
     private final UUID cycleId = UUID.randomUUID();
@@ -70,6 +72,9 @@ class OrderCancelServiceTest {
                 null, LocalDate.now(), null, null, null);
         // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(brokerPort).when(registry).require(any(), any());
+        // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
+        service = new OrderCancelService(orderPort, registry, accountPort, cyclePort, strategyCyclePort,
+                eventPublisher, new OrderCancelStateWriter(orderPort));
     }
 
     // --- cancelByCycle ---
@@ -219,6 +224,42 @@ class OrderCancelServiceTest {
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(OrderCancelException.class);
+    }
+
+    // --- 트랜잭션 분리 검증 ---
+
+    @Test
+    @DisplayName("OrderCancelService는 클래스·메서드 어디에도 @Transactional이 없다 — 브로커 취소 HTTP가 트랜잭션 밖에서 실행됨")
+    void orderCancelService_hasNoTransactionalAnnotation() throws NoSuchMethodException {
+        assertThat(OrderCancelService.class.isAnnotationPresent(Transactional.class)).isFalse();
+
+        Method cancelByCycle = OrderCancelService.class.getDeclaredMethod("cancelByCycle", UUID.class, UUID.class);
+        Method cancelOrder = OrderCancelService.class.getDeclaredMethod("cancelOrder", UUID.class, UUID.class);
+        assertThat(cancelByCycle.isAnnotationPresent(Transactional.class)).isFalse();
+        assertThat(cancelOrder.isAnnotationPresent(Transactional.class)).isFalse();
+    }
+
+    @Test
+    @DisplayName("OrderCancelStateWriter의 DB 쓰기 메서드에는 @Transactional이 있다")
+    void orderCancelStateWriter_dbWritesAreTransactional() throws NoSuchMethodException {
+        Method deletePlanned = OrderCancelStateWriter.class.getDeclaredMethod("deletePlanned", UUID.class, LocalDate.class);
+        Method markCancelled = OrderCancelStateWriter.class.getDeclaredMethod("markCancelled", UUID.class);
+        assertThat(deletePlanned.isAnnotationPresent(Transactional.class)).isTrue();
+        assertThat(markCancelled.isAnnotationPresent(Transactional.class)).isTrue();
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커 취소 성공 이후에만 markCancelled가 호출된다")
+    void cancelOrder_marksCancelledOnlyAfterBrokerCancelSucceeds() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        InOrder inOrder = inOrder(brokerPort, orderPort);
+        inOrder.verify(brokerPort).cancel(order, ownedAccount);
+        inOrder.verify(orderPort).markCancelled(orderId);
     }
 
     // ---
