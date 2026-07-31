@@ -2,6 +2,8 @@ package com.kista.domain.port.out;
 
 import com.kista.domain.model.strategy.StrategyVrDetail;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,4 +17,7 @@ public interface StrategyVrDetailPort {
 
     // 전략의 활성 버전 VR 상세 조회 (strategy_version.deleted_at IS NULL 최신 1건)
     Optional<StrategyVrDetail> findActiveByStrategyId(UUID strategyId);
+
+    // 여러 버전의 VR 상세 배치 조회 (목록 조회 N+1 방지) — PK(strategyVersionId) IN 조회
+    Map<UUID, StrategyVrDetail> findByStrategyVersionIds(Collection<UUID> strategyVersionIds);
 }

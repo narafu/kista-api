@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -169,6 +170,58 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).isEmpty();
     }
 
+    // ===== findFirstByCycleIds / findLatestByCycleIds — 목록 조회 배치 조회 =====
+
+    @Test
+    void findFirstByCycleIds_returnsOpeningPositionPerCycleExcludingDeleted() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);
+        UUID cycleA = insertCycleChain(accountId, false, false);
+        UUID cycleB = insertCycleChain(accountId, false, false);
+        UUID otherCycle = insertCycleChain(accountId, false, false); // 조회 대상 아님
+
+        UUID openingA = insertPosition(cycleA, new BigDecimal("1.00"), base, false);
+        insertPosition(cycleA, new BigDecimal("2.00"), base.plus(1, ChronoUnit.HOURS), false); // A의 최신 — 개장 아님
+        UUID deletedOpeningB = insertPosition(cycleB, new BigDecimal("3.00"), base, true); // 삭제된 개장 — 제외
+        UUID firstActiveB = insertPosition(cycleB, new BigDecimal("4.00"), base.plus(1, ChronoUnit.HOURS), false);
+        insertPosition(otherCycle, new BigDecimal("5.00"), base, false);
+
+        Map<UUID, CyclePosition> result = cyclePositionAdapter.findFirstByCycleIds(List.of(cycleA, cycleB));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(cycleA).id()).isEqualTo(openingA);
+        assertThat(result.get(cycleB).id()).isEqualTo(firstActiveB);
+        assertThat(result.get(cycleB).id()).isNotEqualTo(deletedOpeningB);
+        assertThat(result).doesNotContainKey(otherCycle);
+    }
+
+    @Test
+    void findFirstByCycleIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cyclePositionAdapter.findFirstByCycleIds(List.of())).isEmpty();
+    }
+
+    @Test
+    void findLatestByCycleIds_returnsMostRecentPositionPerCycleExcludingDeleted() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);
+        UUID cycleA = insertCycleChain(accountId, false, false);
+        UUID cycleB = insertCycleChain(accountId, false, false);
+
+        insertPosition(cycleA, new BigDecimal("1.00"), base, false);
+        UUID latestA = insertPosition(cycleA, new BigDecimal("2.00"), base.plus(1, ChronoUnit.HOURS), false);
+        UUID firstB = insertPosition(cycleB, new BigDecimal("3.00"), base, false);
+        insertPosition(cycleB, new BigDecimal("4.00"), base.plus(1, ChronoUnit.HOURS), true); // 삭제된 최신 — 제외
+
+        Map<UUID, CyclePosition> result = cyclePositionAdapter.findLatestByCycleIds(List.of(cycleA, cycleB));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(cycleA).id()).isEqualTo(latestA);
+        assertThat(result.get(cycleB).id()).isEqualTo(firstB);
+    }
+
+    @Test
+    void findLatestByCycleIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cyclePositionAdapter.findLatestByCycleIds(List.of())).isEmpty();
+    }
+
     @Test
     void findFirstOne_skipsSoftDeletedOpeningPosition() {
         Instant openingAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);
@@ -180,6 +233,38 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         Optional<CyclePosition> result = cyclePositionAdapter.findFirstOne(cycleId);
 
         assertThat(result).get().extracting(CyclePosition::id).isEqualTo(firstActiveId);
+    }
+
+    @Test
+    void findByCyclePositionIds_returnsDetailsKeyedByPositionId() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
+                null, strategy.id(), version.id(), new BigDecimal("1000.00"),
+                null, LocalDate.now(), null, null, null
+        ));
+        CyclePosition posA = cyclePositionAdapter.save(CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00")));
+        CyclePosition posB = cyclePositionAdapter.save(new CyclePosition(
+                null, cycle.id(), new BigDecimal("900.00"),
+                new BigDecimal("25.00"), new BigDecimal("24.00"), 5, null, null
+        ));
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posA.id(), false));
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posB.id(), true));
+
+        var result = cyclePositionInfiniteDetailAdapter.findByCyclePositionIds(
+                List.of(posA.id(), posB.id(), UUID.randomUUID()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(posA.id()).isReverseMode()).isFalse();
+        assertThat(result.get(posB.id()).isReverseMode()).isTrue();
+    }
+
+    @Test
+    void findByCyclePositionIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cyclePositionInfiniteDetailAdapter.findByCyclePositionIds(List.of())).isEmpty();
     }
 
     @Test

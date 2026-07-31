@@ -3,6 +3,8 @@ package com.kista.domain.port.out;
 import com.kista.domain.model.strategy.StrategyVersion;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +20,9 @@ public interface StrategyVersionPort {
     }
 
     Optional<StrategyVersion> findActiveByStrategyId(UUID strategyId);
+
+    // 여러 전략의 활성 버전 배치 조회 (목록 조회 N+1 방지) — strategyId 기준 versionNo 최대 1건씩
+    Map<UUID, StrategyVersion> findActiveByStrategyIds(Collection<UUID> strategyIds);
 
     int nextVersionNo(UUID strategyId);
 

@@ -7,8 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -30,6 +33,14 @@ class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
     public Optional<StrategyVersion> findActiveByStrategyId(UUID strategyId) {
         return jpaRepository.findTop1ByStrategyIdAndDeletedAtIsNullOrderByVersionNoDesc(strategyId)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public Map<UUID, StrategyVersion> findActiveByStrategyIds(Collection<UUID> strategyIds) {
+        if (strategyIds.isEmpty()) return Map.of();
+        return jpaRepository.findActiveByStrategyIdIn(strategyIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(StrategyVersion::strategyId, v -> v));
     }
 
     @Override

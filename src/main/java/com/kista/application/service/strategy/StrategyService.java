@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -376,19 +378,19 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByUserId(UUID userId) {
-        return accountPort.findByUserId(userId).stream()
-                .flatMap(acc -> strategyPort.findByAccountId(acc.id()).stream())
-                .map(this::toDetail)
+        List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
+        Map<UUID, List<Strategy>> strategiesByAccount = strategyPort.findByAccountIds(accountIds);
+        List<Strategy> strategies = accountIds.stream()
+                .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
                 .toList();
+        return toDetails(strategies);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         accountPort.requireOwnedAccount(accountId, requesterId);
-        return strategyPort.findByAccountId(accountId).stream()
-                .map(this::toDetail)
-                .toList();
+        return toDetails(strategyPort.findByAccountId(accountId));
     }
 
     @Override
@@ -452,7 +454,7 @@ class StrategyService implements StrategyUseCase {
         log.info("시드 수정: strategyId={}, newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
     }
 
-    // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다.
+    // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다. (단건 경로 — 단건 port 호출로 입력 구성 후 assemble 위임)
     private StrategyDetail toDetail(Strategy strategy) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         Optional<CyclePosition> openingPosition = strategy.isVr()
@@ -460,14 +462,9 @@ class StrategyService implements StrategyUseCase {
                         .orElseThrow(() -> new IllegalStateException(
                                 "VR 시작 포지션 없음: cycleId=" + cycle.id())))
                 : Optional.empty();
-        BigDecimal initialUsdDeposit = strategy.isVr()
-                ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
-                : latestCycle.map(StrategyCycle::startAmount).orElse(null);
-        LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         Integer divisionCount = strategy.isInfinite()
-                ? strategyVersionPort.findActiveByStrategyId(strategy.id())
-                        .flatMap(version -> strategyInfiniteDetailPort.findByStrategyVersionId(version.id()))
+                ? strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                         .map(StrategyInfiniteDetail::divisionCount)
                         .orElse(Strategy.DEFAULT_DIVISION_COUNT)
                 : null;
@@ -479,18 +476,94 @@ class StrategyService implements StrategyUseCase {
                 .map(CyclePositionInfiniteDetail::isReverseMode)
                 .orElse(false);
 
+        // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition은 위에서 이미 조회한 값 재사용
+        StrategyDetail.VrSummary vrSummary = strategy.isVr()
+                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition).orElse(null)
+                : null;
+
+        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary);
+    }
+
+    // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
+    private List<StrategyDetail> toDetails(List<Strategy> strategies) {
+        if (strategies.isEmpty()) return List.of();
+        List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
+
+        Map<UUID, StrategyCycle> latestCycles = strategyCyclePort.findLatestByStrategyIds(strategyIds);
+        List<UUID> cycleIds = latestCycles.values().stream().map(StrategyCycle::id).toList();
+
+        // VR만 개장 포지션 필요 — 해당 전략들의 최신 사이클 ID로만 조회
+        List<UUID> vrCycleIds = strategies.stream()
+                .filter(Strategy::isVr)
+                .map(s -> latestCycles.get(s.id()))
+                .filter(Objects::nonNull)
+                .map(StrategyCycle::id)
+                .toList();
+        Map<UUID, CyclePosition> openingPositions = cyclePositionPort.findFirstByCycleIds(vrCycleIds);
+        Map<UUID, CyclePosition> latestPositions = cyclePositionPort.findLatestByCycleIds(cycleIds);
+
+        Map<UUID, StrategyVersion> activeVersions = strategyVersionPort.findActiveByStrategyIds(strategyIds);
+        List<UUID> versionIds = activeVersions.values().stream().map(StrategyVersion::id).toList();
+        Map<UUID, StrategyInfiniteDetail> infiniteDetails = strategyInfiniteDetailPort.findByStrategyVersionIds(versionIds);
+        Map<UUID, StrategyVrDetail> vrDetails = vrStrategyLifecycle.findVrDetailsByVersionIds(versionIds);
+        Map<UUID, StrategyCycleVrDetail> cycleVrDetails = vrStrategyLifecycle.findCycleVrDetailsByCycleIds(cycleIds);
+
+        List<UUID> positionIds = latestPositions.values().stream().map(CyclePosition::id).toList();
+        Map<UUID, CyclePositionInfiniteDetail> infinitePositionDetails =
+                cyclePositionInfiniteDetailPort.findByCyclePositionIds(positionIds);
+
+        return strategies.stream().map(strategy -> {
+            Optional<StrategyCycle> latestCycle = Optional.ofNullable(latestCycles.get(strategy.id()));
+            Optional<CyclePosition> openingPosition = strategy.isVr()
+                    ? latestCycle.map(cycle -> Optional.ofNullable(openingPositions.get(cycle.id()))
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "VR 시작 포지션 없음: cycleId=" + cycle.id())))
+                    : Optional.empty();
+            Optional<StrategyVersion> activeVersion = Optional.ofNullable(activeVersions.get(strategy.id()));
+
+            Integer divisionCount = strategy.isInfinite()
+                    ? activeVersion.map(StrategyVersion::id)
+                            .flatMap(versionId -> Optional.ofNullable(infiniteDetails.get(versionId)))
+                            .map(StrategyInfiniteDetail::divisionCount)
+                            .orElse(Strategy.DEFAULT_DIVISION_COUNT)
+                    : null;
+
+            Optional<CyclePosition> latestPos = latestCycle.flatMap(cycle -> Optional.ofNullable(latestPositions.get(cycle.id())));
+
+            boolean isReverseMode = latestPos
+                    .flatMap(pos -> Optional.ofNullable(infinitePositionDetails.get(pos.id())))
+                    .map(CyclePositionInfiniteDetail::isReverseMode)
+                    .orElse(false);
+
+            StrategyDetail.VrSummary vrSummary = strategy.isVr()
+                    ? activeVersion.map(StrategyVersion::id)
+                            .flatMap(versionId -> Optional.ofNullable(vrDetails.get(versionId)))
+                            .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
+                                    .map(cycleVr -> vrStrategyLifecycle.buildSummary(
+                                            vrDetail, cycleVr, openingPosition.map(CyclePosition::usdDeposit).orElse(null))))
+                            .orElse(null)
+                    : null;
+
+            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary);
+        }).toList();
+    }
+
+    // 이미 조회된 입력들을 조합만 하는 순수 조립 메서드 — toDetail/toDetails 공용
+    private StrategyDetail assemble(Strategy strategy, Optional<StrategyCycle> latestCycle,
+                                     Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
+                                     Integer divisionCount, boolean isReverseMode, StrategyDetail.VrSummary vrSummary) {
+        BigDecimal initialUsdDeposit = strategy.isVr()
+                ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
+                : latestCycle.map(StrategyCycle::startAmount).orElse(null);
+        LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
+
         // VR은 currentRound 없음 — INFINITE만 계산
         Double currentRound = strategy.isVr() ? null :
-                latestPos.map(pos -> InfinitePosition.calcCurrentRound(
+                latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
                         pos.avgPrice(), pos.holdings(), pos.usdDeposit(),
                         divisionCount == null ? 0 : divisionCount)).orElse(null);
 
-        Integer currentHoldings = latestPos.map(CyclePosition::holdings).orElse(null);
-
-        // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산
-        StrategyDetail.VrSummary vrSummary = strategy.isVr()
-                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle).orElse(null)
-                : null;
+        Integer currentHoldings = latestPosition.map(CyclePosition::holdings).orElse(null);
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
     }

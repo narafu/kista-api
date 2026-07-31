@@ -116,6 +116,25 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findByCycleIds_returnsDetailsKeyedByCycleId() {
+        StrategyCycle cycleA = createCycle();
+        StrategyCycle cycleB = createCycle();
+        cycleVrAdapter.save(new StrategyCycleVrDetail(cycleA.id(), new BigDecimal("5000.00"), 10, new BigDecimal("0.75")));
+        cycleVrAdapter.save(new StrategyCycleVrDetail(cycleB.id(), new BigDecimal("6000.00"), 20, new BigDecimal("0.50")));
+
+        var result = cycleVrAdapter.findByCycleIds(java.util.List.of(cycleA.id(), cycleB.id(), UUID.randomUUID()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(cycleA.id()).value()).isEqualByComparingTo("5000.00");
+        assertThat(result.get(cycleB.id()).value()).isEqualByComparingTo("6000.00");
+    }
+
+    @Test
+    void findByCycleIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cycleVrAdapter.findByCycleIds(java.util.List.of())).isEmpty();
+    }
+
+    @Test
     void strategyCycleVrHasNoDeletedAt_confirmedBySchema() {
         // strategy_cycle_vr 테이블에 deleted_at 없음 — 부모 FK CASCADE로 처리
         Integer deletedAtCount = jdbcTemplate.queryForObject(

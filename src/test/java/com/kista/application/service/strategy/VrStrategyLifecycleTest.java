@@ -5,7 +5,6 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
-import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +31,6 @@ class VrStrategyLifecycleTest {
 
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
-    @Mock CyclePositionPort cyclePositionPort;
 
     @InjectMocks VrStrategyLifecycle vrStrategyLifecycle;
 
@@ -105,10 +103,9 @@ class VrStrategyLifecycleTest {
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
-        when(cyclePositionPort.findFirstOne(cycleId)).thenReturn(Optional.of(openingPosition));
 
         Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
-                strategyId, Optional.of(latestCycle));
+                strategyId, Optional.of(latestCycle), Optional.of(openingPosition));
 
         assertThat(result).isPresent();
         assertThat(result.get().intervalWeeks()).isEqualTo(4);
@@ -132,7 +129,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(strategyId, Optional.of(latestCycle)))
+        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(strategyId, Optional.of(latestCycle), Optional.empty()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음")
                 .hasMessageContaining(cycleId.toString());

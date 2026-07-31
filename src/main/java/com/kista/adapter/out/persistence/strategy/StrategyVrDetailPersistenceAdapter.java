@@ -6,8 +6,11 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -28,6 +31,14 @@ class StrategyVrDetailPersistenceAdapter implements StrategyVrDetailPort {
     @Override
     public Optional<StrategyVrDetail> findActiveByStrategyId(UUID strategyId) {
         return jpaRepository.findActiveByStrategyId(strategyId).map(this::toDomain);
+    }
+
+    @Override
+    public Map<UUID, StrategyVrDetail> findByStrategyVersionIds(Collection<UUID> strategyVersionIds) {
+        if (strategyVersionIds.isEmpty()) return Map.of();
+        return jpaRepository.findAllById(strategyVersionIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(StrategyVrDetail::strategyVersionId, d -> d));
     }
 
     private StrategyVrDetail toDomain(StrategyVrVersionEntity entity) {

@@ -242,6 +242,29 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findByStrategyVersionIds_returnsDetailsKeyedByVersionId() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, Strategy.Type.VR,
+                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+        ));
+        StrategyVersion v1 = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyVersion v2 = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 2, null, null));
+        vrDetailAdapter.save(noRampDetail(v1.id(), 4, new BigDecimal("10.00"), 100));
+        vrDetailAdapter.save(noRampDetail(v2.id(), 8, new BigDecimal("20.00"), 200));
+
+        var result = vrDetailAdapter.findByStrategyVersionIds(java.util.List.of(v1.id(), v2.id(), UUID.randomUUID()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(v1.id()).intervalWeeks()).isEqualTo(4);
+        assertThat(result.get(v2.id()).intervalWeeks()).isEqualTo(8);
+    }
+
+    @Test
+    void findByStrategyVersionIds_emptyCollection_returnsEmptyMap() {
+        assertThat(vrDetailAdapter.findByStrategyVersionIds(java.util.List.of())).isEmpty();
+    }
+
+    @Test
     void strategyVrVersionHasNoDeletedAt_confirmedBySchema() {
         // strategy_vr_version 테이블에 deleted_at 없음 — 부모 FK CASCADE로 처리
         Integer deletedAtCount = jdbcTemplate.queryForObject(
