@@ -3,29 +3,37 @@ package com.kista.adapter.out.toss;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.broker.Currency;
 import com.kista.domain.model.broker.MarginItem;
+import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.util.MultiValueMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
+@Execution(ExecutionMode.SAME_THREAD)
 @DisplayName("TossHoldingsApi 단위 테스트")
 class TossHoldingsApiTest {
 
@@ -209,5 +217,75 @@ class TossHoldingsApiTest {
         assertThat(second.rate()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(tossHttpClient, org.mockito.Mockito.times(2)).getCommon(
                 eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    @DisplayName("getPresentBalance: holdings·USD·KRW·환율 4개 호출이 병렬 실행된다")
+    void getPresentBalance_fourCallsRunInParallel() throws Exception {
+        // 4개 독립 호출이 모두 barrier에 동시 도달해야만 진행 — 순차 실행이면 타임아웃으로 실패
+        CyclicBarrier barrier = new CyclicBarrier(4);
+
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenAnswer(inv -> {
+                barrier.await(2, TimeUnit.SECONDS);
+                return new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of()));
+            });
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenAnswer(inv -> {
+                barrier.await(2, TimeUnit.SECONDS);
+                @SuppressWarnings("unchecked")
+                MultiValueMap<String, String> params = (MultiValueMap<String, String>) inv.getArgument(2);
+                String currency = params.getFirst("currency");
+                String amount = "USD".equals(currency) ? "100.00" : "140000";
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+            });
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+            .thenAnswer(inv -> {
+                barrier.await(2, TimeUnit.SECONDS);
+                return new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00"));
+            });
+
+        PresentBalanceResult result = tossHoldingsApi.getPresentBalance(ACCOUNT);
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    @DisplayName("getMargin: USD·KRW·환율 3개 호출이 병렬 실행된다")
+    void getMargin_threeCallsRunInParallel() throws Exception {
+        // 3개 독립 호출이 모두 barrier에 동시 도달해야만 진행 — 순차 실행이면 타임아웃으로 실패
+        CyclicBarrier barrier = new CyclicBarrier(3);
+
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenAnswer(inv -> {
+                barrier.await(2, TimeUnit.SECONDS);
+                @SuppressWarnings("unchecked")
+                MultiValueMap<String, String> params = (MultiValueMap<String, String>) inv.getArgument(2);
+                String currency = params.getFirst("currency");
+                String amount = "USD".equals(currency) ? "100.00" : "140000";
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+            });
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+            .thenAnswer(inv -> {
+                barrier.await(2, TimeUnit.SECONDS);
+                return new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00"));
+            });
+
+        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
+
+        assertThat(items).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("병렬 호출 중 TossApiException 발생 시 언래핑되어 그대로 전파된다")
+    void getMargin_exceptionInParallelTask_propagatesUnwrapped() {
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenThrow(new TossApiException("Toss 매수가능금액 조회 실패", null));
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+
+        assertThatThrownBy(() -> tossHoldingsApi.getMargin(ACCOUNT))
+            .isInstanceOf(TossApiException.class)
+            .hasMessage("Toss 매수가능금액 조회 실패");
     }
 }

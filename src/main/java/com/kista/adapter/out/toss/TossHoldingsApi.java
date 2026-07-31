@@ -8,6 +8,7 @@ import com.kista.domain.model.broker.MarginItem;
 import com.kista.domain.model.broker.PresentBalanceResult;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.model.toss.TossExchangeRate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -75,10 +80,18 @@ class TossHoldingsApi {
 
     // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
     public List<MarginItem> getMargin(Account account) {
-        // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
-        BigDecimal usdBuyable = fetchBuyingPower(account, "USD");
-        BigDecimal krwBuyable = fetchBuyingPower(account, "KRW");
-        BigDecimal usdToKrwRate = fetchUsdToKrwRate();
+        // USD·KRW 예수금·환율 3개 독립 HTTP 호출을 virtual thread로 병렬 실행
+        BigDecimal usdBuyable;
+        BigDecimal krwBuyable;
+        BigDecimal usdToKrwRate;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<BigDecimal> usdFuture = executor.submit(() -> fetchBuyingPower(account, "USD"));
+            Future<BigDecimal> krwFuture = executor.submit(() -> fetchBuyingPower(account, "KRW"));
+            Future<BigDecimal> rateFuture = executor.submit(this::fetchUsdToKrwRate);
+            usdBuyable = await(usdFuture);
+            krwBuyable = await(krwFuture);
+            usdToKrwRate = await(rateFuture);
+        }
 
         // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
         log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
@@ -90,15 +103,25 @@ class TossHoldingsApi {
     }
 
     public PresentBalanceResult getPresentBalance(Account account) {
-        // 1. 전체 보유 종목 조회 — TossResult<HoldingsResponse> 제네릭 래퍼 구조
-        TossResult<HoldingsResponse> holdingsWrapper = tossHttpClient.get(
-                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
-                new ParameterizedTypeReference<TossResult<HoldingsResponse>>() {});
-        HoldingsResponse holdingsResponse = holdingsWrapper != null ? holdingsWrapper.result() : null;
-        // 2~4. USD·KRW 예수금 및 환율 조회
-        BigDecimal usdDeposit = fetchBuyingPower(account, "USD");
-        BigDecimal krwDeposit = fetchBuyingPower(account, "KRW");
-        BigDecimal rate = fetchUsdToKrwRate();
+        // 1~4. 보유 종목·USD·KRW 예수금·환율 4개 독립 HTTP 호출을 virtual thread로 병렬 실행
+        HoldingsResponse holdingsResponse;
+        BigDecimal usdDeposit;
+        BigDecimal krwDeposit;
+        BigDecimal rate;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<TossResult<HoldingsResponse>> holdingsFuture = executor.submit(() -> tossHttpClient.get(
+                    HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
+                    new ParameterizedTypeReference<TossResult<HoldingsResponse>>() {}));
+            Future<BigDecimal> usdFuture = executor.submit(() -> fetchBuyingPower(account, "USD"));
+            Future<BigDecimal> krwFuture = executor.submit(() -> fetchBuyingPower(account, "KRW"));
+            Future<BigDecimal> rateFuture = executor.submit(this::fetchUsdToKrwRate);
+
+            TossResult<HoldingsResponse> holdingsWrapper = await(holdingsFuture);
+            holdingsResponse = holdingsWrapper != null ? holdingsWrapper.result() : null;
+            usdDeposit = await(usdFuture);
+            krwDeposit = await(krwFuture);
+            rate = await(rateFuture);
+        }
 
         // 5. Ticker 파싱 성공·수량 > 0 항목만 원시 보유값으로 추출 (계산은 도메인 위임)
         List<PresentBalanceResult.TossHolding> holdings = List.of();
@@ -187,6 +210,20 @@ class TossHoldingsApi {
         int quantity = TossResponseParser.parseIntOrZero(result.sellableQuantity());
         log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
+    }
+
+    // Future 결과 대기 — ExecutionException을 언래핑해 TossApiException 등 원본 예외를 호출자에 그대로 전파
+    private static <T> T await(Future<T> future) {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException re) throw re;
+            if (e.getCause() instanceof Error err) throw err;
+            throw new TossApiException("Toss 병렬 조회 실패: " + e.getCause(), e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new TossApiException("Toss 병렬 조회 인터럽트", e);
+        }
     }
 
     // package-private — TossHoldingsApiTest에서 직접 생성하여 stub에 사용
