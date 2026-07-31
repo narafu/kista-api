@@ -147,7 +147,10 @@ class TossHttpClient {
                 return call.apply(token);
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() != 401) {
-                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+                    String body = e.getResponseBodyAsString();
+                    // 취소 요청 직전/직후 체결 확정 — 브로커가 거부하는 예상된 경합 (TradingReporter가 관리자 알림 없이 처리)
+                    boolean alreadyFilled = e.getStatusCode().value() == 409 && body.contains("already-filled");
+                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, alreadyFilled);
                 }
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);

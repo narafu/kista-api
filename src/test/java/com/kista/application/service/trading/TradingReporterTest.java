@@ -9,6 +9,7 @@ import com.kista.domain.model.strategy.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
@@ -200,6 +201,22 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
 
         verify(notifyPort).notifyError(any());
+        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), Order.OrderStatus.FILLED);
+    }
+
+    @Test
+    void Toss_취소가_이미체결_409로_거부되면_관리자_알림없이_체결로_기록된다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = tossPlacedOrder(orderId, "E1", 5);
+        doThrow(new TossApiException(
+                "Toss API 오류: 409 CONFLICT {\"error\":{\"code\":\"already-filled\",\"message\":\"체결 완료된 주문입니다.\"}}",
+                null, true)).when(brokerOrderPort).cancel(order, TOSS_ACCOUNT);
+        when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, TOSS_ACCOUNT))
+                .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
+
+        reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
+
+        verify(notifyPort, never()).notifyError(any());
         verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), Order.OrderStatus.FILLED);
     }
 

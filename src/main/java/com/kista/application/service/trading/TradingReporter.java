@@ -7,6 +7,7 @@ import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.TradeEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
@@ -90,10 +91,20 @@ class TradingReporter {
             try {
                 registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
             } catch (Exception e) {
-                log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
-                notifyPort.notifyError(e);
+                if (isAlreadyFilled(e)) {
+                    // 취소 요청 직전/직후 체결 확정 — 브로커 주석대로 예상된 경합, 관리자 알림 불필요
+                    log.info("[orderId={}] 취소 시점 이미 체결 완료 — 취소 생략", order.id());
+                } else {
+                    log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
+                    notifyPort.notifyError(e);
+                }
             }
         }
+    }
+
+    // 취소 시점 이미 체결 확정 여부 — TossHttpClient가 409 CONFLICT(already-filled) 응답을 판정해 TossApiException에 실어 보낸다
+    private boolean isAlreadyFilled(Exception e) {
+        return e instanceof TossApiException tae && tae.isAlreadyFilledConflict();
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록
