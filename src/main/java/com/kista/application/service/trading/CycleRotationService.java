@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.NewCycleStartedEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -16,6 +17,7 @@ import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -36,7 +38,7 @@ class CycleRotationService {
     private final CyclePositionPort cyclePositionPort;         // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)
     private final CycleSnapshotCreator cycleSnapshotCreator;   // StrategyCycle + CyclePosition 원자적 저장
     private final NotifyPort notifyPort;                       // 관리자 알림 (잔고 부족·오류)
-    private final UserNotificationPort userNotificationPort;   // 사용자 알림 (재등록 완료)
+    private final ApplicationEventPublisher eventPublisher;    // 새 사이클 시작 이벤트 발행 (재등록 완료)
     private final CycleOrderStrategies cycleStrategies;        // 전략 타입별 최소금액 정책
     private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
 
@@ -80,7 +82,7 @@ class CycleRotationService {
         StrategyCycle newCycle = cycleSnapshotCreator.createCycleAndSnapshot(
                 strategy.id(), activeVersion.id(), targetSeed, price);
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
-        userNotificationPort.notifyNewCycleStarted(user, account, strategy, targetSeed); // 사용자 알림
+        eventPublisher.publishEvent(new NewCycleStartedEvent(user, account, strategy, targetSeed)); // 사용자 알림 이벤트
     }
 
     // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환

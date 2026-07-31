@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.TradingReportReadyEvent;
 import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -53,7 +55,6 @@ class TradingServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort; // TradingService + TradingReporter 양쪽에서 사용
     @Mock OrderPort orderPort;
-    @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyPort cyclePort;
@@ -70,6 +71,7 @@ class TradingServiceTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
     @Mock StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 조회 (CycleOrderComputer용)
     @Mock VrStrategy vrStrategy; // VR 전략 주문 생성 mock (VrCycleOrderStrategy 조립용)
+    @Mock ApplicationEventPublisher eventPublisher; // 사이클 완료/시작·리포트 이벤트 발행 (헬퍼 컴포넌트 조립용)
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -124,7 +126,7 @@ class TradingServiceTest {
                 eq(MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
                 marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
-                cycleHistoryPort, cycleSnapshotCreator, notifyPort, userNotificationPort, cycleStrategies, userSettingsPort);
+                cycleHistoryPort, cycleSnapshotCreator, notifyPort, eventPublisher, cycleStrategies, userSettingsPort);
         // 브로커 포트 레지스트리 — 각 mock을 직접 연결 (KisPricePort/KisExecutionPort 삭제로 단순화)
         BrokerAdapterRegistry tradingRegistry = mock(BrokerAdapterRegistry.class);
 
@@ -150,10 +152,10 @@ class TradingServiceTest {
         VrCycleRolloverService vrRolloverService = mock(VrCycleRolloverService.class); // VR 롤오버 mock
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, userNotificationPort, cycleStrategies, vrRolloverService);
+                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService);
         TradingReporter reporter = new TradingReporter(
-                tradingRegistry, orderPort, userNotificationPort, realtimeNotificationPort,
-                userSettingsPort, positionPersistor, notifyPort);
+                tradingRegistry, orderPort, userSettingsPort,
+                positionPersistor, notifyPort, eventPublisher);
         // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT), any()))
@@ -248,7 +250,9 @@ class TradingServiceTest {
         // 종가(PRICE="22.00")가 저장되어야 함 — 시작가("20.00")가 저장되면 버그
         verify(cycleHistoryPort).save(argThat(h -> h.closingPrice() != null
                 && h.closingPrice().compareTo(PRICE) == 0));
-        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
+        verify(eventPublisher).publishEvent(argThat((Object event) ->
+                event instanceof TradingReportReadyEvent e
+                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
     }
 
     @Test
@@ -339,7 +343,9 @@ class TradingServiceTest {
                 && h.avgPrice() != null && h.avgPrice().compareTo(executionPrice) == 0
                 && h.closingPrice() != null && h.closingPrice().compareTo(closingPrice) == 0));
         // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
-        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
+        verify(eventPublisher).publishEvent(argThat((Object event) ->
+                event instanceof TradingReportReadyEvent e
+                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
     }
 
     // ── placeOpenOrders 테스트 ────────────────────────────────────────────────
@@ -1126,7 +1132,9 @@ class TradingServiceTest {
         verify(infiniteStrategy, never()).buildOrders(any(InfinitePosition.class), any(LocalDate.class));
         verify(brokerOrderPort, times(5)).place(any(), eq(ACCOUNT));
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
-        verify(userNotificationPort).notifyTradingReport(eq(USER), eq(ACCOUNT), any(TradingReport.class));
+        verify(eventPublisher).publishEvent(argThat((Object event) ->
+                event instanceof TradingReportReadyEvent e
+                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
     }
 
     @Test

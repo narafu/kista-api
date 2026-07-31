@@ -1,11 +1,13 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.CycleCompletedEvent;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -23,7 +25,7 @@ class CyclePositionPersistor {
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;        // 전략 버전별 divisionCount 조회
     private final StrategyCyclePort strategyCyclePort;                          // 사이클 종료 기록
     private final CycleRotationService cycleRotationService;                    // 사이클 종료 후 연속 정책 실행
-    private final UserNotificationPort userNotificationPort;                    // 사이클 완료 알림
+    private final ApplicationEventPublisher eventPublisher;                     // 사이클 완료 이벤트 발행
     private final CycleOrderStrategies cycleOrderStrategies;                    // 전략 타입별 capability 조회
     private final VrCycleRolloverService vrCycleRolloverService;                // VR N주 롤오버
 
@@ -57,7 +59,7 @@ class CyclePositionPersistor {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
-            userNotificationPort.notifyCycleCompleted(ctx.user(), ctx.account(), strategy);
+            eventPublisher.publishEvent(new CycleCompletedEvent(ctx.user(), ctx.account(), strategy));
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
         }
 

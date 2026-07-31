@@ -22,7 +22,6 @@ import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
-import com.kista.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.support.DomainFixtures;
@@ -34,6 +33,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -67,7 +67,7 @@ class VrReconfigureServiceTest {
     @Mock BrokerAdapterRegistry registry;
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock OrderCancelService orderCancelService;
-    @Mock UserNotificationPort userNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock NotifyPort notifyPort;
     @Mock StrategyUseCase strategyUseCase;
     @Mock BrokerPricePort pricePort; // registry.require(account, BrokerPricePort.class) 반환값
@@ -254,7 +254,7 @@ class VrReconfigureServiceTest {
     void reconfigure_userNotificationFails_stillReturnsResultButNotifiesAdmin() {
         stubHappyPathChain();
         org.mockito.Mockito.doThrow(new RuntimeException("텔레그램 발송 실패"))
-                .when(userNotificationPort).notifyNewCycleStarted(any(), any(), any(), any());
+                .when(eventPublisher).publishEvent(any());
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 

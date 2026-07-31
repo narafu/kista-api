@@ -1,5 +1,6 @@
 package com.kista.application.service.trading;
 
+import com.kista.application.event.NewCycleStartedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -37,6 +39,7 @@ class VrCycleRolloverServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     VrCycleRolloverService service;
 
@@ -85,7 +88,7 @@ class VrCycleRolloverServiceTest {
     void setUp() {
         service = new VrCycleRolloverService(
                 strategyCycleVrPort, strategyVrDetailPort, strategyCyclePort,
-                cycleSnapshotCreator, notifyPort, userNotificationPort);
+                cycleSnapshotCreator, notifyPort, userNotificationPort, eventPublisher);
         ctx = new BatchContext(VR_STRATEGY, CYCLE, ACCOUNT, USER);
         // 램프 재계산 기준 — 최초 사이클 시작일 조회 기본 stub (CYCLE 자신이 최초 사이클인 케이스)
         // due 미도래·cycleVr 미존재 등 조기 return 테스트는 호출 자체가 없어 unnecessary stub 문제 없음(lenient)
@@ -319,7 +322,7 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        verify(userNotificationPort).notifyNewCycleStarted(eq(USER), eq(ACCOUNT), eq(VR_STRATEGY), eq(USD_DEPOSIT));
+        verify(eventPublisher).publishEvent(new NewCycleStartedEvent(USER, ACCOUNT, VR_STRATEGY, USD_DEPOSIT));
     }
 
     // ── 경과주수 기반 램프 재계산 검증 (신규 기능 핵심 회귀) ──────────────────────────

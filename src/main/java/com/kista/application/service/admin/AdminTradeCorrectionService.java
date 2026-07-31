@@ -1,5 +1,6 @@
 package com.kista.application.service.admin;
 
+import com.kista.application.event.CycleEndedEvent;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
@@ -20,6 +21,7 @@ import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final AuditLogPort auditLogPort;
+    private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
 
     @Override
     public AdminTradeCorrectionResult correctManualFills(UUID adminId, AdminManualTradeCorrectionCommand command) {
@@ -83,6 +86,9 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
             }
         }
 
+        if (cycleEnded) {
+            eventPublisher.publishEvent(new CycleEndedEvent(user, account, updatedStrategy));
+        }
         orderPort.saveAll(manualOrders);
         auditLogPort.log(adminId, AUDIT_ACTION, "STRATEGY", strategy.id(),
                 Map.of(
