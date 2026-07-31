@@ -177,4 +177,37 @@ class TossHoldingsApiTest {
                 .doesNotContainKey("dateTime");
         assertThat(exchangeRate.midRate()).isEqualByComparingTo("1365.20");
     }
+
+    @Test
+    @DisplayName("환율 캐시 히트: 60초 내 재조회 시 HTTP 호출은 1회만 발생한다")
+    void getExchangeRate_cachedWithinTtl_callsHttpOnce() {
+        when(tossHttpClient.getCommon(
+                eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(new TossResult<>(
+                        new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+
+        var first = tossHoldingsApi.getExchangeRate();
+        var second = tossHoldingsApi.getExchangeRate();
+
+        assertThat(first.rate()).isEqualByComparingTo("1400.00");
+        assertThat(second.rate()).isEqualByComparingTo("1400.00");
+        verify(tossHttpClient, org.mockito.Mockito.times(1)).getCommon(
+                eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    @DisplayName("환율 조회 실패(ZERO 폴백)는 캐싱되지 않고 매번 재조회한다")
+    void getExchangeRate_failureNotCached_callsHttpEveryTime() {
+        when(tossHttpClient.getCommon(
+                eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(null);
+
+        var first = tossHoldingsApi.getExchangeRate();
+        var second = tossHoldingsApi.getExchangeRate();
+
+        assertThat(first.rate()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(second.rate()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(tossHttpClient, org.mockito.Mockito.times(2)).getCommon(
+                eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class));
+    }
 }

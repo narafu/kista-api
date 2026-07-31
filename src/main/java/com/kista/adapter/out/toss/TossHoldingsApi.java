@@ -17,6 +17,8 @@ import org.springframework.util.LinkedMultiValueMap;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -36,6 +38,8 @@ class TossHoldingsApi {
     private static final String SELLABLE_QUANTITY_PATH = "/api/v1/sellable-quantity";
 
     private final TossHttpClient tossHttpClient;
+    // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
+    private final UsdKrwRateCache exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), Instant::now);
 
     public AccountBalance getBalance(Account account, Ticker ticker) {
         // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
@@ -140,6 +144,12 @@ class TossHoldingsApi {
     // ── TossExchangeRatePort ───────────────────────────────────────────────────
 
     public TossExchangeRate getExchangeRate() {
+        // 60초 TTL 캐시 경유 — 성공 값만 캐싱, ZERO 폴백·예외는 그대로 전파
+        return exchangeRateCache.getOrFetch(this::fetchExchangeRateUncached);
+    }
+
+    // 캐시 미적용 원본 환율 조회 (UsdKrwRateCache의 fetcher로만 사용)
+    private TossExchangeRate fetchExchangeRateUncached() {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("baseCurrency", "USD");
         params.add("quoteCurrency", "KRW");
