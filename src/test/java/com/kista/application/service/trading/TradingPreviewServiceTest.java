@@ -65,7 +65,11 @@ class TradingPreviewServiceTest {
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        // previewBatch()는 배치 조회를 사용 — 단건 preview() 테스트와 공용 기본 stub
+        lenient().when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE));
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(any(), any())).thenReturn(List.of());
+        lenient().when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of());
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
@@ -258,7 +262,7 @@ class TradingPreviewServiceTest {
     @Test
     void previewBatch_omitsStrategy_whenNoCycleHistory() {
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.empty());
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id()))).thenReturn(Map.of());
 
         Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -293,16 +297,18 @@ class TradingPreviewServiceTest {
         List<Strategy> strategies = List.of(s1, s2);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
+        Map<UUID, StrategyCycle> cyclesById = new java.util.HashMap<>();
         for (Strategy s : strategies) {
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                     new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
-            when(strategyCyclePort.findLatestByStrategyId(s.id())).thenReturn(Optional.of(cycle));
+            cyclesById.put(s.id(), cycle);
             Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LIMIT,
                     Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
             CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(s1.id(), s2.id()))).thenReturn(cyclesById);
 
         service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
@@ -337,7 +343,6 @@ class TradingPreviewServiceTest {
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                     new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
             cycles.put(s.id(), cycle);
-            when(strategyCyclePort.findLatestByStrategyId(s.id())).thenReturn(Optional.of(cycle));
 
             Order buy = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LOC,
                     Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
@@ -345,6 +350,7 @@ class TradingPreviewServiceTest {
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(s1.id(), s2.id(), s3.id()))).thenReturn(cycles);
 
         PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
         lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));

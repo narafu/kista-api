@@ -66,15 +66,21 @@ class TradingPreviewService {
         LocalDate today = DstInfo.nextTradeDate();
         List<Strategy> strategies = strategyPort.findByAccountId(accountId);
 
+        // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
+        List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
+        Map<UUID, StrategyCycle> latestCycles = strategyCyclePort.findLatestByStrategyIds(strategyIds);
         Map<UUID, StrategyCycle> cyclesByStrategyId = new LinkedHashMap<>();
         for (Strategy strategy : strategies) {
-            strategyCyclePort.findLatestByStrategyId(strategy.id())
-                    .ifPresent(cycle -> cyclesByStrategyId.put(strategy.id(), cycle));
+            StrategyCycle cycle = latestCycles.get(strategy.id());
+            if (cycle != null) cyclesByStrategyId.put(strategy.id(), cycle);
         }
 
+        // 사이클들의 오늘 PLANNED/PLACED 주문을 1회 배치 조회 (사이클마다 개별 조회하던 것을 축소)
+        List<UUID> cycleIds = cyclesByStrategyId.values().stream().map(StrategyCycle::id).toList();
+        Map<UUID, List<Order>> ordersByCycleId = orderPort.findPlannedOrPlacedByCycleIdsAndDate(cycleIds, today);
         Map<UUID, List<Order>> todayOrdersByStrategyId = new LinkedHashMap<>();
         cyclesByStrategyId.forEach((strategyId, cycle) -> todayOrdersByStrategyId.put(strategyId,
-                orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), today)));
+                ordersByCycleId.getOrDefault(cycle.id(), List.of())));
 
         // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 KIS 왕복을 생략
         List<Strategy.Ticker> tickers = strategies.stream()

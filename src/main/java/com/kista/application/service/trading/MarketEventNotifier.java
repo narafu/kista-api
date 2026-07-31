@@ -32,8 +32,13 @@ class MarketEventNotifier {
     }
 
     private void notify(NotificationType type, Consumer<User> action) {
-        userPort.findAllByStatus(User.UserStatus.ACTIVE).forEach(user -> {
-            UserSettings settings = userSettingsPort.findOrDefault(user.id());
+        // 배치 조회로 N+1 제거
+        var users = userPort.findAllByStatus(User.UserStatus.ACTIVE);
+        var userIds = users.stream().map(User::id).toList();
+        var settingsMap = userSettingsPort.findOrDefaultByUserIds(userIds);
+
+        users.forEach(user -> {
+            UserSettings settings = settingsMap.get(user.id());
             if (settings.isNotificationEnabled(type)) {
                 try {
                     action.accept(user);

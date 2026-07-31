@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -66,7 +67,8 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public List<Order> listTrades(LocalDate from, LocalDate to) {
-        LocalDate f = from != null ? from : LocalDate.EPOCH;
+        // from 미지정 시 기본값: 최근 30일 — orders 테이블 전체 로드 방지
+        LocalDate f = from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
         LocalDate t = to   != null ? to   : LocalDate.now(TimeZones.KST);
         return orderPort.findAll(f, t);
     }
@@ -86,19 +88,23 @@ class AdminQueryService implements AdminQueryUseCase {
         LocalDate rangeTo   = to   != null ? to   : today;
         List<Account> allAccounts = accountPort.findAll();
 
+        // 배치 조회: 모든 계좌의 전략을 한 번에 조회 (N+1 방지)
+        Map<UUID, List<Strategy>> strategiesByAccountId = strategyPort.findByAccountIds(
+                allAccounts.stream().map(Account::id).collect(Collectors.toSet()));
+
         // PAUSED 전략이 있는 계좌
         List<Account> pausedAccounts = allAccounts.stream()
-                .filter(a -> strategyPort.findByAccountId(a.id()).stream()
+                .filter(a -> strategiesByAccountId.getOrDefault(a.id(), List.of()).stream()
                         .anyMatch(Strategy::isPaused))
                 .toList();
 
-        // 범위 내 거래 있는 accountId 집합
-        Set<UUID> activeAccountIds = orderPort.findAll(rangeFrom, rangeTo)
-                .stream().map(Order::accountId).collect(Collectors.toSet());
+        // 범위 내 거래 있는 accountId 집합 (distinct만 필요 → 별도 쿼리로 최소 데이터 로드)
+        Set<UUID> activeAccountIds = new HashSet<>(
+                orderPort.findDistinctAccountIdsByTradeDateBetween(rangeFrom, rangeTo));
 
         // ACTIVE 전략이 있지만 범위 내 거래 없는 계좌
         List<Account> inactiveAccounts = allAccounts.stream()
-                .filter(a -> strategyPort.findByAccountId(a.id()).stream()
+                .filter(a -> strategiesByAccountId.getOrDefault(a.id(), List.of()).stream()
                         .anyMatch(Strategy::isActive))
                 .filter(a -> !activeAccountIds.contains(a.id()))
                 .toList();

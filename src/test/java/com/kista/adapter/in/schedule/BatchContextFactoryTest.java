@@ -20,8 +20,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +70,8 @@ class BatchContextFactoryTest {
         Account account = mockAccount(ACCOUNT_ID);
         User user = mockUser();
 
-        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(cycle));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategy.id())))
+                .thenReturn(Map.of(strategy.id(), cycle));
         when(accountPort.findAll()).thenReturn(List.of(account));
         when(userPort.findAll()).thenReturn(List.of(user));
 
@@ -83,6 +84,7 @@ class BatchContextFactoryTest {
     void buildAll_emptyStrategies_returnsEmptyList() {
         when(accountPort.findAll()).thenReturn(List.of());
         when(userPort.findAll()).thenReturn(List.of());
+        when(strategyCyclePort.findLatestByStrategyIds(List.of())).thenReturn(Map.of());
 
         List<BatchContext> result = factory.buildAll(List.of());
         assertThat(result).isEmpty();
@@ -98,8 +100,8 @@ class BatchContextFactoryTest {
         Account account2 = mockAccount(accountId2);
         User user = mockUser();
 
-        when(strategyCyclePort.findLatestByStrategyId(strategy1.id())).thenReturn(Optional.of(mockCycle(strategy1.id())));
-        when(strategyCyclePort.findLatestByStrategyId(strategy2.id())).thenReturn(Optional.of(cycle2));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategy1.id(), strategy2.id())))
+                .thenReturn(Map.of(strategy1.id(), mockCycle(strategy1.id()), strategy2.id(), cycle2));
         // account2만 배치 조회 결과에 포함 — strategy1의 ACCOUNT_ID는 조회되지 않아 NoSuchElementException 발생
         when(accountPort.findAll()).thenReturn(List.of(account2));
         when(userPort.findAll()).thenReturn(List.of(user));
@@ -115,8 +117,8 @@ class BatchContextFactoryTest {
     void buildAll_latestCycleAlreadyEnded_skipsAndNotifiesAdmin() {
         // rotation 실패로 새 사이클이 없는 좀비 상태 — 종료 사이클에 주문이 나가면 안 됨
         Strategy strategy = mockStrategy(ACCOUNT_ID);
-        when(strategyCyclePort.findLatestByStrategyId(strategy.id()))
-                .thenReturn(Optional.of(mockEndedCycle(strategy.id())));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategy.id())))
+                .thenReturn(Map.of(strategy.id(), mockEndedCycle(strategy.id())));
         when(accountPort.findAll()).thenReturn(List.of());
         when(userPort.findAll()).thenReturn(List.of());
 

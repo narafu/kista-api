@@ -106,7 +106,12 @@ class StatsService implements UserStatsUseCase {
 
         boolean hasMore = filtered.size() > size;
         List<CycleView> pageItems = hasMore ? filtered.subList(0, size) : filtered;
-        List<CyclePerformance> items = pageItems.stream().map(this::toPerformance).toList();
+        // 미종료 사이클의 최신 포지션을 일괄 조회 (N+1 방지)
+        Set<UUID> openCycleIds = pageItems.stream().filter(v -> !v.closed())
+                .map(v -> v.cycle().id()).collect(Collectors.toSet());
+        Map<UUID, CyclePosition> latestPositions = openCycleIds.isEmpty()
+                ? Map.of() : cyclePositionPort.findLatestByCycleIds(openCycleIds);
+        List<CyclePerformance> items = pageItems.stream().map(v -> toPerformance(v, latestPositions)).toList();
         Instant nextCursor = hasMore ? pageItems.get(pageItems.size() - 1).cycle().createdAt() : null;
         return new CyclePerformancePage(items, nextCursor, hasMore);
     }
@@ -195,9 +200,12 @@ class StatsService implements UserStatsUseCase {
             strategies = List.of(selectedStrategy);
         } else {
             // 벤치마크 "전체 포트폴리오"는 실제 투자 성과 비교 목적이므로 모의계좌(MOCK)를 제외한다
-            strategies = accountPort.findByUserId(userId).stream()
+            List<UUID> accountIds = accountPort.findByUserId(userId).stream()
                     .filter(account -> account.broker() != Account.Broker.MOCK)
-                    .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
+                    .map(Account::id)
+                    .toList();
+            strategies = accountIds.isEmpty() ? List.of() : strategyPort.findByAccountIds(accountIds).values().stream()
+                    .flatMap(List::stream)
                     .toList();
         }
 
@@ -248,22 +256,35 @@ class StatsService implements UserStatsUseCase {
     // excludeMock=true: 누적자산추이·전략유형비교처럼 실제 투자 성과 집계 목적인 조회에서 모의계좌(MOCK) 제외.
     // 사이클 성과 목록은 계좌별 이력 확인이 목적이라 모의계좌도 포함(excludeMock=false)한다.
     private List<CycleView> loadCycles(UUID userId, boolean excludeMock) {
-        Map<UUID, Strategy> strategies = accountPort.findByUserId(userId).stream()
+        List<UUID> accountIds = accountPort.findByUserId(userId).stream()
                 .filter(a -> !excludeMock || a.broker() != Account.Broker.MOCK)
-                .flatMap(a -> strategyPort.findByAccountId(a.id()).stream())
+                .map(Account::id)
+                .toList();
+        if (accountIds.isEmpty()) return List.of();
+        Map<UUID, Strategy> strategies = strategyPort.findByAccountIds(accountIds).values().stream()
+                .flatMap(List::stream)
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
-        return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()
-                .map(c -> toCycleView(c, strategies.get(c.strategyId())))
+        List<StrategyCycle> cycles = strategyCyclePort.findByStrategyIds(strategies.keySet());
+        // VR 전략 사이클의 개장 포지션을 일괄 조회 (N+1 방지)
+        Set<UUID> vrCycleIds = cycles.stream()
+                .filter(c -> strategies.get(c.strategyId()).isVr())
+                .map(StrategyCycle::id)
+                .collect(Collectors.toSet());
+        Map<UUID, CyclePosition> openingPositions = vrCycleIds.isEmpty()
+                ? Map.of() : cyclePositionPort.findFirstByCycleIds(vrCycleIds);
+        return cycles.stream()
+                .map(c -> toCycleView(c, strategies.get(c.strategyId()), openingPositions))
                 .toList();
     }
 
-    private CycleView toCycleView(StrategyCycle cycle, Strategy strategy) {
+    private CycleView toCycleView(StrategyCycle cycle, Strategy strategy, Map<UUID, CyclePosition> openingPositions) {
         BigDecimal effectiveStartAmount = cycle.startAmount();
         if (strategy.isVr()) {
-            effectiveStartAmount = cyclePositionPort.findFirstOne(cycle.id())
-                    .map(opening -> compatibleVrStartAmount(cycle, opening))
-                    .orElse(cycle.startAmount());
+            CyclePosition opening = openingPositions.get(cycle.id());
+            effectiveStartAmount = opening != null
+                    ? compatibleVrStartAmount(cycle, opening)
+                    : cycle.startAmount();
         }
         return new CycleView(cycle, strategy, effectiveStartAmount);
     }
@@ -357,11 +378,16 @@ class StatsService implements UserStatsUseCase {
 
     // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 - 호환 개장금액 (스냅샷 없으면 제외)
     private Map<UUID, BigDecimal> unrealizedByCycle(List<CycleView> cycles) {
+        List<CycleView> open = cycles.stream().filter(v -> !v.closed()).toList();
+        Set<UUID> openCycleIds = open.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
+        Map<UUID, CyclePosition> latestPositions = openCycleIds.isEmpty()
+                ? Map.of() : cyclePositionPort.findLatestByCycleIds(openCycleIds);
         Map<UUID, BigDecimal> result = new HashMap<>();
-        for (CycleView v : cycles) {
-            if (v.closed()) continue;
-            cyclePositionPort.findLatestOne(v.cycle().id()).ifPresent(pos ->
-                    result.put(v.cycle().id(), assetOf(pos).subtract(v.effectiveStartAmount())));
+        for (CycleView v : open) {
+            CyclePosition pos = latestPositions.get(v.cycle().id());
+            if (pos != null) {
+                result.put(v.cycle().id(), assetOf(pos).subtract(v.effectiveStartAmount()));
+            }
         }
         return result;
     }
@@ -448,10 +474,10 @@ class StatsService implements UserStatsUseCase {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private CyclePerformance toPerformance(CycleView v) {
+    private CyclePerformance toPerformance(CycleView v, Map<UUID, CyclePosition> latestPositions) {
         StrategyCycle c = v.cycle();
         BigDecimal endAmount = v.closed() ? c.endAmount()
-                : cyclePositionPort.findLatestOne(c.id()).map(StatsService::assetOf).orElse(null);
+                : Optional.ofNullable(latestPositions.get(c.id())).map(StatsService::assetOf).orElse(null);
         BigDecimal pnl = endAmount != null ? endAmount.subtract(v.effectiveStartAmount()) : null;
         // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
         BigDecimal returnRate = (pnl != null && v.effectiveStartAmount().signum() != 0)

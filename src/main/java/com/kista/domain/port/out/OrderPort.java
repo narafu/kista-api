@@ -5,7 +5,9 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +30,9 @@ public interface OrderPort {
     // 기간 내 전체 계좌 조회 ticker 필터 없음 (관리자·이상징후 감지용)
     List<Order> findAll(LocalDate from, LocalDate to);
 
+    // 기간 내 distinct accountId 목록 조회 (이상징후 감지용 N+1 방지)
+    List<UUID> findDistinctAccountIdsByTradeDateBetween(LocalDate from, LocalDate to);
+
     // 단건 조회 (취소 전 상태 확인용)
     Optional<Order> findById(UUID orderId);
 
@@ -36,6 +41,9 @@ public interface OrderPort {
 
     // 오늘 PLANNED 또는 PLACED 주문 조회 (스케쥴러 재계산 skip 판정용)
     List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
+
+    // 여러 사이클의 오늘 PLANNED 또는 PLACED 주문 배치 조회 (미리보기 N+1 방지) — strategyCycleId 기준 그룹핑
+    Map<UUID, List<Order>> findPlannedOrPlacedByCycleIdsAndDate(Collection<UUID> strategyCycleIds, LocalDate tradeDate);
 
     // 취소 완료 또는 미체결 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
