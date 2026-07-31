@@ -446,6 +446,84 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("기존 사용자 login: email 미보유 + 카카오 응답에 email 있으면 백필 저장")
+    void login_existingUserWithoutEmail_backfillsEmailFromKakao() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-002";
+        String accessToken = "kakao-access-token";
+        String kakaoEmail = "user@example.com";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", null, User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", kakaoEmail));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo(kakaoEmail);
+        verify(userPort).save(argThat(u -> kakaoEmail.equals(u.email())));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: 카카오 이메일이 기존과 다르면 최신값으로 갱신")
+    void login_existingUserWithDifferentEmail_updatesToLatest() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-003";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", "old@example.com", User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", "new@example.com"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo("new@example.com");
+        verify(userPort).save(argThat(u -> "new@example.com".equals(u.email())));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: 카카오 이메일이 기존과 동일하면 저장 없음")
+    void login_existingUserWithSameEmail_doesNotSave() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-004";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", "same@example.com", User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", "same@example.com"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo("same@example.com");
+        verify(userPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("중복 등록 경쟁 조건: save에서 DataIntegrityViolationException → findByKakaoId 재조회로 fallback")
     void login_duplicateRegistration_fallbacksToExistingUser() {
         // given

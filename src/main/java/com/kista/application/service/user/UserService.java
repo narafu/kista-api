@@ -80,6 +80,11 @@ class UserService implements UserUseCase {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
             user = userPort.save(user.withStatus(User.UserStatus.ACTIVE).withRole(User.UserRole.ADMIN));
         }
+        // 카카오 이메일과 다르면 동기화 — 매 로그인마다 이미 조회하는 kakaoUser.email() 재사용 (추가 API 호출 없음)
+        if (kakaoUser.email() != null && !kakaoUser.email().equals(user.email())) {
+            log.info("기존 사용자 이메일 동기화: kakaoId={}", user.kakaoId());
+            user = userPort.save(user.withEmail(kakaoUser.email()));
+        }
         return user;
     }
 
