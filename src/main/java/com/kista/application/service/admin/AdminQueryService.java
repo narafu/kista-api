@@ -43,10 +43,12 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public AdminStats getStats() {
-        long totalUsers = userPort.countAll();
-        long pendingCount = userPort.countByStatus(User.UserStatus.PENDING);
-        long activeCount = userPort.countByStatus(User.UserStatus.ACTIVE);
-        long rejectedCount = userPort.countByStatus(User.UserStatus.REJECTED);
+        // 상태별 카운트를 단일 GROUP BY 쿼리로 조회 (countAll+countByStatus×3 직렬 호출 대체)
+        Map<User.UserStatus, Long> byStatus = userPort.countGroupByStatus();
+        long pendingCount = byStatus.getOrDefault(User.UserStatus.PENDING, 0L);
+        long activeCount = byStatus.getOrDefault(User.UserStatus.ACTIVE, 0L);
+        long rejectedCount = byStatus.getOrDefault(User.UserStatus.REJECTED, 0L);
+        long totalUsers = pendingCount + activeCount + rejectedCount;
         long totalAccounts = accountPort.countAll();
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }

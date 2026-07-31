@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,13 +52,13 @@ public class UserPersistenceAdapter implements UserPort {
     }
 
     @Override
-    public long countAll() {
-        return jpaRepository.count();
-    }
-
-    @Override
-    public long countByStatus(User.UserStatus status) {
-        return jpaRepository.countByStatus(status);
+    public Map<User.UserStatus, Long> countGroupByStatus() {
+        // GROUP BY 프로젝션을 EnumMap으로 수집 — 결과에 없는 상태는 호출측 getOrDefault(0)로 처리
+        Map<User.UserStatus, Long> result = new EnumMap<>(User.UserStatus.class);
+        for (UserJpaRepository.StatusCountProjection p : jpaRepository.countGroupByStatus()) {
+            result.put(p.getStatus(), p.getCount());
+        }
+        return result;
     }
 
     @Override
