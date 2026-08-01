@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -33,6 +34,8 @@ class StatsService implements UserStatsUseCase {
     private static final String SEOUL_REGION_NAME = "서울";
     // 실제 KB Land 데이터는 2008-12부터 존재 — 여유 있는 안전 하한
     private static final LocalDate EARLIEST_BENCHMARK_DATE = LocalDate.of(2000, 1, 1);
+    // 사이클 스냅샷은 04:30 배치+체결 append-only라 TTL 만료로 충분(수동실행 직후 최대 5분 stale 허용 트레이드오프)
+    private static final Duration CURVE_CACHE_TTL = Duration.ofMinutes(5);
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -41,9 +44,16 @@ class StatsService implements UserStatsUseCase {
     private final HousingBenchmarkPricePort housingBenchmarkPricePort;
     private final ExchangeRatePort exchangeRatePort;
     private final IndexPricePort indexPricePort;
+    private final StatsResultCache statsResultCache;
     private final MonthlyReturnCalculator monthlyReturnCalculator = new MonthlyReturnCalculator();
     private final HousingBenchmarkComparisonBuilder comparisonBuilder =
             new HousingBenchmarkComparisonBuilder();
+
+    // getSummary 캐시 키
+    private record SummaryKey(UUID userId) {}
+
+    // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
+    private record EquityCurveKey(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰
     private record CycleView(StrategyCycle cycle, Strategy strategy, BigDecimal effectiveStartAmount) {
@@ -58,6 +68,11 @@ class StatsService implements UserStatsUseCase {
 
     @Override
     public StatsSummary getSummary(UUID userId) {
+        return statsResultCache.getOrCompute(
+                new SummaryKey(userId), CURVE_CACHE_TTL, () -> computeSummary(userId));
+    }
+
+    private StatsSummary computeSummary(UUID userId) {
         List<CycleView> cycles = loadCycles(userId, true);
         Map<UUID, BigDecimal> unrealizedByCycle = unrealizedByCycle(cycles);
 
@@ -79,6 +94,12 @@ class StatsService implements UserStatsUseCase {
 
     @Override
     public EquityCurve getEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {
+        return statsResultCache.getOrCompute(
+                new EquityCurveKey(userId, type, from, to), CURVE_CACHE_TTL,
+                () -> computeEquityCurve(userId, type, from, to));
+    }
+
+    private EquityCurve computeEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)

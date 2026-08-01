@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -42,6 +43,8 @@ class StatsServiceTest {
     @Mock HousingBenchmarkPricePort housingBenchmarkPricePort;
     @Mock ExchangeRatePort exchangeRatePort;
     @Mock IndexPricePort indexPricePort;
+    // getOrCompute가 null을 반환하지 않도록 mock이 아닌 실제 캐시 인스턴스 사용 (@InjectMocks가 생성자로 주입)
+    @Spy StatsResultCache statsResultCache = new StatsResultCache();
     @InjectMocks StatsService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -1030,5 +1033,38 @@ class StatsServiceTest {
         CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
 
         assertThat(page.items()).extracting(CyclePerformance::accountId).containsExactly(mockAccountId);
+    }
+
+    // ── 결과 캐시(TTL 5분) ───────────────────────────────────────────────────
+
+    @Test
+    void getSummary는_TTL_내_재조회시_캐시를_반환하고_DB를_다시_조회하지_않는다() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
+
+        StatsSummary first = statsService.getSummary(USER_ID);
+        StatsSummary second = statsService.getSummary(USER_ID);
+
+        assertThat(second).isEqualTo(first);
+        verify(accountPort, times(1)).findByUserId(USER_ID);
+        verify(strategyCyclePort, times(1)).findByStrategyIds(any());
+    }
+
+    @Test
+    void getEquityCurve는_파라미터별로_캐시_키가_분리된다() {
+        stubUserWithStrategy();
+        StrategyCycle active = activeCycle("1000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
+
+        // 같은 파라미터 2회 → 캐시 1회 조회
+        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        // to가 다른 호출 → 별도 캐시 키로 재조회
+        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-31"));
+
+        verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
     }
 }
