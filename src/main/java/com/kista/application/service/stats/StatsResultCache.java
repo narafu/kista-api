@@ -1,5 +1,6 @@
 package com.kista.application.service.stats;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -22,6 +23,7 @@ class StatsResultCache {
     private final ConcurrentMap<Object, Entry> cache = new ConcurrentHashMap<>();
     private final ReentrantLock[] stripes = createStripes(); // 키 해시로 매핑하는 고정 크기 락 배열 — 무한 증가·제거 레이스 없음
 
+    @Autowired
     StatsResultCache() {
         this(Clock.systemUTC());
     }
