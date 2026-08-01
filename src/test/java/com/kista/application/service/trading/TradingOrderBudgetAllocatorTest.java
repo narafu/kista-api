@@ -27,9 +27,12 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,7 +65,7 @@ class TradingOrderBudgetAllocatorTest {
         lenient().when(vrCycleOrderStrategy.allocationPriority()).thenReturn(0);
         CycleOrderStrategies cycleOrderStrategies = new CycleOrderStrategies(List.of(
                 infiniteCycleOrderStrategy, privacyCycleOrderStrategy, vrCycleOrderStrategy));
-        allocator = new TradingOrderBudgetAllocator(registry, orderPort, cycleOrderStrategies);
+        allocator = new TradingOrderBudgetAllocator(registry, orderPort, cycleOrderStrategies, new TradingParallelRunner(2));
         lenient().when(registry.require(any(Account.class), eq(LiveBalancePort.class))).thenReturn(liveBalancePort);
         lenient().when(registry.require(any(Account.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(eq(account.id()), eq(tradeDate))).thenReturn(BigDecimal.ZERO);
@@ -302,6 +305,37 @@ class TradingOrderBudgetAllocatorTest {
         assertThat(result.rejectedBuy()).singleElement()
                 .satisfies(rejected -> assertThat(rejected.orders())
                         .containsExactly(firstBuy, secondBuy));
+    }
+
+    @Test
+    void fetchLiveQuotes_capturesFailurePerAccountAndAllocateRethrowsOriginalException() throws InterruptedException {
+        RuntimeException brokerFailure = new IllegalStateException("KIS 잔고 조회 실패");
+        when(liveBalancePort.getLiveBalance(eq(account), eq(Strategy.Ticker.SOXL))).thenThrow(brokerFailure);
+
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(Strategy.Type.INFINITE, "1000.00");
+        TradingOrderBudgetAllocator.LiveQuotes quotes =
+                allocator.fetchLiveQuotes(List.of(List.of(candidate)));
+        TradingOrderBudgetAllocator.AccountQuote quote = quotes.require(account.id());
+
+        assertThat(quote.failure()).isSameAs(brokerFailure);
+        assertThatThrownBy(() -> allocator.allocate(List.of(candidate), tradeDate, quote))
+                .isSameAs(brokerFailure);
+    }
+
+    @Test
+    void allocate_withPrefetchedQuoteDoesNotCallRegistryAgain() throws InterruptedException {
+        when(liveBalancePort.getLiveBalance(eq(account), eq(Strategy.Ticker.SOXL)))
+                .thenReturn(new AccountBalance(100, new BigDecimal("20.00"), new BigDecimal("3000.00")));
+
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(Strategy.Type.INFINITE, "500.00");
+        TradingOrderBudgetAllocator.LiveQuotes quotes =
+                allocator.fetchLiveQuotes(List.of(List.of(candidate)));
+        TradingOrderBudgetAllocator.Allocation result =
+                allocator.allocate(List.of(candidate), tradeDate, quotes.require(account.id()));
+
+        assertThat(result.approved()).containsExactly(candidate);
+        // fetchLiveQuotes 단계에서 1회만 조회하고, allocate 단계에서는 quote를 재사용해 재조회하지 않는다
+        verify(liveBalancePort, times(1)).getLiveBalance(eq(account), eq(Strategy.Ticker.SOXL));
     }
 
     private TradingOrderBudgetAllocator.Candidate candidate(Strategy.Type type, String buyAmount) {

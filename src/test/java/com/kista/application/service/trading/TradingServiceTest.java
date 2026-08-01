@@ -189,7 +189,7 @@ class TradingServiceTest {
         // MarketEventNotifier — UserPort/UserSettingsPort/UserNotificationPort를 직접 주입해 생성
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(userPort, userSettingsPort, userNotificationPort);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
-                tradingRegistry, orderPort, cycleStrategies);
+                tradingRegistry, orderPort, cycleStrategies, new TradingParallelRunner(0));
         service = new TradingService(
                 marketCalendarPort, notifyPort, userNotificationPort,
                 orderPort, privacyTradePort, strategyCyclePort,

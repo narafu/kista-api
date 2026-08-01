@@ -391,11 +391,17 @@ class TradingService {
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
         List<TradingOrderBudgetAllocator.Allocation> allocations = new ArrayList<>();
 
+        // 브로커 HTTP 조회(잔고·판매가능수량)는 계좌 간 선 병렬 일괄 조회로 분리한다.
+        // 계좌 내 예산 차감(우선순위 순차 배정)은 순서 의존이라 아래 루프에서 그대로 순차 유지한다.
+        TradingOrderBudgetAllocator.LiveQuotes liveQuotes =
+                budgetAllocator.fetchLiveQuotes(List.copyOf(candidatesByAccount.values()));
+
         // 계좌별 예산 조회 실패가 다른 계좌의 주문 생성을 막지 않도록 격리한다.
         for (List<TradingOrderBudgetAllocator.Candidate> accountCandidates : candidatesByAccount.values()) {
             BatchContext firstContext = accountCandidates.getFirst().ctx();
+            UUID accountId = firstContext.account().id();
             Optional<TradingOrderBudgetAllocator.Allocation> allocation = runSafely("계좌 주문 예산 배정", firstContext,
-                    () -> budgetAllocator.allocate(accountCandidates, tradeDate));
+                    () -> budgetAllocator.allocate(accountCandidates, tradeDate, liveQuotes.require(accountId)));
             if (allocation.isPresent()) {
                 allocations.add(allocation.get());
             }
