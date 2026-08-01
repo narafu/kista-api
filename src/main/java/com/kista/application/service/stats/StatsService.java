@@ -22,7 +22,13 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +42,8 @@ class StatsService implements UserStatsUseCase {
     private static final LocalDate EARLIEST_BENCHMARK_DATE = LocalDate.of(2000, 1, 1);
     // 사이클 스냅샷은 04:30 배치+체결 append-only라 TTL 만료로 충분(수동실행 직후 최대 5분 stale 허용 트레이드오프)
     private static final Duration CURVE_CACHE_TTL = Duration.ofMinutes(5);
+    // 벤치마크 비교 본체(사이클·포지션·벤치마크 시세 DB 조회) 캐시 TTL — 환율은 캐시 제외, 응답마다 재조회
+    private static final Duration BENCHMARK_CACHE_TTL = Duration.ofMinutes(10);
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -54,6 +62,11 @@ class StatsService implements UserStatsUseCase {
 
     // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
     private record EquityCurveKey(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {}
+
+    // 벤치마크 비교 캐시 키 — HOUSING(quintile 사용, symbol=null) / ETF(symbol 사용, quintile=null) 공용
+    private record BenchmarkComparisonKey(
+            UUID userId, BenchmarkAssetType assetType, BenchmarkScope scope, UUID strategyId,
+            Integer quintile, String symbol, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰
     private record CycleView(StrategyCycle cycle, Strategy strategy, BigDecimal effectiveStartAmount) {
@@ -142,6 +155,16 @@ class StatsService implements UserStatsUseCase {
             UUID userId, BenchmarkScope scope, UUID strategyId,
             int quintile, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, quintile, from, to);
+        // 병렬 조회(본체∥환율) 이전에 소유권을 동기적으로 검증 — 인가 실패 시 외부 환율 API가 호출되지 않도록 보장
+        authorizeIfStrategyScope(scope, strategyId, userId);
+        BenchmarkComparisonKey key = new BenchmarkComparisonKey(
+                userId, BenchmarkAssetType.HOUSING, scope, strategyId, quintile, null, from, to);
+        return comparisonWithExchangeRate(key,
+                () -> computeHousingComparisonBody(userId, scope, strategyId, quintile, from, to));
+    }
+
+    private HousingBenchmarkComparison computeHousingComparisonBody(
+            UUID userId, BenchmarkScope scope, UUID strategyId, int quintile, LocalDate from, LocalDate to) {
         InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.MONTHLY);
 
         LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
@@ -166,16 +189,27 @@ class StatsService implements UserStatsUseCase {
                 BenchmarkAssetType.HOUSING, SEOUL_REGION_CODE, SEOUL_REGION_NAME, quintile, null,
                 SEOUL_REGION_NAME + " 아파트 " + quintile + "분위", sourceUpdatedDate);
 
-        HousingBenchmarkComparison comparison = comparisonBuilder.build(
+        return comparisonBuilder.build(
                 scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), selectedBenchmarkPrices,
                 BenchmarkGranularity.MONTHLY);
-        return comparison.withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 
     @Override
     public HousingBenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
+        // ETF는 별도 최상위 검증이 없어 buildInvestmentContext 내부에서만 검증되던 것을
+        // 병렬 실행 전 fast-fail 위해 여기로 앞당긴다 (검증 로직·예외 타입은 100% 동일하게 재사용)
+        validateScopeAndRange(scope, strategyId, from, to);
+        authorizeIfStrategyScope(scope, strategyId, userId);
+        BenchmarkComparisonKey key = new BenchmarkComparisonKey(
+                userId, BenchmarkAssetType.ETF, scope, strategyId, null, symbol.name(), from, to);
+        return comparisonWithExchangeRate(key,
+                () -> computeEtfComparisonBody(userId, scope, strategyId, symbol, from, to));
+    }
+
+    private HousingBenchmarkComparison computeEtfComparisonBody(
+            UUID userId, BenchmarkScope scope, UUID strategyId, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
         InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.DAILY);
         LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
         LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
@@ -198,8 +232,51 @@ class StatsService implements UserStatsUseCase {
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
         return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), prices,
-                        BenchmarkGranularity.DAILY)
-                .withCurrentExchangeRate(fetchCurrentExchangeRate());
+                BenchmarkGranularity.DAILY);
+    }
+
+    // STRATEGY scope의 소유권을 병렬 조회 이전에 동기적으로 선검증 — 인가 실패가 병렬 잡(환율 등)을
+    // 유발하지 않도록 fast-fail 한다. buildInvestmentContext도 동일 검증을 한 번 더(멱등) 수행한다.
+    private void authorizeIfStrategyScope(BenchmarkScope scope, UUID strategyId, UUID userId) {
+        if (scope != BenchmarkScope.STRATEGY) {
+            return;
+        }
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.findByIdOrThrow(strategy.accountId()).verifyOwnedBy(userId);
+    }
+
+    // 캐시 hit면 병렬화 없이 환율만 후결합, miss면 본체(DB)와 환율(외부 HTTP)을 virtual thread로 병렬 조회.
+    // 본체∥환율 2갈래 — 벤치마크 시세 범위가 사이클 DB 조회 결과에 의존해 3갈래 불가, 환율 스레드는 DB 미사용이라 커넥션 증가 없음.
+    private HousingBenchmarkComparison comparisonWithExchangeRate(
+            BenchmarkComparisonKey key, Supplier<HousingBenchmarkComparison> bodyLoader) {
+        HousingBenchmarkComparison cached = statsResultCache.peek(key);
+        if (cached != null) {
+            return cached.withCurrentExchangeRate(fetchCurrentExchangeRate());
+        }
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Callable<Object>> jobs = List.of(
+                    () -> statsResultCache.getOrCompute(key, BENCHMARK_CACHE_TTL, bodyLoader),
+                    () -> fetchCurrentExchangeRate());
+            List<Future<Object>> futures = executor.invokeAll(jobs);
+            HousingBenchmarkComparison body = (HousingBenchmarkComparison) join(futures.get(0));
+            CurrentExchangeRate rate = (CurrentExchangeRate) join(futures.get(1));
+            return body.withCurrentExchangeRate(rate);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("벤치마크 비교 병렬 조회가 중단됐습니다", e);
+        }
+    }
+
+    // Future 결과를 언랩 — 원인이 RuntimeException이면 그대로(래핑 없이) 재전파
+    private static Object join(Future<Object> future) throws InterruptedException {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new IllegalStateException("벤치마크 비교 병렬 조회 실패", e.getCause());
+        }
     }
 
     // 자산 종류(HOUSING/ETF)와 무관한 공통 준비 단계 — 소유권 검증·사이클/포지션 조회·투자 지수 계산

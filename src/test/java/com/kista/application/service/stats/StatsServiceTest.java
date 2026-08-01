@@ -1067,4 +1067,58 @@ class StatsServiceTest {
 
         verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
     }
+
+    // ── 벤치마크 비교 캐시(TTL 10분) + 환율 병렬 조회 ───────────────────────────
+
+    @Test
+    void 벤치마크_비교는_같은_파라미터_재조회시_본체는_캐시하고_환율은_매번_재조회한다() {
+        stubPortfolioComparison("100.00", "184.20");
+        when(exchangeRatePort.getExchangeRate()).thenReturn(
+                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+
+        HousingBenchmarkComparison first = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, TO);
+        HousingBenchmarkComparison second = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, TO);
+
+        assertThat(second.points()).isEqualTo(first.points());
+        // 본체(DB) 조회는 캐시 hit이라 1회만 — cyclePositionPort/housingBenchmarkPricePort 둘 다 검증
+        verify(cyclePositionPort, times(1)).findByUserAndRange(any(), any(), any());
+        verify(housingBenchmarkPricePort, times(1)).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any());
+        // 환율은 캐시 대상이 아니라 응답마다 후결합 재조회
+        verify(exchangeRatePort, times(2)).getExchangeRate();
+    }
+
+    @Test
+    void 벤치마크_비교는_quintile이_다르면_별도_캐시_키로_본체를_재계산한다() {
+        stubPortfolioComparison("100.00", "184.20");
+        when(exchangeRatePort.getExchangeRate()).thenReturn(
+                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, TO);
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, 4, FROM, TO);
+
+        // quintile이 캐시 키에 포함되므로 본체(DB)가 각각 다시 조회된다
+        verify(cyclePositionPort, times(2)).findByUserAndRange(any(), any(), any());
+        verify(housingBenchmarkPricePort, times(2)).findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void 벤치마크_본체_계산_실패는_병렬_래핑_없이_원본_예외를_그대로_전파한다() {
+        stubUserWithStrategy();
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
+                depositSnapshot(cycle.id(), "184.20", "2026-02-28T01:00:00Z")));
+        RuntimeException boom = new IllegalStateException("벤치마크 조회 실패");
+        when(housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
+                anyString(), anyString(), any(), any())).thenThrow(boom);
+
+        assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, FROM, TO))
+                .isSameAs(boom);
+    }
 }
