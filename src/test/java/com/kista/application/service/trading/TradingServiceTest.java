@@ -195,7 +195,8 @@ class TradingServiceTest {
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
-                marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies);
+                marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies,
+                new TradingParallelRunner(0)); // 순차 모드 — 기존 테스트 결정성 보존
     }
 
     @Test

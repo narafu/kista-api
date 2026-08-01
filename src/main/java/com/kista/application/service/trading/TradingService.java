@@ -51,6 +51,7 @@ class TradingService {
     private final TradingOrderBudgetAllocator budgetAllocator; // 계좌별 BUY 예산·SELL 판매가능수량 배정
     private final BuyOrderPriceCapper priceCapper;             // 신규 후보 BUY 가격 cap 계산 (영속화 없음)
     private final CycleOrderStrategies cycleOrderStrategies;   // 전략별 BUY 가격 cap 방식 조회
+    private final TradingParallelRunner parallelRunner;        // 계좌별 동시 상한 내 사이클 병렬 실행
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
@@ -155,48 +156,52 @@ class TradingService {
                 .toList();
     }
 
-    // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리)
+    // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
     private List<CyclePlacedState> placeAll(List<CycleState> states, LocalDate today) throws InterruptedException {
         // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
         // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
         // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
         Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(states);
-        List<CyclePlacedState> placedStates = new ArrayList<>();
-        for (CycleState state : states) {
-            runSafely("증권사 접수", state.ctx(), () -> {
-                // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
-                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
-                        .orElse(state.startPrice());
-                List<Order> mainOrders = orderExecutor.placeOrders(today,
-                        state.ctx().account(), state.ctx().currentCycle().id(),
-                        placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
-                // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
-                // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
-                Set<UUID> mainOrderIds = mainOrders.stream()
-                        .map(Order::id).collect(Collectors.toSet());
-                List<Order> prePlaced = orderPort
-                        .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
-                        .stream().filter(o -> !mainOrderIds.contains(o.id())).toList();
-                if (!prePlaced.isEmpty()) {
-                    mainOrders = Stream.concat(prePlaced.stream(), mainOrders.stream()).toList();
-                }
-                return new CyclePlacedState(state, mainOrders);
-            }).ifPresent(placedStates::add);
-        }
-        return placedStates;
+        // groupKey=계좌 id — 같은 계좌 내 사이클끼리만 동시 상한 공유, 다른 계좌는 완전 병렬
+        List<TradingParallelRunner.Task<CyclePlacedState>> tasks = states.stream()
+                .map(state -> new TradingParallelRunner.Task<CyclePlacedState>(
+                        state.ctx().account().id(),
+                        () -> runSafely("증권사 접수", state.ctx(), () -> {
+                            // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
+                            BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                                    .orElse(state.startPrice());
+                            List<Order> mainOrders = orderExecutor.placeOrders(today,
+                                    state.ctx().account(), state.ctx().currentCycle().id(),
+                                    placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
+                            // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
+                            // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
+                            Set<UUID> mainOrderIds = mainOrders.stream()
+                                    .map(Order::id).collect(Collectors.toSet());
+                            List<Order> prePlaced = orderPort
+                                    .findPlacedByCycleAndDate(state.ctx().currentCycle().id(), today)
+                                    .stream().filter(o -> !mainOrderIds.contains(o.id())).toList();
+                            if (!prePlaced.isEmpty()) {
+                                mainOrders = Stream.concat(prePlaced.stream(), mainOrders.stream()).toList();
+                            }
+                            return new CyclePlacedState(state, mainOrders);
+                        })))
+                .toList();
+        return parallelRunner.runAll(tasks);
     }
 
-    // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리)
+    // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
     private void reportAll(List<CyclePlacedState> placedStates, Map<Ticker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
-        for (CyclePlacedState ps : placedStates) {
-            CycleState st = ps.state();
-            runSafely("recordAndNotify", st.ctx(), () -> {
-                reporter.recordAndNotify(today, st.ctx(), st.balance(),
-                        closingPrices.get(st.ctx().strategy().ticker()),
-                        ps.mainOrders(), st.privacyBase());
-                return null;
-            });
-        }
+        List<TradingParallelRunner.Task<Void>> tasks = placedStates.stream()
+                .map(ps -> new TradingParallelRunner.Task<Void>(
+                        ps.state().ctx().account().id(),
+                        () -> runSafely("recordAndNotify", ps.state().ctx(), () -> {
+                            reporter.recordAndNotify(today, ps.state().ctx(), ps.state().balance(),
+                                    closingPrices.get(ps.state().ctx().strategy().ticker()),
+                                    ps.mainOrders(), ps.state().privacyBase());
+                            return null;
+                        })))
+                .toList();
+        parallelRunner.runAll(tasks);
     }
 
     // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
