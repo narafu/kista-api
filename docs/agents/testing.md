@@ -60,7 +60,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`
 - `TradingServiceTest`는 `when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
-- `TradingService` 단위 테스트는 실제 `TradingOrderBudgetAllocator(tradingRegistry, orderPort, cycleOrderStrategies)`를 주입하고, `LiveBalancePort`·`SellableQuantityPort` 라우팅과 기존 BUY/SELL 예약량을 stub한다.
+- `TradingService` 단위 테스트는 실제 `TradingOrderBudgetAllocator(tradingRegistry, orderPort, cycleOrderStrategies, new TradingParallelRunner(0))`를 주입하고, `LiveBalancePort`·`SellableQuantityPort` 라우팅과 기존 BUY/SELL 예약량을 stub한다. `TradingService` 자체에도 `new TradingParallelRunner(0)`(순차 인라인 모드)을 마지막 생성자 인자로 주입해 기존 51개 테스트의 결정적 호출 순서를 보존한다 — 병렬 의미론(동시 상한·그룹 격리·순서 보존·인터럽트 승격)은 별도 `TradingParallelRunnerTest`가 검증한다. 예산 조회/계산 분리 후 allocator는 `fetchLiveQuotes`로 선조회한 `LiveQuotes`를 3-arg `allocate(candidates, tradeDate, quote)`에 넘기며, 2-arg `allocate`는 하위호환용으로 내부 인라인 조회를 수행한다.
 - scheduler leg recovery 테스트는 `Order.withLeg(...)`로 concrete leg를 명시한다. legacy 호환 케이스는 `Order.UNKNOWN_LEG`를 사용하고, `UNKNOWN`은 `timing + direction` coarse 슬롯이라는 점을 검증한다.
 - INFINITE compute skip 테스트는 correction 포함 complete concrete leg와 partial concrete leg를 모두 둔다. complete는 `buildOrders(...)` 미호출, partial은 호출을 검증해 누락 leg 복구가 막히지 않게 한다. 개장 스케쥴러 회귀는 기존 `AT_CLOSE` BUY만 있을 때 `AT_OPEN` SELL 복구가 막히지 않는지도 검증한다. VR/PRIVACY는 variable ladder라 concrete compute skip을 가정하지 않는다.
 - cap 예산 회귀 테스트는 `buildCappedBuyOrders(...)`가 반환하는 base+correction BUY 총액이 원본 BUY보다 커지는 경우를 만들고, allocator가 최종 총액으로 BUY를 거절하는지 검증한다.
