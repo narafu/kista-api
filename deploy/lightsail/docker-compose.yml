@@ -1,0 +1,53 @@
+# AWS Lightsail 단일 인스턴스 배포용 Docker Compose
+# kista-api는 OTLP 직접 푸시로 Grafana Cloud 메트릭 전송, Caddy가 리버스 프록시·HTTPS 담당
+
+services:
+  kista-api:
+    image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
+    container_name: kista-api
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx768m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
+    expose:
+      - "8080"
+    stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
+    mem_limit: 1200m         # 힙768m + 메타256m + 코드캐시64m + 네이티브 여유
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2.9-alpine   # 버전 핀 — 무빙 태그 방지
+    container_name: kista-api-caddy
+    env_file:
+      - .env
+    # depends_on 제거 — lb_try_duration이 기동 순서 보장, 리부트 시 caddy 선기동 가능
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:

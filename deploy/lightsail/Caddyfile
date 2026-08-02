@@ -1,0 +1,14 @@
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy kista-api:8080 {
+		# 컨테이너 재시작 공백 동안 클라이언트 요청 재시도 (스타트업 p99 ~90s 커버)
+		lb_try_duration 120s
+		lb_try_interval 500ms
+
+		# liveness만 체크 — DB/Redis 장애가 upstream down으로 전파되지 않도록
+		health_uri      /actuator/health/liveness
+		health_interval 10s
+		health_timeout  5s
+	}
+}
