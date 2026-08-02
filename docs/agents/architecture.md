@@ -67,6 +67,7 @@ application/
     user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM), UserSettingsService, UserCascadeDeleter(소프트 삭제 cascade helper)
     portfolio/   ← PortfolioService
     stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), StatsService(UserStatsUseCase 구현 — summary/equity-curve(type 필터는 사이클과 해당 cycleId 포지션 모두에 적용)/cycles/housing-benchmark 단일 진입점)
+                   StatsResultCache — summary/equity-curve 5분, housing-benchmark 비교 10분 인메모리 TTL 캐시(PreviewDepositCache 패턴 재사용). 매매 직후 통계가 해당 TTL만큼 stale할 수 있음. 단일 인스턴스 전제 — 다중 인스턴스 시 인스턴스별 캐시가 최대 TTL만큼 상이할 수 있음
                    MonthlyReturnCalculator — 사이클·포지션 스냅샷에서 현금흐름 조정 월별 USD 투자지수(TWR) 계산, Spring·포트 비의존 순수 클래스
                    HousingBenchmarkComparisonBuilder — 투자지수·KB Land 분위가를 공통월 첫 달=100 기준 정규화해 비교 summary·points 조립, 마찬가지로 순수 클래스
                    getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary 계산에는 미반영(조회 실패 시 null 처리, 200 정상 반환) — 투자(USD)·서울아파트(KRW) 현지통화 그대로 비교, 환율 변환 없음
@@ -75,7 +76,7 @@ application/
     admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함), AdminStrategyService, AdminCycleCloser(holdings 소진 시 사이클 종료), AdminSelectionChain, AdminReorderService, AdminTradeCorrectionService
     settings/    ← RuntimeSettingsService(공개 조회 + ADMIN 전체 갱신, 승인 필수 해제 시 PENDING 사용자 일괄 승인 + 감사 로그)
     auth/        ← BlacklistService (JWT 블랙리스트), TokenService (RT 발급/갱신/폐기)
-  event/         ← UserApproved/UserRejected/UserReappliedEvent — @TransactionalEventListener용 도메인 이벤트 (application 레이어)
+  event/         ← @TransactionalEventListener용 도메인 이벤트 다수(application 레이어) — 사용자 승인/거부/재신청/신규가입, 사이클 종료/신규시작, 매매리포트, 주문취소실패, 사용자탈퇴 등
 
 adapter/in/
   schedule/      ← TradingOpenScheduler (월~금 22:30 KST — 누락 슬롯 주문 생성·예산 배정 + AT_OPEN 선접수 + 예수금 부족 사용자 알람)
