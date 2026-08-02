@@ -8,8 +8,13 @@ spring:
       max-lifetime: 1800000
   jpa:
     show-sql: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s  # docker stop_grace_period 35s와 쌍으로 관리
 
 management:
+  health:
+    probes:
+      enabled: true  # /actuator/health/liveness + /actuator/health/readiness 활성화
   endpoint:
     health:
       show-details: never
