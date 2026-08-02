@@ -1,5 +1,5 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /workspace
 
 # Docker 빌드 중 Gradle JVM 메모리 상한 — 미설정 시 컨테이너 메모리 ~25%를 힙으로 잡아 BuildKit OOM 유발
