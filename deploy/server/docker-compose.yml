@@ -1,4 +1,4 @@
-# AWS Lightsail 단일 인스턴스 배포용 Docker Compose
+# 단일 인스턴스 배포용 Docker Compose (현재 OCI arm64 기준)
 # kista-api는 OTLP 직접 푸시로 Grafana Cloud 메트릭 전송, Caddy가 리버스 프록시·HTTPS 담당
 
 services:
@@ -9,11 +9,11 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      JAVA_OPTS: ${JAVA_OPTS:--Xmx768m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
     stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
-    mem_limit: 1200m         # 힙768m + 메타256m + 코드캐시64m + 네이티브 여유
+    mem_limit: 4096m         # 힙3072m + 메타384m + 코드캐시96m + 네이티브 여유 (OCI 12GB 인스턴스, 2 OCPU — 나머지는 OS/Docker/Caddy용)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
