@@ -13,18 +13,18 @@
 - G1GC: 2GB 환경에서 요청/스케줄러 겹침 시 지연시간 변동 완화 목적
 
 ### Fly.io 배포 방식
-- `.github/workflows/fly-deploy.yml` — Lightsail 전환 후 `push` 트리거 제거, `workflow_dispatch` 수동 실행 전용(커트오버 기간 긴급 롤백용). main push 시 자동 배포는 이제 Lightsail(`lightsail-deploy.yml`)이 담당
+- `.github/workflows/fly-deploy.yml` — 서버 전환 후 `push` 트리거 제거, `workflow_dispatch` 수동 실행 전용(커트오버 기간 긴급 롤백용). main push 시 자동 배포는 이제 서버 배포(`server-deploy.yml`)가 담당
 - 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
 - `fly.toml`의 배포 전략은 `[deploy]` 섹션의 `strategy` 키다 — **`[deployment]`는 flyctl이 인식하지 못하는 오타 섹션名**이라 조용히 무시된다(`flyctl config show --local --toml`로 로컬 파싱 결과를 직접 비교해야 확인 가능, `config show` 기본 동작은 로컬 파일이 아닌 Fly 서비스에 저장된 원격 설정을 보여줘서 이 오타를 못 잡는다). Redis fencing 도입 시 이 오타 때문에 의도했던 `immediate`(pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 1회성 protocol cutover)가 실제로는 한 번도 적용되지 않고 매번 flyctl 기본값인 `rolling`으로 배포됐다 — 그런데도 신·구 프로토콜이 실제로 충돌하는 사고는 없었다(2026-07-22 확인). 현재 `strategy = "rolling"`으로 명시 고정돼 있다.
 - 향후 유사한 protocol cutover가 필요하면: (1) `[deploy] strategy = "immediate"`로 변경 후 `flyctl config show --local --toml`로 로컬 파싱 결과에 `[deploy] strategy = 'immediate'`가 실제로 찍히는지 반드시 확인, (2) 배포 로그에 `Updating existing machines ... with immediate strategy` 문구로 실제 적용을 재확인, (3) `fly status`로 정상 기동 확인 후 별도 커밋으로 `rolling` 복원 — 오타로 검증 자체가 무력화됐던 사례가 있으니 "커밋했다"가 아니라 "실제 적용을 확인했다"를 기준으로 삼을 것.
 
-### Lightsail 배포 방식
-- `.github/workflows/lightsail-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/amd64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 Lightsail 서버에 배포
-- 배포 파일: `deploy/lightsail/docker-compose.yml`(kista-api + caddy 2서비스), `deploy/lightsail/Caddyfile`, `deploy/lightsail/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
-- **인스턴스는 반드시 amd64(x86_64)** — GitHub Actions 러너가 amd64로 이미지를 빌드하므로 arm64 인스턴스에서는 컨테이너 기동 불가
-- Caddy가 80/443만 외부에 공개하고 HTTPS를 종료해 `kista-api:8080`으로 reverse proxy — Lightsail 방화벽에서 `8080`은 절대 공개하지 않는다
-- GitHub Secrets: `LIGHTSAIL_HOST`(서버 IP/도메인), `LIGHTSAIL_USER`(SSH 사용자명), `LIGHTSAIL_SSH_KEY`(SSH 개인키), `LIGHTSAIL_SSH_PORT`(기본값 22, 선택) — `.env`는 서버에서 직접 관리하며 Actions가 덮어쓰지 않음
-- `.env` 필수 키는 `deploy/lightsail/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`(Caddy reverse proxy 대상 도메인) 포함
+### 서버 배포 방식 (현재 OCI)
+- `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 서버에 배포
+- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + caddy 2서비스), `deploy/server/Caddyfile`, `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
+- **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
+- Caddy가 80/443만 외부에 공개하고 HTTPS를 종료해 `kista-api:8080`으로 reverse proxy — 서버 방화벽에서 `8080`은 절대 공개하지 않는다
+- GitHub Secrets: `SERVER_HOST`(서버 IP/도메인), `SERVER_USER`(SSH 사용자명), `SERVER_SSH_KEY`(SSH 개인키), `SERVER_SSH_PORT`(기본값 22, 선택) — `.env`는 서버에서 직접 관리하며 Actions가 덮어쓰지 않음
+- `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`(Caddy reverse proxy 대상 도메인) 포함
 
 ### Fly.io 다중 인스턴스 Toss 토큰 조정
 - 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
@@ -73,7 +73,7 @@ vercel logs                                                     # kista-ui 운�
 # 헬스 체크 / 배포 상태
 curl https://kista-api.fly.dev/actuator/health
 fly status -a kista-api
-# 수동 배포 (Lightsail 전환 후 workflow_dispatch 전용 — 커트오버 기간 긴급 롤백용)
+# 수동 배포 (서버 전환 후 workflow_dispatch 전용 — 커트오버 기간 긴급 롤백용)
 fly deploy --app kista-api
 # 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
 # 로컬 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB)
@@ -85,7 +85,7 @@ Fly.io 자체 헬스체크(`fly.toml`)는 실패한 machine을 재시작할 뿐 
 
 - **가동 여부**: UptimeRobot(무료) → `https://kista-api.fly.dev/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
 - **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 완료 시 ping. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
-- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치(Fly.io/Lightsail) 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push. Lightsail에서도 별도 Alloy 사이드카 없이 동일하게 동작 (`GRAFANA_CLOUD_OTLP_*` 환경변수, → "Fly.io 환경변수 설정" 참고 — Lightsail은 `deploy/lightsail/README.md`의 `.env` 목록에 동일 변수 있음)
+- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치(Fly.io/서버) 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push. 서버(OCI)에서도 별도 Alloy 사이드카 없이 동일하게 동작 (`GRAFANA_CLOUD_OTLP_*` 환경변수, → "Fly.io 환경변수 설정" 참고 — 서버는 `deploy/server/README.md`의 `.env` 목록에 동일 변수 있음)
   - 대시보드 JSON: `deploy/grafana/kista-api-dashboard.json` — Grafana Cloud 계정 유실 시 재구성용, Dashboards → New → Import로 재적용
   - **Import 시 주의**: 대시보드 JSON Model 편집창(Settings → JSON Model)은 계정이 이미 v2 스키마(`elements`/`layout`)로 마이그레이션된 경우 구버전 `panels`/`gridPos` JSON을 거부함(`Missing property "elements"` 등) — 기존 대시보드를 고치려 하지 말고 **Import로 새로 생성** 후 기존 것 삭제
   - Grafana Cloud 메트릭 이름은 Micrometer 관례와 다를 수 있음 — 예: 업타임은 `process_uptime_seconds`가 아니라 **`process_uptime_milliseconds`**(단위도 ms). 확인 방법: Explore에서 `{application="kista-api"}`로 전체 시리즈 조회 후 이름 확인
