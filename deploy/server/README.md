@@ -1,6 +1,6 @@
-# Lightsail deployment
+# Server deployment (OCI)
 
-`kista-api`를 AWS Lightsail 단일 인스턴스에서 Docker Compose + Caddy로 운영한다.
+`kista-api`를 단일 인스턴스(현재 OCI)에서 Docker Compose + Caddy로 운영한다.
 
 ## 서버 레이아웃
 
@@ -13,9 +13,12 @@
 
 ## 초기 서버 설정 (최초 1회)
 
-1. Lightsail 2GB Ubuntu 22.04 LTS 인스턴스 생성 (Tokyo 리전) — 반드시 amd64(x86_64) 아키텍처로 생성한다(GitHub Actions 러너가 amd64로 이미지를 빌드하므로 arm64 인스턴스에서는 컨테이너가 기동하지 않는다)
-2. 정적 IP 할당 → 도메인 A 레코드 연결
-3. 인바운드 포트 `80`, `443` 개방 / `8080` 비공개 유지
+1. OCI 인스턴스(이미 생성됨): `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04 LTS — **arm64이므로 배포 워크플로가 `linux/arm64`로 이미지를 빌드한다**(다른 아키텍처로 재생성 시 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요)
+2. 정적 공인 IP: 인스턴스 생성 시 Reserved Public IP 할당(또는 별도 예약 공인 IP 연결) → 도메인 A 레코드 연결
+3. 인바운드 포트 개방 — 2단계:
+   - OCI 콘솔: 인스턴스가 속한 VCN의 Security List(또는 연결된 NSG)에 Ingress Rule 추가 — TCP `80`, `443`, source `0.0.0.0/0` (`22`는 이미 열려있을 것)
+   - **주의**: OCI Ubuntu 이미지는 콘솔 레벨 방화벽 외에 OS 레벨에서도 `iptables`(netfilter-persistent)로 SSH 외 인바운드를 기본 차단해두는 경우가 있다. 콘솔에서 포트를 열었는데 접속이 안 되면 인스턴스에서 `sudo iptables -L INPUT -n --line-numbers`로 OS 방화벽 규칙을 먼저 확인할 것 — 막혀 있으면 80/443 허용 규칙 추가 후 `sudo netfilter-persistent save`로 저장한다 (OCI 이미지 버전에 따라 달라질 수 있어 실제 접속 테스트로 최종 확인 필요)
+   - `8080`은 비공개 유지 — Caddy가 Docker 네트워크를 통해 접근한다
 4. Docker 설치:
    ```bash
    curl -fsSL https://get.docker.com | sh
@@ -40,23 +43,15 @@
    sudo sed -i 's/^Unattended-Upgrade::Automatic-Reboot "true"/Unattended-Upgrade::Automatic-Reboot "false"/' \
      /etc/apt/apt.conf.d/50unattended-upgrades
    ```
-8. 2GB swap 추가:
-   ```bash
-   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
-   sudo mkswap /swapfile && sudo swapon /swapfile
-   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-   ```
-
-Port `8080`은 외부에 공개하지 않는다 — Caddy가 Docker 네트워크를 통해 접근한다.
 
 ## GitHub Secrets
 
 | Secret | 설명 |
 |--------|------|
-| `LIGHTSAIL_HOST` | 서버 IP 또는 도메인 |
-| `LIGHTSAIL_USER` | SSH 사용자명 |
-| `LIGHTSAIL_SSH_KEY` | SSH 개인키 (PEM) |
-| `LIGHTSAIL_SSH_PORT` | SSH 포트 (기본값 22, 생략 가능) |
+| `SERVER_HOST` | 서버 IP 또는 도메인 |
+| `SERVER_USER` | SSH 사용자명 |
+| `SERVER_SSH_KEY` | SSH 개인키 (PEM) |
+| `SERVER_SSH_PORT` | SSH 포트 (기본값 22, 생략 가능) |
 
 `.env`는 서버에서 직접 관리 — Actions에 시크릿으로 올리지 않음.
 
@@ -96,10 +91,10 @@ HEARTBEAT_OPEN_URL=          # healthchecks.io 개장 스케쥴러 dead-man's sw
 HEARTBEAT_CLOSE_URL=         # healthchecks.io 마감 스케쥴러 dead-man's switch (미설정 시 핑 생략)
 ```
 
-Optional JVM override for the 2 GB instance:
+Optional JVM override (기본값은 `docker-compose.yml`에 이미 OCI 12GB 인스턴스 기준으로 반영돼 있다 — 다른 값이 필요할 때만 `.env`에 명시):
 
 ```dotenv
-JAVA_OPTS=-Xmx768m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom
+JAVA_OPTS=-Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom
 ```
 
 ## 배포 흐름
@@ -150,7 +145,7 @@ docker compose up -d --no-deps kista-api
 
 ## 커트오버 체크리스트
 
-- [ ] Lightsail 인스턴스 생성 + 정적 IP + 도메인 A 레코드
+- [ ] OCI 인스턴스 방화벽 확인(Security List/NSG + OS iptables) + 정적 IP + 도메인 A 레코드
 - [ ] `.env` 작성 및 필수 키 검증
 - [ ] `docker compose up -d` 수동 실행 + 헬스체크 확인
 - [ ] `/actuator/health` 외부 접근 확인
