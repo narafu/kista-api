@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://redis:6379  # depends_on 미사용 — Spring Data Redis가 lazy connection이라 앱 부팅을 막지 않음 (caddy와 동일한 "서비스별 독립 재시작 회복력" 원칙)
       JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
@@ -57,6 +57,11 @@ services:
       - redis_data:/data
     mem_limit: 256m
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     logging:
       driver: json-file
       options:
