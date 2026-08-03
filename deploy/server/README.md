@@ -147,6 +147,32 @@ docker compose up -d --no-deps kista-api
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
 - **로그**: `docker compose logs -f kista-api` (서버 SSH)
 
+## fida 병행 배포 (커트오버 시 적용 — 아직 미적용)
+
+fida를 같은 OCI 서버에 별도 compose 프로젝트(`/opt/fida/`, fida 저장소 소유)로 배포할 때만 아래를 적용한다. 미리 병합해두지 않는 이유: `shared_net`이 없는 상태에서 `docker compose up -d` 전체 재기동을 하면 caddy가 "network shared_net declared as external, but could not be found"로 실패하고, `FIDA_DOMAIN`이 비어 있는 상태에서 Caddyfile 블록만 먼저 들어가면 Caddy 프로세스가 재시작될 때(호스트 리부트·OOM·수동 재시작 등 fida와 무관한 모든 이벤트 포함) 빈 사이트 주소 파싱 실패로 크래시 루프에 빠져 kista-api 라우팅까지 함께 죽는다 — 그래서 아래 순서를 반드시 지켜 fida 커트오버와 동시에 적용한다.
+
+1. 외부 Docker 네트워크 최초 1회 생성 (fida가 실제로 배포되기 직전에 실행 — 이미 떠 있는 kista-api/caddy 컨테이너에는 영향 없는 무해한 명령):
+   ```bash
+   docker network create shared_net
+   ```
+   fida는 자기 `docker-compose.yml`(fida 저장소 소유, 독립 배포)에서 이 네트워크를 `external: true`로 join해야 caddy가 컨테이너명(`fida:7070`)으로 reverse_proxy 할 수 있다
+2. DNS: `fida.kista-app.com` 같은 서브도메인 A 레코드를 `API_DOMAIN`과 동일한 IP로 추가
+3. 서버 `.env`에 `FIDA_DOMAIN=fida.kista-app.com` 추가
+4. **`.env`에 `FIDA_DOMAIN`이 실제로 채워진 뒤에** `docker-compose.yml`의 caddy 서비스에 `networks: [default, shared_net]` 추가 + 최상위 `networks: shared_net: {external: true}` 추가
+5. **이어서** `Caddyfile`에 아래 블록 추가 (순서 중요 — 3·4번보다 먼저 넣으면 안 됨):
+   ```caddyfile
+   {$FIDA_DOMAIN} {
+   	encode zstd gzip
+
+   	reverse_proxy fida:7070 {
+   		health_uri      /actuator/health
+   		health_interval 10s
+   		health_timeout  5s
+   	}
+   }
+   ```
+6. `docker compose up -d --no-deps caddy`로 caddy만 재기동해 새 설정 반영 확인
+
 ## 커트오버 체크리스트
 
 - [ ] OCI 인스턴스 방화벽 확인(Security List/NSG + OS iptables) + 정적 IP + 도메인 A 레코드
