@@ -57,13 +57,14 @@
 
 ## .env 내용
 
+Redis는 `docker-compose.yml`에 내장된 컨테이너로 자체 호스팅되며 `REDIS_URL`이 `redis://redis:6379`로 하드코딩되어 있다 — `.env`에 별도 설정 불필요.
+
 ```dotenv
 API_DOMAIN=api.example.com
 
 DB_URL=
 DB_USERNAME=
 DB_PASSWORD=
-REDIS_URL=                  # Upstash: rediss://default:xxx@xxx.upstash.io:6379
 
 JWT_SIGNING_KEY=
 AES_ENCRYPTION_KEY=
@@ -139,6 +140,7 @@ docker compose up -d --no-deps kista-api
 ## 모니터링
 
 - **메트릭**: 앱이 `micrometer-registry-otlp`로 Grafana Cloud에 60초 간격 직접 OTLP push (`management.otlp.metrics.export`, `GRAFANA_CLOUD_OTLP_*` 환경변수) — 별도 사이드카 불필요
+- **Redis 영속성**: `redis` 컨테이너는 AOF(`appendonly yes`, `appendfsync everysec`)로 `redis_data` volume에 영속화 — 컨테이너 재시작·재배포 시 자동 replay로 JWT 블랙리스트·Toss 토큰 조정 상태 복원. 유실 구간은 최대 1초(마지막 fsync 이후)
 - **헬스체크**: UptimeRobot → `https://{API_DOMAIN}/actuator/health` 5분 간격 (full health — DB·Redis 포함)
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
 - **로그**: `docker compose logs -f kista-api` (서버 SSH)

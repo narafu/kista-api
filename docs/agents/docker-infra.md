@@ -20,11 +20,12 @@
 
 ### 서버 배포 방식 (현재 OCI)
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 서버에 배포
-- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + caddy 2서비스), `deploy/server/Caddyfile`, `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
+- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + caddy + redis 3서비스), `deploy/server/Caddyfile`, `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
 - **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
 - Caddy가 80/443만 외부에 공개하고 HTTPS를 종료해 `kista-api:8080`으로 reverse proxy — 서버 방화벽에서 `8080`은 절대 공개하지 않는다
 - GitHub Secrets: `SERVER_HOST`(서버 IP/도메인), `SERVER_USER`(SSH 사용자명), `SERVER_SSH_KEY`(SSH 개인키), `SERVER_SSH_PORT`(기본값 22, 선택) — `.env`는 서버에서 직접 관리하며 Actions가 덮어쓰지 않음
 - `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`(Caddy reverse proxy 대상 도메인) 포함
+- **Redis는 자체 호스팅**(`docker-compose.yml`의 `redis` 서비스, AOF 영속성) — Fly.io는 다중 인스턴스 가능성 때문에 외부 공유 Redis(Upstash)가 필수였지만, OCI는 단일 인스턴스라 로컬 Redis 하나로 "모든 운영 인스턴스가 같은 Redis를 봐야 함" 제약이 자동 충족됨. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있어 `.env` 설정 불필요
 
 ### Fly.io 다중 인스턴스 Toss 토큰 조정
 - 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
