@@ -21,7 +21,9 @@
 ### 서버 배포 방식 (현재 OCI)
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 서버에 배포
 - 배포 파일: `deploy/server/docker-compose.yml`(kista-api + caddy + redis 3서비스), `deploy/server/Caddyfile`, `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
-- **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
+- **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
+- **OCI 볼륨은 in-place 축소 불가, OCPU·메모리는 가능** — 최초 12GB/부트 200GB로 생성했다가 free-tier 리전 스토리지(200GB) 전량을 부트 볼륨 하나가 점유해 다른 인스턴스를 만들 여유가 없어져 부트 볼륨만 50GB로 재생성함(2026-08-03). 볼륨을 줄여야 하면 재생성이 유일한 방법 — 아래 무중단 재생성 노하우 참고. 반면 OCPU·메모리는 Flexible shape 속성이라 `oci compute instance update --shape-config '{"ocpus":N,"memoryInGBs":M}'`로 살아있는 인스턴스에서 바로 변경 가능(적용에 재부팅 필요, IP·볼륨 유지) — 재생성 없이 스펙만 조정할 땐 이 경로를 우선 검토
+- **예약 공인 IP 재할당으로 무중단 호스트 교체**: 공인 IP를 처음부터 Reserved(에페메럴 아님)로 할당해두면, 인스턴스 재생성(스펙 변경·볼륨 축소 등) 시 새 인스턴스를 임시 공인 IP로 완전히 기동·스모크 테스트한 뒤 `oci network public-ip update --private-ip-id <새 인스턴스 private-ip-ocid>`로 예약 IP만 재할당하면 된다 — 도메인·DNS·GitHub Secret(`SERVER_HOST`)·카카오 OAuth·CORS 전부 무변경. old 인스턴스는 외부 검증 통과 전까지 종료하지 않는 것이 핵심 안전장치(문제 발생 시 예약 IP를 old로 즉시 되돌려 롤백)
 - Caddy가 80/443만 외부에 공개하고 HTTPS를 종료해 `kista-api:8080`으로 reverse proxy — 서버 방화벽에서 `8080`은 절대 공개하지 않는다
 - GitHub Secrets: `SERVER_HOST`(서버 IP/도메인), `SERVER_USER`(SSH 사용자명), `SERVER_SSH_KEY`(SSH 개인키), `SERVER_SSH_PORT`(기본값 22, 선택) — `.env`는 서버에서 직접 관리하며 Actions가 덮어쓰지 않음
 - `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`(Caddy reverse proxy 대상 도메인) 포함

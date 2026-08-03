@@ -13,8 +13,9 @@
 
 ## 초기 서버 설정 (최초 1회)
 
-1. OCI 인스턴스(이미 생성됨): `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04 LTS — **arm64이므로 배포 워크플로가 `linux/arm64`로 이미지를 빌드한다**(다른 아키텍처로 재생성 시 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요)
+1. OCI 인스턴스(이미 생성됨): `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04 LTS — **arm64이므로 배포 워크플로가 `linux/arm64`로 이미지를 빌드한다**(다른 아키텍처로 재생성 시 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요). 최초 12GB/부트 200GB로 생성했다가, free-tier 스토리지(리전당 200GB) 전량을 부트 볼륨 하나가 점유해 다른 인스턴스를 만들 여유가 없어져 부트 볼륨만 50GB로 재생성함(2026-08-03) — OCI는 볼륨 in-place 축소를 지원하지 않아 재생성이 유일한 방법. OCPU·메모리는 볼륨과 달리 Flexible shape라 `oci compute instance update --shape-config`로 실행 중에도 변경 가능(적용에 재부팅 필요) — 계획한 인스턴스 3대 합계가 OCI Always Free Ampere A1 총 한도(4 OCPU + 24GB RAM)를 정확히 채우도록 재생성 직후 8GB→12GB로 조정함
 2. 정적 공인 IP: 인스턴스 생성 시 Reserved Public IP 할당(또는 별도 예약 공인 IP 연결) → 도메인 A 레코드 연결 — **DNS 제공자가 프록시 기능을 지원하면(예: Cloudflare) 반드시 "DNS only"(프록시 끔, 회색 구름)로 설정**. 프록시를 켜면 DNS 제공자가 TLS를 가로채 Caddy의 Let's Encrypt 자동 인증서 발급(HTTP-01 challenge)이 실패한다
+   - **예약(Reserved) 공인 IP로 무중단 호스트 교체**: 반드시 Reserved(에페메럴 아님)로 할당해두면, 이후 인스턴스를 재생성해야 할 때(스펙 변경·볼륨 축소 등) 새 인스턴스를 임시 공인 IP로 완전히 기동·스모크 테스트한 뒤 예약 IP만 `oci network public-ip update --private-ip-id <새 인스턴스 private-ip-ocid>`로 재할당하면 된다 — 도메인·DNS·GitHub Secret(`SERVER_HOST`) 변경 없이 호스트를 교체할 수 있다(2026-08-03 부트 볼륨 축소 재생성 시 실사용)
 3. 인바운드 포트 개방 — 2단계:
    - OCI 콘솔: 인스턴스가 속한 VCN의 Security List(또는 연결된 NSG)에 Ingress Rule 추가 — TCP `80`, `443`, source `0.0.0.0/0` (`22`는 이미 열려있을 것)
    - **주의**: OCI Ubuntu 이미지는 콘솔 레벨 방화벽 외에 OS 레벨에서도 `iptables`(netfilter-persistent)로 SSH 외 인바운드를 기본 차단해두는 경우가 있다. 콘솔에서 포트를 열었는데 접속이 안 되면 인스턴스에서 `sudo iptables -L INPUT -n --line-numbers`로 OS 방화벽 규칙을 먼저 확인할 것 — 막혀 있으면 80/443 허용 규칙 추가 후 `sudo netfilter-persistent save`로 저장한다 (OCI 이미지 버전에 따라 달라질 수 있어 실제 접속 테스트로 최종 확인 필요)
