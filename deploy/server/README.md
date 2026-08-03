@@ -14,7 +14,7 @@
 ## 초기 서버 설정 (최초 1회)
 
 1. OCI 인스턴스(이미 생성됨): `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, Ubuntu 24.04 LTS — **arm64이므로 배포 워크플로가 `linux/arm64`로 이미지를 빌드한다**(다른 아키텍처로 재생성 시 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요)
-2. 정적 공인 IP: 인스턴스 생성 시 Reserved Public IP 할당(또는 별도 예약 공인 IP 연결) → 도메인 A 레코드 연결
+2. 정적 공인 IP: 인스턴스 생성 시 Reserved Public IP 할당(또는 별도 예약 공인 IP 연결) → 도메인 A 레코드 연결 — **DNS 제공자가 프록시 기능을 지원하면(예: Cloudflare) 반드시 "DNS only"(프록시 끔, 회색 구름)로 설정**. 프록시를 켜면 DNS 제공자가 TLS를 가로채 Caddy의 Let's Encrypt 자동 인증서 발급(HTTP-01 challenge)이 실패한다
 3. 인바운드 포트 개방 — 2단계:
    - OCI 콘솔: 인스턴스가 속한 VCN의 Security List(또는 연결된 NSG)에 Ingress Rule 추가 — TCP `80`, `443`, source `0.0.0.0/0` (`22`는 이미 열려있을 것)
    - **주의**: OCI Ubuntu 이미지는 콘솔 레벨 방화벽 외에 OS 레벨에서도 `iptables`(netfilter-persistent)로 SSH 외 인바운드를 기본 차단해두는 경우가 있다. 콘솔에서 포트를 열었는데 접속이 안 되면 인스턴스에서 `sudo iptables -L INPUT -n --line-numbers`로 OS 방화벽 규칙을 먼저 확인할 것 — 막혀 있으면 80/443 허용 규칙 추가 후 `sudo netfilter-persistent save`로 저장한다 (OCI 이미지 버전에 따라 달라질 수 있어 실제 접속 테스트로 최종 확인 필요)
@@ -131,6 +131,8 @@ docker compose up -d --no-deps kista-api
 ```
 
 **Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요.
+
+**이미지 디스크 정리 참고**: 배포 워크플로의 `docker image prune -f`는 dangling(태그 없는) 레이어만 제거한다 — 롤백에 쓰이는 SHA 태그 이미지는 계속 쌓인다. 디스크 압박이 느껴지면 수동으로 `docker image prune -af --filter "until=720h"`(30일 이상 지난 이미지만) 등으로 정리하되, 최근 롤백 후보 몇 개는 남겨둘 것.
 
 ## Flyway 배포 주의사항
 

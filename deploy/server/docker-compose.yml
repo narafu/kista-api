@@ -57,7 +57,7 @@ services:
       - redis_data:/data
     mem_limit: 256m
     restart: unless-stopped
-    healthcheck:
+    healthcheck:  # 관측용(docker ps/inspect에서 확인) — depends_on consumer 없음, 게이트 아님(설계상 의도)
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 5s

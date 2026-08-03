@@ -26,6 +26,11 @@
 - GitHub Secrets: `SERVER_HOST`(서버 IP/도메인), `SERVER_USER`(SSH 사용자명), `SERVER_SSH_KEY`(SSH 개인키), `SERVER_SSH_PORT`(기본값 22, 선택) — `.env`는 서버에서 직접 관리하며 Actions가 덮어쓰지 않음
 - `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`(Caddy reverse proxy 대상 도메인) 포함
 - **Redis는 자체 호스팅**(`docker-compose.yml`의 `redis` 서비스, AOF 영속성) — Fly.io는 다중 인스턴스 가능성 때문에 외부 공유 Redis(Upstash)가 필수였지만, OCI는 단일 인스턴스라 로컬 Redis 하나로 "모든 운영 인스턴스가 같은 Redis를 봐야 함" 제약이 자동 충족됨. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있어 `.env` 설정 불필요
+- Fly.io의 기존 Redis("Fly Redis" 애드온, `fly-*-redis.upstash.io`)는 Fly 사설 네트워크(`fdaa::/16`, 6PN 전용) 주소라 **외부에서 접근 불가** — 커트오버 시 이 값을 그대로 재사용하려다 실측(`fly ssh console`로 조회 후 외부에서 접속 시도 → `Network is unreachable`)으로 확인됨. 벤더를 완전히 바꾸는 마이그레이션에서는 Fly Redis를 승계할 수 없다는 뜻이라, 새 Redis(관리형이든 자체 호스팅이든)를 처음부터 새로 구성해야 함
+
+### Fly↔서버(OCI) 병행 운영 전환 안전성 (2026-08-03 커트오버 실측)
+- 커트오버 기간 중 Fly와 서버(OCI)가 같은 Supabase DB를 동시에 바라보는 시점이 발생한다. 매매 스케쥴러 중복 실행 방지는 Redis가 아니라 **Postgres 기반 분산 락**(`SchedulerLockService`, `scheduler_locks` 테이블, DB 서버 시각 `now()` 기준 `INSERT ... ON CONFLICT ... WHERE lock_until <= now()`)이라 두 인스턴스가 서로 다른 호스트라도 시계 편차 없이 안전하게 경쟁한다 — 어느 한쪽만 매 사이클 실행된다
+- 단, 이 락은 "중복 실행"만 막을 뿐 "어느 쪽이 실행되는지"는 보장하지 않는다 — Fly가 이겨도 동작 자체는 가능하므로, **커트오버 기간에는 Fly 머신을 `fly scale count 0`으로 내려 능동적 경쟁 자체를 제거하는 것을 권장**(이미지·시크릿·릴리스 히스토리는 보존되어 `fly scale count 1`로 즉시 롤백 가능 — `fly apps destroy`와는 다름). 브로커가 IP 화이트리스트(Toss 등)를 쓰면 등록된 IP가 아닌 호스트의 매매 API 호출은 어차피 거부되지만, 화이트리스트가 없는 브로커(KIS 등)는 이 보호를 못 받으므로 스케일다운이 여전히 필요
 
 ### Fly.io 다중 인스턴스 Toss 토큰 조정
 - 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
