@@ -155,7 +155,7 @@ jobs:
             cd "${DEPLOY_PATH}"
 
             # 필수 환경변수 존재 검증 (.env 서버 직접 관리)
-            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID REDIS_URL API_DOMAIN; do
+            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID API_DOMAIN; do
               grep -q "^${key}=" .env || { echo "::error::필수 환경변수 누락: ${key}"; exit 1; }
             done
 
