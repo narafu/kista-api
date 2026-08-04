@@ -1,7 +1,7 @@
 # PostgreSQL 자체 호스팅 + kista 올인원 통합 — 구현 플랜
 
 - **작성일**: 2026-08-04 (v2 — 전면 재검토 반영, 구현 중심 재작성)
-- **상태**: 설계 확정, 구현 대기
+- **상태**: Phase 1·2(파일 작성) 완료, Phase 0·3·4·5(실제 운영 전환) 대기
 - **실행 환경 전제**: 이 문서를 작성한 PC에는 oci-cli·OCI SSH 키·운영 환경변수가 없음 → **구현은 해당 자원이 있는 PC에서 진행**. 실행 계정은 Fable 한도 없음 → 오케스트레이터 = **Opus 4.8**(플랜·검토·판단) + **Sonnet 5**(실행, opusplan 기본). 구현 서브에이전트 = Sonnet 5, 문서 = Haiku 4.5, 검토자 = Opus 4.8
 
 ## 확정 사항
@@ -88,6 +88,8 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 검증: infra 기동 → `docker network inspect`로 alias, `pg_isready`, caddy 기동(앱 미기동 502 정상), `.env` 3개 렌더링.
 
+**실행 완료(2026-08-04)**: kista-infra `a38842a` (초기 신설), kista-api 워크트리 `infra/pg-oci-selfhost` `013f4f2e` (docs 반영), kista-ui 워크트리 `infra/pg-oci-selfhost` `7be81d5` (docs 반영). — 실제 인스턴스 배포는 Phase 3 이후 계획.
+
 ## Phase 2 — 앱 레포 수정
 
 **kista-api** (`deploy/server/docker-compose.yml` + `server-deploy.yml`):
@@ -106,6 +108,8 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 **공통 규약**: `.gitignore` = `.env*` 차단 + `!.env.example`(+ui는 `!.env.production.public`). `.env.example`은 `.gpg` 내용과 키 목록 동기.
 
 검증: 3레포 compose config 정합(alias·네트워크·도메인·키 목록 크로스 대조 — Opus 검토자).
+
+**실행 완료(2026-08-04)**: kista-api 워크트리 `infra/pg-oci-selfhost` `81fb7448` (모든 docs 반영 포함), kista-ui 워크트리 `infra/pg-oci-selfhost` `cdd0196` (모든 docs 반영 포함), kista-infra `4ccf172` (README 포함). — Task 4(문서 반영) 완료. 실제 인스턴스 배포는 Phase 3 이후 계획.
 
 ## Phase 3 — 데이터 이관 + 커트오버 (휴장 주말 단일 정비 창)
 
