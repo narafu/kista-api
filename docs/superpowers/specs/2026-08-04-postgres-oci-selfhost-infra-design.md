@@ -88,7 +88,7 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 검증: infra 기동 → `docker network inspect`로 alias, `pg_isready`, caddy 기동(앱 미기동 502 정상), `.env` 3개 렌더링.
 
-**실행 완료(2026-08-04)**: kista-infra `a38842a` (초기 신설), kista-api 워크트리 `infra/pg-oci-selfhost` `013f4f2e` (docs 반영), kista-ui 워크트리 `infra/pg-oci-selfhost` `7be81d5` (docs 반영). — 실제 인스턴스 배포는 Phase 3 이후 계획.
+**실행 완료(2026-08-04)**: kista-infra `a4894b2`(레포 신설) → `a38842a`(리뷰 수정).
 
 ## Phase 2 — 앱 레포 수정
 
@@ -109,7 +109,9 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 검증: 3레포 compose config 정합(alias·네트워크·도메인·키 목록 크로스 대조 — Opus 검토자).
 
-**실행 완료(2026-08-04)**: kista-api 워크트리 `infra/pg-oci-selfhost` `81fb7448` (모든 docs 반영 포함), kista-ui 워크트리 `infra/pg-oci-selfhost` `cdd0196` (모든 docs 반영 포함), kista-infra `4ccf172` (README 포함). — Task 4(문서 반영) 완료. 실제 인스턴스 배포는 Phase 3 이후 계획.
+**실행 완료(2026-08-04)**: kista-api 워크트리 `infra/pg-oci-selfhost` `6e0e445f`, `dbe78717` / kista-ui 워크트리 `infra/pg-oci-selfhost` `bc587e8`, `109b288`(Task 2·3 구현 커밋).
+
+**문서 반영(Task 4, 2026-08-04)**: kista-api 워크트리 `infra/pg-oci-selfhost` `81fb7448` / kista-ui 워크트리 `infra/pg-oci-selfhost` `cdd0196` / kista-infra `4ccf172`(README 포함).
 
 ## Phase 3 — 데이터 이관 + 커트오버 (휴장 주말 단일 정비 창)
 
