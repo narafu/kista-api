@@ -1,13 +1,14 @@
 # Server deployment (OCI)
 
-`kista-api`를 단일 인스턴스(현재 OCI)에서 Docker Compose + Caddy로 운영한다.
+`kista-api`를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
+`kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
+네트워크에 합류만 한다.
 
 ## 서버 레이아웃
 
 ```text
 /opt/kista-api/
 ├── .env                    ← 서버에서 직접 관리 (Actions에서 덮어쓰지 않음)
-├── Caddyfile               ← GitHub Actions 업로드
 └── docker-compose.yml      ← GitHub Actions 업로드
 ```
 
@@ -19,7 +20,7 @@
 3. 인바운드 포트 개방 — 2단계:
    - OCI 콘솔: 인스턴스가 속한 VCN의 Security List(또는 연결된 NSG)에 Ingress Rule 추가 — TCP `80`, `443`, source `0.0.0.0/0` (`22`는 이미 열려있을 것)
    - **주의**: OCI Ubuntu 이미지는 콘솔 레벨 방화벽 외에 OS 레벨에서도 `iptables`(netfilter-persistent)로 SSH 외 인바운드를 기본 차단해두는 경우가 있다. 콘솔에서 포트를 열었는데 접속이 안 되면 인스턴스에서 `sudo iptables -L INPUT -n --line-numbers`로 OS 방화벽 규칙을 먼저 확인할 것 — 막혀 있으면 80/443 허용 규칙 추가 후 `sudo netfilter-persistent save`로 저장한다 (OCI 이미지 버전에 따라 달라질 수 있어 실제 접속 테스트로 최종 확인 필요)
-   - `8080`은 비공개 유지 — Caddy가 Docker 네트워크를 통해 접근한다
+   - `8080`은 비공개 유지 — kista-infra의 Caddy가 `shared_net`을 통해 접근한다
 4. Docker 설치:
    ```bash
    curl -fsSL https://get.docker.com | sh
@@ -58,7 +59,8 @@
 
 ## .env 내용
 
-Redis는 `docker-compose.yml`에 내장된 컨테이너로 자체 호스팅되며 `REDIS_URL`이 `redis://redis:6379`로 하드코딩되어 있다 — `.env`에 별도 설정 불필요.
+Redis는 kista-infra 레포가 소유하는 컨테이너로 `data_net`에서 `redis` alias로 접근하며, `REDIS_URL`이
+`docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있다 — `.env`에 별도 설정 불필요.
 
 ```dotenv
 API_DOMAIN=api.example.com
@@ -108,7 +110,7 @@ JAVA_OPTS=-Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize
 5. `docker compose pull kista-api && docker compose up -d --no-deps kista-api`
 6. 헬스 게이트: 호스트에서 `docker inspect --format '{{.State.Health.Status}}' kista-api`로 컨테이너 헬스 상태를 10초 간격 최대 5분(300초) 폴링 — 컨테이너 healthcheck의 start_period(180s)+retries×interval(90s)보다 여유 있게 설정
 7. 실패 시 이전 이미지로 자동 롤백
-8. Caddy `lb_try_duration 120s`가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
+8. kista-infra의 Caddy `lb_try_duration 120s`(kista-infra 레포 소유 설정)가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
 
 ## 배포 시간 제한
 
@@ -143,36 +145,16 @@ docker compose up -d --no-deps kista-api
 ## 모니터링
 
 - **메트릭**: 앱이 `micrometer-registry-otlp`로 Grafana Cloud에 60초 간격 직접 OTLP push (`management.otlp.metrics.export`, `GRAFANA_CLOUD_OTLP_*` 환경변수) — 별도 사이드카 불필요
-- **Redis 영속성**: `redis` 컨테이너는 AOF(`appendonly yes`, `appendfsync everysec`)로 `redis_data` volume에 영속화 — 컨테이너 재시작·재배포 시 자동 replay로 JWT 블랙리스트·Toss 토큰 조정 상태 복원. 유실 구간은 최대 1초(마지막 fsync 이후). `kista-api`에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
+- **Redis 영속성**: kista-infra 레포 소유 — 상세 설정(AOF 등)은 kista-infra README 참고. `kista-api`에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
 - **헬스체크**: UptimeRobot → `https://{API_DOMAIN}/actuator/health` 5분 간격 (full health — DB·Redis 포함)
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
 - **로그**: `docker compose logs -f kista-api` (서버 SSH)
 
-## fida 병행 배포 (커트오버 시 적용 — 아직 미적용)
+## fida 병행 배포
 
-fida를 같은 OCI 서버에 별도 compose 프로젝트(`/opt/fida/`, fida 저장소 소유)로 배포할 때만 아래를 적용한다. 미리 병합해두지 않는 이유: `shared_net`이 없는 상태에서 `docker compose up -d` 전체 재기동을 하면 caddy가 "network shared_net declared as external, but could not be found"로 실패하고, `FIDA_DOMAIN`이 비어 있는 상태에서 Caddyfile 블록만 먼저 들어가면 Caddy 프로세스가 재시작될 때(호스트 리부트·OOM·수동 재시작 등 fida와 무관한 모든 이벤트 포함) 빈 사이트 주소 파싱 실패로 크래시 루프에 빠져 kista-api 라우팅까지 함께 죽는다 — 그래서 아래 순서를 반드시 지켜 fida 커트오버와 동시에 적용한다.
-
-1. 외부 Docker 네트워크 최초 1회 생성 (fida가 실제로 배포되기 직전에 실행 — 이미 떠 있는 kista-api/caddy 컨테이너에는 영향 없는 무해한 명령):
-   ```bash
-   docker network create shared_net
-   ```
-   fida는 자기 `docker-compose.yml`(fida 저장소 소유, 독립 배포)에서 이 네트워크를 `external: true`로 join해야 caddy가 컨테이너명(`fida:7070`)으로 reverse_proxy 할 수 있다
-2. DNS: `fida.kista-app.com` 같은 서브도메인 A 레코드를 `API_DOMAIN`과 동일한 IP로 추가
-3. 서버 `.env`에 `FIDA_DOMAIN=fida.kista-app.com` 추가
-4. **`.env`에 `FIDA_DOMAIN`이 실제로 채워진 뒤에** `docker-compose.yml`의 caddy 서비스에 `networks: [default, shared_net]` 추가 + 최상위 `networks: shared_net: {external: true}` 추가
-5. **이어서** `Caddyfile`에 아래 블록 추가 (순서 중요 — 3·4번보다 먼저 넣으면 안 됨):
-   ```caddyfile
-   {$FIDA_DOMAIN} {
-   	encode zstd gzip
-
-   	reverse_proxy fida:7070 {
-   		health_uri      /actuator/health
-   		health_interval 10s
-   		health_timeout  5s
-   	}
-   }
-   ```
-6. `docker compose up -d --no-deps caddy`로 caddy만 재기동해 새 설정 반영 확인
+`shared_net`/`data_net` 소유권과 Caddy 라우팅(fida 도메인 블록 포함)이 kista-infra 레포로 이관됨에 따라, fida를 같은
+OCI 서버에 병행 배포하는 절차도 kista-infra 레포 문서가 SSOT다 — 이 레포에서는 더 이상 caddy 서비스·Caddyfile을
+소유하지 않으므로 절차를 여기 중복 기술하지 않는다.
 
 ## 커트오버 체크리스트
 
