@@ -1,8 +1,7 @@
+# Phase 3(자체 호스팅 DB 이관) 완료 후 이 워크플로 자체를 삭제할 것 — kista-infra의 backup.sh가 대체
 name: DB Backup
 
 on:
-  schedule:
-    - cron: '0 17 * * *'  # 매일 02:00 KST (스케쥴러 실행 구간과 겹치지 않는 시간대)
   workflow_dispatch:
 
 jobs:

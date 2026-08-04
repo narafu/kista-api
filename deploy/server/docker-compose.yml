@@ -1,5 +1,6 @@
 # 단일 인스턴스 배포용 Docker Compose (현재 OCI arm64 기준)
-# kista-api는 OTLP 직접 푸시로 Grafana Cloud 메트릭 전송, Caddy가 리버스 프록시·HTTPS 담당
+# kista-api는 OTLP 직접 푸시로 Grafana Cloud 메트릭 전송
+# Caddy(리버스 프록시·HTTPS)와 Redis는 kista-infra 레포가 소유 — kista-api는 shared_net/data_net으로 합류만 한다
 
 services:
   kista-api:
@@ -9,12 +10,15 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      REDIS_URL: redis://redis:6379  # depends_on 미사용 — Spring Data Redis가 lazy connection이라 앱 부팅을 막지 않음 (caddy와 동일한 "서비스별 독립 재시작 회복력" 원칙)
+      REDIS_URL: redis://redis:6379  # kista-infra가 소유하는 data_net의 redis alias — depends_on 미사용 (Spring Data Redis lazy connection)
       JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
+    networks:
+      - shared_net   # kista-infra Caddy 리버스 프록시 라우팅용
+      - data_net     # kista-infra postgres/redis 접근용
     stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
-    mem_limit: 4096m         # 힙3072m + 메타384m + 코드캐시96m + 네이티브 여유 (OCI 12GB 인스턴스, 2 OCPU — 나머지는 OS/Docker/Caddy용)
+    mem_limit: 4096m         # 힙3072m + 메타384m + 코드캐시96m + 네이티브 여유 (OCI 12GB 인스턴스, 2 OCPU — 나머지는 OS/Docker/kista-infra용)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
@@ -28,47 +32,8 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  caddy:
-    image: caddy:2.9-alpine   # 버전 핀 — 무빙 태그 방지
-    container_name: kista-api-caddy
-    env_file:
-      - .env
-    # depends_on 제거 — lb_try_duration이 기동 순서 보장, 리부트 시 caddy 선기동 가능
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    mem_limit: 64m
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-  redis:
-    image: redis:7-alpine
-    container_name: kista-api-redis
-    command: redis-server --appendonly yes --appendfsync everysec
-    volumes:
-      - redis_data:/data
-    mem_limit: 256m
-    restart: unless-stopped
-    healthcheck:  # 관측용(docker ps/inspect에서 확인) — depends_on consumer 없음, 게이트 아님(설계상 의도)
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-volumes:
-  caddy_data:
-  caddy_config:
-  redis_data:
+networks:
+  shared_net:
+    external: true   # kista-infra 레포의 compose가 생성/소유
+  data_net:
+    external: true   # kista-infra 레포의 compose가 생성/소유
