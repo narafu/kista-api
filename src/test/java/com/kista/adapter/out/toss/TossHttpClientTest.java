@@ -249,6 +249,40 @@ class TossHttpClientTest {
     }
 
     @Test
+    @DisplayName("409 CONFLICT(already-canceled) 응답은 TossApiException.isAlreadyCanceledConflict()=true로 전달")
+    void get_409AlreadyCanceled_setsAlreadyCanceledConflictFlag() {
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
+                any(ParameterizedTypeReference.class)))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.CONFLICT, "Conflict", HttpHeaders.EMPTY,
+                        "{\"error\":{\"code\":\"already-canceled\",\"message\":\"취소된 주문입니다.\"}}".getBytes(), null));
+
+        TossHttpClient client = newClient();
+        assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<String>() {}))
+                .isInstanceOfSatisfying(TossApiException.class,
+                        tae -> assertThat(tae.isAlreadyCanceledConflict()).isTrue());
+    }
+
+    @Test
+    @DisplayName("409 CONFLICT(already-filled) 응답은 already-canceled로 오판정되지 않는다")
+    void get_409AlreadyFilled_doesNotSetAlreadyCanceledConflictFlag() {
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
+                any(ParameterizedTypeReference.class)))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.CONFLICT, "Conflict", HttpHeaders.EMPTY,
+                        "{\"error\":{\"code\":\"already-filled\",\"message\":\"체결 완료된 주문입니다.\"}}".getBytes(), null));
+
+        TossHttpClient client = newClient();
+        assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<String>() {}))
+                .isInstanceOfSatisfying(TossApiException.class, tae -> {
+                    assertThat(tae.isAlreadyFilledConflict()).isTrue();
+                    assertThat(tae.isAlreadyCanceledConflict()).isFalse();
+                });
+    }
+
+    @Test
     @DisplayName("공통 API(getCommon) 401도 최대 2회까지 백오프 재시도 후 성공")
     void getCommon_retriesTwiceAfter401_thenSucceeds() {
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");

@@ -8,6 +8,7 @@ import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.application.event.OrderCancelFailedEvent;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.OrderPort;
@@ -134,6 +135,31 @@ class OrderCancelServiceTest {
     }
 
     @Test
+    @DisplayName("cancelByCycle: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수 → CancelResult(2, 0), 알림 없음")
+    void cancelByCycle_alreadyCanceledConflict_absorbedAsSuccess() {
+        Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
+        Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(order1, order2));
+        // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
+        doNothing().when(brokerPort).cancel(eq(order1), any());
+        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(eq(order2), any());
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(2);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(orderPort).markCancelled(order1.id());
+        verify(orderPort).markCancelled(order2.id());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
     @DisplayName("cancelByCycle: PLANNED·PLACED 주문 없으면 CancelResult(0, 0)")
     void cancelByCycle_noPlacedOrders() {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
@@ -189,6 +215,34 @@ class OrderCancelServiceTest {
 
         verify(orderPort).markCancelled(orderId);
         verifyNoInteractions(brokerPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수해 DB만 CANCELLED 처리")
+    void cancelOrder_alreadyCanceledConflict_absorbedAsSuccess() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(order, ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커 취소가 그 외 사유로 실패하면 예외가 그대로 전파된다")
+    void cancelOrder_otherBrokerFailure_propagates() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(order, ownedAccount);
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("네트워크 오류");
+        verify(orderPort, never()).markCancelled(orderId);
     }
 
     @Test

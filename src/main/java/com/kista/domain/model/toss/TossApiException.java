@@ -3,19 +3,29 @@ package com.kista.domain.model.toss;
 // Toss 외부 API 호출 실패 — GlobalExceptionHandler에서 503으로 매핑
 public class TossApiException extends RuntimeException {
 
-    // 취소 요청 직전/직후 체결이 확정되어 409 CONFLICT(already-filled)로 거부된 경우 — 예상된 경합, 어댑터가 판정해 전달
-    private final boolean alreadyFilledConflict;
-
-    public TossApiException(String message, Throwable cause) {
-        this(message, cause, false);
+    // 409 CONFLICT 세부 사유 — 어댑터(TossHttpClient)가 응답 바디를 판정해 전달하는 예상된 경합
+    public enum Conflict {
+        NONE,
+        ALREADY_FILLED,   // 취소 요청 직전/직후 체결이 확정된 경우
+        ALREADY_CANCELED, // 이미 취소 처리된 주문에 중복 취소 요청이 도착한 경우
     }
 
-    public TossApiException(String message, Throwable cause, boolean alreadyFilledConflict) {
+    private final Conflict conflict;
+
+    public TossApiException(String message, Throwable cause) {
+        this(message, cause, Conflict.NONE);
+    }
+
+    public TossApiException(String message, Throwable cause, Conflict conflict) {
         super(message, cause);
-        this.alreadyFilledConflict = alreadyFilledConflict;
+        this.conflict = conflict;
     }
 
     public boolean isAlreadyFilledConflict() {
-        return alreadyFilledConflict;
+        return conflict == Conflict.ALREADY_FILLED;
+    }
+
+    public boolean isAlreadyCanceledConflict() {
+        return conflict == Conflict.ALREADY_CANCELED;
     }
 }
