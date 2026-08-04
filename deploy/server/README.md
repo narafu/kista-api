@@ -186,7 +186,7 @@ fida를 같은 OCI 서버에 별도 compose 프로젝트(`/opt/fida/`, fida 저�
 - [ ] FIDA 호출측 URL → 새 도메인으로 변경 (`/api/internal/**`)
 - [ ] kista-ui `NEXT_PUBLIC_API_URL` → 새 도메인으로 변경
 - [ ] UptimeRobot 헬스체크 URL 업데이트
-- [ ] healthchecks.io 체크 2개 생성(개장/마감) + `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 등록 + Grafana Cloud 알림 규칙 연동
+- [x] healthchecks.io 체크 2개 생성(개장/마감) + `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 등록 (API로 실제 ping_url·cron 스케쥴 일치 확인, 2026-08-04) — 알림 채널은 이메일만 연결됨, Grafana Cloud 연동은 미완료
 - [ ] Fly.io 1~2일 유지 후 종료
 
 ## Fly.io 롤백
