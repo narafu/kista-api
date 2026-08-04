@@ -83,7 +83,7 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 **`scripts/backup.sh`**: Phase 4 참고
 
-**`.github/workflows/server-deploy.yml`**: SHA 핀 + `environment: production`. 순서: checkout → `ENV_PASSPHRASE`로 3파일 복호화 → scp로 compose·Caddyfile 업로드 + 3개 서버 경로에 `.env` 렌더링(`/opt/kista-api/.env`, `/opt/kista-ui/.env`, `/opt/kista-infra/.env`) → `docker network create shared_net data_net`(멱등) → `docker compose up -d`
+**`.github/workflows/server-deploy.yml`**: SHA 핀 + `environment: production`. 순서: checkout → `ENV_PASSPHRASE`로 3파일 복호화 → scp로 compose·Caddyfile 업로드 + 3개 서버 경로에 `.env` 렌더링(`/opt/kista-api/.env`, `/opt/kista-ui/.env`, `/opt/kista-infra/.env`) → `docker network create shared_net` + `docker network create data_net`(각각 `2>/dev/null || true`로 멱등) → `docker compose up -d`
 - GitHub Secrets(infra): `ENV_PASSPHRASE`, `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_SSH_PORT`
 
 검증: infra 기동 → `docker network inspect`로 alias, `pg_isready`, caddy 기동(앱 미기동 502 정상), `.env` 3개 렌더링.
@@ -115,12 +115,14 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 ## Phase 3 — 데이터 이관 + 커트오버 (휴장 주말 단일 정비 창)
 
+> ⚠️ **이 Phase는 kista-infra가 A에 실제로 배포된 뒤에만 진행**: kista-api·kista-ui 워크트리(`infra/pg-oci-selfhost`)를 `main`에 병합하는 시점이 곧 자동 배포 트리거다 — kista-infra 최초 배포(Phase 1의 `server-deploy.yml` 성공 실행)가 끝나기 전에 두 앱 브랜치 중 하나라도 먼저 `main`에 병합되면, 아직 없는 `data_net`을 향해 `REDIS_URL=redis://redis:6379`가 실패하고 `--remove-orphans` 없는 재기동이 구 caddy/redis 컨테이너를 orphan 처리해 라우팅이 끊긴다(Toss 토큰 스토어는 DB fallback 없이 fail-closed 503). 두 앱 README(`deploy/server/README.md`)의 배포 전 필독 경고도 동일 내용을 다룬다.
+>
 > ⚠️ **이중 스케쥴러 금지**: B(Supabase)와 A(로컬 pg)는 서로 다른 DB → `scheduler_locks` 분산 락이 서로를 못 봄 → 동시 기동 시 브로커에 중복 실주문. 순서 엄수, 두 api 동시 기동 절대 금지.
 
 1. 사전 점검: Supabase에서 `SELECT pg_database_size(current_database());`, `SELECT extname FROM pg_extension;`, non-public 스키마 의존 확인
 2. **B의 kista-api `docker compose stop`** (삭제 아님 — 정지 상태로 롤백 후보 유지)
 3. 덤프: `pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc` (session mode 5432, postgres:17 클라이언트)
-4. 복원: A postgres에 `CREATE DATABASE kistadb OWNER kista;` → `pg_restore --no-owner --no-privileges -d kistadb`. **`flyway_schema_history` 최신 버전 = 배포 이미지 버전 확인**
+4. 복원: A postgres는 kista-infra `docker-compose.yml`의 `POSTGRES_DB=kistadb`/`POSTGRES_USER=kista`가 최초 기동 시 이미 `kistadb`를 생성해뒀으므로 `CREATE DATABASE` 없이 바로 `pg_restore --no-owner --no-privileges -d kistadb` 실행(재실행 시 `database "kistadb" already exists` 오류 방지). **`flyway_schema_history` 최신 버전 = 배포 이미지 버전 확인**
 5. DNS: API A레코드 B IP → A IP → 전파 확인 → A Caddy 인증서 발급 확인
 6. A에서 kista-api 기동 (새 DB_URL)
 7. kista-api GitHub Secrets `SERVER_HOST`/`SERVER_SSH_KEY` → A로 변경

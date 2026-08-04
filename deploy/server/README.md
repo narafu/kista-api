@@ -1,5 +1,12 @@
 # Server deployment (OCI)
 
+> ⚠️ **배포 전 필독 — 이 브랜치를 아직 `main`에 병합하지 말 것**
+> 이 문서와 `server-deploy.yml`은 `kista-infra` 레포(Caddy·Postgres·Redis 소유)가 실제로 서버에 배포된 **이후** 상태를 전제로 작성됐다.
+> `kista-infra`가 아직 배포되지 않은 시점에 이 브랜치를 `main`에 병합하면 `push: main` 트리거로 `server-deploy.yml`이 즉시 자동 실행되어 운영이 깨진다:
+> - `--remove-orphans` 없이 재기동되므로 현재 살아있는 구 caddy/redis 컨테이너가 orphan 처리되어 Caddy 라우팅이 끊긴다
+> - `REDIS_URL=redis://redis:6379`가 아직 존재하지 않는 `data_net`을 가리켜 Redis 연결 실패 → Toss 토큰 스토어가 DB fallback 없이 fail-closed(503) → 실거래 경로 장애 (`docs/agents/docker-infra.md` "Fly.io 다중 인스턴스 Toss 토큰 조정" 참고)
+> **병합 가능 조건**: kista-infra의 Phase 0(인스턴스 재편) + kista-infra 자체 최초 배포(`kista-infra/.github/workflows/server-deploy.yml` 성공 실행)가 완료된 뒤에만 이 브랜치를 `main`에 병합할 것.
+
 `kista-api`를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
 `kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
 네트워크에 합류만 한다.
@@ -8,7 +15,7 @@
 
 ```text
 /opt/kista-api/
-├── .env                    ← 서버에서 직접 관리 (Actions에서 덮어쓰지 않음)
+├── .env                    ← kista-infra 배포 워크플로가 렌더링·덮어쓴다 (이 레포의 Actions는 관여하지 않음, 아래 "GitHub Secrets" 참고)
 └── docker-compose.yml      ← GitHub Actions 업로드
 ```
 
@@ -55,7 +62,9 @@
 | `SERVER_SSH_KEY` | SSH 개인키 (PEM) |
 | `SERVER_SSH_PORT` | SSH 포트 (기본값 22, 생략 가능) |
 
-`.env`는 서버에서 직접 관리 — Actions에 시크릿으로 올리지 않음.
+`.env`는 이 레포의 Actions가 아니라 `kista-infra` 레포의 배포 워크플로가 관리한다 — `kista-infra`에 GPG로 암호화 커밋된 `secrets/kista-api.env.gpg`를 복호화해 매 배포마다 `/opt/kista-api/.env`를 렌더링·덮어쓴다. 값을 바꾸려면 `kista-infra`의 `scripts/env.sh edit kista-api`로 수정 후 커밋·배포해야 하며, 서버에서 `.env`를 직접 수정해도 다음 kista-infra 배포 시 되돌아간다.
+
+**주의**: kista-infra의 `.env` 렌더링은 이 레포의 배포를 트리거하지 않는다 — `/opt/kista-api/.env` 파일 내용은 바뀌지만, 이미 떠 있는 `kista-api` 컨테이너는 재시작 전까지 구 값을 메모리에 유지한다. 시크릿 로테이션을 실제로 반영하려면 kista-infra 배포 뒤 이 레포의 `server-deploy.yml`도 별도로 실행(재배포)해야 한다.
 
 ## .env 내용
 
@@ -150,11 +159,12 @@ docker compose up -d --no-deps kista-api
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
 - **로그**: `docker compose logs -f kista-api` (서버 SSH)
 
-## fida 병행 배포
+## fida
 
-`shared_net`/`data_net` 소유권과 Caddy 라우팅(fida 도메인 블록 포함)이 kista-infra 레포로 이관됨에 따라, fida를 같은
-OCI 서버에 병행 배포하는 절차도 kista-infra 레포 문서가 SSOT다 — 이 레포에서는 더 이상 caddy 서비스·Caddyfile을
-소유하지 않으므로 절차를 여기 중복 기술하지 않는다.
+fida는 이 인스턴스(A: kista-api/kista-ui/kista-infra)와 **별도의 OCI 인스턴스(B)**에서 독립 운영된다 — 같은 서버에
+병행 배포되지 않으며, `kista-infra`의 Caddy·네트워크·시크릿 어느 것도 fida를 대상으로 하지 않는다. 따라서 fida 배포
+절차는 이 레포·kista-infra 레포 양쪽 모두 범위 밖이다. fida→kista-api `/api/internal/**` 호출은 공인 도메인을
+경유하므로(무변경) 이 전환과 무관하게 그대로 동작한다.
 
 ## 커트오버 체크리스트
 
