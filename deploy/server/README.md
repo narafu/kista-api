@@ -169,6 +169,7 @@ OCI 서버에 병행 배포하는 절차도 kista-infra 레포 문서가 SSOT다
 - [ ] kista-ui `NEXT_PUBLIC_API_URL` → 새 도메인으로 변경
 - [ ] UptimeRobot 헬스체크 URL 업데이트
 - [x] healthchecks.io 체크 2개 생성(개장/마감) + `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 등록 (API로 실제 ping_url·cron 스케쥴 일치 확인, 2026-08-04) — 알림 채널은 이메일만 연결됨, Grafana Cloud 연동은 미완료
+- [ ] kista-infra 배포 **전에** 구 `kista-api-caddy`/`kista-api-redis` 컨테이너 정리: `docker rm -f kista-api-caddy kista-api-redis` (포트 80/443 선점 해제, 신규 kista-infra caddy가 대신 기동)
 - [ ] Fly.io 1~2일 유지 후 종료
 
 ## Fly.io 롤백
