@@ -4,10 +4,8 @@ services:
     image: postgres:17
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_DB: ${LOCAL_DB_NAME:-}
-      POSTGRES_USER: ${LOCAL_DB_USERNAME:-}
-      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-}
+    env_file:
+      - .env.local
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
