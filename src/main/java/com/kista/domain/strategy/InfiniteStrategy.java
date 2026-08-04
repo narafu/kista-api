@@ -33,14 +33,19 @@ public class InfiniteStrategy {
     }
 
     // BUY PLANNED 가격이 cap을 초과할 때 cap 기준으로 매수 수량 재산정 + 보정 주문(1주 LOC × 3회) 추가
+    // 입력에 이미 correction leg(같은 배치 내 재접수 시점 추가 하락으로 재캡되는 경우)가 섞여 있으면
+    // base 주문(평단가/기준가)만 재산정 대상으로 삼는다 — 없으면 그대로 base로 취급
     public List<Order> buildCappedBuyOrders(InfinitePosition position, LocalDate tradeDate, List<Order> buyOrders, BigDecimal cap) {
         BigDecimal unitAmount = position.unitAmount(); // 단위금액 (실값)
+        List<Order> baseOrders = buyOrders.stream().filter(order -> !isCorrectionLeg(order)).toList();
+        // base 주문 없이 correction leg만 남은 비정상 상태(부분 저장 실패 등) — 재산정 근거가 없어 보정 없이 원본 유지
+        if (baseOrders.isEmpty()) return buyOrders;
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
         // 주문이 1건이면 후반 단일 LOC, 2건이면 전반 ①②
-        List<Order> newBuys = buyOrders.size() == 1
-                ? computeLateBuys(tradeDate, position, buyOrders.getFirst(), cap, unitAmount)
-                : computeEarlyBuys(tradeDate, position, buyOrders, cap, unitAmount);
+        List<Order> newBuys = baseOrders.size() == 1
+                ? computeLateBuys(tradeDate, position, baseOrders.getFirst(), cap, unitAmount)
+                : computeEarlyBuys(tradeDate, position, baseOrders, cap, unitAmount);
 
         // 전후반 공통 보정 주문
         for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
@@ -82,6 +87,11 @@ public class InfiniteStrategy {
                     quantity2, cappedRef, buy2.orderLeg()));
         }
         return buys;
+    }
+
+    // correction 주문(INFINITE_CORRECTION_01~03) 여부 — 재진입 캡 계산 시 base 주문과 분리하기 위함
+    private static boolean isCorrectionLeg(Order order) {
+        return order.orderLeg() != null && order.orderLeg().startsWith("INFINITE_CORRECTION_");
     }
 
     private void addCorrectionOrder(LocalDate tradeDate, InfinitePosition position, List<Order> newBuys,

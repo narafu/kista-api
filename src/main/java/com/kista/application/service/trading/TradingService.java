@@ -342,11 +342,13 @@ class TradingService {
         marketEventNotifier.notifyMarketOpen();
 
         // 후보를 모두 수집한 뒤 계좌별 BUY 예산을 배정하고 AT_OPEN 주문만 선접수
+        // AT_CLOSE는 여기서 생성하지 않는다 — 캡(BuyOrderPriceCapper)이 개장 시점 가격으로 고정돼 마감 접수 시점까지
+        // 재평가되지 않는 stale-cap 문제를 막기 위해, AT_CLOSE 계산·캡·예산배정·접수는 close 스케쥴러가 전담한다
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
             runSafely("개장 order 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(),
-                            tradeDate, EnumSet.allOf(Order.OrderTiming.class)))
+                            tradeDate, EnumSet.of(Order.OrderTiming.AT_OPEN)))
                     .ifPresent(candidates::add);
         }
 

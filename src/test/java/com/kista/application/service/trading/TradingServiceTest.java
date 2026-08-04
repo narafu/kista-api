@@ -353,7 +353,8 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_savesAllOrdersAndPlacesSellsOnly() throws InterruptedException {
-        // AT_OPEN SELL 주문은 개장 시 선접수, BUY는 AT_CLOSE 마감 배치
+        // AT_OPEN SELL 주문은 개장 시 선접수. AT_CLOSE BUY는 stale-cap 방지를 위해 마감 스케쥴러 전담이라
+        // 전략 계산 결과에 섞여 있어도 개장 경로에서는 저장 대상에서 제외돼야 한다 (회귀 가드).
         BigDecimal prevClose = new BigDecimal("19.00");
         Order buyTemplate  = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,  1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null)
@@ -383,8 +384,10 @@ class TradingServiceTest {
 
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        // 전체 주문 저장 (BUY + SELL)
-        verify(orderPort).saveAll(anyList());
+        // AT_OPEN SELL만 저장 — 후보에 섞여 있던 AT_CLOSE BUY는 개장 경로에서 제외돼야 한다
+        verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
+                && saved.getFirst().timing() == Order.OrderTiming.AT_OPEN
+                && saved.getFirst().direction() == Order.OrderDirection.SELL));
         // SELL만 KIS 접수
         verify(brokerOrderPort).place(eq(sellPlanned), eq(ACCOUNT));
         verify(orderPort).markPlaced(eq(sellPlannedId), eq("ORD-SELL-001"));
@@ -433,9 +436,10 @@ class TradingServiceTest {
     @Test
     void placeOpenOrders_insufficientBalance_notifiesUserAndSkipsSave() throws InterruptedException {
         // 매수 금액 초과 → live 잔고 부족 → 사용자 알람, 저장 건너뜀
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
         BigDecimal prevClose = new BigDecimal("19.00");
         Order bigBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 100, new BigDecimal("500.00"), // 50,000 >> usdDeposit=10
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 100, new BigDecimal("500.00"), // 50,000 >> usdDeposit=10
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -514,9 +518,10 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_sellRejected_stillSavesApprovedBuy() throws InterruptedException {
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
         Order buy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
-                Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_CLOSE_BUY");
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_BUY");
         Order sell = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("25.00"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
@@ -540,14 +545,15 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_cappedBuyExceedsBudget_savesOnlyApprovedSell() throws InterruptedException {
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
         Order originalBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("60.00"),
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 1, new BigDecimal("60.00"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_ORIGINAL_BUY");
         Order sell = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, new BigDecimal("45.00"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
         Order cappedBuy = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("52.50"),
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 2, new BigDecimal("52.50"),
                 Order.OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -624,10 +630,12 @@ class TradingServiceTest {
                 .withLeg("TEST_TQQQ_AT_OPEN_BUY_20_00");
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.TQQQ), any(), any(), any()))
                 .thenReturn(List.of(vrBuyOrder));
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — 계좌별 우선순위 배정 메커니즘 자체를
+        // 검증하는 목적이므로 AT_OPEN으로 대체해 개장 스케쥴러 경로에서도 동일하게 동작함을 확인
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(buyTemplate(Ticker.SOXL, "1000.00", Order.OrderTiming.AT_CLOSE)));
+                .thenReturn(List.of(buyTemplate(Ticker.SOXL, "1000.00", Order.OrderTiming.AT_OPEN)));
         when(privacyStrategy.buildOrders(any(), any(), any()))
-                .thenReturn(List.of(buyTemplate(Ticker.SOXL, "1000.00", Order.OrderTiming.AT_CLOSE)));
+                .thenReturn(List.of(buyTemplate(Ticker.SOXL, "1000.00", Order.OrderTiming.AT_OPEN)));
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.TQQQ)))
                 .thenReturn(new AccountBalance(100, new BigDecimal("20.00"), new BigDecimal("3000.00")));
 
@@ -732,10 +740,11 @@ class TradingServiceTest {
     @Test
     void placeOpenOrders_noSellOrders_skipsKisPlace() throws InterruptedException {
         // 후반 최종회차 등 SELL 없음 — KIS 접수 0건 (정상)
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY만 있는 시나리오로 대체
         BigDecimal prevClose = new BigDecimal("19.00");
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null)
-                .withLeg("TEST_CLOSE_BUY");
+                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, 1, new BigDecimal("20.00"), Order.OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_OPEN_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
@@ -1942,7 +1951,8 @@ class TradingServiceTest {
         LocalDate tradeDate = DstInfo.nextTradeDate();
         StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, tradeDate.minusDays(1), null, null, null);
-        Order template = buyTemplate(Ticker.SOXL, "20.00", Order.OrderTiming.AT_CLOSE);
+        // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN으로 생성 확인
+        Order template = buyTemplate(Ticker.SOXL, "20.00", Order.OrderTiming.AT_OPEN);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))

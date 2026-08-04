@@ -10,7 +10,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 정밀한 투자 전략�
 
 ## 기술 스택
 
-Java 21 · Spring Boot 3 · Hexagonal Architecture · PostgreSQL · Flyway · Fly.io
+Java 21 · Spring Boot 3 · Hexagonal Architecture · PostgreSQL · Flyway · OCI
 
 ## 아키텍처
 
@@ -97,7 +97,7 @@ graph TB
         UIApp["kista-ui (Next.js)"]
     end
 
-    subgraph FlyInfra["Fly.io"]
+    subgraph OciInfra["OCI"]
         APIApp["kista-api"]
     end
 
@@ -112,7 +112,7 @@ graph TB
     end
 
     RepoUI -->|"GitHub 통합 자동 배포"| UIApp
-    RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ flyctl deploy"| APIApp
+    RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ SSH 배포"| APIApp
     UIApp -->|"HTTPS"| APIApp
     APIApp --> PG2
     BackupAction -->|"pg_dump → 암호화 → artifact"| PG2

@@ -12,8 +12,8 @@
 - 이전 1GB 설정은 `Xmx384m` + SerialGC 사용
 - G1GC: 2GB 환경에서 요청/스케줄러 겹침 시 지연시간 변동 완화 목적
 
-### Fly.io 배포 방식
-- `.github/workflows/fly-deploy.yml` — 서버 전환 후 `push` 트리거 제거, `workflow_dispatch` 수동 실행 전용(커트오버 기간 긴급 롤백용). main push 시 자동 배포는 이제 서버 배포(`server-deploy.yml`)가 담당
+### Fly.io 배포 방식 (폐지됨)
+- OCI 전환 완료로 `.github/workflows/fly-deploy.yml`(긴급 롤백용 `workflow_dispatch` 전용) 삭제 — main push 자동 배포는 서버 배포(`server-deploy.yml`)만 담당
 - 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
 - `fly.toml`의 배포 전략은 `[deploy]` 섹션의 `strategy` 키다 — **`[deployment]`는 flyctl이 인식하지 못하는 오타 섹션名**이라 조용히 무시된다(`flyctl config show --local --toml`로 로컬 파싱 결과를 직접 비교해야 확인 가능, `config show` 기본 동작은 로컬 파일이 아닌 Fly 서비스에 저장된 원격 설정을 보여줘서 이 오타를 못 잡는다). Redis fencing 도입 시 이 오타 때문에 의도했던 `immediate`(pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 1회성 protocol cutover)가 실제로는 한 번도 적용되지 않고 매번 flyctl 기본값인 `rolling`으로 배포됐다 — 그런데도 신·구 프로토콜이 실제로 충돌하는 사고는 없었다(2026-07-22 확인). 현재 `strategy = "rolling"`으로 명시 고정돼 있다.
 - 향후 유사한 protocol cutover가 필요하면: (1) `[deploy] strategy = "immediate"`로 변경 후 `flyctl config show --local --toml`로 로컬 파싱 결과에 `[deploy] strategy = 'immediate'`가 실제로 찍히는지 반드시 확인, (2) 배포 로그에 `Updating existing machines ... with immediate strategy` 문구로 실제 적용을 재확인, (3) `fly status`로 정상 기동 확인 후 별도 커밋으로 `rolling` 복원 — 오타로 검증 자체가 무력화됐던 사례가 있으니 "커밋했다"가 아니라 "실제 적용을 확인했다"를 기준으로 삼을 것.
