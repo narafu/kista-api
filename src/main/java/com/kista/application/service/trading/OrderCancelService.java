@@ -8,6 +8,7 @@ import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.OrderCancelException;
 import com.kista.domain.model.strategy.DstInfo;
+import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
@@ -69,6 +70,13 @@ class OrderCancelService {
                 stateWriter.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
+                if (isAlreadyCanceled(e)) {
+                    // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
+                    log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                    stateWriter.markCancelled(order.id());
+                    cancelledCount++;
+                    continue;
+                }
                 log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
                         order.id(), order.externalOrderId(), e.getMessage());
                 failures.add("orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId()
@@ -103,8 +111,21 @@ class OrderCancelService {
             throw new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: " + order.status());
         }
 
-        registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
+        try {
+            registry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
+        } catch (Exception e) {
+            if (!isAlreadyCanceled(e)) {
+                throw e;
+            }
+            // 동일 주문에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
+            log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", orderId, order.externalOrderId());
+        }
         stateWriter.markCancelled(orderId);
+    }
+
+    // 중복 취소 요청으로 브로커가 거부한 예상된 경합 여부 — TossHttpClient가 409 CONFLICT(already-canceled) 응답을 판정해 전달
+    private boolean isAlreadyCanceled(Exception e) {
+        return e instanceof TossApiException tae && tae.isAlreadyCanceledConflict();
     }
 
 }

@@ -215,7 +215,7 @@ class TradingReporterTest {
         Order order = tossPlacedOrder(orderId, "E1", 5);
         doThrow(new TossApiException(
                 "Toss API 오류: 409 CONFLICT {\"error\":{\"code\":\"already-filled\",\"message\":\"체결 완료된 주문입니다.\"}}",
-                null, true)).when(brokerOrderPort).cancel(order, TOSS_ACCOUNT);
+                null, TossApiException.Conflict.ALREADY_FILLED)).when(brokerOrderPort).cancel(order, TOSS_ACCOUNT);
         when(executionPort.getExecutions(TODAY, TODAY, Ticker.SOXL, TOSS_ACCOUNT))
                 .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
 

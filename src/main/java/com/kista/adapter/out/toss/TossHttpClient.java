@@ -148,9 +148,19 @@ class TossHttpClient {
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() != 401) {
                     String body = e.getResponseBodyAsString();
-                    // 취소 요청 직전/직후 체결 확정 — 브로커가 거부하는 예상된 경합 (TradingReporter가 관리자 알림 없이 처리)
-                    boolean alreadyFilled = e.getStatusCode().value() == 409 && body.contains("already-filled");
-                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, alreadyFilled);
+                    // 예상된 409 경합 — 취소 요청 직전/직후 체결 확정(already-filled)은 TradingReporter가,
+                    // 중복 취소 요청으로 이미 취소된 주문(already-canceled)은 OrderCancelService가 관리자 알림 없이 처리
+                    // Toss error.code 필드 값으로 정확히 매칭 — 무관한 오류 메시지에 문자열이 우연히 섞여
+                    // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지 (알림도 함께 억제되므로 오판정 위험 큼)
+                    TossApiException.Conflict conflict = TossApiException.Conflict.NONE;
+                    if (e.getStatusCode().value() == 409) {
+                        if (body.contains("\"code\":\"already-filled\"")) {
+                            conflict = TossApiException.Conflict.ALREADY_FILLED;
+                        } else if (body.contains("\"code\":\"already-canceled\"")) {
+                            conflict = TossApiException.Conflict.ALREADY_CANCELED;
+                        }
+                    }
+                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict);
                 }
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
