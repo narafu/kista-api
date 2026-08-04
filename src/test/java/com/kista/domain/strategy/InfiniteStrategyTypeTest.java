@@ -292,4 +292,46 @@ class InfiniteStrategyTypeTest {
         assertThat(result.get(2).price()).isEqualByComparingTo("16.67");
         assertThat(result.get(3).price()).isEqualByComparingTo("12.50");
     }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders base 없이 correction leg만 입력되면 재산정 없이 원본 그대로 반환(방어적 가드)")
+    void buildCappedBuyOrders_onlyCorrectionLegsNoBase_returnsInputUnchangedWithoutCrashing() {
+        // 부분 저장 실패 등으로 base 주문 없이 correction leg만 남은 비정상 상태 — IndexOutOfBounds 없이 안전하게 원본 유지
+        InfinitePosition position = positionWithUnitAmount("20000");
+        List<Order> buyOrders = List.of(
+                buy("52.63", 1, "INFINITE_CORRECTION_01"),
+                buy("50.00", 1, "INFINITE_CORRECTION_02"),
+                buy("47.62", 1, "INFINITE_CORRECTION_03"));
+
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("40.00"));
+
+        assertThat(result).isSameAs(buyOrders);
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 재진입(입력에 correction leg 3건 혼입): base 1건만 재산정 대상, correction은 무시하고 새로 생성")
+    void buildCappedBuyOrders_reentrantWithExistingCorrectionLegs_ignoresThemAndRecalculatesBaseOnly() {
+        // 동일 close 배치 내에서 접수 직전 재조회 가격이 최초 계산 시점보다 한 번 더 하락해
+        // 이미 캡+correction 4건이 저장된 상태로 capIfNeeded가 재호출되는 시나리오.
+        // correction leg가 buy②(기준가)로 오인되면 안 되고, base 1건만 재산정 대상이어야 한다.
+        InfinitePosition position = positionWithUnitAmount("20000");
+        List<Order> buyOrders = List.of(
+                buy("55.00", 18, "INFINITE_LATE_REF_BUY"),   // 직전 캡으로 이미 재산정된 base
+                buy("52.63", 1, "INFINITE_CORRECTION_01"),
+                buy("50.00", 1, "INFINITE_CORRECTION_02"),
+                buy("47.62", 1, "INFINITE_CORRECTION_03"));
+
+        // 추가 하락으로 캡이 더 낮아짐 (55.00 → 40.00)
+        List<Order> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("40.00"));
+
+        // base만 재산정(단일 LOC 취급) + 신규 보정 3건 = 4건 — correction leg가 buy②로 오인돼
+        // computeEarlyBuys(2건 이상 취급)로 잘못 빠지지 않는다
+        assertThat(result).hasSize(4);
+        assertThat(result.getFirst().orderLeg()).isEqualTo("INFINITE_LATE_REF_BUY");
+        assertThat(result.getFirst().price()).isEqualByComparingTo("40.00");
+        assertThat(result.getFirst().quantity()).isEqualTo(25); // floor(1000/40)
+        assertThat(result).extracting(Order::orderLeg)
+                .containsExactly("INFINITE_LATE_REF_BUY",
+                        "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
+    }
 }
