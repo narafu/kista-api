@@ -27,6 +27,8 @@ import java.util.UUID;
 @Slf4j
 class TradingOrderExecutor {
 
+    private static final long ORDER_PLACEMENT_PACING_MILLIS = 350; // 같은 계좌 연속 주문 접수 간 KIS 초당 거래건수 제한(EGW00201) 회피용 간격
+
     private final OrderPort orderPort;
     private final BrokerAdapterRegistry registry;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
@@ -81,9 +83,16 @@ class TradingOrderExecutor {
     }
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)
+    // 첫 주문 제외, 두 번째 주문부터 접수 전 페이싱 대기 — 같은 계좌 연속 접수로 인한 EGW00201(초당 거래건수 초과) 예방
     private List<Order> placeEach(List<Order> orders, Account account) {
         List<Order> placed = new ArrayList<>();
-        for (Order p : orders) {
+        for (int i = 0; i < orders.size(); i++) {
+            if (i > 0 && !sleepPacing()) {
+                // 페이싱 대기 중 인터럽트(배포·강제종료) — 무페이싱으로 남은 주문을 계속 쏘면 EGW00201 재발 위험만 커지므로 중단
+                log.warn("[{}] 페이싱 대기 중 인터럽트 — 남은 주문 {}건 접수 중단", account.nickname(), orders.size() - i);
+                break;
+            }
+            Order p = orders.get(i);
             Order placedOrder;
             try {
                 placedOrder = registry.require(account, BrokerOrderCorrectionPort.class).place(p, account);
@@ -106,6 +115,17 @@ class TradingOrderExecutor {
             }
         }
         return placed;
+    }
+
+    // 같은 계좌 연속 주문 접수 간 대기 — KIS 초당 거래건수 제한(EGW00201) 사전 예방. 인터럽트 시 false(호출측이 중단)
+    private boolean sleepPacing() {
+        try {
+            Thread.sleep(ORDER_PLACEMENT_PACING_MILLIS);
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     // 일시적 DB 오류 흡수 — 1초 후 1회 재시도, 2차 실패는 호출측으로 전파

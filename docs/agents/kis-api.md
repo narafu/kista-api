@@ -26,6 +26,10 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   2. **LOC 주문에 가격 "0" 전송**: LOC(장마감지정가)는 실제 limit price 필수. `"0"` 전송 시 "$0 이하 체결" 불가 조건으로 판단해 거부 (과거 `formatPrice(LOC,price)="0"` 버그, 수정 완료)
   3. **주문 body를 Map(compact JSON)으로 전송**: KIS GW는 raw JSON String 포맷만 허용 — `KisOrderApi.place()`는 `String.format()` 방식 사용 (LinkedHashMap → Jackson 직렬화 금지)
   - 재시도 로직 없음 — 원인 제거로만 해결
+- `EGW00201` "초당 거래건수를 초과하였습니다" — 실전계좌 초당 20건 제한(공식 문서 기준) 초과. 2026-08-06 장개시 스케쥴러에서 한 계좌의 INFINITE 매도 선접수(LOC_SELL 성공 직후 지연 없는 LIMIT_SELL)가 이 오류로 실패한 사례로 확인됨
+  - 조회(가격·잔고·판매가능수량, GET): `KisHttpClient.executeWithRetry(..., retryOnRateLimit=true)`가 msg_cd 매칭 시 지수 백오프(1초 기준) 재시도
+  - 주문 접수(POST): 재시도 안 함(중복 주문 위험 배제) — 대신 `TradingOrderExecutor.placeEach()`가 같은 계좌 연속 주문 사이에 `ORDER_PLACEMENT_PACING_MILLIS`(350ms) 페이싱을 둬 사전 예방
+  - 주문 취소(POST, `OrderCancelService`/`TradingReporter.cancelUnresolvedOrders`)는 `placeEach`를 거치지 않아 이 페이싱이 적용되지 않음 — 취소 API도 같은 계좌에서 연속 호출되면 동일하게 노출될 수 있음(후속 과제)
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
 - `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 `TradingOrderBudgetAllocator`에서 BUY·SELL을 독립 검증하며, BUY는 cap·correction 반영 최종 총액과 기존 PLANNED 금액을, SELL은 계좌·거래일·종목별 기존 PLANNED/PLACED 예약 수량을 각각 반영한다. 수동 SELL도 기존 예약 수량과 신규 수량의 합을 검증한다.
 

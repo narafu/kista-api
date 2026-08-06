@@ -14,6 +14,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.ResourceAccessException;
 
@@ -53,6 +54,14 @@ class KisHttpClientTest {
     private HttpClientErrorException unauthorized() {
         return HttpClientErrorException.create(
                 HttpStatus.UNAUTHORIZED, "Unauthorized", HttpHeaders.EMPTY, new byte[0], null);
+    }
+
+    // KIS EGW00201(초당 거래건수 초과) 500 응답 생성 헬퍼
+    private HttpServerErrorException rateLimited() {
+        byte[] body = "{\"rt_cd\":\"1\",\"msg1\":\"초당 거래건수를 초과하였습니다.\",\"msg_cd\":\"EGW00201\",\"message\":\"EGW00201\"}"
+                .getBytes();
+        return HttpServerErrorException.create(
+                HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", HttpHeaders.EMPTY, body, null);
     }
 
     @Test
@@ -123,5 +132,56 @@ class KisHttpClientTest {
                 .hasMessageContaining("KIS API 오류");
 
         verify(kisAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("GET: EGW00201 1회 → 백오프 후 재시도 성공")
+    // 백오프 상수(RATE_LIMIT_BACKOFF_BASE_MILLIS=1000ms)만큼 실제로 대기하므로 이 테스트는 ~1초가 걸린다.
+    // 스위트 전체가 느려지는 게 문제가 되면 리뷰 시점에 판단할 것 — 임의로 상수를 낮추지 않았음
+    void retriesOnceAfterRateLimit_thenSucceeds() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(rateLimited())
+                .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
+
+        String result = newClient().tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {});
+
+        assertThat(result).isEqualTo("OK");
+        // 토큰 문제가 아니므로 재조회 없이 같은 토큰으로 재시도
+        verify(kisAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString());
+        verify(kisRestTemplate, times(2)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    @DisplayName("GET: EGW00201이 MAX_RATE_LIMIT_RETRIES+1회 연속 → KisApiException")
+    void throwsKisApiException_whenRateLimitedBeyondMaxRetries() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(rateLimited(), rateLimited(), rateLimited());
+
+        KisHttpClient client = newClient();
+        assertThatThrownBy(() -> client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {}))
+                .isInstanceOf(KisApiException.class)
+                .hasMessageContaining("KIS API 오류");
+
+        // MAX_RATE_LIMIT_RETRIES=2 → attempt 0,1은 재시도, attempt 2에서 최종 실패 → 총 3회 호출
+        verify(kisRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
+        verify(kisAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("POST(주문 접수): EGW00201 → 재시도 없이 즉시 KisApiException")
+    void doesNotRetryRateLimit_onPost() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(rateLimited());
+
+        KisHttpClient client = newClient();
+        assertThatThrownBy(() -> client.post(TR_ID, PATH, ACCOUNT, "{}", String.class))
+                .isInstanceOf(KisApiException.class)
+                .hasMessageContaining("KIS API 오류");
+
+        // retryOnRateLimit=false — 접수/취소는 재시도하지 않음(사전 페이싱으로 별도 대응)
+        verify(kisRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
     }
 }
