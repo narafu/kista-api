@@ -96,7 +96,12 @@ class TradingService {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
     void executeBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
-        if (contexts.isEmpty()) return;
+        // 아래 각 조기 반환은 정상 흐름(휴장·시작 전·계산 skip 등)이라 예외/오류 알림 대상이 아니지만,
+        // "리포트가 안 왔는데 원인이 안 보이는" 재발 시 로그만으로 중단 지점을 특정하기 위해 사유를 남긴다.
+        if (contexts.isEmpty()) {
+            log.info("매매 배치 중단 — 대상 전략 0건");
+            return;
+        }
 
         LocalDate today = LocalDate.now(TimeZones.KST);
 
@@ -104,15 +109,23 @@ class TradingService {
         if (!isMarketOpen(today)) return;
 
         // 시작예정일 미도래 사이클 제외
+        int contextsBeforeScheduledFilter = contexts.size();
         contexts = filterScheduledStart(contexts, today);
-        if (contexts.isEmpty()) return;
+        if (contexts.isEmpty()) {
+            log.info("매매 배치 중단 — 시작예정일 미도래로 대상 {}건 전량 제외", contextsBeforeScheduledFilter);
+            return;
+        }
 
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         PriceContext priceCtx = loadPriceContext(contexts, today);
 
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<CycleState> states = planAll(contexts, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
-        if (states.isEmpty()) return;
+        if (states.isEmpty()) {
+            log.warn("매매 배치 중단 — 전략 계산 결과 0건 (대상 {}건 전량 skip, 원인은 위 'plan 후보 생성 오류'/'전략 계산 skip' 로그 참고)",
+                    contexts.size());
+            return;
+        }
 
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
         // 이 시점 인터럽트 시 states(증권사 접수 전)는 전부 미처리 — 사용자 알림 대상
