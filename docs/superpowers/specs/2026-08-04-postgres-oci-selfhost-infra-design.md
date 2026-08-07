@@ -1,7 +1,7 @@
 # PostgreSQL 자체 호스팅 + kista 올인원 통합 — 구현 플랜
 
 - **작성일**: 2026-08-04 (v2 — 전면 재검토 반영, 구현 중심 재작성)
-- **상태**: Phase 0(볼륨 확장·인스턴스 통합)·1·2·4·5 완료. Phase 3(Supabase→자체호스팅 DB 실제 데이터 이관)만 대기 — DB는 여전히 Supabase
+- **상태**: Phase 0(볼륨 확장·인스턴스 통합)·1·2·4·5 완료. Phase 3(Supabase→자체호스팅 DB 실제 데이터 이관)은 사전 점검·리허설·롤백 경로 준비까지 완료, 실제 정지→덤프→복원→전환(2~6번)만 대기 — DB는 여전히 Supabase. 다음 안전 창: 토요일 06:20 KST 이후 ~ 월요일 22:20 KST 이전
 - **실행 환경 전제**: 이 문서를 작성한 PC에는 oci-cli·OCI SSH 키·운영 환경변수가 없음 → **구현은 해당 자원이 있는 PC에서 진행**. 실행 계정은 Fable 한도 없음 → 오케스트레이터 = **Opus 4.8**(플랜·검토·판단) + **Sonnet 5**(실행, opusplan 기본). 구현 서브에이전트 = Sonnet 5, 문서 = Haiku 4.5, 검토자 = Opus 4.8
 
 ## 확정 사항
@@ -117,24 +117,29 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 ## Phase 3 — 데이터 이관 + 커트오버 (휴장 주말 단일 정비 창)
 
-> ⚠️ **이 Phase는 kista-infra가 A에 실제로 배포된 뒤에만 진행**: kista-api·kista-ui 워크트리(`infra/pg-oci-selfhost`)를 `main`에 병합하는 시점이 곧 자동 배포 트리거다 — kista-infra 최초 배포(Phase 1의 `server-deploy.yml` 성공 실행)가 끝나기 전에 두 앱 브랜치 중 하나라도 먼저 `main`에 병합되면, 아직 없는 `data_net`을 향해 `REDIS_URL=redis://redis:6379`가 실패하고 `--remove-orphans` 없는 재기동이 구 caddy/redis 컨테이너를 orphan 처리해 라우팅이 끊긴다(Toss 토큰 스토어는 DB fallback 없이 fail-closed 503). 두 앱 README(`deploy/server/README.md`)의 배포 전 필독 경고도 동일 내용을 다룬다.
+> ⚠️ **토폴로지 정정(2026-08-07)**: 원안은 B(별도 인스턴스에서 Supabase를 보는 kista-api)가 남아있어 DNS 플립으로 롤백하는 시나리오였다. 실제로는 인스턴스 통합·kista-ui-server 삭제가 먼저 끝나 kista-api는 처음부터 A 하나에서만 실행 중이고 B는 존재하지 않는다 — 아래 5/7/10번(DNS 플립, GitHub Secrets 서버 변경, B 스택 정리)과 "이중 스케쥴러 금지" 경고는 모두 무의미해졌다. 남은 절차를 실제 토폴로지 기준으로 재작성했다.
 >
-> ⚠️ **이중 스케쥴러 금지**: B(Supabase)와 A(로컬 pg)는 서로 다른 DB → `scheduler_locks` 분산 락이 서로를 못 봄 → 동시 기동 시 브로커에 중복 실주문. 순서 엄수, 두 api 동시 기동 절대 금지.
+> ⚠️ **쓰기 유실 구간 주의**: dump 시점 이후 Supabase에 들어오는 쓰기는 복원본에 반영되지 않고 유실된다 — 반드시 **kista-api 정지 → dump → restore → DB_URL 전환 → 기동** 순서를 지킨다. 살아있는 DB를 먼저 dump하고 나중에 전환하는 순서 금지.
 
-1. 사전 점검: Supabase에서 `SELECT pg_database_size(current_database());`, `SELECT extname FROM pg_extension;`, non-public 스키마 의존 확인
-2. **B의 kista-api `docker compose stop`** (삭제 아님 — 정지 상태로 롤백 후보 유지)
-3. 덤프: `pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc` (session mode 5432, postgres:17 클라이언트)
-4. 복원: A postgres는 kista-infra `docker-compose.yml`의 `POSTGRES_DB=kistadb`/`POSTGRES_USER=kista`가 최초 기동 시 이미 `kistadb`를 생성해뒀으므로 `CREATE DATABASE` 없이 바로 `pg_restore --no-owner --no-privileges -d kistadb` 실행(재실행 시 `database "kistadb" already exists` 오류 방지). **`flyway_schema_history` 최신 버전 = 배포 이미지 버전 확인**
-5. DNS: API A레코드 B IP → A IP → 전파 확인 → A Caddy 인증서 발급 확인
-6. A에서 kista-api 기동 (새 DB_URL)
-7. kista-api GitHub Secrets `SERVER_HOST`/`SERVER_SSH_KEY` → A로 변경
-8. 연동 점검: Telegram webhook 재등록, CORS·카카오 OAuth·FIDA URL·UptimeRobot·healthchecks.io (도메인 동일 — 대부분 무변경)
-9. 롤백: DNS를 B IP로 복귀 + B api 재기동. **Supabase는 이관 후 최소 1주 보존**
-10. 검증 후 B 스택 정리
+1. 사전 점검 (실행 완료 — 아래 "사전 점검 + 리허설 실행 결과" 참고)
+2. **A의 kista-api `docker compose stop`**
+3. 덤프: `pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -n public -Fc -f dump.custom` (session mode 5432, postgres:17 클라이언트). **`-n public` 필수** — Supabase는 `auth`/`storage`/`realtime`/`vault`/`graphql`/`supabase_migrations` 등 관리 스키마를 함께 갖고 있어 스키마 미지정 시 vanilla postgres에 없는 스키마 복원을 시도해 실패한다(앱 테이블은 전부 `public`, 사전 점검에서 확인)
+4. 복원: A postgres는 kista-infra `docker-compose.yml`의 `POSTGRES_DB=kistadb`/`POSTGRES_USER=kista`가 최초 기동 시 이미 `kistadb`를 생성해뒀으므로 `CREATE DATABASE` 없이 바로 `pg_restore --no-owner --no-privileges -U kista -d kistadb dump.custom` 실행. `schema "public" already exists` 오류 1건은 정상(모든 신규 DB에 기본 존재)이며 그 외 오류가 나오면 중단. `flyway_schema_history` 최신 버전은 로컬 코드·Supabase 모두 8(사전 점검에서 확인, 드리프트 없음)이므로 배포 이미지 재확인은 형식적 절차
+5. `infra.env`의 `DB_PASSWORD`를 확인해 `scripts/env.sh edit kista-api`로 `kista-api.env`의 `DB_URL=jdbc:postgresql://postgres:5432/kistadb`·`DB_USERNAME=kista`·`DB_PASSWORD=<infra.env와 동일값>`으로 교체 → commit/push → kista-infra Actions 배포(급하면 서버에서 `.env` 직접 편집 후 `docker compose up -d --force-recreate kista-api`로 즉시 반영하고, 사후에 kista-infra 레포 시크릿도 동일 값으로 맞춘다)
+6. A에서 kista-api 재기동 확인 후 검증: `/actuator/health` 200(DB·Redis), 로그인·전략 read/write, 스케쥴러 수동 트리거, Telegram webhook·CORS·카카오 OAuth·FIDA URL 정상 동작(도메인 불변이라 대부분 무변경 확인 절차)
 
-검증: `/actuator/health` 200(DB·Redis), 로그인·전략 read/write, 스케쥴러 수동 트리거.
+**롤백**: DNS 플립은 B가 없어 더 이상 유효하지 않다. 대신 전환 전 `.env`를 kista-infra 배포 워크플로가 덮어쓰지 않는 경로 `/opt/kista-api/.env.supabase-rollback`에 미리 백업해뒀다(2026-08-07 스테이징 완료) — 롤백은 `cp /opt/kista-api/.env.supabase-rollback /opt/kista-api/.env && cd /opt/kista-api && docker compose up -d --force-recreate kista-api` 한 번으로 GitHub Actions 경유 없이 즉시 Supabase 연결로 복귀한다. **Supabase는 이관 후 최소 1주 보존.**
 
-**부분 실행 완료(2026-08-07)**: 위 절차 중 인스턴스 통합·DNS 컷오버 부분(5~8번 상당)만 먼저 진행했다 — `api.kista-app.com`은 애초에 kista-api-server(A)를 가리키고 있어 DNS 변경이 필요 없었고, `kista-app.com`(UI)만 구 `kista-ui-server`에서 A로 이전 후 A IP로 전환했다(Cloudflare A레코드, TTL 300초로 수 분 내 전파). Let's Encrypt 인증서는 전환 직후 `docker compose restart caddy`로 즉시 재발급 트리거해 확인했다. **DB 이관(1~4, 9~10번)은 미실행 — kista-api는 여전히 Supabase를 바라본다.** `kista-ui-server` 인스턴스는 검증 후 종료, 연결돼 있던 미사용 Reserved IP(`134.185.118.35`)도 해제했다. 남은 Phase 3(실제 DB 이관)은 휴장 주말 등 별도 정비 창에서 진행 필요.
+검증 후 정리: `db-backup.yml`(현재 workflow_dispatch 전용으로 격하) 완전 삭제, Supabase 자격증명 로테이션 또는 폐기 검토.
+
+**사전 점검 + 리허설 실행 완료(2026-08-07)**:
+- Supabase DB 크기 16.7MB — A postgres 여유 공간(91GB) 대비 여유 충분
+- 확장기능 5개(`pg_stat_statements`/`pgcrypto`/`plpgsql`/`supabase_vault`/`uuid-ossp`) 설치돼 있으나 마이그레이션 전체 검색 결과 앱 스키마는 `gen_random_uuid()`만 사용 — PG13+ 코어 내장 함수(`pg_catalog.gen_random_uuid`, pgcrypto 함수 아님)로 확인돼 **확장기능 의존 없음**, vanilla `postgres:17`에서 그대로 동작
+- 앱 테이블 27개 전부 `public` 스키마(auth/storage/realtime/vault 등은 Supabase 관리 스키마, 앱 데이터 없음)
+- 실제 덤프(689KB, `-n public`)를 A의 `kista-postgres` 컨테이너에 `kistadb_rehearsal` 스크래치 DB로 복원 리허설 — 오류 1건(`schema "public" already exists`, 무해)만 발생, 27개 테이블·`flyway_schema_history`(버전 8)·users(2)/accounts(5)/orders(811) 로우 수 정상 확인. 리허설 DB·덤프 파일(로컬·서버 양쪽)은 정리 완료
+- 롤백용 `/opt/kista-api/.env.supabase-rollback` 스테이징 완료(현재 운영 `.env`와 동일, Supabase 연결 유지 상태)
+- 인스턴스 통합·DNS 컷오버는 이미 완료된 상태: `api.kista-app.com`은 애초에 A를 가리키고 있어 DNS 변경 불필요했고, `kista-app.com`(UI)만 구 `kista-ui-server`에서 A로 전환(Cloudflare A레코드, TTL 300초). Let's Encrypt 인증서는 전환 직후 `docker compose restart caddy`로 재발급 확인. `kista-ui-server` 인스턴스와 미사용 Reserved IP(`134.185.118.35`)는 삭제 완료
+- **아직 실행 안 함**: 위 2~6번(실제 정지→덤프→복원→전환→재기동) — 매매 시간대(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 회피 필요, 다음 안전 창은 토요일 06:20 이후 ~ 월요일 22:20 이전
 
 ## Phase 4 — 백업 (서버 cron → OCI Object Storage)
 
