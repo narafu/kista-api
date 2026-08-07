@@ -1,7 +1,7 @@
 # PostgreSQL 자체 호스팅 + kista 올인원 통합 — 구현 플랜
 
 - **작성일**: 2026-08-04 (v2 — 전면 재검토 반영, 구현 중심 재작성)
-- **상태**: Phase 0(볼륨 확장·인스턴스 통합)·1·2·4·5 완료. Phase 3(Supabase→자체호스팅 DB 실제 데이터 이관)은 사전 점검·리허설·롤백 경로 준비까지 완료, 실제 정지→덤프→복원→전환(2~6번)만 대기 — DB는 여전히 Supabase. 다음 안전 창: 토요일 06:20 KST 이후 ~ 월요일 22:20 KST 이전
+- **상태**: 전체 Phase(0~5) 완료. Supabase→자체호스팅 postgres 데이터 이관·컷오버 실행 완료(2026-08-07 16:5x KST) — kista-api는 이제 A 서버의 `kista-postgres`(`postgres:5432/kistadb`)에 연결. kista-infra의 `secrets/kista-api.env.gpg`도 동일 값으로 갱신·push 완료. Supabase는 롤백 대비 최소 1주(~2026-08-14) 보존 후 정리
 - **실행 환경 전제**: 이 문서를 작성한 PC에는 oci-cli·OCI SSH 키·운영 환경변수가 없음 → **구현은 해당 자원이 있는 PC에서 진행**. 실행 계정은 Fable 한도 없음 → 오케스트레이터 = **Opus 4.8**(플랜·검토·판단) + **Sonnet 5**(실행, opusplan 기본). 구현 서브에이전트 = Sonnet 5, 문서 = Haiku 4.5, 검토자 = Opus 4.8
 
 ## 확정 사항
@@ -139,7 +139,13 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 - 실제 덤프(689KB, `-n public`)를 A의 `kista-postgres` 컨테이너에 `kistadb_rehearsal` 스크래치 DB로 복원 리허설 — 오류 1건(`schema "public" already exists`, 무해)만 발생, 27개 테이블·`flyway_schema_history`(버전 8)·users(2)/accounts(5)/orders(811) 로우 수 정상 확인. 리허설 DB·덤프 파일(로컬·서버 양쪽)은 정리 완료
 - 롤백용 `/opt/kista-api/.env.supabase-rollback` 스테이징 완료(현재 운영 `.env`와 동일, Supabase 연결 유지 상태)
 - 인스턴스 통합·DNS 컷오버는 이미 완료된 상태: `api.kista-app.com`은 애초에 A를 가리키고 있어 DNS 변경 불필요했고, `kista-app.com`(UI)만 구 `kista-ui-server`에서 A로 전환(Cloudflare A레코드, TTL 300초). Let's Encrypt 인증서는 전환 직후 `docker compose restart caddy`로 재발급 확인. `kista-ui-server` 인스턴스와 미사용 Reserved IP(`134.185.118.35`)는 삭제 완료
-- **아직 실행 안 함**: 위 2~6번(실제 정지→덤프→복원→전환→재기동) — 매매 시간대(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 회피 필요, 다음 안전 창은 토요일 06:20 이후 ~ 월요일 22:20 이전
+**실제 컷오버 실행 완료(2026-08-07, 금요일 16:47~16:56 KST)**: 사용자 확인 후 매매 시간대(22:20 개장 스케쥴러)까지 5시간 이상 여유가 있다고 판단해 주말 창을 기다리지 않고 즉시 진행했다. 2~6번을 실제로 실행:
+- kista-api `docker compose stop` (compose interpolation에 `KISTA_API_IMAGE`가 `.env`가 아닌 배포 시점 셸 환경변수라 `docker inspect`로 현재 이미지 태그를 읽어 인라인 전달해야 했음 — 이 문제는 재기동 시에도 동일하게 적용)
+- Supabase 최종 덤프(689KB, `-n public`) → A의 `kista-postgres`에 실제 `kistadb`로 `pg_restore` — 리허설과 동일하게 오류 1건(무해)만 발생, users(2)/accounts(5)/orders(811) 로우 수 일치 확인
+- `/opt/kista-api/.env`의 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`를 `infra.env`의 `DB_PASSWORD`와 일치하도록 직접 수정 → `docker compose up -d --force-recreate kista-api`로 재기동, healthy 전환까지 약 30초
+- 검증: `/actuator/health` 200, `pg_stat_activity`에서 HikariCP 커넥션 2개 확인(로컬 postgres에 실제 접속), 재기동 후 5분간 로그에 error/exception/warn 없음
+- **후속 조치**: kista-infra 레포의 `secrets/kista-api.env.gpg`도 동일 DB 값으로 갱신해 push(그렇지 않으면 향후 kista-infra에 어떤 push가 발생하든 서버 `.env`가 옛 Supabase 값으로 되돌아가는 위험이 있었음) — 재배포로 3개 `.env` 재렌더링·caddy reload까지 정상 완료 확인. `db-backup.yml`(Supabase 전용 수동 백업 워크플로) 삭제, kista-api의 미사용 GH Secrets(`BACKUP_ENCRYPTION_KEY`/`SUPABASE_DB_URL`) 삭제, `docs/agents/docker-infra.md`의 DB 백업 절차를 kista-infra `backup.sh` 기준으로 교체 완료
+- 롤백용 `/opt/kista-api/.env.supabase-rollback`은 그대로 보존(kista-infra 배포가 덮어쓰지 않는 경로) — Supabase 프로젝트 자체도 최소 1주 보존 후 정리 예정
 
 ## Phase 4 — 백업 (서버 cron → OCI Object Storage)
 

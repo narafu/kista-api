@@ -21,7 +21,7 @@
 ### 서버 배포 방식 (현재 OCI)
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 서버에 배포
 - 배포 파일: `deploy/server/docker-compose.yml`(kista-api 단일 서비스 — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
-- `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담하는 구조로 전환 준비 완료(코드/설정 커밋됨). `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. **실제 인스턴스 재편·컷오버는 아직 실행 전** — 현재는 여전히 kista-api-server/kista-ui-server/fida-server 3대 분리 운영, DB는 Supabase.
+- `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담한다. `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. **인스턴스 재편·컷오버 완료(2026-08-07)** — kista-api-server(A)가 caddy·postgres·redis·kista-api·kista-ui를 모두 올인원으로 호스팅, kista-ui-server는 삭제됨, DB는 Supabase에서 자체호스팅 postgres(`postgres:5432/kistadb`)로 이관 완료. fida-server만 별도 유지.
 - **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
 - **OCI 볼륨은 in-place 축소 불가, OCPU·메모리는 가능** — 최초 12GB/부트 200GB로 생성했다가 free-tier 리전 스토리지(200GB) 전량을 부트 볼륨 하나가 점유해 다른 인스턴스를 만들 여유가 없어져 부트 볼륨만 50GB로 재생성함(2026-08-03). 볼륨을 줄여야 하면 재생성이 유일한 방법 — 아래 무중단 재생성 노하우 참고. 반면 OCPU·메모리는 Flexible shape 속성이라 `oci compute instance update --shape-config '{"ocpus":N,"memoryInGBs":M}'`로 살아있는 인스턴스에서 바로 변경 가능(적용에 재부팅 필요, IP·볼륨 유지) — 재생성 없이 스펙만 조정할 땐 이 경로를 우선 검토
 - **예약 공인 IP 재할당으로 무중단 호스트 교체**: 공인 IP를 처음부터 Reserved(에페메럴 아님)로 할당해두면, 인스턴스 재생성(스펙 변경·볼륨 축소 등) 시 새 인스턴스를 임시 공인 IP로 완전히 기동·스모크 테스트한 뒤 `oci network public-ip update --private-ip-id <새 인스턴스 private-ip-ocid>`로 예약 IP만 재할당하면 된다 — 도메인·DNS·GitHub Secret(`SERVER_HOST`)·카카오 OAuth·CORS 전부 무변경. old 인스턴스는 외부 검증 통과 전까지 종료하지 않는 것이 핵심 안전장치(문제 발생 시 예약 IP를 old로 즉시 되돌려 롤백)
@@ -182,20 +182,18 @@ docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
 
 ## 백업/복구 런북
 
-### DB 백업 (Supabase 운영)
-아래는 **DB가 Supabase인 동안** 유효한 절차다. Phase 3(자체 호스팅 postgres 이관) 완료 후에는 `kista-infra` 레포의 `scripts/backup.sh`(pg_dump → gpg 암호화 → OCI Object Storage)가 이 섹션을 대체한다 — 이관 완료 후 이 섹션 전체를 그 내용으로 교체할 것.
+### DB 백업 (자체호스팅 postgres, 2026-08-07 Phase 3 이관 완료)
+DB는 Supabase에서 자체호스팅 postgres(`kista-postgres` 컨테이너, A 서버)로 이관 완료됐다. 옛 `db-backup.yml`(Supabase workflow_dispatch 수동 백업)은 삭제됨 — `kista-infra` 레포의 `scripts/backup.sh`가 유일한 백업 경로다.
 
-- Supabase 자동 백업: 대시보드 → Database → Backups에서 플랜별 보존 기간 확인 (Free: 없음, Pro: 일 1회 7일 보존) — Free 플랜 유지 중이므로 자체 백업 필수
-- **수동 백업**(workflow_dispatch): `.github/workflows/db-backup.yml` — `pg_dump` → GPG 대칭키 암호화 → GitHub Actions artifact 업로드(30일 보존). (2026-08-04 Task 2에서 스케줄 트리거 제거 — kista-infra 이관 준비로 자동 실행은 멈추고 수동 실행만 가능)
-  - 레포가 **public**이라 artifact는 누구나 다운로드 가능 — 반드시 GPG로 암호화한 뒤 업로드 (평문 업로드 금지)
-  - 필요 GH secret: `SUPABASE_DB_URL`(session mode 포트 5432, pgbouncer 6543 아님), `BACKUP_ENCRYPTION_KEY`
-  - `SUPABASE_DB_URL` 구성: 앱이 쓰는 Fly `DB_URL`(JDBC, pgbouncer 6543)과 다름 — host/user/password는 동일하게 재사용하되 포트만 `5432`로 바꾸고 `postgresql://user:password@host:5432/postgres` 형태의 순수 URI로 변환 필요
-- 수동 백업: `supabase db dump --linked -f backup-$(date +%Y%m%d).sql` — 중요 스키마 변경(마이그레이션 배포) 직전 필수 실행
-- 백업 파일(복호화 후)은 레포 밖 안전한 위치에 보관 (git 커밋 금지 — 사용자 데이터 포함)
+- `kista-infra`의 `scripts/backup.sh`: `docker exec kista-postgres pg_dump -U kista kistadb -Fc` → `gpg --symmetric`(`BACKUP_ENCRYPTION_KEY`) → `oci os object put`(Object Storage, Always Free 20GB), 30일 롤링 삭제
+- 서버 cron: `0 2 * * * /opt/kista-infra/scripts/backup.sh` (매일 02:00 KST, 매매·pg 부하 없는 시각)
+- `oci` CLI는 `/usr/local/bin/oci` 심볼릭 링크로 설치(원본 `/home/ubuntu/bin/oci`) — cron 기본 PATH에 `/home/ubuntu/bin`이 없어 심볼릭 링크로 우회
+- 수동 백업: 서버에서 `/opt/kista-infra/scripts/backup.sh` 직접 실행
+- 이관 시 사용한 Supabase 자격증명은 `.env.production`(로컬, gitignored)과 kista-api `.env.supabase-rollback`(서버, `/opt/kista-api/`)에만 남아있다 — Supabase 프로젝트 자체는 롤백 대비 최소 1주 보존 후 정리
 
 ### 복구
-1. artifact 백업 사용 시 먼저 복호화: `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -o backup.sql -d backup-YYYYMMDD.sql.gpg`
-2. 신규/기존 프로젝트에 복원: `psql "$DB_URL" < backup.sql`
+1. Object Storage에서 다운로드 → `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -d backup-YYYYMMDD.sql.gpg -o backup.dump`
+2. `docker exec -i kista-postgres pg_restore --no-owner --no-privileges -U kista -d kistadb < backup.dump` (재해 복구로 DB 자체가 없으면 먼저 `createdb -U kista kistadb`)
 3. 복원 후 `flyway_schema_history` 최신 버전이 배포 코드의 마이그레이션 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패
 4. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
