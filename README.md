@@ -6,11 +6,11 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
 
 KISTA(Key Investment Strategy & Trading Automation) — 정밀한 투자 전략을 기반으로 작동하는 다중 증권사 통합 자동매매 SaaS의 백엔드.
-프론트엔드는 별도 저장소 [`kista-ui`](https://github.com/narafu/kista-ui)(Next.js 16, Vercel)와 연동한다.
+프론트엔드는 별도 저장소 [`kista-ui`](https://github.com/narafu/kista-ui)(Next.js 16)와 연동하며, 같은 OCI 인스턴스에서 함께 호스팅된다.
 
 ## 기술 스택
 
-Java 21 · Spring Boot 3 · Hexagonal Architecture · PostgreSQL · Flyway · OCI
+Java 21 · Spring Boot 3 · Hexagonal Architecture · PostgreSQL · Redis · Flyway · OCI
 
 ## 아키텍처
 
@@ -69,7 +69,7 @@ sequenceDiagram
 
     S1->>TF: executeBatch() — 전략 전체 순회
     TF->>KIS: 잔고/보유수량 조회 (BrokerAdapterRegistry 경유)
-    TF->>TF: CycleOrderStrategy.compute()<br/>(INFINITE/PRIVACY/VR 별 주문 계산)
+    TF->>TF: CycleOrderStrategy.plan()<br/>(INFINITE/PRIVACY/VR 별 주문 계산)
     TF->>DB: Order 저장 (계획 상태)
     TF->>KIS: 매도 선접수 (INFINITE)
 
@@ -90,19 +90,16 @@ graph TB
     subgraph GH["GitHub"]
         RepoUI["kista-ui repo"]
         RepoAPI["kista-api repo"]
-        BackupAction["DB 백업 워크플로"]
+        RepoInfra["kista-infra repo (private)"]
     end
 
-    subgraph VercelInfra["Vercel"]
-        UIApp["kista-ui (Next.js)"]
-    end
-
-    subgraph OciInfra["OCI"]
-        APIApp["kista-api"]
-    end
-
-    subgraph SupaInfra["Supabase"]
-        PG2[("PostgreSQL")]
+    subgraph OciInfra["OCI 단일 인스턴스 (kista-api-server)"]
+        Caddy["Caddy (리버스 프록시·HTTPS)"]
+        APIApp["kista-api (Spring Boot)"]
+        UIApp["kista-ui (Next.js 16)"]
+        PG[("PostgreSQL (자체 호스팅)")]
+        Redis[("Redis (자체 호스팅)")]
+        Backup["백업 cron → Object Storage"]
     end
 
     subgraph Monitoring["외부 모니터링"]
@@ -111,17 +108,19 @@ graph TB
         Grafana["메트릭 추세 관찰"]
     end
 
-    RepoUI -->|"GitHub 통합 자동 배포"| UIApp
+    RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ SSH 배포"| UIApp
     RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ SSH 배포"| APIApp
-    UIApp -->|"HTTPS"| APIApp
-    APIApp --> PG2
-    BackupAction -->|"pg_dump → 암호화 → artifact"| PG2
+    RepoInfra -->|"Caddy·Postgres·Redis·백업 cron 소유"| Caddy
+    Caddy --> APIApp
+    Caddy --> UIApp
+    APIApp --> PG
+    APIApp --> Redis
+    PG --> Backup
     Uptime --> APIApp
     APIApp --> HC
     APIApp --> Grafana
 ```
 
-- Supabase Free 플랜은 자체 백업이 없어 정기적으로 `pg_dump` → 암호화 → GitHub Actions artifact로 별도 백업한다.
+- `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다(2026-08-07 인스턴스 재편·DB 이관 완료 — 기존 Fly.io·Vercel·Supabase는 폐지).
+- 백업 메커니즘·주기 상세는 `docs/agents/docker-infra.md` 참고.
 - 외부 모니터링은 서로 다른 실패 모드를 감지한다: 가동 모니터링(서버 다운) / 생존 확인(스케쥴러 정지) / 메트릭 추세(리소스 악화).
-
-`kista-infra`(private) 레포에 caddy·자체 호스팅 postgres·redis로 통합하는 설정이 준비 완료되었다(아직 미적용 — 인스턴스 재편·DB 이관 후 전환 예정). 전환 후에도 이 다이어그램의 배포 흐름(테스트→이미지 빌드→SSH 배포)은 동일하게 유지된다.

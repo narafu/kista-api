@@ -45,7 +45,7 @@
 - 예산 배정 우선순위·compute skip·실패 격리·수동 SELL 검증 등 실행 규칙 전체는 `docs/agents/workflow.md`가 SSOT — 매매·스케쥴러·주문 로직 작업 시 필수 Read
 - `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 `TradingService`가 PLANNED 저장 전 `IllegalStateException`으로 거절), legacy 행은 `UNKNOWN` 유지, 브로커 API payload에 미포함
 - 슬롯 점유 판단: concrete leg는 `timing + direction + orderLeg`, `UNKNOWN` legacy 행은 `timing + direction` coarse
-- `V24__add_order_leg_and_order_indexes.sql`이 `orders.order_leg`와 scheduler/reservation 조회용 인덱스를 추가 — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인 (V23 번호 충돌로 병합 시 V24로 재번호됨)
+- `orders.order_leg`와 scheduler/reservation 조회용 인덱스(`idx_orders_cycle_date_timing_status` 등)는 현재 `V1__init.sql`에 포함되어 있다(과거 별도 마이그레이션이었으나 스쿼시됨) — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인
 
 ### MetaController (enum SSOT)
 - `GET /api/meta` — `MetaBundle` 단일 번들 (strategyTypes/tickers/brokers/strategyStatuses/cycleSeedTypes)
@@ -63,7 +63,7 @@
 
 ### AES-256 암호화 컬럼 크기
 - AES-256 CBC 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
-- 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/app_key/secret_key/telegram_bot_token 모두 512
+- 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/app_key/secret_key 512, `UserEntity`: telegram_bot_token 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴
@@ -163,7 +163,8 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - `account.accountNo()`에 `"74420614-01"` 형태로 저장된 경우 split 결과 `["74420614","01"]`; `"74420614"` 8자리만 저장된 경우 기본 `"01"` 사용
 
 ### Flyway
-- 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지** (V1 포함 전체 버전) — Flyway 체크섬 불일치로 앱 기동 즉시 크래시. 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인) [V12 수정→운영 크래시 사례]
+- 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지** (V1 포함 전체 버전) — Flyway 체크섬 불일치로 앱 기동 즉시 크래시. 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인) — 과거 적용된 버전 수정으로 실제 운영 크래시가 난 사례 있음
+- 마이그레이션 이력은 과거 스쿼시된 적이 있다(현재 `V1__init.sql`이 예전 여러 버전을 흡수) — `constraints.md`·`architecture.md` 등 문서에 특정 버전 번호(`V24`, `V28` 등)를 근거로 서술하지 말 것. 버전 번호는 `git log`로만 추적하고, 문서에는 "어떤 컬럼/제약이 어느 파일에 있는지"만 현재 파일 기준으로 기록
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale` 변경 시 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 불일치만 런타임 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException`
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, JPA 1차 캐시에는 원본 BigDecimal 유지 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
@@ -235,7 +236,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 
 ### Telegram Webhook 등록
 - `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
-- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://kista-api.fly.dev/telegram/webhook"}'`
+- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://api.kista-app.com/telegram/webhook"}'`
 - 배포 URL 변경 시 재등록 필요
 
 ### @Transactional 내부 외부 시스템 호출 금지
@@ -280,7 +281,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
 
 ### 시간 기준 정책 (KST 단일 기준)
-- **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (V28에서 US→KST shift 완료)
+- **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (과거 US 거래일 기준에서 KST 기준으로 전환 완료됨)
 - **`privacy_trade_bases.release_date` = FIDA 발행일 원본(KST)** — 거래일 아님. 발행일↔거래일(+1일)은 `PrivacyDates.releaseDateFor()/tradeDateOf()` 업무 규칙 헬퍼만 사용
 - **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일) — KST↔US 변환은 해당 어댑터 내부에서만 (`UsTradeDates.toUsTradeDate()/toKstTradeDate()`)
 - `UsTradeDates` 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter`, `KisPriceApi`(dailyprice BYMD 파라미터) — 도메인·서비스·orders persistence에서 사용 금지

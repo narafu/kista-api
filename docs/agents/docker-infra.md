@@ -73,58 +73,37 @@
 
 ## 배포/인프라/외부 연동 런북
 
-### Fly.io 배포 모니터링
+### 서버(OCI) 운영 모니터링
 ```bash
-# 운영 로그 실시간 조회
-fly logs -a kista-api                                           # kista-api 운영 로그
-vercel logs                                                     # kista-ui 운영 로그
+# 운영 로그 실시간 조회 (SSH 접속 후, /opt/kista-api 또는 /opt/kista-ui에서)
+docker compose logs -f kista-api                                # kista-api 운영 로그
+docker compose logs -f kista-ui                                 # kista-ui 운영 로그
 
 # 헬스 체크 / 배포 상태
-curl https://kista-api.fly.dev/actuator/health
-fly status -a kista-api
-# 수동 배포 (서버 전환 후 workflow_dispatch 전용 — 커트오버 기간 긴급 롤백용)
-fly deploy --app kista-api
-# 증상: "Connection to localhost:5432 refused" = DB_URL 환경변수 미설정
-# 로컬 컨테이너명: kista-api-app-1 (앱), kista-api-postgres-1 (DB)
-# 로컬 로그 확인: ~/.local/bin/docker --context desktop-linux logs kista-api-app-1 --tail=200
+curl https://api.kista-app.com/actuator/health
+gh run list --repo narafu/kista-api                              # 최근 배포 워크플로 상태
+gh workflow run "Server Deploy" --repo narafu/kista-api          # 수동 재배포 트리거(push 미인식 시 우회 경로)
 ```
 
 ### 외부 모니터링/알림
-Fly.io 자체 헬스체크(`fly.toml`)는 실패한 machine을 재시작할 뿐 사람에게 알리지 않음 — 아래 3개는 사람이 실제로 장애를 인지하기 위한 외부 계층.
+컨테이너 자체 healthcheck(`docker-compose.yml`의 `healthcheck:`)는 실패 시 재시작만 할 뿐 사람에게 알리지 않음 — 아래 3개는 사람이 실제로 장애를 인지하기 위한 외부 계층.
 
-- **가동 여부**: UptimeRobot(무료) → `https://kista-api.fly.dev/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
+- **가동 여부**: UptimeRobot(무료) → `https://api.kista-app.com/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
 - **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 완료 시 ping. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
-- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치(Fly.io/서버) 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push. 서버(OCI)에서도 별도 Alloy 사이드카 없이 동일하게 동작 (`GRAFANA_CLOUD_OTLP_*` 환경변수, → "Fly.io 환경변수 설정" 참고 — 서버는 `deploy/server/README.md`의 `.env` 목록에 동일 변수 있음)
+- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, kista-infra의 `secrets/kista-api.env.gpg`로 관리 — 값 목록은 저장소 루트 `.env.example` 참고)
   - 대시보드 JSON: `deploy/grafana/kista-api-dashboard.json` — Grafana Cloud 계정 유실 시 재구성용, Dashboards → New → Import로 재적용
   - **Import 시 주의**: 대시보드 JSON Model 편집창(Settings → JSON Model)은 계정이 이미 v2 스키마(`elements`/`layout`)로 마이그레이션된 경우 구버전 `panels`/`gridPos` JSON을 거부함(`Missing property "elements"` 등) — 기존 대시보드를 고치려 하지 말고 **Import로 새로 생성** 후 기존 것 삭제
   - Grafana Cloud 메트릭 이름은 Micrometer 관례와 다를 수 있음 — 예: 업타임은 `process_uptime_seconds`가 아니라 **`process_uptime_milliseconds`**(단위도 ms). 확인 방법: Explore에서 `{application="kista-api"}`로 전체 시리즈 조회 후 이름 확인
 
-### Fly.io 환경변수 설정
+### 서버(OCI) 환경변수 설정
+`fly secrets set` 같은 CLI 경로 없음 — 환경변수는 전부 kista-infra 레포의 GPG 암호화 시크릿으로 관리한다.
 ```bash
-# 환경변수 일괄 설정
-fly secrets set KEY=VALUE KEY2=VALUE2 --app kista-api
-# 환경변수 목록 확인
-fly secrets list --app kista-api
-# 필수 환경변수 (V2 멀티계좌 — KIS 자격증명은 accounts 테이블에 계좌별 암호화 저장, 전역 env 아님):
-#   JWT_SIGNING_KEY          — EC P-256 JWK JSON (JWT 서명/검증)
-#   AES_ENCRYPTION_KEY       — AES-256 암호화 키 (계좌 자격증명 복호화)
-#   ADMIN_KAKAO_IDS          — 쉼표 구분 카카오 ID (로그인 시 ADMIN 자동 승격)
-#   INTERNAL_API_TOKEN       — 서버 간 내부 인증 (/api/internal/**)
-#   KAKAO_CLIENT_ID          — 카카오 OAuth 클라이언트 ID
-#   KAKAO_CLIENT_SECRET      — 카카오 OAuth 클라이언트 시크릿 (선택)
-#   TELEGRAM_BOT_TOKEN       — 관리자봇 토큰 (NotifyPort 오류/리포트 알림)
-#   TELEGRAM_CHAT_ID         — 관리자봇 chat ID
-#   DB_URL, DB_USERNAME, DB_PASSWORD — Supabase PostgreSQL 연결
-#   REDIS_URL               — Upstash Redis TLS URL (JWT blacklist + Toss 분산 토큰 조정)
-#   CORS_ALLOWED_ORIGINS     — 쉼표 구분 허용 Origin (Vercel 프로덕션 URL)
-# 선택 환경변수 (모니터링 — 미설정 시 각 기능 비활성/생략, 배포 안전):
-#   HEARTBEAT_OPEN_URL       — healthchecks.io 개장 스케쥴러 dead-man's switch ping URL
-#   HEARTBEAT_CLOSE_URL      — healthchecks.io 마감 스케쥴러 dead-man's switch ping URL
-#   GRAFANA_CLOUD_OTLP_ENABLED    — true 설정 시 OTLP metrics push 활성화 (기본 false)
-#   GRAFANA_CLOUD_OTLP_ENDPOINT   — Grafana Cloud OTLP gateway URL (예: https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp)
-#   GRAFANA_CLOUD_OTLP_AUTH_HEADER — Grafana Cloud 발급 "Basic xxxx" 인증 헤더 값 전체
-# SPRING_PROFILES_ACTIVE=prod 는 fly.toml [env]에 이미 고정
+cd ../kista-infra
+./scripts/env.sh edit kista-api      # 복호화 → 편집 → 저장 시 자동 재암호화 → commit/push하면 다음 배포에 반영
 ```
+- 필수/선택 키 전체 목록은 `kista-infra/.env.example` 참고(JWT_SIGNING_KEY·AES_ENCRYPTION_KEY·ADMIN_KAKAO_IDS·INTERNAL_API_TOKEN·카카오 OAuth·텔레그램 봇·DB_URL/USERNAME/PASSWORD·CORS_ALLOWED_ORIGINS·HEARTBEAT_*_URL·GRAFANA_CLOUD_OTLP_* 등)
+- `SPRING_PROFILES_ACTIVE=prod`는 `deploy/server/docker-compose.yml`의 `environment:`에 고정
+- 편집한 시크릿은 push해야 서버에 반영된다 — kista-infra의 `server-deploy.yml`이 매 배포마다 복호화해 `/opt/kista-api/.env`를 렌더링·덮어쓰지만, 재시작 대상은 caddy/postgres/redis뿐이라 kista-api에 실제로 반영하려면 kista-api 자체 배포도 별도로 트리거해야 함
 
 ### kis-trade-mcp 재시작
 ```bash
@@ -153,29 +132,19 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - `~/.claude/settings.json`은 `mcpServers` 미지원 — 글로벌 MCP 서버는 `~/.claude/.mcp.json`에 추가
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
 
-### 운영 → 로컬 마이그레이션 (supabase-cli)
+### 운영 → 로컬 마이그레이션 (자체호스팅 postgres, Phase 3 이관 후 절차)
+DB가 자체호스팅 postgres로 바뀌면서 supabase-cli의 CSV 덤프/COPY 우회가 더 이상 필요 없다 — SSH로 서버 컨테이너에서 직접 `pg_dump -t`로 테이블을 골라 떠서 로컬로 복원한다.
 ```bash
-# 1. 운영 DB에서 CSV 덤프 (supabase CLI 출력 메시지가 CSV에 섞이므로 UUID 행만 grep으로 추출)
-supabase db query --linked --output csv "SELECT * FROM privacy_trade_bases ORDER BY created_at" | \
-  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/privacy_trade_bases.csv
-supabase db query --linked --output csv "SELECT * FROM privacy_trade_base_orders ORDER BY created_at" | \
-  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/privacy_trade_base_orders.csv
-supabase db query --linked --output csv "SELECT * FROM fear_greed_snapshots ORDER BY created_at" | \
-  grep -E "^id,|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}," > /tmp/fear_greed_snapshots.csv
+# 1. 서버에서 필요한 테이블만 pg_dump (custom format)
+ssh -i ~/secret/oci-ssh-key-kista.key ubuntu@<SERVER_HOST> \
+  "docker exec kista-postgres pg_dump -U kista -d kistadb -Fc \
+     -t privacy_trade_bases -t privacy_trade_base_orders -t fear_greed_snapshots \
+     -f /tmp/seed.dump && docker cp kista-postgres:/tmp/seed.dump /tmp/seed.dump"
 
-# 2. CSV를 로컬 컨테이너에 복사
-docker cp /tmp/privacy_trade_bases.csv kista-api-postgres-1:/tmp/privacy_trade_bases.csv
-docker cp /tmp/privacy_trade_base_orders.csv kista-api-postgres-1:/tmp/privacy_trade_base_orders.csv
-docker cp /tmp/fear_greed_snapshots.csv kista-api-postgres-1:/tmp/fear_greed_snapshots.csv
-
-# 3. 로컬 DB에 임포트 (NULL 'NULL' 옵션 필수 — supabase CSV에서 NULL이 문자열 "NULL"로 출력됨)
-#    컬럼 순서는 CSV 헤더(SELECT * 순서)와 일치해야 함
-docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
-  "COPY privacy_trade_bases (id, release_date, ticker, current_cycle_start, current_cycle_realized_pnl, avg_price, holdings, created_at) FROM '/tmp/privacy_trade_bases.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
-docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
-  "COPY privacy_trade_base_orders (id, privacy_trade_id, direction, order_type, price, quantity, created_at) FROM '/tmp/privacy_trade_base_orders.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
-docker exec kista-api-postgres-1 psql -U kista -d kistadb -c \
-  "COPY fear_greed_snapshots (id, source, snapshot_date, value, rating, created_at) FROM '/tmp/fear_greed_snapshots.csv' WITH (FORMAT CSV, HEADER true, NULL 'NULL');"
+# 2. 로컬로 다운로드 후 로컬 컨테이너로 복원
+scp -i ~/secret/oci-ssh-key-kista.key ubuntu@<SERVER_HOST>:/tmp/seed.dump /tmp/seed.dump
+docker cp /tmp/seed.dump kista-api-postgres-1:/tmp/seed.dump
+docker exec kista-api-postgres-1 pg_restore -U kista -d kistadb --data-only --disable-triggers /tmp/seed.dump
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
 # docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases, fear_greed_snapshots;"
 ```

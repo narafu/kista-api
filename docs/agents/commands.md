@@ -28,7 +28,7 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  
 
 ### Docker (로컬)
 ```bash
-docker compose up -d                                            # PostgreSQL + Prometheus + Grafana (앱은 IntelliJ 또는 bootRun으로 별도 실행)
+docker compose up -d                                            # PostgreSQL + Redis + Prometheus + Grafana (앱은 IntelliJ 또는 bootRun으로 별도 실행)
 docker compose up -d postgres                                   # DB만 기동
 docker compose build <service> && docker compose up -d --force-recreate <service>
 ```
@@ -42,7 +42,7 @@ tail -f logs/kista-api.log
 ## 배포/인프라/외부 연동 런북
 
 저빈도 운영 작업 — 필요시 `docs/agents/docker-infra.md` 참고:
-- Fly.io 배포 모니터링/환경변수 설정
+- 서버(OCI) 배포 모니터링/환경변수 설정 (Fly.io는 폐지됨)
 - kista-ui 운영 로그 조회, kista-api↔kista-ui URL 변경 연동
 - kis-trade-mcp 재시작, .mcp.json 경로 이식성
-- Privacy 기준표 운영 → 로컬 마이그레이션 (supabase-cli)
+- Privacy 기준표 운영 → 로컬 마이그레이션

@@ -47,8 +47,8 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 
 ## 운영 도구
 
-- **API 운영 로그**: flyio-cli — `fly logs -a kista-api` (상세 명령어 → `docs/agents/docker-infra.md`)
-- **DB 작업**: supabase-cli — `supabase db query --linked` (상세 명령어 → `docs/agents/docker-infra.md`)
+- **API 운영 로그**: OCI 서버 SSH 접속 후 `docker compose logs kista-api` (Fly.io는 폐지됨 — 상세 명령어 → `docs/agents/docker-infra.md`)
+- **DB 작업**: 자체호스팅 postgres(`kista-postgres` 컨테이너) — SSH 접속 후 `docker exec kista-postgres psql -U kista -d kistadb` (Supabase는 롤백 대비로만 잠시 보존 중 — 상세 명령어 → `docs/agents/docker-infra.md`)
 
 ## 참고 문서 (필요시 Read)
 - **매매·스케쥴러·주문 로직 작업 시 필수 Read**: `docs/agents/workflow.md` — 스케쥴러 실행 흐름, MarketSession(DIRECT|BLOCKED), BuyOrderPriceCapper 보정 주문, orders/cycle_position 기록 테이블 구분
