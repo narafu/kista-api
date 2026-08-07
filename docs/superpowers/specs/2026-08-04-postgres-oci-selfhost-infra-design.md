@@ -1,7 +1,7 @@
 # PostgreSQL 자체 호스팅 + kista 올인원 통합 — 구현 플랜
 
 - **작성일**: 2026-08-04 (v2 — 전면 재검토 반영, 구현 중심 재작성)
-- **상태**: Phase 1·2(파일 작성) 완료, Phase 0·3·4·5(실제 운영 전환) 대기
+- **상태**: Phase 0(볼륨 확장·인스턴스 통합)·1·2·4·5 완료. Phase 3(Supabase→자체호스팅 DB 실제 데이터 이관)만 대기 — DB는 여전히 Supabase
 - **실행 환경 전제**: 이 문서를 작성한 PC에는 oci-cli·OCI SSH 키·운영 환경변수가 없음 → **구현은 해당 자원이 있는 PC에서 진행**. 실행 계정은 Fable 한도 없음 → 오케스트레이터 = **Opus 4.8**(플랜·검토·판단) + **Sonnet 5**(실행, opusplan 기본). 구현 서브에이전트 = Sonnet 5, 문서 = Haiku 4.5, 검토자 = Opus 4.8
 
 ## 확정 사항
@@ -38,6 +38,8 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 6. **API 도메인 DNS TTL → 60초 선인하** (현재 API A레코드는 B의 IP — Phase 3 대비)
 
 검증: shape 반영, `df -h`, 새 키 SSH 접속.
+
+**실행 완료(2026-08-04~08-07, 계획과 다르게 진행)**: 사전 조사 결과 실제 OCI 인스턴스는 계획 당시 이미 3대(`kista-api-server` 2 OCPU/12GB, `kista-ui-server` 1 OCPU/6GB, `fida-server` 1 OCPU/6GB)로 분리되어 있어 "인스턴스 C 종료" 전제가 맞지 않았다. 실제로는 `kista-api-server`를 그대로 인스턴스 A로 채택(부트 볼륨만 50→100GB 온라인 확장, `growpart`+`resize2fs`, 재부팅 없이 완료 — OCPU/메모리는 이미 목표 스펙과 일치해 변경 불필요)하고, `kista-ui-server`를 kista-api-server로 컨테이너 이전 후 종료했다(= 계획의 "C 제거"에 해당, 다만 실제로는 UI가 있던 인스턴스가 C 역할). SSH 키 분리·DNS TTL 사전 인하는 이미 기존 값(TTL 300초)이 충분해 별도 조치 불필요했다. `fida-server`(B)는 변경 없음.
 
 ## Phase 1 — kista-infra 레포 신설 (private)
 
@@ -132,6 +134,8 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 검증: `/actuator/health` 200(DB·Redis), 로그인·전략 read/write, 스케쥴러 수동 트리거.
 
+**부분 실행 완료(2026-08-07)**: 위 절차 중 인스턴스 통합·DNS 컷오버 부분(5~8번 상당)만 먼저 진행했다 — `api.kista-app.com`은 애초에 kista-api-server(A)를 가리키고 있어 DNS 변경이 필요 없었고, `kista-app.com`(UI)만 구 `kista-ui-server`에서 A로 이전 후 A IP로 전환했다(Cloudflare A레코드, TTL 300초로 수 분 내 전파). Let's Encrypt 인증서는 전환 직후 `docker compose restart caddy`로 즉시 재발급 트리거해 확인했다. **DB 이관(1~4, 9~10번)은 미실행 — kista-api는 여전히 Supabase를 바라본다.** `kista-ui-server` 인스턴스는 검증 후 종료, 연결돼 있던 미사용 Reserved IP(`134.185.118.35`)도 해제했다. 남은 Phase 3(실제 DB 이관)은 휴장 주말 등 별도 정비 창에서 진행 필요.
+
 ## Phase 4 — 백업 (서버 cron → OCI Object Storage)
 
 기존 `db-backup.yml`은 외부 러너가 비공개 5432에 접근 불가 → 무력화. on-box 백업은 VM 손실 시 함께 소멸하므로 외부 반출이 단일 호스트 구성의 허용 조건.
@@ -142,12 +146,16 @@ data_net   (external): postgres·redis ↔ kista-api만    (ui는 미가입)
 
 검증: 수동 1회 실행 → Object Storage 도착 → 복호화·`pg_restore --list`.
 
+**실행 완료(2026-08-07)**: 서버에 `oci` CLI 설치(`/usr/local/bin/oci` 심볼릭 링크로 cron PATH 문제 회피), `scripts/backup.sh`를 `/opt/kista-infra/scripts/`에 배포, IAM 정책 문법 수정(따옴표 누락으로 최초 `BucketNotFound` 발생 — `target.bucket.name='kista-infra-backups'`로 수정 후 정상화) 후 수동 실행으로 실제 업로드까지 검증. `crontab -e`로 `0 2 * * * /opt/kista-infra/scripts/backup.sh >> /var/log/kista-backup.log 2>&1` 등록 완료. 현재 로컬 postgres는 Phase 3 이관 전이라 실질 데이터는 비어있음(백업 메커니즘 자체만 검증된 상태) — Phase 3 완료 후 실데이터 백업이 의미를 가짐.
+
 ## Phase 5 — 마무리
 
 - kista-api·ui의 기존 운영 GitHub Secrets 정리(SSH 계열만 잔존)
 - SHA 핀·`production` Environment 스코프·fork PR(`pull_request_target`) 부재 점검
 - `AES_ENCRYPTION_KEY`/`JWT_SIGNING_KEY`/`BACKUP_ENCRYPTION_KEY`/`ENV_PASSPHRASE` 오프라인 보관 확인
 - (선택) push 승인 → `production` Environment required reviewers
+
+**실행 완료(2026-08-07)**: kista-api `FLY_API_TOKEN`(Fly.io 폐지로 미참조), kista-ui `NEXT_PUBLIC_*` 9개(`.env.production.public` 파일로 대체돼 미참조) 총 10개 미사용 GitHub Secrets 삭제 — 양 레포 모두 SSH/DB 관련 필수 값만 잔존. `server-deploy.yml`(시크릿을 다루는 워크플로) SHA 핀은 3레포 모두 이미 완료 상태 확인(`ci.yml`/`react-doctor.yml`은 이번 작업 범위 밖 기존 워크플로라 미대상). `pull_request_target` 미사용 확인. `production` Environment required reviewers: kista-api는 기존 설정 유지, kista-ui는 신규 추가(대소문자 무관 매칭 확인). **kista-infra는 private 레포라 GitHub Free 플랜 정책상 required reviewers 사용 불가**(Public 레포만 무료 지원) — 게이트 없이 push 즉시 배포로 남김, 필요 시 유료 플랜 전환 후 재검토. 오프라인 보관 대상 시크릿은 코드로 검증 불가하여 사용자 직접 확인 필요(비밀번호 관리자 저장 여부). 작업 중 발견한 로컬 임시 파일 잔재(`/private/tmp/filled.env`, `/private/tmp/kista-infra-secrets/`)는 확인 후 삭제 — 둘 다 실제 값 없는 테스트/placeholder 파일이었음.
 
 ## 문서 반영 (동일 작업에서)
 
