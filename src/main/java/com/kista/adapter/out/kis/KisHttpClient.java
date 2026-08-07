@@ -17,6 +17,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -69,7 +71,7 @@ class KisHttpClient {
     }
 
     // 계좌 기반 POST — buildHeaders + post + 401 재시도 일괄 처리 (KisOrderApi 등)
-    // 주문 접수/취소라 재시도 안 함(중복 주문 위험 배제) — 페이싱은 TradingOrderExecutor가 사전 예방
+    // 주문 접수/취소라 재시도 안 함(중복 주문 위험 배제) — 대신 executeWithRetry의 계좌 호출 간격 게이트가 사전 예방
     public <T> T post(String trId, String path, Account account, Object body, Class<T> responseType) {
         return executeWithRetry(trId, account, false, headers -> post(path, headers, body, responseType));
     }
@@ -98,12 +100,19 @@ class KisHttpClient {
     private static final long RATE_LIMIT_JITTER_MILLIS = 200;        // 동시 재시도가 같은 초에 재정렬되는 것을 완화하는 지터
     private static final int MAX_RATE_LIMIT_RETRIES = 2;
 
+    // 계좌(앱키) 단위 최소 호출 간격 게이트 — EGW00201은 accountId가 아닌 appKey 단위 제한이라 appKey로 키잉한다.
+    // 조회·주문접수·취소 등 모든 KIS 호출이 executeWithRetry를 거치므로 이 한 지점이 전체 경로의 SSOT다.
+    private static final long MIN_CALL_INTERVAL_MILLIS = 350;  // 같은 앱키의 연속 호출 사이 최소 간격
+    private static final long MAX_QUEUE_WAIT_MILLIS = 20_000;  // 대량 배치가 슬롯을 선점 중이어도 이 이상은 기다리지 않고 즉시 실패(라이브 조회 무한 대기 방지)
+    private final ConcurrentHashMap<String, AtomicLong> nextSlotByAppKey = new ConcurrentHashMap<>();
+
     // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
-    // retryOnRateLimit=true: 조회(GET) 전용 — 안전하게 재시도 가능. false: 주문 접수/취소(POST) — 재시도 안 함(사전 페이싱으로 별도 대응)
+    // retryOnRateLimit=true: 조회(GET) 전용 — EGW00201 감지 시 추가 백오프 재시도까지 안전. false: 주문 접수/취소(POST) — 재시도 안 함(중복 위험 배제, 사전 게이트로만 방어)
     // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
     private <T> T executeWithRetry(String trId, Account account, boolean retryOnRateLimit, Function<HttpHeaders, T> call) {
         String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         for (int attempt = 0; ; attempt++) {
+            awaitAccountSlot(account); // 매 시도(최초 호출 + EGW00201 재시도) 전에 간격 확보
             try {
                 return call.apply(buildHeaders(token, account.appKey(), account.secretKey(), trId));
             } catch (HttpStatusCodeException e) {
@@ -111,6 +120,9 @@ class KisHttpClient {
                     log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
                     String recoveredToken = kisAuthApi.recoverToken(
                             account.id(), account.appKey(), account.secretKey(), token).accessToken();
+                    // 토큰 재발급이 다른 스레드의 캐시 적중으로 즉시(HTTP 왕복 없이) 끝날 수 있어
+                    // 이 재시도도 간격 게이트를 반드시 거쳐야 직전 호출과 밀착 발사되지 않는다
+                    awaitAccountSlot(account);
                     try {
                         return call.apply(buildHeaders(recoveredToken, account.appKey(), account.secretKey(), trId));
                     } catch (RestClientException retryEx) {
@@ -130,6 +142,38 @@ class KisHttpClient {
                 throw new KisApiException("KIS API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
             } catch (RestClientException e) {
                 throw new KisApiException("KIS API 요청 실패: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    // 같은 앱키로의 연속 호출 사이 최소 간격을 보장 — 락 없는 슬롯 예약(가상스레드가 synchronized 안에서 sleep하면
+    // 캐리어 스레드에 pin되는 함정을 피하기 위해 명시적 CAS 루프만 사용). System.nanoTime()은 상대 경과 시간
+    // 측정용이라 NTP 보정 등 벽시계 역행에 영향받지 않는다.
+    // 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않는다 — accumulateAndGet처럼 무조건 먼저 예약해버리면
+    // 거부된 호출도 대기열을 뒤로 밀어버려 반복 거부가 대기열을 무한히 미래로 누적시키는 회귀가 생긴다.
+    private void awaitAccountSlot(Account account) {
+        AtomicLong nextSlot = nextSlotByAppKey.computeIfAbsent(account.appKey(), key -> new AtomicLong(0));
+        long intervalNanos = MIN_CALL_INTERVAL_MILLIS * 1_000_000L;
+        long maxWaitNanos = MAX_QUEUE_WAIT_MILLIS * 1_000_000L;
+        while (true) {
+            long now = System.nanoTime();
+            long currentSlot = nextSlot.get();
+            long myTurn = Math.max(currentSlot, now);
+            long waitNanos = myTurn - now;
+            if (waitNanos > maxWaitNanos) {
+                throw new KisApiException("KIS 계좌 호출 대기열 과다(" + (waitNanos / 1_000_000L)
+                        + "ms 대기 필요) — 요청 거부: accountId=" + account.id(), null);
+            }
+            if (!nextSlot.compareAndSet(currentSlot, myTurn + intervalNanos)) {
+                continue; // 동시 경쟁으로 CAS 실패 — 최신 슬롯으로 재계산
+            }
+            if (waitNanos <= 0) return;
+            try {
+                Thread.sleep(waitNanos / 1_000_000L);
+                return;
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new KisApiException("KIS 호출 대기 중 인터럽트: accountId=" + account.id(), ie);
             }
         }
     }

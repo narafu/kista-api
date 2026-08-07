@@ -27,8 +27,6 @@ import java.util.UUID;
 @Slf4j
 class TradingOrderExecutor {
 
-    private static final long ORDER_PLACEMENT_PACING_MILLIS = 350; // 같은 계좌 연속 주문 접수 간 KIS 초당 거래건수 제한(EGW00201) 회피용 간격
-
     private final OrderPort orderPort;
     private final BrokerAdapterRegistry registry;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
@@ -83,13 +81,14 @@ class TradingOrderExecutor {
     }
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)
-    // 첫 주문 제외, 두 번째 주문부터 접수 전 페이싱 대기 — 같은 계좌 연속 접수로 인한 EGW00201(초당 거래건수 초과) 예방
+    // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
     private List<Order> placeEach(List<Order> orders, Account account) {
         List<Order> placed = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
-            if (i > 0 && !sleepPacing()) {
-                // 페이싱 대기 중 인터럽트(배포·강제종료) — 무페이싱으로 남은 주문을 계속 쏘면 EGW00201 재발 위험만 커지므로 중단
-                log.warn("[{}] 페이싱 대기 중 인터럽트 — 남은 주문 {}건 접수 중단", account.nickname(), orders.size() - i);
+            // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
+            // catch 블록의 인터럽트 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
+            if (Thread.currentThread().isInterrupted()) {
+                log.warn("[{}] 인터럽트 감지 — 남은 주문 {}건 접수 중단", account.nickname(), orders.size() - i);
                 break;
             }
             Order p = orders.get(i);
@@ -101,6 +100,12 @@ class TradingOrderExecutor {
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
                 notifyPort.notifyError(e);
                 orderPort.markFailed(p.id()); // 접수 실패 → FAILED
+                // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 예외로 전파한다 — 이 경우 이 주문만
+                // FAILED로 남기고 나머지 주문은 다음 반복 상단의 체크에서 중단된다
+                if (Thread.currentThread().isInterrupted()) {
+                    log.warn("[{}] 인터럽트 감지 — 남은 주문 접수 중단", account.nickname());
+                    break;
+                }
                 continue;
             }
             // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태 (1회 재시도로 창 축소)
@@ -115,17 +120,6 @@ class TradingOrderExecutor {
             }
         }
         return placed;
-    }
-
-    // 같은 계좌 연속 주문 접수 간 대기 — KIS 초당 거래건수 제한(EGW00201) 사전 예방. 인터럽트 시 false(호출측이 중단)
-    private boolean sleepPacing() {
-        try {
-            Thread.sleep(ORDER_PLACEMENT_PACING_MILLIS);
-            return true;
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
     }
 
     // 일시적 DB 오류 흡수 — 1초 후 1회 재시도, 2차 실패는 호출측으로 전파

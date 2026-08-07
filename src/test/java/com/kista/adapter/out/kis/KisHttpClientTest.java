@@ -181,7 +181,49 @@ class KisHttpClientTest {
                 .isInstanceOf(KisApiException.class)
                 .hasMessageContaining("KIS API 오류");
 
-        // retryOnRateLimit=false — 접수/취소는 재시도하지 않음(사전 페이싱으로 별도 대응)
+        // retryOnRateLimit=false — 접수/취소는 재시도하지 않음(사전 호출 간격 게이트로 별도 대응)
         verify(kisRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    @DisplayName("같은 appKey 연속 호출 2건 → 최소 간격(MIN_CALL_INTERVAL_MILLIS) 이상 벌어짐")
+    // 실제로 최소 간격만큼 대기하므로 이 테스트는 ~350ms가 걸린다.
+    void spacesConsecutiveCallsForSameAppKey() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
+
+        KisHttpClient client = newClient();
+        long start = System.nanoTime();
+        client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {});
+        client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {});
+        long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
+
+        assertThat(elapsedMillis).isGreaterThanOrEqualTo(340); // 지터 없는 고정 간격, 스케쥴링 오차만 소폭 허용
+    }
+
+    @Test
+    @DisplayName("같은 appKey 대기열이 대기 상한(MAX_QUEUE_WAIT_MILLIS)을 넘으면 대기 없이 즉시 KisApiException")
+    void throwsImmediately_whenQueueWaitExceedsCap() throws Exception {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+
+        KisHttpClient client = newClient();
+        // 실제로 20초를 기다리지 않기 위해 다음 슬롯이 이미 25초 뒤로 예약된 것처럼 내부 상태를 직접 주입
+        java.lang.reflect.Field field = KisHttpClient.class.getDeclaredField("nextSlotByAppKey");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var slots = (java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong>) field.get(client);
+        java.util.concurrent.atomic.AtomicLong slot = new java.util.concurrent.atomic.AtomicLong(System.nanoTime() + 25_000_000_000L);
+        slots.put(ACCOUNT.appKey(), slot);
+        long slotBefore = slot.get();
+
+        assertThatThrownBy(() -> client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {}))
+                .isInstanceOf(KisApiException.class)
+                .hasMessageContaining("대기열 과다");
+
+        // 대기하지 않고 즉시 실패해야 하므로 브로커 호출 자체가 발생하지 않음
+        verify(kisRestTemplate, never()).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
+        // 회귀 방지: 거부된 호출이 슬롯을 커밋해 대기열을 더 미래로 밀어버리면 안 됨(반복 거부 시 무한 누적 버그 재발 감지)
+        assertThat(slot.get()).isEqualTo(slotBefore);
     }
 }
