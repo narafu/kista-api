@@ -82,7 +82,7 @@ crypto:
 app:
   cookie:
     secure: true        # prod: HTTPS 쿠키
-    same-site: "None"   # prod: 크로스 오리진(Vercel→Fly.io)
+    same-site: "None"   # prod: 크로스 오리진(kista-app.com→api.kista-app.com)
   trading:
     parallel-per-account: 2   # 계좌별 사이클 동시 실행 상한 (0 이하 = 순차)
 

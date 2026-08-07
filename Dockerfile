@@ -24,7 +24,7 @@ USER appuser
 
 COPY --from=builder /workspace/build/libs/app.jar app.jar
 
-# JVM 옵션: Fly.io 2GB 기준 메모리 분배
+# JVM 옵션: 컨테이너 2GB 기준 메모리 분배
 # Heap 768m + Metaspace 256m + CodeCache 64m + OS/스택/네이티브 메모리 여유 확보
 # G1GC: 2GB 환경에서 SerialGC보다 지연시간 변동을 줄이기 위한 기본값
 ENV JAVA_OPTS="-Xmx768m \

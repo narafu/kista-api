@@ -1,4 +1,3 @@
-# flyctl launch added from .gitignore
 # Gradle
 **/.gradle
 **/build
@@ -34,9 +33,6 @@
 # Docker override
 **/docker-compose.override.yml
 
-# Fly.io
-**/.fly
-
 # memory
 .shrimp-data/memory
 
@@ -54,19 +50,12 @@
 # Node.js 의존성 폴더
 **/node_modules
 
-#supabase 로컬 상태 및 데이터
-**/.supabase
-**/package-lock.json
-**/supabase/.temp
-
 # 로컬 서버 로그
 **/logs
 
-# flyctl launch added from .serena/.gitignore
 .serena/cache
 .serena/project.local.yml
 
-# flyctl launch added from .shrimp-data/.gitignore
 # Temporary files
 .shrimp-data/**/*.tmp
 .shrimp-data/**/*.log
@@ -74,4 +63,3 @@
 # OS files
 .shrimp-data/**/.DS_Store
 .shrimp-data/**/Thumbs.db
-fly.toml
