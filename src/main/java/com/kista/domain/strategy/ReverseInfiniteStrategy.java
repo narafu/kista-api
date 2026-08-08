@@ -34,7 +34,12 @@ public class ReverseInfiniteStrategy {
     }
 
     // 두번째 날 이후: LOC 매도(별지점 위) + LOC 쿼터매수(별지점 아래)
+    // 쿼터매수 예산 소진 시(별지점은 있으나 1주도 못 사는 경우) 매수 대신 동일 수량 MOC 매도로 청산 가속
     public List<Order> buildOrders(ReverseModePosition position, LocalDate tradeDate) {
+        if (position.isQuotaBuyExhausted()) {
+            return buildQuotaExhaustedOrders(position, tradeDate);
+        }
+
         List<Order> orders = new ArrayList<>();
 
         // LOC 매도 — 별지점 위에서 (starPointPrice 가격으로 LOC)
@@ -55,5 +60,17 @@ public class ReverseInfiniteStrategy {
         }
 
         return orders;
+    }
+
+    // 쿼터매수 예산 소진 — 매수 생략, 동일 수량(quarter) MOC 매도로 청산 가속
+    private List<Order> buildQuotaExhaustedOrders(ReverseModePosition position, LocalDate tradeDate) {
+        int mocSellQuantity = position.calcLocSellQuantity();
+        if (mocSellQuantity < 1) {
+            log.warn("[리버스모드 예산소진] MOC 매도 수량 0 — holdings={}", position.holdings());
+            return List.of();
+        }
+        log.info("[리버스모드 예산소진] 쿼터매수 불가 → MOC 매도 {}주", mocSellQuantity);
+        return List.of(Order.planned(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity,
+                BigDecimal.ZERO, "REVERSE_INFINITE_QUOTA_MOC_SELL"));
     }
 }
