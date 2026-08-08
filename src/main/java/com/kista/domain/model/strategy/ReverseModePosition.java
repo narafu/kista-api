@@ -49,6 +49,13 @@ public record ReverseModePosition(
         return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
     }
 
+    // 예산 소진 판정: 별지점은 계산됐지만(데이터 존재) 쿼터매수 예산으로 1주도 못 사는 경우
+    // starPointPrice==null(별지점 데이터 미계산)은 별개 상태이므로 제외
+    public boolean isQuotaBuyExhausted() {
+        return starPointPrice != null && starPointPrice.compareTo(BigDecimal.ZERO) > 0
+                && calcLocBuyQuantity() == 0;
+    }
+
     // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
     // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
     public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
