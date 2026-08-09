@@ -155,6 +155,23 @@ class VrStrategyTypeTest {
         assertThat(buy.quantity()).isEqualTo(1); // floor(200/105.00)
     }
 
+    @Test
+    @DisplayName("holdings>0(정상 사다리 경로)에서도 poolLimit=0(무일푼 개장 사이클, 영구 고정)이면 pool()을 예산으로 대신 쓴다")
+    void poolLimitZero_ladderPhase_fallsBackToLivePoolAsBudget() {
+        // holdings=1, V=1000, bandWidth=10% → lowerBand=900
+        // buyPrice(1)=900/1=900, buyPrice(2)=900/2=450
+        // poolLimit=0(영구 고정) → 폴백 시 pool(1000)을 예산으로 사용
+        // m=1: cumBuy=900 ≤ pool(1000) OK / m=2: cumBuy=900+450=1350 > pool(1000) → break
+        VrPosition position = pos(1, new BigDecimal("1000.00"), new BigDecimal("1000"),
+                new BigDecimal("10.00"), BigDecimal.ZERO);
+
+        List<Order> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("900.00");
+    }
+
     // ── 전 주문 타입 검증 ──────────────────────────────────────────────────────
 
     @Test
@@ -400,6 +417,25 @@ class VrStrategyTypeTest {
         assertThat(buys).hasSize(1);
         assertThat(buys.getFirst().price()).isEqualByComparingTo("525.00");
         assertThat(buys.getFirst().quantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders도 poolLimit=0(무일푼 개장 사이클)이면 pool()로 폴백한다 " +
+            "— 접수 전 재산정 경로(BuyOrderPriceCapper VR_POSITION)도 buildBuyLadder를 공유하므로 동일하게 적용됨")
+    void buildCappedBuyOrders_poolLimitZero_fallsBackToLivePoolAsBudget() {
+        // holdings=1, V=1000, bandWidth=10% → lowerBand=900
+        // buyPrice(1)=900/1=900, buyPrice(2)=900/2=450, cap=1000(캡에 걸리지 않아 가격 변화 없음)
+        // poolLimit=0(영구 고정) → 폴백 시 pool(1000)을 예산으로 사용
+        // m=1: cumBuy=900 ≤ pool(1000) OK / m=2: cumBuy=900+450=1350 > pool(1000) → break
+        VrPosition position = pos(1, new BigDecimal("1000.00"), new BigDecimal("1000"),
+                new BigDecimal("10.00"), BigDecimal.ZERO);
+
+        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1000.00"))
+                .stream().filter(o -> o.direction() == BUY).toList();
+
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("900.00");
+        assertThat(buys.getFirst().quantity()).isEqualTo(1);
     }
 
     @Test

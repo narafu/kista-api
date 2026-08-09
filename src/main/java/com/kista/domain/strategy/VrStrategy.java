@@ -54,14 +54,20 @@ public class VrStrategy {
         return position.lowerBand().compareTo(remainingBudget(position)) > 0;
     }
 
-    // 이번에 매수에 쓸 수 있는 잔여 예산 — poolLimit(사이클 개장 시점 예수금×비율) 기준이 원칙이지만,
+    // governance 상한 — poolLimit(사이클 개장 시점 예수금×비율) 기준이 원칙이지만,
     // 완전 무일푼(개장 예수금=0)으로 시작한 사이클은 poolLimit이 영구히 0으로 고정되므로 이 경우엔 DB상
-    // 예수금(pool)을 그대로 상한으로 대신 쓴다. 어느 쪽이든 DB상 예수금(pool)은 넘지 않는다.
-    private BigDecimal remainingBudget(VrPosition position) {
-        BigDecimal governanceLimit = position.poolLimit().signum() > 0
+    // 예수금(pool)을 그대로 상한으로 대신 쓴다. holdings 여부와 무관 — poolLimit은 사이클 개장 시점에
+    // 고정되는 값이라 이후 holdings 변화와 독립적이다. bootstrap(remainingBudget)·사다리(buildBuyLadder)
+    // 양쪽이 이 값을 공유해야 두 경로의 "이번 사이클에 쓸 수 있는 예산" 판단이 어긋나지 않는다.
+    private BigDecimal governanceLimit(VrPosition position) {
+        return position.poolLimit().signum() > 0
                 ? position.poolLimit().subtract(position.poolUsed())
                 : position.pool();
-        return governanceLimit.min(position.pool());
+    }
+
+    // 이번에 매수에 쓸 수 있는 잔여 예산 — 어느 쪽이든 DB상 예수금(pool)은 넘지 않는다.
+    private BigDecimal remainingBudget(VrPosition position) {
+        return governanceLimit(position).min(position.pool());
     }
 
     // 첫 포지션 bootstrap — 잔여 예산(remainingBudget)을 오늘의 캡 가격으로 LOC 매수
@@ -98,8 +104,9 @@ public class VrStrategy {
 
     // 매수 사다리 공통 생성 로직 — cap이 null이면 원가 그대로(계획 생성), 비-null이면 캡 적용(접수 전 보정)
     private List<Order> buildBuyLadder(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
-        // pool 사용 가능 잔여액 (poolLimit − poolUsed)
-        BigDecimal poolBudget = position.poolLimit().subtract(position.poolUsed());
+        // pool 사용 가능 잔여액 — remainingBudget()으로 bootstrap과 동일 기준(governanceLimit·pool 이중 상한)을 공유한다.
+        // 두 경로가 각자 상한을 계산하면 한쪽만 고친 뒤 다른 쪽이 방치되는 drift가 재발할 수 있어 단일 계산으로 통일했다.
+        BigDecimal poolBudget = remainingBudget(position);
 
         List<Order> rawBuys = new ArrayList<>();
         BigDecimal cumBuyAmount = BigDecimal.ZERO;
@@ -117,11 +124,8 @@ public class VrStrategy {
                 price = PriceCapPolicy.applyCap(price, cap);
             }
 
-            // poolLimit 초과 시 이후 단 전량 제외 (누적 금액 > poolBudget)
+            // poolBudget(governanceLimit·pool 중 더 작은 값) 초과 시 이후 단 전량 제외
             if (cumBuyAmount.add(price).compareTo(poolBudget) > 0) break;
-
-            // 예수금 잔액 초과 시 이후 단 전량 제외 (누적 금액 > pool)
-            if (cumBuyAmount.add(price).compareTo(position.pool()) > 0) break;
 
             rawBuys.add(Order.planned(tradeDate, ticker, LIMIT, BUY, 1, price, AT_OPEN));
             cumBuyAmount = cumBuyAmount.add(price);

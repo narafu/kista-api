@@ -74,7 +74,7 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
-        // VR은 최소 시드 가드 미적용 (poolLimit 기반으로 자체 제한)
+        // VR은 최소 시드 가드 미적용 (poolLimit 기반 자체 제한 — poolLimit=0인 무일푼 개장 사이클은 라이브 pool()로 폴백, VrStrategy.governanceLimit 참고)
         return null;
     }
 }
