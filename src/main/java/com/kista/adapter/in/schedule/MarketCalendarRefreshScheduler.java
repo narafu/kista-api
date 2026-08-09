@@ -2,6 +2,7 @@ package com.kista.adapter.in.schedule;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.port.out.MarketCalendarRefreshPort;
+import com.kista.domain.port.out.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 public class MarketCalendarRefreshScheduler {
 
     private final MarketCalendarRefreshPort marketCalendarRefreshPort;
+    private final MarketHolidayStorePort marketHolidayStorePort;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
@@ -29,7 +31,7 @@ public class MarketCalendarRefreshScheduler {
         schedulerLockService.tryRun("market-calendar-startup", Duration.ofHours(1), () -> {
             int year = LocalDate.now(TimeZones.KST).getYear();
             // 기동 중단 방지 — jobRunner가 오류 처리 및 알림 담당
-            jobRunner.run("기동 시 캘린더 초기 적재", () -> refreshYears(year, 3));
+            jobRunner.run("기동 시 캘린더 초기 적재", () -> refreshYearsIfMissing(year, 3));
         });
     }
 
@@ -59,6 +61,16 @@ public class MarketCalendarRefreshScheduler {
     private void refreshYears(int startYear, int count) {
         for (int i = 0; i < count; i++) {
             marketCalendarRefreshPort.refreshCalendar(startYear + i);
+        }
+    }
+
+    // 연도별 데이터가 이미 있으면 스킵 — 재기동마다 불필요한 외부 API 재조회 방지
+    private void refreshYearsIfMissing(int startYear, int count) {
+        for (int i = 0; i < count; i++) {
+            int year = startYear + i;
+            if (marketHolidayStorePort.countByYear(year) == 0) {
+                marketCalendarRefreshPort.refreshCalendar(year);
+            }
         }
     }
 }
