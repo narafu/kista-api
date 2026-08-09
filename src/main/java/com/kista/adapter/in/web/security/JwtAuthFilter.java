@@ -41,9 +41,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String jti = jwt.getId();
                 if ((jti != null && blacklistUseCase.isJtiBlacklisted(jti)) || blacklistUseCase.isBlacklisted(userId)) {
                     log.debug("블랙리스트 차단: userId={}, jti={}", userId, jti);
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"error\":\"TOKEN_BLACKLISTED\",\"message\":\"로그아웃된 토큰입니다. 다시 로그인해 주세요.\"}");
+                    // ASYNC(SSE 타임아웃) 재디스패치 시 응답이 이미 커밋돼 있으면 getWriter() 호출이 IllegalStateException을 던짐
+                    if (!response.isCommitted()) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write("{\"error\":\"TOKEN_BLACKLISTED\",\"message\":\"로그아웃된 토큰입니다. 다시 로그인해 주세요.\"}");
+                    }
                     return;
                 }
 
@@ -53,9 +56,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 if (roleChangedAt != null
                         && (jwt.getIssuedAt() == null || jwt.getIssuedAt().isBefore(roleChangedAt))) {
                     log.debug("stale role AT 차단: userId={}, iat={}, roleChangedAt={}", userId, jwt.getIssuedAt(), roleChangedAt);
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"error\":\"TOKEN_STALE_ROLE\",\"message\":\"권한이 변경되었습니다. 다시 로그인해 주세요.\"}");
+                    if (!response.isCommitted()) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write("{\"error\":\"TOKEN_STALE_ROLE\",\"message\":\"권한이 변경되었습니다. 다시 로그인해 주세요.\"}");
+                    }
                     return;
                 }
 
@@ -74,6 +79,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        // ASYNC(타임아웃) 재처리 시에도 재인증 — 기본값(true)이면 SSE 타임아웃마다 SecurityContext가 비어 AuthorizationFilter가 접근을 거부함
+        return false;
     }
 
     private String extractBearerToken(HttpServletRequest request) {
