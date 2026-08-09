@@ -1,5 +1,4 @@
 {
-  "enabledPlugins": {},
   "hooks": {
     "PostToolUse": [
       {
@@ -12,5 +11,6 @@
         ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {}
 }
