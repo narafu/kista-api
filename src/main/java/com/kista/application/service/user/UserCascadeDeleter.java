@@ -18,6 +18,8 @@ public class UserCascadeDeleter {
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
+    private final AssetPort assetPort;                       // 자동매매와 무관한 개인 자산 기록 — 계좌와 독립적으로 정리
+    private final AssetMonthlyCheckPort assetMonthlyCheckPort;
     private final UserPort userPort;
     private final RefreshTokenPort refreshTokenPort; // 모든 RT 삭제
     private final BlacklistPort blacklistPort;        // 남은 AT 즉시 차단
@@ -31,6 +33,8 @@ public class UserCascadeDeleter {
         strategyCyclePort.deleteByUserId(userId);
         strategyPort.deleteByUserId(userId);
         accountPort.deleteByUserId(userId);
+        assetPort.deleteByUserId(userId);
+        assetMonthlyCheckPort.deleteByUserId(userId);
         userPort.delete(userId);
         // 인증 정리 — RT 전체 삭제 후 AT 즉시 차단
         refreshTokenPort.deleteAllByUserId(userId);

@@ -33,6 +33,7 @@ public class OpenApiConfig {
                         new Tag().name("[DEV] 개발 도구").description("로컬 프로파일 전용 — 운영 환경에서는 노출되지 않음"),
                         new Tag().name("인증").description("카카오 OAuth 로그인, 사용자 정보 조회, 승인 신청"),
                         new Tag().name("계좌").description("계좌 등록·조회·수정·삭제"),
+                        new Tag().name("자산").description("개인 자산·부채 기록 등록·조회·수정·삭제 — 자동매매와 무관한 수동 장부"),
                         new Tag().name("거래 사이클").description("계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개"),
                         new Tag().name("대시보드").description("포트폴리오 스냅샷·사이클 이력 조회"),
                         new Tag().name("통계").description("계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 증권사 자동 분기)"),
