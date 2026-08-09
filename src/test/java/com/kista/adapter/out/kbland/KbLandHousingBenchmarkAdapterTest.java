@@ -80,4 +80,73 @@ class KbLandHousingBenchmarkAdapterTest {
         assertThat(seoul.fetchedAt()).isNotNull();
         server.verify();
     }
+
+    @Test
+    void fetchAptQteSalePrices_skipsRowsWithMissingQuintileData() {
+        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+
+        String responseBody = """
+                {
+                  "dataHeader": {"resultCode": "10000"},
+                  "dataBody": {
+                    "data": {
+                      "업데이트일자": "20260715",
+                      "날짜리스트": ["202607"],
+                      "데이터리스트": [
+                        {
+                          "지역코드": "1100000000",
+                          "지역명": "서울",
+                          "dataList": [
+                            {
+                              "기준날짜": "202607",
+                              "1분위": 52600.99,
+                              "2분위": 86950.46,
+                              "3분위": 126352.96,
+                              "4분위": 181363.60,
+                              "5분위": 344468.13,
+                              "5분위배율": 6.55
+                            }
+                          ]
+                        },
+                        {
+                          "지역코드": "2900000000",
+                          "지역명": "광주",
+                          "dataList": [
+                            {
+                              "기준날짜": "202607",
+                              "1분위": 10000.00,
+                              "2분위": 20000.00,
+                              "3분위": 30000.00,
+                              "4분위": 40000.00,
+                              "5분위": null,
+                              "5분위배율": null
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """;
+
+        server.expect(requestTo("https://data-api.kbland.kr/bfmstat/weekMnthlyHuseTrnd/avgPrcPerPorela?title=%EC%95%84%ED%8C%8C%ED%8A%B8+5%EB%B6%84%EC%9C%84+%EB%A7%A4%EB%A7%A4%ED%8F%89%EA%B7%A0%EA%B0%80%EA%B2%A9&%EB%A7%A4%EB%A7%A4%EC%A0%84%EC%84%B8%EC%BD%94%EB%93%9C=01&%EB%A9%94%EB%89%B4%EC%BD%94%EB%93%9C=01&%EA%B8%B0%EA%B0%84=1"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("osType", "HUB"))
+                .andExpect(header("Referer", "https://data.kbland.kr/"))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        List<HousingBenchmarkPrice> prices = adapter.fetchAptQteSalePrices();
+
+        // 정상 데이터만 포함되고 결측 데이터는 제외됨을 검증한다.
+        assertThat(prices).hasSize(1);
+        assertThat(prices).allMatch(p -> p.regionCode().equals("1100000000"), "only Seoul data should be included");
+        HousingBenchmarkPrice seoul = prices.get(0);
+        assertThat(seoul.regionName()).isEqualTo("서울");
+        assertThat(seoul.fifthQuintilePrice()).isEqualByComparingTo(new BigDecimal("344468.13"));
+        assertThat(seoul.fifthQuintileRatio()).isEqualByComparingTo(new BigDecimal("6.55"));
+        server.verify();
+    }
 }

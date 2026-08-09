@@ -54,6 +54,12 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         for (KbLandRegion region : data.regionList()) {
             if (region.dataList() == null) continue;
             for (KbLandMonthlyPrice monthlyPrice : region.dataList()) {
+                // 5분위 필드 중 하나라도 결측이면 해당 행을 건너뛴다.
+                if (!hasCompleteQuintileData(monthlyPrice)) {
+                    log.warn("KB Land 5분위 가격 결측 스킵: region={}({}), baseMonth={}",
+                            region.regionCode(), region.regionName(), monthlyPrice.baseMonth());
+                    continue;
+                }
                 prices.add(toDomain(region, monthlyPrice, sourceUpdatedDate, fetchedAt));
             }
         }
@@ -98,6 +104,16 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
 
     private static String trimTrailingSlash(String value) {
         return value != null && value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    // 월별 데이터가 모든 필수 5분위 필드를 포함하는지 확인한다.
+    private static boolean hasCompleteQuintileData(KbLandMonthlyPrice monthlyPrice) {
+        return monthlyPrice.firstQuintilePrice() != null
+                && monthlyPrice.secondQuintilePrice() != null
+                && monthlyPrice.thirdQuintilePrice() != null
+                && monthlyPrice.fourthQuintilePrice() != null
+                && monthlyPrice.fifthQuintilePrice() != null
+                && monthlyPrice.fifthQuintileRatio() != null;
     }
 
     // KB Land 공통 응답 래퍼
