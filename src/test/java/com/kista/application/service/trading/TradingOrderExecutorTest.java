@@ -58,8 +58,7 @@ class TradingOrderExecutorTest {
 
     static final VrPosition VR_POSITION = new VrPosition(
             new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00")),
-            new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO,
-            false, false, 1, 0);
+            new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
 
     // 전략 타입별 상수 — placeOrders 호출 시 캡 분기 결정에 사용
     static final Strategy INFINITE_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),

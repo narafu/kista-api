@@ -238,8 +238,8 @@ class VrCycleRolloverServiceTest {
     }
 
     @Test
-    @DisplayName("적립식 bootstrap 매수 실패로 V가 0이면 새 사이클도 V=0으로 이어간다")
-    void rollIfDue_recurringBootstrapFailed_rollsWithZeroValue() {
+    @DisplayName("V=0, holdings=0인 채로 due 도래해도 nextValue 공식대로 V가 자연 성장한다 (강제 0 가드 제거)")
+    void rollIfDue_valueZeroHoldingsZero_newValueGrowsNaturally() {
         StrategyCycleVrDetail zeroCycleVr = new StrategyCycleVrDetail(
                 CYCLE_ID, BigDecimal.ZERO, 10, BigDecimal.ZERO);
         StrategyVrDetail depositDetail = new StrategyVrDetail(
@@ -253,11 +253,12 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, postBalance, CLOSING_PRICE, today);
 
+        // nextValue(0, pool=0, G=10, recurring=200, eval=0) = 0 + 0/10 + 200 + (0-0)/(2√10) = 200.00
         verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("0.00")), eq(today));
         // poolLimitRate는 달러 파생 없이 그대로 전달 — depositDetail은 램프 미개입(gMax/floor=initial)이라 initialPoolLimitRate(0.75) 그대로
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(postBalance), eq(CLOSING_PRICE),
-                eq(BigDecimal.ZERO.setScale(2)), eq(10), eq(new BigDecimal("0.75")));
+                eq(new BigDecimal("200.00")), eq(10), eq(new BigDecimal("0.75")));
         verify(userNotificationPort, never()).notifyError(eq(USER), any(IllegalStateException.class));
     }
 

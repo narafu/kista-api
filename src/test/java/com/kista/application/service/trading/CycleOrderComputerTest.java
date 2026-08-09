@@ -30,11 +30,9 @@ class CycleOrderComputerTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock StrategyCyclePort strategyCyclePort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock OrderPort orderPort;
-    @Mock MarketCalendarPort marketCalendarPort;
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock VrStrategy vrStrategy;
     @Mock PrivacyStrategy privacyStrategy;
@@ -74,7 +72,6 @@ class CycleOrderComputerTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
-        lenient().when(marketCalendarPort.isMarketOpen(any(LocalDate.class))).thenReturn(true);
         lenient().when(cyclePositionPort.findFirstOne(any())).thenAnswer(invocation -> Optional.of(
                 CyclePosition.cycleStartSnapshot(invocation.getArgument(0), new BigDecimal("5000.00"), CURRENT_PRICE)));
 
@@ -86,8 +83,7 @@ class CycleOrderComputerTest {
 
         computer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort,
-                new TradingDayCounter(marketCalendarPort));
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
     }
 
     @Test
@@ -241,8 +237,7 @@ class CycleOrderComputerTest {
         CycleOrderStrategies realCycleStrategies = new CycleOrderStrategies(List.of(realVrCycleStrategy));
         CycleOrderComputer realComputer = new CycleOrderComputer(
                 realCycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort,
-                new TradingDayCounter(marketCalendarPort));
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
 
         // 가격 캡 트리거 픽스처:
         // holdings=1, value=10000, bandWidth=15% → lowerBand=8500, buyPrice(m=1) = 8500/1 = 8500
@@ -315,95 +310,5 @@ class CycleOrderComputerTest {
         computer.compute(BALANCE, VR_STRATEGY, prevClosePrice, LocalDate.now(), VR_CYCLE, null, "preview", null);
 
         verify(vrStrategy).buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(prevClosePrice), isNull(), any(LocalDate.class));
-    }
-
-    @Test
-    @DisplayName("VR 전략 — 첫 사이클 bootstrap 메타데이터를 VrPosition에 전달한다")
-    void compute_vrStrategy_passesInitialBootstrapMetadata() {
-        StrategyCycle firstCycle = new StrategyCycle(
-                UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, VR_START_DATE, null, null, null);
-        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
-                firstCycle.id(), BigDecimal.ZERO, 10, BigDecimal.ZERO);
-        StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200,
-                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
-
-        when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
-        when(strategyCycleVrPort.findByCycleId(firstCycle.id())).thenReturn(Optional.of(cycleVr));
-        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
-        when(orderPort.sumFilledBuyAmountByCycleId(firstCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
-                .thenReturn(List.of());
-
-        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, firstCycle, null, "테스트", CURRENT_PRICE);
-
-        var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
-        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
-        VrPosition captured = captor.getValue();
-        assertThat(captured.firstCycle()).isTrue();
-        assertThat(captured.cycleDue()).isFalse();
-        assertThat(captured.remainingTradingDays()).isGreaterThan(0);
-        assertThat(captured.recurringAmount()).isEqualTo(200);
-    }
-
-    @Test
-    @DisplayName("VR 최초 사이클은 position snapshot이 누적되어도 적립식 bootstrap을 유지한다")
-    void compute_vrStrategy_firstRegisteredCycleKeepsBootstrapAfterSnapshots() {
-        StrategyCycle firstCycle = new StrategyCycle(
-                UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, VR_START_DATE, null, null, null);
-        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
-                firstCycle.id(), BigDecimal.ZERO, 10, BigDecimal.ZERO);
-        StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 200,
-                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
-
-        when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
-        when(strategyCycleVrPort.findByCycleId(firstCycle.id())).thenReturn(Optional.of(cycleVr));
-        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
-        when(orderPort.sumFilledBuyAmountByCycleId(firstCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
-                .thenReturn(List.of());
-
-        computer.compute(BALANCE, VR_STRATEGY, null, VR_START_DATE.plusWeeks(2), firstCycle, null, "테스트", CURRENT_PRICE);
-
-        var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
-        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_START_DATE.plusWeeks(2)));
-        assertThat(captor.getValue().firstCycle()).isTrue();
-        assertThat(captor.getValue().cycleDue()).isTrue();
-    }
-
-    @Test
-    @DisplayName("VR 롤오버 사이클은 초기 스냅샷만 있어도 bootstrap으로 보지 않는다")
-    void compute_vrStrategy_rolloverCycleIsNotBootstrap() {
-        StrategyCycle firstCycle = new StrategyCycle(
-                UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, VR_START_DATE.minusWeeks(2), closingDate(), null, null);
-        StrategyCycle rolloverCycle = new StrategyCycle(
-                UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, VR_START_DATE, null, null, null);
-        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
-                rolloverCycle.id(), new BigDecimal("1000.00"), 10, new BigDecimal("500.00"));
-        StrategyVrDetail vrDetail = new StrategyVrDetail(
-                STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 0,
-                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
-
-        when(strategyCyclePort.findFirstByStrategyId(VR_STRATEGY.id())).thenReturn(Optional.of(firstCycle));
-        when(strategyCycleVrPort.findByCycleId(rolloverCycle.id())).thenReturn(Optional.of(cycleVr));
-        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
-        when(orderPort.sumFilledBuyAmountByCycleId(rolloverCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
-                .thenReturn(List.of());
-
-        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
-
-        var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
-        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
-        assertThat(captor.getValue().firstCycle()).isFalse();
-    }
-
-    private static LocalDate closingDate() {
-        return VR_START_DATE.minusDays(1);
     }
 }

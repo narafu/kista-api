@@ -24,9 +24,6 @@ class VrPositionTest {
                 bandWidth,
                 new BigDecimal("3750"), // poolLimit (임의)
                 BigDecimal.ZERO,         // poolUsed
-                false,                   // firstCycle
-                false,                   // cycleDue
-                1,                       // remainingTradingDays
                 0                        // recurringAmount
         );
     }

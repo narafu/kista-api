@@ -119,7 +119,7 @@ class TradingServiceTest {
                 new VrCycleOrderStrategy(vrStrategy))); // VR 전략 추가 — VR executeBatch 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, strategyCycleVrPort, strategyVrDetailPort, orderPort, new TradingDayCounter(marketCalendarPort));
+                strategyCycleVrPort, strategyVrDetailPort, orderPort);
         // CycleRotationService: BrokerAdapterRegistry.require(account, MarginPort) → kisMarginPort로 위임
         BrokerAdapterRegistry marginRegistry = mock(BrokerAdapterRegistry.class);
         lenient().when(marginRegistry.require(any(Account.class),

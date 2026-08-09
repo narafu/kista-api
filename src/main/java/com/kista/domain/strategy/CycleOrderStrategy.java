@@ -104,9 +104,9 @@ public interface CycleOrderStrategy {
         // bandWidth: 밴드 폭 % (StrategyVrDetail.bandWidth)
         // poolLimit: 개장 USD pool×StrategyCycleVrDetail.poolLimitRate로 파생한 pool 상한 금액
         // poolUsed: 이번 주기에 이미 사용한 pool 누적 금액
-        // referencePrice: BUY bootstrap(×1.10) 기준가 — currentPrice 없으면 전일종가로 대체(fallback 허용)
-        // currentPrice: 스케쥴러 시작 시점 실시간 현재가 — SELL bootstrap(×0.90) 전용, fallback 없음(null이면 SELL bootstrap 미생성)
-        // firstCycle/cycleDue/remainingTradingDays/recurringAmount: 첫 사이클 LOC bootstrap 제어값
+        // referencePrice: BUY bootstrap(V=0,pool>0)·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체(fallback 허용)
+        // currentPrice: 스케쥴러 시작 시점 실시간 현재가
+        // recurringAmount: nextValue() 공식(롤오버 V′ 계산)용
         public record VrInputs(
                 BigDecimal value,
                 BigDecimal bandWidth,
@@ -114,9 +114,6 @@ public interface CycleOrderStrategy {
                 BigDecimal poolUsed,
                 BigDecimal referencePrice,
                 BigDecimal currentPrice,
-                boolean firstCycle,
-                boolean cycleDue,
-                int remainingTradingDays,
                 int recurringAmount
         ) {}
     }

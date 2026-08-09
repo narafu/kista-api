@@ -16,7 +16,6 @@ import static com.kista.domain.model.order.Order.OrderTiming.AT_CLOSE;
 import static com.kista.domain.model.order.Order.OrderTiming.AT_OPEN;
 import static com.kista.domain.model.order.Order.OrderType.LOC;
 import static com.kista.domain.model.order.Order.OrderType.LIMIT;
-import static java.math.RoundingMode.HALF_UP;
 
 // VR(밸류리밸런싱) 전략 — 매수·매도 사다리 주문 생성
 @Component
@@ -25,16 +24,16 @@ public class VrStrategy {
     // 매수·매도 사다리 최대 단 수
     private static final int MAX_RUNGS = 20;
 
-    // 주문 목록 생성 — 매수 사다리(pool 허용 범위) + 매도 사다리(보유 수량 범위)
+    // 주문 목록 생성 — 아직 첫 포지션을 못 만든 상태(needsBootstrap)면 예산 기반 bootstrap(또는 빈 리스트),
+    // 그 외(holdings>0, 사다리로 정상 매수 가능)면 일반 밴드 사다리
     // ticker: 주문에 기록할 거래 종목 (VrPosition은 ticker를 직접 보유하지 않음)
-    // referencePrice: BUY bootstrap(×1.10) 기준가 — currentPrice 없으면 전일종가로 대체 가능
-    // livePrice: SELL bootstrap(×0.90) 전용 실시간 현재가 — fallback 없음(null이면 SELL bootstrap 미생성)
+    // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
+    // livePrice: 과거 SELL bootstrap 전용 파라미터 — case1(V만 있음) 폐기로 현재 미사용, 시그니처는 호출부 영향 최소화를 위해 유지
     // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
     public List<Order> buildOrders(VrPosition position, Strategy.Ticker ticker,
                                    BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
-        if (position.firstCycle()) {
-            List<Order> bootstrapOrders = buildBootstrapOrders(position, ticker, referencePrice, livePrice, tradeDate);
-            if (bootstrapOrders != null) return bootstrapOrders;
+        if (needsBootstrap(position)) {
+            return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
         }
 
         List<Order> orders = new ArrayList<>();
@@ -43,45 +42,42 @@ public class VrStrategy {
         return orders;
     }
 
-    // 첫 사이클 bootstrap — 기존 보유/현금 상태를 LOC 분할 주문으로 poolLimit에 맞춤
-    // BUY(시드만 있음/적립식)는 referencePrice(전일종가 대체 허용), SELL(V만 있음)은 livePrice(실시간 필수, 대체 불가)
-    // — 갭 하락일에 전일종가 기준 과매도 LOC가 나가는 것을 막기 위해 SELL은 fallback을 두지 않는다
-    private List<Order> buildBootstrapOrders(VrPosition position, Strategy.Ticker ticker,
-                                             BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
-        boolean hasValue = position.value().signum() > 0;
-        boolean hasPool = position.pool().signum() > 0;
-
-        if (hasValue && !hasPool) {
-            if (livePrice == null || livePrice.signum() <= 0) return List.of();
-            BigDecimal price = livePrice.multiply(new BigDecimal("0.90")).setScale(2, HALF_UP);
-            return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
-                    price, ticker, tradeDate, SELL);
-        }
-        if (!hasValue && hasPool) {
-            if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
-            BigDecimal price = referencePrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
-            return buildDailyLocOrder(position.poolLimit(), position.remainingTradingDays(),
-                    price, ticker, tradeDate, BUY);
-        }
-        if (!hasValue && !hasPool && position.recurringAmount() > 0) {
-            if (!position.cycleDue()) return List.of();
-            if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
-            BigDecimal price = referencePrice.multiply(new BigDecimal("1.10")).setScale(2, HALF_UP);
-            return buildDailyLocOrder(BigDecimal.valueOf(position.recurringAmount()), 1,
-                    price, ticker, tradeDate, BUY);
-        }
-        return null;
+    // bootstrap 진입 판정 — holdings>0이면 사다리가 항상 정상 작동하므로 대상 아님.
+    // holdings=0인데 V=0이면 사다리 공식 자체가 무의미(lowerBand=0)해 bootstrap 필요.
+    // holdings=0이고 V>0이어도, 사다리 첫 유효 단(m=2, 가격=lowerBand 그대로)조차 예산을 초과하면
+    // 정상 사다리로는 영원히 1주도 못 사므로 마찬가지로 bootstrap 필요 — nextValue() 공식이 매 롤오버마다
+    // holdings와 무관하게 V를 키우기 때문에(pool/G+recurringAmount 항), holdings=0이 지속되면 V가 예산
+    // 대비 너무 커져버릴 수 있다. 이 판정은 그 상태를 감지해 예산 한도 내 매수로 첫 포지션을 만들어준다.
+    private boolean needsBootstrap(VrPosition position) {
+        if (position.holdings() != 0) return false;
+        if (position.value().signum() == 0) return true;
+        return position.lowerBand().compareTo(remainingBudget(position)) > 0;
     }
 
-    // LOC 예산을 남은 거래일로 나눈 뒤 정수 주식 수로 주문 생성
-    private List<Order> buildDailyLocOrder(BigDecimal totalBudget, int remainingTradingDays,
-                                           BigDecimal price, Strategy.Ticker ticker,
-                                           LocalDate tradeDate, Order.OrderDirection direction) {
-        BigDecimal dailyBudget = totalBudget.divide(BigDecimal.valueOf(Math.max(remainingTradingDays, 1)), 2, HALF_UP);
-        int quantity = dailyBudget.divide(price, 0, java.math.RoundingMode.DOWN).intValue();
+    // 이번에 매수에 쓸 수 있는 잔여 예산 — poolLimit(사이클 개장 시점 예수금×비율) 기준이 원칙이지만,
+    // 완전 무일푼(개장 예수금=0)으로 시작한 사이클은 poolLimit이 영구히 0으로 고정되므로 이 경우엔 DB상
+    // 예수금(pool)을 그대로 상한으로 대신 쓴다. 어느 쪽이든 DB상 예수금(pool)은 넘지 않는다.
+    private BigDecimal remainingBudget(VrPosition position) {
+        BigDecimal governanceLimit = position.poolLimit().signum() > 0
+                ? position.poolLimit().subtract(position.poolUsed())
+                : position.pool();
+        return governanceLimit.min(position.pool());
+    }
+
+    // 첫 포지션 bootstrap — 잔여 예산(remainingBudget)을 오늘의 캡 가격으로 LOC 매수
+    // 호출측(needsBootstrap)이 이미 진입 조건을 보장하므로 여기서는 referencePrice 유효성·잔여예산만 확인한다
+    // poolUsed는 실제 체결 금액 기준(orderPort.sumFilledBuyAmountByCycleId)이라 하루 주문이 부분/전액 체결되든
+    // 미체결이든 다음날 자동으로 정확한 잔여예산이 재계산된다 — 별도 "며칠째"인지 추적 불필요
+    private List<Order> buildBootstrapBuyOrders(VrPosition position, Strategy.Ticker ticker,
+                                                 BigDecimal referencePrice, LocalDate tradeDate) {
+        if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
+        BigDecimal remaining = remainingBudget(position);
+        if (remaining.signum() <= 0) return List.of();
+        BigDecimal price = PriceCapPolicy.capFor(referencePrice);
+        int quantity = remaining.divide(price, 0, java.math.RoundingMode.DOWN).intValue();
         if (quantity <= 0) return List.of();
-        return List.of(Order.planned(tradeDate, ticker, LOC, direction, quantity, price, AT_CLOSE,
-                Order.leg("VR_" + direction, 1)));
+        return List.of(Order.planned(tradeDate, ticker, LOC, BUY, quantity, price, AT_CLOSE,
+                Order.leg("VR_BUY", 1)));
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
@@ -92,9 +88,9 @@ public class VrStrategy {
 
     // 접수 직전 가격 캡 보정 — BuyOrderPriceCapper(VR_POSITION)가 최신 현재가 기준 cap으로 사다리를 다시 만든다
     // position은 plan() 시점과 동일 스냅샷(pool·poolUsed·holdings 등) 재사용, cap만 최신 가격 기준으로 교체
-    // 주의: 사다리(LIMIT+AT_OPEN) 전용 재산정이다 — bootstrap(LOC+AT_CLOSE, referencePrice×1.10) 주문에는
-    // 호출하면 안 된다. bootstrap은 value=0인 경우가 많아 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
-    // 무의미해지고, 원래의 1.10배 여유폭 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
+    // 주의: 사다리(LIMIT+AT_OPEN) 전용 재산정이다 — bootstrap(LOC+AT_CLOSE, PriceCapPolicy.capFor) 주문에는
+    // 호출하면 안 된다. bootstrap은 value=0인 경우이므로 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
+    // 무의미해지고, bootstrap 자체의 캡 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
     // orderType(LOC vs LIMIT)으로 bootstrap 배치를 가려내 이 함수 호출 자체를 막는다.
     public List<Order> buildCappedBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
         return buildBuyLadder(position, ticker, tradeDate, cap);

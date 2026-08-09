@@ -60,13 +60,10 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
                 inputs.bandWidth(),
                 inputs.poolLimit(),
                 inputs.poolUsed(),
-                inputs.firstCycle(),
-                inputs.cycleDue(),
-                inputs.remainingTradingDays(),
                 inputs.recurringAmount()
         );
         Strategy.Ticker ticker = ctx.strategy().ticker(); // 거래 종목 (strategy에서 결정)
-        // referencePrice: BUY bootstrap 기준가(전일종가 대체 허용) / currentPrice: SELL bootstrap 전용(실시간 필수)
+        // referencePrice: bootstrap·캡 판정 공용 기준가(전일종가 대체 허용)
         List<Order> orders = vrStrategy.buildOrders(position, ticker, inputs.referencePrice(), inputs.currentPrice(), ctx.tradeDate());
         log.info("[{}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
                 ctx.label(), position.holdings(), position.value(),

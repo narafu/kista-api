@@ -58,8 +58,7 @@ class BuyOrderPriceCapperTest {
 
     static final VrPosition VR_POSITION = new VrPosition(
             new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00")),
-            new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO,
-            false, false, 1, 0);
+            new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
 
     private BuyOrderPriceCapper capper() {
         return new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
@@ -216,21 +215,20 @@ class BuyOrderPriceCapperTest {
         BuyOrderPriceCapper realCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, infiniteStrategy, realVrStrategy, strategyCyclePort);
 
-        // 시드만 있는 첫 사이클 bootstrap 포지션 (value=0, pool>0, firstCycle=true)
+        // V=0, pool>0 bootstrap 포지션
         VrPosition bootstrapPosition = new VrPosition(
                 new AccountBalance(0, null, new BigDecimal("10000.00")),
-                BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO,
-                true, false, 10, 0);
-        // referencePrice=100.00×1.10=110.00 — VrStrategy가 실제로 생성하는 bootstrap 주문 그대로 사용
+                BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
+        // referencePrice=100.00×1.05=105.00 — VrStrategy가 실제로 생성하는 bootstrap 주문 그대로 사용
         Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, Ticker.TQQQ,
                 new BigDecimal("100.00"), null, TODAY).getFirst();
         assertThat(bootstrapBuy.orderType()).isEqualTo(Order.OrderType.LOC); // 픽스처 전제 확인
         assertThat(bootstrapBuy.timing()).isEqualTo(Order.OrderTiming.AT_CLOSE);
-        assertThat(bootstrapBuy.price()).isEqualByComparingTo("110.00");
+        assertThat(bootstrapBuy.price()).isEqualByComparingTo("105.00");
 
-        // currentPrice=100.00 → cap=105.00 < 110.00(bootstrap 가격) → cap 로직이 트리거되는 조건
+        // currentPrice=90.00 → cap=94.50 < 105.00(bootstrap 가격) → cap 로직이 트리거되는 조건
         List<Order> prepared = realCapper.prepareForAllocation(
-                List.of(bootstrapBuy), new BigDecimal("100.00"), null, bootstrapPosition, Ticker.TQQQ,
+                List.of(bootstrapBuy), new BigDecimal("90.00"), null, bootstrapPosition, Ticker.TQQQ,
                 CycleOrderStrategy.PriceCapMode.VR_POSITION, TODAY);
 
         // 가드가 없었다면 value=0 → lowerBand=0 → 사다리 전부 0원으로 재계산돼 qty=19 LIMIT/AT_OPEN 주문으로
@@ -238,7 +236,7 @@ class BuyOrderPriceCapperTest {
         assertThat(prepared).containsExactly(bootstrapBuy);
         assertThat(prepared.getFirst().orderType()).isEqualTo(Order.OrderType.LOC);
         assertThat(prepared.getFirst().timing()).isEqualTo(Order.OrderTiming.AT_CLOSE);
-        assertThat(prepared.getFirst().price()).isEqualByComparingTo("110.00");
+        assertThat(prepared.getFirst().price()).isEqualByComparingTo("105.00");
     }
 
     @Test
@@ -249,13 +247,12 @@ class BuyOrderPriceCapperTest {
 
         VrPosition bootstrapPosition = new VrPosition(
                 new AccountBalance(0, null, new BigDecimal("10000.00")),
-                BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO,
-                true, false, 10, 0);
+                BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
         Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, Ticker.TQQQ,
                 new BigDecimal("100.00"), null, TODAY).getFirst();
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(bootstrapBuy));
 
-        realCapper.capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("100.00"), bootstrapPosition, Ticker.TQQQ);
+        realCapper.capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("90.00"), bootstrapPosition, Ticker.TQQQ);
 
         // bootstrap 주문은 접수 전 보정 대상이 아니므로 취소·재저장이 전혀 발생하지 않아야 한다
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);

@@ -5,7 +5,6 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.CyclePositionPort;
 import com.kista.domain.port.out.CyclePositionInfiniteDetailPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyInfiniteDetailPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
@@ -36,11 +35,9 @@ class CycleOrderComputer {
     private final CyclePositionPort cyclePositionPort;    // 리버스모드 별지점 계산용
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final StrategyCyclePort strategyCyclePort;            // VR 최초 사이클 판정용
     private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimitRate)
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
-    private final TradingDayCounter tradingDayCounter;       // VR 첫 사이클 분할 거래일 계산
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
@@ -83,22 +80,17 @@ class CycleOrderComputer {
             StrategyVrDetail vrDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                     .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: versionId=" + currentCycle.strategyVersionId()));
             BigDecimal poolUsed = orderPort.sumFilledBuyAmountByCycleId(currentCycle.id());
-            LocalDate dueDate = currentCycle.startDate().plusWeeks(vrDetail.intervalWeeks());
-            boolean firstCycle = isFirstOpenCycle(currentCycle);
-            boolean cycleDue = !tradeDate.isBefore(dueDate);
-            int remainingTradingDays = tradingDayCounter.countOpenDaysInclusive(tradeDate, dueDate);
             // poolLimit(달러)은 개장 포지션의 예수금 × 고정 poolLimitRate 스냅샷
             CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
                     .orElseThrow(() -> new IllegalStateException("VR 시작 포지션 없음: cycleId=" + currentCycle.id()));
             BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);
-            // referencePrice: BUY bootstrap 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
-            // currentPrice: SELL bootstrap 전용 — 실시간 현재가만 허용, fallback 없음(갭 하락 과매도 방지)
+            // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
                     cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, vrReferencePrice, currentPrice,
-                    firstCycle, cycleDue, remainingTradingDays, vrDetail.recurringAmount());
+                    vrDetail.recurringAmount());
         }
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
@@ -131,13 +123,5 @@ class CycleOrderComputer {
         return strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
                 .orElse(Strategy.DEFAULT_DIVISION_COUNT);
-    }
-
-    // 명시 컬럼이 없으므로 전략의 최초 등록 사이클 id와 현재 사이클 id를 비교
-    private boolean isFirstOpenCycle(StrategyCycle currentCycle) {
-        if (currentCycle == null || currentCycle.endDate() != null) return false;
-        return strategyCyclePort.findFirstByStrategyId(currentCycle.strategyId())
-                .map(cycle -> cycle.id().equals(currentCycle.id()))
-                .orElse(false);
     }
 }

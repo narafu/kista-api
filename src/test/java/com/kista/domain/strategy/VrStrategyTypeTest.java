@@ -28,113 +28,131 @@ class VrStrategyTypeTest {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
 
-    // VrPosition 생성 헬퍼 — poolUsed=0 기본값
+    // VrPosition 생성 헬퍼 — poolUsed=0, recurringAmount=0 기본값
     private VrPosition pos(int holdings, BigDecimal pool, BigDecimal value, BigDecimal bandWidth,
                            BigDecimal poolLimit) {
         AccountBalance balance = new AccountBalance(holdings, holdings > 0 ? new BigDecimal("100") : null, pool);
-        return new VrPosition(balance, value, bandWidth, poolLimit, BigDecimal.ZERO,
-                false, false, 1, 0);
+        return new VrPosition(balance, value, bandWidth, poolLimit, BigDecimal.ZERO, 0);
     }
 
     private VrPosition pos(int holdings, BigDecimal pool, BigDecimal value, BigDecimal bandWidth,
                            BigDecimal poolLimit, BigDecimal poolUsed) {
         AccountBalance balance = new AccountBalance(holdings, holdings > 0 ? new BigDecimal("100") : null, pool);
-        return new VrPosition(balance, value, bandWidth, poolLimit, poolUsed,
-                false, false, 1, 0);
+        return new VrPosition(balance, value, bandWidth, poolLimit, poolUsed, 0);
     }
 
-    // ── 첫 사이클 bootstrap ───────────────────────────────────────────────────
+    // ── V=0 bootstrap ─────────────────────────────────────────────────────────
+    // firstCycle 개념은 폐기됨 — V==0 여부만으로 게이팅하므로 몇 번째 사이클인지는 무관하다
 
     @Test
-    @DisplayName("첫 사이클 V만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매도한다 (livePrice 필요)")
-    void firstCycle_valueOnly_sellsPoolLimitAcrossRemainingDays() {
-        AccountBalance balance = new AccountBalance(10, new BigDecimal("100"), BigDecimal.ZERO);
-        VrPosition position = new VrPosition(
-                balance, new BigDecimal("10000"), new BigDecimal("15.00"),
-                new BigDecimal("5000.00"), BigDecimal.ZERO,
-                true, false, 10, 0);
-
-        // SELL bootstrap은 livePrice(실시간 현재가)만 사용 — referencePrice는 무시됨
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, new BigDecimal("100.00"), TODAY);
-        Order sell = orders.getFirst();
-
-        assertThat(orders).hasSize(1);
-        assertThat(sell.orderType()).isEqualTo(LOC);
-        assertThat(sell.timing()).isEqualTo(AT_CLOSE);
-        assertThat(sell.price()).isEqualByComparingTo("90.00");
-        assertThat(sell.quantity()).isEqualTo(5);
-        assertThat(orders).extracting(Order::orderLeg)
-                .containsExactly("VR_SELL_01");
-    }
-
-    @Test
-    @DisplayName("SELL bootstrap은 livePrice가 없으면 전일종가로 대체하지 않고 빈 주문을 반환한다 (갭 하락 과매도 방지)")
-    void firstCycle_valueOnly_noLivePrice_returnsEmpty() {
-        AccountBalance balance = new AccountBalance(10, new BigDecimal("100"), BigDecimal.ZERO);
-        VrPosition position = new VrPosition(
-                balance, new BigDecimal("10000"), new BigDecimal("15.00"),
-                new BigDecimal("5000.00"), BigDecimal.ZERO,
-                true, false, 10, 0);
-
-        // referencePrice(전일종가 대체값)만 있고 livePrice(실시간)는 없는 preview/수동실행 상황 재현
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
-
-        assertThat(orders).isEmpty();
-    }
-
-    @Test
-    @DisplayName("첫 사이클 시드만 있으면 poolLimit을 남은 거래일로 나눠 LOC 매수한다 (referencePrice로 전일종가 대체 가능)")
-    void firstCycle_seedOnly_buysPoolLimitAcrossRemainingDays() {
+    @DisplayName("V=0, pool>0이면 poolLimit 중 남은 예산을 그날 캡 가격(×1.05)으로 전액 LOC 매수 시도한다")
+    void valueZero_poolPositive_buysRemainingBudgetAtCap() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
         VrPosition position = new VrPosition(
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
-                new BigDecimal("5000.00"), BigDecimal.ZERO,
-                true, false, 10, 0);
+                new BigDecimal("7500.00"), BigDecimal.ZERO, 0);
 
-        // BUY bootstrap은 referencePrice만으로도 생성 가능 — livePrice=null(preview/수동실행)이어도 전일종가 대체값으로 진행
         List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
         Order buy = orders.getFirst();
 
         assertThat(orders).hasSize(1);
         assertThat(buy.orderType()).isEqualTo(LOC);
         assertThat(buy.timing()).isEqualTo(AT_CLOSE);
-        assertThat(buy.price()).isEqualByComparingTo("110.00");
-        assertThat(buy.quantity()).isEqualTo(4);
+        assertThat(buy.price()).isEqualByComparingTo("105.00"); // 100.00 × 1.05
+        assertThat(buy.quantity()).isEqualTo(71); // floor(7500/105.00)
         assertThat(orders).extracting(Order::orderLeg)
                 .containsExactly("VR_BUY_01");
     }
 
     @Test
-    @DisplayName("적립식 첫 사이클은 due date 당일에 recurringAmount만큼 LOC 매수한다 (referencePrice 대체 가능)")
-    void firstCycle_recurringOnly_dueDate_buysRecurringAmount() {
-        AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
+    @DisplayName("V=0, pool>0이지만 이미 poolUsed로 일부 소진됐으면 잔여분만 매수한다")
+    void valueZero_poolPositive_partiallyUsed_buysRemainingOnly() {
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
         VrPosition position = new VrPosition(
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
-                BigDecimal.ZERO, BigDecimal.ZERO,
-                true, true, 1, 200);
+                new BigDecimal("7500.00"), new BigDecimal("5000.00"), 0);
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY)
-                .stream().filter(o -> o.direction() == BUY).toList();
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        Order buy = orders.getFirst();
 
-        assertThat(buys).hasSize(1);
-        assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
-        assertThat(buys.getFirst().timing()).isEqualTo(AT_CLOSE);
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("110.00");
-        assertThat(buys.getFirst().quantity()).isEqualTo(1);
+        assertThat(buy.price()).isEqualByComparingTo("105.00");
+        assertThat(buy.quantity()).isEqualTo(23); // floor((7500-5000)/105.00)
     }
 
     @Test
-    @DisplayName("적립식 첫 사이클은 due date 전에는 주문을 만들지 않는다")
-    void firstCycle_recurringOnly_beforeDueDate_noOrders() {
-        AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
+    @DisplayName("V=0, poolLimit이 소진되면(poolUsed>=poolLimit) 빈 주문을 반환한다")
+    void valueZero_poolLimitExhausted_returnsEmpty() {
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
         VrPosition position = new VrPosition(
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
-                BigDecimal.ZERO, BigDecimal.ZERO,
-                true, false, 5, 200);
+                new BigDecimal("7500.00"), new BigDecimal("7500.00"), 0);
 
         List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
 
         assertThat(orders).isEmpty();
+    }
+
+    @Test
+    @DisplayName("V=0, referencePrice가 없으면 빈 주문을 반환한다")
+    void valueZero_poolPositive_noReferencePrice_returnsEmpty() {
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                new BigDecimal("7500.00"), BigDecimal.ZERO, 0);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+
+        assertThat(orders).isEmpty();
+    }
+
+    @Test
+    @DisplayName("V=0, pool=0이면 빈 주문을 반환한다 (0원 사다리 버그 회귀 방지)")
+    void valueZero_poolZero_returnsEmpty() {
+        AccountBalance balance = new AccountBalance(0, null, BigDecimal.ZERO);
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                new BigDecimal("7500.00"), BigDecimal.ZERO, 200);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+
+        assertThat(orders).isEmpty();
+    }
+
+    @Test
+    @DisplayName("holdings=0, V>0이어도 사다리 첫 단(lowerBand)이 예산을 초과하면 bootstrap으로 진입한다 " +
+            "(nextValue 공식이 holdings 무관하게 V를 키워 사다리가 영구히 막히는 상황 방지)")
+    void holdingsZero_valuePositive_ladderUnaffordable_fallsBackToBootstrap() {
+        // V=10000, bandWidth=15% → lowerBand=8500. poolLimit=pool=1000이라 사다리 m=2(8500)조차 불가능
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000.00"));
+        VrPosition position = new VrPosition(
+                balance, new BigDecimal("10000"), new BigDecimal("15.00"),
+                new BigDecimal("1000.00"), BigDecimal.ZERO, 0);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        Order buy = orders.getFirst();
+
+        // 사다리 가격(8500)이 아니라 bootstrap 캡 가격(100×1.05=105.00) — 예산(1000) 내에서 매수
+        assertThat(orders).hasSize(1);
+        assertThat(buy.orderType()).isEqualTo(LOC);
+        assertThat(buy.timing()).isEqualTo(AT_CLOSE);
+        assertThat(buy.price()).isEqualByComparingTo("105.00");
+        assertThat(buy.quantity()).isEqualTo(9); // floor(1000/105.00)
+    }
+
+    @Test
+    @DisplayName("poolLimit=0(완전 무일푼으로 개장해 영구 고정)이어도 pool()>0이면 그 예수금을 예산으로 대신 쓴다")
+    void poolLimitZero_fallsBackToLivePoolAsBudget() {
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("200.00"));
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                BigDecimal.ZERO, BigDecimal.ZERO, 200);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        Order buy = orders.getFirst();
+
+        assertThat(orders).hasSize(1);
+        assertThat(buy.price()).isEqualByComparingTo("105.00");
+        assertThat(buy.quantity()).isEqualTo(1); // floor(200/105.00)
     }
 
     // ── 전 주문 타입 검증 ──────────────────────────────────────────────────────
@@ -322,10 +340,11 @@ class VrStrategyTypeTest {
     // ── 매도 없음 시나리오 ─────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("holdings=0이면 매도 주문 없음")
+    @DisplayName("holdings=0이면 매도 주문 없음 (사다리 첫 단이 예산 내라 bootstrap이 아닌 정상 사다리로 진입)")
     void holdings0_noSellOrders() {
-        VrPosition position = pos(0, new BigDecimal("5000"), new BigDecimal("10000"),
-                new BigDecimal("15.00"), new BigDecimal("5000.00"));
+        // lowerBand=8500 ≤ remainingBudget(min(poolLimit=8500, pool=9000))=8500 → needsBootstrap=false
+        VrPosition position = pos(0, new BigDecimal("9000"), new BigDecimal("10000"),
+                new BigDecimal("15.00"), new BigDecimal("8500.00"));
 
         List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
@@ -416,26 +435,5 @@ class VrStrategyTypeTest {
 
         // buyPrice(1) = 8500/1 = 8500.00 (캡 미적용)
         assertThat(buys.getFirst().price()).isEqualByComparingTo("8500.00");
-    }
-
-    @Test
-    @DisplayName("buildCappedBuyOrders는 사다리 전용이다 — bootstrap(value=0) 포지션에 호출하면 0원짜리 사다리가 나온다 " +
-            "(BuyOrderPriceCapper가 orderType으로 bootstrap 배치를 가려 이 함수 호출 자체를 막아야 하는 이유)")
-    void buildCappedBuyOrders_onBootstrapPosition_producesDegenerateLadder_notBootstrapPrice() {
-        // value=0인 bootstrap 포지션 — lowerBand=0이라 buyPrice(m)=0. bootstrap의 실제 가격(referencePrice×1.10)과는
-        // 완전히 무관한 산정식이므로, 이 포지션에 buildCappedBuyOrders를 호출하는 것 자체가 잘못이다.
-        VrPosition bootstrapPosition = pos(0, new BigDecimal("10000"), BigDecimal.ZERO,
-                new BigDecimal("15.00"), new BigDecimal("5000.00"));
-
-        List<Order> buys = strategy.buildCappedBuyOrders(bootstrapPosition, TQQQ, TODAY, new BigDecimal("105.00"))
-                .stream().filter(o -> o.direction() == BUY).toList();
-
-        // 사다리 공식으로는 0원 주문만 나온다 — bootstrap가 실제로 생성했을 110.00(referencePrice×1.10)과 무관
-        assertThat(buys).isNotEmpty();
-        assertThat(buys.getFirst().price()).isEqualByComparingTo("0.00");
-        // 사다리는 항상 LIMIT+AT_OPEN — bootstrap의 LOC+AT_CLOSE와 형태가 다르다는 것이
-        // BuyOrderPriceCapper가 이 둘을 구분하는 근거(orderType==LOC 여부)
-        assertThat(buys.getFirst().timing()).isEqualTo(AT_OPEN);
-        assertThat(buys.getFirst().orderType()).isEqualTo(LIMIT);
     }
 }
