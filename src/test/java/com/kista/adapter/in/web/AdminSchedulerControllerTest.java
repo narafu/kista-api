@@ -1,5 +1,6 @@
 package com.kista.adapter.in.web;
 
+import com.kista.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.adapter.in.schedule.TradingOpenScheduler;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
@@ -41,6 +42,7 @@ class AdminSchedulerControllerTest {
 
     @MockitoBean private TradingOpenScheduler openScheduler;
     @MockitoBean private TradingCloseScheduler closeScheduler;
+    @MockitoBean private KbLandHousingBenchmarkScheduler kbLandScheduler;
 
     private static final java.util.UUID ADMIN_UUID = DEV_ADMIN_UUID;
     private static final java.util.UUID USER_UUID = DEV_USER_UUID;
@@ -64,6 +66,16 @@ class AdminSchedulerControllerTest {
                 .andExpect(status().isAccepted());
 
         verify(closeScheduler, timeout(2000)).runNow();
+    }
+
+    @Test
+    void triggerKbLandHousingBenchmark_adminToken_returns202AndRunsScheduler() throws Exception {
+        mockMvc.perform(post("/api/admin/scheduler/kbland-housing-benchmark")
+                        .with(csrf())
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isAccepted());
+
+        verify(kbLandScheduler, timeout(2000)).runNow();
     }
 
     @Test
