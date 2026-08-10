@@ -16,7 +16,7 @@ class KbLandConfig {
         // KB Land 아파트 벤치마크 조회 API 응답 지연 대비 타임아웃 설정 — 미설정 시 OS 기본값(~60초)로 무한 대기 가능
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000); // 연결 타임아웃 3초
-        factory.setReadTimeout(7_000);    // 읽기 타임아웃 7초
+        factory.setReadTimeout(20_000);   // 읽기 타임아웃 20초 (주간 지수 API 응답 실측 3.5초 대비 여유 확보 — 5분위 조회와 빈 공유이므로 동일 적용)
         RestTemplate restTemplate = new RestTemplate(factory);
         // KB Land data-api는 프론트 내부 호출과 유사한 헤더가 없으면 400을 반환할 수 있다.
         restTemplate.getInterceptors().add((request, body, execution) -> {

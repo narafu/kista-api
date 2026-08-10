@@ -1,6 +1,7 @@
 package com.kista.adapter.out.kbland;
 
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
+import com.kista.domain.model.stats.HousingPriceIndex;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -147,6 +149,126 @@ class KbLandHousingBenchmarkAdapterTest {
         assertThat(seoul.regionName()).isEqualTo("서울");
         assertThat(seoul.fifthQuintilePrice()).isEqualByComparingTo(new BigDecimal("344468.13"));
         assertThat(seoul.fifthQuintileRatio()).isEqualByComparingTo(new BigDecimal("6.55"));
+        server.verify();
+    }
+
+    private static final String WEEKLY_INDEX_URL = "https://data-api.kbland.kr/bfmstat/weekMnthlyHuseTrnd/priceIndex"
+            + "?%EB%A7%A4%EB%AC%BC%EC%A2%85%EB%B3%84%EA%B5%AC%EB%B6%84=01"
+            + "&%EB%A7%A4%EB%A7%A4%EC%A0%84%EC%84%B8%EC%BD%94%EB%93%9C=01"
+            + "&%EC%9B%94%EA%B0%84%EC%A3%BC%EA%B0%84%EA%B5%AC%EB%B6%84%EC%BD%94%EB%93%9C=02"
+            + "&%EA%B8%B0%EA%B0%84=20";
+
+    @Test
+    void fetchWeeklyAptSalePriceIndex_parsesRegionWeeklyIndexAndDropsTrailingChangeRateElement() {
+        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+
+        // 날짜리스트 3개, dataList 4개 — 마지막 원소(전주대비 변동률)는 zip에서 잘려야 한다.
+        String responseBody = """
+                {
+                  "dataHeader": {"resultCode": "10000"},
+                  "dataBody": {
+                    "data": {
+                      "업데이트일자": "20260803",
+                      "날짜리스트": ["20260706", "20260713", "20260720"],
+                      "데이터리스트": [
+                        {
+                          "지역코드": "1100000000",
+                          "지역명": "서울",
+                          "dataList": [100.0, 101.5, 102.75, 0.5]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """;
+
+        server.expect(requestTo(WEEKLY_INDEX_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("osType", "HUB"))
+                .andExpect(header("Referer", "https://data.kbland.kr/"))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex();
+
+        // 변동률 원소가 잘려 날짜리스트 개수(3개)만큼만 도메인 행이 생성된다.
+        assertThat(indices).hasSize(3);
+        assertThat(indices).extracting(HousingPriceIndex::baseDate).containsExactly(
+                LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 13), LocalDate.of(2026, 7, 20));
+        assertThat(indices).extracting(HousingPriceIndex::indexValue).containsExactly(
+                new BigDecimal("100.0"), new BigDecimal("101.5"), new BigDecimal("102.75"));
+        HousingPriceIndex first = indices.get(0);
+        assertThat(first.source()).isEqualTo("KBLAND");
+        assertThat(first.metricCode()).isEqualTo("WEEKLY_APT_SALE_PRICE_INDEX");
+        assertThat(first.regionCode()).isEqualTo("1100000000");
+        assertThat(first.regionName()).isEqualTo("서울");
+        assertThat(first.sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 8, 3));
+        assertThat(first.fetchedAt()).isNotNull();
+        server.verify();
+    }
+
+    @Test
+    void fetchWeeklyAptSalePriceIndex_skipsNullIndexValues() {
+        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+
+        String responseBody = """
+                {
+                  "dataHeader": {"resultCode": "10000"},
+                  "dataBody": {
+                    "data": {
+                      "업데이트일자": "20260803",
+                      "날짜리스트": ["20260706", "20260713"],
+                      "데이터리스트": [
+                        {
+                          "지역코드": "2900000000",
+                          "지역명": "광주",
+                          "dataList": [null, 50.25, 0.1]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """;
+
+        server.expect(requestTo(WEEKLY_INDEX_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex();
+
+        // null 값 첫 원소는 스킵되고 두 번째 값만 남는다.
+        assertThat(indices).hasSize(1);
+        assertThat(indices.get(0).baseDate()).isEqualTo(LocalDate.of(2026, 7, 13));
+        assertThat(indices.get(0).indexValue()).isEqualByComparingTo(new BigDecimal("50.25"));
+        server.verify();
+    }
+
+    @Test
+    void fetchWeeklyAptSalePriceIndex_throwsWhenResultCodeIsNotSuccess() {
+        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+
+        String responseBody = """
+                {
+                  "dataHeader": {"resultCode": "90000"},
+                  "dataBody": {"data": null}
+                }
+                """;
+
+        server.expect(requestTo(WEEKLY_INDEX_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(adapter::fetchWeeklyAptSalePriceIndex)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("90000");
         server.verify();
     }
 }

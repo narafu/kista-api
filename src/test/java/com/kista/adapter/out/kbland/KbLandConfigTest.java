@@ -36,6 +36,6 @@ class KbLandConfigTest {
         Integer readTimeout = (Integer) ReflectionTestUtils.getField(delegateFactory, "readTimeout");
 
         assertThat(connectTimeout).isEqualTo(3_000);
-        assertThat(readTimeout).isEqualTo(7_000);
+        assertThat(readTimeout).isEqualTo(20_000);
     }
 }

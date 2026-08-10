@@ -1,6 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
+import com.kista.adapter.in.schedule.KbLandPriceIndexScheduler;
 import com.kista.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.adapter.in.schedule.TradingOpenScheduler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +29,9 @@ public class AdminSchedulerController {
 
     @Autowired(required = false)
     private KbLandHousingBenchmarkScheduler kbLandScheduler;
+
+    @Autowired(required = false)
+    private KbLandPriceIndexScheduler kbLandPriceIndexScheduler;
 
     // 개장 스케쥴러 수동 트리거 — 개장 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
     @Operation(summary = "개장 스케쥴러 수동 트리거", description = "개장 대기 없이 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
@@ -79,6 +83,24 @@ public class AdminSchedulerController {
                 log.warn("KB Land 주택 벤치마크 스케쥴러 수동 트리거 인터럽트");
             } catch (Exception e) {
                 log.error("KB Land 주택 벤치마크 스케쥴러 수동 트리거 오류: {}", e.getMessage(), e);
+            }
+        });
+    }
+
+    // KB Land 주간 아파트 매매가격지수 스케쥴러 수동 트리거 — 수동으로 즉시 실행, 202 반환 후 백그라운드 실행
+    @Operation(summary = "KB Land 주간 아파트 매매가격지수 스케쥴러 수동 트리거", description = "운영 이슈 발생 시 다음 크론까지 기다리지 않고 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
+    @PostMapping("/kbland-price-index")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void triggerKbLandPriceIndex() {
+        if (kbLandPriceIndexScheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
+        Thread.ofVirtual().start(() -> {
+            try {
+                kbLandPriceIndexScheduler.runNow();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("KB Land 주간 아파트 매매가격지수 스케쥴러 수동 트리거 인터럽트");
+            } catch (Exception e) {
+                log.error("KB Land 주간 아파트 매매가격지수 스케쥴러 수동 트리거 오류: {}", e.getMessage(), e);
             }
         });
     }

@@ -29,7 +29,7 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     kis/         ← KisApiException (KIS 전용)
     toss/        ← TossApiException (→ GlobalExceptionHandler 503), TossAccountInfo, TossCandle, TossExchangeRate, TossMarketSession, TossStockInfo
     market/      ← FearGreedSnapshot, FearGreedRating
-    stats/       ← HousingBenchmarkPrice (KB Land 주택 벤치마크 월별 분위 가격), EtfBenchmarkSymbol(SPY/QQQ/QLD/IBIT/ETHA 벤치마크 화이트리스트), IndexPrice(symbol별 일별 종가, tradeDate는 US 거래일 원본), BenchmarkScope(PORTFOLIO/STRATEGY), BenchmarkAssetType(HOUSING/ETF)
+    stats/       ← HousingBenchmarkPrice (KB Land 주택 벤치마크 월별 분위 가격), HousingPriceIndex(주간 아파트 매매가격지수, KbLand), EtfBenchmarkSymbol(SPY/QQQ/QLD/IBIT/ETHA 벤치마크 화이트리스트), IndexPrice(symbol별 일별 종가, tradeDate는 US 거래일 원본), BenchmarkScope(PORTFOLIO/STRATEGY), BenchmarkAssetType(HOUSING/ETF)
     admin/       ← AdminAnomalies, AdminStats, AdminUserView, AuditLog, AppErrorLog
     privacy/     ← FidaOrderCommand, PrivacyCurrentBase, PrivacyTradeBase, PrivacyTradeBaseView, PrivacyTradeSaveResult, PrivacyTradeConflictException,
                    PrivacyDates(releaseDateFor()/tradeDateOf() — 발행일↔거래일 업무 규칙, 시간대 변환 아님)
@@ -66,7 +66,7 @@ application/
     strategy/    ← StrategyService(신규 등록 시 RuntimeSettings 전략 생성 정책 적용; 수정·사이클 흐름은 미적용)
     user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM), UserSettingsService, UserCascadeDeleter(소프트 삭제 cascade helper)
     portfolio/   ← PortfolioService
-    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), MarketIndexPriceSyncService(SyncMarketIndexPricesUseCase 구현 — EtfBenchmarkSymbol 전체 순회 동기화, 실패 심볼은 collect 후 일괄 예외),
+    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), HousingPriceIndexService (주간 아파트 매매가격지수 수집·upsert), MarketIndexPriceSyncService(SyncMarketIndexPricesUseCase 구현 — EtfBenchmarkSymbol 전체 순회 동기화, 실패 심볼은 collect 후 일괄 예외),
                    StatsService(UserStatsUseCase 구현 — summary/equity-curve(type 필터는 사이클과 해당 cycleId 포지션 모두에 적용)/cycles/housing-benchmark(HOUSING·ETF 공용, benchmarkType으로 분기)/housing-benchmark/series/housing-benchmark/regions 단일 진입점)
                    StatsResultCache — summary/equity-curve 5분, 벤치마크 비교(housing-benchmark, ETF 포함) 10분 인메모리 TTL 캐시(PreviewDepositCache 패턴 재사용). 매매 직후 통계가 해당 TTL만큼 stale할 수 있음. 단일 인스턴스 전제 — 다중 인스턴스 시 인스턴스별 캐시가 최대 TTL만큼 상이할 수 있음
                    MonthlyReturnCalculator — 사이클·포지션 스냅샷에서 현금흐름 조정 월별 USD 투자지수(TWR) 계산, Spring·포트 비의존 순수 클래스
@@ -84,7 +84,7 @@ adapter/in/
                    TradingCloseScheduler (화~토 04:30 KST — 누락 AT_CLOSE 슬롯 복구, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 04:00 KST 만료 RT 삭제 / 03:05 KST grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화), FearGreedScheduler (KST 00:00/12:00 — CNN·크립토 공포탐욕지수),
-                   KbLandHousingBenchmarkScheduler (매월 10일·20일 07:00 KST — KB Land 주택 벤치마크 수집), MarketIndexPriceSyncScheduler (매일 09:00 KST — ETF 벤치마크(EtfBenchmarkSymbol) 종가 동기화, 비거래일은 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음)
+                   KbLandHousingBenchmarkScheduler (매주 일요일 07:00 KST — KB Land 아파트 5분위 매매평균가격 수집), KbLandPriceIndexScheduler (매주 일요일 07:10 KST — KB Land 아파트 주간 매매가격지수 수집), MarketIndexPriceSyncScheduler (매일 09:00 KST — ETF 벤치마크(EtfBenchmarkSymbol) 종가 동기화, 비거래일은 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음)
                    BatchContextFactory (전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError)
                    SchedulerJobRunner (공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
                    SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
@@ -115,7 +115,7 @@ adapter/out/
                    증권사 API 호출 없이 DB(cycle_position/orders) 기반으로 잔고·체결 시뮬레이션. 시세는 adapter/out/marketdata/CommonMarketPriceFeed(Toss 공통 시세 재사용) 경유.
                    getLiveBalance()의 usdDeposit은 계좌 내 전략 전체 합산값(TradingOrderBudgetAllocator가 대표 전략 1개로 계좌 전체 BUY 예산을 판단하는 기존 계약에 맞춤 — 전략별 값을 그대로 반환하면 다른 전략 잔고로 오판정)
   marketdata/    ← CommonMarketPriceFeed — 계좌 자격증명 불필요한 공통 시세 조회 인터페이스, TossPriceApi가 구현(모의계좌가 재사용)
-  kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격 조회
+  kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격(월간) + 주간 매매가격지수 조회, HousingBenchmarkFeedPort 양쪽 메서드 모두 구현
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter
   redis/         ← RedisBlacklistAdapter (BlacklistPort — userId/JTI 단위 JWT 블랙리스트, TTL 기반)
   persistence/   ← JPA 인프라 (BaseAuditEntity, BaseCreatedAtEntity, JpaAuditingConfig) + 어그리게이트별 서브패키지
@@ -123,7 +123,7 @@ adapter/out/
                    user(+AdminUserViewAdapter) / account / strategy(+PersistenceSupport upsert 헬퍼; VR: StrategyVrVersionEntity=strategy_vr_version, StrategyCycleVrEntity=strategy_cycle_vr)
                    / kistoken(KisTokenEntity, table=broker_tokens) / auth(RefreshToken) / audit(AuditLog+AppErrorLog)
                    / settings(UserSettings+UserNotificationPref+RuntimeSettings, admin_runtime_settings JSONB 단일 행)
-                   / trade(Order) / privacy(PrivacyTradeBase+PrivacyTradeBaseOrder) / calendar(UsMarketHoliday) / fcm / feargreed / housingbenchmark(HousingBenchmarkPrice) / marketindex(IndexPricePort 구현 — ETF 벤치마크 일별 종가)
+                   / trade(Order) / privacy(PrivacyTradeBase+PrivacyTradeBaseOrder) / calendar(UsMarketHoliday) / fcm / feargreed / housingbenchmark(HousingBenchmarkPrice, HousingPriceIndexEntity/JpaRepository/PersistenceAdapter — 테이블 housing_price_indices) / marketindex(IndexPricePort 구현 — ETF 벤치마크 일별 종가)
   notify/        ← TelegramAdapter (NotifyPort — 관리자봇 오류/리포트 알림)
                    CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter (UserNotificationPort — 사용자 알림)
                    TelegramBotInfoAdapter (봇 username 조회), TelegramHttpClient (package-private HTTP 헬퍼)

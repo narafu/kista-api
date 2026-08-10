@@ -40,7 +40,7 @@ class AdminSchedulerControllerDisabledTest {
     private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
 
-    // TradingOpenScheduler/TradingCloseScheduler/KbLandHousingBenchmarkScheduler는 의도적으로 @MockitoBean 미등록
+    // TradingOpenScheduler/TradingCloseScheduler/KbLandHousingBenchmarkScheduler/KbLandPriceIndexScheduler는 의도적으로 @MockitoBean 미등록
     // -> AdminSchedulerController의 @Autowired(required = false) 필드가 null로 주입됨
 
     private static final UUID ADMIN_UUID = DEV_ADMIN_UUID;
@@ -64,6 +64,14 @@ class AdminSchedulerControllerDisabledTest {
     @Test
     void triggerKbLandHousingBenchmark_schedulerDisabled_returns400() throws Exception {
         mockMvc.perform(post("/api/admin/scheduler/kbland-housing-benchmark")
+                        .with(csrf())
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void triggerKbLandPriceIndex_schedulerDisabled_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/scheduler/kbland-price-index")
                         .with(csrf())
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isBadRequest());
