@@ -2,6 +2,8 @@ package com.kista.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.domain.model.account.Account.Broker;
+import com.kista.domain.model.asset.AssetCategory;
+import com.kista.domain.model.settings.AssetFormOptions;
 import com.kista.domain.model.settings.BenchmarkFieldSettings;
 import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RuntimeSettings;
@@ -24,7 +26,9 @@ public record RuntimeSettingsResponse(
         @Schema(description = "전략 타입별 생성 정책 설정")
         Map<Type, StrategyResponse> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정")
-        BenchmarkResponse benchmarks
+        BenchmarkResponse benchmarks,
+        @Schema(description = "자산 등록 폼 추천 목록 설정")
+        AssetFormOptionsResponse assetFormOptions
 ) {
     public static RuntimeSettingsResponse from(RuntimeSettings settings) {
         // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다.
@@ -33,7 +37,8 @@ public record RuntimeSettingsResponse(
         Map<Type, StrategyResponse> strategies = new EnumMap<>(Type.class);
         settings.strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
         return new RuntimeSettingsResponse(new AuthResponse(settings.approvalRequired()),
-                Map.copyOf(brokers), Map.copyOf(strategies), BenchmarkResponse.from(settings.benchmarks()));
+                Map.copyOf(brokers), Map.copyOf(strategies), BenchmarkResponse.from(settings.benchmarks()),
+                AssetFormOptionsResponse.from(settings.assetFormOptions()));
     }
 
     public record AuthResponse(
@@ -91,6 +96,22 @@ public record RuntimeSettingsResponse(
     ) { // 개별 벤치마크 필드 공개 설정
         static <T> BenchmarkFieldResponse<T> from(BenchmarkFieldSettings<T> settings) {
             return new BenchmarkFieldResponse<>(settings.allowedValues(), settings.defaultValue());
+        }
+    }
+
+    public record AssetFormOptionsResponse(
+            @Schema(description = "카테고리별 세부 카테고리 추천 목록")
+            Map<AssetCategory, List<String>> subcategorySuggestions,
+            @Schema(description = "기관 추천 목록")
+            List<String> institutionSuggestions,
+            @Schema(description = "자산군 추천 목록")
+            List<String> assetClassSuggestions,
+            @Schema(description = "운용전략 추천 목록")
+            List<String> strategySuggestions
+    ) { // 자산 등록 폼 추천 목록 공개 설정
+        static AssetFormOptionsResponse from(AssetFormOptions options) {
+            return new AssetFormOptionsResponse(options.subcategorySuggestions(), options.institutionSuggestions(),
+                    options.assetClassSuggestions(), options.strategySuggestions());
         }
     }
 }

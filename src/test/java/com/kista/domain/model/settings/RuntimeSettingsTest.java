@@ -1,6 +1,7 @@
 package com.kista.domain.model.settings;
 
 import com.kista.domain.model.account.Account.Broker;
+import com.kista.domain.model.asset.AssetCategory;
 import com.kista.domain.model.strategy.Strategy;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,8 @@ class RuntimeSettingsTest {
                 .isEqualTo(new StrategyFieldSettings<>(false, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL));
         assertThat(settings.strategies().get(Strategy.Type.VR).recurringMode().defaultValue())
                 .isEqualTo(RecurringMode.HOLD);
+        assertThat(settings.assetFormOptions().subcategorySuggestions()).containsOnlyKeys(AssetCategory.values());
+        assertThat(settings.assetFormOptions().strategySuggestions()).contains("VR", "INFINITE", "PRIVACY", "DCA");
     }
 
     @Test
@@ -41,6 +44,34 @@ class RuntimeSettingsTest {
                 Map.of(Strategy.Type.INFINITE, defaults.strategies().get(Strategy.Type.INFINITE))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("strategy");
+    }
+
+    @Test
+    void backwardCompatConstructorFillsBenchmarksAndAssetFormOptionsDefaults() {
+        // benchmarks·assetFormOptions 도입 이전 호출부(3-arg 생성자)도 둘 다 기본값을 채워야 한다.
+        RuntimeSettings defaults = RuntimeSettings.defaults();
+        RuntimeSettings viaThreeArg = new RuntimeSettings(true, defaults.brokers(), defaults.strategies());
+
+        assertThat(viaThreeArg.benchmarks()).isEqualTo(BenchmarkSettings.defaults());
+        assertThat(viaThreeArg.assetFormOptions()).isEqualTo(AssetFormOptions.defaults());
+    }
+
+    @Test
+    void assetFormOptionsBackfillsMissingCategoryKeyWithEmptyListInsteadOfRejecting() {
+        // brokers/strategies 맵과 달리 이 필드는 순수 추천 목록이라 누락 키를 거부하지 않고 빈 목록으로 채운다 —
+        // 완전성을 강제하면 향후 AssetCategory 추가 시 기존 저장 행이 전부 역직렬화 실패로 죽는다.
+        AssetFormOptions defaults = AssetFormOptions.defaults();
+
+        AssetFormOptions partial = new AssetFormOptions(
+                Map.of(AssetCategory.INVESTMENT, defaults.subcategorySuggestions().get(AssetCategory.INVESTMENT)),
+                defaults.institutionSuggestions(), defaults.assetClassSuggestions(), defaults.strategySuggestions());
+
+        assertThat(partial.subcategorySuggestions()).containsOnlyKeys(AssetCategory.values());
+        assertThat(partial.subcategorySuggestions().get(AssetCategory.INVESTMENT))
+                .isEqualTo(defaults.subcategorySuggestions().get(AssetCategory.INVESTMENT));
+        assertThat(partial.subcategorySuggestions().get(AssetCategory.SAVINGS)).isEmpty();
+        assertThat(partial.subcategorySuggestions().get(AssetCategory.LOAN)).isEmpty();
+        assertThat(partial.subcategorySuggestions().get(AssetCategory.REAL_ESTATE)).isEmpty();
     }
 
     @Test
