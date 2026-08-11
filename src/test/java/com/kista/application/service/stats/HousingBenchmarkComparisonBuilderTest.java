@@ -20,7 +20,7 @@ class HousingBenchmarkComparisonBuilderTest {
     private final HousingBenchmarkComparisonBuilder builder = new HousingBenchmarkComparisonBuilder();
 
     private static final HousingBenchmarkComparison.Benchmark BENCHMARK = new HousingBenchmarkComparison.Benchmark(
-            BenchmarkAssetType.HOUSING, "1100000000", "서울", null, null, "서울 아파트 매매가격지수", null);
+            BenchmarkAssetType.HOUSING, "1100000000", "서울", null, "서울 아파트 매매가격지수", null);
 
     private static InvestmentPoint point(LocalDate date, String indexUsd) {
         return new InvestmentPoint(date, new BigDecimal(indexUsd), null);

@@ -63,16 +63,16 @@ public class StatsController {
                 userStats.getCyclePerformances(userId, type, cursorInstant, Math.clamp(size, 1, 200)));
     }
 
-    @Operation(summary = "벤치마크 비교 (서울 아파트 · ETF)",
-            description = "USD 투자 성과와 벤치마크(서울 아파트 분위 가격 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
-                    + "benchmarkType=ETF면 symbol이 필수이며 quintile은 무시됩니다.")
+    @Operation(summary = "벤치마크 비교 (아파트 매매가격지수 · ETF)",
+            description = "USD 투자 성과와 벤치마크(아파트 지역 매매가격지수 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
+                    + "benchmarkType=ETF면 symbol이 필수이며 regionCode는 무시됩니다.")
     @GetMapping("/housing-benchmark")
     public HousingBenchmarkComparisonResponse getHousingBenchmarkComparison(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(defaultValue = "PORTFOLIO") BenchmarkScope scope,
             @RequestParam(required = false) UUID strategyId,
             @RequestParam(defaultValue = "HOUSING") BenchmarkAssetType benchmarkType,
-            @RequestParam(defaultValue = "3") int quintile,
+            @RequestParam(defaultValue = "1100000000") String regionCode,
             @RequestParam(required = false) EtfBenchmarkSymbol symbol,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -92,12 +92,12 @@ public class StatsController {
             return HousingBenchmarkComparisonResponse.from(
                     userStats.getEtfBenchmarkComparison(userId, scope, strategyId, symbol, from, to));
         }
-        if (quintile < 1 || quintile > 5) {
-            throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        if (regionCode == null || regionCode.isBlank()) {
+            throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
         }
         return HousingBenchmarkComparisonResponse.from(
                 userStats.getHousingBenchmarkComparison(
-                        userId, scope, strategyId, quintile, from, to));
+                        userId, scope, strategyId, regionCode, from, to));
     }
 
     @Operation(summary = "KB 지역 5분위 가격 시계열",
@@ -117,8 +117,9 @@ public class StatsController {
         return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
     }
 
-    @Operation(summary = "서울 아파트 등 KB 지역 카탈로그",
-            description = "5분위 시계열 조회에 사용 가능한 지역 코드·명 목록.")
+    @Operation(summary = "KB 지역 카탈로그",
+            description = "아파트 벤치마크 비교(regionCode)에 사용 가능한 지역 코드·명 목록. "
+                    + "5분위 시계열(`/housing-benchmark/series`)의 14개 지역은 이 목록(25개)의 부분집합이다.")
     @GetMapping("/housing-benchmark/regions")
     public ResponseEntity<HousingBenchmarkRegionsResponse> getHousingBenchmarkRegions() {
         HousingBenchmarkRegionsResponse response = HousingBenchmarkRegionsResponse.from(userStats.getHousingBenchmarkRegions());

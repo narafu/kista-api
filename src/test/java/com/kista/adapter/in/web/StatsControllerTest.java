@@ -113,9 +113,9 @@ class StatsControllerTest {
     }
 
     @Test
-    void 서울_아파트_벤치마크_비교를_기본값과_통화_기준으로_반환한다() throws Exception {
+    void 아파트_벤치마크_비교를_기본값과_통화_기준으로_반환한다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
                 .thenReturn(comparison(new CurrentExchangeRate(
                         new BigDecimal("1365.20"), Instant.parse("2026-07-19T01:30:00Z"), "TOSS_INVEST")));
 
@@ -123,7 +123,6 @@ class StatsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scope").value("PORTFOLIO"))
                 .andExpect(jsonPath("$.benchmark.regionCode").value("1100000000"))
-                .andExpect(jsonPath("$.benchmark.quintile").value(3))
                 .andExpect(jsonPath("$.period.pointCount").value(2))
                 .andExpect(jsonPath("$.points[0].investmentIndexUsd").value(100.0))
                 .andExpect(jsonPath("$.points[1].benchmarkIndex").value(110.0))
@@ -134,7 +133,8 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.quality.investmentCurrency").value("USD"))
                 .andExpect(jsonPath("$.quality.benchmarkCurrency").value("KRW"))
                 .andExpect(jsonPath("$.quality.notice").value(
-                        "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다."))
+                        "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 아파트 매매가격지수는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다. "
+                                + "벤치마크 시점은 KB Land 주간 조사일(매주 월요일) 기준입니다."))
                 .andExpect(jsonPath("$.currentExchangeRate.midRate").value(1365.2))
                 .andExpect(jsonPath("$.currentExchangeRate.fetchedAt").value("2026-07-19T01:30:00Z"))
                 .andExpect(jsonPath("$.currentExchangeRate.source").value("TOSS_INVEST"))
@@ -144,7 +144,7 @@ class StatsControllerTest {
     @Test
     void 현재_환율이_없어도_명시적_null과_함께_200을_반환한다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
@@ -164,13 +164,10 @@ class StatsControllerTest {
     }
 
     @Test
-    void 분위는_1부터_5까지만_허용한다() throws Exception {
+    void regionCode가_공백이면_400을_반환한다() throws Exception {
+        // 빈 문자열("")은 Spring이 @RequestParam defaultValue로 치환하므로 공백 문자열로 blank 가드를 검증한다
         mockMvc.perform(get("/api/stats/housing-benchmark")
-                        .param("quintile", "0")
-                        .with(authentication(auth())))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/stats/housing-benchmark")
-                        .param("quintile", "6")
+                        .param("regionCode", " ")
                         .with(authentication(auth())))
                 .andExpect(status().isBadRequest());
 
@@ -183,20 +180,20 @@ class StatsControllerTest {
         LocalDate from = LocalDate.of(2021, 7, 1);
         LocalDate to = LocalDate.of(2026, 7, 1);
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, strategyId, 5, from, to))
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, "2600000000", from, to))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark")
                         .param("scope", "STRATEGY")
                         .param("strategyId", strategyId.toString())
-                        .param("quintile", "5")
+                        .param("regionCode", "2600000000")
                         .param("from", from.toString())
                         .param("to", to.toString())
                         .with(authentication(auth())))
                 .andExpect(status().isOk());
 
         verify(userStats).getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, strategyId, 5, from, to);
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, "2600000000", from, to);
     }
 
     @Test
@@ -229,7 +226,7 @@ class StatsControllerTest {
     @Test
     void benchmarkType_생략시_기존_HOUSING_동작을_그대로_따른다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
@@ -237,7 +234,7 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.benchmark.assetType").value("HOUSING"));
 
         verify(userStats).getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, 3, null, null);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null);
     }
 
     private static HousingBenchmarkComparison etfComparison() {
@@ -245,7 +242,7 @@ class StatsControllerTest {
                 BenchmarkScope.PORTFOLIO,
                 null,
                 new HousingBenchmarkComparison.Benchmark(
-                        BenchmarkAssetType.ETF, null, null, null, "QLD",
+                        BenchmarkAssetType.ETF, null, null, "QLD",
                         "QLD (ProShares Ultra QQQ (2x 레버리지))", LocalDate.of(2026, 7, 18)),
                 new HousingBenchmarkComparison.Period(
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
@@ -326,8 +323,8 @@ class StatsControllerTest {
                 BenchmarkScope.PORTFOLIO,
                 null,
                 new HousingBenchmarkComparison.Benchmark(
-                        BenchmarkAssetType.HOUSING, "1100000000", "서울", 3, null,
-                        "서울 아파트 3분위", LocalDate.of(2026, 6, 15)),
+                        BenchmarkAssetType.HOUSING, "1100000000", "서울", null,
+                        "서울 아파트 매매가격지수", LocalDate.of(2026, 6, 15)),
                 new HousingBenchmarkComparison.Period(
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
                 new PerformanceComparisonSummary(

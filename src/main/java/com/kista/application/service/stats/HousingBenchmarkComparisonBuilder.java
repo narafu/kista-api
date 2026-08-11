@@ -70,7 +70,8 @@ final class HousingBenchmarkComparisonBuilder {
                     investmentByDate.get(date).investmentIndexUsd(), firstInvestmentIndex);
             BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(date), firstBenchmarkPrice);
             // MONTHLY는 인접 데이터 간 공백(결측월)이 있으면 수익률을 비워 오해를 막는다.
-            // DAILY는 commonDates 자체가 이미 실거래일 교집합이라 인접 검사 없이 항상 계산한다.
+            // 그 외(WEEKLY·DAILY)는 commonDates 자체가 이미 실제 관측 포인트 교집합이라
+            // 인접 검사 없이 항상 계산한다.
             boolean computeReturn = previousDate != null
                     && (granularity != BenchmarkGranularity.MONTHLY || date.equals(previousDate.plusMonths(1)));
             points.add(new HousingBenchmarkPoint(

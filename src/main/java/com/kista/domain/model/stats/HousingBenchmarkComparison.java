@@ -22,7 +22,6 @@ public record HousingBenchmarkComparison(
             BenchmarkAssetType assetType,
             String regionCode,   // HOUSING 전용, ETF면 null
             String regionName,   // HOUSING 전용, ETF면 null
-            Integer quintile,    // HOUSING 전용, ETF면 null
             String symbol,       // ETF 전용, HOUSING이면 null
             String label,
             LocalDate sourceUpdatedDate

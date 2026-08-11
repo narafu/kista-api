@@ -26,7 +26,7 @@ public interface UserStatsUseCase {
 
     HousingBenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
-            int quintile, LocalDate from, LocalDate to);
+            String regionCode, LocalDate from, LocalDate to);
 
     // ETF(SPY/QQQ/QLD/IBIT/ETHA) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
     HousingBenchmarkComparison getEtfBenchmarkComparison(
