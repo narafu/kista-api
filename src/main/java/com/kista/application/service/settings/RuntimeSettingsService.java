@@ -38,12 +38,15 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
     public RuntimeSettings updateSettings(UUID adminId, RuntimeSettings settings, boolean benchmarksProvided) {
         RuntimeSettings previous = settingsPort.loadForUpdate();
 
-        // benchmarks는 생략 시 기존 값 유지가 문서화된 예외 규칙 — auth/brokers/strategies는 여전히 전체 교체
+        // benchmarks는 생략 시 기존 값 유지가 문서화된 예외 규칙 — auth/brokers/strategies/assetFormOptions는 여전히 전체 교체.
         // settings.benchmarks()는 toDomain() 변환 과정에서 이미 기본값으로 치환되어 null 여부로 생략을 판별할 수 없으므로
         // 컨트롤러가 전달한 benchmarksProvided(요청 DTO 단계의 null 여부)를 기준으로 판단한다.
+        // assetFormOptions는 반드시 settings.assetFormOptions()(요청에 항상 존재)를 명시적으로 넘긴다 — 4-arg 생성자로
+        // 암묵적으로 defaults()에 되돌아가게 하면 관리자가 저장한 추천 목록이 benchmarks 생략 요청 한 번에 조용히 사라진다.
         RuntimeSettings effective = benchmarksProvided
                 ? settings
-                : new RuntimeSettings(settings.approvalRequired(), settings.brokers(), settings.strategies(), previous.benchmarks());
+                : new RuntimeSettings(settings.approvalRequired(), settings.brokers(), settings.strategies(),
+                        previous.benchmarks(), settings.assetFormOptions());
 
         // 검증 완료된 전체 설정을 단일 저장 호출로 반영한다.
         RuntimeSettings saved = settingsPort.save(effective);

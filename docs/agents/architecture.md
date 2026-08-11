@@ -33,7 +33,8 @@ domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금�
     admin/       ← AdminAnomalies, AdminStats, AdminUserView, AuditLog, AppErrorLog
     privacy/     ← FidaOrderCommand, PrivacyCurrentBase, PrivacyTradeBase, PrivacyTradeBaseView, PrivacyTradeSaveResult, PrivacyTradeConflictException,
                    PrivacyDates(releaseDateFor()/tradeDateOf() — 발행일↔거래일 업무 규칙, 시간대 변환 아님)
-    settings/    ← RuntimeSettings, StrategyCreationSettings, StrategyFieldSettings, RecurringMode (admin_runtime_settings 전역 설정 도메인)
+    settings/    ← RuntimeSettings, StrategyCreationSettings, StrategyFieldSettings, RecurringMode, AssetFormOptions
+                   (admin_runtime_settings 전역 설정 도메인 — AssetFormOptions는 자산 등록 폼 세부 카테고리/기관/자산군/운용전략 추천 목록, 값 강제 없는 순수 추천 목록)
   strategy/      ← InfiniteStrategy/ReverseInfiniteStrategy/PrivacyStrategy/VrStrategy 구현 클래스 (1:1 인터페이스 통폐합됨) — @Component 허용 예외 (ArchUnit)
                    CycleOrderStrategy (인터페이스 + Infinite/Privacy/VrCycleOrderStrategy 구현): 최소시드·capability SSOT (아래 "CycleOrderStrategy Capability 패턴")
                    CycleOrderStrategies (@Component 라우터): Map<Strategy.Type, CycleOrderStrategy> 자동 수집
