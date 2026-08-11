@@ -17,12 +17,7 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     @Override
     @Transactional
     public void save(UUID userId, String token, String platform) {
-        String normalizedPlatform = normalizePlatform(platform);
-        if (repository.findByUserIdAndToken(userId, token).isEmpty()) {
-            repository.deleteByToken(token);
-            repository.flush();
-            repository.save(FcmDeviceTokenEntity.of(userId, token, normalizedPlatform));
-        }
+        repository.upsert(userId, token, normalizePlatform(platform));
     }
 
     @Override
