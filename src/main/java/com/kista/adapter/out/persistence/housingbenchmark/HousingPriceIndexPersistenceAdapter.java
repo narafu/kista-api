@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.housingbenchmark;
 
+import com.kista.domain.model.stats.HousingBenchmarkRegion;
 import com.kista.domain.model.stats.HousingPriceIndex;
 import com.kista.domain.port.out.HousingPriceIndexPort;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.List;
 
 @Component
@@ -15,6 +17,7 @@ public class HousingPriceIndexPersistenceAdapter implements HousingPriceIndexPor
 
     private static final int BATCH_SIZE = 1000; // 주간 지수는 지역 25개 × 20년치라 약 21,900행 — 단일 batchUpdate 방지 위해 청킹
 
+    private final HousingPriceIndexJpaRepository repository;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -51,5 +54,20 @@ public class HousingPriceIndexPersistenceAdapter implements HousingPriceIndexPor
             ps.setObject(7, index.sourceUpdatedDate());
             ps.setTimestamp(8, Timestamp.from(index.fetchedAt()));
         });
+    }
+
+    @Override
+    public List<HousingPriceIndex> findByMetricCodeAndRegionCodeAndBaseDateBetween(
+            String metricCode, String regionCode, LocalDate from, LocalDate to) {
+        return repository.findByMetricCodeAndRegionCodeAndBaseDateBetweenOrderByBaseDateAsc(
+                        metricCode, regionCode, from, to)
+                .stream()
+                .map(HousingPriceIndexEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<HousingBenchmarkRegion> findDistinctRegions(String metricCode) {
+        return repository.findDistinctRegionsByMetricCode(metricCode);
     }
 }

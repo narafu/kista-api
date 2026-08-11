@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.housingbenchmark;
 
+import com.kista.domain.model.stats.HousingBenchmarkRegion;
 import com.kista.domain.model.stats.HousingPriceIndex;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.Test;
@@ -74,5 +75,33 @@ class HousingPriceIndexPersistenceAdapterTest extends DataJpaTestBase {
                 LocalDate.of(2026, 8, 3),
                 Instant.parse("2026-08-03T00:00:00Z")
         );
+    }
+
+    @Test
+    void findByMetricCodeAndRegionCodeAndBaseDateBetween_returnsRowsOrderedByBaseDateAscending() {
+        LocalDate week1 = LocalDate.of(2026, 1, 5);
+        LocalDate week2 = LocalDate.of(2026, 1, 12);
+        adapter.upsertAll(List.of(
+                index("서울", "1100000000", week2, "101.500000000000"),
+                index("서울", "1100000000", week1, "100.000000000000"),
+                index("서울", "1100000000", LocalDate.of(2020, 1, 6), "50.000000000000")));
+
+        List<HousingPriceIndex> result = adapter.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "1100000000", week1, week2);
+
+        assertThat(result).extracting(HousingPriceIndex::baseDate).containsExactly(week1, week2);
+    }
+
+    @Test
+    void findDistinctRegions_returnsRegionCodeAndNameOrderedByCode() {
+        adapter.upsertAll(List.of(
+                index("서울", "1100000000", LocalDate.of(2026, 1, 5), "100.000000000000"),
+                index("부산", "2600000000", LocalDate.of(2026, 1, 5), "90.000000000000")));
+
+        List<HousingBenchmarkRegion> result =
+                adapter.findDistinctRegions(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX);
+
+        assertThat(result).extracting(HousingBenchmarkRegion::regionCode)
+                .containsExactly("1100000000", "2600000000");
     }
 }
