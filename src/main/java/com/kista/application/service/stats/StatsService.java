@@ -182,6 +182,9 @@ class StatsService implements UserStatsUseCase {
                         (left, right) -> right, TreeMap::new));
         List<InvestmentPoint> snappedPoints = new ArrayList<>();
         for (LocalDate surveyDate : indexByDate.keySet()) {
+            // 투자 종료(마지막 스냅샷) 이후 조사일은 스킵 — floorEntry가 마지막 값을 그대로
+            // 반환해 투자지수가 고정된 채 벤치마크만 계속 움직이는 착시를 방지한다.
+            if (!investmentByDate.isEmpty() && surveyDate.isAfter(investmentByDate.lastKey())) continue;
             var asOf = investmentByDate.floorEntry(surveyDate);
             if (asOf == null) continue; // 투자 시작 전 조사일은 스킵
             snappedPoints.add(new InvestmentPoint(surveyDate, asOf.getValue().investmentIndexUsd(), null));

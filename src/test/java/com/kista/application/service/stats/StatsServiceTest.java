@@ -527,6 +527,69 @@ class StatsServiceTest {
     }
 
     @Test
+    void 조사일과_정확히_일치하지_않는_투자_스냅샷은_직전_값으로_carry_back된다() {
+        stubUserWithStrategy();
+        // 투자 스냅샷은 01-09(금)와 01-13(화) 두 시점에 있고, 01-12(월)에는 holdings>0인데
+        // closingPrice가 없어 평가 불가능한 스냅샷을 둔다 — MonthlyReturnCalculator.assetOf()가
+        // null을 반환해 그날은 투자지수 시계열에서 통째로 빠지므로, KB 조사일 01-12는
+        // investmentByDate에 정확히 일치하는 키가 없는 상태에서 floorEntry의 진짜 carry-back
+        // 경로(직전 01-11의 값)를 타게 된다.
+        StrategyCycle cycle = activeCycle("100.00", "2026-01-09");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-09T01:00:00Z"),
+                new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal("999.00"),
+                        null, new BigDecimal("50.00"), 1, Instant.parse("2026-01-12T01:00:00Z"), null),
+                depositSnapshot(cycle.id(), "110.00", "2026-01-13T01:00:00Z")));
+        // KB 조사일은 01-09/01-12/01-13 — 01-12는 두 투자 스냅샷 사이에 끼어 정확히 일치하지 않는다
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of(
+                weeklyIndex(LocalDate.of(2026, 1, 9), "100"),
+                weeklyIndex(LocalDate.of(2026, 1, 12), "105"),
+                weeklyIndex(LocalDate.of(2026, 1, 13), "110")));
+
+        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
+
+        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+                .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 12), LocalDate.of(2026, 1, 13));
+        // 01-12는 아직 01-13 스냅샷(110)이 오지 않았으므로 직전 01-09/01-11 값(100)을 그대로 이어받는다
+        assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("100.0");
+        // 01-13에서야 비로소 값이 갱신된다
+        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("110.0");
+    }
+
+    @Test
+    void 투자_종료_이후_조사일은_지수_고정_없이_스킵된다() {
+        stubUserWithStrategy();
+        // 사이클이 01-13에 종료되고 이후 재등록이 없다 — 01-20/01-27 조사일은
+        // investmentByDate의 마지막 키(01-13)보다 뒤라 floorEntry가 01-13 값을
+        // 그대로 반환해버리면 투자지수가 고정된 채 벤치마크만 계속 움직이는
+        // 착시가 생긴다. 가드가 없으면 이 두 조사일도 결과에 포함된다.
+        StrategyCycle cycle = closedCycle("100.00", "110.00", "2026-01-09", "2026-01-13");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-09T01:00:00Z"),
+                depositSnapshot(cycle.id(), "110.00", "2026-01-13T01:00:00Z")));
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of(
+                weeklyIndex(LocalDate.of(2026, 1, 9), "100"),
+                weeklyIndex(LocalDate.of(2026, 1, 13), "110"),
+                weeklyIndex(LocalDate.of(2026, 1, 20), "130"),
+                weeklyIndex(LocalDate.of(2026, 1, 27), "150")));
+
+        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 27));
+
+        // 투자 종료(01-13) 이후 조사일(01-20, 01-27)은 지수 고정 없이 스킵된다
+        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+                .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
+        assertThat(result.period().toDate()).isEqualTo(LocalDate.of(2026, 1, 13));
+    }
+
+    @Test
     void 아파트_벤치마크는_지정된_regionCode의_지수를_조회하고_지역명을_동적으로_채운다() {
         stubUserWithStrategy();
         StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
