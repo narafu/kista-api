@@ -88,6 +88,9 @@ final class HousingBenchmarkComparisonBuilder {
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
+        // MONTHLY 이외 granularity는 짧은 구간(90일 미만)에서 연환산 시 극단값이 나오므로 null로 억제한다
+        boolean suppressAnnualized = granularity != BenchmarkGranularity.MONTHLY
+                && ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate()) < 90;
         double periodsPerYear = granularity == BenchmarkGranularity.MONTHLY
                 ? 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate())
                 : DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate());
@@ -95,8 +98,8 @@ final class HousingBenchmarkComparisonBuilder {
                 investmentCumulativeReturn,
                 benchmarkCumulativeReturn,
                 investmentCumulativeReturn.subtract(benchmarkCumulativeReturn).setScale(SCALE, HALF_UP),
-                annualizedReturn(lastInvestmentIndex, periodsPerYear),
-                annualizedReturn(lastBenchmarkIndex, periodsPerYear),
+                suppressAnnualized ? null : annualizedReturn(lastInvestmentIndex, periodsPerYear),
+                suppressAnnualized ? null : annualizedReturn(lastBenchmarkIndex, periodsPerYear),
                 maxDrawdown(points.stream().map(HousingBenchmarkPoint::investmentIndexUsd).toList()),
                 maxDrawdown(points.stream().map(HousingBenchmarkPoint::benchmarkIndex).toList()));
 

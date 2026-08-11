@@ -64,4 +64,59 @@ class HousingBenchmarkComparisonBuilderTest {
         assertThat(result.emptyReason()).isNull();
         assertThat(result.summary()).isNotNull();
     }
+
+    @Test
+    void 짧은_구간에서는_연환산_수익률을_null로_억제한다() {
+        // 21일(< 90일) 구간 — WEEKLY(아파트)와 DAILY(ETF) 둘 다 동일 규칙 적용
+        LocalDate d1 = LocalDate.of(2026, 1, 5);
+        LocalDate d2 = LocalDate.of(2026, 1, 26);
+        List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "101"));
+        Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
+
+        HousingBenchmarkComparison weekly = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
+                BenchmarkGranularity.WEEKLY);
+        HousingBenchmarkComparison daily = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
+                BenchmarkGranularity.DAILY);
+
+        assertThat(weekly.summary().investmentAnnualizedReturn()).isNull();
+        assertThat(weekly.summary().benchmarkAnnualizedReturn()).isNull();
+        assertThat(daily.summary().investmentAnnualizedReturn()).isNull();
+        assertThat(daily.summary().benchmarkAnnualizedReturn()).isNull();
+    }
+
+    @Test
+    void 긴_구간에서는_연환산_수익률을_계산한다() {
+        // 119일(>= 90일) 구간
+        LocalDate d1 = LocalDate.of(2026, 1, 5);
+        LocalDate d2 = LocalDate.of(2026, 5, 4);
+        List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "184.2"));
+        Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
+
+        HousingBenchmarkComparison result = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
+                BenchmarkGranularity.WEEKLY);
+
+        assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
+                BigDecimal.valueOf(Math.pow(1.842, 365.0 / 119.0) - 1.0),
+                org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
+    }
+
+    @Test
+    void MONTHLY_구간에서는_짧은_구간이어도_연환산_수익률을_그대로_계산한다() {
+        // MONTHLY는 이번 변경의 영향을 받지 않아야 한다 (회귀 방지)
+        LocalDate d1 = LocalDate.of(2026, 1, 1);
+        LocalDate d2 = LocalDate.of(2026, 2, 1);
+        List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "184.2"));
+        Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
+
+        HousingBenchmarkComparison result = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
+                BenchmarkGranularity.MONTHLY);
+
+        assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
+                BigDecimal.valueOf(Math.pow(1.842, 12.0) - 1.0),
+                org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
+    }
 }
