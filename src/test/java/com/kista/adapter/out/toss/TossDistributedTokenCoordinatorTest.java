@@ -138,6 +138,24 @@ class TossDistributedTokenCoordinatorTest {
     }
 
     @Test
+    @DisplayName("forceReissue=true는 지문 보호 TTL 만료 전에도 즉시 실제 재발급을 강제한다")
+    void recover_forceReissue_bypassesFingerprintBeforeTtlExpires() {
+        FakeTokenStore store = new FakeTokenStore();
+        TossDistributedTokenCoordinator coordinator = coordinator(store, "owner");
+        AtomicInteger oauthCalls = new AtomicInteger();
+
+        String issued = coordinator.obtain(
+                ACCOUNT_ID, () -> token("token-1", oauthCalls));
+        // 지문 보호 TTL(2초)이 전혀 지나지 않은 시점 — forceReissue 없이는 여전히 token-1을 재사용해야 함
+        TokenCoordinator.RecoveredToken forced = coordinator.recover(
+                ACCOUNT_ID, issued, () -> token("token-2", oauthCalls), true);
+
+        assertThat(forced.accessToken()).isEqualTo("token-2");
+        assertThat(forced.freshlyIssued()).isTrue();
+        assertThat(oauthCalls.get()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("현재 canonical 토큰이 rejected token과 다르면 재발급 없이 재사용하고 freshlyIssued=false")
     void recoverAccountToken_reusesDifferentCanonicalToken_withoutPropagationWait() {
         FakeTokenStore store = new FakeTokenStore();

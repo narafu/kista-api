@@ -119,9 +119,9 @@ class TossAuthApiTest {
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String current = api.getAdminToken();
-        when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any()))
+        when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any(), eq(false)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", false));
-        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token");
+        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token", false);
 
         assertThat(current).isEqualTo("admin-token-1");
         assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
@@ -136,9 +136,9 @@ class TossAuthApiTest {
                 .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("admin-token-1", 86400L)));
 
         String issued = api.getAdminToken();
-        when(tokenCoordinator.recoverAdminToken(eq(issued), any()))
+        when(tokenCoordinator.recoverAdminToken(eq(issued), any(), eq(false)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", true));
-        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken(issued);
+        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken(issued, false);
 
         assertThat(recovered.accessToken()).isEqualTo("admin-token-1");
         verify(tossRestTemplate, times(1)).exchange(
@@ -146,19 +146,46 @@ class TossAuthApiTest {
     }
 
     @Test
-    @DisplayName("계좌 401 복구를 rejected token과 함께 분산 coordinator에 위임")
+    @DisplayName("관리자 토큰 복구 forceReissue=true는 coordinator에 그대로 전달")
+    void recoverAdminToken_forwardsForceReissueFlag() {
+        when(tokenCoordinator.recoverAdminToken(eq("stale-admin-token"), any(), eq(true)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-2", true));
+
+        TokenCoordinator.RecoveredToken recovered = api.recoverAdminToken("stale-admin-token", true);
+
+        assertThat(recovered.accessToken()).isEqualTo("admin-token-2");
+        verify(tokenCoordinator).recoverAdminToken(eq("stale-admin-token"), any(), eq(true));
+    }
+
+    @Test
+    @DisplayName("계좌 401 복구를 rejected token·forceReissue와 함께 분산 coordinator에 위임")
     void recoverToken_delegatesToDistributedCoordinator() {
         when(tokenCoordinator.recover(
-                eq(ACCOUNT_ID), eq("rejected-token"), any()))
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), eq(false)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("coordinated-token", false));
 
         TokenCoordinator.RecoveredToken recovered = api.recoverToken(
-                ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token");
+                ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token", false);
 
         assertThat(recovered.accessToken()).isEqualTo("coordinated-token");
         verify(tokenCoordinator).recover(
-                eq(ACCOUNT_ID), eq("rejected-token"), any());
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), eq(false));
         verifyNoInteractions(tossRestTemplate);
+    }
+
+    @Test
+    @DisplayName("계좌 401 복구 forceReissue=true는 coordinator에 그대로 전달")
+    void recoverToken_forwardsForceReissueFlag() {
+        when(tokenCoordinator.recover(
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), eq(true)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("reissued-token", true));
+
+        TokenCoordinator.RecoveredToken recovered = api.recoverToken(
+                ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET, "rejected-token", true);
+
+        assertThat(recovered.accessToken()).isEqualTo("reissued-token");
+        verify(tokenCoordinator).recover(
+                eq(ACCOUNT_ID), eq("rejected-token"), any(), eq(true));
     }
 
     @Nested

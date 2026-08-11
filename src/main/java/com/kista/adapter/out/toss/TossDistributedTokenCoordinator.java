@@ -55,25 +55,31 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
     @Override
     public String obtain(UUID accountId, TokenIssuer issuer) {
         // 최초 조회는 복구 흐름이 아니므로 freshlyIssued 여부를 폐기하고 토큰 문자열만 반환
-        return getOrIssue(accountScope(accountId), null, issuer).accessToken();
+        return getOrIssue(accountScope(accountId), null, issuer, false).accessToken();
     }
 
     @Override
     public RecoveredToken recover(UUID accountId, String rejectedToken, TokenIssuer issuer) {
-        return getOrIssue(accountScope(accountId), rejectedToken, issuer);
+        return recover(accountId, rejectedToken, issuer, false);
+    }
+
+    // forceReissue=true — 같은 rejectedToken이 반복 거절되어 지문 보호 구간 대기가 이미 실패로 판명된 경우,
+    // 지문 보호를 건너뛰고 실제 재발급(lease 획득 → OAuth)을 강제한다. 호출부(TossHttpClient) 전용 오버로드.
+    RecoveredToken recover(UUID accountId, String rejectedToken, TokenIssuer issuer, boolean forceReissue) {
+        return getOrIssue(accountScope(accountId), rejectedToken, issuer, forceReissue);
     }
 
     String getAdminToken(TokenIssuer issuer) {
-        return getOrIssue(ADMIN_SCOPE, null, issuer).accessToken();
+        return getOrIssue(ADMIN_SCOPE, null, issuer, false).accessToken();
     }
 
-    RecoveredToken recoverAdminToken(String rejectedToken, TokenIssuer issuer) {
-        return getOrIssue(ADMIN_SCOPE, rejectedToken, issuer);
+    RecoveredToken recoverAdminToken(String rejectedToken, TokenIssuer issuer, boolean forceReissue) {
+        return getOrIssue(ADMIN_SCOPE, rejectedToken, issuer, forceReissue);
     }
 
-    private RecoveredToken getOrIssue(String scope, String rejectedToken, TokenIssuer issuer) {
+    private RecoveredToken getOrIssue(String scope, String rejectedToken, TokenIssuer issuer, boolean forceReissue) {
         Optional<TossTokenStore.CanonicalToken> current = tokenStore.find(scope);
-        RecoveredToken reusable = reusableToken(scope, current, rejectedToken);
+        RecoveredToken reusable = reusableToken(scope, current, rejectedToken, forceReissue);
         if (reusable != null) {
             return reusable;
         }
@@ -83,14 +89,14 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
             Optional<TossTokenStore.Lease> lease = tokenStore.tryAcquire(
                     scope, ownerIds.get(), LEASE_TTL);
             if (lease.isPresent()) {
-                return issueAsOwner(lease.orElseThrow(), rejectedToken, issuer);
+                return issueAsOwner(lease.orElseThrow(), rejectedToken, issuer, forceReissue);
             }
             if (attempt == maxPollAttempts) {
                 break;
             }
             pollWaiter.await(POLL_INTERVAL);
             current = tokenStore.find(scope);
-            reusable = reusableToken(scope, current, rejectedToken);
+            reusable = reusableToken(scope, current, rejectedToken, forceReissue);
             if (reusable != null) {
                 return reusable;
             }
@@ -101,11 +107,12 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
     private RecoveredToken issueAsOwner(
             TossTokenStore.Lease lease,
             String rejectedToken,
-            TokenIssuer issuer
+            TokenIssuer issuer,
+            boolean forceReissue
     ) {
         try {
             Optional<TossTokenStore.CanonicalToken> current = tokenStore.find(lease.scope());
-            RecoveredToken reusable = reusableToken(lease.scope(), current, rejectedToken);
+            RecoveredToken reusable = reusableToken(lease.scope(), current, rejectedToken, forceReissue);
             if (reusable != null) {
                 return reusable;
             }
@@ -149,7 +156,8 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
     private RecoveredToken reusableToken(
             String scope,
             Optional<TossTokenStore.CanonicalToken> current,
-            String rejectedToken
+            String rejectedToken,
+            boolean forceReissue
     ) {
         if (rejectedToken == null) {
             // 복구 흐름이 아닌 최초 조회 — freshlyIssued는 호출부에서 사용하지 않으므로 false 고정
@@ -159,6 +167,11 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
                 && !Objects.equals(current.orElseThrow().accessToken(), rejectedToken)) {
             // 이미 다른 인스턴스가 발급·저장해 둔 canonical 토큰 — Redis 읽기만으로 재사용, 전파 대기 불필요
             return new RecoveredToken(current.orElseThrow().accessToken(), false);
+        }
+        if (forceReissue) {
+            // 같은 토큰이 이미 한 번의 지문 보호 대기를 거치고도 다시 거절됨 — 전파 지연 가설이 틀렸다고 판단해
+            // 지문 보호를 건너뛰고 아래 lease 획득 경로로 진행해 실제 재발급을 강제한다
+            return null;
         }
         // 거절된 토큰과 동일 — 최근 발급 지문 보호 구간 내 재사용은 여전히 전파 지연 위험이 있어 대기 필요
         boolean recentFingerprint = tokenStore.matchesRecentFingerprint(scope, rejectedToken);

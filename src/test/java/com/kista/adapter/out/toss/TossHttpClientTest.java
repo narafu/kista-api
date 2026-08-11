@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -189,11 +190,15 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("신규 토큰 전파가 지연되면 같은 신규 토큰으로 재시도")
+    @DisplayName("신규 토큰 전파가 지연되면 매 401마다 복구를 재조회해 같은 신규 토큰으로 재시도")
     @SuppressWarnings("unchecked")
     void retriesSameFreshToken_whenPropagationIsDelayed() {
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
-        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0"), eq(false)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token-1", true));
+        // 두 번째 401도 다른 값(token-1)이라 forceReissue=false로 재조회하며, 코디네이터가 자체 지문 보호로
+        // 같은 token-1을 다시 반환한다(전파가 아직 안 끝난 것으로 판단, 대기 유지)
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-1"), eq(false)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
@@ -205,8 +210,9 @@ class TossHttpClientTest {
                 new ParameterizedTypeReference<String>() {});
 
         assertThat(result).isEqualTo("OK");
-        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0");
-        verify(tossAuthApi, never()).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-1");
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0", false);
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-1", false);
+        verify(tossAuthApi, never()).recoverToken(eq(ACCOUNT.id()), eq("cid"), eq("csecret"), anyString(), eq(true));
         verify(tossAuthApi).getToken(eq(ACCOUNT.id()), anyString(), anyString());
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
@@ -220,17 +226,56 @@ class TossHttpClientTest {
         retryOrder.verify(tossAuthApi).getToken(ACCOUNT.id(), "cid", "csecret");
         retryOrder.verify(tossRestTemplate).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class));
-        retryOrder.verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0");
-        retryOrder.verify(tossRestTemplate, times(2)).exchange(anyString(), eq(HttpMethod.GET),
+        retryOrder.verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0", false);
+        retryOrder.verify(tossRestTemplate).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
+                any(ParameterizedTypeReference.class));
+        retryOrder.verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-1", false);
+        retryOrder.verify(tossRestTemplate).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
-    @DisplayName("재시도 한도 후에도 신규 토큰은 무효화하지 않음")
-    void throwsAfterRetryLimit_withoutInvalidatingFreshToken() {
+    @DisplayName("같은 토큰이 두 번째로 거절되면 지문 보호를 건너뛰고 강제 재발급(forceReissue)으로 승격")
+    @SuppressWarnings("unchecked")
+    void escalatesToForceReissue_whenSameTokenRejectedTwiceInARow() {
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
-        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
+        // 1차 401: 지문 보호 재사용으로 같은 token-0을 다시 받음(freshlyIssued=true, 전파 대기)
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0"), eq(false)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token-0", true));
+        // 2차 401(같은 token-0 재거절) → forceReissue=true로 승격, 코디네이터가 실제 재발급한 token-1 반환
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0"), eq(true)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("token-1", true));
+        when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
+                any(ParameterizedTypeReference.class)))
+                .thenThrow(unauthorized())
+                .thenThrow(unauthorized())
+                .thenReturn(new ResponseEntity<>("OK", HttpStatus.OK));
+
+        String result = newClient().get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<String>() {});
+
+        assertThat(result).isEqualTo("OK");
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0", false);
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0", true);
+        ArgumentCaptor<HttpEntity<?>> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+                requestCaptor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(requestCaptor.getAllValues())
+                .extracting(request -> request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                .containsExactly("Bearer token-0", "Bearer token-0", "Bearer token-1");
+    }
+
+    @Test
+    @DisplayName("재시도 한도(MAX=3) 도달 시 매 401마다 해당 토큰의 복구를 시도하되 서로 다른 토큰이면 강제 재발급으로 승격하지 않음")
+    void throwsAfterRetryLimit_recoveringEachDistinctRejectedTokenOnce() {
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        // 세 번의 복구가 매번 서로 다른 값을 반환 — 어느 것도 직전과 동일하지 않으므로 forceReissue는 한 번도 true가 되지 않음
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0"), eq(false)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token-1", true));
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-1"), eq(false)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token-2", true));
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-2"), eq(false)))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token-3", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
                 .thenThrow(unauthorized());
@@ -241,10 +286,14 @@ class TossHttpClientTest {
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("토큰 재시도 실패");
 
-        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0");
-        verify(tossAuthApi, never()).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-1");
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-0", false);
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-1", false);
+        verify(tossAuthApi).recoverToken(ACCOUNT.id(), "cid", "csecret", "token-2", false);
+        // 마지막(4번째) 시도는 attempt>=MAX_RETRY_ATTEMPTS로 즉시 실패해 token-3에 대한 복구는 시도되지 않음
+        verify(tossAuthApi, never()).recoverToken(eq(ACCOUNT.id()), eq("cid"), eq("csecret"), eq("token-3"), anyBoolean());
+        verify(tossAuthApi, never()).recoverToken(eq(ACCOUNT.id()), eq("cid"), eq("csecret"), anyString(), eq(true));
         verify(tossAuthApi).getToken(eq(ACCOUNT.id()), anyString(), anyString());
-        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+        verify(tossRestTemplate, times(4)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
@@ -283,10 +332,13 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("공통 API(getCommon) 401도 최대 2회까지 백오프 재시도 후 성공")
+    @DisplayName("공통 API(getCommon) 401도 매번 복구를 재조회하며 백오프 재시도 후 성공")
     void getCommon_retriesTwiceAfter401_thenSucceeds() {
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
-        when(tossAuthApi.recoverAdminToken("admin-token-0"))
+        when(tossAuthApi.recoverAdminToken("admin-token-0", false))
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", true));
+        // 두 번째 401도 다른 값(admin-token-1)이라 forceReissue=false로 계속 복구를 재조회
+        when(tossAuthApi.recoverAdminToken("admin-token-1", false))
                 .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized())
@@ -296,19 +348,25 @@ class TossHttpClientTest {
         String result = newClient().getCommon(PATH, new LinkedMultiValueMap<>(), String.class);
 
         assertThat(result).isEqualTo("OK");
-        verify(tossAuthApi).recoverAdminToken("admin-token-0");
-        verify(tossAuthApi, never()).recoverAdminToken("admin-token-1");
+        verify(tossAuthApi).recoverAdminToken("admin-token-0", false);
+        verify(tossAuthApi).recoverAdminToken("admin-token-1", false);
+        verify(tossAuthApi, never()).recoverAdminToken(anyString(), eq(true));
         verify(tossAuthApi).getAdminToken();
         verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), eq(String.class));
     }
 
     @Test
-    @DisplayName("공통 API 401이 세 번(최초+2차 재시도 모두) 발생하면 TossApiException")
+    @DisplayName("공통 API 401이 재시도 한도(MAX=3) 내내 발생하면 TossApiException")
     void getCommon_throwsTossApiException_when401Persists() {
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
-        when(tossAuthApi.recoverAdminToken("admin-token-0"))
+        // 세 번의 복구가 매번 서로 다른 값을 반환 — 어느 것도 직전과 동일하지 않으므로 forceReissue는 한 번도 true가 되지 않음
+        when(tossAuthApi.recoverAdminToken("admin-token-0", false))
                 .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-1", true));
+        when(tossAuthApi.recoverAdminToken("admin-token-1", false))
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-2", true));
+        when(tossAuthApi.recoverAdminToken("admin-token-2", false))
+                .thenReturn(new TokenCoordinator.RecoveredToken("admin-token-3", true));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(unauthorized());
 
@@ -317,10 +375,14 @@ class TossHttpClientTest {
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("토큰 재시도 실패");
 
-        verify(tossAuthApi).recoverAdminToken("admin-token-0");
-        verify(tossAuthApi, never()).recoverAdminToken("admin-token-1");
+        verify(tossAuthApi).recoverAdminToken("admin-token-0", false);
+        verify(tossAuthApi).recoverAdminToken("admin-token-1", false);
+        verify(tossAuthApi).recoverAdminToken("admin-token-2", false);
+        // 마지막(4번째) 시도는 attempt>=MAX_RETRY_ATTEMPTS로 즉시 실패해 admin-token-3에 대한 복구는 시도되지 않음
+        verify(tossAuthApi, never()).recoverAdminToken(eq("admin-token-3"), anyBoolean());
+        verify(tossAuthApi, never()).recoverAdminToken(anyString(), eq(true));
         verify(tossAuthApi).getAdminToken();
-        verify(tossRestTemplate, times(3)).exchange(anyString(), eq(HttpMethod.GET),
+        verify(tossRestTemplate, times(4)).exchange(anyString(), eq(HttpMethod.GET),
                 any(HttpEntity.class), eq(String.class));
     }
 
@@ -330,7 +392,7 @@ class TossHttpClientTest {
     void skipsBackoff_whenRecoveredTokenIsCheapReuse_notFreshlyIssued() {
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         // freshlyIssued=false — 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용
-        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0")))
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), eq("token-0"), eq(false)))
                 .thenReturn(new TokenCoordinator.RecoveredToken("token-1", false));
         when(tossRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class),
                 any(ParameterizedTypeReference.class)))
@@ -377,7 +439,7 @@ class TossHttpClientTest {
                 TossDistributedTokenCoordinator.class);
         AtomicReference<String> currentToken = new AtomicReference<>(initialToken);
         when(coordinator.obtain(any(), any())).thenAnswer(invocation -> currentToken.get());
-        when(coordinator.recover(any(), anyString(), any()))
+        when(coordinator.recover(any(), anyString(), any(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     String rejectedToken = invocation.getArgument(1);
                     String current = currentToken.get();
@@ -405,7 +467,7 @@ class TossHttpClientTest {
                 TossDistributedTokenCoordinator.class);
         AtomicReference<String> currentToken = new AtomicReference<>(initialToken);
         when(coordinator.getAdminToken(any())).thenAnswer(invocation -> currentToken.get());
-        when(coordinator.recoverAdminToken(anyString(), any())).thenAnswer(invocation -> {
+        when(coordinator.recoverAdminToken(anyString(), any(), anyBoolean())).thenAnswer(invocation -> {
             String rejectedToken = invocation.getArgument(0);
             String current = currentToken.get();
             if (!current.equals(rejectedToken)) {

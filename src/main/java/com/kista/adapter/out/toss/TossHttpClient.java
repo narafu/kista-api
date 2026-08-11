@@ -17,6 +17,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -113,15 +115,17 @@ class TossHttpClient {
 
     // 401 재시도 시 백오프 간격(ms) — 재발급 직후 토큰이 Toss 리소스 서버에 즉시 반영되지 않는 경우 대응
     private static final long RETRY_BACKOFF_MILLIS = 300;
-    // 최초 시도 이후 허용하는 최대 401 재시도 횟수
-    private static final int MAX_RETRY_ATTEMPTS = 2;
+    // 최초 시도 이후 허용하는 최대 401 재시도 횟수 — 3회(백오프 300+600+900=1800ms 누적)로 지문 보호
+    // TTL(TossRedisTokenStore.RECENT_FINGERPRINT_TTL=2s)에 가깝게 맞춰, forceReissue로 강제 재발급된
+    // 토큰도 자기 나이 최대 ~1500ms까지 재시도 기회를 받도록 한다(2로는 600ms뿐이라 부족했음 — 2026-08-11 사례)
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     // 계좌 토큰 재시도 — 공통 헬퍼에 계좌별 토큰 조회/원자적 401 복구만 주입
     private <T> T executeWithRetry(Account account, String path, Function<String, T> call) {
         return executeWithBackoffRetry("계좌", path,
                 () -> tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey()),
-                token -> tossAuthApi.recoverToken(
-                        account.id(), account.appKey(), account.secretKey(), token),
+                (rejectedToken, forceReissue) -> tossAuthApi.recoverToken(
+                        account.id(), account.appKey(), account.secretKey(), rejectedToken, forceReissue),
                 call);
     }
 
@@ -135,13 +139,20 @@ class TossHttpClient {
     }
 
     // 401 → 실패 토큰을 최신/최근 발급 세대와 원자적으로 비교한 뒤 최대 MAX_RETRY_ATTEMPTS회 재시도한다.
-    // 재시도 사이 짧은 백오프를 둬 갓 재발급된 토큰의 리소스 서버 반영 지연을 흡수한다.
+    // 매 401마다 코디네이터를 재호출해 복구를 시도한다 — 같은 rejectedToken이 연속으로 다시 거절되면
+    // (직전 지문 보호 대기가 전파 지연을 못 해소한 것으로 판명됨) forceReissue로 승격해 지문 보호를 건너뛰고
+    // 실제 재발급을 강제한다. 첫 401에서만 복구를 시도하고 이후 같은 토큰을 맹목적으로 재시도하던 이전 방식은
+    // 지문 보호 TTL(2초)보다 총 백오프 예산(구 MAX=2, 최대 900ms)이 짧아 전파 지연이 그 안에 안 끝나면
+    // 결정적으로 실패했다 — 2026-08-11 PRIVACY BUY 주문 접수 실패 사례.
+    // 401 재시도 경로(정상 경로 아님)의 지연·부하가 이전보다 늘어난다: 코디네이터 호출이 매 401마다 발생하고
+    // (구 방식은 최초 1회) forceReissue는 실제 lease 획득+OAuth 재발급을 유발할 수 있다 — 정상 응답 경로에는
+    // 영향 없음.
     // 계좌 토큰(executeWithRetry)·관리자 토큰(getCommon) 양쪽이 공유하는 재시도 골격.
     private <T> T executeWithBackoffRetry(String tokenKind, String path, Supplier<String> tokenFetcher,
-                                           Function<String, TossDistributedTokenCoordinator.RecoveredToken> tokenRecoverer,
+                                           BiFunction<String, Boolean, TossDistributedTokenCoordinator.RecoveredToken> tokenRecoverer,
                                            Function<String, T> call) {
         String token = tokenFetcher.get();
-        boolean refreshed = false; // 최초 401에서만 토큰을 갱신하고 이후에는 신규 토큰을 재사용
+        String previousRecoveryInput = null; // 직전 복구 시도에 넘긴 거절 토큰 — 같은 토큰이 또 거절되면 대기가 무의미
         for (int attempt = 0; ; attempt++) {
             try {
                 return call.apply(token);
@@ -165,21 +176,15 @@ class TossHttpClient {
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
                 }
-                // 최초 401은 같은 발급 락의 원자적 복구로 교체/최근 세대를 먼저 확보한 뒤 전파를 기다린다.
-                if (!refreshed) {
-                    log.warn("Toss 401 — {} 토큰 복구 후 전파 대기 재시도 {}/{}: path={}",
-                            tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
-                    TossDistributedTokenCoordinator.RecoveredToken recovered = tokenRecoverer.apply(token);
-                    token = recovered.accessToken();
-                    // 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우
-                    // (freshlyIssued=false)에는 전파 지연 위험이 없으므로 백오프 대기를 생략한다.
-                    if (recovered.freshlyIssued()) {
-                        sleepBackoff(attempt);
-                    }
-                    refreshed = true;
-                } else {
-                    log.warn("Toss 401 — {} 신규 토큰 전파 대기 재시도 {}/{}: path={}",
-                            tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path);
+                boolean forceReissue = Objects.equals(token, previousRecoveryInput);
+                log.warn("Toss 401 — {} 토큰 복구 재시도 {}/{}: path={}, forceReissue={}",
+                        tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path, forceReissue);
+                previousRecoveryInput = token;
+                TossDistributedTokenCoordinator.RecoveredToken recovered = tokenRecoverer.apply(token, forceReissue);
+                token = recovered.accessToken();
+                // 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우
+                // (freshlyIssued=false)에는 전파 지연 위험이 없으므로 백오프 대기를 생략한다.
+                if (recovered.freshlyIssued()) {
                     sleepBackoff(attempt);
                 }
             } catch (RestClientException e) {

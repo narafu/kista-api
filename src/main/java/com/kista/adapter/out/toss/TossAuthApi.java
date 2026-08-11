@@ -49,12 +49,14 @@ class TossAuthApi implements BrokerConnectionTestPort {
         return new TokenCoordinator.IssuedToken(response.accessToken(), response.expiresIn());
     }
 
+    // forceReissue=true — 동일 rejectedAccessToken이 반복 거절된 경우, 지문 보호 재사용을 건너뛰고 실제 재발급을 강제한다
     public TokenCoordinator.RecoveredToken recoverToken(
-            UUID accountId, String clientId, String clientSecret, String rejectedAccessToken) {
+            UUID accountId, String clientId, String clientSecret, String rejectedAccessToken, boolean forceReissue) {
         return tokenCoordinator.recover(
                 accountId,
                 rejectedAccessToken,
-                () -> issueAccountToken(accountId, clientId, clientSecret));
+                () -> issueAccountToken(accountId, clientId, clientSecret),
+                forceReissue);
     }
 
     // ── 관리자(공통 API) 토큰 — 시세·환율·시장정보 공통 API 전용 (Account 없음, TokenCoordinator 범위 밖) ──
@@ -63,8 +65,9 @@ class TossAuthApi implements BrokerConnectionTestPort {
         return tokenCoordinator.getAdminToken(this::issueAdminToken);
     }
 
-    public TokenCoordinator.RecoveredToken recoverAdminToken(String rejectedAccessToken) {
-        return tokenCoordinator.recoverAdminToken(rejectedAccessToken, this::issueAdminToken);
+    // forceReissue=true — 동일 rejectedAccessToken이 반복 거절된 경우, 지문 보호 재사용을 건너뛰고 실제 재발급을 강제한다
+    public TokenCoordinator.RecoveredToken recoverAdminToken(String rejectedAccessToken, boolean forceReissue) {
+        return tokenCoordinator.recoverAdminToken(rejectedAccessToken, this::issueAdminToken, forceReissue);
     }
 
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────
