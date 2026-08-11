@@ -394,6 +394,28 @@ class MonthlyReturnCalculatorTest {
                                 FEBRUARY_2, new BigDecimal("121.0000000000"), new BigDecimal("0.1000000000")));
     }
 
+    @Test
+    void WEEKLY_granularity는_DAILY와_동일하게_매_유효_평가일마다_포인트를_방출한다() {
+        StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
+
+        List<InvestmentPoint> result = calculator.calculate(
+                List.of(cycle),
+                List.of(position(cycle, JANUARY_31, "100"),
+                        position(cycle, FEBRUARY_1, "110"),
+                        position(cycle, FEBRUARY_2, "121")),
+                JANUARY_31, FEBRUARY_2, BenchmarkGranularity.WEEKLY);
+
+        assertThat(result)
+                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd, InvestmentPoint::periodReturn)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(
+                                JANUARY_31, new BigDecimal("100.0000000000"), new BigDecimal("0.0000000000")),
+                        org.assertj.core.groups.Tuple.tuple(
+                                FEBRUARY_1, new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000")),
+                        org.assertj.core.groups.Tuple.tuple(
+                                FEBRUARY_2, new BigDecimal("121.0000000000"), new BigDecimal("0.1000000000")));
+    }
+
     private static StrategyCycle activeCycle(UUID strategyId, String startAmount, LocalDate startDate) {
         return cycle(strategyId, startAmount, null, startDate, null);
     }

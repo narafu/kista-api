@@ -243,7 +243,7 @@ final class MonthlyReturnCalculator {
             previousValue = valuation.value();
             previousDate = valuation.date();
             if (validIndex) {
-                if (granularity == BenchmarkGranularity.DAILY) {
+                if (granularity != BenchmarkGranularity.MONTHLY) {
                     dailyPoints.add(new InvestmentPoint(
                             valuation.date(),
                             investmentIndex.setScale(SCALE, ROUNDING_MODE),
@@ -256,7 +256,7 @@ final class MonthlyReturnCalculator {
                 }
             }
         }
-        return granularity == BenchmarkGranularity.DAILY
+        return granularity != BenchmarkGranularity.MONTHLY
                 ? List.copyOf(dailyPoints) : List.copyOf(monthlyPoints.values());
     }
 

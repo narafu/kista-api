@@ -72,7 +72,7 @@ final class HousingBenchmarkComparisonBuilder {
             // MONTHLY는 인접 데이터 간 공백(결측월)이 있으면 수익률을 비워 오해를 막는다.
             // DAILY는 commonDates 자체가 이미 실거래일 교집합이라 인접 검사 없이 항상 계산한다.
             boolean computeReturn = previousDate != null
-                    && (granularity == BenchmarkGranularity.DAILY || date.equals(previousDate.plusMonths(1)));
+                    && (granularity != BenchmarkGranularity.MONTHLY || date.equals(previousDate.plusMonths(1)));
             points.add(new HousingBenchmarkPoint(
                     date,
                     investmentIndex,
@@ -88,9 +88,9 @@ final class HousingBenchmarkComparisonBuilder {
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
-        double periodsPerYear = granularity == BenchmarkGranularity.DAILY
-                ? DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate())
-                : 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate());
+        double periodsPerYear = granularity == BenchmarkGranularity.MONTHLY
+                ? 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate())
+                : DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate());
         PerformanceComparisonSummary summary = new PerformanceComparisonSummary(
                 investmentCumulativeReturn,
                 benchmarkCumulativeReturn,

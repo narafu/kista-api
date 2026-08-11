@@ -313,7 +313,7 @@ class StatsService implements UserStatsUseCase {
         // MONTHLY(아파트)는 월 단위 비교라 요청한 from을 월초로 내림하지만, DAILY(ETF)는 사용자가
         // 고른 정확한 날짜를 그대로 써야 한다 — 월초로 내리면 요청하지 않은 기간까지 포함된다.
         LocalDate effectiveFrom = from != null
-                ? (granularity == BenchmarkGranularity.DAILY ? from : from.withDayOfMonth(1))
+                ? (granularity != BenchmarkGranularity.MONTHLY ? from : from.withDayOfMonth(1))
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo)
                         .orElse(effectiveTo).withDayOfMonth(1);
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
@@ -440,7 +440,7 @@ class StatsService implements UserStatsUseCase {
     // 그대로 적용하면 당월 투자 기록·ETF 시세가 전부 잘려나간다.
     private static LocalDate completedMonthEnd(LocalDate requestedTo, BenchmarkGranularity granularity) {
         LocalDate today = LocalDate.now(TimeZones.KST);
-        if (granularity == BenchmarkGranularity.DAILY) {
+        if (granularity != BenchmarkGranularity.MONTHLY) {
             return requestedTo != null ? requestedTo : today;
         }
         YearMonth requestedMonth = YearMonth.from(requestedTo != null ? requestedTo : today);
