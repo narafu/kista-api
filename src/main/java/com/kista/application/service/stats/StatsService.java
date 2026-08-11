@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 class StatsService implements UserStatsUseCase {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
-    private static final String SEOUL_REGION_NAME = "서울";
     // 실제 KB Land 데이터는 2008-12부터 존재 — 여유 있는 안전 하한
     private static final LocalDate EARLIEST_BENCHMARK_DATE = LocalDate.of(2000, 1, 1);
     // 사이클 스냅샷은 04:30 배치+체결 append-only라 TTL 만료로 충분(수동실행 직후 최대 5분 stale 허용 트레이드오프)
@@ -50,6 +49,7 @@ class StatsService implements UserStatsUseCase {
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final HousingBenchmarkPricePort housingBenchmarkPricePort;
+    private final HousingPriceIndexPort housingPriceIndexPort;
     private final ExchangeRatePort exchangeRatePort;
     private final IndexPricePort indexPricePort;
     private final StatsResultCache statsResultCache;
@@ -63,10 +63,10 @@ class StatsService implements UserStatsUseCase {
     // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
     private record EquityCurveKey(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {}
 
-    // 벤치마크 비교 캐시 키 — HOUSING(quintile 사용, symbol=null) / ETF(symbol 사용, quintile=null) 공용
+    // 벤치마크 비교 캐시 키 — HOUSING(regionCode 사용, symbol=null) / ETF(symbol 사용, regionCode=null) 공용
     private record BenchmarkComparisonKey(
             UUID userId, BenchmarkAssetType assetType, BenchmarkScope scope, UUID strategyId,
-            Integer quintile, String symbol, LocalDate from, LocalDate to) {}
+            String regionCode, String symbol, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰
     private record CycleView(StrategyCycle cycle, Strategy strategy, BigDecimal effectiveStartAmount) {
@@ -153,45 +153,57 @@ class StatsService implements UserStatsUseCase {
     @Override
     public HousingBenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
-            int quintile, LocalDate from, LocalDate to) {
-        validateComparisonRequest(scope, strategyId, quintile, from, to);
+            String regionCode, LocalDate from, LocalDate to) {
+        validateComparisonRequest(scope, strategyId, regionCode, from, to);
         // 병렬 조회(본체∥환율) 이전에 소유권을 동기적으로 검증 — 인가 실패 시 외부 환율 API가 호출되지 않도록 보장
         authorizeIfStrategyScope(scope, strategyId, userId);
         BenchmarkComparisonKey key = new BenchmarkComparisonKey(
-                userId, BenchmarkAssetType.HOUSING, scope, strategyId, quintile, null, from, to);
+                userId, BenchmarkAssetType.HOUSING, scope, strategyId, regionCode, null, from, to);
         return comparisonWithExchangeRate(key,
-                () -> computeHousingComparisonBody(userId, scope, strategyId, quintile, from, to));
+                () -> computeHousingComparisonBody(userId, scope, strategyId, regionCode, from, to));
     }
 
     private HousingBenchmarkComparison computeHousingComparisonBody(
-            UUID userId, BenchmarkScope scope, UUID strategyId, int quintile, LocalDate from, LocalDate to) {
-        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.MONTHLY);
+            UUID userId, BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
+        InvestmentContext ctx = buildInvestmentContext(userId, scope, strategyId, from, to, BenchmarkGranularity.WEEKLY);
 
-        LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
-        LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
-        List<HousingBenchmarkPrice> benchmarkRows =
-                housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
-                        HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
-                        SEOUL_REGION_CODE, benchmarkFrom, benchmarkTo);
-        Map<LocalDate, BigDecimal> selectedBenchmarkPrices = benchmarkRows.stream()
-                .collect(Collectors.toMap(
-                        HousingBenchmarkPrice::baseMonth,
-                        price -> selectQuintilePrice(price, quintile),
-                        (left, right) -> right,
-                        TreeMap::new));
-        LocalDate sourceUpdatedDate = benchmarkRows.stream()
-                .map(HousingBenchmarkPrice::sourceUpdatedDate)
+        List<HousingPriceIndex> indexRows = housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, regionCode,
+                ctx.effectiveFrom(), ctx.effectiveTo());
+        NavigableMap<LocalDate, BigDecimal> indexByDate = indexRows.stream()
+                .collect(Collectors.toMap(HousingPriceIndex::baseDate, HousingPriceIndex::indexValue,
+                        (left, right) -> right, TreeMap::new));
+
+        // 투자 일별 지수를 KB 주간 조사일에 as-of(그 날짜 이하 최근값)로 스냅한다 — 조사일과
+        // 투자 평가일이 어긋나는 날(미국 휴일, KB 결측 주)이 정확한 날짜 일치 교집합에서 조용히
+        // 사라지는 것을 방지한다.
+        NavigableMap<LocalDate, InvestmentPoint> investmentByDate = ctx.investmentPoints().stream()
+                .collect(Collectors.toMap(InvestmentPoint::baseDate, Function.identity(),
+                        (left, right) -> right, TreeMap::new));
+        List<InvestmentPoint> snappedPoints = new ArrayList<>();
+        for (LocalDate surveyDate : indexByDate.keySet()) {
+            // 투자 종료(마지막 스냅샷) 이후 조사일은 스킵 — floorEntry가 마지막 값을 그대로
+            // 반환해 투자지수가 고정된 채 벤치마크만 계속 움직이는 착시를 방지한다.
+            if (!investmentByDate.isEmpty() && surveyDate.isAfter(investmentByDate.lastKey())) continue;
+            var asOf = investmentByDate.floorEntry(surveyDate);
+            if (asOf == null) continue; // 투자 시작 전 조사일은 스킵
+            snappedPoints.add(new InvestmentPoint(surveyDate, asOf.getValue().investmentIndexUsd(), null));
+        }
+
+        String regionName = indexRows.stream().findFirst().map(HousingPriceIndex::regionName).orElse(null);
+        LocalDate sourceUpdatedDate = indexRows.stream()
+                .map(HousingPriceIndex::sourceUpdatedDate)
                 .filter(Objects::nonNull)
                 .max(LocalDate::compareTo)
                 .orElse(null);
 
         HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
-                BenchmarkAssetType.HOUSING, SEOUL_REGION_CODE, SEOUL_REGION_NAME, quintile, null,
-                SEOUL_REGION_NAME + " 아파트 " + quintile + "분위", sourceUpdatedDate);
+                BenchmarkAssetType.HOUSING, regionCode, regionName, null,
+                (regionName != null ? regionName : regionCode) + " 아파트 매매가격지수", sourceUpdatedDate);
 
         return comparisonBuilder.build(
-                scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), selectedBenchmarkPrices,
-                BenchmarkGranularity.MONTHLY);
+                scope, ctx.selectedStrategy(), benchmark, snappedPoints, indexByDate,
+                BenchmarkGranularity.WEEKLY);
     }
 
     @Override
@@ -228,7 +240,7 @@ class StatsService implements UserStatsUseCase {
                 .max(LocalDate::compareTo).map(date -> date.plusDays(1)).orElse(null);
 
         HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
-                BenchmarkAssetType.ETF, null, null, null, symbol.name(),
+                BenchmarkAssetType.ETF, null, null, symbol.name(),
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
         return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.investmentPoints(), prices,
@@ -310,10 +322,10 @@ class StatsService implements UserStatsUseCase {
         Set<UUID> strategyIds = strategies.stream().map(Strategy::id).collect(Collectors.toSet());
         List<StrategyCycle> cycles = strategyIds.isEmpty()
                 ? List.of() : strategyCyclePort.findByStrategyIds(strategyIds);
-        // MONTHLY(아파트)는 월 단위 비교라 요청한 from을 월초로 내림하지만, DAILY(ETF)는 사용자가
-        // 고른 정확한 날짜를 그대로 써야 한다 — 월초로 내리면 요청하지 않은 기간까지 포함된다.
+        // MONTHLY만 월 단위 비교라 요청한 from을 월초로 내림한다. 그 외(WEEKLY·DAILY)는 포인트
+        // 단위 비교라 사용자가 고른 정확한 날짜를 그대로 쓴다 — 월초로 내리면 요청하지 않은 기간까지 포함된다.
         LocalDate effectiveFrom = from != null
-                ? (granularity == BenchmarkGranularity.DAILY ? from : from.withDayOfMonth(1))
+                ? (granularity != BenchmarkGranularity.MONTHLY ? from : from.withDayOfMonth(1))
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo)
                         .orElse(effectiveTo).withDayOfMonth(1);
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
@@ -342,7 +354,7 @@ class StatsService implements UserStatsUseCase {
 
     @Override
     public List<HousingBenchmarkRegion> getHousingBenchmarkRegions() {
-        return housingBenchmarkPricePort.findDistinctRegions(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE);
+        return housingPriceIndexPort.findDistinctRegions(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
@@ -399,7 +411,7 @@ class StatsService implements UserStatsUseCase {
     }
 
     private static void validateComparisonRequest(
-            BenchmarkScope scope, UUID strategyId, int quintile, LocalDate from, LocalDate to) {
+            BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
         if (scope == null) {
             throw new IllegalArgumentException("scope은 필수입니다");
         }
@@ -409,15 +421,15 @@ class StatsService implements UserStatsUseCase {
         if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
             throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
         }
-        if (quintile < 1 || quintile > 5) {
-            throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
+        if (regionCode == null || regionCode.isBlank()) {
+            throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
         }
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
     }
 
-    // 자산 종류와 무관한 공통 검증 (quintile 제외) — HOUSING은 validateComparisonRequest로 이미 검증된 뒤
+    // 자산 종류와 무관한 공통 검증 (regionCode 제외) — HOUSING은 validateComparisonRequest로 이미 검증된 뒤
     // buildInvestmentContext에서 한 번 더(멱등) 타고, ETF는 이 메서드가 유일한 검증 지점이다.
     private static void validateScopeAndRange(
             BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
@@ -435,12 +447,12 @@ class StatsService implements UserStatsUseCase {
         }
     }
 
-    // 아파트(KB Land)는 월 단위로 늦게 발행되어 이번 달 데이터가 아직 없을 수 있으므로
-    // 직전 완료 월까지만 비교한다. ETF는 매일 갱신되는 데이터라 이 clamp가 필요 없다 —
-    // 그대로 적용하면 당월 투자 기록·ETF 시세가 전부 잘려나간다.
+    // MONTHLY만 월 단위로 늦게 발행되는 데이터를 전제로 직전 완료 월까지 clamp한다.
+    // 그 외(WEEKLY·DAILY)는 포인트 단위로 자주 갱신되어 clamp가 필요 없다 —
+    // 그대로 적용하면 당월 투자 기록·벤치마크 시세가 전부 잘려나간다.
     private static LocalDate completedMonthEnd(LocalDate requestedTo, BenchmarkGranularity granularity) {
         LocalDate today = LocalDate.now(TimeZones.KST);
-        if (granularity == BenchmarkGranularity.DAILY) {
+        if (granularity != BenchmarkGranularity.MONTHLY) {
             return requestedTo != null ? requestedTo : today;
         }
         YearMonth requestedMonth = YearMonth.from(requestedTo != null ? requestedTo : today);
@@ -448,17 +460,6 @@ class StatsService implements UserStatsUseCase {
         YearMonth effectiveMonth = requestedMonth.isAfter(lastCompletedMonth)
                 ? lastCompletedMonth : requestedMonth;
         return effectiveMonth.atEndOfMonth();
-    }
-
-    private static BigDecimal selectQuintilePrice(HousingBenchmarkPrice price, int quintile) {
-        return switch (quintile) {
-            case 1 -> price.firstQuintilePrice();
-            case 2 -> price.secondQuintilePrice();
-            case 3 -> price.thirdQuintilePrice();
-            case 4 -> price.fourthQuintilePrice();
-            case 5 -> price.fifthQuintilePrice();
-            default -> throw new IllegalArgumentException("quintile은 1부터 5까지여야 합니다");
-        };
     }
 
     private CurrentExchangeRate fetchCurrentExchangeRate() {

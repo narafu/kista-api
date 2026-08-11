@@ -30,7 +30,8 @@ public record HousingBenchmarkComparisonResponse(
         @Schema(types = {"string", "null"}) String emptyReason
 ) {
     private static final String HOUSING_NOTICE =
-            "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 서울 아파트는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다.";
+            "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 아파트 매매가격지수는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다. "
+                    + "벤치마크 시점은 KB Land 주간 조사일(매주 월요일) 기준입니다.";
     private static final String ETF_NOTICE =
             "전략 운용 기록 기반 근사치입니다. 투자와 ETF 벤치마크 모두 USD 기준이며 환율 변수가 없습니다.";
 
@@ -42,7 +43,6 @@ public record HousingBenchmarkComparisonResponse(
             String assetType,
             @Schema(types = {"string", "null"}) String regionCode,
             @Schema(types = {"string", "null"}) String regionName,
-            @Schema(types = {"integer", "null"}) Integer quintile,
             @Schema(types = {"string", "null"}) String symbol,
             String label,
             @Schema(types = {"string", "null"}, format = "date") LocalDate sourceUpdatedDate
@@ -60,8 +60,9 @@ public record HousingBenchmarkComparisonResponse(
             BigDecimal investmentCumulativeReturn,
             BigDecimal benchmarkCumulativeReturn,
             BigDecimal excessReturn,
-            BigDecimal investmentAnnualizedReturn,
-            BigDecimal benchmarkAnnualizedReturn,
+            // 90일 미만 구간은 연환산이 억제되어 null이 내려간다
+            @Schema(types = {"number", "null"}) BigDecimal investmentAnnualizedReturn,
+            @Schema(types = {"number", "null"}) BigDecimal benchmarkAnnualizedReturn,
             BigDecimal investmentMaxDrawdown,
             BigDecimal benchmarkMaxDrawdown
     ) {}
@@ -99,8 +100,7 @@ public record HousingBenchmarkComparisonResponse(
                         strategy.id(), strategy.type().name(), strategy.ticker().name()),
                 new Benchmark(
                         benchmark.assetType().name(), benchmark.regionCode(), benchmark.regionName(),
-                        benchmark.quintile(), benchmark.symbol(),
-                        benchmark.label(), benchmark.sourceUpdatedDate()),
+                        benchmark.symbol(), benchmark.label(), benchmark.sourceUpdatedDate()),
                 new Period(period.fromDate(), period.toDate(), period.pointCount()),
                 toSummary(comparison.summary()),
                 comparison.points().stream().map(HousingBenchmarkComparisonResponse::toPoint).toList(),
