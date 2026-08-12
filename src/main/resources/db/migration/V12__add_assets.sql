@@ -1,4 +1,4 @@
--- V10: 개인 자산 관리(자산 기록 + 월별 기록 점검) 테이블 추가
+-- V12: 개인 자산 관리(자산 기록 + 월별 기록 점검) 테이블 추가
 -- Column order: pk -> fk -> business columns -> created_at -> updated_at -> deleted_at
 
 CREATE TABLE assets (
