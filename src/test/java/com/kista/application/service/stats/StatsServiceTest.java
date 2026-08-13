@@ -859,6 +859,67 @@ class StatsServiceTest {
     }
 
     @Test
+    void 매매가격지수_시계열_조회는_from_to를_그대로_port에_전달한다() {
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "1100000000", FROM, TO))
+                .thenReturn(weeklyIndices());
+
+        List<HousingPriceIndex> result = statsService.getHousingPriceIndexSeries(FROM, TO, null);
+
+        assertThat(result).isEqualTo(weeklyIndices());
+        verify(housingPriceIndexPort).findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "1100000000", FROM, TO);
+    }
+
+    @Test
+    void 매매가격지수_시계열_조회는_from_to가_모두_없으면_최소날짜부터_오늘까지_조회한다() {
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                anyString(), anyString(), any(), any())).thenReturn(List.of());
+        ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
+
+        statsService.getHousingPriceIndexSeries(null, null, null);
+
+        verify(housingPriceIndexPort).findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                eq(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX), eq("1100000000"),
+                fromCaptor.capture(), toCaptor.capture());
+        assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+    }
+
+    @Test
+    void 매매가격지수_시계열_조회는_역전된_기간을_거부한다() {
+        assertThatThrownBy(() -> statsService.getHousingPriceIndexSeries(TO, FROM, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(housingPriceIndexPort);
+    }
+
+    @Test
+    void 매매가격지수_시계열_조회는_지정된_regionCode를_그대로_port에_전달한다() {
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "2600000000", FROM, TO))
+                .thenReturn(List.of());
+
+        statsService.getHousingPriceIndexSeries(FROM, TO, "2600000000");
+
+        verify(housingPriceIndexPort).findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "2600000000", FROM, TO);
+    }
+
+    @Test
+    void 매매가격지수_시계열_조회는_공백_regionCode를_서울로_대체한다() {
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "1100000000", FROM, TO))
+                .thenReturn(List.of());
+
+        statsService.getHousingPriceIndexSeries(FROM, TO, "  ");
+
+        verify(housingPriceIndexPort).findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, "1100000000", FROM, TO);
+    }
+
+    @Test
     void 지역_카탈로그는_주간_지수_port_결과를_그대로_반환한다() {
         List<HousingBenchmarkRegion> regions = List.of(
                 new HousingBenchmarkRegion("1100000000", "서울"),
@@ -869,6 +930,37 @@ class StatsServiceTest {
         List<HousingBenchmarkRegion> result = statsService.getHousingBenchmarkRegions();
 
         assertThat(result).isEqualTo(regions);
+    }
+
+    @Test
+    void ETF_가격_시계열_조회는_symbol_from_to를_그대로_port에_전달한다() {
+        when(indexPricePort.findBySymbolAndRange("SPY", FROM, TO)).thenReturn(spyPrices());
+
+        List<IndexPrice> result = statsService.getEtfPriceSeries(FROM, TO, EtfBenchmarkSymbol.SPY);
+
+        assertThat(result).isEqualTo(spyPrices());
+        verify(indexPricePort).findBySymbolAndRange("SPY", FROM, TO);
+    }
+
+    @Test
+    void ETF_가격_시계열_조회는_from_to가_모두_없으면_최소날짜부터_오늘까지_조회한다() {
+        when(indexPricePort.findBySymbolAndRange(anyString(), any(), any())).thenReturn(List.of());
+        ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
+
+        statsService.getEtfPriceSeries(null, null, EtfBenchmarkSymbol.QQQ);
+
+        verify(indexPricePort).findBySymbolAndRange(eq("QQQ"), fromCaptor.capture(), toCaptor.capture());
+        assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+    }
+
+    @Test
+    void ETF_가격_시계열_조회는_역전된_기간을_거부한다() {
+        assertThatThrownBy(() -> statsService.getEtfPriceSeries(TO, FROM, EtfBenchmarkSymbol.SPY))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(indexPricePort);
     }
 
     // ── ETF 벤치마크 비교 ────────────────────────────────────────────────────

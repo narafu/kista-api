@@ -6,6 +6,8 @@ import com.kista.adapter.in.web.dto.StatsSummaryResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkComparisonResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkRegionsResponse;
 import com.kista.adapter.in.web.dto.HousingBenchmarkSeriesResponse;
+import com.kista.adapter.in.web.dto.HousingPriceIndexSeriesResponse;
+import com.kista.adapter.in.web.dto.EtfPriceSeriesResponse;
 import com.kista.domain.model.stats.BenchmarkAssetType;
 import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.EtfBenchmarkSymbol;
@@ -114,6 +116,43 @@ public class StatsController {
             throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
         HousingBenchmarkSeriesResponse response = HousingBenchmarkSeriesResponse.from(userStats.getHousingBenchmarkSeries(from, to, regionCode));
+        return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
+    }
+
+    @Operation(summary = "아파트 주간 매매가격지수 시계열",
+            description = "KB Land 주간 아파트 매매가격지수 원본 시계열 (regionCode 미지정 시 서울 기본값, 투자 성과와 무관·비교 없음).")
+    @GetMapping("/housing-benchmark/index-series")
+    public ResponseEntity<HousingPriceIndexSeriesResponse> getHousingPriceIndexSeries(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String regionCode) {
+        // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+        HousingPriceIndexSeriesResponse response = HousingPriceIndexSeriesResponse.from(userStats.getHousingPriceIndexSeries(from, to, regionCode));
+        return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
+    }
+
+    @Operation(summary = "ETF 원본 종가 시계열",
+            description = "ETF(SPY/QQQ/QLD/IBIT/ETHA) 일별 종가 원본 시계열 (symbol 필수, 투자 성과와 무관·비교 없음).")
+    @GetMapping("/housing-benchmark/etf-series")
+    public ResponseEntity<EtfPriceSeriesResponse> getEtfPriceSeries(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) EtfBenchmarkSymbol symbol) {
+        // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        }
+        if (symbol == null) {
+            throw new IllegalArgumentException("symbol이 필요합니다");
+        }
+        EtfPriceSeriesResponse response = EtfPriceSeriesResponse.from(userStats.getEtfPriceSeries(from, to, symbol));
         return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
     }
 

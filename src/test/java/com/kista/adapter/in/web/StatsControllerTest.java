@@ -318,6 +318,77 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.regions[1].name").value("부산"));
     }
 
+    @Test
+    void 아파트_매매가격지수_시계열을_반환한다() throws Exception {
+        when(userStats.getHousingPriceIndexSeries(null, null, null)).thenReturn(List.of(
+                new HousingPriceIndex(
+                        HousingPriceIndex.SOURCE_KBLAND, HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
+                        "1100000000", "서울", LocalDate.of(2026, 1, 5), new BigDecimal("100.5"),
+                        LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"))));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/index-series").with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"))
+                .andExpect(jsonPath("$.points[0].baseDate").value("2026-01-05"))
+                .andExpect(jsonPath("$.points[0].indexValue").value(100.5))
+                .andExpect(jsonPath("$.sourceUpdatedDate").value("2026-02-15"));
+    }
+
+    @Test
+    void 매매가격지수_시계열_역전된_기간은_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark/index-series")
+                        .param("from", "2026-07-01").param("to", "2026-01-01")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void 매매가격지수_시계열_조회는_regionCode_파라미터를_서비스에_전달한다() throws Exception {
+        when(userStats.getHousingPriceIndexSeries(null, null, "0000000000")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/index-series")
+                        .param("regionCode", "0000000000")
+                        .with(authentication(auth())))
+                .andExpect(status().isOk());
+
+        verify(userStats).getHousingPriceIndexSeries(null, null, "0000000000");
+    }
+
+    @Test
+    void ETF_가격_시계열을_반환한다() throws Exception {
+        when(userStats.getEtfPriceSeries(null, null, EtfBenchmarkSymbol.SPY)).thenReturn(List.of(
+                new IndexPrice("SPY", LocalDate.of(2026, 1, 30), new BigDecimal("400.00"))));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark/etf-series")
+                        .param("symbol", "SPY")
+                        .with(authentication(auth())))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"))
+                .andExpect(jsonPath("$.points[0].tradeDate").value("2026-01-30"))
+                .andExpect(jsonPath("$.points[0].close").value(400.00));
+    }
+
+    @Test
+    void ETF_가격_시계열은_symbol이_없으면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark/etf-series").with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
+    @Test
+    void ETF_가격_시계열_역전된_기간은_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/stats/housing-benchmark/etf-series")
+                        .param("symbol", "SPY")
+                        .param("from", "2026-07-01").param("to", "2026-01-01")
+                        .with(authentication(auth())))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userStats);
+    }
+
     private static HousingBenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {
         return new HousingBenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,

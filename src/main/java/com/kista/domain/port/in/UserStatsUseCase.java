@@ -7,6 +7,8 @@ import com.kista.domain.model.stats.EtfBenchmarkSymbol;
 import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
 import com.kista.domain.model.stats.HousingBenchmarkRegion;
+import com.kista.domain.model.stats.HousingPriceIndex;
+import com.kista.domain.model.stats.IndexPrice;
 import com.kista.domain.model.stats.StatsSummary;
 import com.kista.domain.model.strategy.Strategy;
 
@@ -35,6 +37,12 @@ public interface UserStatsUseCase {
 
     // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 시계열
     List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode);
+
+    // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 주간 매매가격지수 시계열
+    List<HousingPriceIndex> getHousingPriceIndexSeries(LocalDate from, LocalDate to, String regionCode);
+
+    // from/to null 허용 (null이면 전체 구간). symbol은 필수. 투자 데이터와 무관한 원본 일별 종가 시계열
+    List<IndexPrice> getEtfPriceSeries(LocalDate from, LocalDate to, EtfBenchmarkSymbol symbol);
 
     // 시계열 조회에 사용 가능한 지역 카탈로그 (KB Land 제공 지역 그대로, 하드코딩 아님)
     List<HousingBenchmarkRegion> getHousingBenchmarkRegions();
