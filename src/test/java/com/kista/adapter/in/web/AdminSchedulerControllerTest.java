@@ -91,6 +91,16 @@ class AdminSchedulerControllerTest {
     }
 
     @Test
+    void triggerKbLandPriceIndexFullRefresh_adminToken_returns202AndRunsScheduler() throws Exception {
+        mockMvc.perform(post("/api/admin/scheduler/kbland-price-index/full-refresh")
+                        .with(csrf())
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isAccepted());
+
+        verify(kbLandPriceIndexScheduler, timeout(2000)).runFullRefreshNow();
+    }
+
+    @Test
     void triggerOpen_userToken_returns403() throws Exception {
         mockMvc.perform(post("/api/admin/scheduler/open")
                         .with(csrf())

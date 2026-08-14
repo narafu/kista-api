@@ -30,11 +30,12 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
             + "&%EB%A9%94%EB%89%B4%EC%BD%94%EB%93%9C=01"
             + "&%EA%B8%B0%EA%B0%84=1"; // 최근 1년치
 
+    // years는 요청마다 동적으로 붙는다 (매주는 최근 구간만, 매월 풀 리프레시는 20년 전체)
     private static final String WEEKLY_APT_SALE_PRICE_INDEX_PATH = "/bfmstat/weekMnthlyHuseTrnd/priceIndex"
             + "?%EB%A7%A4%EB%AC%BC%EC%A2%85%EB%B3%84%EA%B5%AC%EB%B6%84=01"
             + "&%EB%A7%A4%EB%A7%A4%EC%A0%84%EC%84%B8%EC%BD%94%EB%93%9C=01"
             + "&%EC%9B%94%EA%B0%84%EC%A3%BC%EA%B0%84%EA%B5%AC%EB%B6%84%EC%BD%94%EB%93%9C=02"
-            + "&%EA%B8%B0%EA%B0%84=20"; // 최근 20년치
+            + "&%EA%B8%B0%EA%B0%84=";
 
     private static final DateTimeFormatter BASE_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
     private static final DateTimeFormatter UPDATED_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -81,8 +82,8 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
     }
 
     @Override
-    public List<HousingPriceIndex> fetchWeeklyAptSalePriceIndex() {
-        KbLandIndexResponse response = kbLandRestTemplate.getForObject(weeklyIndexRequestUri(), KbLandIndexResponse.class);
+    public List<HousingPriceIndex> fetchWeeklyAptSalePriceIndex(int years) {
+        KbLandIndexResponse response = kbLandRestTemplate.getForObject(weeklyIndexRequestUri(years), KbLandIndexResponse.class);
         if (response == null) {
             throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
         }
@@ -140,8 +141,8 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         return URI.create(trimTrailingSlash(properties.baseUrl()) + APT_QTE_SALE_PRICE_PATH);
     }
 
-    private URI weeklyIndexRequestUri() {
-        return URI.create(trimTrailingSlash(properties.baseUrl()) + WEEKLY_APT_SALE_PRICE_INDEX_PATH);
+    private URI weeklyIndexRequestUri(int years) {
+        return URI.create(trimTrailingSlash(properties.baseUrl()) + WEEKLY_APT_SALE_PRICE_INDEX_PATH + years);
     }
 
     private static HousingBenchmarkPrice toDomain(

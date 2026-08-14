@@ -21,14 +21,14 @@ class HousingPriceIndexService implements FetchHousingPriceIndexUseCase {
     private final NotifyPort notifyPort;
 
     @Override
-    public void fetchAndSave() {
+    public void fetchAndSave(int years) {
         try {
-            // KB Land API에서 최근 20년치 지역별 주간 아파트 매매가격지수를 가져와 upsert한다.
-            List<HousingPriceIndex> indices = feedPort.fetchWeeklyAptSalePriceIndex();
+            // KB Land API에서 지정 기간(년)의 지역별 주간 아파트 매매가격지수를 가져와 upsert한다.
+            List<HousingPriceIndex> indices = feedPort.fetchWeeklyAptSalePriceIndex(years);
             indexPort.upsertAll(indices);
-            log.info("KB Land 주간 아파트 매매가격지수 저장 완료: rows={}", indices.size());
+            log.info("KB Land 주간 아파트 매매가격지수 저장 완료: years={}, rows={}", years, indices.size());
         } catch (Exception e) {
-            log.error("KB Land 주간 아파트 매매가격지수 수집 실패: {}", e.getMessage(), e);
+            log.error("KB Land 주간 아파트 매매가격지수 수집 실패: years={}, {}", years, e.getMessage(), e);
             notifyPort.notifyError(e);
         }
     }

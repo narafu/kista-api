@@ -156,7 +156,7 @@ class KbLandHousingBenchmarkAdapterTest {
             + "?%EB%A7%A4%EB%AC%BC%EC%A2%85%EB%B3%84%EA%B5%AC%EB%B6%84=01"
             + "&%EB%A7%A4%EB%A7%A4%EC%A0%84%EC%84%B8%EC%BD%94%EB%93%9C=01"
             + "&%EC%9B%94%EA%B0%84%EC%A3%BC%EA%B0%84%EA%B5%AC%EB%B6%84%EC%BD%94%EB%93%9C=02"
-            + "&%EA%B8%B0%EA%B0%84=20";
+            + "&%EA%B8%B0%EA%B0%84=5";
 
     @Test
     void fetchWeeklyAptSalePriceIndex_parsesRegionWeeklyIndexAndDropsTrailingChangeRateElement() {
@@ -191,7 +191,7 @@ class KbLandHousingBenchmarkAdapterTest {
                 .andExpect(header("Referer", "https://data.kbland.kr/"))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
-        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex();
+        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex(5);
 
         // 변동률 원소가 잘려 날짜리스트 개수(3개)만큼만 도메인 행이 생성된다.
         assertThat(indices).hasSize(3);
@@ -239,7 +239,7 @@ class KbLandHousingBenchmarkAdapterTest {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
-        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex();
+        List<HousingPriceIndex> indices = adapter.fetchWeeklyAptSalePriceIndex(5);
 
         // null 값 첫 원소는 스킵되고 두 번째 값만 남는다.
         assertThat(indices).hasSize(1);
@@ -266,7 +266,7 @@ class KbLandHousingBenchmarkAdapterTest {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(adapter::fetchWeeklyAptSalePriceIndex)
+        assertThatThrownBy(() -> adapter.fetchWeeklyAptSalePriceIndex(5))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("90000");
         server.verify();

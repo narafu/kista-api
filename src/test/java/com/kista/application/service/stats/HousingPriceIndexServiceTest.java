@@ -38,9 +38,9 @@ class HousingPriceIndexServiceTest {
     @Test
     void fetchAndSave_fetchesKbLandWeeklyIndexAndUpsertsAllRows() {
         HousingPriceIndex seoul = index("서울", "1100000000");
-        when(feedPort.fetchWeeklyAptSalePriceIndex()).thenReturn(List.of(seoul));
+        when(feedPort.fetchWeeklyAptSalePriceIndex(2)).thenReturn(List.of(seoul));
 
-        service.fetchAndSave();
+        service.fetchAndSave(2);
 
         ArgumentCaptor<List<HousingPriceIndex>> captor = ArgumentCaptor.captor();
         verify(indexPort).upsertAll(captor.capture());
@@ -51,9 +51,9 @@ class HousingPriceIndexServiceTest {
     @Test
     void fetchAndSave_notifiesErrorWhenKbLandFetchFails() {
         RuntimeException failure = new RuntimeException("kbland api down");
-        when(feedPort.fetchWeeklyAptSalePriceIndex()).thenThrow(failure);
+        when(feedPort.fetchWeeklyAptSalePriceIndex(20)).thenThrow(failure);
 
-        service.fetchAndSave();
+        service.fetchAndSave(20);
 
         verify(indexPort, never()).upsertAll(any());
         verify(notifyPort).notifyError(failure);

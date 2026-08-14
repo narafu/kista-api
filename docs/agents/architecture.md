@@ -85,7 +85,7 @@ adapter/in/
                    TradingCloseScheduler (화~토 04:30 KST — 누락 AT_CLOSE 슬롯 복구, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
                    RefreshTokenCleanupScheduler (매일 04:00 KST 만료 RT 삭제 / 03:05 KST grace 초과 회전 RT 삭제)
                    MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화), FearGreedScheduler (KST 00:00/12:00 — CNN·크립토 공포탐욕지수),
-                   KbLandHousingBenchmarkScheduler (매주 토요일 08:00 KST — KB Land 아파트 5분위 매매평균가격 수집), KbLandPriceIndexScheduler (매주 토요일 08:10 KST — KB Land 아파트 주간 매매가격지수 수집), MarketIndexPriceSyncScheduler (매일 09:00 KST — ETF 벤치마크(EtfBenchmarkSymbol) 종가 동기화, 비거래일은 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음)
+                   KbLandHousingBenchmarkScheduler (매주 토요일 08:00 KST — KB Land 아파트 5분위 매매평균가격 수집), KbLandPriceIndexScheduler (매주 토요일 08:10 KST — KB Land 아파트 주간 매매가격지수 최근 2년치 수집, 매월 1일 08:20 KST 별도 락으로 20년 전체 풀 리프레시해 과거 값 보정 반영), MarketIndexPriceSyncScheduler (매일 09:00 KST — ETF 벤치마크(EtfBenchmarkSymbol) 종가 동기화, 비거래일은 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음)
                    BatchContextFactory (전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError)
                    SchedulerJobRunner (공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
                    SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)

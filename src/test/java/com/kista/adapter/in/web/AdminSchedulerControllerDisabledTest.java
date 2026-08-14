@@ -76,4 +76,12 @@ class AdminSchedulerControllerDisabledTest {
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void triggerKbLandPriceIndexFullRefresh_schedulerDisabled_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/scheduler/kbland-price-index/full-refresh")
+                        .with(csrf())
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isBadRequest());
+    }
 }

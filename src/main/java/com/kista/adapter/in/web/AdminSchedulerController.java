@@ -104,4 +104,22 @@ public class AdminSchedulerController {
             }
         });
     }
+
+    // KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 수동 트리거 — 과거 값 보정을 다음 달 1일까지 기다리지 않고 즉시 반영
+    @Operation(summary = "KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 수동 트리거", description = "20년 전체를 다시 받아 KB Land 과거 값 보정을 즉시 반영하며, 202 반환 후 백그라운드에서 처리합니다.")
+    @PostMapping("/kbland-price-index/full-refresh")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void triggerKbLandPriceIndexFullRefresh() {
+        if (kbLandPriceIndexScheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
+        Thread.ofVirtual().start(() -> {
+            try {
+                kbLandPriceIndexScheduler.runFullRefreshNow();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 수동 트리거 인터럽트");
+            } catch (Exception e) {
+                log.error("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 수동 트리거 오류: {}", e.getMessage(), e);
+            }
+        });
+    }
 }
