@@ -27,6 +27,9 @@ class AlpacaIndexPriceAdapterTest {
         // t는 UTC — 2024-01-02T05:00:00Z = 뉴욕 2024-01-02 00:00 (미국 거래일 2024-01-02)
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test/v2/stocks/SPY/bars")))
                 .andExpect(header("APCA-API-KEY-ID", "test-key"))
+                // 무료 플랜은 feed=sip 조회 시 end가 최소 15분 이전이어야 하는 제약이 있어
+                // 매일 end=오늘로 증분 동기화하는 이 경로는 반드시 feed=iex여야 한다 (회귀 방지)
+                .andExpect(queryParam("feed", "iex"))
                 .andRespond(withSuccess("""
                         {"bars":[{"t":"2024-01-02T05:00:00Z","c":470.12},
                                  {"t":"2024-01-03T05:00:00Z","c":468.55}],
