@@ -21,7 +21,7 @@ public class KbLandHousingBenchmarkScheduler {
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
-    @Scheduled(cron = "0 0 7 * * SUN", zone = TimeZones.KST_ID) // 매주 일요일 07:00 KST
+    @Scheduled(cron = "0 0 8 * * SAT", zone = TimeZones.KST_ID) // 매주 토요일 08:00 KST
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("kbland-housing-benchmark", Duration.ofMinutes(30), this::runLocked);
     }

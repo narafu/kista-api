@@ -14,8 +14,8 @@
 - `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `notifyPort.notifyError()`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림
 - **병렬 접수 인터럽트 리스크(운영 주의)**: 접수 병렬화로 배포·재시작 인터럽트 시 torn-order 범위가 확대된다. Virtual Thread는 인터럽트 시 진행 중 소켓을 강제 종료(JDK21 `Socket` 계약)하므로, 접수 HTTP 응답 대기 중 인터럽트되면 `SocketException`이 `TradingOrderExecutor.placeEach`의 `catch(Exception)`에서 브로커 거절과 구분 없이 `markFailed`로 처리된다 — 브로커는 이미 접수·체결했을 수 있어 DB=FAILED / 브로커=체결 불일치 가능. 순차 시 최대 1건이던 이 위험이 병렬 시 동시 진행 중이던 `계좌수 × parallel-per-account(2)`건으로 늘어난다. 저빈도(배포 시점 접수창 겹칠 때)이나, 배포 타이밍을 접수창(개장 22:30·마감 04:30 KST 직후) 밖으로 두거나 후속으로 `placeEach`에서 인터럽트 기인 실패를 "수동 확인 필요"로 격상하는 완화가 권장된다.
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
-- `KbLandHousingBenchmarkScheduler`: 매주 일요일 07:00 KST `kbland-housing-benchmark` 분산 락으로 실행 — KB Land 최근 1년치 아파트 5분위 매매평균가격을 자연키(source+metric+region+baseMonth) 기준 upsert
-- `KbLandPriceIndexScheduler`: 매주 일요일 07:10 KST `kbland-price-index` 분산 락(5분위와 별도)으로 실행 — KB Land 최근 20년치 아파트 주간 매매가격지수를 자연키(source+metric+region+baseDate) 기준 upsert
+- `KbLandHousingBenchmarkScheduler`: 매주 토요일 08:00 KST `kbland-housing-benchmark` 분산 락으로 실행 — KB Land 최근 1년치 아파트 5분위 매매평균가격을 자연키(source+metric+region+baseMonth) 기준 upsert
+- `KbLandPriceIndexScheduler`: 매주 토요일 08:10 KST `kbland-price-index` 분산 락(5분위와 별도)으로 실행 — KB Land 최근 20년치 아파트 주간 매매가격지수를 자연키(source+metric+region+baseDate) 기준 upsert
 
 ### DstInfo.MarketSession (수동 실행 시간대 판단)
 - `DIRECT`: 프리마켓+정규장 전 구간 — 주문 가능 (DST: 17:00~05:00 / 비DST: 18:00~06:00 KST)
