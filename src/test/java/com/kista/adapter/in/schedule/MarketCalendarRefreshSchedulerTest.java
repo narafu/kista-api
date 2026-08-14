@@ -47,6 +47,31 @@ class MarketCalendarRefreshSchedulerTest {
     }
 
     @Test
+    void onStartup_skipsJobRunnerEntirelyWhenAllYearsPresent() throws Exception {
+        MarketCalendarRefreshPort refreshPort = mock(MarketCalendarRefreshPort.class);
+        MarketHolidayStorePort storePort = mock(MarketHolidayStorePort.class);
+        SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
+        SchedulerLockService lockService = mock(SchedulerLockService.class);
+        MarketCalendarRefreshScheduler scheduler =
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService);
+
+        int year = LocalDate.now(KST).getYear();
+        when(storePort.countByYear(year)).thenReturn(10L);
+        when(storePort.countByYear(year + 1)).thenReturn(5L);
+        when(storePort.countByYear(year + 2)).thenReturn(1L);
+
+        scheduler.onStartup();
+
+        ArgumentCaptor<SchedulerLockService.LockedTask> lockCaptor = ArgumentCaptor.forClass(SchedulerLockService.LockedTask.class);
+        verify(lockService).tryRun(eq("market-calendar-startup"), eq(Duration.ofHours(1)), lockCaptor.capture());
+        lockCaptor.getValue().run();
+
+        // 3년치 모두 존재 — jobRunner 자체를 호출하지 않아 텔레그램 알림도 발생하지 않음
+        verify(jobRunner, never()).run(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Runnable.class));
+        verify(refreshPort, never()).refreshCalendar(org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
     void refreshForNewYear_alwaysRefreshesRegardlessOfExistingData() throws Exception {
         MarketCalendarRefreshPort refreshPort = mock(MarketCalendarRefreshPort.class);
         MarketHolidayStorePort storePort = mock(MarketHolidayStorePort.class);

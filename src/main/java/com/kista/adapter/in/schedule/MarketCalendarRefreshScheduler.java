@@ -30,6 +30,11 @@ public class MarketCalendarRefreshScheduler {
     public void onStartup() throws InterruptedException {
         schedulerLockService.tryRun("market-calendar-startup", Duration.ofHours(1), () -> {
             int year = LocalDate.now(TimeZones.KST).getYear();
+            if (allYearsPresentSafely(year, 3)) {
+                // 적재할 데이터 없음 — jobRunner 알림 자체를 생략해 매 기동마다 텔레그램 오는 것 방지
+                log.debug("캘린더 {}~{} 이미 적재됨 — 기동 시 초기 적재 스킵", year, year + 2);
+                return;
+            }
             // 기동 중단 방지 — jobRunner가 오류 처리 및 알림 담당
             jobRunner.run("기동 시 캘린더 초기 적재", () -> refreshYearsIfMissing(year, 3));
         });
@@ -61,6 +66,22 @@ public class MarketCalendarRefreshScheduler {
     private void refreshYears(int startYear, int count) {
         for (int i = 0; i < count; i++) {
             marketCalendarRefreshPort.refreshCalendar(startYear + i);
+        }
+    }
+
+    // count년치 모두 이미 적재됐는지 확인 — 기동 알림 생략 여부 판단용
+    // jobRunner 보호망 밖에서 실행되므로 DB 조회 실패 시 false로 fail-open해 jobRunner.run 경로(오류 알림 담당)로 넘긴다
+    private boolean allYearsPresentSafely(int startYear, int count) {
+        try {
+            for (int i = 0; i < count; i++) {
+                if (marketHolidayStorePort.countByYear(startYear + i) == 0) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("캘린더 적재 여부 사전 확인 실패 — 기동 초기 적재로 진행: {}", e.getMessage());
+            return false;
         }
     }
 
