@@ -158,7 +158,7 @@ DB는 Supabase에서 자체호스팅 postgres(`kista-postgres` 컨테이너, A �
 - 서버 cron: `0 2 * * * /opt/kista-infra/scripts/backup.sh` (매일 02:00 KST, 매매·pg 부하 없는 시각)
 - `oci` CLI는 `/usr/local/bin/oci` 심볼릭 링크로 설치(원본 `/home/ubuntu/bin/oci`) — cron 기본 PATH에 `/home/ubuntu/bin`이 없어 심볼릭 링크로 우회
 - 수동 백업: 서버에서 `/opt/kista-infra/scripts/backup.sh` 직접 실행
-- 이관 시 사용한 Supabase 자격증명은 `.env.production`(로컬, gitignored)과 kista-api `.env.supabase-rollback`(서버, `/opt/kista-api/`)에만 남아있다 — Supabase 프로젝트 자체는 롤백 대비 최소 1주 보존 후 정리
+- Supabase 프로젝트(nnpchirdkaxvdybhqzct)는 2026-08-14 영구 삭제 완료 — 서버 `.env.supabase-rollback`도 함께 삭제됨. 롤백 경로 없음, 백업/복구는 전적으로 위 `kista-infra` Object Storage 경로에 의존
 
 ### 복구
 1. Object Storage에서 다운로드 → `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -d backup-YYYYMMDD.sql.gpg -o backup.dump`
