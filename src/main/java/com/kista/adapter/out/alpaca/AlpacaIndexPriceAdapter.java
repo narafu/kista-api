@@ -29,6 +29,8 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
     private final AlpacaProperties alpacaProperties;
 
     // Alpaca Market Data /v2/stocks/{symbol}/bars — 일봉 limit 10000이면 약 40년치라 페이지네이션 불필요
+    // feed=sip 사용 — 실측 확인 결과 무료 플랜 기준 iex는 2020-07-27 이전 데이터가 없고, sip은 2016-01-04까지 확장됨
+    // (그 이전은 sip도 데이터 없음 — 별도 외부 소스로 1회성 백필 필요)
     @Override
     public List<IndexPrice> fetchDailyCloses(String symbol, LocalDate from, LocalDate to) {
         String url = UriComponentsBuilder
@@ -37,7 +39,7 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
                 .queryParam("start", from.toString())
                 .queryParam("end", to.toString())
                 .queryParam("adjustment", "split")
-                .queryParam("feed", "iex")
+                .queryParam("feed", "sip")
                 .queryParam("limit", 10000)
                 .toUriString();
 
