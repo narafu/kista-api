@@ -36,7 +36,7 @@
 
 ### 주의사항
 
-- KIS API와 필드명·인증 방식이 다르므로 혼용 주의 (`TossApiException` → 503은 constraints.md, 브로커 분기는 architecture.md "BrokerAdapter Registry 패턴" 참고)
+- KIS API와 필드명·인증 방식이 다르므로 혼용 주의 (`TossApiException` → 503 매핑은 `GlobalExceptionHandler`가 SSOT, 브로커 분기는 architecture.md "BrokerAdapter Registry 패턴" 참고)
 
 ### 가격 조회 API 3분리 — TossPriceApi
 

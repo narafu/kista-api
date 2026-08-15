@@ -11,6 +11,9 @@ bash 명령으로 최신 버전 확인 후 +1:
   ls src/main/resources/db/migration/ | sort -V | tail -3
 파일명: V{N+1}__<영문_설명>.sql
 
+브랜치/워크트리 간 미머지 마이그레이션 파일이 있으면 버전 번호가 충돌할 수 있다 (2026-08-12 실제 배포 롤백 2회 발생 사례: 병렬 브랜치의 V10 마이그레이션이 서로 다른 파일로 미머지 상태에서 충돌). 로컬 ls뿐 아니라 아래 명령으로 다른 브랜치의 최근 마이그레이션도 함께 확인할 것:
+  git log --all --diff-filter=A -- 'src/main/resources/db/migration/*'
+
 ## 2. Entity ↔ SQL 크로스체크 (필수)
 
 - Entity @Column의 nullable/length/precision/scale 값이 SQL 컬럼 정의와 일치하는지 확인
@@ -46,7 +49,7 @@ FK 선언: 반드시 명시적 이름 사용
   CREATE TABLE xxx (...);
   INSERT INTO xxx SELECT ... FROM xxx_old;
   DROP TABLE xxx_old;
-  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (V6__strategy_cycle_lifecycle_columns.sql 참고)
+  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (현재는 V1__init.sql에 스쿼시되어 예시로 참고할 별도 파일 없음 — constraints.md "테이블 재생성 패턴 FK 제약명 주의" 참고)
 
 ## 5. 검증
 

@@ -5,140 +5,72 @@ Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의�
 
 ```
 common/          ← 공통 유틸리티 (Spring/JPA 독립)
-  CycleLookups   — 활성 StrategyCycle 조회 헬퍼 (requireLatestCycle — IllegalStateException 400)
-  TimeZones      — KST/UTC ZoneId 상수
-  UsTradeDates   — toUsTradeDate()/toKstTradeDate() KST↔US 거래일 ±1일 변환, US 기준 외부 데이터 어댑터 전용 (→ constraints.md "시간 기준 정책")
+  UsTradeDates   — KST↔US 거래일 ±1일 변환. 사용 허용 위치: KisTradingApi(KIS API는 US 거래일 기준)·MarketCalendarPersistenceAdapter·KisPriceApi(dailyprice BYMD)뿐 — 도메인·서비스·orders persistence에서 사용 금지 (→ constraints.md "시간 기준 정책")
 
 domain/          ← 순수 Java record/class. Spring·JPA 어노테이션 금지
-  model/         ← 불변 값 객체 (record 사용), 어그리게이트별 서브패키지
-    user/        ← User (nested: UserRole/UserStatus/NotificationChannel enum + CooldownException), UserSettings, FcmDeviceToken,
-                   NotificationType(TRADING_ALERT) — 독립 enum, User nested enum 아님
-    account/     ← Account (nested exceptions: InvalidBrokerKeyException, KisRateLimitException, DuplicateAccountException), Broker,
-                   Register/UpdateAccountCommand, SellableQuantity
-    strategy/    ← Strategy (nested: Type{INFINITE/PRIVACY/VR}, Status, Ticker, CycleSeedType), StrategyCycle, CyclePosition, StrategyDetail,
-                   CyclePositionHistoryEntry, CycleHistoryPage, Register/UpdateStrategyCommand, ReconfigureVrCommand(VR 운영 중 재설정), BatchContext, InfinitePosition, ReverseModePosition,
-                   AccountBalance, TradingSnapshot, TradingReport, DstInfo, PriceSnapshot,
-                   StrategyVrDetail(+gradientAt(weeks)/poolLimitRateAt(weeks) 램프 8필드 포함), StrategyCycleVrDetail(value·gradient·poolLimitRate 스냅샷), VrPosition(+lowerBand/upperBand/buyPrice/sellPrice/nextValue())
-    order/       ← Order, TradeEvent, CancelResult, NextOrdersPreview
-                   Order.withPlaced(externalOrderId) — 브로커 접수 완료 표시 헬퍼
-                   OrderPort 조회/삭제는 strategyCycleId+tradeDate 기준 (cycle 단위 격리)
-                   Order.orderLeg — 내부 leg 식별자; 신규 주문은 concrete leg, legacy 행은 UNKNOWN
-                   OrderPort.findPlannedOrPlacedByCycleAndDate(cycleId, date) — timing+direction+orderLeg 슬롯 점유 확인 (UNKNOWN은 timing+direction coarse) + 수동 실행 결과 반환
-    auth/        ← RefreshToken, TokenRefreshResult, InvalidRefreshTokenException (→ GlobalExceptionHandler 401)
-    broker/      ← 브로커 공통 응답 record (Execution, PresentBalanceResult, MarginItem, Currency, DailyTransaction* — KIS·Toss 공용)
-    kis/         ← KisApiException (KIS 전용)
-    toss/        ← TossApiException (→ GlobalExceptionHandler 503), TossAccountInfo, TossCandle, TossExchangeRate, TossMarketSession, TossStockInfo
-    market/      ← FearGreedSnapshot, FearGreedRating
-    stats/       ← HousingBenchmarkPrice (KB Land 주택 벤치마크 월별 분위 가격), HousingPriceIndex(주간 아파트 매매가격지수, KbLand), EtfBenchmarkSymbol(SPY/QQQ/QLD/IBIT/ETHA 벤치마크 화이트리스트), IndexPrice(symbol별 일별 종가, tradeDate는 US 거래일 원본), BenchmarkScope(PORTFOLIO/STRATEGY), BenchmarkAssetType(HOUSING/ETF)
-    admin/       ← AdminAnomalies, AdminStats, AdminUserView, AuditLog, AppErrorLog
-    privacy/     ← FidaOrderCommand, PrivacyCurrentBase, PrivacyTradeBase, PrivacyTradeBaseView, PrivacyTradeSaveResult, PrivacyTradeConflictException,
-                   PrivacyDates(releaseDateFor()/tradeDateOf() — 발행일↔거래일 업무 규칙, 시간대 변환 아님)
-    settings/    ← RuntimeSettings, StrategyCreationSettings, StrategyFieldSettings, RecurringMode, AssetFormOptions
-                   (admin_runtime_settings 전역 설정 도메인 — AssetFormOptions는 자산 등록 폼 세부 카테고리/기관/자산군/운용전략 추천 목록, 값 강제 없는 순수 추천 목록)
-  strategy/      ← InfiniteStrategy/ReverseInfiniteStrategy/PrivacyStrategy/VrStrategy 구현 클래스 (1:1 인터페이스 통폐합됨) — @Component 허용 예외 (ArchUnit)
-                   CycleOrderStrategy (인터페이스 + Infinite/Privacy/VrCycleOrderStrategy 구현): 최소시드·capability SSOT (아래 "CycleOrderStrategy Capability 패턴")
-                   CycleOrderStrategies (@Component 라우터): Map<Strategy.Type, CycleOrderStrategy> 자동 수집
-                   StrategyCreationResolver (인터페이스 + Infinite/Privacy/VrCreationResolver 구현 + StrategyCreationResolvers 라우터): 전략 등록 시 런타임 설정(StrategyCreationSettings) 기반 필드 해석·검증
-                   PriceCapPolicy (순수 정적 유틸): 매수 가격 캡 배수(currentPrice×1.05) 단일 SSOT — application의 BuyOrderPriceCapper(INFINITE/PRIVACY/VR 접수 전 보정)와 domain의 VrStrategy 매수 사다리(`buildCappedBuyOrders`)가 공용
+  model/         ← 불변 값 객체(record), 어그리게이트별 서브패키지: user/account/strategy/order/auth/broker/kis/toss/market/stats/admin/privacy/settings/asset
+                   Strategy.Type/Status/Ticker/CycleSeedType 등은 Strategy record의 nested enum (→ constraints.md "Account ↔ Strategy 분리")
+                   Order.orderLeg — 신규 주문은 concrete leg 필수, legacy 행만 UNKNOWN 유지 (→ constraints.md "스케쥴러 주문 예산 배정")
+                   privacy/PrivacyDates.releaseDateFor()/tradeDateOf() — FIDA 발행일↔거래일 업무 규칙 헬퍼 (시간대 변환 아님)
+  strategy/      ← 전략 구현 클래스(Infinite/ReverseInfinite/Privacy/VrStrategy) — @Component 허용 예외 (ArchUnit)
+                   CycleOrderStrategy capability 패턴 SSOT (아래 "CycleOrderStrategy Capability 패턴" 참고)
+                   PriceCapPolicy(순수 정적 유틸) — 매수 가격 캡 배수(currentPrice×1.05) 단일 SSOT, application의 BuyOrderPriceCapper와 domain의 VrStrategy.buildCappedBuyOrders()가 공용
   port/in/       ← UseCase 인터페이스 (인바운드 포트)
   port/out/      ← 아웃바운드 포트 인터페이스 (*Port)
-                   RuntimeSettingsPort — 전역 런타임 설정 전체 조회/저장
-    broker/      ← 브로커 공통 Capability 인터페이스
-                   공통 9개: BrokerAdapterPort(supports()), PortfolioPort, MarginPort, SellableQuantityPort, ExecutionPort, BrokerOrderCorrectionPort(place/cancel), BrokerPricePort, LiveBalancePort, BrokerConnectionTestPort
-                   Toss 전용 5개: CandlePort, ExchangeRatePort, StockInfoPort, BrokerMarketCalendarPort, BrokerAccountPort
-                   BrokerConnectionTestPort: 계좌 등록 전 검증이라 Account 없이 broker enum으로 라우팅 — verifyCredentials/verifyAccount→brokerAccountCode (KIS: null, Toss: accountSeq)
+    broker/      ← 브로커 Capability 인터페이스 — 공통 9개 + Toss 전용 5개
+                   BrokerConnectionTestPort: 계좌 등록 전 검증이라 Account 없이 broker enum으로 라우팅 — verifyAccount→brokerAccountCode(KIS: null, Toss: accountSeq)
 
 application/
-  service/       ← UseCase 구현체 (package-private @Service), Port를 통해서만 외부 호출, 어그리게이트별 서브패키지
-    trading/     ← TradingExecutionFacade (TradingExecutionUseCase 구현 — preview/executeManually/cancelOrder/cancelByCycle/execute/executeBatch 단일 진입점),
-                   TradingService(배치·단건 실행 코어), ManualTradingService(수동 실행), TradingPreviewService(미리보기 전용, @Transactional readOnly),
-                   OrderCancelService(주문 취소), CycleRotationService(사이클 종료 후 cycleSeedType 기반 재등록),
-                   MarketEventNotifier(장 개시·마감 알림 — UserPort+UserSettingsPort+UserNotificationPort 조합)
-                   package-private helper: TradingBalanceLoader/TradingOrderPlanner/TradingOrderExecutor/TradingOrderBudgetAllocator/TradingPriceFetcher/TradingReporter/BuyOrderPriceCapper/CycleOrderComputer/CycleSnapshotCreator/SeedResolutionPolicy/PreviewDepositCache
+  service/       ← UseCase 구현체 (package-private @Service), Port를 통해서만 외부 호출, 어그리게이트별 서브패키지: trading/account/broker/strategy/user/portfolio/stats/market/privacy/admin/settings/auth/asset
+    trading/     ← TradingExecutionFacade가 preview/executeManually/cancelOrder/cancelByCycle/execute/executeBatch 단일 진입점, TradingService가 배치·단건 실행 코어
                    PreviewDepositCache — TradingBuyCompetitionSimulator 전용 계좌 단위 라이브 예수금(usdDeposit) 짧은 TTL(3초) 캐시 + 계좌별 락으로 동시 miss 단일화. usdDeposit은 ticker 무관 계좌 전체 값이라 계좌당 전략 N개의 preview 병렬 호출을 실제 조회 1회로 축소. 실주문 집행 경로(ManualTradingService/TradingOrderBudgetAllocator)는 미사용 — 항상 최신값 직접 조회
-                   BuyOrderPriceCapper — 신규 후보의 cap·수량 재산정·correction BUY를 영속화 없이 allocator 전에 준비하고, 기존 PLANNED BUY의 접수 전 보정도 담당
                    TradingOrderBudgetAllocator — 계좌별 slot-aware BUY/SELL 독립 예산 배정 (우선순위·실패 격리·제외 규칙 상세 → workflow.md "스케쥴러 주문 예산 배정")
                    live 잔고·판매가능수량 조회는 BrokerAdapterRegistry.require(account, LiveBalancePort/SellableQuantityPort.class) 직접 라우팅 — 별도 Router 클래스 없음 (KIS: TTTS3012R fetchHolding 재사용 / Toss: /api/v1/sellable-quantity)
                    CyclePositionPersistor: 포지션 스냅샷 저장 + 사이클 종료·rotation + VrCycleRolloverService.rollIfDue() 호출 (VR 예외 → "VR 전략 패턴")
-    account/     ← AccountService(신규 등록·연결 테스트 전 RuntimeSettings 브로커 활성 여부 검증), AccountStatisticsService, TossStatisticsService, BrokerStatisticsRouter(package-private — 브로커별 통계 라우팅)
-    broker/      ← BrokerAdapterRegistry (public @Component — require(account, Port.class) / find())
-                   BrokerConnectionTesters (public @Component — of(broker) 라우팅, 계좌 등록 전 자격증명 검증용)
-                   BrokerCallGuard (static 유틸 — 브로커 API 호출 예외를 IllegalStateException 400으로 래핑)
-    strategy/    ← StrategyService(신규 등록 시 RuntimeSettings 전략 생성 정책 적용; 수정·사이클 흐름은 미적용)
-    user/        ← UserService(인증·수명주기), UserProfileService(텔레그램·닉네임·알림채널·FCM), UserSettingsService, UserCascadeDeleter(소프트 삭제 cascade helper)
-    portfolio/   ← PortfolioService
-    stats/       ← HousingBenchmarkService (KB Land 주택 벤치마크 조회·upsert), HousingPriceIndexService (주간 아파트 매매가격지수 수집·upsert), MarketIndexPriceSyncService(SyncMarketIndexPricesUseCase 구현 — EtfBenchmarkSymbol 전체 순회 동기화, 실패 심볼은 collect 후 일괄 예외),
-                   StatsService(UserStatsUseCase 구현 — summary/equity-curve(type 필터는 사이클과 해당 cycleId 포지션 모두에 적용)/cycles/housing-benchmark(HOUSING·ETF 공용, benchmarkType으로 분기 — HOUSING은 regionCode 기준 KB Land 주간 매매가격지수, 투자지수를 주간 조사일에 as-of 스냅)/housing-benchmark/series(5분위 월간 원본)/housing-benchmark/index-series(주간 매매가격지수 원본, 투자 비교 없음)/housing-benchmark/etf-series(ETF 일별 종가 원본, 투자 비교 없음)/housing-benchmark/regions(주간 지수 지역 카탈로그))
-                   StatsResultCache — summary/equity-curve 5분, 벤치마크 비교(housing-benchmark, ETF 포함) 10분 인메모리 TTL 캐시(PreviewDepositCache 패턴 재사용). 매매 직후 통계가 해당 TTL만큼 stale할 수 있음. 단일 인스턴스 전제 — 다중 인스턴스 시 인스턴스별 캐시가 최대 TTL만큼 상이할 수 있음
-                   MonthlyReturnCalculator — 사이클·포지션 스냅샷에서 현금흐름 조정 월별 USD 투자지수(TWR) 계산, Spring·포트 비의존 순수 클래스
-                   HousingBenchmarkComparisonBuilder — 투자지수·벤치마크(KB Land 주간 아파트 매매가격지수 또는 ETF 종가)를 첫 공통 포인트=100 기준 정규화해 비교 summary·points 조립, 마찬가지로 순수 클래스 (이름은 HousingBenchmark지만 ETF 비교에도 재사용됨). MONTHLY만 결측 구간 수익률 억제·월 clamp 특수 취급이고 WEEKLY(아파트)·DAILY(ETF)는 포인트 단위로 처리하며 90일 미만 구간은 연환산을 null로 억제
+    broker/      ← BrokerAdapterRegistry(public @Component) — require(account, Port.class)/find(); BrokerConnectionTesters(계좌 등록 전 자격증명 검증)
+    stats/       ← StatsService(UserStatsUseCase 구현 — summary/equity-curve/cycles/housing-benchmark 계열)
+                   StatsResultCache — summary/equity-curve 5분, 벤치마크 비교(housing-benchmark, ETF 포함) 10분 인메모리 TTL 캐시. 매매 직후 통계가 해당 TTL만큼 stale할 수 있음. 단일 인스턴스 전제 — 다중 인스턴스 시 인스턴스별 캐시가 최대 TTL만큼 상이할 수 있음
+                   MonthlyReturnCalculator/HousingBenchmarkComparisonBuilder — Spring·포트 비의존 순수 계산 클래스(TWR·정규화 비교 조립). HousingBenchmarkComparisonBuilder는 ETF 비교에도 재사용됨(이름은 HousingBenchmark)
                    getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary 계산에는 미반영(조회 실패 시 null 처리, 200 정상 반환) — 투자(USD)·벤치마크(HOUSING=KRW/ETF=USD) 현지통화 그대로 비교, 환율 변환 없음
-    market/      ← MarketHolidayService, FearGreedQueryService, FearGreedService
-    privacy/     ← PrivacyService
-    admin/       ← AdminService, AdminQueryService(에러 로그 조회/삭제 포함), AdminStrategyService, AdminCycleCloser(holdings 소진 시 사이클 종료), AdminSelectionChain, AdminReorderService, AdminTradeCorrectionService
-    settings/    ← RuntimeSettingsService(공개 조회 + ADMIN 전체 갱신, 승인 필수 해제 시 PENDING 사용자 일괄 승인 + 감사 로그)
-    auth/        ← BlacklistService (JWT 블랙리스트), TokenService (RT 발급/갱신/폐기)
-  event/         ← @TransactionalEventListener용 도메인 이벤트 다수(application 레이어) — 사용자 승인/거부/재신청/신규가입, 사이클 종료/신규시작, 매매리포트, 주문취소실패, 사용자탈퇴 등
+  event/         ← @TransactionalEventListener용 도메인 이벤트(application 레이어) — 사용자 승인/거부/재신청/신규가입, 사이클 종료/신규시작, 매매리포트, 주문취소실패, 사용자탈퇴 등
 
 adapter/in/
-  schedule/      ← TradingOpenScheduler (월~금 22:30 KST — 누락 슬롯 주문 생성·예산 배정 + AT_OPEN 선접수 + 예수금 부족 사용자 알람)
-                   TradingCloseScheduler (화~토 04:30 KST — 누락 AT_CLOSE 슬롯 복구, INFINITE 매수 보정·접수 + PRIVACY 접수 + 리포트, 멀티계좌)
-                   RefreshTokenCleanupScheduler (매일 04:00 KST 만료 RT 삭제 / 03:05 KST grace 초과 회전 RT 삭제)
-                   MarketCalendarRefreshScheduler (1월 1일 3년치 / 매월 1일 최신화), FearGreedScheduler (KST 00:00/12:00 — CNN·크립토 공포탐욕지수),
-                   KbLandHousingBenchmarkScheduler (매주 토요일 08:00 KST — KB Land 아파트 5분위 매매평균가격 수집), KbLandPriceIndexScheduler (매주 토요일 08:10 KST — KB Land 아파트 주간 매매가격지수 최근 2년치 수집, 매월 1일 08:20 KST 별도 락으로 20년 전체 풀 리프레시해 과거 값 보정 반영), MarketIndexPriceSyncScheduler (매일 09:00 KST — ETF 벤치마크(EtfBenchmarkSymbol) 종가 동기화, 비거래일은 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음)
-                   BatchContextFactory (전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError)
-                   SchedulerJobRunner (공통 실행 골격 — 시작/완료 알림·인터럽트 처리; no-context run(name,Runnable) 오버로드: FearGreed·MarketCalendar용)
-                   SchedulerLockService (package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지)
-  web/           ← REST Controller + DTO: Auth(카카오/JWT/승인/탈퇴/SSE), Account(CRUD+연결테스트), TradingCycle(CRUD+pause/resume+수동실행+`GET /api/accounts/{id}/strategy-seed-preview`+`PUT /api/trading-cycles/{id}/vr-config` VR 운영 중 재설정),
-                   Dashboard(DB기반 사이클 이력), Statistics(KIS 전용 live), TossStatistics(Toss 전용 live 5개), Stats(`GET /api/stats/*` DB 근사 집계 — summary/equity-curve(type optional)/cycles/housing-benchmark(`benchmarkType`=HOUSING|ETF, HOUSING은 `regionCode` 기본값 1100000000, ETF는 `symbol` 필수)/housing-benchmark/series(5분위 월간 원본)/housing-benchmark/index-series(주간 매매가격지수 원본, `regionCode` 기본값 서울)/housing-benchmark/etf-series(ETF 일별 종가 원본, `symbol` 필수)/housing-benchmark/regions), FearGreed(`GET /api/market/fear-greed`),
-                   Meta(`GET /api/meta` enum SSOT 번들만, Cache 1h), OrderCancel, MarketHoliday(휴장일/세션 DIRECT|BLOCKED), FidaOrder(`/api/internal/**`, X-Internal-Token),
-                   Settings(텔레그램+알림채널), Fcm, TradeStream(SSE), Admin*(`/api/admin/**` — Dashboard/Account/Anomalies/Audit/Trade/User/PrivacyTrade),
-                   RuntimeConfig(`GET /api/runtime-config` 공개·no-store), AdminSettings(`GET|PUT /api/admin/settings`),
-                   AdminObservability(`/api/admin/logs/` 감사·앱에러 로그 조회, `DELETE /errors/{id}` 소프트 삭제), AdminPing(`/api/admin/_ping`), DevAuth(local 전용),
-                   ClientErrorLog(`POST /api/client-errors`, permitAll — kista-ui error.tsx/global-error.tsx 리포트를 app_error_logs에 저장, 실패해도 204)
+  schedule/      ← 매매·시세·캘린더·KB Land 등 배치 스케쥴러 — 정확한 실행 시각·락 TTL은 `scheduler-time-table.md` 참고
+                   BatchContextFactory(전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner(공통 실행 골격 — 시작/완료 알림·인터럽트 처리)
+                   SchedulerLockService(package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지) — Postgres 기반(`scheduler_locks` 테이블, DB 서버 시각 `now()` 기준 `INSERT ... ON CONFLICT ... WHERE lock_until <= now()`)이라 다중 인스턴스라도 시계 편차 없이 안전하게 경쟁, 어느 한쪽만 매 사이클 실행
+                   MarketIndexPriceSyncScheduler는 비거래일에도 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음
+  web/           ← REST Controller + DTO — Auth/Account/TradingCycle/Dashboard/Statistics(KIS 전용 live)/TossStatistics(Toss 전용 live)/Stats(DB 근사 집계)/FearGreed/Meta(enum SSOT)/OrderCancel/MarketHoliday/FidaOrder(`/api/internal/**`)/Settings/Fcm/TradeStream(SSE)/Admin*/Asset/AssetMonthlyCheck/RuntimeConfig/AdminSettings/AdminObservability/AdminScheduler/AdminPing/DevAuth(local 전용)/ClientErrorLog
+                   상세 라우팅·응답 형식 차이 → 아래 "DashboardController vs StatisticsController" 참고
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/
-  broker/        ← TokenCoordinator (계좌 토큰 obtain/recover 공통 계약 — domain/port/out 아닌 순수 adapter 내부 인터페이스,
-                   KIS/Toss 둘 다 구현하지만 폴리모픽 주입 지점은 없음: KisAuthApi/TossAuthApi 각자 구체 타입을 직접 주입)
-                   DoubleCheckedTokenCache (KisTokenCoordinator 전용 JVM 내 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급;
-                   BrokerTokenCachePort.saveToken/invalidateToken은 REQUIRES_NEW로 락 해제 전 독립 커밋;
-                   invalidateToken은 accountId+거절된 accessToken 일치 시만 INVALIDATED_TOKEN으로 갱신해 stale 401이 이미 재발급된 신규 토큰을 무효화하지 않음)
-                   PrevCloseCache (전일종가 캐시 — 종목+거래일(KST)+버킷 단위 재조회 방지; 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐)
-  kis/           ← KisHttpClient (공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화한 후 최신 토큰으로 1회 재시도, RestClientException → KisApiException 래핑)
-                   KisTokenCoordinator (TokenCoordinator 구현 — DoubleCheckedTokenCache + BrokerTokenCachePort 조합, 재발급이 비파괴적이라 항상 freshlyIssued=true)
-                   KisBrokerAdapter (BrokerAdapterPort + 공통 7개 Port 구현; BrokerConnectionTestPort는 KisAuthApi가 구현)
-  toss/          ← TossHttpClient(공통 헤더)/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi,
-                   TossDistributedTokenCoordinator(TokenCoordinator 구현) + TossRedisTokenStore (계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation을 비교하는 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자(admin) 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드,
-                   TossResponseParser (숫자 파싱 헬퍼, 패키지 내부 전용), TossBrokerAdapter (공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
-  mock/          ← MockBrokerAdapter (BrokerAdapterPort + PortfolioPort/MarginPort/SellableQuantityPort/BrokerOrderCorrectionPort/ExecutionPort/BrokerPricePort/LiveBalancePort 구현; BrokerConnectionTestPort는 MockAuthApi가 구현) —
-                   증권사 API 호출 없이 DB(cycle_position/orders) 기반으로 잔고·체결 시뮬레이션. 시세는 adapter/out/marketdata/CommonMarketPriceFeed(Toss 공통 시세 재사용) 경유.
+  broker/        ← TokenCoordinator — 계좌 토큰 obtain/recover 공통 계약(domain/port/out 아닌 순수 adapter 내부 인터페이스). KIS/Toss 둘 다 구현하지만 폴리모픽 주입 지점은 없음: KisAuthApi/TossAuthApi 각자 구체 타입을 직접 주입
+                   DoubleCheckedTokenCache(KisTokenCoordinator 전용 JVM 내 토큰 캐시 — 1차 조회 → miss 시 계좌별 락 → 2차 double-check → 신규 발급; `BrokerTokenCachePort.saveToken`/`invalidateToken`은 REQUIRES_NEW로 락 해제 전 독립 커밋) — invalidateToken은 accountId+거절된 accessToken 일치 시만 INVALIDATED_TOKEN으로 갱신해 stale 401이 이미 재발급된 신규 토큰을 무효화하지 않음
+                   PrevCloseCache — 전일종가 캐시(종목+거래일(KST)+버킷 단위 재조회 방지). 실패(empty)도 캐싱하는 허용된 트레이드오프. 현재 사용처는 TossPriceApi뿐
+  kis/           ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화한 후 최신 토큰으로 1회 재시도), KisTokenCoordinator, KisBrokerAdapter(BrokerConnectionTestPort는 KisAuthApi가 구현)
+  toss/          ← TossHttpClient/TossConfig, TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi
+                   TossDistributedTokenCoordinator + TossRedisTokenStore(계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation을 비교하는 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자(admin) 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드
+                   TossBrokerAdapter(공통 7개 + Toss 전용 5개 Port 구현; BrokerConnectionTestPort는 TossAuthApi가 구현)
+  mock/          ← MockBrokerAdapter(BrokerConnectionTestPort는 MockAuthApi가 구현) — 증권사 API 호출 없이 DB(cycle_position/orders) 기반 잔고·체결 시뮬레이션. 시세는 adapter/out/marketdata/CommonMarketPriceFeed 경유
                    getLiveBalance()의 usdDeposit은 계좌 내 전략 전체 합산값(TradingOrderBudgetAllocator가 대표 전략 1개로 계좌 전체 BUY 예산을 판단하는 기존 계약에 맞춤 — 전략별 값을 그대로 반환하면 다른 전략 잔고로 오판정)
   marketdata/    ← CommonMarketPriceFeed — 계좌 자격증명 불필요한 공통 시세 조회 인터페이스, TossPriceApi가 구현(모의계좌가 재사용)
-  kbland/        ← KbLandConfig/KbLandProperties/KbLandHousingBenchmarkAdapter — KB Land 아파트 5분위 매매평균가격(월간) + 주간 매매가격지수 조회, HousingBenchmarkFeedPort 양쪽 메서드 모두 구현
+  kbland/        ← KB Land 아파트 5분위 매매평균가격(월간) + 주간 매매가격지수 조회 어댑터
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter
   redis/         ← RedisBlacklistAdapter (BlacklistPort — userId/JTI 단위 JWT 블랙리스트, TTL 기반)
-  persistence/   ← JPA 인프라 (BaseAuditEntity, BaseCreatedAtEntity, JpaAuditingConfig) + 어그리게이트별 서브패키지
-                   각 서브패키지는 Entity + *JpaRepository(package-private) + *PersistenceAdapter(Port 구현) 3종 구성:
-                   user(+AdminUserViewAdapter) / account / strategy(+PersistenceSupport upsert 헬퍼; VR: StrategyVrVersionEntity=strategy_vr_version, StrategyCycleVrEntity=strategy_cycle_vr)
-                   / kistoken(KisTokenEntity, table=broker_tokens) / auth(RefreshToken) / audit(AuditLog+AppErrorLog)
-                   / settings(UserSettings+UserNotificationPref+RuntimeSettings, admin_runtime_settings JSONB 단일 행)
-                   / trade(Order) / privacy(PrivacyTradeBase+PrivacyTradeBaseOrder) / calendar(UsMarketHoliday) / fcm / feargreed / housingbenchmark(HousingBenchmarkPrice, HousingPriceIndexEntity/JpaRepository/PersistenceAdapter — 테이블 housing_price_indices) / marketindex(IndexPricePort 구현 — ETF 벤치마크 일별 종가)
-  notify/        ← TelegramAdapter (NotifyPort — 관리자봇 오류/리포트 알림)
-                   CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter (UserNotificationPort — 사용자 알림)
-                   TelegramBotInfoAdapter (봇 username 조회), TelegramHttpClient (package-private HTTP 헬퍼)
-  sse/           ← SseEmitterRegistry (RealtimeNotificationPort — 사용자별 SSE 연결 관리), TradeSseEmitterRegistry (매매 이벤트 SSE)
+  persistence/   ← JPA 인프라 + 어그리게이트별 서브패키지, 각각 Entity + *JpaRepository(package-private) + *PersistenceAdapter(Port 구현) 3종 구성
+  notify/        ← TelegramAdapter(관리자봇), CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter(사용자 알림)
+  sse/           ← SseEmitterRegistry(사용자별 SSE), TradeSseEmitterRegistry(매매 이벤트 SSE)
   kakao/         ← KakaoOAuthAdapter — 카카오 소셜 로그인
-  alpaca/        ← AlpacaCalendarAdapter (MarketCalendarRefreshPort), AlpacaIndexPriceAdapter (IndexPriceFeedPort — ETF 벤치마크 일별 종가 조회) — Alpaca Markets API
-  heartbeat/     ← HeartbeatAdapter (HeartbeatPort — 스케쥴러 dead-man's switch 핑, Open/Close 스케쥴러가 호출)
-  crypto/        ← AesCryptoService — AES-256 암호화/복호화 (persistence 경계에서만 사용), AccountNoHasher — 계좌번호 결정론적 HMAC-SHA256 해시 (전역 중복 체크용)
+  alpaca/        ← AlpacaCalendarAdapter, AlpacaIndexPriceAdapter — Alpaca Markets API
+  heartbeat/     ← HeartbeatAdapter — 스케쥴러 dead-man's switch 핑, Open/Close 스케쥴러가 호출
+  crypto/        ← AesCryptoService(AES-256, persistence 경계에서만 사용), AccountNoHasher(계좌번호 결정론적 HMAC-SHA256 해시 — 전역 중복 체크용)
 ```
 
 ### DashboardController vs StatisticsController 응답 형식 차이
 - `DashboardController`: DB 기반 전용 DTO 반환 — `GET /api/accounts/{accountId}/cycle-history` → `CycleHistoryPageResponse` (커서 페이지네이션)
-- `StatisticsController`: **KIS 전용** live API 직접 호출 → `PresentBalanceResult`, `PeriodProfitResult` 등 도메인 모델 그대로 반환
-  - kista-ui에서 소비 시 normalizer 함수 필요 (예: `normalizePortfolio()`, `ProfitSummary` optional 필드 fallback)
+- `StatisticsController`: **KIS 전용** live API 직접 호출 → 전용 Response DTO 반환 (`PortfolioSummaryResponse`/`List<MarginResponse>`/`DailyTransactionResponse`/`MultiPriceResponse`)
+  - normalizer는 이미 API 서버 쪽(`PortfolioSummaryResponse.from()` 등)에서 수행 — `PresentBalanceResult` 등 도메인 모델은 컨트롤러 반환 직전에 DTO로 정규화되어 kista-ui는 그대로 소비
   - 신규 live 엔드포인트 추가 시 kista-ui 타입과 응답 필드명 반드시 대조 확인
 - `TossStatisticsController`: **Toss 전용** — 캔들/환율/세션/종목정보/계좌정보 5개 엔드포인트 (`/api/accounts/{accountId}/*`)
 
@@ -185,18 +117,9 @@ adapter/out/
 - **`INSUFFICIENT_BALANCE` skip 시 position 포함**: `shouldSkip(price)` true여도 `InfinitePosition`을 Result에 포함 — 프론트에서 단위금액·현재가·부족 금액 표시 목적
 
 ### CycleOrderStrategy Capability 패턴
-- `CycleOrderStrategy` 인터페이스: 전략 타입별 동작을 캡슐화하는 다형성 계층
-  - `requiresPrivacyBase()` — basePrice 소스가 기준 매매표인지 (PRIVACY=true, INFINITE/VR=false)
-  - `requiresPrevClose()` — 전일 종가 필요 여부
-  - `availableDivisionCounts()` — 지원하는 분할 수 목록 (INFINITE=`[20, 30, 40]`, PRIVACY/VR=`[]`)
-  - `supportsReverseMode()` — 리버스모드 배지 지원 (INFINITE=true, PRIVACY/VR=false)
-  - `endsCycleOnLiquidation()` — holdings=0(전량 청산) 시 사이클 종료 여부 (VR=false, INFINITE/PRIVACY=true)
-  - `minRequiredDeposit(price, privacyBase, divisionCount)` — 최소 시드 계산 (SSOT, VR=null 미적용)
-  - `allocationPriority()` — 스케쥴러 예산 배정 우선순위 (VR=0, INFINITE=1, PRIVACY=2, 기본=100)
-  - `canSkipOrderComputation(existingOrders, creatableTimings)` — scheduler compute skip capability. 기본 false이며 INFINITE만 complete concrete leg 또는 direction-aware legacy UNKNOWN 점유를 보수적으로 판단한다.
-  - `tracksReverseMode()` — 리버스모드 detail 저장 여부 (INFINITE만 true)
-  - `requiresRolloverCheck()` — 포지션 저장 후 롤오버 판정 수행 여부 (VR만 true)
-  - `priceCapMode()` — BUY 가격 사후 보정 방식 (`PriceCapMode` enum: NONE / INFINITE_POSITION / PRIVACY_SIMPLE / VR_POSITION). VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrStrategy.buildCappedBuyOrders()`로 보정한다
+- `CycleOrderStrategy` 인터페이스: 전략 타입별 동작(basePrice 소스, 전일종가 필요 여부, 분할수, 리버스모드 지원, 청산 시 사이클 종료 여부, 최소시드, 예산배정 우선순위, compute skip, 롤오버 판정 필요 여부, BUY 가격 캡 보정 방식 등)을 캡슐화하는 다형성 계층 — 메서드별 상세는 코드가 SSOT
+  - `canSkipOrderComputation()`은 기본 false이며 INFINITE만 complete concrete leg 또는 direction-aware legacy UNKNOWN 점유를 보수적으로 판단한다
+  - `priceCapMode()`: VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrStrategy.buildCappedBuyOrders()`로 보정한다
 - `CycleOrderStrategies`: `Map<Strategy.Type, CycleOrderStrategy>` 라우터 — `of(type)` 으로 구현체 조회
 - **프론트 capability 소비**: `GET /api/meta`의 `StrategyTypeMeta`에 capability 7필드(code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts) 직렬화 → 프론트는 `isInfinite` 휴리스틱 대신 `divisionCounts`/`requiresPrivacyBase` 직접 소비
 - **최소시드 미리보기**: `GET /api/accounts/{id}/strategy-seed-preview?type=&ticker=&divisionCount=` → `StrategySeedPreviewResponse { ticker, basePrice, minSeed, skipReason }`

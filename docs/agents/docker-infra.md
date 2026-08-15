@@ -1,24 +1,13 @@
 ## Docker / 인프라
 
 ### JVM 기본 TimeZone (호출부 명시, 전역 설정 금지)
-- Fly.io 컨테이너 기본 TZ = UTC → `LocalDate.now()`/`LocalTime.now()`를 타임존 없이 호출하면 UTC 날짜 반환 → KST 09시 이전 "오늘" 오판
+- Docker 컨테이너 기본 TZ = UTC(호스트 무관, JVM 공통) → `LocalDate.now()`/`LocalTime.now()`를 타임존 없이 호출하면 UTC 날짜 반환 → KST 09시 이전 "오늘" 오판. Fly.io 운영 시절 이 문제로 실제 발견된 정책
 - 해결 정책(`45758166`): `KistaApplication.main()`의 전역 `TimeZone.setDefault()` 의존 제거 — 모든 `LocalDate.now()`/`LocalTime.now()` 호출부에 `TimeZones.KST`(`com.kista.common.TimeZones`)를 명시. 신규 호출부 추가 시 반드시 `LocalDate.now(TimeZones.KST)` 형태 사용, `KistaApplication`에 전역 설정 재도입 금지
 - `build.gradle.kts` test task에 `systemProperty("user.timezone", "Asia/Seoul")` — CI 환경에서도 테스트 일관성 보장
 - 시간 기준 정책(거래일 KST 단일 기준, US 외부 데이터만 어댑터 내부 변환): `constraints.md`의 "시간 기준 정책 (KST 단일 기준)" 섹션 참고
 
-### Fly.io 런타임 메모리 설정
-- Fly.io: 2GB RAM (`fly.toml [[vm]] memory='2gb'`)
-- `ENV JAVA_OPTS="-Xmx768m -Xms128m ..."` — Dockerfile에 설정됨
-- 이전 1GB 설정은 `Xmx384m` + SerialGC 사용
-- G1GC: 2GB 환경에서 요청/스케줄러 겹침 시 지연시간 변동 완화 목적
-
-### Fly.io 배포 방식 (폐지됨)
-- OCI 전환 완료로 `.github/workflows/fly-deploy.yml`(긴급 롤백용 `workflow_dispatch` 전용) 삭제 — main push 자동 배포는 서버 배포(`server-deploy.yml`)만 담당
-- 리전: `nrt` (도쿄), 최소 1대 상시 유지 (`min_machines_running=1`) — 스케쥴러 04:30 KST 실행 보장
-- `fly.toml`의 배포 전략은 `[deploy]` 섹션의 `strategy` 키다 — **`[deployment]`는 flyctl이 인식하지 못하는 오타 섹션名**이라 조용히 무시된다(`flyctl config show --local --toml`로 로컬 파싱 결과를 직접 비교해야 확인 가능, `config show` 기본 동작은 로컬 파일이 아닌 Fly 서비스에 저장된 원격 설정을 보여줘서 이 오타를 못 잡는다). Redis fencing 도입 시 이 오타 때문에 의도했던 `immediate`(pre-branch DB/JVM token protocol과 Redis fencing binary가 겹치지 않게 하는 1회성 protocol cutover)가 실제로는 한 번도 적용되지 않고 매번 flyctl 기본값인 `rolling`으로 배포됐다 — 그런데도 신·구 프로토콜이 실제로 충돌하는 사고는 없었다(2026-07-22 확인). 현재 `strategy = "rolling"`으로 명시 고정돼 있다.
-- 향후 유사한 protocol cutover가 필요하면: (1) `[deploy] strategy = "immediate"`로 변경 후 `flyctl config show --local --toml`로 로컬 파싱 결과에 `[deploy] strategy = 'immediate'`가 실제로 찍히는지 반드시 확인, (2) 배포 로그에 `Updating existing machines ... with immediate strategy` 문구로 실제 적용을 재확인, (3) `fly status`로 정상 기동 확인 후 별도 커밋으로 `rolling` 복원 — 오타로 검증 자체가 무력화됐던 사례가 있으니 "커밋했다"가 아니라 "실제 적용을 확인했다"를 기준으로 삼을 것.
-
 ### 서버 배포 방식 (현재 OCI)
+- 배포 설정 변경은 커밋으로 끝난 게 아니라 **실제 적용 여부를 반드시 확인**할 것 — 과거 Fly.io 시절 `fly.toml`의 배포 전략 섹션 키가 오타(`[deployment]` — 올바른 키는 `[deploy]`)라 조용히 무시되고 한 번도 적용되지 않은 사고 이력이 있음. 플랫폼은 바뀌었지만 "커밋했다"≠"적용됐다"는 원칙은 현행 OCI 배포에도 동일하게 적용
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → 매매 시간대 가드 통과 후 SSH로 서버에 배포
 - 배포 파일: `deploy/server/docker-compose.yml`(kista-api 단일 서비스 — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
 - `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담한다. `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. **인스턴스 재편·컷오버 완료(2026-08-07)** — kista-api-server(A)가 caddy·postgres·redis·kista-api·kista-ui를 모두 올인원으로 호스팅, kista-ui-server는 삭제됨, DB는 Supabase에서 자체호스팅 postgres(`postgres:5432/kistadb`)로 이관 완료. fida-server만 별도 유지.
@@ -31,12 +20,8 @@
 - **Redis는 자체 호스팅**(kista-infra 레포의 `docker-compose.yml`의 `redis` 서비스, AOF 영속성) — Fly.io는 다중 인스턴스 가능성 때문에 외부 공유 Redis(Upstash)가 필수였지만, OCI는 단일 인스턴스라 로컬 Redis 하나로 "모든 운영 인스턴스가 같은 Redis를 봐야 함" 제약이 자동 충족됨. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있어 `.env` 설정 불필요
 - Fly.io의 기존 Redis("Fly Redis" 애드온, `fly-*-redis.upstash.io`)는 Fly 사설 네트워크(`fdaa::/16`, 6PN 전용) 주소라 **외부에서 접근 불가** — 커트오버 시 이 값을 그대로 재사용하려다 실측(`fly ssh console`로 조회 후 외부에서 접속 시도 → `Network is unreachable`)으로 확인됨. 벤더를 완전히 바꾸는 마이그레이션에서는 Fly Redis를 승계할 수 없다는 뜻이라, 새 Redis(관리형이든 자체 호스팅이든)를 처음부터 새로 구성해야 함
 
-### Fly↔서버(OCI) 병행 운영 전환 안전성 (2026-08-03 커트오버 실측)
-- 커트오버 기간 중 Fly와 서버(OCI)가 같은 Supabase DB를 동시에 바라보는 시점이 발생한다. 매매 스케쥴러 중복 실행 방지는 Redis가 아니라 **Postgres 기반 분산 락**(`SchedulerLockService`, `scheduler_locks` 테이블, DB 서버 시각 `now()` 기준 `INSERT ... ON CONFLICT ... WHERE lock_until <= now()`)이라 두 인스턴스가 서로 다른 호스트라도 시계 편차 없이 안전하게 경쟁한다 — 어느 한쪽만 매 사이클 실행된다
-- 단, 이 락은 "중복 실행"만 막을 뿐 "어느 쪽이 실행되는지"는 보장하지 않는다 — Fly가 이겨도 동작 자체는 가능하므로, **커트오버 기간에는 Fly 머신을 `fly scale count 0`으로 내려 능동적 경쟁 자체를 제거하는 것을 권장**(이미지·시크릿·릴리스 히스토리는 보존되어 `fly scale count 1`로 즉시 롤백 가능 — `fly apps destroy`와는 다름). 브로커가 IP 화이트리스트(Toss 등)를 쓰면 등록된 IP가 아닌 호스트의 매매 API 호출은 어차피 거부되지만, 화이트리스트가 없는 브로커(KIS 등)는 이 보호를 못 받으므로 스케일다운이 여전히 필요
-
-### Fly.io 다중 인스턴스 Toss 토큰 조정
-- 모든 Fly 인스턴스의 Toss 계좌·관리자 canonical token은 Upstash Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
+### 다중 인스턴스 Toss 토큰 조정
+- 모든 인스턴스의 Toss 계좌·관리자 canonical token은 자체호스팅 Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
 - scope별 20초 Redis owner lease(OAuth RestTemplate 타임아웃 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
 - Redis에는 canonical raw token 외에 영구 generation counter와 최근 SHA-256 fingerprint(2초)가 존재한다. raw bearer token을 로그 또는 fingerprint key에 기록하지 않는다. Redis 연결·script 실패는 로컬/DB fallback 없이 503으로 fail-closed 하며 운영 인스턴스는 모두 같은 Redis를 보아야 한다.
 
@@ -170,5 +155,5 @@ DB는 Supabase에서 자체호스팅 postgres(`kista-postgres` 컨테이너, A �
 - `AES_ENCRYPTION_KEY` — 분실 시 accounts의 암호화 컬럼(계좌번호·API 키) 전체 복호화 불가 → 사용자 재등록 필요
 - `JWT_SIGNING_KEY` — 분실 시 전체 사용자 재로그인 (치명적이지 않음)
 - `BACKUP_ENCRYPTION_KEY` — 분실 시 GitHub Actions에 쌓인 모든 DB 백업 artifact 복호화 불가 (백업 자체가 무의미해짐)
-- 확인: `fly secrets list -a kista-api` (값은 안 보임 — 원본을 별도 보관해야 함), GH secret은 `gh secret list`로 이름만 확인 가능
+- 확인: kista-infra 레포의 GPG 암호화 시크릿 파일에 원본 보관, GH secret은 `gh secret list`로 이름만 확인 가능(값은 안 보임)
 ```

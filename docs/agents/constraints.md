@@ -6,9 +6,7 @@
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
 
 ### domain/port/out/ 네이밍 규칙
-- 모든 아웃바운드 포트 인터페이스: `*Port` 접미사 사용 (예: `UserPort`, `AccountPort`, `StrategyPort`)
-- Spring Data JPA 인터페이스는 `*JpaRepository` (adapter 레이어) — `domain/port/out/`와 완전히 다른 계층
-- `*Repository` 접미사 사용 금지 — JpaRepository와 혼동 유발
+- 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
@@ -18,20 +16,15 @@
 
 
 ### GlobalExceptionHandler 자동 예외 처리
-- Controller에서 별도 catch/rethrow 불필요 — 아래 예외는 모두 `GlobalExceptionHandler`에서 자동 처리됨
-- `NoSuchElementException` → 404, `IllegalArgumentException` → 400, `IllegalStateException` → 400, `PrivacyTradeConflictException` → 409
-- `SecurityException` → 403, `KisApiException` → 503, `TossApiException` → 503, `Account.InvalidBrokerKeyException` → 422
-- `ManualTradingException` / `OrderCancelException` → 409, `Account.DuplicateAccountException` → 409
-- `User.CooldownException` → 429(Retry-After 포함, 재신청 쿨다운), `Account.KisRateLimitException` → 429
-- `InvalidRefreshTokenException` → 401 (RT 재사용·만료·위변조 시)
-- `GlobalExceptionHandler`의 async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
+- Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
+- async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 
 ### Account ↔ Strategy 분리
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
 - `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
 - `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지)
 - 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드)
-- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; 모든 전략의 `startAmount`=개장 예수금+개장 보유분 시장가)은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
+- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount` 계약 → 아래 "VR 공식"의 "개장 금액 계약")은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `VrSummary` nested(VR 외 null)
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
@@ -48,9 +41,7 @@
 - `orders.order_leg`와 scheduler/reservation 조회용 인덱스(`idx_orders_cycle_date_timing_status` 등)는 현재 `V1__init.sql`에 포함되어 있다(과거 별도 마이그레이션이었으나 스쿼시됨) — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인
 
 ### MetaController (enum SSOT)
-- `GET /api/meta` — `MetaBundle` 단일 번들 (strategyTypes/tickers/brokers/strategyStatuses/cycleSeedTypes)
-- enum에 label/description 포함 (DTO `from()` 팩토리) — UI에서 enum 리터럴 하드코딩 금지
-- `TickerMeta`: `code`/`label`/`description`/`targetProfitRate` — KIS 거래소 코드는 `KisExchangeRegistry`(어댑터 내부) 전용, UI 미노출
+- `GET /api/meta` — enum 메타(label/description 포함) 단일 번들 제공 — UI에서 enum 리터럴 하드코딩 금지
 
 ### 파일 인코딩 주의 (BOM)
 - 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
@@ -67,18 +58,14 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴
-- `User.UserRole`, `User.UserStatus`, `User.NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum으로 선언
-- import: `import com.kista.domain.model.user.User.NotificationChannel`
+- `User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE` (domain 상수 — 서비스/컨트롤러에서 직접 하드코딩 금지)
 
 ### 도메인 Command 명명 규칙
-- 도메인 포트 인바운드 파라미터/입력 모델: `*Command` suffix (예: `FidaOrderCommand`)
-- `*Request` suffix 사용 금지 — 외부 HTTP DTO 성격으로 오인됨
-- `domain/model/<도메인>/` 하위 위치 (ArchUnit domain 규칙 준수)
+- 도메인 포트 인바운드 파라미터/입력 모델: `*Command` suffix, `*Request` suffix 금지(외부 HTTP DTO 성격 오인), `domain/model/<도메인>/` 하위 위치
 
 ### Ticker enum (Strategy.Ticker nested enum)
-- import: `import com.kista.domain.model.strategy.Strategy.Ticker;`
-- MAGX/USD/TQQQ/SOXL — KIS 거래소 코드는 `KisExchangeRegistry`(adapter/out/kis)가 관리, 새 종목 추가 시 양쪽 갱신 필수
+- KIS 거래소 코드는 `KisExchangeRegistry`(adapter/out/kis) 전용 — 새 종목 추가 시 양쪽 갱신 필수
 - PRIVACY·VR 신규 등록 ticker는 `StrategyCreationSettings.ticker()`의 고정값 정책으로 결정되며, 다른 명시 입력은 거부한다 (기본값: PRIVACY=SOXL, VR=TQQQ)
 - ticker는 `Account` 아닌 `strategy.ticker()` — 매매 시 strategy에서 참조
 
