@@ -19,7 +19,7 @@ telegram:
   chat-id: "12345678"
 
 crypto:
-  aes-key: dGVzdC1hZXMtMzItYnl0ZXMta2V5LXBhZGRpbmc=
+  aes-key: dGVzdC1hZXMtMzItYnl0ZXMta2V5LXBhZGRpbmchISE=
 
 # 테스트용 EC P-256 JWK — 보안 불필요 (테스트 전용)
 jwt:

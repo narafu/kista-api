@@ -1,6 +1,11 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.finance.FinanceAccount;
+import com.kista.domain.model.finance.FinanceBudget;
+import com.kista.domain.model.finance.FinanceCategory;
+import com.kista.domain.model.finance.FinanceGroup;
+import com.kista.domain.model.finance.FinanceGroupInvitation;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.kis.KisApiException;
@@ -53,7 +58,12 @@ public class GlobalExceptionHandler {
         Map.entry(Account.DuplicateAccountException.class,         new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(ManualTradingException.class,                    new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict"))
+        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict")),
+        Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
+        Map.entry(FinanceAccount.DuplicateNameException.class,         new Mapping(HttpStatus.CONFLICT,           "Conflict")),
+        Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
+        Map.entry(FinanceGroup.CannotLeavePersonalGroupException.class, new Mapping(HttpStatus.CONFLICT,          "Conflict")),
+        Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict"))
     );
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지

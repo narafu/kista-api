@@ -5,6 +5,10 @@ import com.kista.adapter.in.web.dto.MetaBundle;
 import com.kista.adapter.in.web.dto.StrategyTypeMeta;
 import com.kista.adapter.in.web.dto.TickerMeta;
 import com.kista.domain.model.account.Account;
+import com.kista.domain.model.finance.AssetClass;
+import com.kista.domain.model.finance.FinanceAccount;
+import com.kista.domain.model.finance.FinanceCategory;
+import com.kista.domain.model.finance.Market;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,7 +39,8 @@ public class MetaController {
     public ResponseEntity<MetaBundle> getBundle() {
         MetaBundle bundle = new MetaBundle(
                 getStrategyTypeList(), getTickerList(), getBrokerList(),
-                getStrategyStatusList(), getCycleSeedTypeList()
+                getStrategyStatusList(), getCycleSeedTypeList(),
+                getAssetClassList(), getMarketList(), getFinanceAccountTypeList(), getFinanceCategoryTypeList()
         );
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
@@ -66,6 +71,30 @@ public class MetaController {
 
     private List<EnumMeta> getCycleSeedTypeList() {
         return Arrays.stream(Strategy.CycleSeedType.values())
+                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
+                .toList();
+    }
+
+    private List<EnumMeta> getAssetClassList() {
+        return Arrays.stream(AssetClass.values())
+                .map(c -> new EnumMeta(c.name(), c.getLabel(), null))
+                .toList();
+    }
+
+    private List<EnumMeta> getMarketList() {
+        return Arrays.stream(Market.values())
+                .map(m -> new EnumMeta(m.name(), m.getLabel(), null))
+                .toList();
+    }
+
+    private List<EnumMeta> getFinanceAccountTypeList() {
+        return Arrays.stream(FinanceAccount.Type.values())
+                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
+                .toList();
+    }
+
+    private List<EnumMeta> getFinanceCategoryTypeList() {
+        return Arrays.stream(FinanceCategory.Type.values())
                 .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
                 .toList();
     }

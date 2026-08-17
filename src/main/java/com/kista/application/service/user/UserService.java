@@ -42,6 +42,7 @@ class UserService implements UserUseCase {
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
     private final RuntimeSettingsPort runtimeSettingsPort;  // 가입 승인 런타임 설정 조회
     private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
+    private final FinanceGroupPort financeGroupPort;         // 가입 시 개인 그룹 부트스트랩
 
     @Override
     @Transactional(readOnly = true)
@@ -106,6 +107,7 @@ class UserService implements UserUseCase {
             User newUser = new User(userId, kakaoId, nickname, email, status, role,
                     null, null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
+            financeGroupPort.createPersonalGroup(saved.id()); // 재무 도메인 소유 축 — 가입 즉시 1인 개인 그룹 생성
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
             eventPublisher.publishEvent(new NewUserRegisteredEvent(saved));

@@ -1,7 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.account.Account.Broker;
-import com.kista.domain.model.asset.AssetCategory;
 import com.kista.domain.model.settings.AssetFormOptions;
 import com.kista.domain.model.settings.BenchmarkFieldSettings;
 import com.kista.domain.model.settings.BenchmarkSettings;
@@ -134,18 +133,11 @@ public record AdminSettingsRequest(
     }
 
     public record AssetFormOptionsRequest(
-            @Schema(description = "카테고리별 세부 카테고리 추천 목록 (key=AssetCategory)")
-            @NotNull Map<AssetCategory, @NotNull List<@NotNull String>> subcategorySuggestions,
-            @Schema(description = "기관 추천 목록")
-            @NotNull List<@NotNull String> institutionSuggestions,
-            @Schema(description = "자산군 추천 목록")
-            @NotNull List<@NotNull String> assetClassSuggestions,
             @Schema(description = "운용전략 추천 목록")
             @NotNull List<@NotNull String> strategySuggestions
     ) { // 자산 등록 폼 추천 목록 관리자 입력
         AssetFormOptions toDomain() {
-            return new AssetFormOptions(subcategorySuggestions, institutionSuggestions,
-                    assetClassSuggestions, strategySuggestions);
+            return new AssetFormOptions(strategySuggestions);
         }
     }
 }
