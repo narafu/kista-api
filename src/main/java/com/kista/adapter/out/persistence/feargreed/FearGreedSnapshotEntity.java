@@ -13,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "fear_greed_snapshots",
+    schema = "reference",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_fear_greed_source_date",
         columnNames = {"source", "snapshot_date"}

@@ -14,7 +14,7 @@ import java.util.UUID;
 // deleted_at 없음 — 파생 설정이라 하드 삭제 대상. finance_budgets_no_overlap EXCLUDE 제약이
 // 소프트 삭제 행까지 감안하면 오히려 재등록을 막는 쪽으로 작동해 하드 삭제가 맞다 (§4.1).
 @Entity
-@Table(name = "finance_budgets")
+@Table(name = "finance_budgets", schema = "finance")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

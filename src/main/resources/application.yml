@@ -16,6 +16,7 @@ spring:
       minimum-idle: 2
       connection-timeout: 20000
       pool-name: HikariPool-KistaApi
+      connection-init-sql: "SET search_path TO kista, finance, reference, public"
 
   jpa:
     open-in-view: false
@@ -32,6 +33,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
     validate-on-migrate: true
+    default-schema: public
 
   task:
     scheduling:

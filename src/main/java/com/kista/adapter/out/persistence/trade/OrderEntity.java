@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", schema = "kista")
 @Getter
 @Setter(AccessLevel.PACKAGE) // markPlaced 전용 (status, externalOrderId)
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용

@@ -14,7 +14,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "admin_runtime_settings")
+@Table(name = "admin_runtime_settings", schema = "public")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor

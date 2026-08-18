@@ -13,7 +13,7 @@ import java.util.UUID;
 
 // deleted_at 없음 — 그룹 단위 상태 레코드. 그룹 소프트 삭제(멤버 0) 시 deleteByGroupId로 하드 정리된다.
 @Entity
-@Table(name = "finance_monthly_closings")
+@Table(name = "finance_monthly_closings", schema = "finance")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

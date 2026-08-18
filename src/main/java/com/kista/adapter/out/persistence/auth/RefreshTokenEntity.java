@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "refresh_tokens")
+@Table(name = "refresh_tokens", schema = "public")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class RefreshTokenEntity {

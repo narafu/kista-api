@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 @Entity
-@Table(name = "user_notification_prefs")
+@Table(name = "user_notification_prefs", schema = "public")
 @IdClass(UserNotificationPrefId.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

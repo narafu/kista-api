@@ -16,7 +16,7 @@ import java.util.UUID;
 // (B) 과거 거래·자산 기록의 카테고리 이름 렌더링 = 삭제된 행도 조회돼야 함 → findById는 무필터.
 // 클래스 레벨 @SQLRestriction을 걸면 (B)가 죽어 소프트 삭제된 카테고리를 참조하는 거래 목록 조회가 깨진다.
 @Entity
-@Table(name = "finance_categories")
+@Table(name = "finance_categories", schema = "finance")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

@@ -59,6 +59,7 @@ adapter/out/
   feargreed/     ← CnnFearGreedAdapter, CryptoFearGreedAdapter
   redis/         ← RedisBlacklistAdapter (BlacklistPort — userId/JTI 단위 JWT 블랙리스트, TTL 기반)
   persistence/   ← JPA 인프라 + 어그리게이트별 서브패키지, 각각 Entity + *JpaRepository(package-private) + *PersistenceAdapter(Port 구현) 3종 구성
+                   DB 스키마 3분리(kista/finance/reference, V15 마이그레이션): kista=순수 매매 도메인(계좌·주문·전략·포지션), finance=가계부, reference=외부 참조·시장 데이터(FIDA PRIVACY 기준 매매표 포함, 전역 공유·비개인 데이터가 기준). 인증/관리자/로그/알림 성격 테이블(users/user_settings/user_notification_prefs/refresh_tokens/broker_tokens/admin_runtime_settings/audit_logs/app_error_logs/fcm_device_tokens/scheduler_locks)은 플랫폼 공통이라 public 유지. 신규 테이블은 이 기준으로 분류해 Entity에 `@Table(schema=...)` 명시(public도 명시 — search_path 첫 스키마가 kista라 생략 시 validate 실패) — nativeQuery/JdbcTemplate/raw SQL은 DB 유저 search_path(`kista, finance, reference, public`)로 unqualified 이름이 자동 해석되므로 스키마 접두사 불필요
   notify/        ← TelegramAdapter(관리자봇), CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter(사용자 알림)
   sse/           ← SseEmitterRegistry(사용자별 SSE), TradeSseEmitterRegistry(매매 이벤트 SSE)
   kakao/         ← KakaoOAuthAdapter — 카카오 소셜 로그인

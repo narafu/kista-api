@@ -16,7 +16,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "finance_asset_snapshots")
+@Table(name = "finance_asset_snapshots", schema = "finance")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)

@@ -8,7 +8,7 @@ import org.hibernate.type.SqlTypes;
 import java.util.UUID;
 
 @Entity
-@Table(name = "audit_logs")
+@Table(name = "audit_logs", schema = "public")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor
