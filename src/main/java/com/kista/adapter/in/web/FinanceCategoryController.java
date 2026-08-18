@@ -66,6 +66,11 @@ public class FinanceCategoryController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) UUID groupId,
             @Valid @RequestBody FinanceCategoryRequest request) {
+        if (request.type() == null) {
+            // DB NOT NULL 위반이 FinanceCategoryPersistenceAdapter에서 무조건 DuplicateNameException(409)으로
+            // 오분류되는 걸 막기 위해 여기서 먼저 400을 낸다 — @NotNull은 update()가 공유하는 DTO라 걸 수 없다.
+            throw new IllegalArgumentException("type은 필수입니다");
+        }
         FinanceCategory saved = categoryUseCase.create(userId, groupId, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/categories/" + saved.id()))
                 .body(FinanceCategoryResponse.from(saved, List.of()));

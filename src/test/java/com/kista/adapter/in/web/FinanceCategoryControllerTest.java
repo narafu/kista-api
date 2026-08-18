@@ -107,6 +107,17 @@ class FinanceCategoryControllerTest {
     }
 
     @Test
+    void create_withoutType_returns400() throws Exception {
+        mockMvc.perform(post("/api/finance/categories")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"식비\",\"sortOrder\":0}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(categoryUseCase);
+    }
+
+    @Test
     void update_returns200() throws Exception {
         UUID id = UUID.randomUUID();
         FinanceCategory updated = new FinanceCategory(id, null, null, USER_ID,

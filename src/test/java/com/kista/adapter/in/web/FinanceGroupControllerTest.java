@@ -3,8 +3,10 @@ package com.kista.adapter.in.web;
 import com.kista.domain.model.finance.FinanceGroup;
 import com.kista.domain.model.finance.FinanceGroupInvitation;
 import com.kista.domain.model.finance.FinanceGroupMember;
+import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.FinanceGroupUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import com.kista.domain.port.out.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -41,6 +43,7 @@ class FinanceGroupControllerTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase;
     @MockitoBean FinanceGroupUseCase groupUseCase;
+    @MockitoBean UserUseCase userUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -61,12 +64,54 @@ class FinanceGroupControllerTest {
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
+        User user = new User(USER_ID, "kakao", "홍길동", null, User.UserStatus.ACTIVE, User.UserRole.USER,
+                null, null, null, null, null, User.DEFAULT_CHANNEL);
+        when(userUseCase.getById(USER_ID)).thenReturn(user);
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$[0].nickname").value("홍길동"))
                 .andExpect(jsonPath("$[0].role").value("OWNER"));
+    }
+
+    @Test
+    void listMembers_multipleMembers_looksUpEachOwnNickname() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        FinanceGroupMember owner = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
+                FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
+        FinanceGroupMember other = new FinanceGroupMember(UUID.randomUUID(), groupId, otherUserId,
+                FinanceGroup.MemberRole.MEMBER, Instant.now(), Instant.now());
+        when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(owner, other));
+        when(userUseCase.getById(USER_ID)).thenReturn(new User(USER_ID, "kakao", "홍길동", null,
+                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
+        when(userUseCase.getById(otherUserId)).thenReturn(new User(otherUserId, "kakao2", "김철수", null,
+                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
+
+        mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$[0].nickname").value("홍길동"))
+                .andExpect(jsonPath("$[1].userId").value(otherUserId.toString()))
+                .andExpect(jsonPath("$[1].nickname").value("김철수"));
+    }
+
+    @Test
+    void listMembers_memberDeletedMidRequest_omitsNicknameInsteadOf404() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
+                FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
+        when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
+        when(userUseCase.getById(USER_ID)).thenThrow(new java.util.NoSuchElementException("사용자를 찾을 수 없습니다"));
+
+        mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$[0].nickname").doesNotExist());
     }
 
     // 컨트롤러가 예외를 삼키지 않고 GlobalExceptionHandler(@RestControllerAdvice)가 SecurityException을

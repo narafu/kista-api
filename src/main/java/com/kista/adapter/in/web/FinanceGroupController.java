@@ -7,6 +7,7 @@ import com.kista.adapter.in.web.dto.FinanceGroupMemberResponse;
 import com.kista.adapter.in.web.dto.FinanceGroupResponse;
 import com.kista.domain.model.finance.FinanceGroupInvitation;
 import com.kista.domain.port.in.FinanceGroupUseCase;
+import com.kista.domain.port.in.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class FinanceGroupController {
 
     private final FinanceGroupUseCase groupUseCase;
+    private final UserUseCase userUseCase;
 
     @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 전체 — 개인 그룹 포함.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -50,8 +52,18 @@ public class FinanceGroupController {
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         return groupUseCase.listMembers(id, userId).stream()
-                .map(FinanceGroupMemberResponse::from)
+                .map(m -> FinanceGroupMemberResponse.from(m, resolveNickname(m.userId())))
                 .toList();
+    }
+
+    // 조회와 탈퇴 사이 경합으로 멤버가 방금 회원 탈퇴했으면 그 한 명만 닉네임 없이 보여준다 —
+    // NoSuchElementException을 그대로 전파하면 목록 전체가 404로 죽는다.
+    private String resolveNickname(UUID userId) {
+        try {
+            return userUseCase.getById(userId).nickname();
+        } catch (java.util.NoSuchElementException e) {
+            return null;
+        }
     }
 
     @Operation(summary = "그룹 초대 생성", description = "그룹 OWNER만 생성할 수 있습니다.")
