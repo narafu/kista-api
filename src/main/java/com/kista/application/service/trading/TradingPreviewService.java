@@ -97,6 +97,13 @@ class TradingPreviewService {
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
+            if (!today.isAfter(cycle.startDate())) {
+                // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 경쟁 시뮬레이션이 캐시 미스로 오인해
+                // planBuilder.build()를 직접 재계산하면서 시작예정일 미도래 전략이 정상 주문을 만든 것처럼 취급됨
+                planResultsByStrategyId.put(strategy.id(),
+                        new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED));
+                continue;
+            }
             try {
                 planResultsByStrategyId.put(strategy.id(),
                         planBuilder.build(strategy, account, cycle, today, "batch:" + strategy.id(), prevCloseCache));
@@ -145,6 +152,12 @@ class TradingPreviewService {
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
+
+        // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
+        if (!today.isAfter(currentCycle.startDate())) {
+            return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+        }
 
         StrategyOrderPlanBuilder.PlanResult result = precomputedPlanResult != null
                 ? precomputedPlanResult

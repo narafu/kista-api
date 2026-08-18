@@ -55,8 +55,10 @@ class TradingPreviewServiceTest {
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
 
+    // startDate는 항상 과거로 고정 — LocalDate.now()를 쓰면 KST 00:00~04:30 사이 테스트 실행 시
+    // DstInfo.nextTradeDate()가 오늘 날짜를 반환해 신규 SCHEDULED_START_NOT_REACHED skip과 경합하는 flaky 테스트가 됨
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), STRATEGY.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+            UUID.randomUUID(), STRATEGY.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
 
     @BeforeEach
     void setUp() {
@@ -87,6 +89,23 @@ class TradingPreviewServiceTest {
         assertThat(result.orders()).hasSize(1);
         assertThat(result.competition()).isNull();
         verify(competitionSimulator, never()).simulate(any(), any(), any(), any(), any(), any());
+    }
+
+    // 시작예정일 미도래 사이클 — TradingService.filterScheduledStart와 동일 기준으로 미리보기도 skip해야 함
+    @Test
+    void preview_returnsScheduledStartNotReached_whenCycleStartDateIsFuture() {
+        // DstInfo.nextTradeDate()는 KST 04:30 이전엔 오늘, 이후엔 내일을 반환하므로 명확히 먼 미래로 고정해야
+        // 테스트 실행 시각과 무관하게 항상 시작예정일 미도래로 판정된다
+        StrategyCycle futureCycle = new StrategyCycle(
+                STRATEGY_CYCLE.id(), STRATEGY.id(), STRATEGY_CYCLE.strategyVersionId(), new BigDecimal("1000.00"),
+                null, LocalDate.now().plusDays(30), null, null, null);
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(futureCycle));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isEqualTo(NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED);
+        assertThat(result.orders()).isEmpty();
+        verify(planBuilder, never()).build(any(), any(), any(), any(), anyString());
     }
 
     @Test
@@ -370,5 +389,53 @@ class TradingPreviewServiceTest {
         for (Strategy s : strategies) {
             verify(planBuilder, times(1)).build(eq(s), eq(ACCOUNT), eq(cycles.get(s.id())), any(), anyString(), any());
         }
+    }
+
+    // previewBatch()의 skip 캐시 채움 회귀 테스트 — 시작예정일 미도래 전략을 캐시에서 그냥 생략(continue)하면
+    // TradingBuyCompetitionSimulator가 캐시 미스로 오인해 재계산, 정상 주문을 만든 것처럼 예산을 잠식한다.
+    // 실제 TradingBuyCompetitionSimulator를 그대로 사용해 대상 전략의 경쟁 결과에 영향이 없는지 검증한다.
+    @Test
+    void previewBatch_excludesScheduledStartNotReachedStrategy_fromCompetitionBudget() {
+        Strategy started = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy notStarted = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        List<Strategy> strategies = List.of(started, notStarted);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
+
+        StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), started.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
+        StrategyCycle notStartedCycle = new StrategyCycle(UUID.randomUUID(), notStarted.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().plusDays(30), null, null, null);
+        Map<UUID, StrategyCycle> cycles = Map.of(started.id(), startedCycle, notStarted.id(), notStartedCycle);
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(started.id(), notStarted.id()))).thenReturn(cycles);
+
+        Order buy = Order.planned(LocalDate.now(), started.ticker(), Order.OrderType.LOC,
+                Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
+        CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buy));
+        when(planBuilder.build(eq(started), eq(ACCOUNT), eq(startedCycle), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
+
+        PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
+        lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
+        com.kista.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.domain.strategy.CycleOrderStrategies.class);
+        com.kista.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.domain.strategy.CycleOrderStrategy.class);
+        lenient().when(cycleOrderStrategies.of(any(Strategy.Type.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
+        lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
+
+        TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
+                strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+        TradingPreviewService realService = new TradingPreviewService(
+                accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, sellSufficiencySimulator, priceFetcher);
+
+        Map<UUID, NextOrdersPreview> result = realService.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.get(notStarted.id()).skipReason()).isEqualTo(SkipReason.SCHEDULED_START_NOT_REACHED);
+        verify(planBuilder, never()).build(eq(notStarted), any(), any(), any(), anyString(), any());
+
+        BuyCompetitionPreview competition = result.get(started.id()).competition();
+        assertThat(competition.consumedByHigherPriority()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(competition.blockedByHigherPriority()).isEmpty();
     }
 }

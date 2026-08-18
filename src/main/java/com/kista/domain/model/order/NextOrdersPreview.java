@@ -17,7 +17,8 @@ public record NextOrdersPreview(
         SellSufficiencyPreview sellSufficiency            // SELL 판매가능수량 충족 시뮬레이션 결과 (SELL 없으면 null)
 ) {
     public enum SkipReason {
-        NO_CYCLE_HISTORY,   // 사이클 이력 없음 (신규)
-        NO_PRIVACY_BASE     // PRIVACY 기준매매표 미수신
+        NO_CYCLE_HISTORY,          // 사이클 이력 없음 (신규)
+        NO_PRIVACY_BASE,           // PRIVACY 기준매매표 미수신
+        SCHEDULED_START_NOT_REACHED // 사이클 시작예정일 미도래
     }
 }
