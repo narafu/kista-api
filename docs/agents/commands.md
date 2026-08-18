@@ -42,7 +42,7 @@ tail -f logs/kista-api.log
 ## 배포/인프라/외부 연동 런북
 
 저빈도 운영 작업 — 필요시 `docs/agents/docker-infra.md` 참고:
-- 서버(OCI) 배포 모니터링/환경변수 설정 (Fly.io는 폐지됨)
+- 서버(OCI) 배포 모니터링/환경변수 설정
 - kista-ui 운영 로그 조회, kista-api↔kista-ui URL 변경 연동
 - kis-trade-mcp 재시작, .mcp.json 경로 이식성
 - Privacy 기준표 운영 → 로컬 마이그레이션
