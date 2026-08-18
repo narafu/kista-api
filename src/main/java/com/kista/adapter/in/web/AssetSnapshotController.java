@@ -100,7 +100,12 @@ public class AssetSnapshotController {
     // 지금은 그대로 두고, 필요해지면 나중에 배치 조회로 최적화한다.
     private AssetSnapshotResponse enrich(AssetSnapshot snapshot) {
         FinanceCategory category = financeCategoryPort.findByIdOrThrow(snapshot.categoryId());
-        UUID rootCategoryId = category.parentId() != null ? category.parentId() : category.id();
+        // 임의 depth 트리 루트까지 거슬러 올라감 — parentId가 null일 때까지 반복 조회
+        FinanceCategory root = category;
+        while (root.parentId() != null) {
+            root = financeCategoryPort.findByIdOrThrow(root.parentId());
+        }
+        UUID rootCategoryId = root.id();
         String accountName = snapshot.accountId() != null
                 ? financeAccountPort.findByIdOrThrow(snapshot.accountId()).name()
                 : null;

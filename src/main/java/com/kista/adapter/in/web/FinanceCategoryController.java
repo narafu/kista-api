@@ -29,7 +29,7 @@ public class FinanceCategoryController {
 
     private final FinanceCategoryUseCase categoryUseCase;
 
-    @Operation(summary = "카테고리 목록 조회", description = "L1 카테고리에 L2 하위 카테고리가 중첩된 트리로 반환합니다.")
+    @Operation(summary = "카테고리 목록 조회", description = "카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<FinanceCategoryResponse> list(
@@ -42,11 +42,16 @@ public class FinanceCategoryController {
                 .collect(Collectors.groupingBy(FinanceCategory::parentId));
         return flat.stream()
                 .filter(c -> c.parentId() == null)
-                .map(l1 -> FinanceCategoryResponse.from(l1,
-                        byParent.getOrDefault(l1.id(), List.of()).stream()
-                                .map(l2 -> FinanceCategoryResponse.from(l2, List.of()))
-                                .toList()))
+                .map(root -> toResponse(root, byParent))
                 .toList();
+    }
+
+    // 재귀적으로 카테고리 계층을 조립해 임의 depth 트리 구성
+    private FinanceCategoryResponse toResponse(FinanceCategory category, Map<UUID, List<FinanceCategory>> byParent) {
+        List<FinanceCategoryResponse> children = byParent.getOrDefault(category.id(), List.of()).stream()
+                .map(child -> toResponse(child, byParent))
+                .toList();
+        return FinanceCategoryResponse.from(category, children);
     }
 
     @Operation(summary = "카테고리 등록")

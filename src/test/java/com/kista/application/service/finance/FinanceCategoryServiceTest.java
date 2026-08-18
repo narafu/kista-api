@@ -105,22 +105,21 @@ class FinanceCategoryServiceTest {
     }
 
     @Test
-    @DisplayName("생성 시 parentId가 이미 L2(부모의 부모 존재)인 카테고리를 가리키면 IllegalArgumentException")
-    void create_parentIsAlreadyL2_throws() {
+    @DisplayName("생성 시 parentId가 이미 L2(부모의 부모 존재)인 카테고리를 가리켜도 depth 무관 정책상 정상 생성됨")
+    void create_parentIsAlreadyL2_allowedUnderDepthAgnosticPolicy() {
         when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        // 부모 자체가 그룹 소유(멤버십 통과)이지만 parentId가 non-null이라 이미 L2인 상황을 시뮬레이션한다.
         FinanceCategory l2Parent = new FinanceCategory(UUID.randomUUID(), groupId, UUID.randomUUID(), userId,
                 FinanceCategory.Type.EXPENSE, "이미L2", 10, null);
         when(categoryPort.findByIdOrThrow(l2Parent.id())).thenReturn(l2Parent);
+        FinanceCategory saved = new FinanceCategory(UUID.randomUUID(), groupId, l2Parent.id(), userId,
+                FinanceCategory.Type.EXPENSE, "새카테고리", 10, null);
+        when(categoryPort.save(any())).thenReturn(saved);
 
         FinanceCategoryCommand command = new FinanceCategoryCommand(
                 l2Parent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
-        assertThatThrownBy(() -> categoryService.create(userId, null, command))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2계층");
-
-        verify(categoryPort, never()).save(any());
+        assertThat(categoryService.create(userId, null, command)).isEqualTo(saved);
+        verify(categoryPort).save(any());
     }
 
     @Test

@@ -69,10 +69,10 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     }
 
     // V13 복합 FK(parent_id, group_id) 폐기의 유일한 대체 방어선.
-    // 부모는 (같은 type) AND (시스템이거나 같은 그룹 소유) AND (그 자체가 L1)이어야 한다.
+    // 부모는 (같은 type) AND (시스템이거나 같은 그룹 소유)이어야 한다.
     private void resolveParent(UUID parentId, UUID groupId, FinanceCategory.Type type) {
         if (parentId == null) {
-            return; // 신규 L1 — 허용
+            return; // 신규 루트 — 허용
         }
         FinanceCategory parent = categoryPort.findByIdOrThrow(parentId);
         if (parent.type() != type) {
@@ -80,9 +80,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         }
         if (!parent.isSystem() && !parent.groupId().equals(groupId)) {
             throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다");
-        }
-        if (parent.parentId() != null) {
-            throw new IllegalArgumentException("카테고리는 최대 2계층까지만 허용됩니다");
         }
     }
 }

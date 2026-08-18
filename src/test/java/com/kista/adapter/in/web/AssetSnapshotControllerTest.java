@@ -82,13 +82,40 @@ class AssetSnapshotControllerTest {
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l2Category = new FinanceCategory(categoryId, null, parentId, null,
                 FinanceCategory.Type.ASSET, "국내주식", 0, Instant.now());
+        FinanceCategory rootCategory = new FinanceCategory(parentId, null, null, null,
+                FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(l2Category);
+        when(financeCategoryPort.findByIdOrThrow(parentId)).thenReturn(rootCategory);
 
         mockMvc.perform(get("/api/finance/asset-snapshots")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].rootCategoryId").value(parentId.toString()))
                 .andExpect(jsonPath("$[0].categoryName").value("국내주식"));
+    }
+
+    @Test
+    void list_categoryIsL3_rootCategoryIdEqualsGrandparentId() throws Exception {
+        UUID rootId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        when(assetSnapshotUseCase.list(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(snapshot(categoryId, null)));
+        FinanceCategory l3Category = new FinanceCategory(categoryId, null, parentId, null,
+                FinanceCategory.Type.ASSET, "미국주식", 0, Instant.now());
+        FinanceCategory l2Category = new FinanceCategory(parentId, null, rootId, null,
+                FinanceCategory.Type.ASSET, "해외주식", 0, Instant.now());
+        FinanceCategory rootCategory = new FinanceCategory(rootId, null, null, null,
+                FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(l3Category);
+        when(financeCategoryPort.findByIdOrThrow(parentId)).thenReturn(l2Category);
+        when(financeCategoryPort.findByIdOrThrow(rootId)).thenReturn(rootCategory);
+
+        mockMvc.perform(get("/api/finance/asset-snapshots")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rootCategoryId").value(rootId.toString()))
+                .andExpect(jsonPath("$[0].categoryName").value("미국주식"));
     }
 
     @Test

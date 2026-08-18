@@ -113,6 +113,20 @@ class FinanceCategoryPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void softDeleteWithChildren_cascadesThroughArbitraryDepth() {
+        FinanceCategory l1 = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "L1카테고리"));
+        FinanceCategory l2 = adapter.save(groupCategory(l1.id(), FinanceCategory.Type.EXPENSE, "L2카테고리"));
+        FinanceCategory l3 = adapter.save(groupCategory(l2.id(), FinanceCategory.Type.EXPENSE, "L3카테고리"));
+
+        adapter.softDeleteWithChildren(l1.id());
+
+        Integer deletedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM finance_categories WHERE id IN (?, ?, ?) AND deleted_at IS NOT NULL",
+                Integer.class, l1.id(), l2.id(), l3.id());
+        assertThat(deletedCount).isEqualTo(3);
+    }
+
+    @Test
     void save_duplicateNameSameGroupAndParent_throwsDuplicateNameException() {
         FinanceCategory parent = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "부모카테고리"));
         adapter.save(groupCategory(parent.id(), FinanceCategory.Type.EXPENSE, "중복이름"));

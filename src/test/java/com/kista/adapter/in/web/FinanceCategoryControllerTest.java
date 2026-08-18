@@ -61,6 +61,28 @@ class FinanceCategoryControllerTest {
     }
 
     @Test
+    void list_returnsNestedTree_arbitraryDepth() throws Exception {
+        UUID l1Id = UUID.randomUUID();
+        UUID l2Id = UUID.randomUUID();
+        UUID l3Id = UUID.randomUUID();
+        FinanceCategory l1 = new FinanceCategory(l1Id, null, null, null,
+                FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
+        FinanceCategory l2 = new FinanceCategory(l2Id, null, l1Id, null,
+                FinanceCategory.Type.EXPENSE, "외식", 0, Instant.now());
+        FinanceCategory l3 = new FinanceCategory(l3Id, null, l2Id, null,
+                FinanceCategory.Type.EXPENSE, "배달", 0, Instant.now());
+        when(categoryUseCase.list(any(), any(), any())).thenReturn(List.of(l1, l2, l3));
+
+        mockMvc.perform(get("/api/finance/categories")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(l1Id.toString()))
+                .andExpect(jsonPath("$[0].children[0].id").value(l2Id.toString()))
+                .andExpect(jsonPath("$[0].children[0].children[0].id").value(l3Id.toString()))
+                .andExpect(jsonPath("$[0].children[0].children[0].name").value("배달"));
+    }
+
+    @Test
     void create_returns201WithLocationHeader() throws Exception {
         UUID savedId = UUID.randomUUID();
         FinanceCategory saved = new FinanceCategory(savedId, null, null, USER_ID,

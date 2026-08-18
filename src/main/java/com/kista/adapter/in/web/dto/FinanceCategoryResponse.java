@@ -21,7 +21,7 @@ public record FinanceCategoryResponse(
         int sortOrder,
         @Schema(description = "시스템 전역 카테고리 여부 (true면 수정·삭제 불가)")
         boolean system,
-        @Schema(description = "하위 카테고리 목록 (L1만 채워짐)")
+        @Schema(description = "하위 카테고리 목록 (임의 depth로 재귀 중첩)")
         List<FinanceCategoryResponse> children
 ) {
     public static FinanceCategoryResponse from(FinanceCategory c, List<FinanceCategoryResponse> children) {

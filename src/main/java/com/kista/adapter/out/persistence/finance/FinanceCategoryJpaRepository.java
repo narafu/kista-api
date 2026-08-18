@@ -19,9 +19,13 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
             "AND deleted_at IS NULL AND (CAST(:type AS varchar) IS NULL OR type = :type)")
     List<FinanceCategoryEntity> findSelectableByGroup(@Param("groupId") UUID groupId, @Param("type") String type);
 
-    // 소프트 삭제 시 자식(parent_id = id) 동반 — 2계층이라 재귀 불필요
+    // 소프트 삭제 시 모든 하위 세대(임의 depth) 동반 — recursive CTE로 전체 서브트리 조회 후 일괄 UPDATE
     @Modifying
-    @Query("UPDATE FinanceCategoryEntity c SET c.deletedAt = :now WHERE c.id = :id OR c.parentId = :id")
+    @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
+            "SELECT id FROM finance_categories WHERE id = :id " +
+            "UNION ALL " +
+            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance_categories SET deleted_at = :now WHERE id IN (SELECT id FROM descendants)")
     void softDeleteWithChildren(@Param("id") UUID id, @Param("now") Instant now);
 
     // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 createdBy NULL이라 자동 제외)

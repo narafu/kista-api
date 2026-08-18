@@ -21,7 +21,7 @@ public interface FinanceCategoryPort {
 
     FinanceCategory save(FinanceCategory category);
 
-    // 소프트 삭제 — 자식(parent_id = id)도 함께 소프트 삭제 (2계층이라 재귀 불필요)
+    // 소프트 삭제 — 모든 하위 세대(임의 depth)도 함께 소프트 삭제
     void softDeleteWithChildren(UUID id);
 
     void softDeleteByCreatedBy(UUID userId); // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 createdBy null이라 자동 제외)

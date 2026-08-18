@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FinanceCategoryUseCase {
-    // requestedGroupId null이면 개인 그룹. type null이면 전체 타입. L1에 children이 중첩된 트리로 반환.
+    // requestedGroupId null이면 개인 그룹. type null이면 전체 타입. flat 목록 반환 — 트리 조립은 web 계층 책임.
     List<FinanceCategory> list(UUID userId, UUID requestedGroupId, FinanceCategory.Type type);
     FinanceCategory create(UUID userId, UUID requestedGroupId, FinanceCategoryCommand command);
     FinanceCategory update(UUID categoryId, UUID userId, FinanceCategoryCommand command);
