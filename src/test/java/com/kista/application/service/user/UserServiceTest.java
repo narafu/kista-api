@@ -50,6 +50,7 @@ class UserServiceTest {
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock RuntimeSettingsPort runtimeSettingsPort;
     @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
+    @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩
 
     @InjectMocks UserService userService;
 

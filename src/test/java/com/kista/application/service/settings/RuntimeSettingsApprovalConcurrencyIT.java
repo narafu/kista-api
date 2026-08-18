@@ -61,6 +61,13 @@ class RuntimeSettingsApprovalConcurrencyIT {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS block_runtime_settings_signup_trigger ON users");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS block_runtime_settings_signup()");
         adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults(), true);
+        // UserService.register()가 가입 시 개인 그룹(finance_groups + OWNER 멤버십)을 자동 생성하므로,
+        // users를 하드 삭제하기 전에 그 그룹 자체와 멤버십부터 지워야 FK 위반이 나지 않는다
+        // (finance_group_members_user_id_fkey, finance_groups_owner_user_id_fkey).
+        jdbcTemplate.update(
+                "DELETE FROM finance_group_members WHERE user_id IN (?, ?)", adminId, signupId);
+        jdbcTemplate.update(
+                "DELETE FROM finance_groups WHERE owner_user_id IN (?, ?)", adminId, signupId);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", adminId, signupId);
         executor.shutdownNow();
     }

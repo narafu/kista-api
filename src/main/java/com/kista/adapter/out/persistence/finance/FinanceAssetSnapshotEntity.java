@@ -1,0 +1,83 @@
+package com.kista.adapter.out.persistence.finance;
+
+import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.domain.model.finance.AssetClass;
+import com.kista.domain.model.finance.AssetSnapshot;
+import com.kista.domain.model.finance.Market;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "finance_asset_snapshots")
+@SQLRestriction("deleted_at IS NULL")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+class FinanceAssetSnapshotEntity extends BaseAuditEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "UUID")
+    private UUID id;
+
+    @Column(name = "group_id", nullable = false, columnDefinition = "UUID")
+    private UUID groupId;                 // FK → finance_groups.id
+
+    @Column(name = "category_id", nullable = false, columnDefinition = "UUID")
+    private UUID categoryId;              // FK → finance_categories.id (type='ASSET'인 L1 또는 L2)
+
+    @Column(name = "account_id", columnDefinition = "UUID")
+    private UUID accountId;               // FK → finance_accounts.id, 계좌 없는 자산은 NULL
+
+    @Column(name = "created_by", nullable = false, columnDefinition = "UUID")
+    private UUID createdBy;               // FK → users.id
+
+    @Column(name = "entry_date", nullable = false)
+    private LocalDate entryDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "asset_class", nullable = false, length = 20)
+    private AssetClass assetClass;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Market market;
+
+    @Column(length = 50)
+    private String strategy;              // 자유 입력, 선택
+
+    @Column(nullable = false)
+    private long amount;                  // 원화 정수, 0 이상
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
+
+    static FinanceAssetSnapshotEntity fromModel(AssetSnapshot s) {
+        FinanceAssetSnapshotEntity e = new FinanceAssetSnapshotEntity();
+        e.id = s.id(); // null이면 @GeneratedValue가 UUID 생성
+        e.groupId = s.groupId();
+        e.categoryId = s.categoryId();
+        e.accountId = s.accountId();
+        e.createdBy = s.createdBy();
+        e.entryDate = s.entryDate();
+        e.assetClass = s.assetClass();
+        e.market = s.market();
+        e.strategy = s.strategy();
+        e.amount = s.amount();
+        return e;
+    }
+
+    static AssetSnapshot toDomain(FinanceAssetSnapshotEntity e) {
+        return new AssetSnapshot(
+                e.id, e.groupId, e.categoryId, e.accountId, e.createdBy, e.entryDate,
+                e.assetClass, e.market, e.strategy, e.amount, e.getCreatedAt());
+    }
+}

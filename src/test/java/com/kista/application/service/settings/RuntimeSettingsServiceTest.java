@@ -72,9 +72,7 @@ class RuntimeSettingsServiceTest {
         AssetFormOptions previousAssetFormOptions = AssetFormOptions.defaults();
         // previous와 다른 값을 준다 — assetFormOptions는 benchmarks와 달리 요청에 항상 존재(@NotNull)하므로
         // "생략 시 기존 값 유지" 규칙이 이 필드에는 적용되지 않고 요청값이 그대로 반영돼야 한다.
-        AssetFormOptions requestedAssetFormOptions = new AssetFormOptions(
-                previousAssetFormOptions.subcategorySuggestions(), List.of("카카오뱅크"),
-                previousAssetFormOptions.assetClassSuggestions(), previousAssetFormOptions.strategySuggestions());
+        AssetFormOptions requestedAssetFormOptions = new AssetFormOptions(List.of("커스텀전략"));
         RuntimeSettings previous = new RuntimeSettings(true, RuntimeSettings.defaults().brokers(),
                 RuntimeSettings.defaults().strategies(), customBenchmarks, previousAssetFormOptions);
         // 요청 DTO에 benchmarks가 없었던 상황을 재현 — toDomain()이 이미 null을 defaults()로 치환한 상태
