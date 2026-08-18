@@ -38,6 +38,7 @@ Java 21 + Spring Boot 3 기반 Hexagonal Architecture.
 - **작업 완료 후 자동 커밋**: 요청된 작업 완료 시(코드 변경이면 위 검토자 검수까지 끝난 뒤) 스스로 커밋 생성
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
 - **README.md 드리프트 감지**: 코드 변경으로 `README.md`(기술 스택 배지 버전, 아키텍처 다이어그램 속 클래스/패키지명, 스케쥴러 실행 시각, 배포 파이프라인 방식 등)의 내용이 실제와 달라지면 같은 작업에서 `README.md`도 함께 수정. kista-ui 쪽 README도 영향받으면 `../kista-ui/README.md`까지 확인
+- **범위 밖 리팩토링 필요성 발견 시 제안**: 작업 중 우아하지 않은 코드, 일관성 깨는 패턴, 더 단순한 구현이 가능한 부분을 발견하면 임의로 고치지 말고 짧게 언급만 (범위 밖 변경은 사용자 승인 필요)
 - Git 규칙(push·author·커밋 메시지)은 `docs/agents/constraints.md` 참고
 
 @docs/agents/commands.md
