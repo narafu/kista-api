@@ -7,14 +7,17 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.util.UUID;
 
+// @SQLRestriction("deleted_at IS NULL")를 의도적으로 붙이지 않는다 (FinanceCategoryEntity §4.2와 동일 이유).
+// 계좌는 읽기 모드가 둘: (A) 폼 선택지 = 활성 행만 → findByGroupId가 명시적으로 필터링.
+// (B) 과거 자산 기록의 계좌명 렌더링(AssetSnapshotController.enrich) = 삭제된 행도 조회돼야 함 → findById는 무필터.
+// 클래스 레벨 @SQLRestriction을 걸면 (B)가 죽어, 계좌 삭제 후에도 남아있는 자산 스냅샷이 목록 조회 전체를
+// 404(NoSuchElementException)로 깨뜨린다 — 운영에서 실제로 발생한 장애(2026-08-19).
 @Entity
 @Table(name = "finance_accounts", schema = "finance")
-@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

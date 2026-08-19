@@ -70,7 +70,7 @@ class FinanceAccountServiceTest {
     @Test
     @DisplayName("update는 load-then-verify-membership 패턴 — 기존 계좌의 groupId로 멤버십 검증")
     void update_loadsThenVerifiesMembership() {
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(existingAccount());
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(existingAccount());
         when(financeGroupPort.resolveGroupId(userId, groupId)).thenReturn(groupId);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -79,7 +79,7 @@ class FinanceAccountServiceTest {
         assertThat(result.name()).isEqualTo("카카오뱅크");
         assertThat(result.id()).isEqualTo(accountId);
         assertThat(result.createdBy()).isEqualTo(userId); // 기존 createdBy 유지
-        verify(accountPort).findByIdOrThrow(accountId);
+        verify(accountPort).findActiveByIdOrThrow(accountId);
         verify(financeGroupPort).resolveGroupId(userId, groupId);
     }
 
@@ -109,12 +109,25 @@ class FinanceAccountServiceTest {
     @Test
     @DisplayName("update 중 계좌명 중복 시 DuplicateNameException이 그대로 전파됨")
     void update_duplicateName_propagatesUntouched() {
-        when(accountPort.findByIdOrThrow(accountId)).thenReturn(existingAccount());
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(existingAccount());
         when(financeGroupPort.resolveGroupId(userId, groupId)).thenReturn(groupId);
         when(accountPort.save(any())).thenThrow(new FinanceAccount.DuplicateNameException("카카오뱅크"));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, command()))
                 .isInstanceOf(FinanceAccount.DuplicateNameException.class)
                 .hasMessageContaining("카카오뱅크");
+    }
+
+    // 삭제된 계좌는 findActiveByIdOrThrow가 못 찾아야 함 — findByIdOrThrow(삭제 계좌도 조회됨)를 쓰면
+    // save() merge 시 deletedAt이 조용히 풀려 되살아난다(코드리뷰에서 발견, 2026-08-19).
+    @Test
+    @DisplayName("update는 삭제된 계좌를 되살리지 못하고 404로 거부됨")
+    void update_deletedAccount_throwsNotFound() {
+        when(accountPort.findActiveByIdOrThrow(accountId))
+                .thenThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+
+        assertThatThrownBy(() -> accountService.update(accountId, userId, command()))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        verify(accountPort, never()).save(any());
     }
 }

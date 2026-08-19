@@ -9,10 +9,19 @@ import java.util.UUID;
 
 public interface FinanceAccountPort {
     List<FinanceAccount> findByGroupId(UUID groupId);
+    // 삭제된 계좌도 조회됨 — 과거 자산 기록 렌더링(AssetSnapshotController.enrich) 전용. 수정·삭제 같은
+    // 쓰기 경로에서 쓰면 안 됨(FinanceAccount에 deletedAt 필드가 없어 save()가 merge 시 삭제 상태를
+    // 조용히 되살릴 수 있다) — 그런 경로는 findActiveByIdOrThrow를 쓴다.
     Optional<FinanceAccount> findById(UUID id);
+    Optional<FinanceAccount> findActiveById(UUID id);
 
     default FinanceAccount findByIdOrThrow(UUID id) {
         return findById(id).orElseThrow(
+                () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + id));
+    }
+
+    default FinanceAccount findActiveByIdOrThrow(UUID id) {
+        return findActiveById(id).orElseThrow(
                 () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + id));
     }
 

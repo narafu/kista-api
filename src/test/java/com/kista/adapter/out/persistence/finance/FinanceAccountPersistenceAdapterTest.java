@@ -111,4 +111,17 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
         assertThatThrownBy(() -> adapter.reassignGroup(groupId, otherGroupId, userId))
                 .isInstanceOf(FinanceAccount.DuplicateNameException.class);
     }
+
+    // 운영 장애 재현(2026-08-19): 삭제된 계좌를 여전히 참조하는 자산 스냅샷이 있으면 enrich()가
+    // findByIdOrThrow로 계좌명을 조회하는데, 클래스 레벨 @SQLRestriction이 있으면 여기서 404가 나
+    // 목록 조회 전체가 깨진다. findById는 삭제된 계좌도 찾아야 하고, findByGroupId는 계속 제외해야 한다.
+    @Test
+    void softDeletedAccount_stillFindableById_butExcludedFromGroupList() {
+        FinanceAccount saved = adapter.save(account("삭제예정계좌", null));
+
+        adapter.softDelete(saved.id());
+
+        assertThat(adapter.findById(saved.id())).isPresent();
+        assertThat(adapter.findByGroupId(groupId)).isEmpty();
+    }
 }

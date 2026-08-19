@@ -23,7 +23,7 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     @Override
     public List<FinanceAccount> findByGroupId(UUID groupId) {
-        return jpaRepository.findByGroupId(groupId).stream()
+        return jpaRepository.findByGroupIdAndDeletedAtIsNull(groupId).stream()
                 .map(this::toDomain)
                 .toList();
     }
@@ -31,6 +31,11 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
     @Override
     public Optional<FinanceAccount> findById(UUID id) {
         return jpaRepository.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<FinanceAccount> findActiveById(UUID id) {
+        return jpaRepository.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
     }
 
     @Override
@@ -63,10 +68,10 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
         // 신규 등록은 사용자 본인이 의도적으로 만드는 계좌, 이관은 서로 다른 두 그룹의 계좌가 우연히
         // 이름이 겹쳐 알아채지 못한 채 합쳐지는 상황이라 구분한다). DB 제약이 사라졌으니 애플리케이션
         // 레벨에서 동일하게 검증한다.
-        Set<String> targetNames = jpaRepository.findByGroupId(toGroupId).stream()
+        Set<String> targetNames = jpaRepository.findByGroupIdAndDeletedAtIsNull(toGroupId).stream()
                 .map(FinanceAccountEntity::getName)
                 .collect(Collectors.toSet());
-        boolean hasCollision = jpaRepository.findByGroupId(fromGroupId).stream()
+        boolean hasCollision = jpaRepository.findByGroupIdAndDeletedAtIsNull(fromGroupId).stream()
                 .filter(e -> e.getCreatedBy().equals(createdBy))
                 .anyMatch(e -> targetNames.contains(e.getName()));
         if (hasCollision) {

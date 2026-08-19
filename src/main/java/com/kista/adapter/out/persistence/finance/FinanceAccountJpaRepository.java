@@ -7,11 +7,14 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 interface FinanceAccountJpaRepository extends JpaRepository<FinanceAccountEntity, UUID> {
 
-    List<FinanceAccountEntity> findByGroupId(UUID groupId);
+    // 폼 선택지·목록용, 활성 행만 (엔티티 클래스 레벨 @SQLRestriction 제거로 명시적 필터 필요 — FinanceAccountEntity 주석 참고)
+    List<FinanceAccountEntity> findByGroupIdAndDeletedAtIsNull(UUID groupId);
+    Optional<FinanceAccountEntity> findByIdAndDeletedAtIsNull(UUID id);
 
     @Modifying
     @Query("UPDATE FinanceAccountEntity a SET a.deletedAt = :now WHERE a.id = :id")

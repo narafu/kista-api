@@ -41,7 +41,9 @@ class FinanceAccountService implements FinanceAccountUseCase {
 
     @Override
     public FinanceAccount update(UUID accountId, UUID userId, FinanceAccountCommand command) {
-        FinanceAccount existing = accountPort.findByIdOrThrow(accountId);
+        // findByIdOrThrow(삭제된 계좌도 조회됨)를 쓰면 안 됨 — FinanceAccount에 deletedAt이 없어
+        // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19).
+        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
         financeGroupPort.resolveGroupId(userId, existing.groupId());
         FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.createdBy(),
                 command.accountType(), command.name(), command.accountNo(), command.memo(), existing.createdAt());
