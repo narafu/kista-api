@@ -38,11 +38,10 @@ public class FinanceAccountController {
                 .toList();
     }
 
-    @Operation(summary = "계좌 등록")
+    @Operation(summary = "계좌 등록", description = "같은 그룹 안에서도 계좌명 중복이 허용됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "등록 성공"),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청"),
-            @ApiResponse(responseCode = "409", description = "이름 중복")
+            @ApiResponse(responseCode = "400", description = "잘못된 요청")
     })
     @PostMapping
     public ResponseEntity<FinanceAccountResponse> create(
@@ -58,8 +57,7 @@ public class FinanceAccountController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "409", description = "이름 중복")
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
     })
     @PutMapping("/{id}")
     public FinanceAccountResponse update(

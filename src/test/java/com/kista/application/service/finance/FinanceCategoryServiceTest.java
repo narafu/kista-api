@@ -17,6 +17,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -166,5 +167,96 @@ class FinanceCategoryServiceTest {
 
         assertThat(result).extracting(FinanceCategory::sortOrder).containsExactly(10, 20, 30);
         verify(categoryPort).findSelectableByGroup(groupId, FinanceCategory.Type.EXPENSE);
+    }
+
+    // ── 시스템 카테고리 admin 관리 ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("listSystem은 findSelectableByGroup(null, type)을 호출하고 sortOrder로 정렬")
+    void listSystem_queriesWithNullGroupId_andSorts() {
+        FinanceCategory c20 = new FinanceCategory(UUID.randomUUID(), null, null, null, FinanceCategory.Type.INCOME, "c20", 20, null);
+        FinanceCategory c10 = new FinanceCategory(UUID.randomUUID(), null, null, null, FinanceCategory.Type.INCOME, "c10", 10, null);
+        when(categoryPort.findSelectableByGroup(null, FinanceCategory.Type.INCOME)).thenReturn(List.of(c20, c10));
+
+        List<FinanceCategory> result = categoryService.listSystem(FinanceCategory.Type.INCOME);
+
+        assertThat(result).extracting(FinanceCategory::sortOrder).containsExactly(10, 20);
+        verifyNoInteractions(financeGroupPort);
+    }
+
+    @Test
+    @DisplayName("createSystem은 groupId=null, createdBy=null로 저장하고 그룹 조회를 하지 않음")
+    void createSystem_savesWithNullGroupAndCreatedBy() {
+        FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새시스템카테고리", 10);
+        FinanceCategory saved = new FinanceCategory(UUID.randomUUID(), null, null, null,
+                FinanceCategory.Type.EXPENSE, "새시스템카테고리", 10, null);
+        when(categoryPort.save(any())).thenReturn(saved);
+
+        FinanceCategory result = categoryService.createSystem(command);
+
+        assertThat(result).isEqualTo(saved);
+        verify(categoryPort).save(argThat(c -> c.groupId() == null && c.createdBy() == null));
+        verifyNoInteractions(financeGroupPort);
+    }
+
+    @Test
+    @DisplayName("createSystem 시 parentId가 시스템이 아닌(그룹 소유) 카테고리를 가리키면 IllegalArgumentException")
+    void createSystem_parentNotSystem_throws() {
+        FinanceCategory groupParent = groupCategory(groupId);
+        when(categoryPort.findByIdOrThrow(groupParent.id())).thenReturn(groupParent);
+        FinanceCategoryCommand command = new FinanceCategoryCommand(
+                groupParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+
+        assertThatThrownBy(() -> categoryService.createSystem(command))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateSystem은 대상이 시스템 카테고리면 이름·정렬만 갱신")
+    void updateSystem_updatesNameAndSortOrder() {
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
+        when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceCategory result = categoryService.updateSystem(categoryId,
+                new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20));
+
+        assertThat(result.name()).isEqualTo("변경명");
+        assertThat(result.sortOrder()).isEqualTo(20);
+        assertThat(result.groupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateSystem 대상이 그룹 카테고리면 IllegalArgumentException")
+    void updateSystem_targetIsGroupCategory_throws() {
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(groupCategory(groupId));
+
+        assertThatThrownBy(() -> categoryService.updateSystem(categoryId,
+                new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "변경명", 20)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("deleteSystem은 대상이 시스템 카테고리면 softDeleteWithChildren 호출")
+    void deleteSystem_callsSoftDeleteWithChildren() {
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
+
+        categoryService.deleteSystem(categoryId);
+
+        verify(categoryPort).softDeleteWithChildren(categoryId);
+    }
+
+    @Test
+    @DisplayName("deleteSystem 대상이 그룹 카테고리면 IllegalArgumentException")
+    void deleteSystem_targetIsGroupCategory_throws() {
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(groupCategory(groupId));
+
+        assertThatThrownBy(() -> categoryService.deleteSystem(categoryId))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(categoryPort, never()).softDeleteWithChildren(any());
     }
 }

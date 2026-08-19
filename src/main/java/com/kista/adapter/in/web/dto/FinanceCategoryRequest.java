@@ -4,6 +4,7 @@ import com.kista.domain.model.finance.FinanceCategory;
 import com.kista.domain.model.finance.FinanceCategoryCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
@@ -15,8 +16,10 @@ public record FinanceCategoryRequest(
         UUID parentId,
         @Schema(description = "카테고리 타입 (등록 시 필수, 수정 시 무시)", example = "EXPENSE")
         FinanceCategory.Type type,
+        // finance_categories.name 컬럼 길이(50)와 일치 — 미검증 시 초과분이 DB 제약 위반(DataIntegrityViolationException)으로
+        // 떨어져 FinanceCategoryPersistenceAdapter.save()의 catch-all이 "이름 중복" 409로 오분류한다.
         @Schema(description = "카테고리명", example = "식비")
-        @NotBlank String name,
+        @NotBlank @Size(max = 50) String name,
         @Schema(description = "정렬 순서", example = "10")
         int sortOrder
 ) {
