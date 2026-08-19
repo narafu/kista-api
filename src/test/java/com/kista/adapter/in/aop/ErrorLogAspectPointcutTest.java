@@ -6,6 +6,8 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.AppErrorLogPort;
 import com.kista.domain.port.out.NotifyPort;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +23,9 @@ import static org.mockito.Mockito.*;
 // Spring AOP + CGLIB 환경에서 포인트컷이 NotifyPort 구현 클래스에 실제로 적용되는지 검증
 // proxyTargetClass=true: Spring Boot 기본값과 동일한 CGLIB 방식 — 이 설정에서 NotifyPort+(+없음)는 미매칭
 @SpringJUnitConfig(ErrorLogAspectPointcutTest.Config.class)
+// 두 테스트가 같은 Spring 컨텍스트의 appErrorLogPort mock을 공유 — 병렬 실행 시 서로 오염됨
+// (testing.md의 @WebMvcTest/DataJpaTestBase와 동일한 Mockito 병렬 테스트 주의사항)
+@Execution(ExecutionMode.SAME_THREAD)
 class ErrorLogAspectPointcutTest {
 
     @Configuration
