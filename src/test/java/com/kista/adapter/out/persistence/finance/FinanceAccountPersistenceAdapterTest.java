@@ -57,12 +57,16 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(found.accountNo()).isEqualTo(plainAccountNo);
     }
 
+    // V16에서 uq_finance_accounts_group_name을 DROP — 같은 그룹 안에서도 계좌명 중복이 허용된다.
     @Test
-    void save_duplicateNameSameGroup_throwsDuplicateNameException() {
-        adapter.save(account("중복계좌명", "111"));
+    void save_duplicateNameSameGroup_allowsBothAccounts() {
+        FinanceAccount first = adapter.save(account("중복계좌명", "111"));
+        FinanceAccount second = adapter.save(account("중복계좌명", "222"));
 
-        assertThatThrownBy(() -> adapter.save(account("중복계좌명", "222")))
-                .isInstanceOf(FinanceAccount.DuplicateNameException.class);
+        assertThat(second.id()).isNotEqualTo(first.id());
+        assertThat(adapter.findByGroupId(groupId))
+                .extracting(FinanceAccount::name)
+                .containsExactlyInAnyOrder("중복계좌명", "중복계좌명");
     }
 
     @Test
@@ -87,8 +91,13 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(reassigned.groupId()).isEqualTo(otherGroupId);
     }
 
+    // V16에서 uq_finance_accounts_group_name을 DROP — reassignGroup도 같은 제약에 의존했으므로
+    // 이관 대상 그룹에 동명 계좌가 있어도 더 이상 막히지 않고 중복 이름 상태로 이관된다.
     @Test
     void reassignGroup_nameCollisionInTargetGroup_throwsDuplicateNameException() {
+        // 신규 등록 시 계좌명 중복은 V16부터 허용되지만(uq_finance_accounts_group_name DROP), 그룹 이관은
+        // 서로 다른 두 그룹의 계좌가 우연히 이름이 겹쳐 사용자도 모르게 합쳐지는 걸 막는 별도 안전장치라
+        // 애플리케이션 레벨에서 여전히 차단한다(FinanceGroupService.leaveGroup() 계약).
         UUID otherGroupId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '그룹2', false, now(), now())",
@@ -99,7 +108,6 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
         adapter.save(conflicting);
         adapter.save(account("겹치는계좌명", null));
 
-        // reassignGroup 호출은 마지막 DB 접촉이어야 한다 (aborted transaction 규칙)
         assertThatThrownBy(() -> adapter.reassignGroup(groupId, otherGroupId, userId))
                 .isInstanceOf(FinanceAccount.DuplicateNameException.class);
     }

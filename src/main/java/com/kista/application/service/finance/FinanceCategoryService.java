@@ -68,8 +68,57 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         log.info("카테고리 삭제: categoryId={}, userId={}", categoryId, userId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<FinanceCategory> listSystem(FinanceCategory.Type type) {
+        // findSelectableByGroup(null, type)의 네이티브 쿼리는 "(group_id IS NULL OR group_id = :groupId)" —
+        // :groupId가 null로 바인딩되면 두 번째 조건은 SQL 3치 논리상 항상 NULL(=false)이라
+        // group_id IS NULL 하나만 남는다. 즉 시스템 카테고리만 정확히 걸러진다.
+        return categoryPort.findSelectableByGroup(null, type).stream()
+                .sorted(Comparator.comparingInt(FinanceCategory::sortOrder))
+                .toList();
+    }
+
+    @Override
+    public FinanceCategory createSystem(FinanceCategoryCommand command) {
+        resolveParent(command.parentId(), null, command.type());
+        FinanceCategory category = new FinanceCategory(null, null, command.parentId(), null,
+                command.type(), command.name(), command.sortOrder(), null);
+        FinanceCategory saved = categoryPort.save(category);
+        log.info("시스템 카테고리 등록: categoryId={}", saved.id());
+        return saved;
+    }
+
+    @Override
+    public FinanceCategory updateSystem(UUID categoryId, FinanceCategoryCommand command) {
+        FinanceCategory existing = requireSystem(categoryId);
+        // type·parentId는 생성 후 불변 — update()와 동일한 정책.
+        FinanceCategory updated = new FinanceCategory(existing.id(), null, existing.parentId(),
+                null, existing.type(), command.name(), command.sortOrder(), existing.createdAt());
+        return categoryPort.save(updated);
+    }
+
+    @Override
+    public void deleteSystem(UUID categoryId) {
+        requireSystem(categoryId);
+        categoryPort.softDeleteWithChildren(categoryId);
+        log.info("시스템 카테고리 삭제: categoryId={}", categoryId);
+    }
+
+    // 대상이 시스템 카테고리가 아니면(즉 그룹 카테고리 id를 잘못 넘기면) 400으로 거부 — update()/delete()의
+    // "시스템이면 거부"와 정반대 방향의 가드.
+    private FinanceCategory requireSystem(UUID categoryId) {
+        FinanceCategory existing = categoryPort.findByIdOrThrow(categoryId);
+        if (!existing.isSystem()) {
+            throw new IllegalArgumentException("시스템 카테고리가 아닙니다: " + categoryId);
+        }
+        return existing;
+    }
+
     // V13 복합 FK(parent_id, group_id) 폐기의 유일한 대체 방어선.
     // 부모는 (같은 type) AND (시스템이거나 같은 그룹 소유)이어야 한다.
+    // groupId=null(시스템 카테고리 생성)로 호출하면 parent.groupId().equals(null)이 항상 false이므로
+    // 시스템이 아닌 부모는 자동으로 거부된다 — 시스템 자식은 시스템 부모만 가질 수 있다는 정책이 그대로 성립.
     private void resolveParent(UUID parentId, UUID groupId, FinanceCategory.Type type) {
         if (parentId == null) {
             return; // 신규 루트 — 허용

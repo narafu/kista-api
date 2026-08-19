@@ -148,6 +148,35 @@ class FinanceCategoryPersistenceAdapterTest extends DataJpaTestBase {
                 .isInstanceOf(FinanceCategory.DuplicateNameException.class);
     }
 
+    // 시스템 카테고리 admin 관리(groupId=null 저장 경로) — V13 시드 이후 최초로 groupId=null을 실제 DB에 저장한다.
+    // FinanceCategoryEntity의 group_id/created_by는 @Column(nullable=false)가 아니므로 정상 저장돼야 한다.
+    @Test
+    void save_systemCategory_groupIdNull_persists() {
+        FinanceCategory systemCategory = new FinanceCategory(null, null, null, null,
+                FinanceCategory.Type.EXPENSE, "새시스템카테고리", 50, null);
+
+        FinanceCategory saved = adapter.save(systemCategory);
+
+        assertThat(saved.groupId()).isNull();
+        assertThat(saved.createdBy()).isNull();
+        FinanceCategory found = adapter.findById(saved.id()).orElseThrow();
+        assertThat(found.groupId()).isNull();
+        assertThat(found.name()).isEqualTo("새시스템카테고리");
+    }
+
+    // findSelectableByGroup(null, type) — admin listSystem()이 의존하는 네이티브 쿼리 null 바인딩 경로.
+    // groupId 바인드 파라미터에 CAST가 없어 Postgres가 타입을 못 정하고 거부할 위험이 있다는 우려를
+    // 실제 DB 호출로 검증한다(주석과 달리 type 파라미터만 CAST돼 있고 groupId는 안 돼 있음).
+    @Test
+    void findSelectableByGroup_withNullGroupId_returnsOnlySystemCategories() {
+        adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "그룹전용카테고리"));
+
+        var result = adapter.findSelectableByGroup(null, null);
+
+        assertThat(result).extracting(FinanceCategory::id).contains(SYSTEM_EXPENSE_L1, SYSTEM_INCOME_L1);
+        assertThat(result).allSatisfy(c -> assertThat(c.groupId()).isNull());
+    }
+
     @Test
     void reassignGroup_movesCreatedByOwnedRowsToTargetGroup() {
         UUID otherGroupId = UUID.randomUUID();

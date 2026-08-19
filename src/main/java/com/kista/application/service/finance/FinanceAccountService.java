@@ -34,7 +34,6 @@ class FinanceAccountService implements FinanceAccountUseCase {
         UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
         FinanceAccount account = new FinanceAccount(null, groupId, userId, command.accountType(),
                 command.name(), command.accountNo(), command.memo(), null);
-        // 이름 중복 시 어댑터가 uq_finance_accounts_group_name 위반을 DuplicateNameException으로 변환한다.
         FinanceAccount saved = accountPort.save(account);
         log.info("계좌 등록: groupId={}, accountId={}", groupId, saved.id());
         return saved;
