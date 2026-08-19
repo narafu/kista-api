@@ -18,6 +18,8 @@ public record AdminAccountItem(
         String ownerNickname,
         @Schema(description = "마스킹된 계좌번호", example = "****1234")
         String accountNoMasked,
+        @Schema(description = "원본 계좌번호 (ADMIN 전용)", example = "12345678-01")
+        String accountNo,
         @Schema(description = "브로커 코드", example = "KIS")
         String broker
 ) {
@@ -25,7 +27,7 @@ public record AdminAccountItem(
         AdminUserView user = a.userId() != null ? userMap.get(a.userId()) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountItem(
-                a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()),
+                a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()), a.accountNo(),
                 a.broker() != null ? a.broker().name() : null);
     }
 }
