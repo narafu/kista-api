@@ -142,6 +142,19 @@ class FinanceGroupServiceTest {
     }
 
     @Test
+    @DisplayName("발급자 본인이 자기 초대 코드를 수락하면 SecurityException")
+    void respond_selfAccept_throwsSecurityException() {
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
+        when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
+
+        assertThatThrownBy(() -> financeGroupService.respondToInvitation(invitation.code(), userId, FinanceGroupInvitation.Status.ACCEPTED))
+                .isInstanceOf(SecurityException.class);
+
+        verify(financeGroupPort, never()).addMember(any(), any(), any());
+        verify(financeGroupPort, never()).updateInvitationStatus(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("만료된 초대는 status가 여전히 PENDING이어도 InvalidInvitationStateException")
     void respond_expiredButStillPending_throwsInvalidState() {
         FinanceGroupInvitation invitation = pendingInvitation(Instant.now().minus(1, ChronoUnit.HOURS));

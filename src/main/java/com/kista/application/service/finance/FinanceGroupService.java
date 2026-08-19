@@ -67,6 +67,9 @@ class FinanceGroupService implements FinanceGroupUseCase {
             throw new IllegalArgumentException("초대 응답은 ACCEPTED 또는 DECLINED만 가능합니다");
         }
         FinanceGroupInvitation invitation = financeGroupPort.findInvitationByCodeOrThrow(code);
+        if (invitation.invitedBy().equals(userId)) {
+            throw new SecurityException("본인이 발급한 초대 코드는 본인이 수락할 수 없습니다");
+        }
         if (invitation.status() != FinanceGroupInvitation.Status.PENDING || invitation.expiresAt().isBefore(Instant.now())) {
             throw new FinanceGroupInvitation.InvalidInvitationStateException("만료되었거나 이미 처리된 초대입니다");
         }
