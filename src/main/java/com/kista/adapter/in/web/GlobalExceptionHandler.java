@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +56,8 @@ public class GlobalExceptionHandler {
         Map.entry(MissingServletRequestParameterException.class,   new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
         Map.entry(MethodArgumentTypeMismatchException.class,       new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
         Map.entry(DateTimeParseException.class,                    new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Date Format")),
+        // 요청 바디 파싱 실패(잘못된 JSON, enum에 없는 값 등) — 매핑 누락 시 catch-all이 500으로 처리해버려 클라이언트 오류가 서버 오류로 잘못 보고됨
+        Map.entry(HttpMessageNotReadableException.class,           new Mapping(HttpStatus.BAD_REQUEST,            "Malformed Request")),
         Map.entry(Account.DuplicateAccountException.class,         new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(ManualTradingException.class,                    new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),

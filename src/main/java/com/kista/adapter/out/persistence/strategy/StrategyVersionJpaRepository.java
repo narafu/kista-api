@@ -20,7 +20,7 @@ interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEnti
             SELECT DISTINCT ON (strategy_id) *
             FROM strategy_version
             WHERE strategy_id IN (:strategyIds) AND deleted_at IS NULL
-            ORDER BY strategy_id, version_no DESC, id DESC
+            ORDER BY strategy_id, version_no DESC, created_at DESC, id DESC
             """, nativeQuery = true)
     List<StrategyVersionEntity> findActiveByStrategyIdIn(@Param("strategyIds") Collection<UUID> strategyIds);
 

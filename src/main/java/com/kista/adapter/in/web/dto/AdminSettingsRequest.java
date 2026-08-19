@@ -8,6 +8,7 @@ import com.kista.domain.model.settings.RecurringMode;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.settings.StrategyFieldSettings;
+import com.kista.domain.model.stats.EtfBenchmarkSymbol;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.Strategy.Type;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -93,10 +94,32 @@ public record AdminSettingsRequest(
             @Valid FieldRequest<Integer> intervalWeeks
     ) { // 전략별 관리자 생성 필드 입력
         StrategyFieldSettings<Ticker> tickerValue() { return require(ticker, "ticker").toDomain(); }
-        StrategyFieldSettings<Integer> divisionCountValue() { return require(divisionCount, "divisionCount").toDomain(); }
+
+        StrategyFieldSettings<Integer> divisionCountValue() {
+            FieldRequest<Integer> value = require(divisionCount, "divisionCount");
+            if (value.allowedValues().stream().anyMatch(v -> v <= 0)) {
+                throw new IllegalArgumentException("무한매수 분할 수(divisionCount) 허용값은 0보다 커야 합니다");
+            }
+            return value.toDomain();
+        }
+
         StrategyFieldSettings<RecurringMode> recurringModeValue() { return require(recurringMode, "recurringMode").toDomain(); }
-        StrategyFieldSettings<BigDecimal> bandWidthValue() { return require(bandWidth, "bandWidth").toDomain(); }
-        StrategyFieldSettings<Integer> intervalWeeksValue() { return require(intervalWeeks, "intervalWeeks").toDomain(); }
+
+        StrategyFieldSettings<BigDecimal> bandWidthValue() {
+            FieldRequest<BigDecimal> value = require(bandWidth, "bandWidth");
+            if (value.allowedValues().stream().anyMatch(v -> v.signum() <= 0)) {
+                throw new IllegalArgumentException("VR 밴드 폭(bandWidth) 허용값은 0보다 커야 합니다");
+            }
+            return value.toDomain();
+        }
+
+        StrategyFieldSettings<Integer> intervalWeeksValue() {
+            FieldRequest<Integer> value = require(intervalWeeks, "intervalWeeks");
+            if (value.allowedValues().stream().anyMatch(v -> v <= 0)) {
+                throw new IllegalArgumentException("VR 리밸런싱 주기(intervalWeeks) 허용값은 0보다 커야 합니다");
+            }
+            return value.toDomain();
+        }
     }
 
     public record FieldRequest<T>(
@@ -114,10 +137,11 @@ public record AdminSettingsRequest(
 
     public record BenchmarkRequest(
             @Schema(description = "ETF 벤치마크 비교 자산 설정")
-            @NotNull @Valid BenchmarkFieldRequest<String> etf
-    ) { // 벤치마크 비교 자산 관리자 입력
+            @NotNull @Valid BenchmarkFieldRequest<EtfBenchmarkSymbol> etf
+    ) { // 벤치마크 비교 자산 관리자 입력 — EtfBenchmarkSymbol enum 직결로 시세 동기화 대상 밖 심볼 저장을 막는다
         BenchmarkSettings toDomain() {
-            return new BenchmarkSettings(etf.toDomain());
+            return new BenchmarkSettings(new BenchmarkFieldSettings<>(
+                    etf.allowedValues().stream().map(Enum::name).toList(), etf.defaultValue().name()));
         }
     }
 
@@ -127,9 +151,6 @@ public record AdminSettingsRequest(
             @Schema(description = "비교 기본값")
             @NotNull T defaultValue
     ) { // 개별 벤치마크 필드 관리자 입력
-        BenchmarkFieldSettings<T> toDomain() {
-            return new BenchmarkFieldSettings<>(allowedValues, defaultValue);
-        }
     }
 
     public record AssetFormOptionsRequest(

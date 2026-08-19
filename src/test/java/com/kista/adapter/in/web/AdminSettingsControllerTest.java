@@ -4,6 +4,8 @@ import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.settings.AssetFormOptions;
+import com.kista.domain.model.settings.BenchmarkFieldSettings;
+import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.port.in.AdminSettingsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
@@ -125,6 +127,38 @@ class AdminSettingsControllerTest {
     }
 
     @Test
+    void putSettings_savesProvidedBenchmarks() throws Exception {
+        RuntimeSettings defaults = RuntimeSettings.defaults();
+        BenchmarkSettings customBenchmarks = new BenchmarkSettings(
+                new BenchmarkFieldSettings<>(List.of("SPY", "QQQ"), "QQQ"));
+        AssetFormOptions customAssetFormOptions = new AssetFormOptions(List.of("테스트전략"));
+        RuntimeSettings updated = new RuntimeSettings(true, defaults.brokers(), defaults.strategies(),
+                customBenchmarks, customAssetFormOptions);
+        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(true))).thenReturn(updated);
+
+        mockMvc.perform(put("/api/admin/settings")
+                        .with(authentication(adminToken(ADMIN_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "auth":{"approvalRequired":true},
+                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "strategies":{
+                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
+                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
+                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
+                                  },
+                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "QQQ"], "defaultValue": "QQQ"}},
+                                  "assetFormOptions": %s
+                                }
+                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated, true);
+    }
+
+    @Test
     void putSettings_rejectsFixedRecurringModeOtherThanHold() throws Exception {
         mockMvc.perform(put("/api/admin/settings")
                         .with(authentication(adminToken(ADMIN_ID)))
@@ -138,6 +172,95 @@ class AdminSettingsControllerTest {
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":false,"allowedValues":["DEPOSIT"],"defaultValue":"DEPOSIT"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
                                   },
+                                  "assetFormOptions": %s
+                                }
+                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                .andExpect(status().isBadRequest());
+
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void putSettings_rejectsNonPositiveDivisionCount() throws Exception {
+        mockMvc.perform(put("/api/admin/settings")
+                        .with(authentication(adminToken(ADMIN_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "auth":{"approvalRequired":true},
+                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "strategies":{
+                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[0,20,30],"defaultValue":20}}},
+                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
+                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
+                                  },
+                                  "assetFormOptions": %s
+                                }
+                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                .andExpect(status().isBadRequest());
+
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void putSettings_rejectsNonPositiveBandWidth() throws Exception {
+        mockMvc.perform(put("/api/admin/settings")
+                        .with(authentication(adminToken(ADMIN_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "auth":{"approvalRequired":true},
+                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "strategies":{
+                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
+                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
+                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[0,10,15],"defaultValue":10},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
+                                  },
+                                  "assetFormOptions": %s
+                                }
+                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                .andExpect(status().isBadRequest());
+
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void putSettings_rejectsNonPositiveIntervalWeeks() throws Exception {
+        mockMvc.perform(put("/api/admin/settings")
+                        .with(authentication(adminToken(ADMIN_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "auth":{"approvalRequired":true},
+                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "strategies":{
+                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
+                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
+                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[0,1,2],"defaultValue":1}}}
+                                  },
+                                  "assetFormOptions": %s
+                                }
+                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                .andExpect(status().isBadRequest());
+
+        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void putSettings_rejectsUnsupportedBenchmarkSymbol() throws Exception {
+        mockMvc.perform(put("/api/admin/settings")
+                        .with(authentication(adminToken(ADMIN_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "auth":{"approvalRequired":true},
+                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "strategies":{
+                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
+                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
+                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
+                                  },
+                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "TSLA"], "defaultValue": "SPY"}},
                                   "assetFormOptions": %s
                                 }
                                 """.formatted(ASSET_FORM_OPTIONS_JSON)))
