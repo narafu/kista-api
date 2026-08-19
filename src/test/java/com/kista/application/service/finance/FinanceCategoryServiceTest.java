@@ -45,7 +45,7 @@ class FinanceCategoryServiceTest {
     @Test
     @DisplayName("시스템 카테고리 수정 시 SecurityException — isSystem 체크가 그룹 멤버십 체크보다 먼저 실행됨")
     void update_systemCategory_throwsSecurityException_beforeMembershipCheck() {
-        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
 
         assertThatThrownBy(() -> categoryService.update(categoryId, userId,
                 new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20)))
@@ -75,7 +75,7 @@ class FinanceCategoryServiceTest {
     void update_nonMemberOnSystemCategory_rejectedForBeingSystem_notNonMembership() {
         // financeGroupPort는 아예 호출되지 않아야 하므로 stub하지 않는다 — 호출되면 stub 부재로 NPE가 나서
         // "멤버십 체크가 실제로는 실행되지 않았다"는 사실이 즉시 드러난다.
-        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
 
         assertThatThrownBy(() -> categoryService.update(categoryId, userId,
                 new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20)))
@@ -216,7 +216,7 @@ class FinanceCategoryServiceTest {
     @Test
     @DisplayName("updateSystem은 대상이 시스템 카테고리면 이름·정렬만 갱신")
     void updateSystem_updatesNameAndSortOrder() {
-        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
         when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         FinanceCategory result = categoryService.updateSystem(categoryId,
@@ -230,7 +230,7 @@ class FinanceCategoryServiceTest {
     @Test
     @DisplayName("updateSystem 대상이 그룹 카테고리면 IllegalArgumentException")
     void updateSystem_targetIsGroupCategory_throws() {
-        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(groupCategory(groupId));
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(groupCategory(groupId));
 
         assertThatThrownBy(() -> categoryService.updateSystem(categoryId,
                 new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "변경명", 20)))
@@ -258,5 +258,31 @@ class FinanceCategoryServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(categoryPort, never()).softDeleteWithChildren(any());
+    }
+
+    // 삭제된 카테고리는 findActiveByIdOrThrow가 못 찾아야 함 — findByIdOrThrow(삭제 카테고리도 조회됨)를
+    // 쓰면 save() merge 시 deletedAt이 조용히 풀려 되살아난다(코드리뷰에서 발견, 2026-08-19).
+    @Test
+    @DisplayName("update는 삭제된 카테고리를 되살리지 못하고 404로 거부됨")
+    void update_deletedCategory_throwsNotFound() {
+        when(categoryPort.findActiveByIdOrThrow(categoryId))
+                .thenThrow(new java.util.NoSuchElementException("카테고리를 찾을 수 없습니다: " + categoryId));
+
+        assertThatThrownBy(() -> categoryService.update(categoryId, userId,
+                new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20)))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateSystem은 삭제된 시스템 카테고리를 되살리지 못하고 404로 거부됨")
+    void updateSystem_deletedCategory_throwsNotFound() {
+        when(categoryPort.findActiveByIdOrThrow(categoryId))
+                .thenThrow(new java.util.NoSuchElementException("카테고리를 찾을 수 없습니다: " + categoryId));
+
+        assertThatThrownBy(() -> categoryService.updateSystem(categoryId,
+                new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20)))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        verify(categoryPort, never()).save(any());
     }
 }

@@ -46,7 +46,9 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
 
     @Override
     public FinanceCategory update(UUID categoryId, UUID userId, FinanceCategoryCommand command) {
-        FinanceCategory existing = categoryPort.findByIdOrThrow(categoryId);
+        // findByIdOrThrow(삭제된 카테고리도 조회됨)를 쓰면 안 됨 — FinanceCategory에 deletedAt이 없어
+        // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19, FinanceAccountService와 동일 결함).
+        FinanceCategory existing = categoryPort.findActiveByIdOrThrow(categoryId);
         if (existing.isSystem()) {
             throw new SecurityException("시스템 카테고리는 수정할 수 없습니다");
         }
@@ -91,7 +93,8 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
 
     @Override
     public FinanceCategory updateSystem(UUID categoryId, FinanceCategoryCommand command) {
-        FinanceCategory existing = requireSystem(categoryId);
+        // requireSystem()이 아닌 삭제된 카테고리를 제외하는 조회 사용 — update()와 동일한 부활 방지 이유
+        FinanceCategory existing = requireSystem(categoryPort.findActiveByIdOrThrow(categoryId));
         // type·parentId는 생성 후 불변 — update()와 동일한 정책.
         FinanceCategory updated = new FinanceCategory(existing.id(), null, existing.parentId(),
                 null, existing.type(), command.name(), command.sortOrder(), existing.createdAt());
@@ -106,11 +109,15 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     }
 
     // 대상이 시스템 카테고리가 아니면(즉 그룹 카테고리 id를 잘못 넘기면) 400으로 거부 — update()/delete()의
-    // "시스템이면 거부"와 정반대 방향의 가드.
+    // "시스템이면 거부"와 정반대 방향의 가드. deleteSystem()은 이미 삭제된 카테고리를 다시 삭제해도
+    // 멱등하게 무해하므로 findByIdOrThrow(삭제 카테고리도 조회됨) 그대로 사용한다.
     private FinanceCategory requireSystem(UUID categoryId) {
-        FinanceCategory existing = categoryPort.findByIdOrThrow(categoryId);
+        return requireSystem(categoryPort.findByIdOrThrow(categoryId));
+    }
+
+    private FinanceCategory requireSystem(FinanceCategory existing) {
         if (!existing.isSystem()) {
-            throw new IllegalArgumentException("시스템 카테고리가 아닙니다: " + categoryId);
+            throw new IllegalArgumentException("시스템 카테고리가 아닙니다: " + existing.id());
         }
         return existing;
     }

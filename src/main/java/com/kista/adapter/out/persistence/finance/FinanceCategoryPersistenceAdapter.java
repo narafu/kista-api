@@ -32,6 +32,11 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
     }
 
     @Override
+    public Optional<FinanceCategory> findActiveById(UUID id) {
+        return jpaRepository.findByIdAndDeletedAtIsNull(id).map(FinanceCategoryEntity::toDomain);
+    }
+
+    @Override
     public FinanceCategory save(FinanceCategory category) {
         FinanceCategoryEntity entity = FinanceCategoryEntity.fromModel(category);
         try {

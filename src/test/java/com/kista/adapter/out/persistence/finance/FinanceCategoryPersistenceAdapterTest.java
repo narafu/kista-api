@@ -97,6 +97,18 @@ class FinanceCategoryPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findActiveById_onSoftDeletedCategory_returnsEmpty() {
+        // update()/updateSystem()가 findByIdOrThrow(삭제 카테고리도 조회됨)를 쓰면 save() merge로
+        // 삭제 상태가 조용히 풀린다 — 그 쓰기 경로 전용으로 활성 행만 보는 findActiveById 회귀 테스트.
+        FinanceCategory saved = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "삭제예정카테고리"));
+
+        adapter.softDeleteWithChildren(saved.id());
+
+        assertThat(adapter.findActiveById(saved.id())).isEmpty();
+        assertThat(adapter.findById(saved.id())).isPresent(); // §4.2 (B) 무필터 조회는 그대로 유지
+    }
+
+    @Test
     void softDeleteWithChildren_softDeletesTargetAndChildren() {
         FinanceCategory l1 = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "L1카테고리"));
         FinanceCategory l2 = adapter.save(groupCategory(l1.id(), FinanceCategory.Type.EXPENSE, "L2카테고리"));

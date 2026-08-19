@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEntity, UUID> {
@@ -18,6 +19,9 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
     @Query(nativeQuery = true, value = "SELECT * FROM finance_categories WHERE (group_id IS NULL OR group_id = :groupId) " +
             "AND deleted_at IS NULL AND (CAST(:type AS varchar) IS NULL OR type = :type)")
     List<FinanceCategoryEntity> findSelectableByGroup(@Param("groupId") UUID groupId, @Param("type") String type);
+
+    // 쓰기 경로(update/updateSystem) 전용 — 삭제된 카테고리는 제외해 save() merge로 조용히 되살아나는 것을 막는다
+    Optional<FinanceCategoryEntity> findByIdAndDeletedAtIsNull(UUID id);
 
     // 소프트 삭제 시 모든 하위 세대(임의 depth) 동반 — recursive CTE로 전체 서브트리 조회 후 일괄 UPDATE
     @Modifying
