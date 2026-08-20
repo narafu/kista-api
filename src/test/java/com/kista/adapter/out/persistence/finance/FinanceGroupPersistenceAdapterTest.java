@@ -10,13 +10,20 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.transaction.TestTransaction;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import(FinanceGroupPersistenceAdapter.class)
+@Import({ FinanceGroupPersistenceAdapter.class, FinanceGroupSelfHealer.class })
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
@@ -60,6 +67,72 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
         UUID resolved = adapter.resolveGroupId(userId, null);
 
         assertThat(resolved).isEqualTo(personalGroupId);
+    }
+
+    @Test
+    void resolveGroupId_nullRequestedGroupId_noPersonalGroup_selfHealsAndCreatesOne() {
+        // 초대 수락으로 개인 그룹이 personal=false로 전환된 뒤 아무도 복원하지 않는 실제 버그
+        // 시나리오(그룹 탈퇴 시 "개인 그룹을 찾을 수 없습니다" 500) 재현 — 개인 그룹이 아예 없는 상태에서
+        // resolveGroupId(userId, null) 호출 시 자가 치유로 새로 만들어져야 한다.
+        // selfHealer.createPersonalGroup은 REQUIRES_NEW라 별도 커넥션에서 실행돼, @BeforeEach가 심어둔
+        // (아직 커밋 전인) users 행을 보지 못하면 FK 위반이 난다 — KisTokenPersistenceAdapterTest와 동일하게
+        // 먼저 커밋하고 새 트랜잭션을 시작한다.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        TestTransaction.start();
+
+        UUID resolved = adapter.resolveGroupId(userId, null);
+
+        Boolean personal = jdbcTemplate.queryForObject(
+                "SELECT personal FROM finance_groups WHERE id = ? AND owner_user_id = ?",
+                Boolean.class, resolved, userId);
+        assertThat(personal).isTrue();
+
+        TestTransaction.flagForRollback();
+        TestTransaction.end();
+        // REQUIRES_NEW로 생성된 그룹은 실제 커밋됐으므로 롤백으로 지워지지 않는다 — 직접 정리한다.
+        jdbcTemplate.update("DELETE FROM finance_group_members WHERE group_id = ?", resolved);
+        jdbcTemplate.update("DELETE FROM finance_groups WHERE id = ?", resolved);
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+    }
+
+    @Test
+    void resolveGroupId_nullRequestedGroupId_concurrentCallsWithNoPersonalGroup_convergeOnSameGroup() throws Exception {
+        // 개인 그룹이 없는 같은 사용자에 대해 resolveGroupId(userId, null)가 동시에 두 번 들어오면
+        // 둘 다 SELECT에서 빈 결과를 보고 둘 다 selfHealer.createPersonalGroup을 REQUIRES_NEW로 시도한다 —
+        // 진 쪽은 uq_finance_groups_personal_owner 위반으로 DataIntegrityViolationException을 던졌었고,
+        // 그 예외를 catch 없이 그대로 흘리면 그 요청은 500이었다(수정 전 회귀). 두 스레드 모두 성공하고
+        // 같은 groupId로 수렴해야 한다.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        try {
+            List<Future<UUID>> futures = List.of(
+                    pool.submit(() -> { barrier.await(5, TimeUnit.SECONDS); return adapter.resolveGroupId(userId, null); }),
+                    pool.submit(() -> { barrier.await(5, TimeUnit.SECONDS); return adapter.resolveGroupId(userId, null); }));
+
+            UUID first = futures.get(0).get(10, TimeUnit.SECONDS);
+            UUID second = futures.get(1).get(10, TimeUnit.SECONDS);
+
+            assertThat(first).isNotNull().isEqualTo(second);
+
+            Integer personalGroupCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM finance_groups WHERE owner_user_id = ? AND personal = true",
+                    Integer.class, userId);
+            assertThat(personalGroupCount).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+            // flagForCommit()+end() 이후로 메인 스레드엔 활성 트랜잭션이 없다(의도적 — 백그라운드
+            // 스레드 2개가 메인 스레드 트랜잭션에 중첩되지 않고 독립적으로 경쟁해야 하는 테스트라서다).
+            // 커밋된 데이터라 롤백으로 안 지워지므로 직접 정리한다.
+            jdbcTemplate.update(
+                    "DELETE FROM finance_group_members WHERE group_id IN (SELECT id FROM finance_groups WHERE owner_user_id = ?)",
+                    userId);
+            jdbcTemplate.update("DELETE FROM finance_groups WHERE owner_user_id = ?", userId);
+            jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+        }
     }
 
     @Test

@@ -100,7 +100,12 @@ class FinanceGroupService implements FinanceGroupUseCase {
         if (!isSelf && !isOwner) {
             throw new SecurityException("본인 또는 그룹 소유자만 멤버를 제거할 수 있습니다");
         }
-        // 모든 활성 사용자는 가입 시 정확히 1개의 개인 그룹을 갖는다 — 여기서 새로 만들 필요 없음.
+        // 가입 시 만들어지는 개인 그룹이 초대 수락으로 공유 그룹으로 전환된 뒤 복원되지 않는 경우가
+        // 있어(FinanceGroupPersistenceAdapter.resolveGroupId 주석 참고) 여기서 없으면 자가 치유로
+        // 새로 만든다. 그 생성은 REQUIRES_NEW라 즉시 커밋되므로, 바로 아래 reassignGroup 중 하나가
+        // DuplicateNameException으로 실패해 이 메서드의 나머지가 롤백돼도 방금 만든 개인 그룹은 남는다 —
+        // 실데이터 유실은 없고(재이관 대상 데이터는 정상 롤백) 다음 재시도가 이 그룹을 그대로 재사용하니
+        // 별도 보상 로직은 두지 않는다.
         // 이관 대상(개인 그룹)에 이름이 겹치는 카테고리/계좌가 이미 있으면 각 어댑터가 자동으로 병합/개명하지
         // 않고 DuplicateNameException(409, 기존 GlobalExceptionHandler 매핑)으로 실패시킨다 — 어느 쪽을
         // 남길지는 사용자 판단 영역이라 조용히 데이터를 바꾸지 않는다.
