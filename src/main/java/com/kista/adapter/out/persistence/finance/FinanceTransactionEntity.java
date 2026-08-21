@@ -26,14 +26,14 @@ class FinanceTransactionEntity extends BaseAuditEntity {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "group_id", nullable = false, columnDefinition = "UUID")
-    private UUID groupId;                 // FK → finance_groups.id
+    @Column(name = "group_id", columnDefinition = "UUID")
+    private UUID groupId;                 // FK → finance_groups.id, NULL이면 개인 소유
 
     @Column(name = "category_id", nullable = false, columnDefinition = "UUID")
     private UUID categoryId;              // FK → finance_categories.id
 
-    @Column(name = "created_by", nullable = false, columnDefinition = "UUID")
-    private UUID createdBy;               // 입력자 — 개인/그룹 탭 필터 기준
+    @Column(name = "user_id", nullable = false, columnDefinition = "UUID")
+    private UUID userId;                  // FK → users.id, 소유자 — 개인/그룹 탭 필터 기준
 
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
@@ -52,7 +52,7 @@ class FinanceTransactionEntity extends BaseAuditEntity {
         e.id = t.id(); // null이면 @GeneratedValue가 UUID 생성
         e.groupId = t.groupId();
         e.categoryId = t.categoryId();
-        e.createdBy = t.createdBy();
+        e.userId = t.userId();
         e.transactionDate = t.transactionDate();
         e.amount = t.amount();
         e.memo = t.memo();
@@ -61,6 +61,6 @@ class FinanceTransactionEntity extends BaseAuditEntity {
 
     static FinanceTransaction toDomain(FinanceTransactionEntity e) {
         return new FinanceTransaction(
-                e.id, e.groupId, e.categoryId, e.createdBy, e.transactionDate, e.amount, e.memo, e.getCreatedAt());
+                e.id, e.groupId, e.categoryId, e.userId, e.transactionDate, e.amount, e.memo, e.getCreatedAt());
     }
 }

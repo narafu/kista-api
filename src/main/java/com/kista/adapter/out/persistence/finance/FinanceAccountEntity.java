@@ -28,11 +28,11 @@ class FinanceAccountEntity extends BaseAuditEntity {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "group_id", nullable = false, columnDefinition = "UUID")
-    private UUID groupId;                 // FK → finance_groups.id
+    @Column(name = "group_id", columnDefinition = "UUID")
+    private UUID groupId;                 // FK → finance_groups.id, NULL이면 개인 계좌
 
-    @Column(name = "created_by", nullable = false, columnDefinition = "UUID")
-    private UUID createdBy;               // FK → users.id
+    @Column(name = "user_id", nullable = false, columnDefinition = "UUID")
+    private UUID userId;                  // FK → users.id, 소유자
 
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false, length = 20)
@@ -55,7 +55,7 @@ class FinanceAccountEntity extends BaseAuditEntity {
         FinanceAccountEntity e = new FinanceAccountEntity();
         e.id = a.id(); // null이면 @GeneratedValue가 UUID 생성
         e.groupId = a.groupId();
-        e.createdBy = a.createdBy();
+        e.userId = a.userId();
         e.accountType = a.accountType();
         e.name = a.name();
         e.accountNo = a.accountNo();
@@ -65,6 +65,6 @@ class FinanceAccountEntity extends BaseAuditEntity {
 
     static FinanceAccount toDomain(FinanceAccountEntity e) {
         return new FinanceAccount(
-                e.id, e.groupId, e.createdBy, e.accountType, e.name, e.accountNo, e.memo, e.getCreatedAt());
+                e.id, e.groupId, e.userId, e.accountType, e.name, e.accountNo, e.memo, e.getCreatedAt());
     }
 }

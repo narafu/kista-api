@@ -25,17 +25,17 @@ class FinanceAccountService implements FinanceAccountUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<FinanceAccount> list(UUID userId, UUID requestedGroupId) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        return accountPort.findByGroupId(groupId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return accountPort.findMyScope(userId, currentGroupId);
     }
 
+    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
     @Override
     public FinanceAccount create(UUID userId, UUID requestedGroupId, FinanceAccountCommand command) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        FinanceAccount account = new FinanceAccount(null, groupId, userId, command.accountType(),
+        FinanceAccount account = new FinanceAccount(null, null, userId, command.accountType(),
                 command.name(), command.accountNo(), command.memo(), null);
         FinanceAccount saved = accountPort.save(account);
-        log.info("계좌 등록: groupId={}, accountId={}", groupId, saved.id());
+        log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
         return saved;
     }
 
@@ -44,8 +44,9 @@ class FinanceAccountService implements FinanceAccountUseCase {
         // findByIdOrThrow(삭제된 계좌도 조회됨)를 쓰면 안 됨 — FinanceAccount에 deletedAt이 없어
         // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19).
         FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
-        FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.createdBy(),
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.userId(),
                 command.accountType(), command.name(), command.accountNo(), command.memo(), existing.createdAt());
         return accountPort.save(updated);
     }
@@ -53,7 +54,8 @@ class FinanceAccountService implements FinanceAccountUseCase {
     @Override
     public void delete(UUID accountId, UUID userId) {
         FinanceAccount existing = accountPort.findByIdOrThrow(accountId);
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
         accountPort.softDelete(accountId);
         log.info("계좌 삭제: accountId={}, userId={}", accountId, userId);
     }

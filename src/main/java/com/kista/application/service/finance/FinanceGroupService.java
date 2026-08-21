@@ -4,12 +4,7 @@ import com.kista.domain.model.finance.FinanceGroup;
 import com.kista.domain.model.finance.FinanceGroupInvitation;
 import com.kista.domain.model.finance.FinanceGroupMember;
 import com.kista.domain.port.in.FinanceGroupUseCase;
-import com.kista.domain.port.out.AssetSnapshotPort;
-import com.kista.domain.port.out.FinanceAccountPort;
-import com.kista.domain.port.out.FinanceBudgetPort;
-import com.kista.domain.port.out.FinanceCategoryPort;
 import com.kista.domain.port.out.FinanceGroupPort;
-import com.kista.domain.port.out.FinanceTransactionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,11 +23,6 @@ import java.util.UUID;
 class FinanceGroupService implements FinanceGroupUseCase {
 
     private final FinanceGroupPort financeGroupPort;
-    private final FinanceCategoryPort financeCategoryPort;
-    private final FinanceAccountPort financeAccountPort;
-    private final FinanceBudgetPort financeBudgetPort;
-    private final FinanceTransactionPort financeTransactionPort;
-    private final AssetSnapshotPort assetSnapshotPort;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,22 +33,32 @@ class FinanceGroupService implements FinanceGroupUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<FinanceGroupMember> listMembers(UUID groupId, UUID userId) {
-        financeGroupPort.resolveGroupId(userId, groupId);
+        if (financeGroupPort.findRole(groupId, userId).isEmpty()) {
+            throw new SecurityException("그룹 멤버만 멤버 목록을 조회할 수 있습니다");
+        }
         return financeGroupPort.findActiveMembers(groupId);
     }
 
+    // 무그룹 유저가 초대하면 그 자리에서 새 그룹을 만들고 본인을 OWNER로 등록한다. 이미 그룹이 있으면
+    // 그 그룹의 OWNER만 초대할 수 있다(기존 정책 유지).
     @Override
     public FinanceGroupInvitation invite(UUID groupId, UUID userId, long expiresInHours) {
-        boolean isOwner = financeGroupPort.findRole(groupId, userId)
-                .filter(role -> role == FinanceGroup.MemberRole.OWNER)
-                .isPresent();
-        if (!isOwner) {
-            throw new SecurityException("그룹 소유자만 초대할 수 있습니다");
+        UUID targetGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        if (targetGroupId == null) {
+            targetGroupId = financeGroupPort.createGroup(userId, "가계부");
+            financeGroupPort.addMember(targetGroupId, userId, FinanceGroup.MemberRole.OWNER);
+        } else {
+            boolean isOwner = financeGroupPort.findRole(targetGroupId, userId)
+                    .filter(role -> role == FinanceGroup.MemberRole.OWNER)
+                    .isPresent();
+            if (!isOwner) {
+                throw new SecurityException("그룹 소유자만 초대할 수 있습니다");
+            }
         }
         String code = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         Instant expiresAt = Instant.now().plus(expiresInHours, ChronoUnit.HOURS);
-        FinanceGroupInvitation invitation = financeGroupPort.createInvitation(groupId, userId, code, expiresAt);
-        log.info("그룹 초대 생성: groupId={}, invitedBy={}", groupId, userId);
+        FinanceGroupInvitation invitation = financeGroupPort.createInvitation(targetGroupId, userId, code, expiresAt);
+        log.info("그룹 초대 생성: groupId={}, invitedBy={}", targetGroupId, userId);
         return invitation;
     }
 
@@ -74,25 +75,23 @@ class FinanceGroupService implements FinanceGroupUseCase {
             throw new FinanceGroupInvitation.InvalidInvitationStateException("만료되었거나 이미 처리된 초대입니다");
         }
         if (status == FinanceGroupInvitation.Status.ACCEPTED) {
+            // 1인1그룹 강제 — 이미 다른 그룹에 소속돼 있으면 수락 자체를 거부한다.
+            if (financeGroupPort.findCurrentGroupId(userId).isPresent()) {
+                throw new IllegalStateException("이미 다른 그룹에 소속되어 있습니다 — 먼저 탈퇴해야 합니다");
+            }
             financeGroupPort.addMember(invitation.groupId(), userId, FinanceGroup.MemberRole.MEMBER);
-            // 두 번째 멤버가 들어오는 순간 더 이상 "1인 개인 그룹"이 아니다 — 그대로 두면
-            // leaveGroup의 CannotLeavePersonalGroupException이 이 그룹을 영구히 탈퇴 불가로 막는다.
-            financeGroupPort.unmarkPersonal(invitation.groupId());
         }
         FinanceGroupInvitation updated = financeGroupPort.updateInvitationStatus(invitation.id(), status, userId);
         log.info("그룹 초대 응답: code={}, userId={}, status={}", code, userId, status);
         return updated;
     }
 
-    // 탈퇴(withdrawal, UserCascadeDeleter)와 다르다 — 이탈은 남은 그룹 데이터를 지우지 않고
-    // 이탈자의 created_by 소유 행만 그의 개인 그룹으로 옮긴다.
+    // 그룹 이탈 — 리소스(finance_transactions 등)의 group_id는 그대로 유지되고 이관하지 않는다.
+    // 나간 사람은 더 이상 멤버가 아니므로 findMyScope에서 그룹 데이터가 자연히 제외되고, 남은 사람은
+    // 계속 조회된다. 회원 탈퇴(UserCascadeDeleter)와 달리 그룹 자체는 남길 수 있다.
     @Override
     @Transactional
     public void leaveGroup(UUID groupId, UUID userId, UUID targetUserId) {
-        FinanceGroup group = financeGroupPort.findByIdOrThrow(groupId);
-        if (group.personal()) {
-            throw new FinanceGroup.CannotLeavePersonalGroupException();
-        }
         boolean isSelf = userId.equals(targetUserId);
         boolean isOwner = financeGroupPort.findRole(groupId, userId)
                 .filter(role -> role == FinanceGroup.MemberRole.OWNER)
@@ -100,21 +99,6 @@ class FinanceGroupService implements FinanceGroupUseCase {
         if (!isSelf && !isOwner) {
             throw new SecurityException("본인 또는 그룹 소유자만 멤버를 제거할 수 있습니다");
         }
-        // 가입 시 만들어지는 개인 그룹이 초대 수락으로 공유 그룹으로 전환된 뒤 복원되지 않는 경우가
-        // 있어(FinanceGroupPersistenceAdapter.resolveGroupId 주석 참고) 여기서 없으면 자가 치유로
-        // 새로 만든다. 그 생성은 REQUIRES_NEW라 즉시 커밋되므로, 바로 아래 reassignGroup 중 하나가
-        // DuplicateNameException으로 실패해 이 메서드의 나머지가 롤백돼도 방금 만든 개인 그룹은 남는다 —
-        // 실데이터 유실은 없고(재이관 대상 데이터는 정상 롤백) 다음 재시도가 이 그룹을 그대로 재사용하니
-        // 별도 보상 로직은 두지 않는다.
-        // 이관 대상(개인 그룹)에 이름이 겹치는 카테고리/계좌가 이미 있으면 각 어댑터가 자동으로 병합/개명하지
-        // 않고 DuplicateNameException(409, 기존 GlobalExceptionHandler 매핑)으로 실패시킨다 — 어느 쪽을
-        // 남길지는 사용자 판단 영역이라 조용히 데이터를 바꾸지 않는다.
-        UUID personalGroupId = financeGroupPort.resolveGroupId(targetUserId, null);
-        financeCategoryPort.reassignGroup(groupId, personalGroupId, targetUserId);
-        financeAccountPort.reassignGroup(groupId, personalGroupId, targetUserId);
-        financeBudgetPort.reassignGroup(groupId, personalGroupId, targetUserId);
-        financeTransactionPort.reassignGroup(groupId, personalGroupId, targetUserId);
-        assetSnapshotPort.reassignGroup(groupId, personalGroupId, targetUserId);
         financeGroupPort.softDeleteMembership(groupId, targetUserId);
 
         List<FinanceGroupMember> remaining = financeGroupPort.findActiveMembers(groupId).stream()
@@ -128,7 +112,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
             // OWNER가 나갔는데 남은 멤버 중 OWNER가 없으면 아무도 다시 초대할 수 없는 그룹이 된다 —
             // 가장 먼저 합류한 남은 멤버를 새 OWNER로 승격한다.
             FinanceGroupMember successor = remaining.stream()
-                    .min(java.util.Comparator.comparing(FinanceGroupMember::joinedAt))
+                    .min(Comparator.comparing(FinanceGroupMember::joinedAt))
                     .orElseThrow();
             financeGroupPort.updateMemberRole(groupId, successor.userId(), FinanceGroup.MemberRole.OWNER);
             log.info("그룹 OWNER 승격: groupId={}, newOwner={}", groupId, successor.userId());

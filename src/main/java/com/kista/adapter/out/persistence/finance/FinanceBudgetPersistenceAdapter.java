@@ -19,8 +19,8 @@ public class FinanceBudgetPersistenceAdapter implements FinanceBudgetPort {
     private final FinanceBudgetJpaRepository jpaRepository;
 
     @Override
-    public List<FinanceBudget> findByGroupId(UUID groupId, UUID categoryId, LocalDate date) {
-        return jpaRepository.findByGroupId(groupId, categoryId, date).stream()
+    public List<FinanceBudget> findMyScope(UUID userId, UUID currentGroupId, UUID categoryId, LocalDate date) {
+        return jpaRepository.findMyScope(userId, currentGroupId, categoryId, date).stream()
                 .map(FinanceBudgetEntity::toDomain)
                 .toList();
     }
@@ -49,12 +49,7 @@ public class FinanceBudgetPersistenceAdapter implements FinanceBudgetPort {
     }
 
     @Override
-    public void deleteByCreatedBy(UUID userId) {
-        jpaRepository.deleteByCreatedBy(userId);
-    }
-
-    @Override
-    public void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy) {
-        jpaRepository.reassignGroup(fromGroupId, toGroupId, createdBy);
+    public void deleteByUserId(UUID userId) {
+        jpaRepository.deleteByUserId(userId);
     }
 }

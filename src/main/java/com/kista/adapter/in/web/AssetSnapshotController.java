@@ -46,8 +46,8 @@ public class AssetSnapshotController {
             @RequestParam(required = false) UUID groupId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) UUID createdBy) {
-        return assetSnapshotUseCase.list(userId, groupId, from, to, createdBy).stream()
+            @RequestParam(name = "userId", required = false) UUID filterUserId) {
+        return assetSnapshotUseCase.list(userId, groupId, from, to, filterUserId).stream()
                 .sorted(Comparator.comparing(AssetSnapshot::entryDate).reversed())
                 .map(this::enrich)
                 .toList();

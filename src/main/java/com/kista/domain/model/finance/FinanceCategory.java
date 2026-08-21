@@ -6,11 +6,13 @@ import lombok.RequiredArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
+// 3-state 소유축: system(userId·groupId 둘 다 null, 전 사용자 읽기전용) /
+// personal(userId 있음, groupId null, 본인만) / group(groupId 있음, 그룹 전원)
 public record FinanceCategory(
         UUID id,           // PK
-        UUID groupId,      // FK → finance_groups.id, null이면 시스템 전역 카테고리
+        UUID groupId,      // FK → finance_groups.id, null이면 시스템 또는 개인 카테고리
         UUID parentId,     // FK → 자기참조, L1이면 null
-        UUID createdBy,    // FK → users.id, 시스템 카테고리는 null
+        UUID userId,       // FK → users.id, 시스템 카테고리는 null
         Type type,         // 생성 후 불변
         String name,
         int sortOrder,
@@ -21,16 +23,18 @@ public record FinanceCategory(
     public static final UUID SYSTEM_LOAN_ID = UUID.fromString("f1000000-0000-4000-8000-000000000404");
 
     public boolean isSystem() {
-        return groupId == null;
+        return userId == null;
     }
 
-    // 시스템 카테고리는 전 그룹 공용 읽기 허용, 그룹 카테고리는 소유 그룹만 접근 가능.
-    // 불일치 시 SecurityException → 컨트롤러에서 403 매핑
-    public void verifyOwnedBy(UUID requesterGroupId) {
+    // 시스템 카테고리는 전 그룹 공용 읽기 허용, 개인/그룹 카테고리는 본인 소유이거나 현재 소속
+    // 그룹과 같은 group_id일 때만 접근 가능. 불일치 시 SecurityException → 컨트롤러에서 403 매핑
+    public void verifyAccessibleBy(UUID requesterUserId, UUID requesterGroupId) {
         if (isSystem()) {
             return;
         }
-        if (!groupId.equals(requesterGroupId)) {
+        boolean owned = userId.equals(requesterUserId);
+        boolean sharedInMyGroup = groupId != null && groupId.equals(requesterGroupId);
+        if (!owned && !sharedInMyGroup) {
             throw new SecurityException("카테고리에 대한 접근 권한이 없습니다");
         }
     }

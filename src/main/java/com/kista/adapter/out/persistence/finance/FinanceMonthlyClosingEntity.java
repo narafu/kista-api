@@ -24,11 +24,14 @@ class FinanceMonthlyClosingEntity extends BaseAuditEntity {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "group_id", nullable = false, columnDefinition = "UUID")
-    private UUID groupId;                 // FK → finance_groups.id
+    @Column(name = "group_id", columnDefinition = "UUID")
+    private UUID groupId;                 // FK → finance_groups.id, NULL이면 개인 마감
 
-    @Column(name = "closed_by", columnDefinition = "UUID")
-    private UUID closedBy;                // FK → users.id, 마감 해제 상태면 NULL
+    // 옛 closed_by를 소유자 축(user_id)으로 승격 — 마감 해제해도 더는 null로 되돌리지 않는다
+    // (개인 스코프 유니크 인덱스가 user_id NOT NULL을 전제하므로, null로 되돌리면 재완료 시
+    // UNIQUE 매칭이 깨져 중복 행이 생긴다). "누가 마지막으로 마감했는지"는 closed_at으로 충분히 갈음된다.
+    @Column(name = "user_id", nullable = false, columnDefinition = "UUID")
+    private UUID userId;                  // FK → users.id, 소유자
 
     @Column(nullable = false, length = 7)
     private String month;                 // 'YYYY-MM'
@@ -43,7 +46,7 @@ class FinanceMonthlyClosingEntity extends BaseAuditEntity {
         FinanceMonthlyClosingEntity e = new FinanceMonthlyClosingEntity();
         e.id = m.id(); // null이면 @GeneratedValue가 UUID 생성
         e.groupId = m.groupId();
-        e.closedBy = m.closedBy();
+        e.userId = m.userId();
         e.month = m.month();
         e.completed = m.completed();
         e.closedAt = m.closedAt();
@@ -51,6 +54,6 @@ class FinanceMonthlyClosingEntity extends BaseAuditEntity {
     }
 
     static MonthlyClosing toDomain(FinanceMonthlyClosingEntity e) {
-        return new MonthlyClosing(e.id, e.groupId, e.closedBy, e.month, e.completed, e.closedAt, e.getCreatedAt());
+        return new MonthlyClosing(e.id, e.groupId, e.userId, e.month, e.completed, e.closedAt, e.getCreatedAt());
     }
 }

@@ -12,4 +12,7 @@ public interface FinanceTransactionUseCase {
     FinanceTransaction create(UUID userId, UUID requestedGroupId, FinanceTransactionCommand command);
     FinanceTransaction update(UUID transactionId, UUID userId, FinanceTransactionCommand command);
     void delete(UUID transactionId, UUID userId);
+
+    // 개인 소유 거래내역을 소유자의 현재 그룹으로 공유 전환한다.
+    FinanceTransaction shareToGroup(UUID transactionId, UUID userId);
 }

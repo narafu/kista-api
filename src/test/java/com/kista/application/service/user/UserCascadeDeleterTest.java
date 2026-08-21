@@ -44,21 +44,21 @@ class UserCascadeDeleterTest {
     private final UUID groupId = UUID.randomUUID();
 
     private FinanceGroup sharedGroup() {
-        return new FinanceGroup(groupId, userId, "부부 가계부", false, null);
+        return new FinanceGroup(groupId, userId, "부부 가계부", null);
     }
 
     @Test
-    @DisplayName("created_by 단위로 재무 기록을 정리하고, 그룹 통째 삭제 대신 멤버십만 정리한다")
-    void deleteCascade_scopesFinanceCleanupByCreatedBy() {
+    @DisplayName("userId 단위로 재무 기록을 정리하고, 그룹 통째 삭제 대신 멤버십만 정리한다")
+    void deleteCascade_scopesFinanceCleanupByUserId() {
         when(financeGroupPort.findByMemberUserId(userId)).thenReturn(List.of());
 
         deleter.deleteCascade(userId);
 
-        verify(financeTransactionPort).softDeleteByCreatedBy(userId);
-        verify(assetSnapshotPort).softDeleteByCreatedBy(userId);
-        verify(financeAccountPort).softDeleteByCreatedBy(userId);
-        verify(financeCategoryPort).softDeleteByCreatedBy(userId);
-        verify(financeBudgetPort).deleteByCreatedBy(userId);
+        verify(financeTransactionPort).softDeleteByUserId(userId);
+        verify(assetSnapshotPort).softDeleteByUserId(userId);
+        verify(financeAccountPort).softDeleteByUserId(userId);
+        verify(financeCategoryPort).softDeleteByUserId(userId);
+        verify(financeBudgetPort).deleteByUserId(userId);
         verify(userPort).delete(userId);
     }
 

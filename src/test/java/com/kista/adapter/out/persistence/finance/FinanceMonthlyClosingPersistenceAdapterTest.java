@@ -15,7 +15,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// (group_id, month) 유니크 제약 위 네이티브 upsert 검증 — race 없는 in-place 갱신이 핵심
+// (group_id, month)/(user_id, month) 유니크 partial index 위 네이티브 upsert 검증 — race 없는 in-place 갱신이 핵심
 @Import(FinanceMonthlyClosingPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
@@ -36,12 +36,12 @@ class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '개인', true, now(), now())",
+                "INSERT INTO finance_groups (id, owner_user_id, name, created_at, updated_at) VALUES (?, ?, '가족', now(), now())",
                 groupId, userId);
     }
 
     @Test
-    void upsert_sameGroupAndMonth_updatesInPlace_notDuplicateKey() {
+    void upsert_group_sameGroupAndMonth_updatesInPlace_notDuplicateKey() {
         adapter.upsert(groupId, userId, "2026-08", true);
         adapter.upsert(groupId, userId, "2026-08", false);
 
@@ -52,26 +52,78 @@ class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void upsert_completedTrue_setsClosedByToProvidedUser_andClosedAtNotNull() {
+    void upsert_group_completedTrue_setsClosedAtNotNull_userIdStaysOwner() {
         MonthlyClosing result = adapter.upsert(groupId, userId, "2026-08", true);
 
         assertThat(result.completed()).isTrue();
-        assertThat(result.closedBy()).isEqualTo(userId);
+        assertThat(result.userId()).isEqualTo(userId); // 소유자 축 — 마감 해제해도 null로 되돌지 않는다
         assertThat(result.closedAt()).isNotNull();
     }
 
     @Test
-    void upsert_completedFalse_setsClosedByAndClosedAtNull() {
-        // 먼저 마감했다가 해제하는 시나리오 — completed=false 전환 시 closed_by/closed_at은 NULL로 되돌아간다
+    void upsert_group_completedFalse_setsClosedAtNull_butKeepsUserId() {
+        // 먼저 마감했다가 해제하는 시나리오 — completed=false 전환 시 closed_at은 NULL로 되돌아가지만
+        // user_id(소유자 축)는 유지된다(V17 이후 closed_by와 달리 절대 null로 되돌지 않음).
         adapter.upsert(groupId, userId, "2026-08", true);
-        // upsert()의 조회부는 네이티브 @Modifying 다음 일반 JPA 조회라 1차 캐시를 그대로 반환할 수 있다 —
-        // 같은 영속성 컨텍스트에서 같은 PK를 두 번째 upsert() 하기 전에 비워야 두 번째 결과가 최신 상태를 반영한다.
         entityManager.clear();
 
         MonthlyClosing result = adapter.upsert(groupId, userId, "2026-08", false);
 
         assertThat(result.completed()).isFalse();
-        assertThat(result.closedBy()).isNull();
+        assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.closedAt()).isNull();
+    }
+
+    // groupId=null(개인 마감) 경로 — 어댑터가 upsertPersonal로 분기해야 한다
+    @Test
+    void upsert_personal_nullGroupId_updatesInPlace_notDuplicateKey() {
+        adapter.upsert(null, userId, "2026-08", true);
+        adapter.upsert(null, userId, "2026-08", false);
+
+        Integer rowCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM finance_monthly_closings WHERE user_id = ? AND group_id IS NULL AND month = ?",
+                Integer.class, userId, "2026-08");
+        assertThat(rowCount).isEqualTo(1);
+    }
+
+    @Test
+    void upsert_personal_returnsGroupIdNullAndOwnerUserId() {
+        MonthlyClosing result = adapter.upsert(null, userId, "2026-08", true);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(userId);
+        assertThat(result.completed()).isTrue();
+    }
+
+    // 회귀(플랜 항목 4): 개인 마감과 그룹 마감은 서로 다른 partial unique index라 같은 사용자·같은 월이라도 공존한다.
+    @Test
+    void findMyScope_returnsPersonalUnionGroup() {
+        adapter.upsert(null, userId, "2026-08", true);
+        adapter.upsert(groupId, userId, "2026-08", false);
+
+        var result = adapter.findMyScope(userId, groupId);
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void findMyScope_noGroup_returnsOnlyPersonal() {
+        adapter.upsert(null, userId, "2026-08", true);
+        adapter.upsert(groupId, userId, "2026-08", false);
+
+        var result = adapter.findMyScope(userId, null);
+
+        assertThat(result).extracting(MonthlyClosing::groupId).containsExactly((UUID) null);
+    }
+
+    @Test
+    void deleteByGroupId_removesGroupClosings() {
+        adapter.upsert(groupId, userId, "2026-08", true);
+
+        adapter.deleteByGroupId(groupId);
+
+        Integer rowCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM finance_monthly_closings WHERE group_id = ?", Integer.class, groupId);
+        assertThat(rowCount).isZero();
     }
 }

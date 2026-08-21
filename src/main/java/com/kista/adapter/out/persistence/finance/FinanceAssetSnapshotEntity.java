@@ -28,8 +28,8 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "group_id", nullable = false, columnDefinition = "UUID")
-    private UUID groupId;                 // FK → finance_groups.id
+    @Column(name = "group_id", columnDefinition = "UUID")
+    private UUID groupId;                 // FK → finance_groups.id, NULL이면 개인 소유
 
     @Column(name = "category_id", nullable = false, columnDefinition = "UUID")
     private UUID categoryId;              // FK → finance_categories.id (type='ASSET'인 L1 또는 L2)
@@ -37,8 +37,8 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
     @Column(name = "account_id", columnDefinition = "UUID")
     private UUID accountId;               // FK → finance_accounts.id, 계좌 없는 자산은 NULL
 
-    @Column(name = "created_by", nullable = false, columnDefinition = "UUID")
-    private UUID createdBy;               // FK → users.id
+    @Column(name = "user_id", nullable = false, columnDefinition = "UUID")
+    private UUID userId;                  // FK → users.id, 소유자
 
     @Column(name = "entry_date", nullable = false)
     private LocalDate entryDate;
@@ -66,7 +66,7 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
         e.groupId = s.groupId();
         e.categoryId = s.categoryId();
         e.accountId = s.accountId();
-        e.createdBy = s.createdBy();
+        e.userId = s.userId();
         e.entryDate = s.entryDate();
         e.assetClass = s.assetClass();
         e.market = s.market();
@@ -77,7 +77,7 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
 
     static AssetSnapshot toDomain(FinanceAssetSnapshotEntity e) {
         return new AssetSnapshot(
-                e.id, e.groupId, e.categoryId, e.accountId, e.createdBy, e.entryDate,
+                e.id, e.groupId, e.categoryId, e.accountId, e.userId, e.entryDate,
                 e.assetClass, e.market, e.strategy, e.amount, e.getCreatedAt());
     }
 }

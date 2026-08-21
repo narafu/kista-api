@@ -5,15 +5,12 @@ import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.domain.port.out.FinanceAccountPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -21,11 +18,10 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     private final FinanceAccountJpaRepository jpaRepository;
     private final AesCryptoService crypto; // accountNo AES-256 암호화/복호화
-    private final JdbcTemplate jdbcTemplate; // reassignGroup 경쟁 방지용 advisory lock 전용
 
     @Override
-    public List<FinanceAccount> findByGroupId(UUID groupId) {
-        return jpaRepository.findByGroupIdAndDeletedAtIsNull(groupId).stream()
+    public List<FinanceAccount> findMyScope(UUID userId, UUID currentGroupId) {
+        return jpaRepository.findMyScope(userId, currentGroupId).stream()
                 .map(this::toDomain)
                 .toList();
     }
@@ -57,39 +53,8 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
     }
 
     @Override
-    public void softDeleteByCreatedBy(UUID userId) {
-        jpaRepository.softDeleteByCreatedBy(userId, Instant.now());
-    }
-
-    @Override
-    public void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy) {
-        // V16에서 uq_finance_accounts_group_name을 DROP해(계좌 이름 중복 허용) 더 이상 DB 제약으로
-        // 이관 시 이름 충돌을 막을 수 없다 — 하지만 FinanceGroupService.leaveGroup()은 여전히 "이관
-        // 대상 그룹에 이름이 겹치는 계좌가 있으면 조용히 병합하지 않고 사용자가 판단하게 실패시킨다"는
-        // 계약을 문서화하고 있다(그룹 신규 등록 시의 "같은 이름 여러 계좌 허용"과는 다른 안전장치 —
-        // 신규 등록은 사용자 본인이 의도적으로 만드는 계좌, 이관은 서로 다른 두 그룹의 계좌가 우연히
-        // 이름이 겹쳐 알아채지 못한 채 합쳐지는 상황이라 구분한다). DB 제약이 사라졌으니 애플리케이션
-        // 레벨에서 동일하게 검증한다.
-        // 검증(SELECT)과 반영(UPDATE) 사이가 원자적이지 않아 같은 toGroupId를 향한 reassignGroup 호출이
-        // 동시에 들어오면(예: 같은 사용자의 그룹 이탈 이중 클릭·재시도) 둘 다 충돌 체크를 통과한 뒤 나란히
-        // 반영돼 정작 막으려던 이름 중복 상태가 만들어질 수 있다(TOCTOU). 트랜잭션 scope의 advisory lock으로
-        // 같은 toGroupId를 대상으로 하는 호출끼리 직렬화한다 — 트랜잭션 종료 시 자동 해제.
-        jdbcTemplate.execute("SELECT pg_advisory_xact_lock(hashtext(?))",
-                (java.sql.PreparedStatement ps) -> {
-                    ps.setString(1, toGroupId.toString());
-                    ps.execute();
-                    return null;
-                });
-        Set<String> targetNames = jpaRepository.findByGroupIdAndDeletedAtIsNull(toGroupId).stream()
-                .map(FinanceAccountEntity::getName)
-                .collect(Collectors.toSet());
-        boolean hasCollision = jpaRepository.findByGroupIdAndDeletedAtIsNull(fromGroupId).stream()
-                .filter(e -> e.getCreatedBy().equals(createdBy))
-                .anyMatch(e -> targetNames.contains(e.getName()));
-        if (hasCollision) {
-            throw new FinanceAccount.DuplicateNameException("이관 대상 그룹에 이름이 겹치는 계좌가 있습니다");
-        }
-        jpaRepository.reassignGroup(fromGroupId, toGroupId, createdBy);
+    public void softDeleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 
     // persistence 경계에서 accountNo 복호화
@@ -98,7 +63,7 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
         if (raw.accountNo() == null) {
             return raw;
         }
-        return new FinanceAccount(raw.id(), raw.groupId(), raw.createdBy(), raw.accountType(), raw.name(),
+        return new FinanceAccount(raw.id(), raw.groupId(), raw.userId(), raw.accountType(), raw.name(),
                 crypto.decrypt(raw.accountNo()), raw.memo(), raw.createdAt());
     }
 }

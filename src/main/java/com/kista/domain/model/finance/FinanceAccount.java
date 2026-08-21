@@ -8,17 +8,19 @@ import java.util.UUID;
 
 public record FinanceAccount(
         UUID id,             // PK
-        UUID groupId,        // FK → finance_groups.id
-        UUID createdBy,      // FK → users.id
+        UUID groupId,        // FK → finance_groups.id, null이면 개인 계좌
+        UUID userId,         // FK → users.id, 소유자
         Type accountType,
         String name,         // 계좌명 (예: 토스증권 일반계좌)
         String accountNo,    // 계좌번호(복호화된 값), null 허용
         String memo,         // null 허용
         Instant createdAt    // DB created_at, 신규 등록 시 null
 ) {
-    // 소유권 불일치 시 SecurityException → 컨트롤러에서 403 매핑
-    public void verifyOwnedBy(UUID requesterGroupId) {
-        if (!groupId.equals(requesterGroupId)) {
+    // 접근 불가 시 SecurityException → 컨트롤러에서 403 매핑
+    public void verifyAccessibleBy(UUID requesterUserId, UUID requesterGroupId) {
+        boolean owned = userId.equals(requesterUserId);
+        boolean sharedInMyGroup = groupId != null && groupId.equals(requesterGroupId);
+        if (!owned && !sharedInMyGroup) {
             throw new SecurityException("계좌에 대한 접근 권한이 없습니다");
         }
     }

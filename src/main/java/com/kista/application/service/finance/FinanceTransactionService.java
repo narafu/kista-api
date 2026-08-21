@@ -29,37 +29,38 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<FinanceTransaction> list(UUID userId, UUID requestedGroupId, LocalDate from, LocalDate to,
-                                          UUID categoryId, UUID createdBy) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        return transactionPort.findByGroupId(groupId, from, to, categoryId, createdBy);
+                                          UUID categoryId, UUID filterUserId) {
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return transactionPort.findMyScope(userId, currentGroupId, from, to, categoryId, filterUserId);
     }
 
+    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시(그룹 공유는 shareToGroup으로 별도 전환).
     @Override
     public FinanceTransaction create(UUID userId, UUID requestedGroupId, FinanceTransactionCommand command) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        verifyCategory(groupId, command.categoryId());
-        FinanceTransaction transaction = new FinanceTransaction(null, groupId, command.categoryId(), userId,
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        verifyCategory(userId, currentGroupId, command.categoryId());
+        FinanceTransaction transaction = new FinanceTransaction(null, null, command.categoryId(), userId,
                 command.transactionDate(), command.amount(), command.memo(), null);
         FinanceTransaction saved = transactionPort.save(transaction);
-        log.info("거래내역 등록: groupId={}, transactionId={}", groupId, saved.id());
+        log.info("거래내역 등록: userId={}, transactionId={}", userId, saved.id());
         return saved;
     }
 
     @Override
     public FinanceTransaction update(UUID transactionId, UUID userId, FinanceTransactionCommand command) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
-        verifyCategory(existing.groupId(), command.categoryId());
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
+        verifyCategory(userId, currentGroupId, command.categoryId());
         FinanceTransaction updated = new FinanceTransaction(existing.id(), existing.groupId(), command.categoryId(),
-                existing.createdBy(), command.transactionDate(), command.amount(), command.memo(), existing.createdAt());
+                existing.userId(), command.transactionDate(), command.amount(), command.memo(), existing.createdAt());
         return transactionPort.save(updated);
     }
 
-    // categoryId가 이 그룹에서 실제로 접근 가능한지(시스템이거나 같은 그룹)와, 자산 스냅샷 전용 타입이 아닌지
-    // 확인한다 — 없으면 다른 그룹의 비공개 카테고리를 지정해도 그대로 저장돼 그룹 합계가 오염된다.
-    private void verifyCategory(UUID groupId, UUID categoryId) {
+    // categoryId가 실제로 접근 가능한지(시스템이거나 본인/내 그룹 소유)와, 자산 스냅샷 전용 타입이 아닌지 확인한다.
+    private void verifyCategory(UUID userId, UUID currentGroupId, UUID categoryId) {
         FinanceCategory category = financeCategoryPort.findByIdOrThrow(categoryId);
-        category.verifyOwnedBy(groupId);
+        category.verifyAccessibleBy(userId, currentGroupId);
         if (category.type() == FinanceCategory.Type.ASSET) {
             throw new IllegalArgumentException("자산 카테고리는 거래내역에 사용할 수 없습니다");
         }
@@ -68,8 +69,31 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     @Override
     public void delete(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
         transactionPort.softDelete(transactionId);
         log.info("거래내역 삭제: transactionId={}, userId={}", transactionId, userId);
+    }
+
+    // 개인 소유 거래를 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
+    @Override
+    public FinanceTransaction shareToGroup(UUID transactionId, UUID userId) {
+        FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
+        if (!existing.userId().equals(userId)) {
+            throw new SecurityException("본인 소유 거래내역만 그룹에 공유할 수 있습니다");
+        }
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId)
+                .orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
+        if (currentGroupId.equals(existing.groupId())) {
+            return existing; // 이미 같은 그룹에 공유된 상태 — 멱등
+        }
+        if (existing.groupId() != null) {
+            throw new IllegalStateException("이미 다른 그룹에 공유된 항목입니다");
+        }
+        FinanceTransaction shared = new FinanceTransaction(existing.id(), currentGroupId, existing.categoryId(),
+                existing.userId(), existing.transactionDate(), existing.amount(), existing.memo(), existing.createdAt());
+        FinanceTransaction saved = transactionPort.save(shared);
+        log.info("거래내역 그룹 공유 전환: transactionId={}, groupId={}", transactionId, currentGroupId);
+        return saved;
     }
 }

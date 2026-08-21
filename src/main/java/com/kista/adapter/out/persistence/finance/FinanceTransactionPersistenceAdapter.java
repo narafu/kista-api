@@ -19,8 +19,8 @@ public class FinanceTransactionPersistenceAdapter implements FinanceTransactionP
     private final FinanceTransactionJpaRepository jpaRepository;
 
     @Override
-    public List<FinanceTransaction> findByGroupId(UUID groupId, LocalDate from, LocalDate to, UUID categoryId, UUID createdBy) {
-        return jpaRepository.findByGroupId(groupId, from, to, categoryId, createdBy).stream()
+    public List<FinanceTransaction> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID categoryId, UUID filterUserId) {
+        return jpaRepository.findMyScope(userId, currentGroupId, from, to, categoryId, filterUserId).stream()
                 .map(FinanceTransactionEntity::toDomain)
                 .toList();
     }
@@ -42,12 +42,7 @@ public class FinanceTransactionPersistenceAdapter implements FinanceTransactionP
     }
 
     @Override
-    public void softDeleteByCreatedBy(UUID userId) {
-        jpaRepository.softDeleteByCreatedBy(userId, Instant.now());
-    }
-
-    @Override
-    public void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy) {
-        jpaRepository.reassignGroup(fromGroupId, toGroupId, createdBy);
+    public void softDeleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 }

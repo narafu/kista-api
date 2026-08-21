@@ -45,23 +45,27 @@ class FinanceTransactionPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '개인', true, now(), now())",
+                "INSERT INTO finance_groups (id, owner_user_id, name, created_at, updated_at) VALUES (?, ?, '가족', now(), now())",
                 groupId, userId);
     }
 
-    private FinanceTransaction transaction(UUID categoryId, UUID createdBy, LocalDate date, long amount) {
-        return new FinanceTransaction(null, groupId, categoryId, createdBy, date, amount, "메모", null);
+    private FinanceTransaction groupTransaction(UUID categoryId, UUID owner, LocalDate date, long amount) {
+        return new FinanceTransaction(null, groupId, categoryId, owner, date, amount, "메모", null);
+    }
+
+    private FinanceTransaction personalTransaction(UUID categoryId, UUID owner, LocalDate date, long amount) {
+        return new FinanceTransaction(null, null, categoryId, owner, date, amount, "메모", null);
     }
 
     @Test
     void save_andFindById_roundTrips() {
-        FinanceTransaction saved = adapter.save(transaction(CATEGORY_A, userId, LocalDate.of(2026, 8, 1), 15_000L));
+        FinanceTransaction saved = adapter.save(groupTransaction(CATEGORY_A, userId, LocalDate.of(2026, 8, 1), 15_000L));
 
         FinanceTransaction found = adapter.findById(saved.id()).orElseThrow();
 
         assertThat(found.groupId()).isEqualTo(groupId);
         assertThat(found.categoryId()).isEqualTo(CATEGORY_A);
-        assertThat(found.createdBy()).isEqualTo(userId);
+        assertThat(found.userId()).isEqualTo(userId);
         assertThat(found.transactionDate()).isEqualTo(LocalDate.of(2026, 8, 1));
         assertThat(found.amount()).isEqualTo(15_000L);
         assertThat(found.memo()).isEqualTo("메모");
@@ -69,13 +73,11 @@ class FinanceTransactionPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void softDelete_setsDeletedAt_andExcludesFromFindById() {
-        FinanceTransaction saved = adapter.save(transaction(CATEGORY_A, userId, LocalDate.now(), 1_000L));
+        FinanceTransaction saved = adapter.save(groupTransaction(CATEGORY_A, userId, LocalDate.now(), 1_000L));
 
         adapter.softDelete(saved.id());
-        // softDelete는 @Modifying 벌크 UPDATE라 1차 캐시를 자동 갱신하지 않는다 — clear()로 비워야 한다
         entityManager.clear();
 
-        // @SQLRestriction("deleted_at IS NULL")로 인해 findById도 소프트 삭제된 행은 못 찾는다
         assertThat(adapter.findById(saved.id())).isEmpty();
         var deletedAt = jdbcTemplate.queryForObject(
                 "SELECT deleted_at FROM finance_transactions WHERE id = ?", java.sql.Timestamp.class, saved.id());
@@ -83,29 +85,52 @@ class FinanceTransactionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void findByGroupId_categoryAndCreatedByFilters_matchExactCombination() {
-        // NOTE: from/to(LocalDate) 필터는 이 테스트에서 의도적으로 검증하지 않는다 — 실제 값을 넘기면
-        // FinanceTransactionJpaRepository.findByGroupId의 "(:from IS NULL OR ...)" 패턴이 Postgres에서
-        // "could not determine data type of parameter" SQLGrammarException을 던진다 (findByGroupId
-        // 파라미터가 null일 때만 우연히 통과). 재현 확인 후 어댑터 코드는 건드리지 않고 리포트로 남긴다.
+    void findMyScope_categoryAndFilterUserIdFilters_matchExactCombination() {
         LocalDate targetDate = LocalDate.of(2026, 6, 15);
-        FinanceTransaction target = adapter.save(transaction(CATEGORY_A, userId, targetDate, 10_000L));
+        FinanceTransaction target = adapter.save(groupTransaction(CATEGORY_A, userId, targetDate, 10_000L));
 
-        adapter.save(transaction(CATEGORY_B, userId, targetDate, 40_000L));      // 다른 카테고리
-        adapter.save(transaction(CATEGORY_A, otherUserId, targetDate, 50_000L)); // 다른 입력자
+        adapter.save(groupTransaction(CATEGORY_B, userId, targetDate, 40_000L));      // 다른 카테고리
+        adapter.save(groupTransaction(CATEGORY_A, otherUserId, targetDate, 50_000L)); // 다른 입력자
 
-        var result = adapter.findByGroupId(groupId, null, null, CATEGORY_A, userId);
+        var result = adapter.findMyScope(userId, groupId, null, null, CATEGORY_A, userId);
 
         assertThat(result).extracting(FinanceTransaction::id).containsExactly(target.id());
     }
 
     @Test
-    void findByGroupId_nullFilters_returnAllActiveInGroup() {
-        adapter.save(transaction(CATEGORY_A, userId, LocalDate.of(2026, 1, 1), 1_000L));
-        adapter.save(transaction(CATEGORY_B, otherUserId, LocalDate.of(2026, 2, 1), 2_000L));
+    void findMyScope_nullFilters_returnAllActiveInGroup() {
+        adapter.save(groupTransaction(CATEGORY_A, userId, LocalDate.of(2026, 1, 1), 1_000L));
+        adapter.save(groupTransaction(CATEGORY_B, otherUserId, LocalDate.of(2026, 2, 1), 2_000L));
 
-        var result = adapter.findByGroupId(groupId, null, null, null, null);
+        var result = adapter.findMyScope(userId, groupId, null, null, null, null);
 
         assertThat(result).hasSize(2);
+    }
+
+    // 회귀(플랜 항목 4): findMyScope는 (내 개인 데이터) ∪ (내 그룹 데이터)만 반환해야 하고, 무그룹 유저는
+    // currentGroupId=null이라 개인 데이터만 조회돼야 한다 — 다른 사용자의 개인 데이터는 절대 섞이면 안 된다.
+    @Test
+    void findMyScope_returnsPersonalUnionGroup_excludingOthersPersonalData() {
+        FinanceTransaction myPersonal = adapter.save(personalTransaction(CATEGORY_A, userId, LocalDate.of(2026, 5, 1), 1_000L));
+        FinanceTransaction myGroup = adapter.save(groupTransaction(CATEGORY_A, userId, LocalDate.of(2026, 5, 2), 2_000L));
+        FinanceTransaction othersPersonal = adapter.save(personalTransaction(CATEGORY_A, otherUserId, LocalDate.of(2026, 5, 3), 3_000L));
+
+        var result = adapter.findMyScope(userId, groupId, null, null, null, null);
+
+        assertThat(result).extracting(FinanceTransaction::id)
+                .contains(myPersonal.id(), myGroup.id())
+                .doesNotContain(othersPersonal.id());
+    }
+
+    @Test
+    void findMyScope_noGroup_returnsOnlyPersonalData() {
+        FinanceTransaction myPersonal = adapter.save(personalTransaction(CATEGORY_A, userId, LocalDate.of(2026, 5, 1), 1_000L));
+        FinanceTransaction myGroup = adapter.save(groupTransaction(CATEGORY_A, userId, LocalDate.of(2026, 5, 2), 2_000L));
+
+        var result = adapter.findMyScope(userId, null, null, null, null, null);
+
+        assertThat(result).extracting(FinanceTransaction::id)
+                .contains(myPersonal.id())
+                .doesNotContain(myGroup.id());
     }
 }

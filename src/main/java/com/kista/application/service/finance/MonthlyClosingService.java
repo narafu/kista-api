@@ -27,16 +27,17 @@ class MonthlyClosingService implements MonthlyClosingUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<MonthlyClosing> list(UUID userId, UUID requestedGroupId) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        return monthlyClosingPort.findByGroupId(groupId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return monthlyClosingPort.findMyScope(userId, currentGroupId);
     }
 
     @Override
     public MonthlyClosing setCompleted(UUID userId, UUID requestedGroupId, String month, boolean completed) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         // 형식·범위(월 01~12) 동시 검증 — 실패 시 DateTimeParseException → GlobalExceptionHandler가 400으로 매핑
         YearMonth.parse(month, MONTH_FORMATTER);
-        // 마감 해제 시 closedBy는 null — 어댑터가 closed_at도 함께 null로 되돌린다.
-        return monthlyClosingPort.upsert(groupId, completed ? userId : null, month, completed);
+        // userId는 영구 소유자 축 — 마감 해제해도 null로 되돌리지 않고 항상 실제 userId를 넘긴다.
+        // currentGroupId가 있으면 그룹 마감, 없으면 개인 마감이 된다.
+        return monthlyClosingPort.upsert(currentGroupId, userId, month, completed);
     }
 }

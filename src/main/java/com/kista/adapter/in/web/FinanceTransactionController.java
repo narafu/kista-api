@@ -29,7 +29,7 @@ public class FinanceTransactionController {
 
     private final FinanceTransactionUseCase transactionUseCase;
 
-    @Operation(summary = "거래내역 목록 조회", description = "createdBy=본인UUID로 필터링하면 개인 탭(내가 입력한 내역만)입니다.")
+    @Operation(summary = "거래내역 목록 조회", description = "userId=본인UUID로 필터링하면 개인 탭(내가 입력한 내역만)입니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<FinanceTransactionResponse> list(
@@ -38,8 +38,8 @@ public class FinanceTransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID categoryId,
-            @RequestParam(required = false) UUID createdBy) {
-        return transactionUseCase.list(userId, groupId, from, to, categoryId, createdBy).stream()
+            @RequestParam(name = "userId", required = false) UUID filterUserId) {
+        return transactionUseCase.list(userId, groupId, from, to, categoryId, filterUserId).stream()
                 .map(FinanceTransactionResponse::from)
                 .toList();
     }
@@ -71,6 +71,19 @@ public class FinanceTransactionController {
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceTransactionRequest request) {
         return FinanceTransactionResponse.from(transactionUseCase.update(id, userId, request.toCommand()));
+    }
+
+    @Operation(summary = "거래내역 그룹 공유 전환", description = "개인 소유 거래내역을 소유자의 현재 그룹으로 공유 전환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "전환 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "거래내역을 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/share")
+    public FinanceTransactionResponse share(
+            @Parameter(description = "거래내역 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceTransactionResponse.from(transactionUseCase.shareToGroup(id, userId));
     }
 
     @Operation(summary = "거래내역 삭제")

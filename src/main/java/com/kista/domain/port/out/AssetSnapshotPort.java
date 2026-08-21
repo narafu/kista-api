@@ -9,8 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AssetSnapshotPort {
-    // from/to/createdBy는 선택적 필터 — null이면 무시. entryDate 최신순.
-    List<AssetSnapshot> findByGroupId(UUID groupId, LocalDate from, LocalDate to, UUID createdBy);
+    // from/to/filterUserId는 선택적 필터 — null이면 무시. entryDate 최신순. currentGroupId는 무그룹 유저면 null.
+    List<AssetSnapshot> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID filterUserId);
 
     Optional<AssetSnapshot> findById(UUID id);
 
@@ -21,6 +21,5 @@ public interface AssetSnapshotPort {
 
     AssetSnapshot save(AssetSnapshot snapshot);
     void softDelete(UUID id);
-    void softDeleteByCreatedBy(UUID userId); // 회원 탈퇴 시 내가 입력한 스냅샷만
-    void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy); // 그룹 이탈 시 개인 그룹으로 이관
+    void softDeleteByUserId(UUID userId); // 회원 탈퇴 시 내가 입력한 스냅샷만
 }

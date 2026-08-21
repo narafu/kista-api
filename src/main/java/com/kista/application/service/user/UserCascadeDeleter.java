@@ -41,13 +41,13 @@ public class UserCascadeDeleter {
         strategyPort.deleteByUserId(userId);
         accountPort.deleteByUserId(userId);
 
-        // 재무 기록 — created_by(입력자) 단위로만 정리한다. 그룹을 통째로 지우면 배우자 등 다른
+        // 재무 기록 — userId(입력자) 단위로만 정리한다. 그룹을 통째로 지우면 배우자 등 다른
         // 그룹원의 데이터까지 함께 삭제되므로, 소유 축인 group_id가 아니라 입력자 축으로 스코프한다.
-        financeTransactionPort.softDeleteByCreatedBy(userId);
-        assetSnapshotPort.softDeleteByCreatedBy(userId);
-        financeAccountPort.softDeleteByCreatedBy(userId);
-        financeCategoryPort.softDeleteByCreatedBy(userId);   // 시스템 카테고리는 createdBy가 null이라 자동 제외됨
-        financeBudgetPort.deleteByCreatedBy(userId);          // 예산은 파생 설정이라 하드 삭제
+        financeTransactionPort.softDeleteByUserId(userId);
+        assetSnapshotPort.softDeleteByUserId(userId);
+        financeAccountPort.softDeleteByUserId(userId);
+        financeCategoryPort.softDeleteByUserId(userId);   // 시스템 카테고리는 userId가 null이라 자동 제외됨
+        financeBudgetPort.deleteByUserId(userId);          // 예산은 파생 설정이라 하드 삭제
 
         // 그룹 멤버십 정리 — 이 사용자가 속한 모든 그룹(개인 그룹 포함)에서 멤버십을 소프트 삭제하고,
         // 그 결과 활성 멤버가 0명이 된 그룹(더 이상 아무도 없는 개인 그룹, 또는 마지막 멤버가 나간 공유 그룹)은

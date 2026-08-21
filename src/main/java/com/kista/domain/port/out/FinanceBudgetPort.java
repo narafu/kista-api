@@ -10,7 +10,8 @@ import java.util.UUID;
 
 public interface FinanceBudgetPort {
     // categoryId/date는 선택적 필터 — null이면 무시. date 지정 시 그 날짜에 유효한(기간 포함) 예산만.
-    List<FinanceBudget> findByGroupId(UUID groupId, UUID categoryId, LocalDate date);
+    // currentGroupId는 무그룹 유저면 null(개인 예산만 조회).
+    List<FinanceBudget> findMyScope(UUID userId, UUID currentGroupId, UUID categoryId, LocalDate date);
 
     Optional<FinanceBudget> findById(UUID id);
 
@@ -23,6 +24,5 @@ public interface FinanceBudgetPort {
     FinanceBudget save(FinanceBudget budget);
 
     void delete(UUID id); // 파생 설정이므로 하드 삭제
-    void deleteByCreatedBy(UUID userId); // 회원 탈퇴 시 하드 삭제
-    void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy); // 그룹 이탈 시 개인 그룹으로 이관
+    void deleteByUserId(UUID userId); // 회원 탈퇴 시 하드 삭제
 }
