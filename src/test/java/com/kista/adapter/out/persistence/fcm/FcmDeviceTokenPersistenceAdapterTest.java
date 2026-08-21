@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,17 @@ class FcmDeviceTokenPersistenceAdapterTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("허용값: WEB, ANDROID, IOS");
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void delete_alreadyDeletedByConcurrentThread_swallowsOptimisticLockException() {
+        UUID userId = UUID.randomUUID();
+        doThrow(new ObjectOptimisticLockingFailureException(FcmDeviceTokenEntity.class, "token-a"))
+                .when(repository).deleteByUserIdAndToken(userId, "token-a");
+
+        adapter.delete(userId, "token-a");
+
+        verify(repository).deleteByUserIdAndToken(userId, "token-a");
     }
 
     @Test

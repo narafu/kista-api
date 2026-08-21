@@ -2,6 +2,7 @@ package com.kista.adapter.out.persistence.fcm;
 
 import com.kista.domain.port.out.FcmDeviceTokenPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +24,11 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     @Override
     @Transactional
     public void delete(UUID userId, String token) {
-        repository.deleteByUserIdAndToken(userId, token);
+        // 동일 무효 토큰을 여러 전략 리포트 스레드가 동시에 삭제 시도할 수 있음 — 이미 삭제됐으면 목적 달성으로 간주
+        try {
+            repository.deleteByUserIdAndToken(userId, token);
+        } catch (ObjectOptimisticLockingFailureException ignored) {
+        }
     }
 
     @Override
