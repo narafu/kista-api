@@ -19,8 +19,8 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
     private final FinanceCategoryJpaRepository jpaRepository;
 
     @Override
-    public List<FinanceCategory> findSelectableByGroup(UUID groupId, FinanceCategory.Type type) {
-        return jpaRepository.findSelectableByGroup(groupId, type == null ? null : type.name()).stream()
+    public List<FinanceCategory> findSelectable(UUID userId, UUID currentGroupId, FinanceCategory.Type type) {
+        return jpaRepository.findSelectable(userId, currentGroupId, type == null ? null : type.name()).stream()
                 .map(FinanceCategoryEntity::toDomain)
                 .toList();
     }
@@ -53,19 +53,7 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
     }
 
     @Override
-    public void softDeleteByCreatedBy(UUID userId) {
-        jpaRepository.softDeleteByCreatedBy(userId, Instant.now());
-    }
-
-    @Override
-    public void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy) {
-        // 그룹 이탈 이관 대상 그룹에 같은 부모·이름의 카테고리가 이미 있으면 uq_finance_categories_group_parent_name
-        // 위반 — save()와 동일하게 여기서도 DuplicateNameException(기존 409 매핑)으로 변환한다.
-        // @Modifying 벌크 UPDATE는 호출 즉시(플러시 대기 없이) 실행되므로 saveAndFlush 없이도 예외가 바로 던져진다.
-        try {
-            jpaRepository.reassignGroup(fromGroupId, toGroupId, createdBy);
-        } catch (DataIntegrityViolationException e) {
-            throw new FinanceCategory.DuplicateNameException("이관 대상 그룹에 이름이 겹치는 카테고리가 있습니다");
-        }
+    public void softDeleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 }

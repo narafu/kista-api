@@ -26,21 +26,22 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<FinanceCategory> list(UUID userId, UUID requestedGroupId, FinanceCategory.Type type) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         // 트리 중첩은 이 계층의 관심사가 아니다 — 도메인 레코드가 flat이라 web 계층 DTO에서 조립한다.
-        return categoryPort.findSelectableByGroup(groupId, type).stream()
+        return categoryPort.findSelectable(userId, currentGroupId, type).stream()
                 .sorted(Comparator.comparingInt(FinanceCategory::sortOrder))
                 .toList();
     }
 
+    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
     @Override
     public FinanceCategory create(UUID userId, UUID requestedGroupId, FinanceCategoryCommand command) {
-        UUID groupId = financeGroupPort.resolveGroupId(userId, requestedGroupId);
-        resolveParent(command.parentId(), groupId, command.type());
-        FinanceCategory category = new FinanceCategory(null, groupId, command.parentId(), userId,
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        resolveParent(command.parentId(), userId, currentGroupId, command.type());
+        FinanceCategory category = new FinanceCategory(null, null, command.parentId(), userId,
                 command.type(), command.name(), command.sortOrder(), null);
         FinanceCategory saved = categoryPort.save(category);
-        log.info("카테고리 등록: groupId={}, categoryId={}", groupId, saved.id());
+        log.info("카테고리 등록: userId={}, categoryId={}", userId, saved.id());
         return saved;
     }
 
@@ -52,10 +53,11 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         if (existing.isSystem()) {
             throw new SecurityException("시스템 카테고리는 수정할 수 없습니다");
         }
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
         // type·parentId는 생성 후 불변 — 커맨드에 값이 실려와도 무시하고 기존 값을 유지한다.
         FinanceCategory updated = new FinanceCategory(existing.id(), existing.groupId(), existing.parentId(),
-                existing.createdBy(), existing.type(), command.name(), command.sortOrder(), existing.createdAt());
+                existing.userId(), existing.type(), command.name(), command.sortOrder(), existing.createdAt());
         return categoryPort.save(updated);
     }
 
@@ -65,7 +67,8 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         if (existing.isSystem()) {
             throw new SecurityException("시스템 카테고리는 삭제할 수 없습니다");
         }
-        financeGroupPort.resolveGroupId(userId, existing.groupId());
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
         categoryPort.softDeleteWithChildren(categoryId);
         log.info("카테고리 삭제: categoryId={}, userId={}", categoryId, userId);
     }
@@ -73,17 +76,15 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<FinanceCategory> listSystem(FinanceCategory.Type type) {
-        // findSelectableByGroup(null, type)의 네이티브 쿼리는 "(group_id IS NULL OR group_id = :groupId)" —
-        // :groupId가 null로 바인딩되면 두 번째 조건은 SQL 3치 논리상 항상 NULL(=false)이라
-        // group_id IS NULL 하나만 남는다. 즉 시스템 카테고리만 정확히 걸러진다.
-        return categoryPort.findSelectableByGroup(null, type).stream()
+        // findSelectable(null, null, type)은 (userId IS NULL AND groupId IS NULL) 조건으로 시스템만 정확히 걸러진다.
+        return categoryPort.findSelectable(null, null, type).stream()
                 .sorted(Comparator.comparingInt(FinanceCategory::sortOrder))
                 .toList();
     }
 
     @Override
     public FinanceCategory createSystem(FinanceCategoryCommand command) {
-        resolveParent(command.parentId(), null, command.type());
+        resolveParent(command.parentId(), null, null, command.type());
         FinanceCategory category = new FinanceCategory(null, null, command.parentId(), null,
                 command.type(), command.name(), command.sortOrder(), null);
         FinanceCategory saved = categoryPort.save(category);
@@ -123,10 +124,10 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     }
 
     // V13 복합 FK(parent_id, group_id) 폐기의 유일한 대체 방어선.
-    // 부모는 (같은 type) AND (시스템이거나 같은 그룹 소유)이어야 한다.
-    // groupId=null(시스템 카테고리 생성)로 호출하면 parent.groupId().equals(null)이 항상 false이므로
-    // 시스템이 아닌 부모는 자동으로 거부된다 — 시스템 자식은 시스템 부모만 가질 수 있다는 정책이 그대로 성립.
-    private void resolveParent(UUID parentId, UUID groupId, FinanceCategory.Type type) {
+    // 부모는 (같은 type) AND (시스템이거나 접근 가능한 개인/그룹 카테고리)이어야 한다.
+    // verifyAccessibleBy가 던지는 SecurityException을 IllegalArgumentException(400)으로 재던진다 —
+    // "권한 없음"이 아니라 "잘못된 부모 지정"으로 취급하는 게 이 API의 기존 계약이었다.
+    private void resolveParent(UUID parentId, UUID userId, UUID currentGroupId, FinanceCategory.Type type) {
         if (parentId == null) {
             return; // 신규 루트 — 허용
         }
@@ -134,7 +135,9 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         if (parent.type() != type) {
             throw new IllegalArgumentException("부모 카테고리와 타입이 일치해야 합니다");
         }
-        if (!parent.isSystem() && !parent.groupId().equals(groupId)) {
+        try {
+            parent.verifyAccessibleBy(userId, currentGroupId);
+        } catch (SecurityException e) {
             throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다");
         }
     }

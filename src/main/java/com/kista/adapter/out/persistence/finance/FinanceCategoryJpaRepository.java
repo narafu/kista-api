@@ -13,12 +13,18 @@ import java.util.UUID;
 interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEntity, UUID> {
 
     // §4.2 (A) — 폼 선택지용, 활성 행만. type은 null이면 무시.
+    // 3-way 매칭: 시스템 전역(user_id IS NULL AND group_id IS NULL) ∪ 내 개인(user_id = :userId AND group_id IS NULL)
+    // ∪ 내 그룹(group_id = :currentGroupId). "(group_id IS NULL OR group_id = :groupId)" 형태는 새 모델에서
+    // 전 사용자의 개인 카테고리(group_id NULL)를 전원에게 노출시키는 데이터 유출 버그라 반드시 이 3-way로 유지한다.
     // HQL의 "(:type IS NULL OR ...)" 형태는 다른 finance 리포지토리들의 동일 패턴(:from/:to/:date)과 같은 이유로
     // PostgreSQL이 IS NULL 자리 바인드 파라미터 타입을 추론하지 못해 실패한다 — 네이티브 쿼리로 우회하고,
     // enum 바인딩 모호성을 피하기 위해 파라미터 타입을 String으로 받아 어댑터에서 type.name()을 넘긴다.
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_categories WHERE (group_id IS NULL OR group_id = :groupId) " +
-            "AND deleted_at IS NULL AND (CAST(:type AS varchar) IS NULL OR type = :type)")
-    List<FinanceCategoryEntity> findSelectableByGroup(@Param("groupId") UUID groupId, @Param("type") String type);
+    @Query(nativeQuery = true, value = "SELECT * FROM finance_categories WHERE deleted_at IS NULL AND (" +
+            "(user_id IS NULL AND group_id IS NULL) " +
+            "OR (user_id = :userId AND group_id IS NULL) " +
+            "OR (group_id = :currentGroupId)" +
+            ") AND (CAST(:type AS varchar) IS NULL OR type = :type)")
+    List<FinanceCategoryEntity> findSelectable(@Param("userId") UUID userId, @Param("currentGroupId") UUID currentGroupId, @Param("type") String type);
 
     // 쓰기 경로(update/updateSystem) 전용 — 삭제된 카테고리는 제외해 save() merge로 조용히 되살아나는 것을 막는다
     Optional<FinanceCategoryEntity> findByIdAndDeletedAtIsNull(UUID id);
@@ -32,16 +38,8 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
             ") UPDATE finance_categories SET deleted_at = :now WHERE id IN (SELECT id FROM descendants)")
     void softDeleteWithChildren(@Param("id") UUID id, @Param("now") Instant now);
 
-    // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 createdBy NULL이라 자동 제외)
+    // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 userId NULL이라 자동 제외)
     @Modifying
-    @Query("UPDATE FinanceCategoryEntity c SET c.deletedAt = :now WHERE c.createdBy = :createdBy AND c.deletedAt IS NULL")
-    void softDeleteByCreatedBy(@Param("createdBy") UUID createdBy, @Param("now") Instant now);
-
-    // 그룹 이탈 시 개인 그룹으로 이관. clearAutomatically=true 필수 — 벌크 UPDATE는 1차 캐시를 지우지 않아서,
-    // 같은 트랜잭션 안에서 이 메서드 호출 전에 이미 로드된 엔티티를 이후 findById로 다시 읽으면 groupId가
-    // 갱신 전 값으로 보인다(직접 재현 확인).
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE FinanceCategoryEntity c SET c.groupId = :toGroupId " +
-            "WHERE c.groupId = :fromGroupId AND c.createdBy = :createdBy")
-    void reassignGroup(@Param("fromGroupId") UUID fromGroupId, @Param("toGroupId") UUID toGroupId, @Param("createdBy") UUID createdBy);
+    @Query("UPDATE FinanceCategoryEntity c SET c.deletedAt = :now WHERE c.userId = :userId AND c.deletedAt IS NULL")
+    void softDeleteByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
 }

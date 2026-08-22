@@ -14,9 +14,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// accountNo AES-256-GCM 암/복호화 round-trip 검증이 핵심 — 평문이 컬럼에 그대로 저장되면 안 된다
+// accountNo AES-256 암/복호화 round-trip 검증이 핵심 — 평문이 컬럼에 그대로 저장되면 안 된다
 @Import({FinanceAccountPersistenceAdapter.class, AesCryptoService.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
@@ -25,29 +24,38 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired FinanceAccountPersistenceAdapter adapter;
 
     private UUID userId;
+    private UUID otherUserId;
     private UUID groupId;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        otherUserId = UUID.randomUUID();
         groupId = UUID.randomUUID();
 
         jdbcTemplate.update(
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '개인', true, now(), now())",
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 groupId, userId);
     }
 
-    private FinanceAccount account(String name, String accountNo) {
+    private FinanceAccount groupAccount(String name, String accountNo) {
         return new FinanceAccount(null, groupId, userId, FinanceAccount.Type.SECURITIES, name, accountNo, null, null);
+    }
+
+    private FinanceAccount personalAccount(UUID owner, String name, String accountNo) {
+        return new FinanceAccount(null, null, owner, FinanceAccount.Type.SECURITIES, name, accountNo, null, null);
     }
 
     @Test
     void save_encryptsAccountNoAtRest_andDecryptsOnRead() {
         String plainAccountNo = "110-123-456789";
-        FinanceAccount saved = adapter.save(account("토스증권 일반계좌", plainAccountNo));
+        FinanceAccount saved = adapter.save(groupAccount("토스증권 일반계좌", plainAccountNo));
 
         String rawColumnValue = jdbcTemplate.queryForObject(
                 "SELECT account_no FROM finance_accounts WHERE id = ?", String.class, saved.id());
@@ -60,68 +68,80 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
     // V16에서 uq_finance_accounts_group_name을 DROP — 같은 그룹 안에서도 계좌명 중복이 허용된다.
     @Test
     void save_duplicateNameSameGroup_allowsBothAccounts() {
-        FinanceAccount first = adapter.save(account("중복계좌명", "111"));
-        FinanceAccount second = adapter.save(account("중복계좌명", "222"));
+        FinanceAccount first = adapter.save(groupAccount("중복계좌명", "111"));
+        FinanceAccount second = adapter.save(groupAccount("중복계좌명", "222"));
 
         assertThat(second.id()).isNotEqualTo(first.id());
-        assertThat(adapter.findByGroupId(groupId))
+        assertThat(adapter.findMyScope(userId, groupId))
                 .extracting(FinanceAccount::name)
                 .containsExactlyInAnyOrder("중복계좌명", "중복계좌명");
     }
 
     @Test
     void save_nullAccountNo_savesAndLoadsWithoutCrashing() {
-        FinanceAccount saved = adapter.save(account("계좌번호없는계좌", null));
+        FinanceAccount saved = adapter.save(groupAccount("계좌번호없는계좌", null));
 
         FinanceAccount found = adapter.findById(saved.id()).orElseThrow();
         assertThat(found.accountNo()).isNull();
     }
 
-    @Test
-    void reassignGroup_movesCreatedByOwnedRowsToTargetGroup() {
-        UUID otherGroupId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '그룹2', false, now(), now())",
-                otherGroupId, userId);
-        FinanceAccount saved = adapter.save(account("이관대상계좌", "999"));
-
-        adapter.reassignGroup(groupId, otherGroupId, userId);
-
-        FinanceAccount reassigned = adapter.findById(saved.id()).orElseThrow();
-        assertThat(reassigned.groupId()).isEqualTo(otherGroupId);
-    }
-
-    // V16에서 uq_finance_accounts_group_name을 DROP — reassignGroup도 같은 제약에 의존했으므로
-    // 이관 대상 그룹에 동명 계좌가 있어도 더 이상 막히지 않고 중복 이름 상태로 이관된다.
-    @Test
-    void reassignGroup_nameCollisionInTargetGroup_throwsDuplicateNameException() {
-        // 신규 등록 시 계좌명 중복은 V16부터 허용되지만(uq_finance_accounts_group_name DROP), 그룹 이관은
-        // 서로 다른 두 그룹의 계좌가 우연히 이름이 겹쳐 사용자도 모르게 합쳐지는 걸 막는 별도 안전장치라
-        // 애플리케이션 레벨에서 여전히 차단한다(FinanceGroupService.leaveGroup() 계약).
-        UUID otherGroupId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '그룹2', false, now(), now())",
-                otherGroupId, userId);
-        // 이관 대상 그룹에 같은 이름의 계좌가 이미 있다
-        FinanceAccount conflicting = new FinanceAccount(null, otherGroupId, userId,
-                FinanceAccount.Type.SECURITIES, "겹치는계좌명", null, null, null);
-        adapter.save(conflicting);
-        adapter.save(account("겹치는계좌명", null));
-
-        assertThatThrownBy(() -> adapter.reassignGroup(groupId, otherGroupId, userId))
-                .isInstanceOf(FinanceAccount.DuplicateNameException.class);
-    }
-
     // 운영 장애 재현(2026-08-19): 삭제된 계좌를 여전히 참조하는 자산 스냅샷이 있으면 enrich()가
     // findByIdOrThrow로 계좌명을 조회하는데, 클래스 레벨 @SQLRestriction이 있으면 여기서 404가 나
-    // 목록 조회 전체가 깨진다. findById는 삭제된 계좌도 찾아야 하고, findByGroupId는 계속 제외해야 한다.
+    // 목록 조회 전체가 깨진다. findById는 삭제된 계좌도 찾아야 하고, findMyScope는 계속 제외해야 한다.
     @Test
-    void softDeletedAccount_stillFindableById_butExcludedFromGroupList() {
-        FinanceAccount saved = adapter.save(account("삭제예정계좌", null));
+    void softDeletedAccount_stillFindableById_butExcludedFromMyScope() {
+        FinanceAccount saved = adapter.save(groupAccount("삭제예정계좌", null));
 
         adapter.softDelete(saved.id());
 
         assertThat(adapter.findById(saved.id())).isPresent();
-        assertThat(adapter.findByGroupId(groupId)).isEmpty();
+        assertThat(adapter.findMyScope(userId, groupId)).isEmpty();
+    }
+
+    @Test
+    void findActiveById_onSoftDeletedAccount_returnsEmpty() {
+        FinanceAccount saved = adapter.save(groupAccount("삭제예정계좌", null));
+
+        adapter.softDelete(saved.id());
+
+        assertThat(adapter.findActiveById(saved.id())).isEmpty();
+        assertThat(adapter.findById(saved.id())).isPresent();
+    }
+
+    // 회귀(플랜 항목 4): findMyScope는 (내 개인) ∪ (내 그룹)만 반환 — 타인의 개인 계좌는 유출되면 안 된다.
+    @Test
+    void findMyScope_returnsPersonalUnionGroup_excludingOthersPersonalData() {
+        FinanceAccount myPersonal = adapter.save(personalAccount(userId, "내개인계좌", null));
+        FinanceAccount myGroup = adapter.save(groupAccount("내그룹계좌", null));
+        FinanceAccount othersPersonal = adapter.save(personalAccount(otherUserId, "타인개인계좌", null));
+
+        var result = adapter.findMyScope(userId, groupId);
+
+        assertThat(result).extracting(FinanceAccount::id)
+                .contains(myPersonal.id(), myGroup.id())
+                .doesNotContain(othersPersonal.id());
+    }
+
+    @Test
+    void findMyScope_noGroup_returnsOnlyPersonalAccounts() {
+        FinanceAccount myPersonal = adapter.save(personalAccount(userId, "내개인계좌", null));
+        FinanceAccount myGroup = adapter.save(groupAccount("내그룹계좌", null));
+
+        var result = adapter.findMyScope(userId, null);
+
+        assertThat(result).extracting(FinanceAccount::id)
+                .contains(myPersonal.id())
+                .doesNotContain(myGroup.id());
+    }
+
+    @Test
+    void softDeleteByUserId_softDeletesOnlyThatUsersOwnedAccounts() {
+        FinanceAccount mine = adapter.save(personalAccount(userId, "내계좌", null));
+        FinanceAccount others = adapter.save(personalAccount(otherUserId, "타인계좌", null));
+
+        adapter.softDeleteByUserId(userId);
+
+        assertThat(adapter.findActiveById(mine.id())).isEmpty();
+        assertThat(adapter.findActiveById(others.id())).isPresent();
     }
 }

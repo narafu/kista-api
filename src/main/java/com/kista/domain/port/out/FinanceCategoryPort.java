@@ -8,8 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface FinanceCategoryPort {
-    // 폼 선택지용 — 활성 행만(시스템 전역 + 해당 그룹), type 지정 시 필터링. §4.2의 (A) 읽기 모드.
-    List<FinanceCategory> findSelectableByGroup(UUID groupId, FinanceCategory.Type type);
+    // 폼 선택지용 — 활성 행만(시스템 전역 ∪ 내 개인 ∪ 내 그룹), type 지정 시 필터링. §4.2의 (A) 읽기 모드.
+    List<FinanceCategory> findSelectable(UUID userId, UUID currentGroupId, FinanceCategory.Type type);
 
     // 삭제 여부 무관 조회 — 과거 거래·자산 기록의 카테고리 이름 렌더링 전용. 수정 같은 쓰기 경로에서
     // 쓰면 안 됨(FinanceCategory에 deletedAt 필드가 없어 save()가 merge 시 삭제 상태를 조용히
@@ -32,7 +32,5 @@ public interface FinanceCategoryPort {
     // 소프트 삭제 — 모든 하위 세대(임의 depth)도 함께 소프트 삭제
     void softDeleteWithChildren(UUID id);
 
-    void softDeleteByCreatedBy(UUID userId); // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 createdBy null이라 자동 제외)
-
-    void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy); // 그룹 이탈 시 개인 그룹으로 이관
+    void softDeleteByUserId(UUID userId); // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 userId null이라 자동 제외)
 }

@@ -19,8 +19,8 @@ public class AssetSnapshotPersistenceAdapter implements AssetSnapshotPort {
     private final FinanceAssetSnapshotJpaRepository jpaRepository;
 
     @Override
-    public List<AssetSnapshot> findByGroupId(UUID groupId, LocalDate from, LocalDate to, UUID createdBy) {
-        return jpaRepository.findByGroupId(groupId, from, to, createdBy).stream()
+    public List<AssetSnapshot> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID filterUserId) {
+        return jpaRepository.findMyScope(userId, currentGroupId, from, to, filterUserId).stream()
                 .map(FinanceAssetSnapshotEntity::toDomain)
                 .toList();
     }
@@ -42,12 +42,7 @@ public class AssetSnapshotPersistenceAdapter implements AssetSnapshotPort {
     }
 
     @Override
-    public void softDeleteByCreatedBy(UUID userId) {
-        jpaRepository.softDeleteByCreatedBy(userId, Instant.now());
-    }
-
-    @Override
-    public void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy) {
-        jpaRepository.reassignGroup(fromGroupId, toGroupId, createdBy);
+    public void softDeleteByUserId(UUID userId) {
+        jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
 }

@@ -49,13 +49,13 @@ class FinanceGroupControllerTest {
 
     @Test
     void listMyGroups_returns200() throws Exception {
-        FinanceGroup group = new FinanceGroup(UUID.randomUUID(), USER_ID, "개인", true, Instant.now());
+        FinanceGroup group = new FinanceGroup(UUID.randomUUID(), USER_ID, Instant.now());
         when(groupUseCase.listMyGroups(USER_ID)).thenReturn(List.of(group));
 
         mockMvc.perform(get("/api/finance/groups")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("개인"));
+                .andExpect(jsonPath("$[0].name").value("가계부"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class FinanceGroupControllerTest {
                 USER_ID, code, FinanceGroupInvitation.Status.ACCEPTED, Instant.now().plusSeconds(3600), Instant.now());
         when(groupUseCase.respondToInvitation(eq(code), eq(USER_ID), eq(FinanceGroupInvitation.Status.ACCEPTED)))
                 .thenReturn(accepted);
-        FinanceGroup group = new FinanceGroup(groupId, UUID.randomUUID(), "가족", false, Instant.now());
+        FinanceGroup group = new FinanceGroup(groupId, UUID.randomUUID(), Instant.now());
         when(groupUseCase.listMyGroups(USER_ID)).thenReturn(List.of(group));
 
         mockMvc.perform(patch("/api/finance/invitations/{code}", code)
@@ -171,7 +171,7 @@ class FinanceGroupControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(groupId.toString()))
-                .andExpect(jsonPath("$.name").value("가족"));
+                .andExpect(jsonPath("$.name").value("가계부"));
     }
 
     @Test

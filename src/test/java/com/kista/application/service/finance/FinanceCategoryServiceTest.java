@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,9 +43,14 @@ class FinanceCategoryServiceTest {
                 FinanceCategory.Type.EXPENSE, "식비", 10, null);
     }
 
+    private FinanceCategory personalCategory() {
+        return new FinanceCategory(categoryId, null, null, userId,
+                FinanceCategory.Type.EXPENSE, "개인카테고리", 10, null);
+    }
+
     @Test
-    @DisplayName("시스템 카테고리 수정 시 SecurityException — isSystem 체크가 그룹 멤버십 체크보다 먼저 실행됨")
-    void update_systemCategory_throwsSecurityException_beforeMembershipCheck() {
+    @DisplayName("시스템 카테고리 수정 시 SecurityException — isSystem 체크가 그룹 조회보다 먼저 실행됨")
+    void update_systemCategory_throwsSecurityException_beforeGroupLookup() {
         when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
 
         assertThatThrownBy(() -> categoryService.update(categoryId, userId,
@@ -52,46 +58,30 @@ class FinanceCategoryServiceTest {
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("시스템");
 
-        // isSystem 체크가 먼저 실행되므로 그룹 멤버십 검증(resolveGroupId)까지 도달하지 않는다.
-        verify(financeGroupPort, never()).resolveGroupId(any(), any());
+        verify(financeGroupPort, never()).findCurrentGroupId(any());
         verify(categoryPort, never()).save(any());
     }
 
     @Test
-    @DisplayName("시스템 카테고리 삭제 시 SecurityException — isSystem 체크가 그룹 멤버십 체크보다 먼저 실행됨")
-    void delete_systemCategory_throwsSecurityException_beforeMembershipCheck() {
+    @DisplayName("시스템 카테고리 삭제 시 SecurityException — isSystem 체크가 그룹 조회보다 먼저 실행됨")
+    void delete_systemCategory_throwsSecurityException_beforeGroupLookup() {
         when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(systemCategory());
 
         assertThatThrownBy(() -> categoryService.delete(categoryId, userId))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("시스템");
 
-        verify(financeGroupPort, never()).resolveGroupId(any(), any());
+        verify(financeGroupPort, never()).findCurrentGroupId(any());
         verify(categoryPort, never()).softDeleteWithChildren(any());
-    }
-
-    @Test
-    @DisplayName("비회원이 시스템 카테고리를 수정 시도해도 non-member가 아니라 is-system 사유로 거부됨")
-    void update_nonMemberOnSystemCategory_rejectedForBeingSystem_notNonMembership() {
-        // financeGroupPort는 아예 호출되지 않아야 하므로 stub하지 않는다 — 호출되면 stub 부재로 NPE가 나서
-        // "멤버십 체크가 실제로는 실행되지 않았다"는 사실이 즉시 드러난다.
-        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
-
-        assertThatThrownBy(() -> categoryService.update(categoryId, userId,
-                new FinanceCategoryCommand(null, FinanceCategory.Type.INCOME, "변경명", 20)))
-                .isInstanceOf(SecurityException.class)
-                .hasMessageContaining("시스템")
-                .hasMessageNotContaining("권한"); // 비멤버 사유("...접근 권한이 없습니다")와는 다른 메시지여야 함
-
-        verifyNoInteractions(financeGroupPort);
     }
 
     @Test
     @DisplayName("생성 시 parentId가 타 그룹 소유 카테고리를 가리키면 IllegalArgumentException")
     void create_parentBelongsToDifferentGroup_throws() {
         UUID otherGroupId = UUID.randomUUID();
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        FinanceCategory otherGroupParent = new FinanceCategory(UUID.randomUUID(), otherGroupId, null, userId,
+        UUID otherOwnerId = UUID.randomUUID(); // 부모를 소유하지 않아야 owned=false로 verifyAccessibleBy가 거부한다
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategory otherGroupParent = new FinanceCategory(UUID.randomUUID(), otherGroupId, null, otherOwnerId,
                 FinanceCategory.Type.EXPENSE, "타그룹부모", 10, null);
         when(categoryPort.findByIdOrThrow(otherGroupParent.id())).thenReturn(otherGroupParent);
 
@@ -105,28 +95,48 @@ class FinanceCategoryServiceTest {
         verify(categoryPort, never()).save(any());
     }
 
+    // 회귀(플랜 항목 8): 부모로 개인 카테고리(groupId=null, userId 있음)를 지정해도 verifyAccessibleBy 내부에서
+    // NPE 없이 정상 판정돼야 한다 — 본인 소유면 통과, 타인 소유면 IllegalArgumentException으로 거부.
     @Test
-    @DisplayName("생성 시 parentId가 이미 L2(부모의 부모 존재)인 카테고리를 가리켜도 depth 무관 정책상 정상 생성됨")
-    void create_parentIsAlreadyL2_allowedUnderDepthAgnosticPolicy() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        FinanceCategory l2Parent = new FinanceCategory(UUID.randomUUID(), groupId, UUID.randomUUID(), userId,
-                FinanceCategory.Type.EXPENSE, "이미L2", 10, null);
-        when(categoryPort.findByIdOrThrow(l2Parent.id())).thenReturn(l2Parent);
-        FinanceCategory saved = new FinanceCategory(UUID.randomUUID(), groupId, l2Parent.id(), userId,
+    @DisplayName("생성 시 parentId가 본인의 개인 카테고리를 가리키면 NPE 없이 정상 생성됨")
+    void create_parentIsOwnPersonalCategory_noNpe_succeeds() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceCategory personalParent = personalCategory();
+        when(categoryPort.findByIdOrThrow(personalParent.id())).thenReturn(personalParent);
+        FinanceCategory saved = new FinanceCategory(UUID.randomUUID(), null, personalParent.id(), userId,
                 FinanceCategory.Type.EXPENSE, "새카테고리", 10, null);
         when(categoryPort.save(any())).thenReturn(saved);
 
         FinanceCategoryCommand command = new FinanceCategoryCommand(
-                l2Parent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+                personalParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
         assertThat(categoryService.create(userId, null, command)).isEqualTo(saved);
         verify(categoryPort).save(any());
     }
 
     @Test
+    @DisplayName("생성 시 parentId가 타인의 개인 카테고리를 가리키면 NPE 없이 IllegalArgumentException으로 거부됨")
+    void create_parentIsOthersPersonalCategory_noNpe_rejected() {
+        UUID otherUserId = UUID.randomUUID();
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceCategory othersPersonalParent = new FinanceCategory(UUID.randomUUID(), null, null, otherUserId,
+                FinanceCategory.Type.EXPENSE, "타인개인카테고리", 10, null);
+        when(categoryPort.findByIdOrThrow(othersPersonalParent.id())).thenReturn(othersPersonalParent);
+
+        FinanceCategoryCommand command = new FinanceCategoryCommand(
+                othersPersonalParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+
+        assertThatThrownBy(() -> categoryService.create(userId, null, command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("다른 그룹");
+
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("생성 시 parentId가 다른 type의 카테고리를 가리키면 IllegalArgumentException")
     void create_parentTypeMismatch_throws() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         FinanceCategory incomeParent = new FinanceCategory(UUID.randomUUID(), groupId, null, userId,
                 FinanceCategory.Type.INCOME, "수입부모", 10, null);
         when(categoryPort.findByIdOrThrow(incomeParent.id())).thenReturn(incomeParent);
@@ -141,11 +151,26 @@ class FinanceCategoryServiceTest {
         verify(categoryPort, never()).save(any());
     }
 
+    // 신규 등록은 항상 개인 소유(groupId=null, userId=userId)로 저장한다 — requestedGroupId는 무시된다.
+    @Test
+    @DisplayName("생성은 requestedGroupId와 무관하게 항상 개인 소유(groupId=null)로 저장된다")
+    void create_alwaysSavesAsPersonalOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+        when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceCategory result = categoryService.create(userId, groupId, command);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(userId);
+        verify(categoryPort).save(argThat(c -> c.groupId() == null && userId.equals(c.userId())));
+    }
+
     @Test
     @DisplayName("삭제는 softDeleteWithChildren 단일 호출 — find+delete 2단계가 아님")
     void delete_callsSoftDeleteWithChildren() {
         when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(groupCategory(groupId));
-        when(financeGroupPort.resolveGroupId(userId, groupId)).thenReturn(groupId);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 
         categoryService.delete(categoryId, userId);
 
@@ -154,29 +179,56 @@ class FinanceCategoryServiceTest {
     }
 
     @Test
-    @DisplayName("list는 port 결과를 sortOrder 오름차순으로 정렬해 반환")
+    @DisplayName("삭제 시 접근 불가한 카테고리면 SecurityException")
+    void delete_notAccessible_throwsSecurityException() {
+        FinanceCategory othersGroupCategory = new FinanceCategory(categoryId, UUID.randomUUID(), null,
+                UUID.randomUUID(), FinanceCategory.Type.EXPENSE, "식비", 10, null);
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(othersGroupCategory);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> categoryService.delete(categoryId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(categoryPort, never()).softDeleteWithChildren(any());
+    }
+
+    @Test
+    @DisplayName("list는 findSelectable(userId, currentGroupId, type) 결과를 sortOrder 오름차순으로 정렬해 반환")
     void list_sortsBySortOrder() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         FinanceCategory c30 = new FinanceCategory(UUID.randomUUID(), groupId, null, userId, FinanceCategory.Type.EXPENSE, "c30", 30, null);
         FinanceCategory c10 = new FinanceCategory(UUID.randomUUID(), groupId, null, userId, FinanceCategory.Type.EXPENSE, "c10", 10, null);
         FinanceCategory c20 = new FinanceCategory(UUID.randomUUID(), groupId, null, userId, FinanceCategory.Type.EXPENSE, "c20", 20, null);
-        when(categoryPort.findSelectableByGroup(groupId, FinanceCategory.Type.EXPENSE))
+        when(categoryPort.findSelectable(userId, groupId, FinanceCategory.Type.EXPENSE))
                 .thenReturn(List.of(c30, c10, c20));
 
         List<FinanceCategory> result = categoryService.list(userId, null, FinanceCategory.Type.EXPENSE);
 
         assertThat(result).extracting(FinanceCategory::sortOrder).containsExactly(10, 20, 30);
-        verify(categoryPort).findSelectableByGroup(groupId, FinanceCategory.Type.EXPENSE);
+        verify(categoryPort).findSelectable(userId, groupId, FinanceCategory.Type.EXPENSE);
+    }
+
+    // 회귀(플랜 항목 1): 타 사용자의 개인 카테고리가 findSelectable에 유출되면 안 된다 — 서비스는 port에
+    // 정확히 (userId, currentGroupId)만 넘긴다는 계약을 검증한다(실제 유출 차단은 어댑터/DB 레벨 테스트가 담당).
+    @Test
+    @DisplayName("list는 무그룹 유저에 대해 currentGroupId=null로 조회해 개인 데이터만 노출한다")
+    void list_noCurrentGroup_queriesWithNullGroupId() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(categoryPort.findSelectable(userId, null, null)).thenReturn(List.of());
+
+        categoryService.list(userId, null, null);
+
+        verify(categoryPort).findSelectable(userId, null, null);
     }
 
     // ── 시스템 카테고리 admin 관리 ──────────────────────────────────────────────
 
     @Test
-    @DisplayName("listSystem은 findSelectableByGroup(null, type)을 호출하고 sortOrder로 정렬")
-    void listSystem_queriesWithNullGroupId_andSorts() {
+    @DisplayName("listSystem은 findSelectable(null, null, type)을 호출하고 sortOrder로 정렬")
+    void listSystem_queriesWithNullUserAndGroupId_andSorts() {
         FinanceCategory c20 = new FinanceCategory(UUID.randomUUID(), null, null, null, FinanceCategory.Type.INCOME, "c20", 20, null);
         FinanceCategory c10 = new FinanceCategory(UUID.randomUUID(), null, null, null, FinanceCategory.Type.INCOME, "c10", 10, null);
-        when(categoryPort.findSelectableByGroup(null, FinanceCategory.Type.INCOME)).thenReturn(List.of(c20, c10));
+        when(categoryPort.findSelectable(null, null, FinanceCategory.Type.INCOME)).thenReturn(List.of(c20, c10));
 
         List<FinanceCategory> result = categoryService.listSystem(FinanceCategory.Type.INCOME);
 
@@ -185,8 +237,8 @@ class FinanceCategoryServiceTest {
     }
 
     @Test
-    @DisplayName("createSystem은 groupId=null, createdBy=null로 저장하고 그룹 조회를 하지 않음")
-    void createSystem_savesWithNullGroupAndCreatedBy() {
+    @DisplayName("createSystem은 groupId=null, userId=null로 저장하고 그룹 조회를 하지 않음")
+    void createSystem_savesWithNullGroupAndUserId() {
         FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새시스템카테고리", 10);
         FinanceCategory saved = new FinanceCategory(UUID.randomUUID(), null, null, null,
                 FinanceCategory.Type.EXPENSE, "새시스템카테고리", 10, null);
@@ -195,7 +247,7 @@ class FinanceCategoryServiceTest {
         FinanceCategory result = categoryService.createSystem(command);
 
         assertThat(result).isEqualTo(saved);
-        verify(categoryPort).save(argThat(c -> c.groupId() == null && c.createdBy() == null));
+        verify(categoryPort).save(argThat(c -> c.groupId() == null && c.userId() == null));
         verifyNoInteractions(financeGroupPort);
     }
 

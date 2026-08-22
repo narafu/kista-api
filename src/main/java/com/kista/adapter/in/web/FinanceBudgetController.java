@@ -73,6 +73,19 @@ public class FinanceBudgetController {
         return FinanceBudgetResponse.from(budgetUseCase.update(id, userId, request.toCommand()));
     }
 
+    @Operation(summary = "예산 그룹 공유 전환", description = "개인 소유 예산을 소유자의 현재 그룹으로 공유 전환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "전환 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "예산을 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/share")
+    public FinanceBudgetResponse share(
+            @Parameter(description = "예산 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceBudgetResponse.from(budgetUseCase.shareToGroup(id, userId));
+    }
+
     @Operation(summary = "예산 삭제", description = "파생 설정이라 하드 삭제됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),

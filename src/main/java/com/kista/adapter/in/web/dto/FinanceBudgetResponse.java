@@ -11,6 +11,8 @@ public record FinanceBudgetResponse(
         UUID id,
         @Schema(description = "카테고리 ID")
         UUID categoryId,
+        @Schema(description = "그룹 ID (null이면 개인 소유 — 본인만 조회·전환 가능)")
+        UUID groupId,
         @Schema(description = "적용 시작일", example = "2026-01-01")
         LocalDate applyStartDate,
         @Schema(description = "적용 종료일 (null이면 무기한)", example = "2026-12-31")
@@ -19,6 +21,6 @@ public record FinanceBudgetResponse(
         long amount
 ) {
     public static FinanceBudgetResponse from(FinanceBudget b) {
-        return new FinanceBudgetResponse(b.id(), b.categoryId(), b.applyStartDate(), b.applyEndDate(), b.amount());
+        return new FinanceBudgetResponse(b.id(), b.categoryId(), b.groupId(), b.applyStartDate(), b.applyEndDate(), b.amount());
     }
 }

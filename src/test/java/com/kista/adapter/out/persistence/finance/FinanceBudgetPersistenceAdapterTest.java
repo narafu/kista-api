@@ -31,12 +31,14 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired FinanceBudgetPersistenceAdapter adapter;
 
     private UUID userId;
+    private UUID otherUserId;
     private UUID groupId;
     private UUID otherGroupId;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        otherUserId = UUID.randomUUID();
         groupId = UUID.randomUUID();
         otherGroupId = UUID.randomUUID();
 
@@ -44,11 +46,19 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '개인', true, now(), now())",
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 groupId, userId);
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '가족', false, now(), now())",
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 otherGroupId, userId);
+    }
+
+    // groupId=null(개인 예산) — 예산 record 시그니처는 (id, groupId, categoryId, userId, start, end, amount, createdAt)
+    private FinanceBudget personalBudget(UUID owner, UUID categoryId, LocalDate start, LocalDate end) {
+        return new FinanceBudget(null, null, categoryId, owner, start, end, 500_000L, null);
     }
 
     private FinanceBudget budget(UUID gId, UUID categoryId, LocalDate start, LocalDate end) {
@@ -130,5 +140,41 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
 
         assertThat(first.id()).isNotNull();
         assertThat(second.id()).isNotNull();
+    }
+
+    // 회귀(플랜 항목 2): 같은 사용자·같은 카테고리·겹치는 기간의 개인 예산(groupId=null) 2개는
+    // finance_budgets_personal_no_overlap EXCLUDE 제약(V17)으로 막혀야 한다.
+    @Test
+    void save_overlappingPersonalBudgets_sameUserAndCategory_throwsOverlappingPeriodException() {
+        adapter.save(personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)));
+
+        assertThatThrownBy(() -> adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 1, 15), LocalDate.of(2026, 2, 15))))
+                .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
+    }
+
+    // 개인 예산 EXCLUDE는 group_id가 둘 다 NULL이라도 user_id 축으로 분리되므로 다른 사용자끼리는 안 막힌다.
+    @Test
+    void save_overlappingPersonalBudgets_differentUser_noConflict() {
+        LocalDate start = LocalDate.of(2026, 3, 1);
+        LocalDate end = LocalDate.of(2026, 3, 31);
+        FinanceBudget first = adapter.save(personalBudget(userId, CATEGORY_A, start, end));
+        FinanceBudget second = adapter.save(personalBudget(otherUserId, CATEGORY_A, start, end));
+
+        assertThat(first.id()).isNotNull();
+        assertThat(second.id()).isNotNull();
+    }
+
+    // 그룹 예산(EXCLUDE WHERE group_id IS NOT NULL)과 개인 예산(EXCLUDE WHERE group_id IS NULL)은
+    // 서로 다른 부분 제약이라 같은 사용자·같은 카테고리·겹치는 기간이라도 충돌하지 않는다.
+    @Test
+    void save_overlappingGroupAndPersonalBudget_sameUserAndCategory_noConflict() {
+        LocalDate start = LocalDate.of(2026, 4, 1);
+        LocalDate end = LocalDate.of(2026, 4, 30);
+        FinanceBudget group = adapter.save(budget(groupId, CATEGORY_A, start, end));
+        FinanceBudget personal = adapter.save(personalBudget(userId, CATEGORY_A, start, end));
+
+        assertThat(group.id()).isNotNull();
+        assertThat(personal.id()).isNotNull();
     }
 }

@@ -30,12 +30,14 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired AssetSnapshotPersistenceAdapter adapter;
 
     private UUID userId;
+    private UUID otherUserId;
     private UUID groupId;
     private UUID accountId;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        otherUserId = UUID.randomUUID();
         groupId = UUID.randomUUID();
         accountId = UUID.randomUUID();
 
@@ -43,23 +45,31 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, personal, created_at, updated_at) VALUES (?, ?, '개인', true, now(), now())",
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 groupId, userId);
         jdbcTemplate.update(
-                "INSERT INTO finance_accounts (id, group_id, created_by, account_type, name, created_at, updated_at) " +
+                "INSERT INTO finance_accounts (id, group_id, user_id, account_type, name, created_at, updated_at) " +
                         "VALUES (?, ?, ?, 'SECURITIES', '테스트증권계좌', now(), now())",
                 accountId, groupId, userId);
     }
 
-    private AssetSnapshot snapshot(UUID accId) {
-        return new AssetSnapshot(null, groupId, CATEGORY_ASSET, accId, userId, LocalDate.of(2026, 8, 1),
+    private AssetSnapshot groupSnapshot(UUID accId, UUID owner) {
+        return new AssetSnapshot(null, groupId, CATEGORY_ASSET, accId, owner, LocalDate.of(2026, 8, 1),
                 AssetClass.EQUITY, Market.GLOBAL, "적립식", 1_000_000L, null);
+    }
+
+    private AssetSnapshot personalSnapshot(UUID owner) {
+        return new AssetSnapshot(null, null, CATEGORY_ASSET, null, owner, LocalDate.of(2026, 8, 1),
+                AssetClass.CASH, Market.DOMESTIC, null, 500_000L, null);
     }
 
     @Test
     void save_andFindById_roundTrips_withNullAccountId() {
         // 계좌 없는 자산(전세임차보증금 등) — accountId null 케이스
-        AssetSnapshot saved = adapter.save(snapshot(null));
+        AssetSnapshot saved = adapter.save(groupSnapshot(null, userId));
 
         AssetSnapshot found = adapter.findById(saved.id()).orElseThrow();
 
@@ -74,7 +84,7 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void save_andFindById_roundTrips_withAccountId() {
-        AssetSnapshot saved = adapter.save(snapshot(accountId));
+        AssetSnapshot saved = adapter.save(groupSnapshot(accountId, userId));
 
         AssetSnapshot found = adapter.findById(saved.id()).orElseThrow();
 
@@ -83,17 +93,52 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void softDelete_setsDeletedAt_andExcludesFromFindById() {
-        AssetSnapshot saved = adapter.save(snapshot(null));
+        AssetSnapshot saved = adapter.save(groupSnapshot(null, userId));
 
         adapter.softDelete(saved.id());
-        // softDelete는 @Modifying 벌크 UPDATE라 1차 캐시를 자동 갱신하지 않는다 —
-        // 같은 영속성 컨텍스트 안에서 방금 save()로 로드된 엔티티가 그대로 남아있으므로
-        // clear()로 비워야 findById가 DB의 최신 상태를 다시 읽는다.
         entityManager.clear();
 
         assertThat(adapter.findById(saved.id())).isEmpty();
         var deletedAt = jdbcTemplate.queryForObject(
                 "SELECT deleted_at FROM finance_asset_snapshots WHERE id = ?", java.sql.Timestamp.class, saved.id());
         assertThat(deletedAt).isNotNull();
+    }
+
+    // 회귀(플랜 항목 4): findMyScope는 (내 개인) ∪ (내 그룹)만 반환 — 타인의 개인 자산 기록은 유출되면 안 된다.
+    @Test
+    void findMyScope_returnsPersonalUnionGroup_excludingOthersPersonalData() {
+        AssetSnapshot myPersonal = adapter.save(personalSnapshot(userId));
+        AssetSnapshot myGroup = adapter.save(groupSnapshot(null, userId));
+        AssetSnapshot othersPersonal = adapter.save(personalSnapshot(otherUserId));
+
+        var result = adapter.findMyScope(userId, groupId, null, null, null);
+
+        assertThat(result).extracting(AssetSnapshot::id)
+                .contains(myPersonal.id(), myGroup.id())
+                .doesNotContain(othersPersonal.id());
+    }
+
+    @Test
+    void findMyScope_noGroup_returnsOnlyPersonalData() {
+        AssetSnapshot myPersonal = adapter.save(personalSnapshot(userId));
+        AssetSnapshot myGroup = adapter.save(groupSnapshot(null, userId));
+
+        var result = adapter.findMyScope(userId, null, null, null, null);
+
+        assertThat(result).extracting(AssetSnapshot::id)
+                .contains(myPersonal.id())
+                .doesNotContain(myGroup.id());
+    }
+
+    @Test
+    void softDeleteByUserId_softDeletesOnlyThatUsersOwnedSnapshots() {
+        AssetSnapshot mine = adapter.save(personalSnapshot(userId));
+        AssetSnapshot others = adapter.save(personalSnapshot(otherUserId));
+
+        adapter.softDeleteByUserId(userId);
+        entityManager.clear();
+
+        assertThat(adapter.findById(mine.id())).isEmpty();
+        assertThat(adapter.findById(others.id())).isPresent();
     }
 }

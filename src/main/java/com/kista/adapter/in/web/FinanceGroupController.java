@@ -97,7 +97,7 @@ public class FinanceGroupController {
                 .filter(g -> g.id().equals(invitation.groupId()))
                 .findFirst()
                 .map(FinanceGroupResponse::from)
-                .orElseGet(() -> new FinanceGroupResponse(invitation.groupId(), null, false));
+                .orElseGet(() -> new FinanceGroupResponse(invitation.groupId(), null));
     }
 
     @Operation(summary = "그룹 탈퇴 / 멤버 추방", description = "본인이 나가거나(userId=본인) OWNER가 다른 멤버를 추방할 수 있습니다. 개인 그룹은 탈퇴할 수 없습니다.")

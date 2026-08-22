@@ -9,8 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface FinanceTransactionPort {
-    // from/to/categoryId/createdBy는 선택적 필터 — null이면 무시
-    List<FinanceTransaction> findByGroupId(UUID groupId, LocalDate from, LocalDate to, UUID categoryId, UUID createdBy);
+    // from/to/categoryId/filterUserId는 선택적 필터 — null이면 무시. currentGroupId는 무그룹 유저면 null(개인 데이터만 조회).
+    List<FinanceTransaction> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID categoryId, UUID filterUserId);
 
     Optional<FinanceTransaction> findById(UUID id);
 
@@ -21,6 +21,5 @@ public interface FinanceTransactionPort {
 
     FinanceTransaction save(FinanceTransaction transaction);
     void softDelete(UUID id);
-    void softDeleteByCreatedBy(UUID userId); // 회원 탈퇴 시 내가 입력한 거래만
-    void reassignGroup(UUID fromGroupId, UUID toGroupId, UUID createdBy); // 그룹 이탈 시 개인 그룹으로 이관
+    void softDeleteByUserId(UUID userId); // 회원 탈퇴 시 내가 입력한 거래만
 }

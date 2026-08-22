@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,8 +40,8 @@ class AssetSnapshotServiceTest {
     private final UUID categoryId = UUID.randomUUID();
     private final UUID accountId = UUID.randomUUID();
 
-    private AssetSnapshot existingSnapshot() {
-        return new AssetSnapshot(snapshotId, groupId, categoryId, accountId, userId,
+    private AssetSnapshot personalSnapshot() {
+        return new AssetSnapshot(snapshotId, null, categoryId, accountId, userId,
                 LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
     }
 
@@ -49,60 +50,56 @@ class AssetSnapshotServiceTest {
                 AssetClass.EQUITY, Market.GLOBAL, "장기투자", 2_000_000L);
     }
 
-    // create/update는 저장 전에 categoryId 소유권·타입(ASSET)을 검증하므로 그 경로를 타는 테스트는
-    // 이 그룹 소유의 ASSET 카테고리를 stub해야 한다.
     private FinanceCategory usableCategory() {
-        return new FinanceCategory(categoryId, groupId, null, userId, FinanceCategory.Type.ASSET, "투자", 0, null);
+        return new FinanceCategory(categoryId, null, null, userId, FinanceCategory.Type.ASSET, "투자", 0, null);
     }
 
     @Test
-    @DisplayName("list는 resolveGroupId로 얻은 groupId로 조회")
-    void list_resolvesGroupId() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        when(assetSnapshotPort.findByGroupId(groupId, null, null, null))
-                .thenReturn(List.of(existingSnapshot()));
+    @DisplayName("list는 findCurrentGroupId로 얻은 currentGroupId로 조회")
+    void list_queriesWithCurrentGroupId() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(assetSnapshotPort.findMyScope(userId, groupId, null, null, null))
+                .thenReturn(List.of(personalSnapshot()));
 
         List<AssetSnapshot> result = assetSnapshotService.list(userId, null, null, null, null);
 
         assertThat(result).hasSize(1);
-        verify(financeGroupPort).resolveGroupId(userId, null);
+        verify(assetSnapshotPort).findMyScope(userId, groupId, null, null, null);
     }
 
     @Test
-    @DisplayName("create는 resolveGroupId 호출 후 스냅샷 저장")
-    void create_resolvesGroupIdThenSaves() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
+    @DisplayName("create는 requestedGroupId를 무시하고 개인 소유(groupId=null)로 저장")
+    void create_alwaysSavesAsPersonalOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AssetSnapshot result = assetSnapshotService.create(userId, null, command());
+        AssetSnapshot result = assetSnapshotService.create(userId, groupId, command());
 
-        assertThat(result.groupId()).isEqualTo(groupId);
-        assertThat(result.createdBy()).isEqualTo(userId);
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.amount()).isEqualTo(2_000_000L);
-        verify(financeGroupPort).resolveGroupId(userId, null);
     }
 
     @Test
-    @DisplayName("update는 load-then-verify-membership 패턴")
-    void update_loadsThenVerifiesMembership() {
-        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(existingSnapshot());
-        when(financeGroupPort.resolveGroupId(userId, groupId)).thenReturn(groupId);
+    @DisplayName("update는 load-then-verify 패턴")
+    void update_loadsThenVerifiesAccess() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         AssetSnapshot result = assetSnapshotService.update(snapshotId, userId, command());
 
         assertThat(result.amount()).isEqualTo(2_000_000L);
-        assertThat(result.createdBy()).isEqualTo(userId); // 기존 createdBy 유지
-        verify(financeGroupPort).resolveGroupId(userId, groupId);
+        assertThat(result.userId()).isEqualTo(userId); // 기존 소유자 유지
     }
 
     @Test
     @DisplayName("ASSET이 아닌 카테고리는 자산 스냅샷에 사용할 수 없음")
     void create_nonAssetTypeCategory_rejected() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        FinanceCategory expenseCategory = new FinanceCategory(categoryId, groupId, null, userId,
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceCategory expenseCategory = new FinanceCategory(categoryId, null, null, userId,
                 FinanceCategory.Type.EXPENSE, "식비", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(expenseCategory);
 
@@ -112,12 +109,12 @@ class AssetSnapshotServiceTest {
     }
 
     @Test
-    @DisplayName("다른 그룹 소유 카테고리를 지정하면 SecurityException")
-    void create_categoryFromOtherGroup_rejected() {
-        when(financeGroupPort.resolveGroupId(userId, null)).thenReturn(groupId);
-        FinanceCategory otherGroupCategory = new FinanceCategory(categoryId, UUID.randomUUID(), null, userId,
+    @DisplayName("접근 불가한 카테고리를 지정하면 SecurityException")
+    void create_inaccessibleCategory_rejected() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceCategory othersPersonalCategory = new FinanceCategory(categoryId, null, null, UUID.randomUUID(),
                 FinanceCategory.Type.ASSET, "투자", 0, null);
-        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(otherGroupCategory);
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(othersPersonalCategory);
 
         assertThatThrownBy(() -> assetSnapshotService.create(userId, null, command()))
                 .isInstanceOf(SecurityException.class);
@@ -125,14 +122,27 @@ class AssetSnapshotServiceTest {
     }
 
     @Test
-    @DisplayName("delete는 load-then-verify-membership 후 softDelete 호출")
+    @DisplayName("delete는 load-then-verify 후 softDelete 호출")
     void delete_callsSoftDelete() {
-        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(existingSnapshot());
-        when(financeGroupPort.resolveGroupId(userId, groupId)).thenReturn(groupId);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
 
         assetSnapshotService.delete(snapshotId, userId);
 
-        verify(financeGroupPort).resolveGroupId(userId, groupId);
         verify(assetSnapshotPort).softDelete(snapshotId);
+    }
+
+    @Test
+    @DisplayName("delete 시 접근 불가한 스냅샷이면 SecurityException")
+    void delete_notAccessible_throwsSecurityException() {
+        AssetSnapshot othersSnapshot = new AssetSnapshot(snapshotId, null, categoryId, accountId, UUID.randomUUID(),
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(othersSnapshot);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> assetSnapshotService.delete(snapshotId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(assetSnapshotPort, never()).softDelete(any());
     }
 }

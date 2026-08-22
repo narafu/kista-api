@@ -28,13 +28,13 @@ class FinanceCategoryEntity extends BaseAuditEntity {
     private UUID id;
 
     @Column(name = "group_id", columnDefinition = "UUID")
-    private UUID groupId;                 // FK → finance_groups.id, NULL이면 시스템 전역 카테고리
+    private UUID groupId;                 // FK → finance_groups.id, NULL이면 개인 또는 시스템 카테고리
 
     @Column(name = "parent_id", columnDefinition = "UUID")
     private UUID parentId;                // FK → 자기참조, L1이면 NULL
 
-    @Column(name = "created_by", columnDefinition = "UUID")
-    private UUID createdBy;               // FK → users.id, 시스템 카테고리는 NULL
+    @Column(name = "user_id", columnDefinition = "UUID")
+    private UUID userId;                  // FK → users.id, 시스템 카테고리는 NULL (3-state: system/personal/group)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -54,7 +54,7 @@ class FinanceCategoryEntity extends BaseAuditEntity {
         e.id = c.id(); // null이면 @GeneratedValue가 UUID 생성
         e.groupId = c.groupId();
         e.parentId = c.parentId();
-        e.createdBy = c.createdBy();
+        e.userId = c.userId();
         e.type = c.type();
         e.name = c.name();
         e.sortOrder = c.sortOrder();
@@ -63,6 +63,6 @@ class FinanceCategoryEntity extends BaseAuditEntity {
 
     static FinanceCategory toDomain(FinanceCategoryEntity e) {
         return new FinanceCategory(
-                e.id, e.groupId, e.parentId, e.createdBy, e.type, e.name, e.sortOrder, e.getCreatedAt());
+                e.id, e.groupId, e.parentId, e.userId, e.type, e.name, e.sortOrder, e.getCreatedAt());
     }
 }

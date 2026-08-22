@@ -4,7 +4,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.domain.model.finance.FinanceBudget;
 import com.kista.domain.model.finance.FinanceCategory;
-import com.kista.domain.model.finance.FinanceGroup;
 import com.kista.domain.model.finance.FinanceGroupInvitation;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
@@ -65,7 +64,6 @@ public class GlobalExceptionHandler {
         Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.DuplicateNameException.class,         new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
-        Map.entry(FinanceGroup.CannotLeavePersonalGroupException.class, new Mapping(HttpStatus.CONFLICT,          "Conflict")),
         Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict"))
     );
 
