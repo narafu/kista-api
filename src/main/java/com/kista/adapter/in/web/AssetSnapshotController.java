@@ -82,6 +82,32 @@ public class AssetSnapshotController {
         return enrich(assetSnapshotUseCase.update(id, userId, request.toCommand()));
     }
 
+    @Operation(summary = "자산 기록 그룹 공유 전환", description = "개인 소유 자산 기록을 소유자의 현재 그룹으로 공유 전환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "전환 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "자산 기록을 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/share")
+    public AssetSnapshotResponse share(
+            @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return enrich(assetSnapshotUseCase.shareToGroup(id, userId));
+    }
+
+    @Operation(summary = "자산 기록 그룹 공유 해제", description = "그룹 공유 자산 기록을 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "해제 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "자산 기록을 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/unshare")
+    public AssetSnapshotResponse unshare(
+            @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return enrich(assetSnapshotUseCase.unshare(id, userId));
+    }
+
     @Operation(summary = "자산 기록 삭제")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
@@ -110,7 +136,7 @@ public class AssetSnapshotController {
                 ? financeAccountPort.findByIdOrThrow(snapshot.accountId()).name()
                 : null;
         return new AssetSnapshotResponse(
-                snapshot.id(), snapshot.categoryId(), rootCategoryId, category.name(),
+                snapshot.id(), snapshot.groupId(), snapshot.categoryId(), rootCategoryId, category.name(),
                 snapshot.accountId(), accountName, snapshot.entryDate(),
                 snapshot.assetClass().name(), snapshot.market().name(), snapshot.strategy(), snapshot.amount());
     }

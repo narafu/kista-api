@@ -11,6 +11,8 @@ import java.util.UUID;
 public record AssetSnapshotResponse(
         @Schema(description = "자산 기록 고유 ID")
         UUID id,
+        @Schema(description = "그룹 ID (없으면 개인 소유)")
+        UUID groupId,
         @Schema(description = "카테고리 ID")
         UUID categoryId,
         @Schema(description = "최상위(L1) 카테고리 ID — 대출이면 순자산 계산 시 부채로 취급")

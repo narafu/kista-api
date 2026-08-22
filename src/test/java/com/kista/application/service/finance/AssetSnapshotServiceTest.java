@@ -145,4 +145,116 @@ class AssetSnapshotServiceTest {
 
         verify(assetSnapshotPort, never()).softDelete(any());
     }
+
+    // ----- shareToGroup -----
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유 개인 자산 기록을 현재 그룹으로 전환")
+    void shareToGroup_ownedPersonalSnapshot_movesToCurrentGroup() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssetSnapshot result = assetSnapshotService.shareToGroup(snapshotId, userId);
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유가 아니면 SecurityException")
+    void shareToGroup_notOwner_throwsSecurityException() {
+        AssetSnapshot othersSnapshot = new AssetSnapshot(snapshotId, null, categoryId, accountId, UUID.randomUUID(),
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(othersSnapshot);
+
+        assertThatThrownBy(() -> assetSnapshotService.shareToGroup(snapshotId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 무그룹 유저면 IllegalStateException")
+    void shareToGroup_noCurrentGroup_throwsIllegalState() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> assetSnapshotService.shareToGroup(snapshotId, userId))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 IllegalStateException")
+    void shareToGroup_alreadySharedToAnotherGroup_throwsIllegalState() {
+        AssetSnapshot alreadyShared = new AssetSnapshot(snapshotId, UUID.randomUUID(), categoryId, accountId, userId,
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(alreadyShared);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> assetSnapshotService.shareToGroup(snapshotId, userId))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    // ----- unshare -----
+
+    @Test
+    @DisplayName("unshare는 그룹 공유 자산 기록을 개인 소유로 되돌리고 소유자는 유지")
+    void unshare_groupSharedSnapshot_movesToPersonalKeepingOwner() {
+        UUID ownerId = UUID.randomUUID();
+        AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, groupId, categoryId, accountId, ownerId,
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssetSnapshot result = assetSnapshotService.unshare(snapshotId, userId);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    @DisplayName("unshare는 같은 그룹 소속이면 소유자가 아니어도 허용")
+    void unshare_nonOwnerSameGroupMember_allowed() {
+        UUID ownerId = UUID.randomUUID();
+        AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, groupId, categoryId, accountId, ownerId,
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssetSnapshot result = assetSnapshotService.unshare(snapshotId, userId);
+
+        assertThat(result.groupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
+    void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
+        AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, UUID.randomUUID(), categoryId, accountId, UUID.randomUUID(),
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> assetSnapshotService.unshare(snapshotId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 이미 개인 소유면 그대로 반환(멱등)")
+    void unshare_alreadyPersonal_isIdempotent() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        AssetSnapshot result = assetSnapshotService.unshare(snapshotId, userId);
+
+        assertThat(result.groupId()).isNull();
+        verify(assetSnapshotPort, never()).save(any());
+    }
 }

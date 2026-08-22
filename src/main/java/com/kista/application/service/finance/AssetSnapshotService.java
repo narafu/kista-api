@@ -75,4 +75,44 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         assetSnapshotPort.softDelete(snapshotId);
         log.info("자산 스냅샷 삭제: snapshotId={}, userId={}", snapshotId, userId);
     }
+
+    // 개인 소유 자산 기록을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
+    @Override
+    public AssetSnapshot shareToGroup(UUID snapshotId, UUID userId) {
+        AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
+        if (!existing.userId().equals(userId)) {
+            throw new SecurityException("본인 소유 자산 기록만 그룹에 공유할 수 있습니다");
+        }
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId)
+                .orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
+        if (currentGroupId.equals(existing.groupId())) {
+            return existing; // 이미 같은 그룹에 공유된 상태 — 멱등
+        }
+        if (existing.groupId() != null) {
+            throw new IllegalStateException("이미 다른 그룹에 공유된 항목입니다");
+        }
+        AssetSnapshot shared = new AssetSnapshot(existing.id(), currentGroupId, existing.categoryId(),
+                existing.accountId(), existing.userId(), existing.entryDate(), existing.assetClass(),
+                existing.market(), existing.strategy(), existing.amount(), existing.createdAt());
+        AssetSnapshot saved = assetSnapshotPort.save(shared);
+        log.info("자산 기록 그룹 공유 전환: snapshotId={}, groupId={}", snapshotId, currentGroupId);
+        return saved;
+    }
+
+    // 그룹 공유 자산 기록을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
+    @Override
+    public AssetSnapshot unshare(UUID snapshotId, UUID userId) {
+        AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
+        if (existing.groupId() == null) {
+            return existing; // 이미 개인 소유 — 멱등
+        }
+        AssetSnapshot personal = new AssetSnapshot(existing.id(), null, existing.categoryId(),
+                existing.accountId(), existing.userId(), existing.entryDate(), existing.assetClass(),
+                existing.market(), existing.strategy(), existing.amount(), existing.createdAt());
+        AssetSnapshot saved = assetSnapshotPort.save(personal);
+        log.info("자산 기록 그룹 공유 해제: snapshotId={}, userId={}", snapshotId, userId);
+        return saved;
+    }
 }
