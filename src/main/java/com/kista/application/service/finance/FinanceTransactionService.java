@@ -79,22 +79,14 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     @Override
     public FinanceTransaction shareToGroup(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
-        if (!existing.userId().equals(userId)) {
-            throw new SecurityException("본인 소유 거래내역만 그룹에 공유할 수 있습니다");
-        }
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId)
-                .orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
-        if (currentGroupId.equals(existing.groupId())) {
-            return existing; // 이미 같은 그룹에 공유된 상태 — 멱등
-        }
-        if (existing.groupId() != null) {
-            throw new IllegalStateException("이미 다른 그룹에 공유된 항목입니다");
-        }
-        FinanceTransaction shared = new FinanceTransaction(existing.id(), currentGroupId, existing.categoryId(),
-                existing.userId(), existing.transactionDate(), existing.amount(), existing.memo(), existing.createdAt());
-        FinanceTransaction saved = transactionPort.save(shared);
-        log.info("거래내역 그룹 공유 전환: transactionId={}, groupId={}", transactionId, currentGroupId);
-        return saved;
+        return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
+                        "본인 소유 거래내역만 그룹에 공유할 수 있습니다")
+                .map(shared -> {
+                    FinanceTransaction saved = transactionPort.save(shared);
+                    log.info("거래내역 그룹 공유 전환: transactionId={}, groupId={}", transactionId, saved.groupId());
+                    return saved;
+                })
+                .orElse(existing);
     }
 
     // 그룹 공유 거래내역을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
@@ -102,14 +94,12 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     public FinanceTransaction unshare(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
-        if (existing.groupId() == null) {
-            return existing; // 이미 개인 소유 — 멱등
-        }
-        FinanceTransaction personal = new FinanceTransaction(existing.id(), null, existing.categoryId(),
-                existing.userId(), existing.transactionDate(), existing.amount(), existing.memo(), existing.createdAt());
-        FinanceTransaction saved = transactionPort.save(personal);
-        log.info("거래내역 그룹 공유 해제: transactionId={}, userId={}", transactionId, userId);
-        return saved;
+        return GroupShareSupport.unshare(existing, userId, currentGroupId)
+                .map(personal -> {
+                    FinanceTransaction saved = transactionPort.save(personal);
+                    log.info("거래내역 그룹 공유 해제: transactionId={}, userId={}", transactionId, userId);
+                    return saved;
+                })
+                .orElse(existing);
     }
 }

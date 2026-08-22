@@ -175,4 +175,39 @@ class AssetSnapshotControllerTest {
 
         verify(assetSnapshotUseCase).delete(id, USER_ID);
     }
+
+    @Test
+    void share_returns200WithGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        AssetSnapshot shared = new AssetSnapshot(id, groupId, categoryId, null, USER_ID,
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", 1_000_000L, Instant.now());
+        when(assetSnapshotUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+        FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
+                FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(category);
+
+        mockMvc.perform(patch("/api/finance/asset-snapshots/{id}/share", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+    }
+
+    @Test
+    void unshare_returns200WithNullGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        AssetSnapshot personal = new AssetSnapshot(id, null, categoryId, null, USER_ID,
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", 1_000_000L, Instant.now());
+        when(assetSnapshotUseCase.unshare(id, USER_ID)).thenReturn(personal);
+        FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
+                FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(category);
+
+        mockMvc.perform(patch("/api/finance/asset-snapshots/{id}/unshare", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(nullValue()));
+    }
 }

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.kista.support.WebMvcTestSupport.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -115,5 +116,32 @@ class FinanceBudgetControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(budgetUseCase).delete(id, USER_ID);
+    }
+
+    @Test
+    void share_returns200WithGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceBudget shared = new FinanceBudget(id, groupId, UUID.randomUUID(), USER_ID,
+                LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
+        when(budgetUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+
+        mockMvc.perform(patch("/api/finance/budgets/{id}/share", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+    }
+
+    @Test
+    void unshare_returns200WithNullGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        FinanceBudget personal = new FinanceBudget(id, null, UUID.randomUUID(), USER_ID,
+                LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
+        when(budgetUseCase.unshare(id, USER_ID)).thenReturn(personal);
+
+        mockMvc.perform(patch("/api/finance/budgets/{id}/unshare", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(nullValue()));
     }
 }

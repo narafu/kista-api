@@ -84,26 +84,18 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     }
 
     // 개인 소유 예산을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
+    // 그룹 전환/복귀 시 겹침(EXCLUDE 제약)이 있으면 어댑터가 OverlappingPeriodException으로 변환하므로 그대로 전파.
     @Override
     public FinanceBudget shareToGroup(UUID budgetId, UUID userId) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
-        if (!existing.userId().equals(userId)) {
-            throw new SecurityException("본인 소유 예산만 그룹에 공유할 수 있습니다");
-        }
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId)
-                .orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
-        if (currentGroupId.equals(existing.groupId())) {
-            return existing; // 이미 같은 그룹에 공유된 상태 — 멱등
-        }
-        if (existing.groupId() != null) {
-            throw new IllegalStateException("이미 다른 그룹에 공유된 항목입니다");
-        }
-        FinanceBudget shared = new FinanceBudget(existing.id(), currentGroupId, existing.categoryId(),
-                existing.userId(), existing.applyStartDate(), existing.applyEndDate(), existing.amount(), existing.createdAt());
-        // 그룹 전환 시 겹침(EXCLUDE 제약)이 있으면 어댑터가 OverlappingPeriodException으로 변환하므로 그대로 전파.
-        FinanceBudget saved = budgetPort.save(shared);
-        log.info("예산 그룹 공유 전환: budgetId={}, groupId={}", budgetId, currentGroupId);
-        return saved;
+        return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
+                        "본인 소유 예산만 그룹에 공유할 수 있습니다")
+                .map(shared -> {
+                    FinanceBudget saved = budgetPort.save(shared);
+                    log.info("예산 그룹 공유 전환: budgetId={}, groupId={}", budgetId, saved.groupId());
+                    return saved;
+                })
+                .orElse(existing);
     }
 
     // 그룹 공유 예산을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
@@ -111,15 +103,12 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     public FinanceBudget unshare(UUID budgetId, UUID userId) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
-        if (existing.groupId() == null) {
-            return existing; // 이미 개인 소유 — 멱등
-        }
-        FinanceBudget personal = new FinanceBudget(existing.id(), null, existing.categoryId(),
-                existing.userId(), existing.applyStartDate(), existing.applyEndDate(), existing.amount(), existing.createdAt());
-        // 개인 소유로 되돌릴 때도 겹침(EXCLUDE 제약)이 있으면 어댑터가 OverlappingPeriodException으로 변환하므로 그대로 전파.
-        FinanceBudget saved = budgetPort.save(personal);
-        log.info("예산 그룹 공유 해제: budgetId={}, userId={}", budgetId, userId);
-        return saved;
+        return GroupShareSupport.unshare(existing, userId, currentGroupId)
+                .map(personal -> {
+                    FinanceBudget saved = budgetPort.save(personal);
+                    log.info("예산 그룹 공유 해제: budgetId={}, userId={}", budgetId, userId);
+                    return saved;
+                })
+                .orElse(existing);
     }
 }

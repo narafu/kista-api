@@ -13,7 +13,7 @@ public record FinanceBudget(
         LocalDate applyEndDate, // null이면 무기한
         long amount,            // 월 할당 예산, 원화 정수
         Instant createdAt       // DB created_at, 신규 등록 시 null
-) {
+) implements GroupShareable<FinanceBudget> {
     // 접근 불가 시 SecurityException → 컨트롤러에서 403 매핑
     public void verifyAccessibleBy(UUID requesterUserId, UUID requesterGroupId) {
         boolean owned = userId.equals(requesterUserId);
@@ -21,6 +21,11 @@ public record FinanceBudget(
         if (!owned && !sharedInMyGroup) {
             throw new SecurityException("예산에 대한 접근 권한이 없습니다");
         }
+    }
+
+    @Override
+    public FinanceBudget withGroupId(UUID groupId) {
+        return new FinanceBudget(id, groupId, categoryId, userId, applyStartDate, applyEndDate, amount, createdAt);
     }
 
     // finance_budgets_group_no_overlap/finance_budgets_personal_no_overlap EXCLUDE 제약 위반을

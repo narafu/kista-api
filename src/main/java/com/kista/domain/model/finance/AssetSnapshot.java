@@ -17,7 +17,7 @@ public record AssetSnapshot(
         String strategy,     // 자유 입력, null 허용 — 실제 자동매매 전략과 무관한 개인 메모
         long amount,          // 원화 정수, 0 이상
         Instant createdAt    // DB created_at, 신규 등록 시 null
-) {
+) implements GroupShareable<AssetSnapshot> {
     // 접근 불가 시 SecurityException → 컨트롤러에서 403 매핑
     public void verifyAccessibleBy(UUID requesterUserId, UUID requesterGroupId) {
         boolean owned = userId.equals(requesterUserId);
@@ -25,5 +25,10 @@ public record AssetSnapshot(
         if (!owned && !sharedInMyGroup) {
             throw new SecurityException("자산 기록에 대한 접근 권한이 없습니다");
         }
+    }
+
+    @Override
+    public AssetSnapshot withGroupId(UUID groupId) {
+        return new AssetSnapshot(id, groupId, categoryId, accountId, userId, entryDate, assetClass, market, strategy, amount, createdAt);
     }
 }
