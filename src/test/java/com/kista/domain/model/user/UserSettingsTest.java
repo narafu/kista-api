@@ -9,14 +9,14 @@ class UserSettingsTest {
 
     @Test
     void isNotificationEnabled_returns_true_when_no_pref_record() {
-        UserSettings settings = new UserSettings(UUID.randomUUID(), true, Map.of());
+        UserSettings settings = new UserSettings(UUID.randomUUID(), true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         assertThat(settings.isNotificationEnabled(NotificationType.TRADING_ALERT)).isTrue();
     }
 
     @Test
     void isNotificationEnabled_returns_stored_value() {
         UserSettings settings = new UserSettings(UUID.randomUUID(), true,
-                Map.of(NotificationType.TRADING_ALERT, false));
+                Map.of(NotificationType.TRADING_ALERT, false), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         assertThat(settings.isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
     }
 
@@ -26,5 +26,6 @@ class UserSettingsTest {
         UserSettings settings = UserSettings.defaultFor(userId);
         assertThat(settings.balanceCheckEnabled()).isTrue();
         assertThat(settings.isNotificationEnabled(NotificationType.TRADING_ALERT)).isTrue();
+        assertThat(settings.strategySuggestions()).isEqualTo(UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
     }
 }

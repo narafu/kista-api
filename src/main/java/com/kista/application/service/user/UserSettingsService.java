@@ -5,6 +5,7 @@ import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.GetUserSettingsQuery;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
+import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserSettingsPort;
@@ -20,7 +21,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPrefUseCase, UpdateBalanceCheckUseCase {
+class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPrefUseCase, UpdateBalanceCheckUseCase,
+        UpdateStrategySuggestionsUseCase {
 
     private final UserSettingsPort userSettingsPort;
     private final AccountPort accountPort;
@@ -39,7 +41,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         // 기존 prefs에 변경 항목만 덮어씀
         Map<NotificationType, Boolean> updatedPrefs = new HashMap<>(current.notificationPrefs());
         updatedPrefs.put(command.type(), command.enabled());
-        userSettingsPort.save(new UserSettings(command.userId(), current.balanceCheckEnabled(), updatedPrefs));
+        userSettingsPort.save(current.withNotificationPrefs(updatedPrefs));
         log.info("알림 설정 변경: userId={}, type={}, enabled={}", command.userId(), command.type(), command.enabled());
     }
 
@@ -48,7 +50,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
     public void update(UpdateBalanceCheckCommand command) {
         UserSettings current = getByUserId(command.userId());
         boolean previous = current.balanceCheckEnabled();
-        userSettingsPort.save(new UserSettings(command.userId(), command.enabled(), current.notificationPrefs()));
+        userSettingsPort.save(current.withBalanceCheckEnabled(command.enabled()));
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", command.userId(), previous, command.enabled());
 
         // 활성 전략 수 계산 — 잔고검증 전환 시 경고 로그 출력
@@ -61,6 +63,14 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
             // ON→OFF 전환: KIS 주문 거부 가능성 경고 (APBK0988)
             log.warn("[잔고검증 ON→OFF] userId={} — 활성 전략 {}개. 실잔고 초과 시드로 재등록 시 KIS 주문 거부 가능.", command.userId(), activeCount);
         }
+    }
+
+    @Override
+    @Transactional
+    public void update(UpdateStrategySuggestionsCommand command) {
+        UserSettings current = getByUserId(command.userId());
+        userSettingsPort.save(current.withStrategySuggestions(command.suggestions()));
+        log.info("운영전략 추천 목록 변경: userId={}, count={}", command.userId(), command.suggestions().size());
     }
 
     // 사용자의 모든 계좌에서 ACTIVE 상태 전략 총 개수 반환

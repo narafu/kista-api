@@ -15,25 +15,19 @@ public record RuntimeSettings(
         boolean approvalRequired, // 신규 가입 승인 필요 여부
         Map<Broker, BrokerSettings> brokers, // 증권사별 신규 등록 설정
         Map<Type, StrategyCreationSettings> strategies, // 전략별 신규 생성 설정
-        BenchmarkSettings benchmarks, // ETF 벤치마크 비교 자산 설정
-        AssetFormOptions assetFormOptions // 자산 등록 폼 추천 목록 설정
+        BenchmarkSettings benchmarks // ETF 벤치마크 비교 자산 설정
 ) {
     public RuntimeSettings {
         brokers = immutableEnumMap(Broker.class, brokers, "broker");
         strategies = immutableEnumMap(Type.class, strategies, "strategy");
-        // benchmarks/assetFormOptions 도입 이전에 저장된 행에는 이 필드가 없으므로 역직렬화 시 기본값으로 보충한다.
+        // benchmarks 도입 이전에 저장된 행에는 이 필드가 없으므로 역직렬화 시 기본값으로 보충한다.
         if (benchmarks == null) benchmarks = BenchmarkSettings.defaults();
-        if (assetFormOptions == null) assetFormOptions = AssetFormOptions.defaults();
     }
 
-    // benchmarks/assetFormOptions 도입 이전 호출부와의 호환을 위한 생성자 — 둘 다 기본값을 적용한다.
-    // 4-arg(벤치마크만 지정) 오버로드는 일부러 두지 않는다 — RuntimeSettingsService의 "benchmarks 생략" 분기가
-    // 과거 이 오버로드를 쓰다가 assetFormOptions까지 함께 기본값으로 되돌려버리는 회귀가 있었다(그 필드는 항상
-    // 요청에 존재하므로 반드시 명시적으로 전달해야 한다) — 같은 실수가 재발하지 않도록 호출부가 5개 인자를
-    // 전부 채우도록 강제한다.
+    // benchmarks 도입 이전 호출부와의 호환을 위한 생성자 — 기본값을 적용한다.
     public RuntimeSettings(boolean approvalRequired, Map<Broker, BrokerSettings> brokers,
             Map<Type, StrategyCreationSettings> strategies) {
-        this(approvalRequired, brokers, strategies, null, null);
+        this(approvalRequired, brokers, strategies, null);
     }
 
     public static RuntimeSettings defaults() {

@@ -1,7 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.account.Account.Broker;
-import com.kista.domain.model.settings.AssetFormOptions;
 import com.kista.domain.model.settings.BenchmarkFieldSettings;
 import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RecurringMode;
@@ -29,9 +28,7 @@ public record AdminSettingsRequest(
         @Schema(description = "전략별 신규 생성 정책 설정 (key=Type)")
         @NotNull Map<Type, @Valid StrategyRequest> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
-        @Valid BenchmarkRequest benchmarks,
-        @Schema(description = "자산 등록 폼 추천 목록 설정")
-        @NotNull @Valid AssetFormOptionsRequest assetFormOptions
+        @Valid BenchmarkRequest benchmarks
 ) {
     public RuntimeSettings toDomain() {
         // 모든 enum 키와 전략별 필수 필드를 먼저 변환·검증한 뒤 도메인 설정을 생성한다.
@@ -42,8 +39,7 @@ public record AdminSettingsRequest(
         strategies.forEach((key, value) -> strategySettings.put(key,
                 require(value, "strategy").toDomain(key)));
         BenchmarkSettings benchmarkSettings = benchmarks != null ? benchmarks.toDomain() : null;
-        return new RuntimeSettings(auth.approvalRequired(), brokerSettings, strategySettings, benchmarkSettings,
-                assetFormOptions.toDomain());
+        return new RuntimeSettings(auth.approvalRequired(), brokerSettings, strategySettings, benchmarkSettings);
     }
 
     private static <T> T require(T value, String label) {
@@ -151,14 +147,5 @@ public record AdminSettingsRequest(
             @Schema(description = "비교 기본값")
             @NotNull T defaultValue
     ) { // 개별 벤치마크 필드 관리자 입력
-    }
-
-    public record AssetFormOptionsRequest(
-            @Schema(description = "운용전략 추천 목록")
-            @NotNull List<@NotNull String> strategySuggestions
-    ) { // 자산 등록 폼 추천 목록 관리자 입력
-        AssetFormOptions toDomain() {
-            return new AssetFormOptions(strategySuggestions);
-        }
     }
 }

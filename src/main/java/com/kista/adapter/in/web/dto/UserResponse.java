@@ -5,6 +5,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -29,7 +30,9 @@ public record UserResponse(
         @Schema(description = "알림 타입별 on/off (예: {\"TRADING_ALERT\": true})")
         Map<String, Boolean> notificationPrefs,
         @Schema(description = "반려 사유 (REJECTED 상태에서만 의미, null 가능)")
-        String rejectReason
+        String rejectReason,
+        @Schema(description = "자산 등록 폼 운용전략 추천 목록")
+        List<String> strategySuggestions
 ) {
     public static UserResponse from(User user, UserSettings settings) {
         // notificationPrefs — enum key를 String으로 변환하여 JSON 직렬화
@@ -47,7 +50,8 @@ public record UserResponse(
                 user.notificationChannel(),
                 settings.balanceCheckEnabled(),
                 prefs,
-                maskedRejectReason
+                maskedRejectReason,
+                settings.strategySuggestions()
         );
     }
 }

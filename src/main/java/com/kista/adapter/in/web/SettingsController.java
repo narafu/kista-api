@@ -4,6 +4,7 @@ import com.kista.adapter.in.web.dto.BalanceCheckRequest;
 import com.kista.adapter.in.web.dto.NicknameRequest;
 import com.kista.adapter.in.web.dto.NotificationChannelRequest;
 import com.kista.adapter.in.web.dto.NotificationPrefRequest;
+import com.kista.adapter.in.web.dto.StrategySuggestionsRequest;
 import com.kista.adapter.in.web.dto.TelegramUpdateRequest;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User.NotificationChannel;
@@ -11,6 +12,8 @@ import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
+import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase;
+import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
 import com.kista.domain.port.in.UserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,6 +35,7 @@ public class SettingsController {
     private final UserProfileUseCase userProfileUseCase;
     private final UpdateBalanceCheckUseCase updateBalanceCheckUseCase;       // 잔고검증 설정 — user_settings 테이블
     private final UpdateNotificationPrefUseCase updateNotificationPrefUseCase; // 알림 타입별 on/off — user_notification_prefs 테이블
+    private final UpdateStrategySuggestionsUseCase updateStrategySuggestionsUseCase; // 운영전략 추천 목록 — user_settings 테이블
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
@@ -93,6 +97,16 @@ public class SettingsController {
             throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: TRADING_ALERT");
         }
         updateNotificationPrefUseCase.update(new UpdateNotificationPrefCommand(userId, notificationType, body.enabled()));
+    }
+
+    // 운영전략 추천 목록 변경 (자산 등록 폼 자유입력을 돕는 추천값 — 값 자체를 제한하지 않음)
+    @Operation(summary = "운영전략 추천 목록 변경", description = "자산 등록 폼의 운용전략 추천값 목록을 갱신. body: {\"suggestions\": [\"VR\", \"INFINITE\"]}")
+    @ApiResponse(responseCode = "204", description = "변경 성공")
+    @PutMapping("/strategy-suggestions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateStrategySuggestions(@AuthenticationPrincipal UUID userId,
+                                          @Valid @RequestBody StrategySuggestionsRequest body) {
+        updateStrategySuggestionsUseCase.update(new UpdateStrategySuggestionsCommand(userId, body.suggestions()));
     }
 
     // 닉네임 변경 (1~10자, 한글·영문·숫자·공백)

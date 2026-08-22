@@ -30,7 +30,7 @@ class RuntimeSettingsPersistenceAdapterTest {
     void setUp() {
         // Spring Boot의 자동설정 ObjectMapper는 FAIL_ON_UNKNOWN_PROPERTIES를 기본 false로 둔다 — 이 테스트는
         // 그 빈을 그대로 쓰지 않고 직접 ObjectMapper를 만들므로(Jackson 기본값은 true), 프로덕션 동작을
-        // 재현하려면 여기서도 명시적으로 꺼야 한다. 끄지 않으면 loadIgnoresRemovedAssetFormOptionsFieldsFromLegacyJson이
+        // 재현하려면 여기서도 명시적으로 꺼야 한다. 끄지 않으면 loadIgnoresRemovedAssetFormOptionsFieldFromLegacyJson이
         // "실제로는 성공해야 하는데 테스트 ObjectMapper 설정 차이 때문에 실패"하는 거짓 실패가 난다.
         objectMapper = new ObjectMapper().registerModule(new Jdk8Module())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -102,17 +102,16 @@ class RuntimeSettingsPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("finance 스키마 도입 이전(subcategorySuggestions/institutionSuggestions/assetClassSuggestions 포함) "
-            + "저장된 JSON도 예외 없이 로드되고 strategySuggestions만 복원된다 — Boot의 ObjectMapper가 "
+    @DisplayName("assetFormOptions(운영전략 추천 목록 admin 전역 설정) 도입 이전+이후 저장분 모두 포함해 "
+            + "저장된 JSON에 남은 죽은 키(assetFormOptions)도 예외 없이 로드된다 — Boot의 ObjectMapper가 "
             + "FAIL_ON_UNKNOWN_PROPERTIES를 비활성화한다는 암묵적 의존을 검증하는 회귀 테스트")
-    void loadIgnoresRemovedAssetFormOptionsFieldsFromLegacyJson() throws Exception {
-        ObjectNode root = (ObjectNode) objectMapper.valueToTree(RuntimeSettings.defaults());
-        ObjectNode assetFormOptions = (ObjectNode) root.get("assetFormOptions");
-        assetFormOptions.set("subcategorySuggestions", objectMapper.createObjectNode()
-                .set("INVESTMENT", objectMapper.createArrayNode().add("연금저축펀드")));
-        assetFormOptions.set("institutionSuggestions", objectMapper.createArrayNode().add("토스증권"));
-        assetFormOptions.set("assetClassSuggestions", objectMapper.createArrayNode().add("미국주식"));
-        String legacyJson = objectMapper.writeValueAsString(root);
+    void loadIgnoresRemovedAssetFormOptionsFieldFromLegacyJson() throws Exception {
+        // UserSettings로 이관되기 전 admin 전역 설정 잔존 키를 흉내낸다 — 실제 필드는 더 이상 도메인에 없다.
+        // valueToTree()로 트리 왕복시키면 BigDecimal 스케일이 미묘하게 바뀌어(10 → 10.0) equals 비교가 깨지므로
+        // 순수 문자열 조작으로만 죽은 키를 주입한다.
+        String defaultsJson = objectMapper.writeValueAsString(RuntimeSettings.defaults());
+        String legacyJson = defaultsJson.substring(0, defaultsJson.length() - 1)
+                + ",\"assetFormOptions\":{\"strategySuggestions\":[\"VR\"]}}";
 
         RuntimeSettingsEntity entity = new RuntimeSettingsEntity(
                 RuntimeSettingsPersistenceAdapter.SETTING_KEY, legacyJson);
@@ -120,7 +119,6 @@ class RuntimeSettingsPersistenceAdapterTest {
 
         RuntimeSettings loaded = adapter.load();
 
-        assertThat(loaded.assetFormOptions().strategySuggestions())
-                .isEqualTo(RuntimeSettings.defaults().assetFormOptions().strategySuggestions());
+        assertThat(loaded).isEqualTo(RuntimeSettings.defaults());
     }
 }

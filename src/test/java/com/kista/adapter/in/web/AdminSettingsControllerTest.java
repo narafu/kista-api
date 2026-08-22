@@ -3,7 +3,6 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.model.settings.AssetFormOptions;
 import com.kista.domain.model.settings.BenchmarkFieldSettings;
 import com.kista.domain.model.settings.BenchmarkSettings;
 import com.kista.domain.model.settings.RuntimeSettings;
@@ -39,15 +38,6 @@ class AdminSettingsControllerTest {
 
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-    // strategySuggestions를 AssetFormOptions.defaults()와 다르게 둔다 — putSettings_savesCompletePayload가
-    // 요청→도메인 변환이 실제로 이 값을 반영하는지(예: toDomain()이 요청을 무시하고 defaults()를 반환하는 회귀)
-    // 검증할 수 있으려면 기본값과 구분돼야 한다.
-    private static final String ASSET_FORM_OPTIONS_JSON = """
-            {
-              "strategySuggestions": ["테스트전략"]
-            }
-            """;
-
     @Autowired MockMvc mockMvc;
     @MockitoBean AdminSettingsUseCase adminSettingsUseCase; // 관리자 설정 유스케이스 대역
     @MockitoBean JwtDecoder jwtDecoder;
@@ -67,9 +57,7 @@ class AdminSettingsControllerTest {
         mockMvc.perform(get("/api/admin/settings").with(authentication(adminToken(ADMIN_ID))))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.auth.approvalRequired").value(true))
-                .andExpect(jsonPath("$.assetFormOptions.strategySuggestions").isArray())
-                .andExpect(jsonPath("$.assetFormOptions.strategySuggestions[0]").value("VR"));
+                .andExpect(jsonPath("$.auth.approvalRequired").value(true));
     }
 
     @Test
@@ -95,12 +83,7 @@ class AdminSettingsControllerTest {
     @Test
     void putSettings_savesCompletePayload() throws Exception {
         RuntimeSettings defaults = RuntimeSettings.defaults();
-        // strategySuggestions만 커스텀 — ASSET_FORM_OPTIONS_JSON과 동일한 값을 줘서 마지막 verify()가
-        // 요청 JSON이 실제로 이 필드까지 반영해 도메인으로 변환됐는지(값을 버리고 defaults()를 반환하는 회귀가
-        // 없는지) 검증하게 한다.
-        AssetFormOptions customAssetFormOptions = new AssetFormOptions(List.of("테스트전략"));
-        RuntimeSettings updated = new RuntimeSettings(false, defaults.brokers(), defaults.strategies(),
-                null, customAssetFormOptions);
+        RuntimeSettings updated = new RuntimeSettings(false, defaults.brokers(), defaults.strategies(), null);
         when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(false))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
@@ -114,14 +97,12 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
-                                  },
-                                  "assetFormOptions": %s
+                                  }
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.auth.approvalRequired").value(false))
-                .andExpect(jsonPath("$.assetFormOptions.strategySuggestions[0]").value("테스트전략"));
+                .andExpect(jsonPath("$.auth.approvalRequired").value(false));
 
         verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated, false);
     }
@@ -131,9 +112,8 @@ class AdminSettingsControllerTest {
         RuntimeSettings defaults = RuntimeSettings.defaults();
         BenchmarkSettings customBenchmarks = new BenchmarkSettings(
                 new BenchmarkFieldSettings<>(List.of("SPY", "QQQ"), "QQQ"));
-        AssetFormOptions customAssetFormOptions = new AssetFormOptions(List.of("테스트전략"));
         RuntimeSettings updated = new RuntimeSettings(true, defaults.brokers(), defaults.strategies(),
-                customBenchmarks, customAssetFormOptions);
+                customBenchmarks);
         when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(true))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
@@ -148,10 +128,9 @@ class AdminSettingsControllerTest {
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
                                   },
-                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "QQQ"], "defaultValue": "QQQ"}},
-                                  "assetFormOptions": %s
+                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "QQQ"], "defaultValue": "QQQ"}}
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"));
 
@@ -171,10 +150,9 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":false,"allowedValues":["DEPOSIT"],"defaultValue":"DEPOSIT"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
-                                  },
-                                  "assetFormOptions": %s
+                                  }
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isBadRequest());
 
         verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
@@ -193,10 +171,9 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[0,20,30],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
-                                  },
-                                  "assetFormOptions": %s
+                                  }
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isBadRequest());
 
         verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
@@ -215,10 +192,9 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[0,10,15],"defaultValue":10},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
-                                  },
-                                  "assetFormOptions": %s
+                                  }
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isBadRequest());
 
         verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
@@ -237,10 +213,9 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[0,1,2],"defaultValue":1}}}
-                                  },
-                                  "assetFormOptions": %s
+                                  }
                                 }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
+                                """))
                 .andExpect(status().isBadRequest());
 
         verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
@@ -260,29 +235,7 @@ class AdminSettingsControllerTest {
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
                                   },
-                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "TSLA"], "defaultValue": "SPY"}},
-                                  "assetFormOptions": %s
-                                }
-                                """.formatted(ASSET_FORM_OPTIONS_JSON)))
-                .andExpect(status().isBadRequest());
-
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
-    }
-
-    @Test
-    void putSettings_rejectsWhenAssetFormOptionsMissing() throws Exception {
-        mockMvc.perform(put("/api/admin/settings")
-                        .with(authentication(adminToken(ADMIN_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "auth":{"approvalRequired":false},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
-                                  "strategies":{
-                                    "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
-                                    "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
-                                    "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}}
-                                  }
+                                  "benchmarks": {"etf": {"allowedValues": ["SPY", "TSLA"], "defaultValue": "SPY"}}
                                 }
                                 """))
                 .andExpect(status().isBadRequest());

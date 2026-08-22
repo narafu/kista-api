@@ -1,5 +1,8 @@
 package com.kista.adapter.out.persistence.settings;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.UserSettingsPort;
@@ -8,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +23,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
 
     private final UserSettingsJpaRepository settingsRepo;
     private final UserNotificationPrefJpaRepository prefRepo;
+    private final ObjectMapper objectMapper; // strategySuggestions JSON 직렬화 경계
 
     @Override
     public Optional<UserSettings> loadByUserId(UUID userId) {
@@ -30,14 +35,16 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
                             p -> NotificationType.valueOf(p.getType()),
                             UserNotificationPrefJpaEntity::isEnabled
                     ));
-            return new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs);
+            return new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
+                    deserializeSuggestions(entity.getStrategySuggestions()));
         });
     }
 
     @Override
     public void save(UserSettings settings) {
         // user_settings 행 저장 (없으면 INSERT, 있으면 UPDATE)
-        settingsRepo.save(new UserSettingsJpaEntity(settings.userId(), settings.balanceCheckEnabled()));
+        settingsRepo.save(new UserSettingsJpaEntity(settings.userId(), settings.balanceCheckEnabled(),
+                serializeSuggestions(settings.strategySuggestions())));
         // 알림 선호도 각 타입별로 저장
         settings.notificationPrefs().forEach((type, enabled) ->
                 prefRepo.save(new UserNotificationPrefJpaEntity(settings.userId(), type.name(), enabled))
@@ -66,7 +73,8 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
             if (entities.containsKey(userId)) {
                 UserSettingsJpaEntity entity = entities.get(userId);
                 Map<NotificationType, Boolean> prefs = prefsByUserId.getOrDefault(userId, Map.of());
-                result.put(userId, new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs));
+                result.put(userId, new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
+                        deserializeSuggestions(entity.getStrategySuggestions())));
             } else {
                 // 설정이 없는 사용자는 기본값으로 채운다
                 result.put(userId, UserSettings.defaultFor(userId));
@@ -74,5 +82,22 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
         }
 
         return result;
+    }
+
+    private String serializeSuggestions(List<String> suggestions) {
+        try {
+            return objectMapper.writeValueAsString(suggestions);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("strategySuggestions 직렬화 실패", e);
+        }
+    }
+
+    private List<String> deserializeSuggestions(String json) {
+        if (json == null) return UserSettings.DEFAULT_STRATEGY_SUGGESTIONS;
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("strategySuggestions 역직렬화 실패", e);
+        }
     }
 }

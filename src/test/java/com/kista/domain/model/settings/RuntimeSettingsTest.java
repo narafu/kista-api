@@ -27,7 +27,6 @@ class RuntimeSettingsTest {
                 .isEqualTo(new StrategyFieldSettings<>(false, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL));
         assertThat(settings.strategies().get(Strategy.Type.VR).recurringMode().defaultValue())
                 .isEqualTo(RecurringMode.HOLD);
-        assertThat(settings.assetFormOptions().strategySuggestions()).contains("VR", "INFINITE", "PRIVACY", "DCA");
     }
 
     @Test
@@ -45,13 +44,12 @@ class RuntimeSettingsTest {
     }
 
     @Test
-    void backwardCompatConstructorFillsBenchmarksAndAssetFormOptionsDefaults() {
-        // benchmarks·assetFormOptions 도입 이전 호출부(3-arg 생성자)도 둘 다 기본값을 채워야 한다.
+    void backwardCompatConstructorFillsBenchmarksDefaults() {
+        // benchmarks 도입 이전 호출부(3-arg 생성자)도 기본값을 채워야 한다.
         RuntimeSettings defaults = RuntimeSettings.defaults();
         RuntimeSettings viaThreeArg = new RuntimeSettings(true, defaults.brokers(), defaults.strategies());
 
         assertThat(viaThreeArg.benchmarks()).isEqualTo(BenchmarkSettings.defaults());
-        assertThat(viaThreeArg.assetFormOptions()).isEqualTo(AssetFormOptions.defaults());
     }
 
     @Test

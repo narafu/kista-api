@@ -52,7 +52,7 @@ class MarketEventNotifierTest {
                 .toList();
         Map<UUID, UserSettings> settingsMap = users.stream()
                 .collect(java.util.stream.Collectors.toMap(User::id,
-                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true))));
+                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
         when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
@@ -86,7 +86,7 @@ class MarketEventNotifierTest {
                 .toList();
         Map<UUID, UserSettings> settingsMap = users.stream()
                 .collect(java.util.stream.Collectors.toMap(User::id,
-                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true))));
+                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
         when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
@@ -118,7 +118,7 @@ class MarketEventNotifierTest {
         users.add(failingUser);
         Map<UUID, UserSettings> settingsMap = users.stream()
                 .collect(java.util.stream.Collectors.toMap(User::id,
-                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true))));
+                        u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
         when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
@@ -138,8 +138,8 @@ class MarketEventNotifierTest {
         User disabledUser = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.TELEGRAM);
         List<User> users = List.of(enabledUser, disabledUser);
         Map<UUID, UserSettings> settingsMap = Map.of(
-                enabledUser.id(), new UserSettings(enabledUser.id(), true, Map.of(NotificationType.MARKET_ALERT, true)),
-                disabledUser.id(), new UserSettings(disabledUser.id(), true, Map.of(NotificationType.MARKET_ALERT, false))
+                enabledUser.id(), new UserSettings(enabledUser.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS),
+                disabledUser.id(), new UserSettings(disabledUser.id(), true, Map.of(NotificationType.MARKET_ALERT, false), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)
         );
 
         when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);

@@ -4,6 +4,7 @@ import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
+import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserSettingsPort;
@@ -42,14 +43,15 @@ class UserSettingsServiceTest {
 
     @Test
     void getByUserId_returns_stored_settings() {
-        UserSettings stored = new UserSettings(USER_ID, false, Map.of(NotificationType.TRADING_ALERT, false));
+        UserSettings stored = new UserSettings(USER_ID, false, Map.of(NotificationType.TRADING_ALERT, false),
+                UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(stored);
         assertThat(service.getByUserId(USER_ID)).isSameAs(stored);
     }
 
     @Test
     void updateNotificationPref_saves_updated_pref() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of());
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.update(new UpdateNotificationPrefCommand(USER_ID, NotificationType.TRADING_ALERT, false));
@@ -60,12 +62,22 @@ class UserSettingsServiceTest {
 
     @Test
     void updateBalanceCheck_saves_updated_value() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of());
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of());
 
         service.update(new UpdateBalanceCheckCommand(USER_ID, false));
 
         verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
+    }
+
+    @Test
+    void updateStrategySuggestions_saves_updated_list() {
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+
+        service.update(new UpdateStrategySuggestionsCommand(USER_ID, List.of("커스텀전략")));
+
+        verify(userSettingsPort).save(argThat(s -> s.strategySuggestions().equals(List.of("커스텀전략"))));
     }
 }

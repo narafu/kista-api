@@ -5,6 +5,7 @@ import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
 import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
+import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase;
 import com.kista.domain.port.in.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -40,6 +41,7 @@ class SettingsControllerTest {
     @MockitoBean UserProfileUseCase userProfileUseCase;
     @MockitoBean UpdateBalanceCheckUseCase updateBalanceCheckUseCase;
     @MockitoBean UpdateNotificationPrefUseCase updateNotificationPrefUseCase;
+    @MockitoBean UpdateStrategySuggestionsUseCase updateStrategySuggestionsUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -147,5 +149,17 @@ class SettingsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(updateBalanceCheckUseCase).update(argThat(cmd -> !cmd.enabled()));
+    }
+
+    @Test
+    void put_strategy_suggestions_calls_use_case() throws Exception {
+        mockMvc.perform(put("/api/settings/strategy-suggestions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"suggestions\": [\"VR\", \"커스텀전략\"]}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isNoContent());
+
+        verify(updateStrategySuggestionsUseCase).update(
+                argThat(cmd -> cmd.suggestions().equals(java.util.List.of("VR", "커스텀전략"))));
     }
 }
