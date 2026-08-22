@@ -222,4 +222,63 @@ class FinanceBudgetServiceTest {
 
         verify(budgetPort, never()).save(any());
     }
+
+    // ----- unshare -----
+
+    @Test
+    @DisplayName("unshare는 그룹 공유 예산을 개인 소유로 되돌리고 소유자는 유지")
+    void unshare_groupSharedBudget_movesToPersonalKeepingOwner() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceBudget sharedBudget = new FinanceBudget(budgetId, groupId, categoryId, ownerId,
+                LocalDate.of(2026, 1, 1), null, 500_000L, null);
+        when(budgetPort.findByIdOrThrow(budgetId)).thenReturn(sharedBudget);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceBudget result = budgetService.unshare(budgetId, userId);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    @DisplayName("unshare는 같은 그룹 소속이면 소유자가 아니어도 허용")
+    void unshare_nonOwnerSameGroupMember_allowed() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceBudget sharedBudget = new FinanceBudget(budgetId, groupId, categoryId, ownerId,
+                LocalDate.of(2026, 1, 1), null, 500_000L, null);
+        when(budgetPort.findByIdOrThrow(budgetId)).thenReturn(sharedBudget);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceBudget result = budgetService.unshare(budgetId, userId);
+
+        assertThat(result.groupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
+    void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
+        FinanceBudget sharedBudget = new FinanceBudget(budgetId, UUID.randomUUID(), categoryId, UUID.randomUUID(),
+                LocalDate.of(2026, 1, 1), null, 500_000L, null);
+        when(budgetPort.findByIdOrThrow(budgetId)).thenReturn(sharedBudget);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> budgetService.unshare(budgetId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(budgetPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 이미 개인 소유면 그대로 반환(멱등)")
+    void unshare_alreadyPersonal_isIdempotent() {
+        when(budgetPort.findByIdOrThrow(budgetId)).thenReturn(personalBudget());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        FinanceBudget result = budgetService.unshare(budgetId, userId);
+
+        assertThat(result.groupId()).isNull();
+        verify(budgetPort, never()).save(any());
+    }
 }

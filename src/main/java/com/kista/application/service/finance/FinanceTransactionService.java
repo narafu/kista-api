@@ -96,4 +96,20 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         log.info("거래내역 그룹 공유 전환: transactionId={}, groupId={}", transactionId, currentGroupId);
         return saved;
     }
+
+    // 그룹 공유 거래내역을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
+    @Override
+    public FinanceTransaction unshare(UUID transactionId, UUID userId) {
+        FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
+        if (existing.groupId() == null) {
+            return existing; // 이미 개인 소유 — 멱등
+        }
+        FinanceTransaction personal = new FinanceTransaction(existing.id(), null, existing.categoryId(),
+                existing.userId(), existing.transactionDate(), existing.amount(), existing.memo(), existing.createdAt());
+        FinanceTransaction saved = transactionPort.save(personal);
+        log.info("거래내역 그룹 공유 해제: transactionId={}, userId={}", transactionId, userId);
+        return saved;
+    }
 }

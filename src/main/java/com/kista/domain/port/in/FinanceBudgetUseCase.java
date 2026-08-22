@@ -15,4 +15,7 @@ public interface FinanceBudgetUseCase {
 
     // 개인 소유 예산을 소유자의 현재 그룹으로 공유 전환한다.
     FinanceBudget shareToGroup(UUID budgetId, UUID userId);
+
+    // 그룹 공유 예산을 개인 소유로 되돌린다. 같은 그룹 멤버면 누구든 가능(소유자 한정 아님).
+    FinanceBudget unshare(UUID budgetId, UUID userId);
 }

@@ -86,6 +86,20 @@ public class FinanceBudgetController {
         return FinanceBudgetResponse.from(budgetUseCase.shareToGroup(id, userId));
     }
 
+    @Operation(summary = "예산 그룹 공유 해제", description = "그룹 공유 예산을 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "해제 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "예산을 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "같은 카테고리에 적용 기간이 겹치는 개인 예산 존재")
+    })
+    @PatchMapping("/{id}/unshare")
+    public FinanceBudgetResponse unshare(
+            @Parameter(description = "예산 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceBudgetResponse.from(budgetUseCase.unshare(id, userId));
+    }
+
     @Operation(summary = "예산 삭제", description = "파생 설정이라 하드 삭제됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),

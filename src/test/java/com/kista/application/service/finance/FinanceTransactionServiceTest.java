@@ -180,4 +180,63 @@ class FinanceTransactionServiceTest {
 
         verify(transactionPort, never()).save(any());
     }
+
+    // ----- unshare -----
+
+    @Test
+    @DisplayName("unshare는 그룹 공유 거래내역을 개인 소유로 되돌리고 소유자는 유지")
+    void unshare_groupSharedTransaction_movesToPersonalKeepingOwner() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceTransaction sharedTransaction = new FinanceTransaction(transactionId, groupId, categoryId, ownerId,
+                LocalDate.of(2026, 1, 15), 50_000L, "점심", null);
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(sharedTransaction);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(transactionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceTransaction result = transactionService.unshare(transactionId, userId);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    @DisplayName("unshare는 같은 그룹 소속이면 소유자가 아니어도 허용")
+    void unshare_nonOwnerSameGroupMember_allowed() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceTransaction sharedTransaction = new FinanceTransaction(transactionId, groupId, categoryId, ownerId,
+                LocalDate.of(2026, 1, 15), 50_000L, "점심", null);
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(sharedTransaction);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(transactionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceTransaction result = transactionService.unshare(transactionId, userId);
+
+        assertThat(result.groupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
+    void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
+        FinanceTransaction sharedTransaction = new FinanceTransaction(transactionId, UUID.randomUUID(), categoryId, UUID.randomUUID(),
+                LocalDate.of(2026, 1, 15), 50_000L, "점심", null);
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(sharedTransaction);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> transactionService.unshare(transactionId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(transactionPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 이미 개인 소유면 그대로 반환(멱등)")
+    void unshare_alreadyPersonal_isIdempotent() {
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(personalTransaction());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        FinanceTransaction result = transactionService.unshare(transactionId, userId);
+
+        assertThat(result.groupId()).isNull();
+        verify(transactionPort, never()).save(any());
+    }
 }

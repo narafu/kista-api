@@ -105,4 +105,21 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         log.info("예산 그룹 공유 전환: budgetId={}, groupId={}", budgetId, currentGroupId);
         return saved;
     }
+
+    // 그룹 공유 예산을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
+    @Override
+    public FinanceBudget unshare(UUID budgetId, UUID userId) {
+        FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        existing.verifyAccessibleBy(userId, currentGroupId);
+        if (existing.groupId() == null) {
+            return existing; // 이미 개인 소유 — 멱등
+        }
+        FinanceBudget personal = new FinanceBudget(existing.id(), null, existing.categoryId(),
+                existing.userId(), existing.applyStartDate(), existing.applyEndDate(), existing.amount(), existing.createdAt());
+        // 개인 소유로 되돌릴 때도 겹침(EXCLUDE 제약)이 있으면 어댑터가 OverlappingPeriodException으로 변환하므로 그대로 전파.
+        FinanceBudget saved = budgetPort.save(personal);
+        log.info("예산 그룹 공유 해제: budgetId={}, userId={}", budgetId, userId);
+        return saved;
+    }
 }

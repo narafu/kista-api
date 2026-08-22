@@ -15,4 +15,7 @@ public interface FinanceTransactionUseCase {
 
     // 개인 소유 거래내역을 소유자의 현재 그룹으로 공유 전환한다.
     FinanceTransaction shareToGroup(UUID transactionId, UUID userId);
+
+    // 그룹 공유 거래내역을 개인 소유로 되돌린다. 같은 그룹 멤버면 누구든 가능(소유자 한정 아님).
+    FinanceTransaction unshare(UUID transactionId, UUID userId);
 }
