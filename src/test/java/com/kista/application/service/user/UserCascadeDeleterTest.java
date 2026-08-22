@@ -44,7 +44,7 @@ class UserCascadeDeleterTest {
     private final UUID groupId = UUID.randomUUID();
 
     private FinanceGroup sharedGroup() {
-        return new FinanceGroup(groupId, userId, "부부 가계부", null);
+        return new FinanceGroup(groupId, userId, null);
     }
 
     @Test

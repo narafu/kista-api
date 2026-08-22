@@ -49,10 +49,10 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, created_at, updated_at) VALUES (?, ?, '가족', now(), now())",
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 groupId, userId);
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, name, created_at, updated_at) VALUES (?, ?, '가족2', now(), now())",
+                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
                 otherGroupId, userId);
     }
 

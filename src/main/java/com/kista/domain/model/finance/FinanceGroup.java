@@ -8,7 +8,6 @@ import java.util.UUID;
 public record FinanceGroup(
         UUID id,           // PK
         UUID ownerUserId,  // FK → users.id, 그룹 생성자
-        String name,       // 표시명
         Instant createdAt  // DB created_at, 신규 등록 시 null
 ) {
     public enum MemberRole {

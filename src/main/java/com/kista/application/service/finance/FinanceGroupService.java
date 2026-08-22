@@ -45,7 +45,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
     public FinanceGroupInvitation invite(UUID groupId, UUID userId, long expiresInHours) {
         UUID targetGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         if (targetGroupId == null) {
-            targetGroupId = financeGroupPort.createGroup(userId, "가계부");
+            targetGroupId = financeGroupPort.createGroup(userId);
             financeGroupPort.addMember(targetGroupId, userId, FinanceGroup.MemberRole.OWNER);
         } else {
             boolean isOwner = financeGroupPort.findRole(targetGroupId, userId)

@@ -17,7 +17,7 @@ public interface FinanceGroupPort {
     Optional<UUID> findCurrentGroupId(UUID userId);
 
     // 무그룹 유저가 초대를 발급하는 시점에 새 그룹을 만든다. 생성자는 OWNER로 별도 addMember 호출 필요.
-    UUID createGroup(UUID ownerUserId, String name);
+    UUID createGroup(UUID ownerUserId);
 
     List<FinanceGroup> findByMemberUserId(UUID userId); // 내가 속한 그룹 전체
 

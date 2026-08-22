@@ -130,6 +130,10 @@ CREATE UNIQUE INDEX uq_finance_group_members_one_active_group
 DROP INDEX uq_finance_groups_personal_owner;
 ALTER TABLE finance_groups DROP COLUMN personal;
 
+-- name도 함께 폐기 — rename API가 없어 모든 행이 "가계부" 고정값이라 정보량이 없다.
+-- 컨트롤러 응답(FinanceGroupResponse)은 이 고정 문자열을 상수로 채워 하위 호환을 유지한다.
+ALTER TABLE finance_groups DROP COLUMN name;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- STEP 9. 고volume 개인 브랜치 인덱스 — 대시보드 "개인 ∪ 그룹" 조회에서 개인 가지는
 --   기존 (group_id, ...) 인덱스를 못 탄다.

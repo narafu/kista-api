@@ -45,7 +45,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void createGroup_thenAddMember_findCurrentGroupIdReturnsIt() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         adapter.addMember(groupId, userId, FinanceGroup.MemberRole.OWNER);
 
         assertThat(adapter.findCurrentGroupId(userId)).contains(groupId);
@@ -54,7 +54,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void addMember_calledTwiceForSameGroupAndUser_isIdempotentAndDoesNotPoisonTransaction() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
 
         // ON CONFLICT DO NOTHING이라 두 번째 호출도 예외 없이 끝나야 한다 — 존재 확인 후
         // catch(DataIntegrityViolationException)로 삼키던 옛 구현은 두 번째 INSERT가 제약을 위반하는 순간
@@ -67,7 +67,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void findRole_activeMember_returnsRole() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         adapter.addMember(groupId, userId, FinanceGroup.MemberRole.OWNER);
 
         assertThat(adapter.findRole(groupId, userId)).contains(FinanceGroup.MemberRole.OWNER);
@@ -75,7 +75,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void findRole_softDeletedMembership_returnsEmpty() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         adapter.addMember(groupId, userId, FinanceGroup.MemberRole.MEMBER);
         adapter.softDeleteMembership(groupId, userId);
 
@@ -84,7 +84,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void updateMemberRole_changesRole() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         adapter.addMember(groupId, userId, FinanceGroup.MemberRole.MEMBER);
 
         adapter.updateMemberRole(groupId, userId, FinanceGroup.MemberRole.OWNER);
@@ -94,7 +94,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void softDelete_excludesGroupFromFindById() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
 
         adapter.softDelete(groupId);
         entityManager.clear();
@@ -104,7 +104,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void createInvitation_thenFindByCode_roundTrips() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         String code = "abcd1234efgh5678";
         Instant expiresAt = Instant.now().plus(72, ChronoUnit.HOURS);
 
@@ -116,7 +116,7 @@ class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void updateInvitationStatus_setsStatusAndInviteeUserId() {
-        UUID groupId = adapter.createGroup(userId, "가계부");
+        UUID groupId = adapter.createGroup(userId);
         UUID inviteeId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
