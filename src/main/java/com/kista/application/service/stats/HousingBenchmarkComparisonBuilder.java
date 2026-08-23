@@ -6,6 +6,7 @@ import com.kista.domain.model.stats.HousingBenchmarkComparison;
 import com.kista.domain.model.stats.HousingBenchmarkPoint;
 import com.kista.domain.model.stats.InvestmentPoint;
 import com.kista.domain.model.stats.PerformanceComparisonSummary;
+import com.kista.domain.model.stats.ReturnMetrics;
 import com.kista.domain.model.strategy.Strategy;
 
 import java.math.BigDecimal;
@@ -23,7 +24,6 @@ final class HousingBenchmarkComparisonBuilder {
 
     private static final int SCALE = 10;
     private static final RoundingMode HALF_UP = RoundingMode.HALF_UP;
-    private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final double DAYS_PER_YEAR = 365.0;
 
     HousingBenchmarkComparison build(
@@ -128,9 +128,8 @@ final class HousingBenchmarkComparisonBuilder {
     }
 
     private static BigDecimal normalize(BigDecimal value, BigDecimal initialValue) {
-        return value.divide(initialValue, SCALE, HALF_UP)
-                .multiply(HUNDRED)
-                .setScale(SCALE, HALF_UP);
+        // 순수 수학 계산은 domain/model/stats/ReturnMetrics로 위임(백테스트와 공용)
+        return ReturnMetrics.normalize(value, initialValue);
     }
 
     private static BigDecimal periodReturn(BigDecimal current, BigDecimal previous) {
@@ -143,39 +142,14 @@ final class HousingBenchmarkComparisonBuilder {
     }
 
     private static BigDecimal cumulativeReturn(BigDecimal lastIndex) {
-        return lastIndex.divide(HUNDRED, SCALE, HALF_UP)
-                .subtract(BigDecimal.ONE)
-                .setScale(SCALE, HALF_UP);
+        return ReturnMetrics.cumulativeReturn(lastIndex);
     }
 
     private static BigDecimal annualizedReturn(BigDecimal lastIndex, double periodsPerYear) {
-        if (lastIndex.signum() <= 0) {
-            // 지수가 0 이하(전액 손실)면 Math.pow가 NaN을 낼 수 있어 -100%로 확정
-            return BigDecimal.ONE.negate().setScale(SCALE, HALF_UP);
-        }
-        double annualized = Math.pow(
-                lastIndex.divide(HUNDRED, SCALE, HALF_UP).doubleValue(),
-                periodsPerYear) - 1.0;
-        return BigDecimal.valueOf(annualized).setScale(SCALE, HALF_UP);
+        return ReturnMetrics.annualizedReturn(lastIndex, periodsPerYear);
     }
 
     private static BigDecimal maxDrawdown(List<BigDecimal> indices) {
-        BigDecimal peak = null;
-        BigDecimal maxDrawdown = BigDecimal.ZERO.setScale(SCALE, HALF_UP);
-        for (BigDecimal index : indices) {
-            if (peak == null || index.compareTo(peak) > 0) {
-                peak = index;
-            }
-            if (peak.signum() <= 0) {
-                continue;
-            }
-            BigDecimal drawdown = index.divide(peak, SCALE, HALF_UP)
-                    .subtract(BigDecimal.ONE)
-                    .setScale(SCALE, HALF_UP);
-            if (drawdown.compareTo(maxDrawdown) < 0) {
-                maxDrawdown = drawdown;
-            }
-        }
-        return maxDrawdown;
+        return ReturnMetrics.maxDrawdown(indices);
     }
 }
