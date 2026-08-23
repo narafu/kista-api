@@ -17,7 +17,7 @@ public record FinanceCategory(
         String name,
         int sortOrder,
         Instant createdAt  // DB created_at, 신규 등록 시 null
-) {
+) implements GroupShareable<FinanceCategory> {
     // 대출 L1 고정 UUID (V13 시드값과 동일) — 순자산/총부채 집계의 유일한 부채 판별자.
     // 구 AssetCategory.LOAN의 후계값.
     public static final UUID SYSTEM_LOAN_ID = UUID.fromString("f1000000-0000-4000-8000-000000000404");
@@ -49,6 +49,11 @@ public record FinanceCategory(
 
         private final String label; // 한국어 표시명
         private final int sign;     // finance_transactions.amount 부호 SSOT (순현금흐름 = Σ amount × type.sign)
+    }
+
+    @Override
+    public FinanceCategory withGroupId(UUID groupId) {
+        return new FinanceCategory(id, groupId, parentId, userId, type, name, sortOrder, createdAt);
     }
 
     // 같은 그룹·같은 부모 아래 카테고리명 중복 — uq_finance_categories_group_parent_name 위반을 어댑터가 이 예외로 변환

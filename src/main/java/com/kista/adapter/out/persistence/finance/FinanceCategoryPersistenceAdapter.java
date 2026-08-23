@@ -56,4 +56,14 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
     public void softDeleteByUserId(UUID userId) {
         jpaRepository.softDeleteByUserId(userId, Instant.now());
     }
+
+    @Override
+    public void shareToGroupWithChildren(UUID id, UUID groupId) {
+        jpaRepository.shareToGroupWithChildren(id, groupId);
+    }
+
+    @Override
+    public void unshareWithChildren(UUID id) {
+        jpaRepository.unshareWithChildren(id);
+    }
 }

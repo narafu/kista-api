@@ -11,6 +11,10 @@ public interface FinanceCategoryUseCase {
     List<FinanceCategory> list(UUID userId, UUID requestedGroupId, FinanceCategory.Type type);
     FinanceCategory create(UUID userId, UUID requestedGroupId, FinanceCategoryCommand command);
     FinanceCategory update(UUID categoryId, UUID userId, FinanceCategoryCommand command);
+    // 하위 카테고리(임의 depth)도 함께 groupId 전환 — 개인 소유자만 가능
+    FinanceCategory shareToGroup(UUID categoryId, UUID userId);
+    // 하위 카테고리(임의 depth)도 함께 groupId 해제 — 같은 그룹 멤버면 누구든 가능
+    FinanceCategory unshare(UUID categoryId, UUID userId);
     void delete(UUID categoryId, UUID userId);
 
     // 시스템(그룹 공용) 카테고리 admin 관리 — /api/admin/finance/categories 전용, 그룹 개념이 없다.

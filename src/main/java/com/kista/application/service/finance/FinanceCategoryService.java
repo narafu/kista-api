@@ -61,6 +61,42 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         return categoryPort.save(updated);
     }
 
+    // 개인 소유 카테고리를 소유자가 자신의 현재 그룹으로 전환한다. 하위 카테고리(임의 depth)도 함께 전환된다.
+    // 개인 카테고리의 자식은 resolveParent()가 부모 접근권한을 요구해 구조적으로 항상 같은 소유자 트리이므로
+    // 벌크 UPDATE에 개별 userId 재검증이 필요 없다.
+    @Override
+    public FinanceCategory shareToGroup(UUID categoryId, UUID userId) {
+        FinanceCategory existing = categoryPort.findActiveByIdOrThrow(categoryId);
+        if (existing.isSystem()) {
+            throw new SecurityException("시스템 카테고리는 공유할 수 없습니다");
+        }
+        return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
+                        "본인 소유 카테고리만 그룹에 공유할 수 있습니다")
+                .map(shared -> {
+                    categoryPort.shareToGroupWithChildren(categoryId, shared.groupId());
+                    log.info("카테고리 그룹 공유 전환(하위 포함): categoryId={}, groupId={}", categoryId, shared.groupId());
+                    return categoryPort.findByIdOrThrow(categoryId);
+                })
+                .orElse(existing);
+    }
+
+    // 그룹 공유 카테고리를 개인 소유로 되돌린다. 하위 카테고리(임의 depth)도 함께 되돌아간다.
+    @Override
+    public FinanceCategory unshare(UUID categoryId, UUID userId) {
+        FinanceCategory existing = categoryPort.findActiveByIdOrThrow(categoryId);
+        if (existing.isSystem()) {
+            throw new SecurityException("시스템 카테고리는 공유 해제할 수 없습니다");
+        }
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return GroupShareSupport.unshare(existing, userId, currentGroupId)
+                .map(personal -> {
+                    categoryPort.unshareWithChildren(categoryId);
+                    log.info("카테고리 그룹 공유 해제(하위 포함): categoryId={}, userId={}", categoryId, userId);
+                    return categoryPort.findByIdOrThrow(categoryId);
+                })
+                .orElse(existing);
+    }
+
     @Override
     public void delete(UUID categoryId, UUID userId) {
         FinanceCategory existing = categoryPort.findByIdOrThrow(categoryId);

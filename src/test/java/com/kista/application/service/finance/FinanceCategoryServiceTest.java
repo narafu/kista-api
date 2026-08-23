@@ -337,4 +337,93 @@ class FinanceCategoryServiceTest {
                 .isInstanceOf(java.util.NoSuchElementException.class);
         verify(categoryPort, never()).save(any());
     }
+
+    // ── shareToGroup ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유 개인 카테고리를 현재 그룹으로 cascade 전환")
+    void shareToGroup_ownedPersonalCategory_cascadesToChildren() {
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(personalCategory());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategory reloaded = groupCategory(groupId);
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(reloaded);
+
+        FinanceCategory result = categoryService.shareToGroup(categoryId, userId);
+
+        assertThat(result).isEqualTo(reloaded);
+        verify(categoryPort).shareToGroupWithChildren(categoryId, groupId);
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 시스템 카테고리면 그룹 조회 없이 SecurityException")
+    void shareToGroup_systemCategory_throwsSecurityException_beforeGroupLookup() {
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
+
+        assertThatThrownBy(() -> categoryService.shareToGroup(categoryId, userId))
+                .isInstanceOf(SecurityException.class)
+                .hasMessageContaining("시스템");
+
+        verify(financeGroupPort, never()).findCurrentGroupId(any());
+        verify(categoryPort, never()).shareToGroupWithChildren(any(), any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유가 아니면 SecurityException")
+    void shareToGroup_notOwner_throwsSecurityException() {
+        UUID otherOwnerId = UUID.randomUUID();
+        FinanceCategory othersPersonal = new FinanceCategory(categoryId, null, null, otherOwnerId,
+                FinanceCategory.Type.EXPENSE, "타인개인카테고리", 10, null);
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(othersPersonal);
+
+        assertThatThrownBy(() -> categoryService.shareToGroup(categoryId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(categoryPort, never()).shareToGroupWithChildren(any(), any());
+    }
+
+    // ── unshare ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("unshare는 그룹 공유 카테고리를 개인 소유로 cascade 되돌림")
+    void unshare_groupSharedCategory_cascadesToChildren() {
+        FinanceCategory shared = groupCategory(groupId);
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(shared);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategory reloaded = personalCategory();
+        when(categoryPort.findByIdOrThrow(categoryId)).thenReturn(reloaded);
+
+        FinanceCategory result = categoryService.unshare(categoryId, userId);
+
+        assertThat(result).isEqualTo(reloaded);
+        verify(categoryPort).unshareWithChildren(categoryId);
+        verify(categoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 시스템 카테고리면 그룹 조회 없이 SecurityException")
+    void unshare_systemCategory_throwsSecurityException_beforeGroupLookup() {
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(systemCategory());
+
+        assertThatThrownBy(() -> categoryService.unshare(categoryId, userId))
+                .isInstanceOf(SecurityException.class)
+                .hasMessageContaining("시스템");
+
+        verify(financeGroupPort, never()).findCurrentGroupId(any());
+        verify(categoryPort, never()).unshareWithChildren(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 이미 개인 소유면 cascade 호출 없이 그대로 반환(멱등)")
+    void unshare_alreadyPersonal_isIdempotent() {
+        FinanceCategory personal = personalCategory();
+        when(categoryPort.findActiveByIdOrThrow(categoryId)).thenReturn(personal);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        FinanceCategory result = categoryService.unshare(categoryId, userId);
+
+        assertThat(result).isEqualTo(personal);
+        verify(categoryPort, never()).unshareWithChildren(any());
+        verify(categoryPort, never()).findByIdOrThrow(any());
+    }
 }

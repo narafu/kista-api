@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.kista.support.WebMvcTestSupport.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -141,5 +142,32 @@ class FinanceCategoryControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(categoryUseCase).delete(id, USER_ID);
+    }
+
+    @Test
+    void share_returns200WithGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceCategory shared = new FinanceCategory(id, groupId, null, USER_ID,
+                FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
+        when(categoryUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+
+        mockMvc.perform(patch("/api/finance/categories/{id}/share", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+    }
+
+    @Test
+    void unshare_returns200WithNullGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        FinanceCategory personal = new FinanceCategory(id, null, null, USER_ID,
+                FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
+        when(categoryUseCase.unshare(id, USER_ID)).thenReturn(personal);
+
+        mockMvc.perform(patch("/api/finance/categories/{id}/unshare", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(nullValue()));
     }
 }

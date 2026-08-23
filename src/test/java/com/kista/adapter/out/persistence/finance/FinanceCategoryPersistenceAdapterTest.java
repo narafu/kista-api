@@ -149,6 +149,34 @@ class FinanceCategoryPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void shareToGroupWithChildren_cascadesThroughArbitraryDepth() {
+        FinanceCategory l1 = adapter.save(personalCategory(userId, FinanceCategory.Type.EXPENSE, "L1카테고리"));
+        FinanceCategory l2 = adapter.save(new FinanceCategory(null, null, l1.id(), userId, FinanceCategory.Type.EXPENSE, "L2카테고리", 0, null));
+        FinanceCategory l3 = adapter.save(new FinanceCategory(null, null, l2.id(), userId, FinanceCategory.Type.EXPENSE, "L3카테고리", 0, null));
+
+        adapter.shareToGroupWithChildren(l1.id(), groupId);
+
+        Integer sharedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM finance_categories WHERE id IN (?, ?, ?) AND group_id = ?",
+                Integer.class, l1.id(), l2.id(), l3.id(), groupId);
+        assertThat(sharedCount).isEqualTo(3);
+    }
+
+    @Test
+    void unshareWithChildren_cascadesThroughArbitraryDepth() {
+        FinanceCategory l1 = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "L1카테고리"));
+        FinanceCategory l2 = adapter.save(groupCategory(l1.id(), FinanceCategory.Type.EXPENSE, "L2카테고리"));
+        FinanceCategory l3 = adapter.save(groupCategory(l2.id(), FinanceCategory.Type.EXPENSE, "L3카테고리"));
+
+        adapter.unshareWithChildren(l1.id());
+
+        Integer nullGroupCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM finance_categories WHERE id IN (?, ?, ?) AND group_id IS NULL",
+                Integer.class, l1.id(), l2.id(), l3.id());
+        assertThat(nullGroupCount).isEqualTo(3);
+    }
+
+    @Test
     void save_systemCategory_userIdNull_persists() {
         FinanceCategory systemCategory = new FinanceCategory(null, null, null, null,
                 FinanceCategory.Type.EXPENSE, "새시스템카테고리", 50, null);

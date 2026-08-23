@@ -91,6 +91,32 @@ public class FinanceCategoryController {
         return FinanceCategoryResponse.from(categoryUseCase.update(id, userId, request.toCommand()), List.of());
     }
 
+    @Operation(summary = "카테고리 그룹 공유 전환", description = "개인 소유 카테고리를 소유자의 현재 그룹으로 공유 전환합니다. 하위 카테고리도 함께 전환됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "전환 성공"),
+            @ApiResponse(responseCode = "403", description = "시스템 카테고리이거나 접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "카테고리를 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/share")
+    public FinanceCategoryResponse share(
+            @Parameter(description = "카테고리 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceCategoryResponse.from(categoryUseCase.shareToGroup(id, userId), List.of());
+    }
+
+    @Operation(summary = "카테고리 그룹 공유 해제", description = "그룹 공유 카테고리를 개인 소유로 되돌립니다. 하위 카테고리도 함께 전환됩니다. 같은 그룹 멤버면 누구든 가능합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "해제 성공"),
+            @ApiResponse(responseCode = "403", description = "시스템 카테고리이거나 접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "카테고리를 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/unshare")
+    public FinanceCategoryResponse unshare(
+            @Parameter(description = "카테고리 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceCategoryResponse.from(categoryUseCase.unshare(id, userId), List.of());
+    }
+
     @Operation(summary = "카테고리 삭제", description = "소프트 삭제 — 하위 카테고리도 함께 삭제됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),

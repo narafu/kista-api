@@ -42,4 +42,22 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
     @Modifying
     @Query("UPDATE FinanceCategoryEntity c SET c.deletedAt = :now WHERE c.userId = :userId AND c.deletedAt IS NULL")
     void softDeleteByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    // 그룹 공유 전환 시 모든 하위 세대(임의 depth) 동반 — softDeleteWithChildren과 동일한 recursive CTE 패턴
+    @Modifying
+    @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
+            "SELECT id FROM finance_categories WHERE id = :id " +
+            "UNION ALL " +
+            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance_categories SET group_id = :groupId WHERE id IN (SELECT id FROM descendants)")
+    void shareToGroupWithChildren(@Param("id") UUID id, @Param("groupId") UUID groupId);
+
+    // 그룹 공유 해제 시 모든 하위 세대(임의 depth) 동반
+    @Modifying
+    @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
+            "SELECT id FROM finance_categories WHERE id = :id " +
+            "UNION ALL " +
+            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance_categories SET group_id = NULL WHERE id IN (SELECT id FROM descendants)")
+    void unshareWithChildren(@Param("id") UUID id);
 }
