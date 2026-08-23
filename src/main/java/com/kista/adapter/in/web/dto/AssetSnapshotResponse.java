@@ -31,6 +31,8 @@ public record AssetSnapshotResponse(
         String market,
         @Schema(description = "운용전략", example = "VR")
         String strategy,
+        @Schema(description = "메모")
+        String memo,
         @Schema(description = "금액 (원화 정수)", example = "1000000")
         long amount
 ) {}

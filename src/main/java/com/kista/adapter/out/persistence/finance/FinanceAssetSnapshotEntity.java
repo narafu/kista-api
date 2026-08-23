@@ -54,6 +54,9 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
     @Column(length = 50)
     private String strategy;              // 자유 입력, 선택
 
+    @Column(length = 255)
+    private String memo;                  // 자유 입력, 선택 — strategy와 별개의 자유 메모
+
     @Column(nullable = false)
     private long amount;                  // 원화 정수, 0 이상
 
@@ -71,6 +74,7 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
         e.assetClass = s.assetClass();
         e.market = s.market();
         e.strategy = s.strategy();
+        e.memo = s.memo();
         e.amount = s.amount();
         return e;
     }
@@ -78,6 +82,6 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
     static AssetSnapshot toDomain(FinanceAssetSnapshotEntity e) {
         return new AssetSnapshot(
                 e.id, e.groupId, e.categoryId, e.accountId, e.userId, e.entryDate,
-                e.assetClass, e.market, e.strategy, e.amount, e.getCreatedAt());
+                e.assetClass, e.market, e.strategy, e.memo, e.amount, e.getCreatedAt());
     }
 }

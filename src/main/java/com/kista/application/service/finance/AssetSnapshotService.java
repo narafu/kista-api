@@ -40,7 +40,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
         AssetSnapshot snapshot = new AssetSnapshot(null, null, command.categoryId(), command.accountId(), userId,
-                command.entryDate(), command.assetClass(), command.market(), command.strategy(), command.amount(), null);
+                command.entryDate(), command.assetClass(), command.market(), command.strategy(), command.memo(), command.amount(), null);
         AssetSnapshot saved = assetSnapshotPort.save(snapshot);
         log.info("자산 스냅샷 등록: userId={}, snapshotId={}", userId, saved.id());
         return saved;
@@ -54,7 +54,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
         AssetSnapshot updated = new AssetSnapshot(existing.id(), existing.groupId(), command.categoryId(),
                 command.accountId(), existing.userId(), command.entryDate(), command.assetClass(),
-                command.market(), command.strategy(), command.amount(), existing.createdAt());
+                command.market(), command.strategy(), command.memo(), command.amount(), existing.createdAt());
         return assetSnapshotPort.save(updated);
     }
 

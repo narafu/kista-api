@@ -42,12 +42,12 @@ class AssetSnapshotServiceTest {
 
     private AssetSnapshot personalSnapshot() {
         return new AssetSnapshot(snapshotId, null, categoryId, accountId, userId,
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
     }
 
     private AssetSnapshotCommand command() {
         return new AssetSnapshotCommand(categoryId, accountId, LocalDate.of(2026, 2, 1),
-                AssetClass.EQUITY, Market.GLOBAL, "장기투자", 2_000_000L);
+                AssetClass.EQUITY, Market.GLOBAL, "장기투자", null, 2_000_000L);
     }
 
     private FinanceCategory usableCategory() {
@@ -79,6 +79,20 @@ class AssetSnapshotServiceTest {
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.amount()).isEqualTo(2_000_000L);
+    }
+
+    @Test
+    @DisplayName("create는 command.memo()를 그대로 저장")
+    void create_savesMemo() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        AssetSnapshotCommand commandWithMemo = new AssetSnapshotCommand(categoryId, accountId, LocalDate.of(2026, 2, 1),
+                AssetClass.EQUITY, Market.GLOBAL, "장기투자", "비상금 별도 관리", 2_000_000L);
+
+        AssetSnapshot result = assetSnapshotService.create(userId, groupId, commandWithMemo);
+
+        assertThat(result.memo()).isEqualTo("비상금 별도 관리");
     }
 
     @Test
@@ -136,7 +150,7 @@ class AssetSnapshotServiceTest {
     @DisplayName("delete 시 접근 불가한 스냅샷이면 SecurityException")
     void delete_notAccessible_throwsSecurityException() {
         AssetSnapshot othersSnapshot = new AssetSnapshot(snapshotId, null, categoryId, accountId, UUID.randomUUID(),
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(othersSnapshot);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
 
@@ -164,7 +178,7 @@ class AssetSnapshotServiceTest {
     @DisplayName("shareToGroup은 본인 소유가 아니면 SecurityException")
     void shareToGroup_notOwner_throwsSecurityException() {
         AssetSnapshot othersSnapshot = new AssetSnapshot(snapshotId, null, categoryId, accountId, UUID.randomUUID(),
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(othersSnapshot);
 
         assertThatThrownBy(() -> assetSnapshotService.shareToGroup(snapshotId, userId))
@@ -189,7 +203,7 @@ class AssetSnapshotServiceTest {
     @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 IllegalStateException")
     void shareToGroup_alreadySharedToAnotherGroup_throwsIllegalState() {
         AssetSnapshot alreadyShared = new AssetSnapshot(snapshotId, UUID.randomUUID(), categoryId, accountId, userId,
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(alreadyShared);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 
@@ -206,7 +220,7 @@ class AssetSnapshotServiceTest {
     void unshare_groupSharedSnapshot_movesToPersonalKeepingOwner() {
         UUID ownerId = UUID.randomUUID();
         AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, groupId, categoryId, accountId, ownerId,
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -222,7 +236,7 @@ class AssetSnapshotServiceTest {
     void unshare_nonOwnerSameGroupMember_allowed() {
         UUID ownerId = UUID.randomUUID();
         AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, groupId, categoryId, accountId, ownerId,
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -236,7 +250,7 @@ class AssetSnapshotServiceTest {
     @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
     void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
         AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, UUID.randomUUID(), categoryId, accountId, UUID.randomUUID(),
-                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, 1_000_000L, null);
+                LocalDate.of(2026, 1, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
         when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 

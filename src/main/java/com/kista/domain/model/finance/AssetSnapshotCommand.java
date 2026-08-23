@@ -11,5 +11,6 @@ public record AssetSnapshotCommand(
         AssetClass assetClass,
         Market market,
         String strategy, // null 허용
+        String memo, // null 허용
         long amount
 ) {}

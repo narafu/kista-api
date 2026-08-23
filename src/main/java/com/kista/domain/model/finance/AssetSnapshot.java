@@ -15,6 +15,7 @@ public record AssetSnapshot(
         AssetClass assetClass,
         Market market,
         String strategy,     // 자유 입력, null 허용 — 실제 자동매매 전략과 무관한 개인 메모
+        String memo,         // 자유 입력, null 허용 — strategy와 별개의 자유 메모
         long amount,          // 원화 정수, 0 이상
         Instant createdAt    // DB created_at, 신규 등록 시 null
 ) implements GroupShareable<AssetSnapshot> {
@@ -29,6 +30,6 @@ public record AssetSnapshot(
 
     @Override
     public AssetSnapshot withGroupId(UUID groupId) {
-        return new AssetSnapshot(id, groupId, categoryId, accountId, userId, entryDate, assetClass, market, strategy, amount, createdAt);
+        return new AssetSnapshot(id, groupId, categoryId, accountId, userId, entryDate, assetClass, market, strategy, memo, amount, createdAt);
     }
 }

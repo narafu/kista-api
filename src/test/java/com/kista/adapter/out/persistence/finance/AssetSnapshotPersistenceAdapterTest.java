@@ -58,12 +58,12 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
 
     private AssetSnapshot groupSnapshot(UUID accId, UUID owner) {
         return new AssetSnapshot(null, groupId, CATEGORY_ASSET, accId, owner, LocalDate.of(2026, 8, 1),
-                AssetClass.EQUITY, Market.GLOBAL, "적립식", 1_000_000L, null);
+                AssetClass.EQUITY, Market.GLOBAL, "적립식", "비상금 별도 관리", 1_000_000L, null);
     }
 
     private AssetSnapshot personalSnapshot(UUID owner) {
         return new AssetSnapshot(null, null, CATEGORY_ASSET, null, owner, LocalDate.of(2026, 8, 1),
-                AssetClass.CASH, Market.DOMESTIC, null, 500_000L, null);
+                AssetClass.CASH, Market.DOMESTIC, null, null, 500_000L, null);
     }
 
     @Test
@@ -79,6 +79,7 @@ class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(found.assetClass()).isEqualTo(AssetClass.EQUITY);
         assertThat(found.market()).isEqualTo(Market.GLOBAL);
         assertThat(found.strategy()).isEqualTo("적립식");
+        assertThat(found.memo()).isEqualTo("비상금 별도 관리");
         assertThat(found.amount()).isEqualTo(1_000_000L);
     }
 

@@ -54,7 +54,7 @@ class AssetSnapshotControllerTest {
 
     private static AssetSnapshot snapshot(UUID categoryId, UUID accountId) {
         return new AssetSnapshot(UUID.randomUUID(), null, categoryId, accountId, USER_ID,
-                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", 1_000_000L, Instant.now());
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", null, 1_000_000L, Instant.now());
     }
 
     @Test
@@ -156,6 +156,27 @@ class AssetSnapshotControllerTest {
     }
 
     @Test
+    void create_withMemo_returnsMemoInResponse() throws Exception {
+        UUID categoryId = UUID.randomUUID();
+        AssetSnapshot saved = new AssetSnapshot(UUID.randomUUID(), null, categoryId, null, USER_ID,
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", "비상금 별도 관리", 1_000_000L, Instant.now());
+        when(assetSnapshotUseCase.create(any(), any(), any(AssetSnapshotCommand.class))).thenReturn(saved);
+        FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
+                FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(category);
+
+        mockMvc.perform(post("/api/finance/asset-snapshots")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":\"" + categoryId + "\",\"entryDate\":\"2026-08-01\"," +
+                                "\"assetClass\":\"EQUITY\",\"market\":\"GLOBAL\",\"memo\":\"비상금 별도 관리\",\"amount\":1000000}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.memo").value("비상금 별도 관리"));
+
+        verify(assetSnapshotUseCase).create(eq(USER_ID), any(), argThat(cmd -> "비상금 별도 관리".equals(cmd.memo())));
+    }
+
+    @Test
     void create_withoutCsrf_returns403() throws Exception {
         mockMvc.perform(post("/api/finance/asset-snapshots")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,7 +203,7 @@ class AssetSnapshotControllerTest {
         UUID groupId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
         AssetSnapshot shared = new AssetSnapshot(id, groupId, categoryId, null, USER_ID,
-                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", 1_000_000L, Instant.now());
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", null, 1_000_000L, Instant.now());
         when(assetSnapshotUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
         FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
@@ -199,7 +220,7 @@ class AssetSnapshotControllerTest {
         UUID id = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
         AssetSnapshot personal = new AssetSnapshot(id, null, categoryId, null, USER_ID,
-                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", 1_000_000L, Instant.now());
+                LocalDate.of(2026, 8, 1), AssetClass.EQUITY, Market.GLOBAL, "VR", null, 1_000_000L, Instant.now());
         when(assetSnapshotUseCase.unshare(id, USER_ID)).thenReturn(personal);
         FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());

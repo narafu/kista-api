@@ -138,6 +138,6 @@ public class AssetSnapshotController {
         return new AssetSnapshotResponse(
                 snapshot.id(), snapshot.groupId(), snapshot.categoryId(), rootCategoryId, category.name(),
                 snapshot.accountId(), accountName, snapshot.entryDate(),
-                snapshot.assetClass().name(), snapshot.market().name(), snapshot.strategy(), snapshot.amount());
+                snapshot.assetClass().name(), snapshot.market().name(), snapshot.strategy(), snapshot.memo(), snapshot.amount());
     }
 }

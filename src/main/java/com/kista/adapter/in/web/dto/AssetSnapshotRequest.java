@@ -24,10 +24,12 @@ public record AssetSnapshotRequest(
         @NotNull Market market,
         @Schema(description = "운용전략 (자유 입력, 선택 — 실제 자동매매 전략과 무관한 개인 메모)", example = "VR")
         String strategy,
+        @Schema(description = "메모 (선택)")
+        String memo,
         @Schema(description = "금액 (원화 정수, 0 이상)", example = "1000000")
         @PositiveOrZero long amount
 ) {
     public AssetSnapshotCommand toCommand() {
-        return new AssetSnapshotCommand(categoryId, accountId, entryDate, assetClass, market, strategy, amount);
+        return new AssetSnapshotCommand(categoryId, accountId, entryDate, assetClass, market, strategy, memo, amount);
     }
 }
