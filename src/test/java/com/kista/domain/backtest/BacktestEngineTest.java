@@ -68,18 +68,26 @@ class BacktestEngineTest {
         // seed=1000 → poolLimit=500.00, V=0 → needsBootstrap
         // 2일차 bootstrap: 캡가 = 전일종가 100 × 1.05 = 105.00, 수량 = 500/105 내림 = 4주
         // 3일차: LOC은 종가 기준 판정 — 종가 90 ≤ 105 → 4주×90 = 360.00 체결
+        // 3일차 총자산(1000)은 체결가·평가가가 둘 다 종가 90이라 매수수량과 무관하게 항상 seed와 같다 — 수량 자체는 증명하지 못한다
+        // holdings=4가 되는 순간(3일차 주문생성 단계) V=0인 채로 매도 사다리도 함께 생성된다 — upperBand=V×1.15=0이라 매도가가 전부 0.00
+        // (테스트 "V가_0인_상태에서_보유가_생기면..."과 동일 근본원인) → 4일차 고가는 항상 0 이상이라 4주 전량이 무조건 0달러에 체결된다
+        // 매도 체결가가 0이라 현금은 변화가 없으므로 4일차 총자산 = 3일차 체결 직후 현금(1000 − 매수수량×90) 그대로 남는다
+        // 이 값은 매수수량에 직접 의존한다(수량이 4가 아니면 640이 아님) — 4일차 종가를 90과 다르게 잡아(90=우연한 상쇄값) 확인하되,
+        // 매도가 지정가 0.00 그대로 체결되므로 4일차 종가 자체는 결과값에 영향이 없다(보유분이 이미 0이 된 뒤 평가되기 때문)
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-02", 100, 105, 95, 100),
                 candle("2024-01-03", 100, 105, 95, 100),
-                candle("2024-01-04", 95, 95, 85, 90)
+                candle("2024-01-04", 95, 95, 85, 90),
+                candle("2024-01-05", 100, 115, 90, 110)
         ), vrCommand("1000", "0", 52, 0));
 
         assertThat(output.points()).extracting(BacktestPoint::totalAsset)
                 .satisfiesExactly(
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차: 주문 없음
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 아직 미체결(주문만 생성)
-                        p -> assertThat(p).isEqualByComparingTo("1000")); // 3일차: 예수금 640 + 4주×90
-        assertThat(output.tradeCount()).isEqualTo(1);
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 3일차: 예수금 640 + 4주×90 (수량과 무관하게 항상 seed와 동일)
+                        p -> assertThat(p).isEqualByComparingTo("640"));  // 4일차: 0달러 매도로 전량 청산, 현금 640 그대로 — 매수수량이 4가 아니면 이 값이 어긋난다
+        assertThat(output.tradeCount()).isEqualTo(5); // 매수 1건(4주) + 0달러 매도 사다리 4건(1주씩, holdings=4)
     }
 
     @Test
