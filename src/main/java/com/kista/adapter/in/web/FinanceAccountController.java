@@ -80,4 +80,30 @@ public class FinanceAccountController {
             @AuthenticationPrincipal UUID userId) {
         accountUseCase.delete(id, userId);
     }
+
+    @Operation(summary = "계좌 그룹 공유 전환", description = "개인 소유 계좌를 소유자의 현재 그룹으로 공유 전환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "전환 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/share")
+    public FinanceAccountResponse share(
+            @Parameter(description = "계좌 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceAccountResponse.from(accountUseCase.shareToGroup(id, userId));
+    }
+
+    @Operation(summary = "계좌 그룹 공유 해제", description = "그룹 공유 계좌를 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "해제 성공"),
+            @ApiResponse(responseCode = "403", description = "접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/unshare")
+    public FinanceAccountResponse unshare(
+            @Parameter(description = "계좌 ID") @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return FinanceAccountResponse.from(accountUseCase.unshare(id, userId));
+    }
 }

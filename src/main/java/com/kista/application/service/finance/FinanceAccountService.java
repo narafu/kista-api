@@ -59,4 +59,32 @@ class FinanceAccountService implements FinanceAccountUseCase {
         accountPort.softDelete(accountId);
         log.info("계좌 삭제: accountId={}, userId={}", accountId, userId);
     }
+
+    // 개인 소유 계좌를 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
+    @Override
+    public FinanceAccount shareToGroup(UUID accountId, UUID userId) {
+        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
+        return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
+                        "본인 소유 계좌만 그룹에 공유할 수 있습니다")
+                .map(shared -> {
+                    FinanceAccount saved = accountPort.save(shared);
+                    log.info("계좌 그룹 공유 전환: accountId={}, groupId={}", accountId, saved.groupId());
+                    return saved;
+                })
+                .orElse(existing);
+    }
+
+    // 그룹 공유 계좌를 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
+    @Override
+    public FinanceAccount unshare(UUID accountId, UUID userId) {
+        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return GroupShareSupport.unshare(existing, userId, currentGroupId)
+                .map(personal -> {
+                    FinanceAccount saved = accountPort.save(personal);
+                    log.info("계좌 그룹 공유 해제: accountId={}, userId={}", accountId, userId);
+                    return saved;
+                })
+                .orElse(existing);
+    }
 }

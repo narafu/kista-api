@@ -11,4 +11,6 @@ public interface FinanceAccountUseCase {
     FinanceAccount create(UUID userId, UUID requestedGroupId, FinanceAccountCommand command);
     FinanceAccount update(UUID accountId, UUID userId, FinanceAccountCommand command);
     void delete(UUID accountId, UUID userId);
+    FinanceAccount shareToGroup(UUID accountId, UUID userId);
+    FinanceAccount unshare(UUID accountId, UUID userId);
 }

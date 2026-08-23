@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.kista.support.WebMvcTestSupport.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -77,6 +78,32 @@ class FinanceAccountControllerTest {
     }
 
     @Test
+    void create_withNonNumericAccountNo_returns400() throws Exception {
+        mockMvc.perform(post("/api/finance/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountType\":\"SECURITIES\",\"name\":\"토스증권 일반계좌\",\"accountNo\":\"123-456\"}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(accountUseCase);
+    }
+
+    @Test
+    void create_withNumericAccountNo_returns201() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", "12345678", null, Instant.now());
+        when(accountUseCase.create(any(), any(), any(FinanceAccountCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountType\":\"SECURITIES\",\"name\":\"토스증권 일반계좌\",\"accountNo\":\"12345678\"}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accountNo").value("12345678"));
+    }
+
+    @Test
     void update_returns200() throws Exception {
         UUID id = UUID.randomUUID();
         FinanceAccount updated = new FinanceAccount(id, null, USER_ID,
@@ -100,5 +127,43 @@ class FinanceAccountControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(accountUseCase).delete(id, USER_ID);
+    }
+
+    @Test
+    void share_returns200WithGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceAccount shared = new FinanceAccount(id, groupId, USER_ID,
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+        when(accountUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+
+        mockMvc.perform(patch("/api/finance/accounts/{id}/share", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+    }
+
+    @Test
+    void share_notOwner_returns403() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountUseCase.shareToGroup(id, USER_ID))
+                .thenThrow(new SecurityException("본인 소유 계좌만 그룹에 공유할 수 있습니다"));
+
+        mockMvc.perform(patch("/api/finance/accounts/{id}/share", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unshare_returns200WithNullGroupId() throws Exception {
+        UUID id = UUID.randomUUID();
+        FinanceAccount personal = new FinanceAccount(id, null, USER_ID,
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+        when(accountUseCase.unshare(id, USER_ID)).thenReturn(personal);
+
+        mockMvc.perform(patch("/api/finance/accounts/{id}/unshare", id)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(nullValue()));
     }
 }

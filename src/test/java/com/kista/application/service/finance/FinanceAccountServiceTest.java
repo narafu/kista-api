@@ -128,4 +128,116 @@ class FinanceAccountServiceTest {
                 .isInstanceOf(java.util.NoSuchElementException.class);
         verify(accountPort, never()).save(any());
     }
+
+    // ----- shareToGroup -----
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유 개인 계좌를 현재 그룹으로 전환")
+    void shareToGroup_ownedPersonalAccount_movesToCurrentGroup() {
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(personalAccount());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceAccount result = accountService.shareToGroup(accountId, userId);
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 본인 소유가 아니면 SecurityException")
+    void shareToGroup_notOwner_throwsSecurityException() {
+        FinanceAccount othersAccount = new FinanceAccount(accountId, null, UUID.randomUUID(),
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(othersAccount);
+
+        assertThatThrownBy(() -> accountService.shareToGroup(accountId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 무그룹 유저면 IllegalStateException")
+    void shareToGroup_noCurrentGroup_throwsIllegalState() {
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(personalAccount());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> accountService.shareToGroup(accountId, userId))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 IllegalStateException")
+    void shareToGroup_alreadySharedToAnotherGroup_throwsIllegalState() {
+        FinanceAccount alreadyShared = new FinanceAccount(accountId, UUID.randomUUID(), userId,
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(alreadyShared);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> accountService.shareToGroup(accountId, userId))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
+    // ----- unshare -----
+
+    @Test
+    @DisplayName("unshare는 그룹 공유 계좌를 개인 소유로 되돌리고 소유자는 유지")
+    void unshare_groupSharedAccount_movesToPersonalKeepingOwner() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceAccount sharedAccount = new FinanceAccount(accountId, groupId, ownerId,
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceAccount result = accountService.unshare(accountId, userId);
+
+        assertThat(result.groupId()).isNull();
+        assertThat(result.userId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    @DisplayName("unshare는 같은 그룹 소속이면 소유자가 아니어도 허용")
+    void unshare_nonOwnerSameGroupMember_allowed() {
+        UUID ownerId = UUID.randomUUID();
+        FinanceAccount sharedAccount = new FinanceAccount(accountId, groupId, ownerId,
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceAccount result = accountService.unshare(accountId, userId);
+
+        assertThat(result.groupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
+    void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
+        FinanceAccount sharedAccount = new FinanceAccount(accountId, UUID.randomUUID(), UUID.randomUUID(),
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> accountService.unshare(accountId, userId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 이미 개인 소유면 그대로 반환(멱등)")
+    void unshare_alreadyPersonal_isIdempotent() {
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(personalAccount());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        FinanceAccount result = accountService.unshare(accountId, userId);
+
+        assertThat(result.groupId()).isNull();
+        verify(accountPort, never()).save(any());
+    }
 }
