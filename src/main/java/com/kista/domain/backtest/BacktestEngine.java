@@ -5,6 +5,7 @@ import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
@@ -23,6 +24,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.kista.domain.model.order.Order.OrderDirection.BUY;
@@ -63,9 +65,17 @@ public class BacktestEngine {
         return switch (command.type()) {
             case VR -> runVr(candles, command);
             case INFINITE -> runInfinite(candles, command);
-            // PRIVACY 분기는 후속 태스크가 여기에 추가한다 — 그 전까지는 조용히 빈 결과를 내지 않고 명확히 실패시킨다
+            // PRIVACY는 기준 매매표가 있어야 주문을 만들 수 있다 — 맵을 받는 3-arg 오버로드를 쓰라는 신호로 명확히 실패시킨다
             default -> throw new IllegalArgumentException("백테스트 미지원 전략: " + command.type());
         };
+    }
+
+    // PRIVACY 전용 진입점 — 기준 매매표 조회는 DB I/O라 순수 도메인에서 못 하므로 날짜별 맵을 호출측(BacktestService)이 미리 조달한다
+    // 맵에 키가 없는 날짜는 "기준 매매표 미수신"과 동일 취급 (그날 주문 없음)
+    public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases) {
+        if (command.type() != Strategy.Type.PRIVACY) return run(candles, command);
+        if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of());
+        return runPrivacy(candles, command, privacyBases);
     }
 
     // --- 전략 공통 일봉 루프 ---
@@ -256,6 +266,69 @@ public class BacktestEngine {
         return replaceBuysPreservingOrder(orders, INFINITE_STRATEGY.buildCappedBuyOrders(position, tradeDate, buys, cap));
     }
 
+    // --- PRIVACY 경로 ---
+
+    private Output runPrivacy(List<DailyCandle> candles, BacktestCommand command,
+                              Map<LocalDate, PrivacyTradeBase> privacyBases) {
+        PrivacyState state = new PrivacyState(command);
+        List<String> warnings = new ArrayList<>();
+
+        // PRIVACY도 VR과 마찬가지로 워밍업 프리픽스가 필요 없다(전일종가가 없으면 캡만 생략될 뿐 예외가 없다)
+        Output output = runDays(candles, candles.getFirst().date(), state, warnings,
+                (candle, prevClose) -> planPrivacyDay(state, command, privacyBases, candle, prevClose, warnings));
+
+        // 마지막 캔들까지 이어진 결측 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush하고 warnings를 다시 담는다
+        state.flushMissingBaseGap(warnings);
+        return new Output(output.points(), output.tradeCount(), output.cycleCount(), List.copyOf(warnings));
+    }
+
+    // PRIVACY 하루 처리 — 사이클 종료 판정(endsCycleOnLiquidation=true, 리버스모드 없음) 후 주문 생성
+    private List<Order> planPrivacyDay(PrivacyState state, BacktestCommand command,
+                                       Map<LocalDate, PrivacyTradeBase> privacyBases, DailyCandle candle,
+                                       BigDecimal prevClose, List<String> warnings) {
+        // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산 기준이어야 한다
+        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) {
+            state.initialUsdDeposit = state.balance.usdDeposit(); // 새 사이클 개장 자산 — 자산 이월이지 시드 리셋이 아니다
+            state.cycleCount++;
+        }
+        // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다
+        state.prevDayHoldings = state.balance.holdings();
+
+        return planPrivacyOrders(state, command, privacyBases, candle, prevClose, warnings);
+    }
+
+    // 오늘 주문 생성 — PlanContext 조립 후 기존 PrivacyCycleOrderStrategy.plan()에 위임
+    // 배수(multiple = initialUsdDeposit ÷ currentCycleStart)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
+    private List<Order> planPrivacyOrders(PrivacyState state, BacktestCommand command,
+                                          Map<LocalDate, PrivacyTradeBase> privacyBases, DailyCandle candle,
+                                          BigDecimal prevClose, List<String> warnings) {
+        PrivacyTradeBase base = privacyBases.get(candle.date()); // 없으면 null — plan()이 스스로 Optional.empty()를 낸다
+
+        // 결측은 구간 단위로 1건만 요약 기록 — 데이터 시작일 이전 구간이 수백 일 이어져도 경고가 폭주하지 않는다
+        if (base == null) state.recordMissingBase(candle.date());
+        else state.flushMissingBaseGap(warnings);
+
+        // currentPrice 자리의 전일종가는 PrivacyCycleOrderStrategy.plan()이 소비하지 않는다 — VR/INFINITE와의 조립 일관성 목적
+        CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
+                new CycleOrderStrategy.PlanContext.PrivacyInputs(state.initialUsdDeposit, base, prevClose);
+        CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
+                state.balance, syntheticStrategy(command), candle.date(), "backtest", null, privacyInputs, null);
+
+        List<Order> orders = strategies.of(Strategy.Type.PRIVACY).plan(ctx)
+                .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
+        return applyPrivacyBuyCap(orders, prevClose);
+    }
+
+    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(PRIVACY_SIMPLE)와 동일 규칙
+    // cap 초과 BUY만 가격을 cap으로 치환하고 수량은 건드리지 않는다 (VR/INFINITE와 달리 재산정 자체가 없다)
+    private static List<Order> applyPrivacyBuyCap(List<Order> orders, BigDecimal prevClose) {
+        if (prevClose == null || orders.isEmpty()) return orders;
+        BigDecimal cap = PriceCapPolicy.capFor(prevClose);
+        return orders.stream()
+                .map(o -> o.direction() == BUY && o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
+                .toList();
+    }
+
     // --- 전략 공통 헬퍼 ---
 
     // 재산정 BUY가 원래 BUY 자리를 채우고 남는 보정 BUY는 뒤에 붙인다 — SELL은 원래 상대 순서 그대로 유지
@@ -404,6 +477,36 @@ public class BacktestEngine {
             isFirstReverseDay = false;
             recentCloses.clear();
             cycleCount++;
+        }
+    }
+
+    // PRIVACY 루프의 가변 상태 — 배수 산출 기준 자산 + 결측 구간 요약용 커서
+    private static final class PrivacyState extends DayState {
+        BigDecimal initialUsdDeposit; // 현재 사이클 개장 자산 — PrivacyStrategy 배수 산출 기준, 사이클 교체 때만 갱신
+        int prevDayHoldings;          // 어제 이터레이션 종료 시점 보유수량 — 청산(사이클 종료) 판정용
+        LocalDate missingBaseFrom;    // 진행 중인 기준 매매표 결측 구간 시작일 (없으면 null)
+        LocalDate missingBaseTo;      // 진행 중인 결측 구간 마지막 날
+        int missingBaseDays;          // 진행 중인 결측 구간 일수
+
+        PrivacyState(BacktestCommand command) {
+            super(command.seed());
+            this.initialUsdDeposit = command.seed();
+        }
+
+        // 오늘을 진행 중인 결측 구간에 편입 — 경고는 구간이 닫힐 때 1건만 기록한다
+        void recordMissingBase(LocalDate date) {
+            if (missingBaseFrom == null) missingBaseFrom = date;
+            missingBaseTo = date;
+            missingBaseDays++;
+        }
+
+        // 결측 구간 종료 — 누적된 구간을 한 줄로 요약해 남기고 커서를 비운다
+        void flushMissingBaseGap(List<String> warnings) {
+            if (missingBaseFrom == null) return;
+            warnings.add("기준 매매표 없음: " + missingBaseFrom + "~" + missingBaseTo + ", 총 " + missingBaseDays + "일");
+            missingBaseFrom = null;
+            missingBaseTo = null;
+            missingBaseDays = 0;
         }
     }
 }

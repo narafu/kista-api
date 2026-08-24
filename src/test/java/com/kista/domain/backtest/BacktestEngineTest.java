@@ -4,6 +4,8 @@ import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.domain.model.order.Order;
+import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.domain.model.privacy.PrivacyTradeBase.PrivacyTrade;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
@@ -11,6 +13,8 @@ import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.domain.strategy.InfiniteStrategy;
+import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.domain.strategy.PrivacyStrategy;
 import com.kista.domain.strategy.ReverseInfiniteStrategy;
 import com.kista.domain.strategy.VrCycleOrderStrategy;
 import com.kista.domain.strategy.VrStrategy;
@@ -19,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -199,15 +204,23 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("VR·INFINITE 외 전략 타입은 아직 지원하지 않아 즉시 실패한다")
-    void 미지원_전략은_예외를_던진다() {
-        BacktestCommand privacy = new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
-                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-31"), bd(1000),
-                20, null, null, 0, null);
-
-        assertThatThrownBy(() -> engine.run(List.of(candle("2024-01-02", 100, 105, 95, 100)), privacy))
+    @DisplayName("PRIVACY를 2-arg 경로로 호출하면 실패한다 — 기준 매매표 맵을 받는 3-arg 오버로드를 쓰라는 신호")
+    void 기준매매표_없는_2arg_경로의_PRIVACY는_예외를_던진다() {
+        assertThatThrownBy(() -> engine.run(List.of(candle("2024-01-02", 100, 105, 95, 100)), privacyCommand("1000")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("PRIVACY");
+    }
+
+    @Test
+    @DisplayName("3-arg 오버로드는 VR·INFINITE 커맨드를 기존 2-arg 경로로 그대로 넘긴다")
+    void 오버로드는_비PRIVACY를_기존_경로로_위임한다() {
+        List<DailyCandle> candles = List.of(
+                candle("2024-01-02", 800, 810, 790, 800),
+                candle("2024-01-03", 800, 810, 790, 800));
+        BacktestCommand command = vrCommand("2000", "1000", 4, 0);
+
+        // 맵이 비어 있어도 PRIVACY가 아니면 무시된다 — 결과는 2-arg 호출과 완전히 동일해야 한다
+        assertThat(engine.run(candles, command, Map.of())).isEqualTo(engine.run(candles, command));
     }
 
     @Test
@@ -539,5 +552,206 @@ class BacktestEngineTest {
         assertThat(starDay.inputs().isFirstReverseDay()).isFalse();
         assertThat(starDay.inputs().starPointPrice()).isEqualByComparingTo("968.75");
         assertThat(starDay.inputs().starPointPrice()).isNotEqualByComparingTo("1007.00");
+    }
+
+    // --- PRIVACY 픽스처 헬퍼 ---
+
+    // 날짜별 plan() 결과를 붙잡아 두는 기록기 — 캡 보정 전 전략 원본 주문을 그대로 담는다
+    // 기준 매매표가 없는 날도 엔진이 plan()을 호출하므로 "그날 주문이 비었다"까지 직접 단언할 수 있다
+    private static final class RecordingPrivacy extends PrivacyCycleOrderStrategy {
+
+        private final Map<LocalDate, List<Order>> byDate = new LinkedHashMap<>();
+
+        RecordingPrivacy() {
+            super(new PrivacyStrategy());
+        }
+
+        @Override
+        public Optional<OrderPlan> plan(PlanContext ctx) {
+            Optional<OrderPlan> result = super.plan(ctx);
+            byDate.put(ctx.tradeDate(), result.map(OrderPlan::orders).orElse(List.of()));
+            return result;
+        }
+
+        List<Order> on(String date) {
+            List<Order> orders = byDate.get(LocalDate.parse(date));
+            assertThat(orders).as("%s plan() 호출 기록", date).isNotNull();
+            return orders;
+        }
+    }
+
+    private static BacktestEngine privacyEngine(RecordingPrivacy recorder) {
+        return new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+    }
+
+    private static BacktestCommand privacyCommand(String seed) {
+        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
+                null, null, null, 0, null);
+    }
+
+    // 기준 매매표 픽스처 — seed ÷ currentCycleStart가 곧 PrivacyStrategy가 산출할 배수(multiple)다
+    private static PrivacyTradeBase privacyBase(String currentCycleStart, int holdings, PrivacyTrade... trades) {
+        return new PrivacyTradeBase(null, null, holdings, new BigDecimal(currentCycleStart), List.of(trades));
+    }
+
+    // 가격은 문자열 생성자로 — 배수·캡 결과가 소수 자리 없이 그대로 드러나게 한다
+    private static PrivacyTrade trade(String date, Order.OrderType orderType, Order.OrderDirection direction,
+                                      Integer quantity, String price) {
+        return new PrivacyTrade(LocalDate.parse(date), Strategy.Ticker.SOXL, orderType, direction,
+                quantity, new BigDecimal(price));
+    }
+
+    // --- PRIVACY 경로 ---
+
+    @Test
+    @DisplayName("기준 매매표가 있는 날만 주문이 생성되고, 없는 날은 주문 없이 지나가며 결측 구간이 요약된다")
+    void 기준매매표가_있는_날만_주문이_생성된다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // seed 1000 ÷ currentCycleStart 500 = 배수 2.00 → 기준표 BUY 3주가 6주로 스케일
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 90),
+                flat("2024-01-04", 80)
+        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
+                trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 3, "90"))));
+
+        // 1일차: 기준표 있음 → BUY 6주 @90 (전일종가가 없어 캡은 미적용)
+        assertThat(recorder.on("2024-01-02")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(6),
+                        o -> assertThat(o.price()).isEqualByComparingTo("90"));
+        // 2·3일차: 기준표 없음 → 주문 자체가 없다
+        assertThat(recorder.on("2024-01-03")).isEmpty();
+        assertThat(recorder.on("2024-01-04")).isEmpty();
+
+        // 2일차 종가 90에 LOC 6주 체결(540) → 예수금 460, 3일차는 신규 주문이 없어 체결도 없다
+        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
+                .satisfiesExactly(
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 460 + 6주×90
+                        p -> assertThat(p).isEqualByComparingTo("940"));  // 3일차: 460 + 6주×80
+        assertThat(output.tradeCount()).isEqualTo(1);
+        assertThat(output.cycleCount()).isEqualTo(1);
+        // 연속 결측 2일은 개별 경고가 아니라 구간 1건으로 요약된다
+        assertThat(output.warnings()).containsExactly("기준 매매표 없음: 2024-01-03~2024-01-04, 총 2일");
+    }
+
+    @Test
+    @DisplayName("배수 계약 회귀: 시드를 2배로 올리면 같은 기준표에 대해 주문 수량도 정확히 2배가 된다")
+    void 시드를_2배로_올리면_주문_수량도_2배가_된다() {
+        // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = initialUsdDeposit ÷ currentCycleStart만 검증한다
+        // currentCycleStart=500 기준: seed 1000 → 배수 2.00 → 3주×2 = 6주 / seed 2000 → 배수 4.00 → 3주×4 = 12주
+        Map<LocalDate, PrivacyTradeBase> bases = Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
+                trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 3, "90")));
+        List<DailyCandle> candles = List.of(flat("2024-01-02", 100));
+
+        RecordingPrivacy single = new RecordingPrivacy();
+        privacyEngine(single).run(candles, privacyCommand("1000"), bases);
+        RecordingPrivacy doubled = new RecordingPrivacy();
+        privacyEngine(doubled).run(candles, privacyCommand("2000"), bases);
+
+        assertThat(single.on("2024-01-02")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(6));
+        assertThat(doubled.on("2024-01-02")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(12));
+    }
+
+    @Test
+    @DisplayName("사이클 종료·재시작: 청산되면 cycleCount가 늘고 배수 기준 자산이 시드가 아닌 청산 시점 예수금으로 갱신된다")
+    void 청산되면_배수_기준_자산이_청산_시점_예수금으로_갱신된다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // 1일차 BUY 1주 @100 → 2일차 종가 100에 체결(예수금 900) → 2일차 잔량 전량 매도 주문(SELL null quantity)
+        // → 3일차 종가 60에 체결 → 예수금 960·보유 0 → 사이클 종료·재시작, 개장 자산 = 960
+        // 3일차 기준표는 currentCycleStart=96 → 올바르면 배수 960/96 = 10.00 → 10주×10 = 100주
+        // 시드(1000)로 잘못 리셋하면 배수 1000/96 = 10.41 → 104주가 되어 값이 어긋난다
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 100),
+                flat("2024-01-04", 60)
+        ), privacyCommand("1000"), Map.of(
+                LocalDate.parse("2024-01-02"), privacyBase("1000", 0,
+                        trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100")),
+                LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
+                        trade("2024-01-03", Order.OrderType.LOC, Order.OrderDirection.SELL, null, "50")),
+                LocalDate.parse("2024-01-04"), privacyBase("96", 0,
+                        trade("2024-01-04", Order.OrderType.LOC, Order.OrderDirection.BUY, 10, "60"))));
+
+        // 2일차: 보유 1주 전량을 잔량 매도로 내보낸다
+        assertThat(recorder.on("2024-01-03")).singleElement()
+                .satisfies(o -> assertThat(o.direction()).isEqualTo(Order.OrderDirection.SELL),
+                        o -> assertThat(o.quantity()).isEqualTo(1));
+
+        assertThat(output.cycleCount()).isEqualTo(2);
+        // 3일차 자산 = 예수금 960 (보유 0) — 이 값이 곧 새 사이클의 배수 기준이다
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("960");
+        assertThat(recorder.on("2024-01-04")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(100));
+        assertThat(output.tradeCount()).isEqualTo(2);
+        assertThat(output.warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("가격 캡: cap을 넘는 BUY만 가격이 cap으로 치환되고 수량은 그대로, cap 이하 주문은 원본 그대로다")
+    void cap을_넘는_BUY만_가격이_치환되고_수량은_유지된다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // 2일차 캡 = 전일종가 100 × 1.05 = 105.00 → BUY @200은 105.00으로 치환, BUY @50은 그대로
+        // 3일차 저가 40이 두 지정가를 모두 터치 → LIMIT은 지정가로 체결되므로 치환된 가격이 그대로 현금에 드러난다
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 100),
+                candle("2024-01-04", 100, 110, 40, 100)
+        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
+                trade("2024-01-03", Order.OrderType.LIMIT, Order.OrderDirection.BUY, 1, "200"),
+                trade("2024-01-03", Order.OrderType.LIMIT, Order.OrderDirection.BUY, 1, "50"))));
+
+        // 캡 보정 전 원본 — 배수 1.00이라 수량은 둘 다 1주, 가격은 기준표 그대로(BUY는 고가 우선 정렬)
+        assertThat(recorder.on("2024-01-03")).satisfiesExactly(
+                o -> assertThat(o.price()).isEqualByComparingTo("200"),
+                o -> assertThat(o.price()).isEqualByComparingTo("50"));
+        assertThat(recorder.on("2024-01-03")).allSatisfy(o -> assertThat(o.quantity()).isEqualTo(1));
+
+        // 3일차 체결액 = 105.00 + 50 = 155.00 → 예수금 845 + 2주×종가 100 = 1045.00
+        // 캡이 적용되지 않았다면 200 + 50 = 250 체결로 750 + 200 = 950.00이 된다(수량이 바뀌면 이 값도 어긋난다)
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1045.00");
+        assertThat(output.tradeCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("결측 구간 경고는 결측 일수가 아니라 구간 수에 비례한다")
+    void 결측_구간_경고는_구간당_1건으로_요약된다() {
+        // 결측 20일 → 기준표 1일 → 결측 20일. 일당 1건이면 40건이지만 구간 요약이면 2건이다
+        List<DailyCandle> candles = new ArrayList<>();
+        LocalDate start = LocalDate.parse("2024-01-01");
+        for (int i = 0; i < 41; i++) candles.add(flat(start.plusDays(i).toString(), 100));
+
+        // 유일한 기준표 날의 주문은 LOC BUY @1 — 종가 100에서는 체결되지 않아 잔고에 영향을 주지 않는다
+        BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(candles, privacyCommand("1000"),
+                Map.of(LocalDate.parse("2024-01-21"), privacyBase("1000", 0,
+                        trade("2024-01-21", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "1"))));
+
+        assertThat(output.warnings()).containsExactly(
+                "기준 매매표 없음: 2024-01-01~2024-01-20, 총 20일",   // 구간이 끝나는 기준표 수신일에 flush
+                "기준 매매표 없음: 2024-01-22~2024-02-10, 총 20일");  // 마지막까지 이어진 구간은 루프 종료 후 flush
+        assertThat(output.tradeCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("예수금 음수 방지: 배수 스케일이 시드를 넘겨 체결되면 예수금이 0으로 클램프되고 부족액이 경고로 남는다")
+    void 체결_후_예수금이_음수면_0으로_클램프된다() {
+        // 배수 1.00 + 기준표 목표 보유 100주 → 보유 보정(diff=100)이 가장 싼 BUY에 전량 얹혀 101주 @100 = 10,100달러
+        // PrivacyStrategy는 예산을 검증하지 않으므로 시드 1000달러로는 감당할 수 없는 주문이 그대로 나간다
+        BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(List.of(
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 100)
+        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("1000", 100,
+                trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100"))));
+
+        // 예수금 1000 − 10100 = −9100 → 0으로 클램프, 총자산은 보유분 시장가만 남는다
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("10100");
+        assertThat(output.warnings()).anySatisfy(w -> assertThat(w)
+                .startsWith("체결 후 예수금 부족으로 0 조정: date=2024-01-03, 부족액=9100"));
     }
 }
