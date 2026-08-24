@@ -58,7 +58,11 @@ class BacktestServiceTest {
     }
 
     private static BacktestCommand privacy() {
-        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, FROM, TO, SEED,
+        return privacy(FROM, TO);
+    }
+
+    private static BacktestCommand privacy(LocalDate from, LocalDate to) {
+        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, from, to, SEED,
                 null, null, null, 0, null);
     }
 
@@ -196,8 +200,8 @@ class BacktestServiceTest {
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
-        // findTodayTrade는 release_date >= 조회일 중 가장 이른 1건 — 1/1·1/3 조회에도 1/3 적용분이 딸려온다
-        PrivacyTradeBase base = baseFor(LocalDate.of(2024, 1, 3));
+        // findTodayTrade는 release_date >= 조회일 중 가장 이른 1건 — 어느 날 조회에도 1/3 세션 적용분(적용 거래일 1/4)이 딸려온다
+        PrivacyTradeBase base = baseFor(LocalDate.of(2024, 1, 4));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
 
         BacktestResult result = service.run(privacy());
@@ -211,8 +215,9 @@ class BacktestServiceTest {
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100")));
+        // 1/3 세션 적용분(적용 거래일 1/4) — 1/1 세션(적용 거래일 1/2) 조회에도 이게 딸려온다
         when(privacyTradePort.findTodayTrade(any()))
-                .thenReturn(Optional.of(baseFor(LocalDate.of(2024, 1, 3))));
+                .thenReturn(Optional.of(baseFor(LocalDate.of(2024, 1, 4))));
 
         service.run(privacy());
 
@@ -222,6 +227,35 @@ class BacktestServiceTest {
         verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture());
         assertThat(ctxCaptor.getAllValues().get(0).privacy().privacyBase()).isNull();
         assertThat(ctxCaptor.getAllValues().get(1).privacy().privacyBase()).isNotNull();
+    }
+
+    @Test
+    void PRIVACY_월요일_세션도_그날_발행분_기준표를_적용한다() {
+        when(cycleOrderStrategies.of(Strategy.Type.PRIVACY)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        // 캔들 날짜는 US 세션일 — 금(1/5)·월(1/8). 직전 달력일이 일요일이라 월요일엔 "전날 발행분"이 존재하지 않는다
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(5, "100"), candle(8, "100")));
+        // 실제 어댑터 재현 — release_date >= (조회일 − 1일) 중 가장 이른 발행분을 적용 거래일(발행일 + 1일)로 변환해 반환
+        List<LocalDate> releaseDates = List.of(
+                LocalDate.of(2024, 1, 4), LocalDate.of(2024, 1, 5), LocalDate.of(2024, 1, 8));
+        when(privacyTradePort.findTodayTrade(any())).thenAnswer(invocation -> {
+            LocalDate releaseFrom = invocation.getArgument(0, LocalDate.class).minusDays(1);
+            return releaseDates.stream()
+                    .filter(release -> !release.isBefore(releaseFrom))
+                    .findFirst()
+                    .map(release -> baseFor(release.plusDays(1)));
+        });
+
+        service.run(privacy(LocalDate.of(2024, 1, 5), LocalDate.of(2024, 1, 8)));
+
+        ArgumentCaptor<CycleOrderStrategy.PlanContext> ctxCaptor =
+                ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
+        verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture());
+        // 금요일 세션 1/5 → 1/5 발행분(적용 거래일 1/6)
+        assertThat(appliedBaseTradeDate(ctxCaptor.getAllValues().get(0))).isEqualTo(LocalDate.of(2024, 1, 6));
+        // 월요일 세션 1/8 → 1/8 발행분(적용 거래일 1/9). 캔들 날짜로 그대로 조회하면 이 날은 통째로 매매 없음이 된다
+        assertThat(appliedBaseTradeDate(ctxCaptor.getAllValues().get(1))).isEqualTo(LocalDate.of(2024, 1, 9));
     }
 
     // --- 요약 산수 ---
@@ -290,6 +324,12 @@ class BacktestServiceTest {
 
     private static BigDecimal bd(String v) {
         return new BigDecimal(v);
+    }
+
+    // 엔진에 실제로 전달된 기준표의 적용 거래일 — null이면 그날은 매매 없음으로 떨어진 것
+    private static LocalDate appliedBaseTradeDate(CycleOrderStrategy.PlanContext ctx) {
+        PrivacyTradeBase base = ctx.privacy().privacyBase();
+        return base == null ? null : base.trades().getFirst().tradeDate();
     }
 
     // 적용 거래일이 tradeDate인 기준 매매표 (주문 명세는 비워도 tradeDate 판별에는 1건이면 충분)

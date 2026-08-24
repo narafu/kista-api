@@ -6,6 +6,7 @@ import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.BacktestResult;
 import com.kista.domain.model.backtest.BacktestSummary;
 import com.kista.domain.model.backtest.DailyCandle;
+import com.kista.domain.model.privacy.PrivacyDates;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.stats.ReturnMetrics;
 import com.kista.domain.model.strategy.Strategy;
@@ -136,17 +137,20 @@ class BacktestService implements BacktestUseCase {
     private Map<LocalDate, PrivacyTradeBase> loadPrivacyBases(List<DailyCandle> candles) {
         Map<LocalDate, PrivacyTradeBase> bases = new HashMap<>();
         for (DailyCandle candle : candles) {
-            privacyTradePort.findTodayTrade(candle.date())
-                    .filter(base -> appliesTo(base, candle.date()))
-                    .ifPresent(base -> bases.put(candle.date(), base));
+            // 캔들 날짜는 US 세션일이고 findTodayTrade의 파라미터는 KST 거래일이다 — 세션 D에 적용되는 기준표는
+            // 발행일이 D인 표(= KST 거래일 D+1)이므로 발행일→거래일 헬퍼로 기준을 맞춰 조회·판별한다
+            LocalDate applied = PrivacyDates.tradeDateOf(candle.date());
+            privacyTradePort.findTodayTrade(applied)
+                    .filter(base -> appliesTo(base, applied))
+                    .ifPresent(base -> bases.put(candle.date(), base)); // 맵 키는 엔진이 읽는 캔들 날짜 그대로
         }
         return bases;
     }
 
     // findTodayTrade는 "release_date >= 조회일" 중 가장 이른 1건을 준다 — 데이터가 없는 날엔 미래 기준표가 딸려와
-    // 백테스트에선 look-ahead가 된다. 적용 거래일이 그날과 정확히 일치하는 기준표만 남긴다(주문 없는 표는 어차피 무의미)
-    private static boolean appliesTo(PrivacyTradeBase base, LocalDate date) {
-        return !base.trades().isEmpty() && date.equals(base.trades().getFirst().tradeDate());
+    // 백테스트에선 look-ahead가 된다. 적용 거래일(appliedTradeDate, KST)이 정확히 일치하는 기준표만 남긴다(주문 없는 표는 어차피 무의미)
+    private static boolean appliesTo(PrivacyTradeBase base, LocalDate appliedTradeDate) {
+        return !base.trades().isEmpty() && appliedTradeDate.equals(base.trades().getFirst().tradeDate());
     }
 
     // 요청 구간이 실제 기준표 데이터보다 이르면 1건만 요약 경고 — 시작일은 조회 결과에서 계산(상수 하드코딩 금지)
