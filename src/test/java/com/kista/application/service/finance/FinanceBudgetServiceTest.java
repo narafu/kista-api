@@ -9,6 +9,7 @@ import com.kista.domain.port.out.FinanceGroupPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -280,5 +281,116 @@ class FinanceBudgetServiceTest {
 
         assertThat(result.groupId()).isNull();
         verify(budgetPort, never()).save(any());
+    }
+
+    // ----- create: 겹침 자동조정 -----
+
+    private FinanceBudget budgetOf(LocalDate start, LocalDate end) {
+        return new FinanceBudget(UUID.randomUUID(), null, categoryId, userId, start, end, 500_000L, null);
+    }
+
+    @Test
+    @DisplayName("create: 기존이 새 예산 시작일 이전부터 시작해 시작일 이후로 걸치면 기존 종료일을 트림")
+    void create_trimsExistingEndDate_whenExistingStartsBeforeNewStart() {
+        FinanceBudget existing = budgetOf(LocalDate.of(2020, 1, 1), null); // 무기한
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(existing));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        budgetService.create(userId, null, command()); // command() = 2026/06/01~2026/12/31
+
+        ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
+        verify(budgetPort, times(2)).save(captor.capture()); // 1) 트림된 기존 2) 신규
+        FinanceBudget trimmed = captor.getAllValues().get(0);
+        assertThat(trimmed.id()).isEqualTo(existing.id());
+        assertThat(trimmed.applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
+        verify(budgetPort, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("create: 기존이 새 예산 범위 안에 완전히 들어가면(뒷부분 흡수) 기존을 삭제")
+    void create_deletesExisting_whenFullyAbsorbedByNewRange() {
+        FinanceBudget existing = budgetOf(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30));
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(existing));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        budgetService.create(userId, null, command());
+
+        verify(budgetPort).delete(existing.id());
+        verify(budgetPort, times(1)).save(any()); // 신규만 저장, 트림 없음
+    }
+
+    @Test
+    @DisplayName("create: 기존이 새 예산 앞뒤로 모두 걸치면(중간에 낌) 409")
+    void create_rejects_whenExistingWrapsAroundNewRange() {
+        FinanceBudget existing = budgetOf(LocalDate.of(2020, 1, 1), LocalDate.of(2027, 12, 31));
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+                .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
+
+        verify(budgetPort, never()).save(any());
+        verify(budgetPort, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("create: 기존이 새 예산 시작일 이후 시작해 종료일 뒤로도 이어지면(역트림 필요) 409")
+    void create_rejects_whenExistingExtendsPastNewEnd() {
+        FinanceBudget existing = budgetOf(LocalDate.of(2026, 9, 1), null); // 무기한
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+                .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
+
+        verify(budgetPort, never()).save(any());
+        verify(budgetPort, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("create: 트림 대상과 삭제 대상이 함께 있으면 둘 다 처리")
+    void create_handlesMixedTrimAndDeleteCandidates() {
+        FinanceBudget toTrim = budgetOf(LocalDate.of(2020, 1, 1), null);
+        FinanceBudget toDelete = budgetOf(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30));
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(toTrim, toDelete));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        budgetService.create(userId, null, command());
+
+        verify(budgetPort).delete(toDelete.id());
+        ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
+        verify(budgetPort, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).id()).isEqualTo(toTrim.id());
+        assertThat(captor.getAllValues().get(0).applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
+    }
+
+    @Test
+    @DisplayName("create: 거부 후보가 하나라도 있으면 다른 정상 후보도 변경/삭제되지 않음")
+    void create_rejectsWithoutPartialMutation_whenAnyCandidateRejected() {
+        FinanceBudget validTrim = budgetOf(LocalDate.of(2020, 1, 1), null);
+        FinanceBudget wrapsAround = budgetOf(LocalDate.of(2020, 1, 1), LocalDate.of(2027, 12, 31));
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(validTrim, wrapsAround));
+
+        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+                .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
+
+        verify(budgetPort, never()).save(any());
+        verify(budgetPort, never()).delete(any());
     }
 }

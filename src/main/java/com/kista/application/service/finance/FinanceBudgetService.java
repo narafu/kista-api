@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,16 +35,72 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     }
 
     // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시(그룹 공유는 shareToGroup으로 별도 전환).
+    // 등록 전, 같은 카테고리·개인 스코프에서 겹치는 기존 예산을 규칙에 따라 자동 트림/삭제한다.
+    // 규칙으로 판단 불가한 겹침(중간에 끼거나 새 예산 종료일 뒤로 이어짐)은 409로 거부하며,
+    // 거부 시 어떤 후보도 변경하지 않는다(전량 판정 후 실행) — resolveOverlapActions() 참고.
     @Override
     public FinanceBudget create(UUID userId, UUID requestedGroupId, FinanceBudgetCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyBudgetCommand(userId, currentGroupId, command);
+
+        List<FinanceBudget> candidates = budgetPort.findOverlapping(
+                userId, command.categoryId(), command.applyStartDate(), command.applyEndDate());
+        List<OverlapAction> actions = resolveOverlapActions(candidates, command);
+        actions.forEach(action -> action.execute(budgetPort));
+
         FinanceBudget budget = new FinanceBudget(null, null, command.categoryId(), userId,
                 command.applyStartDate(), command.applyEndDate(), command.amount(), null);
         // 기간 중첩 시 어댑터가 finance_budgets_no_overlap EXCLUDE 위반을 OverlappingPeriodException으로 변환한다.
         FinanceBudget saved = budgetPort.save(budget);
         log.info("예산 등록: userId={}, budgetId={}", userId, saved.id());
         return saved;
+    }
+
+    // 겹치는 후보 각각을 트림/삭제/거부로 판정한다. 하나라도 거부 조건이면 즉시 예외를 던져
+    // create()가 어떤 DB 변경도 실행하지 않도록 한다(부분 적용 방지).
+    private List<OverlapAction> resolveOverlapActions(List<FinanceBudget> candidates, FinanceBudgetCommand command) {
+        LocalDate newStart = command.applyStartDate();
+        LocalDate newEnd = command.applyEndDate();
+        List<OverlapAction> actions = new ArrayList<>();
+        for (FinanceBudget existing : candidates) {
+            LocalDate existingStart = existing.applyStartDate();
+            LocalDate existingEnd = existing.applyEndDate();
+            if (existingStart.isBefore(newStart)) {
+                boolean fitsWithinNewEnd = existingEnd == null || newEnd == null || !existingEnd.isAfter(newEnd);
+                if (!fitsWithinNewEnd) {
+                    throw new FinanceBudget.OverlappingPeriodException("해당 기간에 자동조정할 수 없는 기존 예산이 있습니다");
+                }
+                actions.add(OverlapAction.trim(existing, newStart.minusDays(1)));
+            } else {
+                boolean fullyWithinNewRange = newEnd == null || (existingEnd != null && !existingEnd.isAfter(newEnd));
+                if (!fullyWithinNewRange) {
+                    throw new FinanceBudget.OverlappingPeriodException("해당 기간에 자동조정할 수 없는 기존 예산이 있습니다");
+                }
+                actions.add(OverlapAction.delete(existing));
+            }
+        }
+        return actions;
+    }
+
+    // 겹침 판정 결과 하나(트림 또는 삭제)를 표현하는 내부 값 객체. execute()가 실제 포트 호출을 수행한다.
+    private record OverlapAction(FinanceBudget existing, LocalDate trimmedEndDate) {
+        static OverlapAction trim(FinanceBudget existing, LocalDate trimmedEndDate) {
+            return new OverlapAction(existing, trimmedEndDate);
+        }
+
+        static OverlapAction delete(FinanceBudget existing) {
+            return new OverlapAction(existing, null);
+        }
+
+        void execute(FinanceBudgetPort budgetPort) {
+            if (trimmedEndDate != null) {
+                FinanceBudget trimmed = new FinanceBudget(existing.id(), existing.groupId(), existing.categoryId(),
+                        existing.userId(), existing.applyStartDate(), trimmedEndDate, existing.amount(), existing.createdAt());
+                budgetPort.save(trimmed);
+            } else {
+                budgetPort.delete(existing.id());
+            }
+        }
     }
 
     @Override
