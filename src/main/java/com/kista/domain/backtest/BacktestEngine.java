@@ -94,6 +94,15 @@ public class BacktestEngine {
             // (1) 어제 주문을 오늘 캔들로 체결 — 오늘 만든 주문은 오늘 체결하지 않는다(look-ahead 방지 핵심 불변조건)
             state.applyFills(FillSimulator.simulate(pending, candle));
 
+            // 체결 후 예수금이 음수면 0으로 조정 — INFINITE 최소 1주 강제·PRIVACY 배수 과대 산출로 시드를 넘겨 살 수 있다
+            // VrState.applyRecurringCashFlow의 인출 클램프와 동일 성격의 방어이며, poolUsed 등 전략별 누계는 이미
+            // applyFills 안에서 클램프 전 실제 체결금액으로 계산이 끝난 뒤라 영향받지 않는다(이월 잔고에만 바닥을 둔다)
+            if (state.balance.usdDeposit().signum() < 0) {
+                warnings.add("체결 후 예수금 부족으로 0 조정: date=" + candle.date()
+                        + ", 부족액=" + state.balance.usdDeposit().negate());
+                state.balance = new AccountBalance(state.balance.holdings(), state.balance.avgPrice(), BigDecimal.ZERO);
+            }
+
             // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가
             points.add(new BacktestPoint(candle.date(),
                     state.balance.usdDeposit().add(marketValue(candle, state.balance.holdings())),
