@@ -3,8 +3,15 @@ package com.kista.domain.backtest;
 import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
+import com.kista.domain.model.order.Order;
+import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.domain.strategy.InfiniteStrategy;
+import com.kista.domain.strategy.ReverseInfiniteStrategy;
 import com.kista.domain.strategy.VrCycleOrderStrategy;
 import com.kista.domain.strategy.VrStrategy;
 import org.junit.jupiter.api.DisplayName;
@@ -12,12 +19,15 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// BacktestEngine VR 경로 — 합성 OHLC 픽스처 기반 결정적 검증 (mock 없음, 기대값은 손계산 상수)
+// BacktestEngine VR·INFINITE 경로 — 합성 OHLC 픽스처 기반 결정적 검증 (mock 없음, 기대값은 손계산 상수)
 class BacktestEngineTest {
 
     private final BacktestEngine engine = new BacktestEngine(
@@ -189,15 +199,15 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("VR 외 전략 타입은 아직 지원하지 않아 즉시 실패한다")
-    void VR이_아닌_전략은_예외를_던진다() {
-        BacktestCommand infinite = new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+    @DisplayName("VR·INFINITE 외 전략 타입은 아직 지원하지 않아 즉시 실패한다")
+    void 미지원_전략은_예외를_던진다() {
+        BacktestCommand privacy = new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-31"), bd(1000),
                 20, null, null, 0, null);
 
-        assertThatThrownBy(() -> engine.run(List.of(candle("2024-01-02", 100, 105, 95, 100)), infinite))
+        assertThatThrownBy(() -> engine.run(List.of(candle("2024-01-02", 100, 105, 95, 100)), privacy))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("INFINITE");
+                .hasMessageContaining("PRIVACY");
     }
 
     @Test
@@ -225,5 +235,309 @@ class BacktestEngineTest {
         // 3일차 bootstrap 체결(4주×100=400) 후, 4일차에 0.00 매도가 전량 체결돼 예수금만 600 남는다
         assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("1000");
         assertThat(output.points().get(3).totalAsset()).isEqualByComparingTo("600");
+    }
+
+    // --- INFINITE 픽스처 헬퍼 ---
+
+    // 엔진이 조립해 넘긴 PlanContext를 날짜별로 붙잡아 두는 기록기 — mock이 아니라 실제 전략에 그대로 위임한다
+    // Output(points/tradeCount)만으론 리버스모드 플래그·별지점 같은 내부 입력을 직접 단언할 수 없어 필요하다
+    private static final class RecordingInfinite extends InfiniteCycleOrderStrategy {
+
+        private final Map<LocalDate, Recorded> byDate = new LinkedHashMap<>();
+
+        RecordingInfinite() {
+            super(new InfiniteStrategy(), new ReverseInfiniteStrategy());
+        }
+
+        @Override
+        public Optional<OrderPlan> plan(PlanContext ctx) {
+            Optional<OrderPlan> result = super.plan(ctx);
+            byDate.put(ctx.tradeDate(),
+                    new Recorded(ctx.infinite(), ctx.balance(), result.map(OrderPlan::orders).orElse(List.of())));
+            return result;
+        }
+
+        // 해당 날짜에 plan()이 호출됐는지 — 워밍업 방어로 주문 생성을 건너뛴 날은 false
+        boolean planned(String date) {
+            return byDate.containsKey(LocalDate.parse(date));
+        }
+
+        Recorded on(String date) {
+            Recorded recorded = byDate.get(LocalDate.parse(date));
+            assertThat(recorded).as("%s 주문 생성 기록", date).isNotNull();
+            return recorded;
+        }
+    }
+
+    // 하루치 plan() 입력·출력 스냅샷
+    private record Recorded(
+            CycleOrderStrategy.PlanContext.InfiniteInputs inputs, // 엔진이 조립한 리버스모드·별지점·전일종가
+            AccountBalance balance,                               // 체결 반영 후 잔고
+            List<Order> orders                                    // 캡 보정 전 전략 원본 주문
+    ) {
+        // 주문 다리 식별자 목록 — 전반/후반/리버스 패턴 판별용
+        List<String> legs() {
+            return orders.stream().map(Order::orderLeg).toList();
+        }
+
+        // 전략 계산 시점 포지션 재구성 — currentRound/전후반 판정을 직접 단언하기 위함
+        InfinitePosition position(int divisionCount) {
+            return new InfinitePosition(balance, Strategy.Ticker.TQQQ, inputs.prevClosePrice(), divisionCount);
+        }
+    }
+
+    private static BacktestCommand infiniteCommand(String from, String seed, int divisionCount) {
+        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+                LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
+                divisionCount, null, null, 0, null);
+    }
+
+    private static DailyCandle flat(String date, double close) {
+        return candle(date, close, close, close, close);
+    }
+
+    // --- INFINITE 경로 ---
+
+    @Test
+    @DisplayName("워밍업 없이 from부터 캔들이 시작하면 첫날 주문만 생략하고 경고를 남긴 뒤 둘째 날부터 정상 진행된다")
+    void 전일종가가_없는_첫날은_주문을_생략하고_경고를_남긴다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // seed=1000, 4분할 → 1일차는 holdings=0·prevClose=null이라 planNormalMode()가 예외를 던질 상황 → 호출 자체를 막는다
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 90),
+                candle("2024-01-04", 95, 100, 88, 95)
+        ), infiniteCommand("2024-01-01", "1000", 4));
+
+        assertThat(output.warnings()).containsExactly("전일종가 없음, 첫 거래일 주문 생략: date=2024-01-01");
+        // 예외를 잡아서 넘기는 게 아니라 전략 호출 자체가 없었어야 한다
+        assertThat(recorder.planned("2024-01-01")).isFalse();
+
+        // 2일차: prevClose=100 → 평단가 대용 100, unitAmount=1000/4=250.00, 기준가=100×1.15=115.00 → 전반 매수 2건
+        assertThat(recorder.on("2024-01-02").inputs().prevClosePrice()).isEqualByComparingTo("100");
+        assertThat(recorder.on("2024-01-02").legs())
+                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+
+        // 3일차 종가 90에 LOC 매수 2건(@100.00 / 캡 105.00) 체결 → 예수금 820, 2주 보유
+        // 4일차 종가 95에 기준가 매수 1건(@99.00)만 체결 → 예수금 725 + 3주×95 = 1010.00
+        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
+                .satisfiesExactly(
+                        p -> assertThat(p).isEqualByComparingTo("1000"),
+                        p -> assertThat(p).isEqualByComparingTo("1000"),
+                        p -> assertThat(p).isEqualByComparingTo("1000"),
+                        p -> assertThat(p).isEqualByComparingTo("1010"));
+        assertThat(output.tradeCount()).isEqualTo(3);
+        assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("워밍업 프리픽스가 있으면 from 이전 캔들은 전일종가만 채우고 포인트·주문 없이 지나간다")
+    void 워밍업_프리픽스는_전일종가만_채운다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 01-01은 from(01-02) 이전 — 체결·포인트·주문 전부 없이 prevClose만 100으로 이월된다
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 90),
+                candle("2024-01-04", 95, 100, 88, 95)
+        ), infiniteCommand("2024-01-02", "1000", 4));
+
+        // 워밍업 덕에 from 당일부터 정상 주문 — 경고 없음
+        assertThat(output.warnings()).isEmpty();
+        assertThat(recorder.planned("2024-01-01")).isFalse();
+        assertThat(recorder.on("2024-01-02").inputs().prevClosePrice()).isEqualByComparingTo("100");
+        assertThat(recorder.on("2024-01-02").legs())
+                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+
+        // 포인트는 정확히 from~to 구간(3일)만 — 워밍업 캔들은 자산 곡선에 등장하지 않는다
+        assertThat(output.points()).extracting(BacktestPoint::date)
+                .containsExactly(LocalDate.parse("2024-01-02"), LocalDate.parse("2024-01-03"),
+                        LocalDate.parse("2024-01-04"));
+        // 시드는 from에 그대로 있고 이후 흐름은 워밍업 없는 케이스의 2~4일차와 동일하다
+        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
+                .satisfiesExactly(
+                        p -> assertThat(p).isEqualByComparingTo("1000"),
+                        p -> assertThat(p).isEqualByComparingTo("1000"),
+                        p -> assertThat(p).isEqualByComparingTo("1010"));
+        assertThat(output.tradeCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("일반모드: currentRound가 divisionCount/2를 넘으면 전반 2건 매수에서 후반 단일 매수로 패턴이 바뀐다")
+    void 전반에서_후반으로_주문_패턴이_전환된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 4분할이라 전후반 경계는 currentRound=2.0 — 종가를 계단식으로 내려 회차를 끌어올린다
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
+                flat("2024-01-04", 85), flat("2024-01-05", 80)
+        ), infiniteCommand("2024-01-01", "1000", 4));
+
+        // 4일차: 4주·평단 87.5000·예수금 650 → 매입금 350 ÷ 단위금액 250.00 = 1.4회차 (< 2.0) → 전반
+        Recorded early = recorder.on("2024-01-04");
+        assertThat(early.position(4).currentRound()).isEqualTo(1.4);
+        assertThat(early.position(4).isEarlyStage()).isTrue();
+        assertThat(early.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
+
+        // 5일차: 6주·평단 85.0000·예수금 490 → 매입금 510 ÷ 250.00 = 2.04회차 (≥ 2.0) → 후반 단일 매수
+        Recorded late = recorder.on("2024-01-05");
+        assertThat(late.position(4).currentRound()).isEqualTo(2.04);
+        assertThat(late.position(4).isEarlyStage()).isFalse();
+        assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
+        // 후반 매수 수량 = 단위금액 250.00 ÷ 기준가 85.00 내림 = 2주 (기준가 = 평단 85 × (1 + 0.00))
+        assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
+        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("85.00");
+
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("970");
+        assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("리버스모드 진입: 첫날은 MOC 매도만, 둘째 날부터 별지점 기준 LOC 매도·쿼터매수가 나온다")
+    void 리버스모드_진입_첫날은_MOC_매도만_생성된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
+                flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75),
+                flat("2024-01-07", 70), flat("2024-01-08", 65)
+        ), infiniteCommand("2024-01-01", "1000", 4));
+
+        // 6일차까지는 일반모드 — 단위금액 250.00 ≤ 예수금 340이라 아직 최종회차가 아니다
+        assertThat(recorder.on("2024-01-06").inputs().isReverseMode()).isFalse();
+
+        // 7일차: 11주·평단 79.0909·예수금 130 → 단위금액 250.00 > 예수금 130 → isFinalRound 성립 → 리버스모드 진입
+        Recorded firstDay = recorder.on("2024-01-07");
+        assertThat(firstDay.inputs().isReverseMode()).isTrue();
+        assertThat(firstDay.inputs().isFirstReverseDay()).isTrue();
+        // 진입 첫날은 별지점을 계산하지 않는다(즉시 청산 시작)
+        assertThat(firstDay.inputs().starPointPrice()).isNull();
+        assertThat(firstDay.legs()).containsExactly("REVERSE_INFINITE_MOC_SELL");
+        // MOC 매도 수량 = 11주 ÷ (4분할/2) = 5주
+        assertThat(firstDay.orders().getFirst().quantity()).isEqualTo(5);
+        assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(Order.OrderType.MOC);
+
+        // 8일차: 별지점 = 최근 5거래일 종가(85·80·75·70·65) 평균 = 375 ÷ 5 = 75.00
+        Recorded secondDay = recorder.on("2024-01-08");
+        assertThat(secondDay.inputs().isFirstReverseDay()).isFalse();
+        assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("75.00");
+        assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
+        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 455 ÷ 4) ÷ 74.99 내림 = 1주 @별지점−0.01
+        assertThat(secondDay.orders().get(0).quantity()).isEqualTo(3);
+        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("75.00");
+        assertThat(secondDay.orders().get(1).quantity()).isEqualTo(1);
+        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("74.99");
+
+        // 7일차 MOC 매도 5주가 8일차 종가 65에 체결 → 예수금 455 + 6주×65 = 845.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("845");
+        assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("리버스모드 종료: 종가가 평단×(1−목표수익률) 이상으로 회복되면 일반모드로 복귀한다")
+    void 종가가_회복되면_리버스모드가_종료된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 진입 시나리오는 위와 동일하되 8일차 종가만 65 → 68로 올린다
+        // 회복 임계선 = 평단 79.0909 × (1 − 0.15) = 67.23 → 68 ≥ 67.23이라 복귀
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
+                flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75),
+                flat("2024-01-07", 70), flat("2024-01-08", 68)
+        ), infiniteCommand("2024-01-01", "1000", 4));
+
+        assertThat(recorder.on("2024-01-07").inputs().isReverseMode()).isTrue();
+
+        Recorded back = recorder.on("2024-01-08");
+        assertThat(back.inputs().isReverseMode()).isFalse();
+        assertThat(back.inputs().starPointPrice()).isNull();
+        // 일반모드 주문 다리로 복귀 — 6주·평단 79.0909·예수금 470 → 2.01회차라 후반
+        assertThat(back.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
+        assertThat(back.orders().getFirst().quantity()).isEqualTo(2);
+        assertThat(back.orders().getFirst().price()).isEqualByComparingTo("79.09");
+
+        // MOC 매도 5주가 종가 68에 체결 → 예수금 470 + 6주×68 = 878.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("878");
+        assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("사이클 종료·재시작: 청산되면 cycleCount가 늘고 리버스모드는 꺼지며 예수금은 그대로 이월된다")
+    void 청산되면_새_사이클이_리버스모드_해제_상태로_시작된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 2분할이면 리버스모드 MOC 매도 수량 = holdings ÷ (2/2) = 전량이라 리버스모드 상태 그대로 청산에 도달한다
+        // nextReverseMode()는 holdings=0이면 "유지"를 반환하므로, 새 사이클이 일반모드로 시작되는 건 rotateCycle()의 리셋 덕분이다
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 100),
+                flat("2024-01-04", 95), flat("2024-01-05", 90)
+        ), infiniteCommand("2024-01-02", "1000", 2));
+
+        // 4일차: 10주·평단 97.5·예수금 25 → 단위금액 500.00 > 25 → 리버스모드 진입, 전량(10주) MOC 매도
+        Recorded liquidating = recorder.on("2024-01-04");
+        assertThat(liquidating.inputs().isReverseMode()).isTrue();
+        assertThat(liquidating.inputs().isFirstReverseDay()).isTrue();
+        assertThat(liquidating.orders().getFirst().quantity()).isEqualTo(10);
+
+        // 5일차: 10주가 종가 90에 전량 체결 → holdings 0 → 사이클 종료·즉시 재시작
+        Recorded restarted = recorder.on("2024-01-05");
+        assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(restarted.balance().holdings()).isZero();
+        // 리버스모드·별지점 윈도우 리셋 — 새 사이클은 항상 일반모드 0회차로 시작한다
+        assertThat(restarted.inputs().isReverseMode()).isFalse();
+        assertThat(restarted.inputs().isFirstReverseDay()).isFalse();
+        assertThat(restarted.inputs().starPointPrice()).isNull();
+        assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+
+        // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 25 + 매도대금 900 = 925.00
+        assertThat(restarted.balance().usdDeposit()).isEqualByComparingTo("925");
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("925");
+        assertThat(output.warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("별지점 사이클 스코프 회귀: 새 사이클의 별지점 평균에 이전 사이클 종가가 섞이지 않는다")
+    void 별지점_윈도우는_사이클_경계에서_초기화된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 사이클 A(01-02~01-04)는 1000달러대 고가 구간, 사이클 B(01-04~)는 그보다 낮은 구간 —
+        // 두 구간의 종가 수준을 벌려 놔야 윈도우 오염이 평균값 차이로 드러난다
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 1000),
+                flat("2024-01-02", 1000),
+                flat("2024-01-03", 1000),
+                candle("2024-01-04", 1100, 1200, 1080, 1160), // 지정가 매도 2주@1150 체결 → 전량 청산 → 사이클 종료
+                flat("2024-01-05", 1040),
+                candle("2024-01-06", 1045, 1050, 1040, 1045),
+                flat("2024-01-07", 990),                      // 사이클 B 리버스모드 진입(첫날)
+                flat("2024-01-08", 800)                       // 사이클 B 리버스모드 둘째 날 — 별지점 산출
+        ), infiniteCommand("2024-01-02", "3000", 4));
+
+        assertThat(output.cycleCount()).isEqualTo(2);
+        // 청산 당일이 곧 사이클 B의 0회차 — 예수금 1000 + 매도대금 2300 = 3300.00이 그대로 이월된다
+        assertThat(recorder.on("2024-01-04").balance().holdings()).isZero();
+        assertThat(recorder.on("2024-01-04").balance().usdDeposit()).isEqualByComparingTo("3300.00");
+
+        assertThat(recorder.on("2024-01-07").inputs().isFirstReverseDay()).isTrue();
+
+        // 사이클 B의 별지점 = 사이클 B 종가 4개(1040·1045·990·800) 평균 = 3875 ÷ 4 = 968.75
+        // rotateCycle()이 recentCloses를 비우지 않으면 윈도우가 [1160·1040·1045·990·800]이 되어 1007.00이 나온다
+        // (사이클 A의 청산일 종가 1160이 섞여 별지점이 38.25달러 위로 밀린다)
+        Recorded starDay = recorder.on("2024-01-08");
+        assertThat(starDay.inputs().isReverseMode()).isTrue();
+        assertThat(starDay.inputs().isFirstReverseDay()).isFalse();
+        assertThat(starDay.inputs().starPointPrice()).isEqualByComparingTo("968.75");
+        assertThat(starDay.inputs().starPointPrice()).isNotEqualByComparingTo("1007.00");
     }
 }

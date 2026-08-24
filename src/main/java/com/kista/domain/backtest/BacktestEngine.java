@@ -6,18 +6,22 @@ import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.domain.model.broker.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.domain.model.strategy.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyVrDetail;
 import com.kista.domain.model.strategy.VrPosition;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.domain.strategy.InfiniteStrategy;
 import com.kista.domain.strategy.PriceCapPolicy;
 import com.kista.domain.strategy.VrStrategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,9 +35,13 @@ public class BacktestEngine {
 
     // 캡 재산정(사다리 재생성) 전용 — VrStrategy는 무상태라 인스턴스 공유 가능
     private static final VrStrategy VR_STRATEGY = new VrStrategy();
+    // 캡 재산정(수량 재계산 + 보정 주문) 전용 — InfiniteStrategy도 무상태
+    private static final InfiniteStrategy INFINITE_STRATEGY = new InfiniteStrategy();
     // VR 램프 유예·단계 주수 기본값 — 운영 StrategyService.normalizeVrRampParams()와 동일
     private static final int DEFAULT_GRACE_WEEKS = 52;
     private static final int DEFAULT_STEP_WEEKS = 26;
+    // 리버스모드 별지점 산출에 쓰는 최근 종가 개수 — 운영 CycleOrderComputer.STAR_POINT_WINDOW와 동일
+    private static final int STAR_POINT_WINDOW = 5;
 
     private final CycleOrderStrategies strategies;
 
@@ -54,23 +62,35 @@ public class BacktestEngine {
         if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of());
         return switch (command.type()) {
             case VR -> runVr(candles, command);
-            // INFINITE/PRIVACY 분기는 후속 태스크가 여기에 추가한다 — 그 전까지는 조용히 빈 결과를 내지 않고 명확히 실패시킨다
+            case INFINITE -> runInfinite(candles, command);
+            // PRIVACY 분기는 후속 태스크가 여기에 추가한다 — 그 전까지는 조용히 빈 결과를 내지 않고 명확히 실패시킨다
             default -> throw new IllegalArgumentException("백테스트 미지원 전략: " + command.type());
         };
     }
 
-    // --- VR 경로 ---
+    // --- 전략 공통 일봉 루프 ---
 
-    private Output runVr(List<DailyCandle> candles, BacktestCommand command) {
-        StrategyVrDetail detail = syntheticVrDetail(command);
-        VrState state = new VrState(command, detail, candles.getFirst().date());
+    // 전략별 하루 처리 콜백 — 체결·자산 기록이 끝난 뒤 호출돼 "내일 체결 대상" 주문을 반환한다
+    @FunctionalInterface
+    private interface DayPlanner {
+        List<Order> planFor(DailyCandle candle, BigDecimal prevClose);
+    }
 
+    // 전략 무관 일봉 루프 — look-ahead 불변조건(어제 주문만 오늘 체결 / prevClose는 루프 최하단 갱신)을 여기 한 곳에서만 관리한다
+    // tradingStart 이전 캔들은 전일종가 확보용 워밍업 프리픽스로 취급 — 체결·기록·주문생성을 전혀 하지 않는다
+    private Output runDays(List<DailyCandle> candles, LocalDate tradingStart, DayState state,
+                           List<String> warnings, DayPlanner planner) {
         List<BacktestPoint> points = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
         List<Order> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
         BigDecimal prevClose = null;     // 전일 종가 — referencePrice·캡 기준가 공용
 
         for (DailyCandle candle : candles) {
+            // 워밍업 구간: 매매를 시뮬레이션하지 않고 전일종가만 이월한다
+            if (candle.date().isBefore(tradingStart)) {
+                prevClose = candle.close();
+                continue;
+            }
+
             // (1) 어제 주문을 오늘 캔들로 체결 — 오늘 만든 주문은 오늘 체결하지 않는다(look-ahead 방지 핵심 불변조건)
             state.applyFills(FillSimulator.simulate(pending, candle));
 
@@ -79,17 +99,29 @@ public class BacktestEngine {
                     state.balance.usdDeposit().add(marketValue(candle, state.balance.holdings())),
                     state.principal));
 
-            // (3) 롤오버 판정 — 오늘 체결까지 반영한 잔고 기준으로 판정해야 오늘 새 사이클의 첫 주문이 나온다
-            rolloverIfDue(state, command, detail, candle, warnings);
-
-            // (4)(5) 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정 → 내일 체결 대상이 된다
-            pending = planVrOrders(state, command, candle, prevClose);
+            // (3) 전략별 하루 처리 — 사이클 판정 후 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정
+            pending = planner.planFor(candle, prevClose);
 
             // prevClose 갱신은 반드시 루프 최하단 — 오늘 주문은 "전일" 종가까지만 볼 수 있어야 한다(첫날은 null → 캡·bootstrap 없음)
             prevClose = candle.close();
         }
         // 마지막 pending은 체결 기회가 없어 자연히 버려진다
         return new Output(List.copyOf(points), state.tradeCount, state.cycleCount, List.copyOf(warnings));
+    }
+
+    // --- VR 경로 ---
+
+    private Output runVr(List<DailyCandle> candles, BacktestCommand command) {
+        StrategyVrDetail detail = syntheticVrDetail(command);
+        VrState state = new VrState(command, detail, candles.getFirst().date());
+        List<String> warnings = new ArrayList<>();
+
+        // VR엔 워밍업 프리픽스 개념이 없다(전일종가 없이도 사다리가 성립) — 첫 캔들을 거래 시작일로 넘겨 pre-start skip을 no-op으로 만든다
+        return runDays(candles, candles.getFirst().date(), state, warnings, (candle, prevClose) -> {
+            // 롤오버 판정 — 오늘 체결까지 반영한 잔고 기준으로 판정해야 오늘 새 사이클의 첫 주문이 나온다
+            rolloverIfDue(state, command, detail, candle, warnings);
+            return planVrOrders(state, command, candle, prevClose);
+        });
     }
 
     // VR N주 롤오버 — 운영 VrCycleRolloverService와 동일 순서(조정 전 예수금으로 V′ 계산 → V′≤0이면 보류)
@@ -154,6 +186,69 @@ public class BacktestEngine {
         return replaceBuysPreservingOrder(orders, VR_STRATEGY.buildCappedBuyOrders(position, ticker, tradeDate, cap));
     }
 
+    // --- INFINITE 경로 ---
+
+    private Output runInfinite(List<DailyCandle> candles, BacktestCommand command) {
+        InfiniteState state = new InfiniteState(command);
+        List<String> warnings = new ArrayList<>();
+
+        // INFINITE는 0회차에 전일종가가 필수라 command.from() 이전 캔들을 워밍업 프리픽스로 소비한다(매매는 from부터)
+        return runDays(candles, command.from(), state, warnings,
+                (candle, prevClose) -> planInfiniteDay(state, command, candle, prevClose, warnings));
+    }
+
+    // INFINITE 하루 처리 — 순서 고정: 별지점 윈도우 갱신 → 리버스모드 전이 → 사이클 종료 판정 → 주문 생성
+    private List<Order> planInfiniteDay(InfiniteState state, BacktestCommand command, DailyCandle candle,
+                                        BigDecimal prevClose, List<String> warnings) {
+        // 오늘 종가는 리버스모드 여부와 무관하게 매일 윈도우에 쌓는다(사이클 스코프 — 종료 시 함께 비워짐)
+        state.pushClose(candle.close());
+
+        // 리버스모드 전이 — 오늘 체결까지 반영한 잔고와 오늘 종가로 판정(운영 CyclePositionPersistor.computeNewReverseMode와 동일 타이밍)
+        state.applyReverseModeTransition(command.ticker(), candle.close());
+
+        // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클의 0회차 주문이어야 한다
+        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) state.rotateCycle();
+        // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다(모든 분기 공통 통과 지점)
+        state.prevDayHoldings = state.balance.holdings();
+
+        return planInfiniteOrders(state, command, candle, prevClose, warnings);
+    }
+
+    // 오늘 주문 생성 — PlanContext 조립 후 기존 InfiniteCycleOrderStrategy.plan()에 위임
+    private List<Order> planInfiniteOrders(InfiniteState state, BacktestCommand command, DailyCandle candle,
+                                           BigDecimal prevClose, List<String> warnings) {
+        // 0회차(holdings=0)에 전일종가가 없으면 운영 planNormalMode()가 예외를 던진다 — 호출 전에 방어하고 그날만 주문을 생략한다
+        if (state.balance.holdings() == 0 && prevClose == null) {
+            warnings.add("전일종가 없음, 첫 거래일 주문 생략: date=" + candle.date());
+            return List.of();
+        }
+
+        CycleOrderStrategy.PlanContext.InfiniteInputs infiniteInputs = new CycleOrderStrategy.PlanContext.InfiniteInputs(
+                state.divisionCount, prevClose, state.starPointPrice(), state.reverseMode, state.isFirstReverseDay);
+        CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
+                state.balance, syntheticStrategy(command), candle.date(), "backtest", infiniteInputs, null, null);
+
+        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(Strategy.Type.INFINITE).plan(ctx);
+        List<Order> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
+        // 리버스모드면 position이 null — 운영 BuyOrderPriceCapper와 동일하게 캡 재산정 대상에서 제외된다
+        return applyInfiniteBuyCap(orders, prevClose,
+                plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null), candle.date());
+    }
+
+    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(INFINITE_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
+    private List<Order> applyInfiniteBuyCap(List<Order> orders, BigDecimal prevClose, InfinitePosition position,
+                                            LocalDate tradeDate) {
+        if (prevClose == null || position == null) return orders;
+        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        if (buys.isEmpty()) return orders;
+
+        BigDecimal cap = PriceCapPolicy.capFor(prevClose);
+        if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
+        return replaceBuysPreservingOrder(orders, INFINITE_STRATEGY.buildCappedBuyOrders(position, tradeDate, buys, cap));
+    }
+
+    // --- 전략 공통 헬퍼 ---
+
     // 재산정 BUY가 원래 BUY 자리를 채우고 남는 보정 BUY는 뒤에 붙인다 — SELL은 원래 상대 순서 그대로 유지
     private static List<Order> replaceBuysPreservingOrder(List<Order> orders, List<Order> cappedBuys) {
         List<Order> replaced = new ArrayList<>(orders.size() + cappedBuys.size());
@@ -166,9 +261,9 @@ public class BacktestEngine {
         return List.copyOf(replaced);
     }
 
-    // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 ticker만 참조)
+    // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 type·ticker만 참조)
     private static Strategy syntheticStrategy(BacktestCommand command) {
-        return new Strategy(null, null, Strategy.Type.VR, Strategy.Status.ACTIVE,
+        return new Strategy(null, null, command.type(), Strategy.Status.ACTIVE,
                 command.ticker(), Strategy.CycleSeedType.NONE);
     }
 
@@ -194,33 +289,48 @@ public class BacktestEngine {
         return openPool.multiply(poolLimitRate).setScale(2, HALF_UP);
     }
 
-    // VR 루프의 가변 상태 — 롤오버가 8개 값을 한꺼번에 갱신해야 해 record 대신 가변 홀더로 둔다
-    private static final class VrState {
-        AccountBalance balance;                // 현재 잔고
-        BigDecimal principal;                  // 원금 (시드 + 실제 반영된 적립/인출 누계)
+    // 전략 공통 루프 상태 — 잔고·원금·집계 카운터. 전략별 상태는 서브클래스가 얹는다
+    private static class DayState {
+        AccountBalance balance;   // 현재 잔고
+        BigDecimal principal;     // 원금 (시드 + 실제 반영된 적립/인출 누계)
+        int tradeCount;           // 체결 건수 누계
+        int cycleCount = 1;       // 진행된 사이클 수
+
+        DayState(BigDecimal seed) {
+            this.balance = new AccountBalance(0, null, seed);
+            this.principal = seed;
+        }
+
+        // 체결 반영 — 잔고·체결건수 갱신
+        void applyFills(List<Execution> executions) {
+            if (executions.isEmpty()) return;
+            balance = balance.applyExecutions(executions);
+            tradeCount += executions.size();
+        }
+    }
+
+    // VR 루프의 가변 상태 — 롤오버가 여러 값을 한꺼번에 갱신해야 해 record 대신 가변 홀더로 둔다
+    private static final class VrState extends DayState {
         BigDecimal value;                      // 현재 V값
         final LocalDate firstCycleStartDate;   // 전략 최초 사이클 시작일 — 램프 경과 주수 기준(불변)
         LocalDate cycleStartDate;              // 현재 사이클 시작일 — 롤오버 도래 판정 기준
         BigDecimal poolLimit;                  // 이번 사이클 매수 상한
         BigDecimal poolUsed = BigDecimal.ZERO; // 이번 사이클 매수 체결 누계
-        int tradeCount;                        // 체결 건수 누계
-        int cycleCount = 1;                    // 진행된 사이클 수
         boolean valueHoldWarned;               // V′≤0 보류 경고 중복 방지 플래그
 
         VrState(BacktestCommand command, StrategyVrDetail detail, LocalDate startDate) {
-            this.balance = new AccountBalance(0, null, command.seed());
-            this.principal = command.seed();
+            super(command.seed());
             this.value = command.vrInitialValue() != null ? command.vrInitialValue() : BigDecimal.ZERO;
             this.firstCycleStartDate = startDate;
             this.cycleStartDate = startDate;
             this.poolLimit = poolLimitOf(command.seed(), detail.poolLimitRateAt(0));
         }
 
-        // 체결 반영 — 잔고·체결건수·이번 사이클 매수 사용액 갱신
+        // 공통 체결 반영에 이번 사이클 매수 사용액 누계를 덧붙인다
+        @Override
         void applyFills(List<Execution> executions) {
             if (executions.isEmpty()) return;
-            balance = balance.applyExecutions(executions);
-            tradeCount += executions.size();
+            super.applyFills(executions);
             poolUsed = poolUsed.add(executions.stream()
                     .filter(e -> e.direction() == BUY)
                     .map(Execution::amountUsd)
@@ -240,6 +350,51 @@ public class BacktestEngine {
             // principal은 클램프 후 실제 반영된 만큼만 증감 — 요청 인출액 전부를 반영하면 원금이 과다 차감된다
             principal = principal.add(adjusted.subtract(before));
             balance = new AccountBalance(balance.holdings(), balance.avgPrice(), adjusted);
+        }
+    }
+
+    // INFINITE 루프의 가변 상태 — 리버스모드 상태 머신 + 사이클 스코프 별지점 윈도우
+    private static final class InfiniteState extends DayState {
+        final int divisionCount;                                  // 분할 수 — 사이클 전체에서 고정(재등록 시 변경은 범위 밖)
+        boolean reverseMode;                                      // 현재 리버스모드 여부
+        boolean isFirstReverseDay;                                // 오늘이 리버스모드 진입 첫날인지
+        int prevDayHoldings;                                      // 어제 이터레이션 종료 시점 보유수량 — 청산(사이클 종료) 판정용
+        final Deque<BigDecimal> recentCloses = new ArrayDeque<>(); // 현재 사이클 최근 종가(최대 5개) — 별지점 산출용
+
+        InfiniteState(BacktestCommand command) {
+            super(command.seed());
+            this.divisionCount = command.divisionCount() != null
+                    ? command.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        }
+
+        // 오늘 종가를 별지점 윈도우에 append — 6개째부터 가장 오래된 값을 버린다
+        void pushClose(BigDecimal close) {
+            recentCloses.addLast(close);
+            if (recentCloses.size() > STAR_POINT_WINDOW) recentCloses.removeFirst();
+        }
+
+        // 리버스모드 상태 전이 — 전이 공식은 InfinitePosition.nextReverseMode에 그대로 위임
+        void applyReverseModeTransition(Strategy.Ticker ticker, BigDecimal closingPrice) {
+            boolean prevReverseMode = reverseMode;
+            InfinitePosition probe = new InfinitePosition(balance, ticker, closingPrice, divisionCount);
+            boolean nextReverseMode = probe.nextReverseMode(prevReverseMode);
+            isFirstReverseDay = !prevReverseMode && nextReverseMode;
+            reverseMode = nextReverseMode;
+        }
+
+        // 별지점 = 현재 사이클 최근 종가 평균(scale=2, HALF_UP) — 리버스모드 2일차부터만 사용(첫날은 MOC 즉시 청산)
+        BigDecimal starPointPrice() {
+            if (!reverseMode || isFirstReverseDay || recentCloses.isEmpty()) return null;
+            BigDecimal sum = recentCloses.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            return sum.divide(BigDecimal.valueOf(recentCloses.size()), 2, HALF_UP);
+        }
+
+        // 사이클 종료 + 즉시 재시작(백테스트 전용 규칙) — 자산은 이월하고 리버스모드·별지점 윈도우만 리셋
+        void rotateCycle() {
+            reverseMode = false;
+            isFirstReverseDay = false;
+            recentCloses.clear();
+            cycleCount++;
         }
     }
 }
