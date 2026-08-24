@@ -39,7 +39,7 @@ adapter/in/
                    BatchContextFactory(전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError), SchedulerJobRunner(공통 실행 골격 — 시작/완료 알림·인터럽트 처리)
                    SchedulerLockService(package-private 분산 락 — tryRun(lockKey, timeout, task); @ConditionalOnProperty(scheduler.enabled) 로컬 중복 실행 방지) — Postgres 기반(`scheduler_locks` 테이블, DB 서버 시각 `now()` 기준 `INSERT ... ON CONFLICT ... WHERE lock_until <= now()`)이라 다중 인스턴스라도 시계 편차 없이 안전하게 경쟁, 어느 한쪽만 매 사이클 실행
                    MarketIndexPriceSyncScheduler는 비거래일에도 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음
-  web/           ← REST Controller + DTO — Auth/Account/TradingCycle/Dashboard/Statistics(KIS 전용 live)/TossStatistics(Toss 전용 live)/Stats(DB 근사 집계)/FearGreed/Meta(enum SSOT)/OrderCancel/MarketHoliday/FidaOrder(`/api/internal/**`)/Settings/Fcm/TradeStream(SSE)/Admin*/Asset/AssetMonthlyCheck/RuntimeConfig/AdminSettings/AdminObservability/AdminScheduler/AdminPing/DevAuth(local 전용)/ClientErrorLog
+  web/           ← REST Controller + DTO — Auth/Account/TradingCycle/Dashboard/Statistics(KIS 전용 live)/TossStatistics(Toss 전용 live)/Stats(DB 근사 집계)/FearGreed/Meta(enum SSOT)/OrderCancel/MarketHoliday/Backtest(과거 일봉 시뮬레이션, 계좌 무관)/FidaOrder(`/api/internal/**`)/Settings/Fcm/TradeStream(SSE)/Admin*/Asset/AssetMonthlyCheck/RuntimeConfig/AdminSettings/AdminObservability/AdminScheduler/AdminPing/DevAuth(local 전용)/ClientErrorLog
                    상세 라우팅·응답 형식 차이 → 아래 "DashboardController vs StatisticsController" 참고
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
   telegram/      ← TelegramWebhookController + TelegramBotService

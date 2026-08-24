@@ -2,6 +2,7 @@ package com.kista.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.common.CycleLookups;
+import com.kista.domain.backtest.FillSimulator;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.broker.*;
@@ -166,20 +167,12 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         BigDecimal closingPrice = getClosingPrice(ticker, to, account);
         List<Execution> executions = new ArrayList<>();
         for (Order order : placed) {
-            if (!fills(order, closingPrice)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
+            if (!FillSimulator.fills(order, closingPrice)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
             // LIMIT은 지정가 그대로 체결, LOC/MOC는 종가 기준 체결
             BigDecimal fillPrice = order.orderType() == Order.OrderType.LIMIT ? order.price() : closingPrice;
             executions.add(Execution.ofManualFill(to, ticker, order.direction(), order.quantity(), fillPrice, order.externalOrderId()));
         }
         return executions;
-    }
-
-    // 주문타입·방향별 체결 조건 — MOC는 무조건 체결, LOC/LIMIT은 방향별 종가-지정가 비교(경계값 포함)
-    private static boolean fills(Order order, BigDecimal closingPrice) {
-        if (order.orderType() == Order.OrderType.MOC) return true;
-        return order.direction() == Order.OrderDirection.BUY
-                ? closingPrice.compareTo(order.price()) <= 0
-                : closingPrice.compareTo(order.price()) >= 0;
     }
 
     // --- MarginPort ---
