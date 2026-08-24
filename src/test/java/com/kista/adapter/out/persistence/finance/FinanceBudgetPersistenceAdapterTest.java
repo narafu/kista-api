@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -180,15 +181,28 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void findOverlapping_returnsOnlyOverlappingPersonalBudgetsInSameCategory() {
-        FinanceBudget notOverlapping = adapter.save(
-                personalBudget(userId, CATEGORY_A, LocalDate.of(2020, 1, 1), LocalDate.of(2020, 12, 31)));
+        // 스코프 격리 검증: 다른 user, 다른 category, 그룹 예산, 범위 외 개인 예산이 모두 제외되는지 확인
+        adapter.save(personalBudget(userId, CATEGORY_A, LocalDate.of(2020, 1, 1), LocalDate.of(2020, 12, 31)));
         FinanceBudget overlapping = adapter.save(
                 personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 1, 1), null));
-        FinanceBudget differentCategory = adapter.save(
-                personalBudget(userId, CATEGORY_B, LocalDate.of(2026, 6, 1), null));
+        adapter.save(personalBudget(userId, CATEGORY_B, LocalDate.of(2026, 6, 1), null));
+        adapter.save(personalBudget(otherUserId, CATEGORY_A, LocalDate.of(2026, 6, 1), null));
+        adapter.save(budget(groupId, CATEGORY_A, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30)));
 
-        java.util.List<FinanceBudget> result = adapter.findOverlapping(userId, CATEGORY_A,
+        List<FinanceBudget> result = adapter.findOverlapping(userId, CATEGORY_A,
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31));
+
+        assertThat(result).extracting(FinanceBudget::id).containsExactly(overlapping.id());
+    }
+
+    @Test
+    void findOverlapping_withNullEndDate_returnsAllOverlappingFromStartDateOnward() {
+        // 무기한 조회(endDate=null) 분기가 실행되고 올바르게 동작하는지 검증
+        FinanceBudget overlapping = adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31)));
+        adapter.save(personalBudget(userId, CATEGORY_A, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+
+        List<FinanceBudget> result = adapter.findOverlapping(userId, CATEGORY_A, LocalDate.of(2026, 1, 1), null);
 
         assertThat(result).extracting(FinanceBudget::id).containsExactly(overlapping.id());
     }
