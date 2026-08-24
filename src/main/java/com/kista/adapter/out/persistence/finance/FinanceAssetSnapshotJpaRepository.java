@@ -27,6 +27,8 @@ interface FinanceAssetSnapshotJpaRepository extends JpaRepository<FinanceAssetSn
     List<FinanceAssetSnapshotEntity> findMyScope(@Param("userId") UUID userId, @Param("currentGroupId") UUID currentGroupId,
             @Param("from") LocalDate from, @Param("to") LocalDate to, @Param("filterUserId") UUID filterUserId);
 
+    boolean existsByAccountIdAndDeletedAtIsNull(UUID accountId);
+
     @Modifying
     @Query("UPDATE FinanceAssetSnapshotEntity s SET s.deletedAt = :now WHERE s.id = :id")
     void softDeleteById(@Param("id") UUID id, @Param("now") Instant now);

@@ -37,6 +37,11 @@ public class AssetSnapshotPersistenceAdapter implements AssetSnapshotPort {
     }
 
     @Override
+    public boolean existsByAccountId(UUID accountId) {
+        return jpaRepository.existsByAccountIdAndDeletedAtIsNull(accountId);
+    }
+
+    @Override
     public void softDelete(UUID id) {
         jpaRepository.softDeleteById(id, Instant.now());
     }

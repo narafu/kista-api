@@ -2,6 +2,7 @@ package com.kista.application.service.finance;
 
 import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.domain.model.finance.FinanceAccountCommand;
+import com.kista.domain.port.out.AssetSnapshotPort;
 import com.kista.domain.port.out.FinanceAccountPort;
 import com.kista.domain.port.out.FinanceGroupPort;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,7 @@ class FinanceAccountServiceTest {
 
     @Mock FinanceAccountPort accountPort;
     @Mock FinanceGroupPort financeGroupPort;
+    @Mock AssetSnapshotPort assetSnapshotPort;
     @InjectMocks FinanceAccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -100,10 +102,24 @@ class FinanceAccountServiceTest {
     void delete_loadsThenVerifiesThenSoftDeletes() {
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(personalAccount());
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(assetSnapshotPort.existsByAccountId(accountId)).thenReturn(false);
 
         accountService.delete(accountId, userId);
 
         verify(accountPort).softDelete(accountId);
+    }
+
+    @Test
+    @DisplayName("delete는 매핑된 자산 기록이 있으면 LinkedAssetSnapshotsException으로 거부")
+    void delete_withLinkedAssetSnapshots_throwsLinkedAssetSnapshotsException() {
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(personalAccount());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(assetSnapshotPort.existsByAccountId(accountId)).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.delete(accountId, userId))
+                .isInstanceOf(FinanceAccount.LinkedAssetSnapshotsException.class);
+
+        verify(accountPort, never()).softDelete(accountId);
     }
 
     @Test

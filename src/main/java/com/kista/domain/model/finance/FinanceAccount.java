@@ -50,4 +50,11 @@ public record FinanceAccount(
             super("이미 같은 이름의 계좌가 있습니다: " + name);
         }
     }
+
+    // 계좌 삭제 요청 시 매핑된 자산 기록이 남아있으면 차단 — 먼저 자산 기록의 계좌를 미지정으로 바꿔야 한다.
+    public static class LinkedAssetSnapshotsException extends RuntimeException {
+        public LinkedAssetSnapshotsException() {
+            super("이 계좌에 매핑된 자산 기록이 있어 삭제할 수 없습니다. 먼저 자산 기록의 계좌 매핑을 해제해주세요");
+        }
+    }
 }

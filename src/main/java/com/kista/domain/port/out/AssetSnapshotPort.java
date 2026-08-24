@@ -20,6 +20,7 @@ public interface AssetSnapshotPort {
     }
 
     AssetSnapshot save(AssetSnapshot snapshot);
+    boolean existsByAccountId(UUID accountId);
     void softDelete(UUID id);
     void softDeleteByUserId(UUID userId); // 회원 탈퇴 시 내가 입력한 스냅샷만
 }

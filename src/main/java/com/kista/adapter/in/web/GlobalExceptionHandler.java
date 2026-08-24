@@ -63,6 +63,7 @@ public class GlobalExceptionHandler {
         Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict")),
         Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.DuplicateNameException.class,         new Mapping(HttpStatus.CONFLICT,           "Conflict")),
+        Map.entry(FinanceAccount.LinkedAssetSnapshotsException.class,  new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict"))
     );

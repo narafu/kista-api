@@ -3,6 +3,7 @@ package com.kista.application.service.finance;
 import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.domain.model.finance.FinanceAccountCommand;
 import com.kista.domain.port.in.FinanceAccountUseCase;
+import com.kista.domain.port.out.AssetSnapshotPort;
 import com.kista.domain.port.out.FinanceAccountPort;
 import com.kista.domain.port.out.FinanceGroupPort;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ class FinanceAccountService implements FinanceAccountUseCase {
 
     private final FinanceAccountPort accountPort;
     private final FinanceGroupPort financeGroupPort;
+    private final AssetSnapshotPort assetSnapshotPort;
 
     @Override
     @Transactional(readOnly = true)
@@ -56,6 +58,9 @@ class FinanceAccountService implements FinanceAccountUseCase {
         FinanceAccount existing = accountPort.findByIdOrThrow(accountId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         existing.verifyAccessibleBy(userId, currentGroupId);
+        if (assetSnapshotPort.existsByAccountId(accountId)) {
+            throw new FinanceAccount.LinkedAssetSnapshotsException();
+        }
         accountPort.softDelete(accountId);
         log.info("계좌 삭제: accountId={}, userId={}", accountId, userId);
     }
