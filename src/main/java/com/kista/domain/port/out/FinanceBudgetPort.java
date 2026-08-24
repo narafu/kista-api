@@ -13,6 +13,10 @@ public interface FinanceBudgetPort {
     // currentGroupId는 무그룹 유저면 null(개인 예산만 조회).
     List<FinanceBudget> findMyScope(UUID userId, UUID currentGroupId, UUID categoryId, LocalDate date);
 
+    // 개인 스코프(group_id IS NULL, userId 소유) + 동일 categoryId 중 [startDate, endDate]와 겹치는 예산 조회.
+    // endDate=null이면 무기한 새 예산 — 시작일 이후 전부와 겹침 대상.
+    List<FinanceBudget> findOverlapping(UUID userId, UUID categoryId, LocalDate startDate, LocalDate endDate);
+
     Optional<FinanceBudget> findById(UUID id);
 
     default FinanceBudget findByIdOrThrow(UUID id) {

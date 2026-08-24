@@ -26,6 +26,13 @@ public class FinanceBudgetPersistenceAdapter implements FinanceBudgetPort {
     }
 
     @Override
+    public List<FinanceBudget> findOverlapping(UUID userId, UUID categoryId, LocalDate startDate, LocalDate endDate) {
+        return jpaRepository.findOverlapping(userId, categoryId, startDate, endDate).stream()
+                .map(FinanceBudgetEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<FinanceBudget> findById(UUID id) {
         return jpaRepository.findById(id).map(FinanceBudgetEntity::toDomain);
     }

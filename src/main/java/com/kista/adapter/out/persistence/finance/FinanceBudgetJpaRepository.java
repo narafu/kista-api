@@ -25,6 +25,16 @@ interface FinanceBudgetJpaRepository extends JpaRepository<FinanceBudgetEntity, 
     List<FinanceBudgetEntity> findMyScope(@Param("userId") UUID userId, @Param("currentGroupId") UUID currentGroupId,
             @Param("categoryId") UUID categoryId, @Param("date") LocalDate date);
 
+    // 개인 스코프(user_id 일치, group_id IS NULL) + 동일 category에서 [startDate, endDate]와 겹치는 예산.
+    // endDate가 NULL(무기한)이면 시작일 이후 전부가 겹침 대상 — findMyScope와 동일한 CAST(:x AS date) IS NULL
+    // 우회 패턴 사용(PostgreSQL이 NULL 파라미터 타입을 추론 못 하는 문제 회피).
+    @Query(nativeQuery = true, value = "SELECT * FROM finance_budgets WHERE " +
+            "user_id = :userId AND group_id IS NULL AND category_id = :categoryId " +
+            "AND (CAST(:endDate AS date) IS NULL OR apply_start_date <= CAST(:endDate AS date)) " +
+            "AND (apply_end_date IS NULL OR apply_end_date >= :startDate)")
+    List<FinanceBudgetEntity> findOverlapping(@Param("userId") UUID userId, @Param("categoryId") UUID categoryId,
+            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     // 파생 설정이므로 하드 삭제 (회원 탈퇴 시)
     @Modifying
     @Query("DELETE FROM FinanceBudgetEntity b WHERE b.userId = :userId")

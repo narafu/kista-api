@@ -177,4 +177,19 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(group.id()).isNotNull();
         assertThat(personal.id()).isNotNull();
     }
+
+    @Test
+    void findOverlapping_returnsOnlyOverlappingPersonalBudgetsInSameCategory() {
+        FinanceBudget notOverlapping = adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2020, 1, 1), LocalDate.of(2020, 12, 31)));
+        FinanceBudget overlapping = adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 1, 1), null));
+        FinanceBudget differentCategory = adapter.save(
+                personalBudget(userId, CATEGORY_B, LocalDate.of(2026, 6, 1), null));
+
+        java.util.List<FinanceBudget> result = adapter.findOverlapping(userId, CATEGORY_A,
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31));
+
+        assertThat(result).extracting(FinanceBudget::id).containsExactly(overlapping.id());
+    }
 }
