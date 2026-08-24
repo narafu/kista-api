@@ -93,6 +93,11 @@ public class BacktestEngine {
         List<BacktestPoint> points = new ArrayList<>();
         List<Order> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
         BigDecimal prevClose = null;     // 전일 종가 — referencePrice·캡 기준가 공용
+        // 예수금 플로어 연속 발동구간 커서 — VR valueHoldWarned·PRIVACY 결측요약과 동일 취지로 일별 경고 폭주를 막는다
+        LocalDate floorFrom = null;
+        LocalDate floorTo = null;
+        int floorDays = 0;
+        BigDecimal floorMaxShortfall = BigDecimal.ZERO;
 
         for (DailyCandle candle : candles) {
             // 워밍업 구간: 매매를 시뮬레이션하지 않고 전일종가만 이월한다
@@ -107,10 +112,20 @@ public class BacktestEngine {
             // 체결 후 예수금이 음수면 0으로 조정 — INFINITE 최소 1주 강제·PRIVACY 배수 과대 산출로 시드를 넘겨 살 수 있다
             // VrState.applyRecurringCashFlow의 인출 클램프와 동일 성격의 방어이며, poolUsed 등 전략별 누계는 이미
             // applyFills 안에서 클램프 전 실제 체결금액으로 계산이 끝난 뒤라 영향받지 않는다(이월 잔고에만 바닥을 둔다)
+            // PRIVACY는 initialUsdDeposit이 다음 청산 때까지 안 바뀌고 INFINITE는 매일 최소 1주를 강제해 재발 가능 — 연속구간을
+            // 하루 1건씩 쌓지 않고 구간이 끊길 때(또는 루프 종료)만 1건으로 요약한다
             if (state.balance.usdDeposit().signum() < 0) {
-                warnings.add("체결 후 예수금 부족으로 0 조정: date=" + candle.date()
-                        + ", 부족액=" + state.balance.usdDeposit().negate());
+                BigDecimal shortfall = state.balance.usdDeposit().negate();
+                if (floorFrom == null) floorFrom = candle.date();
+                floorTo = candle.date();
+                floorDays++;
+                if (shortfall.compareTo(floorMaxShortfall) > 0) floorMaxShortfall = shortfall;
                 state.balance = new AccountBalance(state.balance.holdings(), state.balance.avgPrice(), BigDecimal.ZERO);
+            } else if (floorFrom != null) {
+                warnings.add(floorGapWarning(floorFrom, floorTo, floorDays, floorMaxShortfall));
+                floorFrom = null;
+                floorMaxShortfall = BigDecimal.ZERO;
+                floorDays = 0;
             }
 
             // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가
@@ -124,8 +139,15 @@ public class BacktestEngine {
             // prevClose 갱신은 반드시 루프 최하단 — 오늘 주문은 "전일" 종가까지만 볼 수 있어야 한다(첫날은 null → 캡·bootstrap 없음)
             prevClose = candle.close();
         }
+        // 마지막 캔들까지 이어진 플로어 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush
+        if (floorFrom != null) warnings.add(floorGapWarning(floorFrom, floorTo, floorDays, floorMaxShortfall));
         // 마지막 pending은 체결 기회가 없어 자연히 버려진다
         return new Output(List.copyOf(points), state.tradeCount, state.cycleCount, List.copyOf(warnings));
+    }
+
+    // 예수금 플로어 연속구간 1건 요약 — PrivacyState.flushMissingBaseGap과 동일 포맷 관용구
+    private static String floorGapWarning(LocalDate from, LocalDate to, int days, BigDecimal maxShortfall) {
+        return "체결 후 예수금 부족으로 0 조정: " + from + "~" + to + ", 총 " + days + "일, 최대 부족액=" + maxShortfall;
     }
 
     // --- VR 경로 ---

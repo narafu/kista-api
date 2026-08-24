@@ -739,19 +739,32 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("예수금 음수 방지: 배수 스케일이 시드를 넘겨 체결되면 예수금이 0으로 클램프되고 부족액이 경고로 남는다")
+    @DisplayName("예수금 음수 방지: 연속 3일 플로어 발동이 일별 경고가 아니라 구간당 1건으로 요약된다")
     void 체결_후_예수금이_음수면_0으로_클램프된다() {
-        // 배수 1.00 + 기준표 목표 보유 100주 → 보유 보정(diff=100)이 가장 싼 BUY에 전량 얹혀 101주 @100 = 10,100달러
-        // PrivacyStrategy는 예산을 검증하지 않으므로 시드 1000달러로는 감당할 수 없는 주문이 그대로 나간다
+        // 배수 1.00 고정, 기준표 목표 보유를 매일 크게 늘려(100→250→400→550) 보유 보정(diff)이 매일 시드를 넘기게 만든다
+        // 마지막 날(01-05)도 기준표를 채워 "결측 구간" 경고가 섞이지 않게 한다 — 그날 생성된 주문은 체결 기회가 없어 자연히 버려진다
         BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(List.of(
                 flat("2024-01-02", 100),
-                flat("2024-01-03", 100)
-        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("1000", 100,
-                trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100"))));
+                flat("2024-01-03", 100),
+                flat("2024-01-04", 100),
+                flat("2024-01-05", 100)
+        ), privacyCommand("1000"), Map.of(
+                LocalDate.parse("2024-01-02"), privacyBase("1000", 100,
+                        trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100")),
+                LocalDate.parse("2024-01-03"), privacyBase("1000", 250,
+                        trade("2024-01-03", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100")),
+                LocalDate.parse("2024-01-04"), privacyBase("1000", 400,
+                        trade("2024-01-04", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100")),
+                LocalDate.parse("2024-01-05"), privacyBase("1000", 550,
+                        trade("2024-01-05", Order.OrderType.LOC, Order.OrderDirection.BUY, 1, "100"))));
 
-        // 예수금 1000 − 10100 = −9100 → 0으로 클램프, 총자산은 보유분 시장가만 남는다
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("10100");
-        assertThat(output.warnings()).anySatisfy(w -> assertThat(w)
-                .startsWith("체결 후 예수금 부족으로 0 조정: date=2024-01-03, 부족액=9100"));
+        // 01-02 주문: diff=100-0=100 → 101주@100=10,100.0 → 01-03 체결, 예수금 1000-10100.0=-9100.0 → 0 클램프(플로어 1일차)
+        // 01-03 주문: diff=250-101=149 → 150주@100=15,000.0 → 01-04 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 2일차, 최대부족액 15000.0)
+        // 01-04 주문: diff=400-251=149 → 150주@100=15,000.0 → 01-05 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 3일차)
+        // 01-05 주문은 만들어지지만 이후 캔들이 없어 체결·경고 없이 버려짐 → 구간이 루프 종료 시점에 1건으로 flush
+        assertThat(output.warnings()).containsExactly(
+                "체결 후 예수금 부족으로 0 조정: 2024-01-03~2024-01-05, 총 3일, 최대 부족액=15000.0");
+        // 3영업일 연속 플로어가 발동했는데도 경고는 정확히 1건 — 일수에 비례하지 않는다
+        assertThat(output.tradeCount()).isEqualTo(3);
     }
 }
