@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.finance;
 
+import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.support.DataJpaTestBase;
@@ -16,7 +17,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // accountNo AES-256 암/복호화 round-trip 검증이 핵심 — 평문이 컬럼에 그대로 저장되면 안 된다
-@Import({FinanceAccountPersistenceAdapter.class, AesCryptoService.class})
+@Import({FinanceAccountPersistenceAdapter.class, AesCryptoService.class, AccountNoHasher.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
 
@@ -132,6 +133,30 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).extracting(FinanceAccount::id)
                 .contains(myPersonal.id())
                 .doesNotContain(myGroup.id());
+    }
+
+    @Test
+    void existsByAccountNo_activeDuplicate_returnsTrue() {
+        adapter.save(groupAccount("토스증권 일반계좌", "999-888-777"));
+
+        assertThat(adapter.existsByAccountNo("999-888-777", null)).isTrue();
+        assertThat(adapter.existsByAccountNo("000-000-000", null)).isFalse();
+    }
+
+    @Test
+    void existsByAccountNo_excludesGivenId_forSelfUpdate() {
+        FinanceAccount saved = adapter.save(groupAccount("토스증권 일반계좌", "999-888-777"));
+
+        assertThat(adapter.existsByAccountNo("999-888-777", saved.id())).isFalse();
+        assertThat(adapter.existsByAccountNo("999-888-777", UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void existsByAccountNo_softDeletedAccount_isExcluded() {
+        FinanceAccount saved = adapter.save(groupAccount("토스증권 일반계좌", "999-888-777"));
+        adapter.softDelete(saved.id());
+
+        assertThat(adapter.existsByAccountNo("999-888-777", null)).isFalse();
     }
 
     @Test

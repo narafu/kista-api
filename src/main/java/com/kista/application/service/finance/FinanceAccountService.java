@@ -34,6 +34,9 @@ class FinanceAccountService implements FinanceAccountUseCase {
     // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
     @Override
     public FinanceAccount create(UUID userId, UUID requestedGroupId, FinanceAccountCommand command) {
+        if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), null)) {
+            throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
+        }
         FinanceAccount account = new FinanceAccount(null, null, userId, command.accountType(),
                 command.name(), command.accountNo(), command.memo(), null);
         FinanceAccount saved = accountPort.save(account);
@@ -48,6 +51,9 @@ class FinanceAccountService implements FinanceAccountUseCase {
         FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         existing.verifyAccessibleBy(userId, currentGroupId);
+        if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), accountId)) {
+            throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
+        }
         FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.userId(),
                 command.accountType(), command.name(), command.accountNo(), command.memo(), existing.createdAt());
         return accountPort.save(updated);

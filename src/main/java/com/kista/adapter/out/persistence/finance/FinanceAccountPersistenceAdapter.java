@@ -1,5 +1,6 @@
 package com.kista.adapter.out.persistence.finance;
 
+import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.finance.FinanceAccount;
 import com.kista.domain.port.out.FinanceAccountPort;
@@ -18,6 +19,7 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     private final FinanceAccountJpaRepository jpaRepository;
     private final AesCryptoService crypto; // accountNo AES-256 암호화/복호화
+    private final AccountNoHasher hasher;  // accountNo 전역 중복 체크용 HMAC-SHA256 해시
 
     @Override
     public List<FinanceAccount> findMyScope(UUID userId, UUID currentGroupId) {
@@ -37,11 +39,21 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
     }
 
     @Override
+    public boolean existsByAccountNo(String accountNo, UUID excludeId) {
+        // 플레인텍스트 해시 후 DB 조회 — AES는 비결정론적이라 해시 경유 필수
+        String hash = hasher.hash(accountNo);
+        return excludeId == null
+                ? jpaRepository.existsByAccountNoHashAndDeletedAtIsNull(hash)
+                : jpaRepository.existsByAccountNoHashAndDeletedAtIsNullAndIdNot(hash, excludeId);
+    }
+
+    @Override
     public FinanceAccount save(FinanceAccount account) {
         // V16에서 uq_finance_accounts_group_name을 DROP — 같은 그룹 안 계좌명 중복이 이제 허용되므로
         // 더 이상 DataIntegrityViolationException을 DuplicateNameException으로 변환할 이유가 없다.
         FinanceAccountEntity entity = FinanceAccountEntity.fromModel(account);
         if (entity.getAccountNo() != null) {
+            entity.setAccountNoHash(hasher.hash(entity.getAccountNo())); // 전역 중복 체크용 해시 — 암호화 전 평문 기준
             entity.setAccountNo(crypto.encrypt(entity.getAccountNo()));
         }
         return toDomain(jpaRepository.saveAndFlush(entity));

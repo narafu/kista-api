@@ -44,6 +44,9 @@ class FinanceAccountEntity extends BaseAuditEntity {
     @Column(name = "account_no", length = 512)
     private String accountNo;             // AES-256 암호화 저장, 선택
 
+    @Column(name = "account_no_hash", length = 64)
+    private String accountNoHash;         // HMAC-SHA256 해시 (전역 중복 체크용, accountNo 없으면 null)
+
     @Column(length = 255)
     private String memo;                  // 선택
 

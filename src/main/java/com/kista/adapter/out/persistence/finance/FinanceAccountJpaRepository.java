@@ -20,6 +20,10 @@ interface FinanceAccountJpaRepository extends JpaRepository<FinanceAccountEntity
 
     Optional<FinanceAccountEntity> findByIdAndDeletedAtIsNull(UUID id);
 
+    // 전역 계좌번호 중복 체크(HMAC-SHA256 해시). excludeId 없는 버전은 신규 등록용, 있는 버전은 update 시 자기 자신 제외용.
+    boolean existsByAccountNoHashAndDeletedAtIsNull(String accountNoHash);
+    boolean existsByAccountNoHashAndDeletedAtIsNullAndIdNot(String accountNoHash, UUID excludeId);
+
     @Modifying
     @Query("UPDATE FinanceAccountEntity a SET a.deletedAt = :now WHERE a.id = :id")
     void softDeleteById(@Param("id") UUID id, @Param("now") Instant now);

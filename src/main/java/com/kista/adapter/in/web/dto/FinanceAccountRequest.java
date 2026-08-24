@@ -20,6 +20,8 @@ public record FinanceAccountRequest(
         String memo
 ) {
     public FinanceAccountCommand toCommand() {
-        return new FinanceAccountCommand(accountType, name, accountNo, memo);
+        // 빈 문자열은 null로 정규화 — 그대로 두면 hash("")가 결정론적이라 계좌번호 미입력자끼리 전역 중복 오탐 발생
+        String normalizedAccountNo = (accountNo == null || accountNo.isBlank()) ? null : accountNo;
+        return new FinanceAccountCommand(accountType, name, normalizedAccountNo, memo);
     }
 }

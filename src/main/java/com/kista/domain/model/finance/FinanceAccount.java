@@ -57,4 +57,11 @@ public record FinanceAccount(
             super("이 계좌에 매핑된 자산 기록이 있어 삭제할 수 없습니다. 먼저 자산 기록의 계좌 매핑을 해제해주세요");
         }
     }
+
+    // 전역 계좌번호 중복 등록 방지 (HMAC-SHA256 해시 기반 partial unique index, V20)
+    public static class DuplicateAccountNoException extends RuntimeException {
+        public DuplicateAccountNoException(String accountNo) {
+            super("이미 등록된 계좌번호입니다: " + accountNo);
+        }
+    }
 }

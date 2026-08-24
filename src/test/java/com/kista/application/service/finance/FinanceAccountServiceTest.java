@@ -145,6 +145,31 @@ class FinanceAccountServiceTest {
         verify(accountPort, never()).save(any());
     }
 
+    @Test
+    @DisplayName("create는 계좌번호가 전역 중복이면 DuplicateAccountNoException")
+    void create_duplicateAccountNo_throwsDuplicateAccountNoException() {
+        when(accountPort.existsByAccountNo("5678", null)).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.create(userId, null, command()))
+                .isInstanceOf(FinanceAccount.DuplicateAccountNoException.class)
+                .hasMessageContaining("5678");
+
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update는 계좌번호가 자신을 제외한 다른 계좌와 중복이면 DuplicateAccountNoException")
+    void update_duplicateAccountNo_throwsDuplicateAccountNoException() {
+        when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(personalAccount());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(accountPort.existsByAccountNo("5678", accountId)).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.update(accountId, userId, command()))
+                .isInstanceOf(FinanceAccount.DuplicateAccountNoException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
     // ----- shareToGroup -----
 
     @Test

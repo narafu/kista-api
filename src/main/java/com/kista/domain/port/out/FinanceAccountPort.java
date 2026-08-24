@@ -26,6 +26,9 @@ public interface FinanceAccountPort {
                 () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + id));
     }
 
+    // 전역 계좌번호 중복 체크(크로스-유저, HMAC-SHA256 해시 기반). excludeId는 update 시 자기 자신 제외용, 신규 등록은 null.
+    boolean existsByAccountNo(String accountNo, UUID excludeId);
+
     FinanceAccount save(FinanceAccount account);
     void softDelete(UUID id);
     void softDeleteByUserId(UUID userId); // 회원 탈퇴 시 내가 만든 계좌만
