@@ -206,4 +206,18 @@ class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
 
         assertThat(result).extracting(FinanceBudget::id).containsExactly(overlapping.id());
     }
+
+    // 회귀(Critical 버그): delete()가 flush 없이 큐잉되면 Hibernate가 같은 flush 배치에서
+    // INSERT를 DELETE보다 먼저 실행해, 아직 안 지워진 기존 행과 EXCLUDE 제약이 충돌해 오탐 409가 난다.
+    @Test
+    void delete_thenSaveOverlappingBudget_inSameTransaction_succeeds() {
+        FinanceBudget existing = adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30)));
+
+        adapter.delete(existing.id());
+        FinanceBudget saved = adapter.save(
+                personalBudget(userId, CATEGORY_A, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)));
+
+        assertThat(saved.id()).isNotNull();
+    }
 }

@@ -51,8 +51,12 @@ public class FinanceBudgetPersistenceAdapter implements FinanceBudgetPort {
 
     @Override
     public void delete(UUID id) {
-        // 파생 설정이므로 하드 삭제
+        // 파생 설정이므로 하드 삭제. 즉시 flush — create()의 겹침 자동조정에서 삭제 후 신규 INSERT가
+        // 같은 트랜잭션 내에서 이어질 때, flush 없이 두면 Hibernate가 같은 flush 배치 안에서
+        // INSERT를 DELETE보다 먼저 실행해 EXCLUDE 제약(아직 안 지워진 기존 행과 겹침) 위반으로
+        // 오탐 409가 날 수 있다.
         jpaRepository.deleteById(id);
+        jpaRepository.flush();
     }
 
     @Override
