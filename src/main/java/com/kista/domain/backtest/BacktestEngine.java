@@ -371,13 +371,13 @@ public class BacktestEngine {
                 command.ticker(), Strategy.CycleSeedType.NONE);
     }
 
-    // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 부호 기반 기본값을 그대로 쓴다
+    // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 recurringMode 고정값 표(RAMP_DEFAULTS_BY_MODE와 동기화)를 그대로 쓴다
     // gMax=initialGradient, poolLimitFloor=initialPoolLimitRate로 두면 gradientAt()/poolLimitRateAt()의 상하한 클램프가
-    // 항상 초기값을 돌려준다 — 즉 "램프 없음, 초기값 고정"(운영의 미지정 시 no-op 규칙)이 그대로 재현된다
+    // 항상 초기값을 돌려준다 — 즉 "램프 없음, 초기값 고정"(백테스트는 램프 자체를 모델링하지 않는다는 기존 설계 유지)
     private static StrategyVrDetail syntheticVrDetail(BacktestCommand command) {
-        int initialGradient = command.vrRecurringAmount() < 0 ? 20 : 10;
-        BigDecimal initialPoolLimitRate = command.vrRecurringAmount() > 0 ? new BigDecimal("0.75")
-                : command.vrRecurringAmount() == 0 ? new BigDecimal("0.50") : new BigDecimal("0.25");
+        int initialGradient = command.vrRecurringAmount() < 0 ? 40 : 10;
+        BigDecimal initialPoolLimitRate = command.vrRecurringAmount() > 0 ? BigDecimal.ONE
+                : command.vrRecurringAmount() == 0 ? new BigDecimal("0.75") : new BigDecimal("0.1");
         return new StrategyVrDetail(null, command.vrIntervalWeeks(), command.vrBandWidth(),
                 command.vrRecurringAmount(), initialGradient, DEFAULT_GRACE_WEEKS, DEFAULT_STEP_WEEKS,
                 initialGradient, initialPoolLimitRate, DEFAULT_GRACE_WEEKS, DEFAULT_STEP_WEEKS, initialPoolLimitRate);

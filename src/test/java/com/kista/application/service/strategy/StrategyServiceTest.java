@@ -804,7 +804,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 성공 — StrategyVrDetail·StrategyCycleVrDetail 저장, poolLimit 계산, cycleSeedType NONE 강제")
     void register_vr_success_savesVrDetailsAndPoolLimit() {
-        // holdings=0(중간부터 시작 미입력) → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.50(recurringAmount=0) → poolLimit = 1000.00
+        // holdings=0(중간부터 시작 미입력) → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75(recurringAmount=0) → poolLimit = 1500.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
@@ -818,9 +818,9 @@ class StrategyServiceTest {
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, 0, null, null);
-        // recurringAmount=0 → 기본 poolLimitRate=0.50 (거치식) — poolLimit 달러 파생은 개장 pool(2000)×0.50=1000.00
+        // recurringAmount=0 → 기본 poolLimitRate=0.75 (거치식) — poolLimit 달러 파생은 개장 pool(2000)×0.75=1500.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
-                vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.50"));
+                vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
@@ -846,13 +846,13 @@ class StrategyServiceTest {
                         && d.bandWidth().compareTo(new BigDecimal("15.00")) == 0
                         && d.recurringAmount() == 0));
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimitRate().compareTo(new BigDecimal("0.50")) == 0
+                cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0
                         && cv.gradient() == 10));
         // 등록 시점 중간부터 시작 미입력이면 시장가 조회를 건너뛴다
         verify(registry, never()).require(any(), eq(BrokerPricePort.class));
         // 응답 VrSummary 검증
         assertThat(result.vr()).isNotNull();
-        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1500.00");
         assertThat(result.divisionCount()).isNull();  // VR은 divisionCount 없음
         assertThat(result.currentRound()).isNull();    // VR은 currentRound 없음
     }
@@ -911,9 +911,9 @@ class StrategyServiceTest {
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 BigDecimal.ZERO, null, null, 0, null, null);
-        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75, 단 개장 pool=0이므로 파생 poolLimit은 0.00
+        // recurringAmount=200(적립식) → 기본 poolLimitRate=1.0, 단 개장 pool=0이므로 파생 poolLimit은 0.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
-                vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
+                vrCycleId, BigDecimal.ZERO, 10, BigDecimal.ONE);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
@@ -988,7 +988,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() recurringAmount null이면 0으로 저장한다")
     void register_vr_nullRecurringAmount_defaultsToZero() {
-        // holdings=0 → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.50 → poolLimit = 1000.00
+        // holdings=0 → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75 → poolLimit = 1500.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), null,
@@ -1016,12 +1016,12 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
-        // recurringAmount=0(거치식) → 기본 poolLimitRate=0.50, poolLimit 달러 파생값 = 개장 pool(2000)×0.50 = 1000.00
+        // recurringAmount=0(거치식) → 기본 poolLimitRate=0.75, poolLimit 달러 파생값 = 개장 pool(2000)×0.75 = 1500.00
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimitRate().compareTo(new BigDecimal("0.50")) == 0
+                cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0
                         && cv.gradient() == 10));
         assertThat(result.vr().recurringAmount()).isZero();
-        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1500.00");
     }
 
     @Test
@@ -1080,15 +1080,15 @@ class StrategyServiceTest {
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // recurringAmount=200(적립식) → 기본 poolLimitRate=0.75 (개장 pool=0이라 달러 파생 poolLimit은 0이지만 저장 비율 자체는 0.75)
-        verify(strategyCycleVrPort).save(argThat(cv -> cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0));
+        // recurringAmount=200(적립식) → 기본 poolLimitRate=1.0 (개장 pool=0이라 달러 파생 poolLimit은 0이지만 저장 비율 자체는 1.0)
+        verify(strategyCycleVrPort).save(argThat(cv -> cv.poolLimitRate().compareTo(BigDecimal.ONE) == 0));
         verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
-    @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=0.75")
+    @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=1.0")
     void register_vr_poolLimitRate_withDeposit() {
-        // holdings=0 → V=0, recurringAmount=100(입금) → poolLimitRate=0.75 → poolLimit = 1000 × 0.75 = 750.00
+        // holdings=0 → V=0, recurringAmount=100(입금) → poolLimitRate=1.0 → poolLimit = 1000 × 1.0 = 1000.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 100,
@@ -1116,10 +1116,10 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyCycleVrPort).save(argThat(cv ->
-                cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0
+                cv.poolLimitRate().compareTo(BigDecimal.ONE) == 0
                         && cv.gradient() == 10));
-        // poolLimit(달러) 파생값 검증 — 개장 pool(1000) × poolLimitRate(0.75) = 750.00, scale=2 HALF_UP
-        assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
+        // poolLimit(달러) 파생값 검증 — 개장 pool(1000) × poolLimitRate(1.0) = 1000.00, scale=2 HALF_UP
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("1000.00");
     }
 
     // --- VR register() 램프 파라미터 정규화·검증 (경과주수 기반 램프 신규 기능) ---
@@ -1136,18 +1136,17 @@ class StrategyServiceTest {
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // recurringAmount=0(거치식) → initialGradient=10, initialPoolLimitRate=0.50
-        // gMax/poolLimitFloor 미지정 시 initial* 값을 그대로 사용해 램프가 no-op이 되는지 확인
+        // recurringAmount=0(거치식) → initialGradient=10, gMax=20, initialPoolLimitRate=0.75, poolLimitFloor=0.5 (RAMP_DEFAULTS_BY_MODE와 동기화)
         verify(strategyVrDetailPort).save(argThat(d ->
-                d.initialGradient() == 10 && d.gGraceWeeks() == 52 && d.gStepWeeks() == 26 && d.gMax() == 10
-                        && d.initialPoolLimitRate().compareTo(new BigDecimal("0.50")) == 0
+                d.initialGradient() == 10 && d.gGraceWeeks() == 52 && d.gStepWeeks() == 26 && d.gMax() == 20
+                        && d.initialPoolLimitRate().compareTo(new BigDecimal("0.75")) == 0
                         && d.pGraceWeeks() == 52 && d.pStepWeeks() == 26
                         && d.poolLimitFloor().compareTo(new BigDecimal("0.50")) == 0));
     }
 
     @Test
-    @DisplayName("VR register() 램프 8필드 모두 생략 — 인출식(recurringAmount<0)은 initialGradient=20, initialPoolLimitRate=0.25 기본값 적용")
-    void register_vr_rampFieldsOmitted_withdrawal_appliesGradient20() {
+    @DisplayName("VR register() 램프 8필드 모두 생략 — 인출식(recurringAmount<0)은 initialGradient=40/gMax=50/initialPoolLimitRate=0.1 기본값 적용")
+    void register_vr_rampFieldsOmitted_withdrawal_appliesGradient40() {
         stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
         // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialUsdDeposit=20000으로 충족
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
@@ -1159,9 +1158,9 @@ class StrategyServiceTest {
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyVrDetailPort).save(argThat(d ->
-                d.initialGradient() == 20 && d.gMax() == 20
-                        && d.initialPoolLimitRate().compareTo(new BigDecimal("0.25")) == 0
-                        && d.poolLimitFloor().compareTo(new BigDecimal("0.25")) == 0));
+                d.initialGradient() == 40 && d.gMax() == 50
+                        && d.initialPoolLimitRate().compareTo(new BigDecimal("0.1")) == 0
+                        && d.poolLimitFloor().compareTo(new BigDecimal("0.1")) == 0));
     }
 
     @Test
@@ -1709,7 +1708,7 @@ class StrategyServiceTest {
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
-        assertThat(result.vr().poolLimit()).isEqualByComparingTo("500.00");
+        assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
         // VR live 잔고 조회는 완전히 제거됨 — BrokerPricePort 시장가 조회 1회로만 V가 계산된다
         verify(registry, times(1)).require(account, BrokerPricePort.class);
     }

@@ -32,21 +32,21 @@ public record TradingCycleRequest(
         @Schema(description = "VR: 주기당 추가 예수금 (USD, 음수=인출, 0=없음)", example = "0")
         Integer recurringAmount,
         // VR 램프 파라미터 (모두 생략 가능 — 생략 시 recurringAmount 부호 파생 기본값 + 52주 유예/26주 스텝 적용)
-        @Schema(description = "VR: 램프 시작 시점 gradient(G) 값 (생략 시 인출식=20, 그 외=10)", example = "10")
+        @Schema(description = "VR: 램프 시작 시점 gradient(G) 값 (생략 시 인출식=40, 그 외=10)", example = "10")
         Integer initialGradient,
         @Schema(description = "VR: gradient 램프 시작 전 유예 주수 (생략 시 52)", example = "52")
         Integer gGraceWeeks,
         @Schema(description = "VR: gradient가 한 단계(1) 상승하는 주기 (생략 시 26)", example = "26")
         Integer gStepWeeks,
-        @Schema(description = "VR: gradient 램프 상한값 (생략 시 initialGradient — 램프 없음)", example = "20")
+        @Schema(description = "VR: gradient 램프 상한값 (생략 시 적립식/거치식=20, 인출식=50)", example = "20")
         Integer gMax,
-        @Schema(description = "VR: 램프 시작 시점 poolLimitRate 값 (생략 시 적립식=0.75/거치식=0.50/인출식=0.25)", example = "0.75")
+        @Schema(description = "VR: 램프 시작 시점 poolLimitRate 값 (생략 시 적립식=1.0/거치식=0.75/인출식=0.1)", example = "0.75")
         BigDecimal initialPoolLimitRate,
         @Schema(description = "VR: poolLimitRate 램프 시작 전 유예 주수 (생략 시 52)", example = "52")
         Integer pGraceWeeks,
         @Schema(description = "VR: poolLimitRate가 한 단계(5%p) 하강하는 주기 (생략 시 26)", example = "26")
         Integer pStepWeeks,
-        @Schema(description = "VR: poolLimitRate 램프 하한값 (생략 시 initialPoolLimitRate — 램프 없음)", example = "0.50")
+        @Schema(description = "VR: poolLimitRate 램프 하한값 (생략 시 적립식/거치식=0.5, 인출식=0.1)", example = "0.50")
         BigDecimal poolLimitFloor,
         @Schema(description = "시작예정일, 기본값=오늘, 오늘 이후만 허용", example = "2026-08-01")
         LocalDate scheduledStartDate,

@@ -221,22 +221,24 @@ class StrategyService implements StrategyUseCase {
         }
     }
 
-    // VR 램프 파라미터 정규화 — 미지정 필드를 recurringAmount 부호·관례값(52주 유예/26주 스텝)으로 채운다
-    // gMax/poolLimitFloor 미지정 시 initial* 값을 그대로 사용해 램프가 사실상 비활성화(no-op)되도록 한다
+    // VR 램프 파라미터 정규화 — 미지정 필드를 recurringAmount 부호(적립/거치/인출) 고정값 표로 채운다 (kista-ui RAMP_DEFAULTS_BY_MODE와 동기화)
+    // 적립(>0): gradient 10/gMax 20/rate 1.0/floor 0.5, 거치(==0): gradient 10/gMax 20/rate 0.75/floor 0.5, 인출(<0): gradient 40/gMax 50/rate 0.1/floor 0.1
     private VrRampParams normalizeVrRampParams(RegisterStrategyCommand cmd, int normalizedRecurringAmount) {
-        int initialGradient = cmd.initialGradient() != null
-                ? cmd.initialGradient()
-                : (normalizedRecurringAmount < 0 ? 20 : 10);
+        int defaultInitialGradient = normalizedRecurringAmount < 0 ? 40 : 10;
+        int defaultGMax = normalizedRecurringAmount < 0 ? 50 : 20;
+        BigDecimal defaultInitialPoolLimitRate = normalizedRecurringAmount > 0 ? BigDecimal.ONE
+                : normalizedRecurringAmount == 0 ? new BigDecimal("0.75") : new BigDecimal("0.1");
+        BigDecimal defaultPoolLimitFloor = normalizedRecurringAmount < 0 ? new BigDecimal("0.1") : new BigDecimal("0.5");
+
+        int initialGradient = cmd.initialGradient() != null ? cmd.initialGradient() : defaultInitialGradient;
         int gGraceWeeks = cmd.gGraceWeeks() != null ? cmd.gGraceWeeks() : 52;
         int gStepWeeks = cmd.gStepWeeks() != null ? cmd.gStepWeeks() : 26;
-        int gMax = cmd.gMax() != null ? cmd.gMax() : initialGradient;
+        int gMax = cmd.gMax() != null ? cmd.gMax() : defaultGMax;
         BigDecimal initialPoolLimitRate = cmd.initialPoolLimitRate() != null
-                ? cmd.initialPoolLimitRate()
-                : normalizedRecurringAmount > 0 ? new BigDecimal("0.75")
-                        : normalizedRecurringAmount == 0 ? new BigDecimal("0.50") : new BigDecimal("0.25");
+                ? cmd.initialPoolLimitRate() : defaultInitialPoolLimitRate;
         int pGraceWeeks = cmd.pGraceWeeks() != null ? cmd.pGraceWeeks() : 52;
         int pStepWeeks = cmd.pStepWeeks() != null ? cmd.pStepWeeks() : 26;
-        BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : initialPoolLimitRate;
+        BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : defaultPoolLimitFloor;
         return new VrRampParams(initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
     }

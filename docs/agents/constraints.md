@@ -108,10 +108,15 @@ sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
 V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10)
      평가금 = holdings × 종가
 ```
-- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 아래 부호파생 기본값 + 유예 52주·단계 26주·상하한=초기값(램프 없음, 기존 동작 보존)
-  - `gradientAt(weeks)`: `weeks < gGraceWeeks` → `initialGradient`; 이후 `gStepWeeks`마다 `+1`(고정, `StrategyVrDetail.G_STEP`), `gMax` 상한. 미입력 시 `initialGradient` 기본값 = `recurringAmount < 0` → 20(인출), 그 외 → 10
+- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 recurringMode(적립/거치/인출) 고정값 표(kista-ui `RAMP_DEFAULTS_BY_MODE`와 동기화) + 유예 52주·단계 26주로 채운다 — gGraceWeeks/gStepWeeks/pGraceWeeks/pStepWeeks 4필드만 생략 시 관례값, 나머지 4필드(initialGradient/gMax/initialPoolLimitRate/poolLimitFloor)는 아래 표 그대로
+    | recurringMode | initialGradient | gMax | initialPoolLimitRate | poolLimitFloor |
+    |---|---|---|---|---|
+    | 적립(`recurringAmount>0`) | 10 | 20 | 1.0 | 0.5 |
+    | 거치(`recurringAmount==0`) | 10 | 20 | 0.75 | 0.5 |
+    | 인출(`recurringAmount<0`) | 40 | 50 | 0.1 | 0.1 |
+  - `gradientAt(weeks)`: `weeks < gGraceWeeks` → `initialGradient`; 이후 `gStepWeeks`마다 `+1`(고정, `StrategyVrDetail.G_STEP`), `gMax` 상한
     - `gStepWeeks=0`은 gradient 램프 자체를 비활성화(항상 `initialGradient` 유지) — 이때 `gMax`·`gGraceWeeks`는 무관해지므로 0 허용(등록·재설정 양쪽 `gStepWeeks > 0`일 때만 `gMax >= initialGradient` 강제)
-  - `poolLimitRateAt(weeks)`: `weeks < pGraceWeeks` → `initialPoolLimitRate`; 이후 `pStepWeeks`마다 `-5%p`(고정, `StrategyVrDetail.POOL_LIMIT_STEP`), `poolLimitFloor` 하한(scale=2 HALF_UP). 미입력 시 `initialPoolLimitRate` 기본값 = `recurringAmount > 0` → 0.75, `== 0` → 0.50, `< 0` → 0.25
+  - `poolLimitRateAt(weeks)`: `weeks < pGraceWeeks` → `initialPoolLimitRate`; 이후 `pStepWeeks`마다 `-5%p`(고정, `StrategyVrDetail.POOL_LIMIT_STEP`), `poolLimitFloor` 하한(scale=2 HALF_UP)
     - `pStepWeeks=0`은 poolLimitRate 램프 자체를 비활성화(항상 `initialPoolLimitRate` 유지) — 이때 `poolLimitFloor`·`pGraceWeeks`는 무관해지므로 검증 없이 0 허용(등록·재설정 양쪽 `pStepWeeks > 0`일 때만 `0 < poolLimitFloor <= initialPoolLimitRate` 강제)
   - G·poolLimitRate 두 램프의 유예·단계주기는 서로 독립
   - weeks 재계산 시점: 사이클 롤오버(`VrCycleRolloverService`) 및 운영 중 재설정(`VrReconfigureService`) — 둘 다 `ChronoUnit.WEEKS.between(전략 최초 사이클.startDate, today)`. 사이클 진행 중엔 `strategy_cycle_vr` 스냅샷(gradient·poolLimitRate) 고정

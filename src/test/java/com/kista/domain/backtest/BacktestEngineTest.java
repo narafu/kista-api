@@ -80,12 +80,12 @@ class BacktestEngineTest {
     @Test
     @DisplayName("bootstrap 경로: V=0이면 첫날은 전일종가가 없어 주문이 없고, 둘째 날 LOC 매수가 나와 셋째 날 체결된다")
     void V가_0이면_둘째날_bootstrap_LOC_매수가_생성된다() {
-        // seed=1000 → poolLimit=500.00, V=0 → needsBootstrap
-        // 2일차 bootstrap: 캡가 = 전일종가 100 × 1.05 = 105.00, 수량 = 500/105 내림 = 4주
-        // 3일차: LOC은 종가 기준 판정 — 종가 90 ≤ 105 → 4주×90 = 360.00 체결
+        // seed=1000 → poolLimit=750.00(거치식 initialPoolLimitRate=0.75), V=0 → needsBootstrap
+        // 2일차 bootstrap: 캡가 = 전일종가 100 × 1.05 = 105.00, 수량 = 750/105 내림 = 7주
+        // 3일차: LOC은 종가 기준 판정 — 종가 90 ≤ 105 → 7주×90 = 630.00 체결
         // 3일차 총자산(1000)은 체결가·평가가가 둘 다 종가 90이라 매수수량과 무관하게 항상 seed와 같다 — 수량 자체는 증명하지 못한다
-        // holdings=4가 되는 순간(3일차 주문생성 단계) V=0이라 사다리 생성이 skip된다(VrStrategy value=0 가드) — 매도 주문 없음, 보유 유지
-        // 4일차 총자산 = 3일차 체결 직후 현금(1000 − 4주×90 = 640) + 4주 × 4일차 종가(110) = 640 + 440 = 1080
+        // holdings=7가 되는 순간(3일차 주문생성 단계) V=0이라 사다리 생성이 skip된다(VrStrategy value=0 가드) — 매도 주문 없음, 보유 유지
+        // 4일차 총자산 = 3일차 체결 직후 현금(1000 − 7주×90 = 370) + 7주 × 4일차 종가(110) = 370 + 770 = 1140
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-02", 100, 105, 95, 100),
                 candle("2024-01-03", 100, 105, 95, 100),
@@ -97,8 +97,8 @@ class BacktestEngineTest {
                 .satisfiesExactly(
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차: 주문 없음
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 아직 미체결(주문만 생성)
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 3일차: 예수금 640 + 4주×90 (수량과 무관하게 항상 seed와 동일)
-                        p -> assertThat(p).isEqualByComparingTo("1080")); // 4일차: 매도 사다리 skip → 보유 유지, 640 + 4주×110
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 3일차: 예수금 370 + 7주×90 (수량과 무관하게 항상 seed와 동일)
+                        p -> assertThat(p).isEqualByComparingTo("1140")); // 4일차: 매도 사다리 skip → 보유 유지, 370 + 7주×110
         assertThat(output.tradeCount()).isEqualTo(1); // bootstrap 매수 1건뿐 — V=0 구간 매도 사다리 없음
     }
 
@@ -165,7 +165,9 @@ class BacktestEngineTest {
     @Test
     @DisplayName("적립식: 롤오버 시점에 적립금만큼 원금과 예수금이 함께 증가한다")
     void 적립식은_롤오버_시점에_원금이_증가한다() {
-        // recurring=+500 → G=10, poolLimitRate=0.75. V′ = 1000 + 1000/10 + 500 − 158.11 = 1441.89 > 0 → 롤오버 진행
+        // recurring=+500 → G=10, poolLimitRate=1.0(적립식 기본값) → poolLimit=1000.00
+        // V=1000·밴드15% → lowerBand=850.00 ≤ poolLimit(1000) → 1일차에 사다리 LIMIT BUY 1주 @850.00 생성(bootstrap 아님)
+        // V′ = 1000 + 1000/10 + 500 − 158.11 = 1441.89 > 0 → 롤오버 진행
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-01", 100, 105, 95, 100),
                 candle("2024-01-08", 100, 105, 95, 100),
@@ -178,8 +180,10 @@ class BacktestEngineTest {
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차 기록은 롤오버 판정 전 시점
                         p -> assertThat(p).isEqualByComparingTo("1500")); // 3일차: 적립 500 반영
-        // 적립금은 예수금에도 실제 현금흐름으로 반영된다 (체결 없음 → 총자산 = 예수금)
-        assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("1500");
+        // 2일차: 1주 @850 체결(저가 95가 850 아래라 즉시 체결) → 현금 150 + 1주×종가100 = 250.00
+        // 3일차: 현금 150 + 적립 500 = 650 + 1주×종가200 = 850.00
+        assertThat(output.points().get(1).totalAsset()).isEqualByComparingTo("250.00");
+        assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("850.00");
         assertThat(output.warnings()).isEmpty();
     }
 
