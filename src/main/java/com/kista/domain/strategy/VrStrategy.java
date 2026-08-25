@@ -24,15 +24,16 @@ public class VrStrategy {
     // 매수·매도 사다리 최대 단 수
     private static final int MAX_RUNGS = 20;
 
-    // 주문 목록 생성 — 아직 첫 포지션을 못 만든 상태(needsBootstrap)면 예산 기반 bootstrap(또는 빈 리스트),
-    // 그 외(holdings>0, 사다리로 정상 매수 가능)면 일반 밴드 사다리
+    // 주문 목록 생성 — 아직 첫 포지션을 못 만든 상태(needsBootstrap, holdings=0)면 예산 기반 bootstrap(또는 빈 리스트),
+    // holdings>0인데 사다리 첫 단조차 예산 초과인 드리프트 상태면 매수만 bootstrap으로 대체(매도는 정상 유지),
+    // 그 외(사다리로 정상 매수 가능)면 일반 밴드 사다리
     // ticker: 주문에 기록할 거래 종목 (VrPosition은 ticker를 직접 보유하지 않음)
     // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
     // livePrice: 과거 SELL bootstrap 전용 파라미터 — case1(V만 있음) 폐기로 현재 미사용, 시그니처는 호출부 영향 최소화를 위해 유지
     // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
     public List<Order> buildOrders(VrPosition position, Strategy.Ticker ticker,
                                    BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
-        if (needsBootstrap(position)) {
+        if (position.holdings() == 0 && needsBootstrap(position)) {
             return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
         }
 
@@ -45,19 +46,29 @@ public class VrStrategy {
         }
 
         List<Order> orders = new ArrayList<>();
-        orders.addAll(buildBuyOrders(position, ticker, tradeDate));
+        // buildBuyLadder의 break 조건을 여기서 재유도하지 않고, 실제로 사다리를 만들어본 뒤 결과가
+        // 비었으면(holdings>0인데 첫 유효 단조차 예산 초과) bootstrap으로 대체한다 — 사다리 판정 기준은
+        // buildBuyLadder 한 곳만 SSOT로 유지. nextValue()가 holdings와 무관하게 V를 계속 키우는 드리프트
+        // 상태에서 정상 사다리로는 영원히 매수가 불가능하므로 예산 내 캡 가격 bootstrap으로 전환한다.
+        // 매도 사다리는 이 드리프트와 무관하게 그대로 유지한다.
+        List<Order> ladderBuys = buildBuyOrders(position, ticker, tradeDate);
+        if (position.holdings() > 0 && ladderBuys.isEmpty()) {
+            orders.addAll(buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate));
+        } else {
+            orders.addAll(ladderBuys);
+        }
         orders.addAll(buildSellOrders(position, ticker, tradeDate));
         return orders;
     }
 
-    // bootstrap 진입 판정 — holdings>0이면 사다리가 항상 정상 작동하므로 대상 아님.
+    // holdings=0 전용 bootstrap 진입 판정 — holdings>0 드리프트 케이스는 buildOrders()에서
+    // buyPrice(1) vs remainingBudget 비교로 별도 처리(위 참고).
     // holdings=0인데 V=0이면 사다리 공식 자체가 무의미(lowerBand=0)해 bootstrap 필요.
     // holdings=0이고 V>0이어도, 사다리 첫 유효 단(m=2, 가격=lowerBand 그대로)조차 예산을 초과하면
     // 정상 사다리로는 영원히 1주도 못 사므로 마찬가지로 bootstrap 필요 — nextValue() 공식이 매 롤오버마다
     // holdings와 무관하게 V를 키우기 때문에(pool/G+recurringAmount 항), holdings=0이 지속되면 V가 예산
     // 대비 너무 커져버릴 수 있다. 이 판정은 그 상태를 감지해 예산 한도 내 매수로 첫 포지션을 만들어준다.
     private boolean needsBootstrap(VrPosition position) {
-        if (position.holdings() != 0) return false;
         if (position.value().signum() == 0) return true;
         return position.lowerBand().compareTo(remainingBudget(position)) > 0;
     }

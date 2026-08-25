@@ -164,9 +164,12 @@ class BuyOrderPriceCapper {
                 BuyOrderPriceCapper::isVrBootstrapShaped);
     }
 
-    // VR bootstrap 주문(LOC+AT_CLOSE)인지 판별 — VrStrategy.buildOrders()는 아직 첫 포지션을 못 만든 상태
-    // (needsBootstrap)일 때 bootstrap 주문만 단독으로 반환하고(사다리와 섞이지 않음) 사다리 매수는 항상
-    // LIMIT+AT_OPEN이므로, BUY 중 하나라도 LOC이면 이번 배치 전체가 bootstrap이라는 뜻이다. bootstrap 가격
+    // VR bootstrap 주문(LOC+AT_CLOSE)인지 판별 — 이 함수는 buyOrders(BUY만 필터링된 목록)만 검사한다.
+    // VrStrategy.buildOrders()는 holdings=0에서 첫 포지션을 못 만든 상태(needsBootstrap)면 bootstrap
+    // 주문만 단독 반환하지만, holdings>0인데 사다리 첫 유효 단조차 예산 초과인 드리프트 상태에서는
+    // bootstrap BUY(LOC+AT_CLOSE)와 정상 매도 사다리(LIMIT+AT_OPEN)가 같은 배치에 섞여 반환될 수 있다.
+    // 사다리 매수는 항상 LIMIT+AT_OPEN이므로, BUY 중 하나라도 LOC이면 이번 배치의 매수가 bootstrap이라는
+    // 뜻이다(SELL이 섞여 있어도 무관 — 이 함수는 BUY만 본다). bootstrap 가격
     // (PriceCapPolicy.capFor(referencePrice) = referencePrice×1.05)은 사다리의 buyPrice(m) 공식과 무관한
     // 별도 산정식이라 buildCappedBuyOrders(사다리 전용)로 재계산하면 안 된다.
     private static boolean isVrBootstrapShaped(List<Order> buyOrders) {

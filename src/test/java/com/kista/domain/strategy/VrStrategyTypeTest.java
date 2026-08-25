@@ -140,6 +140,30 @@ class VrStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("holdings>0인데 사다리 첫 유효 단(buyPrice(1))조차 예산을 초과하면(V 드리프트) " +
+            "매수만 bootstrap으로 대체하고 매도 사다리는 정상 유지한다 (운영 strategy_id=0fd7e8dc 재현)")
+    void holdingsPositive_ladderFirstRungUnaffordable_bootstrapBuyKeepsSellLadder() {
+        // V=174.05, bandWidth=15% → lowerBand=147.94, holdings=1 → buyPrice(1)=147.94/1=147.94
+        // poolLimit=128.83(재설정 후 실제 pool 기준으로 재스냅샷됐다고 가정) → remainingBudget=128.83
+        // 147.94 > 128.83 → 정상 사다리는 여전히 불가능 → bootstrap 매수로 대체
+        // referencePrice=69.09 → cap=69.09×1.05=72.54, quantity=floor(128.83/72.54)=1
+        VrPosition position = pos(1, new BigDecimal("128.83"), new BigDecimal("174.05"),
+                new BigDecimal("15.00"), new BigDecimal("128.83"));
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
+        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<Order> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
+
+        assertThat(buys).hasSize(1);
+        assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
+        assertThat(buys.getFirst().timing()).isEqualTo(AT_CLOSE);
+        assertThat(buys.getFirst().price()).isEqualByComparingTo("72.54"); // 69.09 × 1.05
+        assertThat(buys.getFirst().quantity()).isEqualTo(1); // floor(128.83/72.54) = 1
+        // holdings=1이므로 매도 사다리는 드리프트와 무관하게 정상 생성 (sellPrice(1) = upperBand/1)
+        assertThat(sells).hasSize(1);
+    }
+
+    @Test
     @DisplayName("holdings>0인데 value=0이면(bootstrap 매수 체결 후 롤오버 전 V 미갱신 갭) 사다리 skip — " +
             "lowerBand/upperBand가 0이 되어 $0 가격 주문이 나가는 버그 회귀 방지")
     void holdingsPositive_valueZero_skipsLadder() {
