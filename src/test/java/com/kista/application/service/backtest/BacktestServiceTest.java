@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,6 +67,18 @@ class BacktestServiceTest {
                 null, null, null, 0, null);
     }
 
+    private static BacktestCommand infiniteWithPosition(BigDecimal seed, Integer holdings, BigDecimal avgPrice) {
+        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, FROM, TO, seed,
+                null, null, null, 0, null, holdings, avgPrice);
+    }
+
+    private static BacktestCommand vrWithPosition(BigDecimal seed, int recurring, String initialValue,
+                                                   Integer holdings, BigDecimal avgPrice) {
+        return new BacktestCommand(Strategy.Type.VR, Strategy.Ticker.TQQQ, FROM, TO, seed,
+                null, new BigDecimal("15"), 4, recurring,
+                initialValue == null ? null : new BigDecimal(initialValue), holdings, avgPrice);
+    }
+
     private static DailyCandle candle(int day, String close) {
         return new DailyCandle(LocalDate.of(2024, 1, day), new BigDecimal(close), new BigDecimal(close),
                 new BigDecimal(close), new BigDecimal(close));
@@ -92,6 +105,47 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("시드");
+    }
+
+    @Test
+    void 음수_시드는_보유_포지션이_있어도_거부한다() {
+        BacktestCommand command = infiniteWithPosition(new BigDecimal("-1"), 10, new BigDecimal("50"));
+
+        assertThatThrownBy(() -> service.run(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("시드");
+        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+    }
+
+    @Test
+    void 예수금_없이_기존_보유만으로_시작할_수_있다() {
+        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+
+        BacktestCommand command = infiniteWithPosition(BigDecimal.ZERO, 10, new BigDecimal("50"));
+
+        assertThatCode(() -> service.run(command)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void 보유_수량이_있는데_평단가가_없으면_거부한다() {
+        BacktestCommand command = infiniteWithPosition(SEED, 10, null);
+
+        assertThatThrownBy(() -> service.run(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("평단가");
+        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+    }
+
+    @Test
+    void 보유_수량이_음수면_거부한다() {
+        BacktestCommand command = infiniteWithPosition(SEED, -1, new BigDecimal("50"));
+
+        assertThatThrownBy(() -> service.run(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("보유 수량");
     }
 
     @Test
@@ -137,6 +191,19 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, -30, "1000")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("3000.00");
+    }
+
+    @Test
+    void VR_인출식_최소자산_검증은_보유_포지션_취득원가도_합산한다() {
+        when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+
+        // required = 30 × 100 × (4주/4주) = 3000.00, seed=0+V=500만으론 미달이지만 보유 50주×60=3000을 더하면 통과
+        BacktestCommand command = vrWithPosition(BigDecimal.ZERO, -30, "500", 50, new BigDecimal("60"));
+
+        assertThatCode(() -> service.run(command)).doesNotThrowAnyException();
     }
 
     @Test

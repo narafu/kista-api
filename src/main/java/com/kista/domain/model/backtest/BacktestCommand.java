@@ -16,5 +16,21 @@ public record BacktestCommand(
         BigDecimal vrBandWidth,    // VR 전용 밴드 폭 (% 단위, 예: 15.00)
         Integer vrIntervalWeeks,   // VR 전용 롤오버 주기 (주)
         int vrRecurringAmount,     // VR 전용 주기당 입출금액 (양수=적립, 0=거치, 음수=인출)
-        BigDecimal vrInitialValue  // VR 전용 초기 V값 (null이면 0 취급)
-) {}
+        BigDecimal vrInitialValue, // VR 전용 초기 V값 (null이면 0 취급)
+        // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
+        Integer initialHoldings,   // 시뮬레이션 시작 시점 기존 보유 수량
+        BigDecimal initialAvgPrice // 시뮬레이션 시작 시점 기존 평단가 (initialHoldings>0이면 필수)
+) {
+    // 기존 10개 필드 호출부(테스트 등) 호환용 — initialHoldings/initialAvgPrice 생략 시 null(빈 포지션에서 시작)
+    public BacktestCommand(Strategy.Type type, Strategy.Ticker ticker, LocalDate from, LocalDate to, BigDecimal seed,
+            Integer divisionCount, BigDecimal vrBandWidth, Integer vrIntervalWeeks, int vrRecurringAmount,
+            BigDecimal vrInitialValue) {
+        this(type, ticker, from, to, seed, divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount,
+                vrInitialValue, null, null);
+    }
+
+    // seed 미입력(null) 시 0 취급 — holdings만으로 시작하는 백테스트 지원을 위한 null-safe 접근자
+    public BigDecimal seedOrZero() {
+        return seed != null ? seed : BigDecimal.ZERO;
+    }
+}

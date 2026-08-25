@@ -112,21 +112,9 @@ class StrategyService implements StrategyUseCase {
         return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
     }
 
-    // 중간부터 시작 입력 검증 — holdings>0이면 avgPrice>0 필수, 둘 다 음수 거부. null/0이면 빈 포지션(기존 동작)
+    // 중간부터 시작 입력 검증 — BootstrapPosition.validate()에 위임 (BacktestService와 공용 규칙)
     private int validateBootstrapPosition(RegisterStrategyCommand cmd) {
-        Integer holdings = cmd.initialHoldings();
-        BigDecimal avgPrice = cmd.initialAvgPrice();
-        if (holdings != null && holdings < 0) {
-            throw new IllegalArgumentException("보유 수량(initialHoldings)은 0 이상이어야 합니다");
-        }
-        if (avgPrice != null && avgPrice.signum() < 0) {
-            throw new IllegalArgumentException("평단가(initialAvgPrice)는 0 이상이어야 합니다");
-        }
-        int normalizedHoldings = holdings != null ? holdings : 0;
-        if (normalizedHoldings > 0 && (avgPrice == null || avgPrice.signum() <= 0)) {
-            throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)는 0보다 커야 합니다");
-        }
-        return normalizedHoldings;
+        return BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice());
     }
 
     // VR V값 우선순위 — 초기 V 직접 입력(>0)이 있으면 그 값을, 없으면 평가금(전일종가×보유수량)을 사용한다.

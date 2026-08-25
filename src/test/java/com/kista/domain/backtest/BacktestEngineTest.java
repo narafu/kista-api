@@ -305,6 +305,13 @@ class BacktestEngineTest {
                 divisionCount, null, null, 0, null);
     }
 
+    private static BacktestCommand infiniteCommandWithPosition(String from, String seed, int divisionCount,
+                                                                int holdings, String avgPrice) {
+        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+                LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
+                divisionCount, null, null, 0, null, holdings, new BigDecimal(avgPrice));
+    }
+
     private static DailyCandle flat(String date, double close) {
         return candle(date, close, close, close, close);
     }
@@ -344,6 +351,39 @@ class BacktestEngineTest {
                         p -> assertThat(p).isEqualByComparingTo("1010"));
         assertThat(output.tradeCount()).isEqualTo(3);
         assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("initialHoldings/initialAvgPrice로 시작하면 첫날 총자산에 기존 보유분 시장가가 반영된다")
+    void 기존_보유분으로_시작하면_첫날_총자산에_반영된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 01-01은 from(01-02) 이전 워밍업 — prevClose만 100으로 이월, 보유 5주(평단가 80)로 시작
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100)
+        ), infiniteCommandWithPosition("2024-01-02", "0", 4, 5, "80"));
+
+        // 첫날(01-02) 총자산 = 예수금 0 + 보유 5주 × 종가 100 = 500
+        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
+                .satisfiesExactly(p -> assertThat(p).isEqualByComparingTo("500"));
+        // 원금 = 시드 0 + 취득원가(5주×80) = 400 — 시장가 아닌 실제 투입 비용 기준
+        assertThat(output.points().getFirst().principal()).isEqualByComparingTo("400");
+    }
+
+    @Test
+    @DisplayName("initialHoldings>0인데 initialAvgPrice가 없으면 NPE 대신 명확한 예외로 거부한다")
+    void 보유_수량만_있고_평단가가_없으면_명확히_거부한다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+        BacktestCommand command = new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+                LocalDate.parse("2024-01-02"), LocalDate.parse("2024-12-31"), new BigDecimal("0"),
+                4, null, null, 0, null, 5, null);
+
+        assertThatThrownBy(() -> infiniteEngine.run(List.of(flat("2024-01-02", 100)), command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("평단가");
     }
 
     @Test
@@ -590,6 +630,12 @@ class BacktestEngineTest {
                 null, null, null, 0, null);
     }
 
+    private static BacktestCommand privacyCommandWithPosition(String seed, int holdings, String avgPrice) {
+        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
+                null, null, null, 0, null, holdings, new BigDecimal(avgPrice));
+    }
+
     // 기준 매매표 픽스처 — seed ÷ currentCycleStart가 곧 PrivacyStrategy가 산출할 배수(multiple)다
     private static PrivacyTradeBase privacyBase(String currentCycleStart, int holdings, PrivacyTrade... trades) {
         return new PrivacyTradeBase(null, null, holdings, new BigDecimal(currentCycleStart), List.of(trades));
@@ -603,6 +649,25 @@ class BacktestEngineTest {
     }
 
     // --- PRIVACY 경로 ---
+
+    @Test
+    @DisplayName("초기 보유 포지션이 있으면 배수 산출 자본에 시작일 종가 평가액이 반영된다")
+    void 보유_포지션이_있으면_배수_산출에_반영된다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // 예수금 0 + 보유 5주 × 첫날 종가 100 = 자본 500 ÷ currentCycleStart 500 = 배수 1.00 → 기준표 BUY 3주 그대로 유지
+        // (보유분 시장가를 빼먹으면 자본이 0이 되어 배수 0.00 → 주문이 통째로 사라진다)
+        // 기준표 목표 보유량(5×배수1.00=5)을 현재 보유(5)와 맞춰 보유 보정(diff) 없이 배수 반영만 순수하게 검증한다
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-02", 100)
+        ), privacyCommandWithPosition("0", 5, "70"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 5,
+                trade("2024-01-02", Order.OrderType.LOC, Order.OrderDirection.BUY, 3, "90"))));
+
+        assertThat(recorder.on("2024-01-02"))
+                .filteredOn(o -> o.direction() == Order.OrderDirection.BUY)
+                .extracting(Order::quantity)
+                .containsExactly(3);
+    }
 
     @Test
     @DisplayName("기준 매매표가 있는 날만 주문이 생성되고, 없는 날은 주문 없이 지나가며 결측 구간이 요약된다")

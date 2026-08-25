@@ -9,6 +9,7 @@ import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.domain.model.privacy.PrivacyDates;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.stats.ReturnMetrics;
+import com.kista.domain.model.strategy.BootstrapPosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.BacktestUseCase;
 import com.kista.domain.port.out.HistoricalCandlePort;
@@ -82,8 +83,13 @@ class BacktestService implements BacktestUseCase {
             throw new IllegalArgumentException(
                     command.type() + " 전략이 지원하지 않는 종목입니다: " + command.ticker());
         }
-        if (command.seed() == null || command.seed().signum() <= 0) {
-            throw new IllegalArgumentException("시드(seed)는 0보다 커야 합니다");
+        if (command.seed() != null && command.seed().signum() < 0) {
+            throw new IllegalArgumentException("시드(seed)는 0 이상이어야 합니다");
+        }
+        int initialHoldings = BootstrapPosition.validate(command.initialHoldings(), command.initialAvgPrice());
+        boolean hasSeed = command.seed() != null && command.seed().signum() > 0;
+        if (!hasSeed && initialHoldings <= 0) {
+            throw new IllegalArgumentException("시드(seed) 또는 기존 보유(initialHoldings·initialAvgPrice) 중 하나는 있어야 합니다");
         }
         if (command.from().isAfter(command.to())) {
             throw new IllegalArgumentException("시작일(from)이 종료일(to)보다 늦을 수 없습니다");
@@ -111,7 +117,11 @@ class BacktestService implements BacktestUseCase {
             BigDecimal required = BigDecimal.valueOf(Math.abs((long) command.vrRecurringAmount()))
                     .multiply(WITHDRAW_MIN_ASSET_MULTIPLIER)
                     .divide(BigDecimal.valueOf(command.vrIntervalWeeks()), 2, RoundingMode.HALF_UP);
-            if (initialValue.add(command.seed()).compareTo(required) < 0) {
+            // 보유분 취득원가도 포함 — holdings만으로 시작하는 인출식 VR을 vrInitialValue 부풀리기 없이 정확히 검증
+            BigDecimal stockCost = command.initialHoldings() != null && command.initialHoldings() > 0
+                    ? command.initialAvgPrice().multiply(BigDecimal.valueOf(command.initialHoldings()))
+                    : BigDecimal.ZERO;
+            if (initialValue.add(command.seedOrZero()).add(stockCost).compareTo(required) < 0) {
                 throw new IllegalArgumentException("인출식 VR 백테스트의 초기 자산은 " + required + " 이상이어야 합니다");
             }
         }

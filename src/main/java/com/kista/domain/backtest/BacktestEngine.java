@@ -292,7 +292,7 @@ public class BacktestEngine {
 
     private Output runPrivacy(List<DailyCandle> candles, BacktestCommand command,
                               Map<LocalDate, PrivacyTradeBase> privacyBases) {
-        PrivacyState state = new PrivacyState(command);
+        PrivacyState state = new PrivacyState(command, candles.getFirst().close());
         List<String> warnings = new ArrayList<>();
 
         // PRIVACY도 VR과 마찬가지로 워밍업 프리픽스가 필요 없다(전일종가가 없으면 캡만 생략될 뿐 예외가 없다)
@@ -400,9 +400,21 @@ public class BacktestEngine {
         int tradeCount;           // 체결 건수 누계
         int cycleCount = 1;       // 진행된 사이클 수
 
-        DayState(BigDecimal seed) {
-            this.balance = new AccountBalance(0, null, seed);
-            this.principal = seed;
+        // 중간부터 시작 — initialHoldings>0이면 avgPrice를 취득원가로 두고 시작 보유분을 잔고에 반영한다
+        // (원가는 registration의 fetchMarketPrice와 달리 백테스트엔 등록 시점 시장가 조회가 없어 사용자가 직접 입력한 avgPrice를 그대로 쓴다)
+        DayState(BacktestCommand command) {
+            int holdings = command.initialHoldings() != null ? command.initialHoldings() : 0;
+            BigDecimal avgPrice = holdings > 0 ? command.initialAvgPrice() : null;
+            if (holdings > 0 && avgPrice == null) {
+                throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)가 필요합니다");
+            }
+            BigDecimal seed = command.seedOrZero();
+            this.balance = new AccountBalance(holdings, avgPrice, seed);
+            // 원금 = 시드 + 기존 보유분 취득원가(시장가 아닌 실제 투입 비용 기준)
+            BigDecimal initialStockCost = holdings > 0
+                    ? avgPrice.multiply(BigDecimal.valueOf(holdings)).setScale(2, HALF_UP)
+                    : BigDecimal.ZERO;
+            this.principal = seed.add(initialStockCost);
         }
 
         // 체결 반영 — 잔고·체결건수 갱신
@@ -423,11 +435,11 @@ public class BacktestEngine {
         boolean valueHoldWarned;               // V′≤0 보류 경고 중복 방지 플래그
 
         VrState(BacktestCommand command, StrategyVrDetail detail, LocalDate startDate) {
-            super(command.seed());
+            super(command);
             this.value = command.vrInitialValue() != null ? command.vrInitialValue() : BigDecimal.ZERO;
             this.firstCycleStartDate = startDate;
             this.cycleStartDate = startDate;
-            this.poolLimit = poolLimitOf(command.seed(), detail.poolLimitRateAt(0));
+            this.poolLimit = poolLimitOf(command.seedOrZero(), detail.poolLimitRateAt(0));
         }
 
         // 공통 체결 반영에 이번 사이클 매수 사용액 누계를 덧붙인다
@@ -466,9 +478,11 @@ public class BacktestEngine {
         final Deque<BigDecimal> recentCloses = new ArrayDeque<>(); // 현재 사이클 최근 종가(최대 5개) — 별지점 산출용
 
         InfiniteState(BacktestCommand command) {
-            super(command.seed());
+            super(command);
             this.divisionCount = command.divisionCount() != null
                     ? command.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+            // 시작 보유분이 있으면 청산 판정 기준선도 그만큼에서 출발 — 0으로 두면 매매 없는 첫날에도 오탐은 없지만(§엔진 주석 참고) 명시적으로 맞춰둔다
+            this.prevDayHoldings = this.balance.holdings();
         }
 
         // 오늘 종가를 별지점 윈도우에 append — 6개째부터 가장 오래된 값을 버린다
@@ -510,9 +524,16 @@ public class BacktestEngine {
         LocalDate missingBaseTo;      // 진행 중인 결측 구간 마지막 날
         int missingBaseDays;          // 진행 중인 결측 구간 일수
 
-        PrivacyState(BacktestCommand command) {
-            super(command.seed());
-            this.initialUsdDeposit = command.seed();
+        // day0Close: 시작 보유분 시장가 평가 기준 — 운영 currentCycle.startAmount()(개장 예수금+개장 보유분 시장가)와 동일 계약을
+        // 재현하려면 등록 시점 시장가가 필요한데 백테스트엔 그 조회가 없어 첫 캔들 종가로 근사한다(알려진 근사)
+        PrivacyState(BacktestCommand command, BigDecimal day0Close) {
+            super(command);
+            BigDecimal seed = command.seedOrZero();
+            BigDecimal initialStockValue = balance.holdings() > 0
+                    ? day0Close.multiply(BigDecimal.valueOf(balance.holdings())).setScale(2, HALF_UP)
+                    : BigDecimal.ZERO;
+            this.initialUsdDeposit = seed.add(initialStockValue);
+            this.prevDayHoldings = balance.holdings();
         }
 
         // 오늘을 진행 중인 결측 구간에 편입 — 경고는 구간이 닫힐 때 1건만 기록한다
