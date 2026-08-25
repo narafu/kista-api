@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -15,4 +16,6 @@ public interface CommonMarketPriceFeed {
     Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers);
     BigDecimal getPrevClose(Ticker ticker);
     Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers);
+    // 특정 거래일의 확정 종가(일봉) — 조회 실패/봉 없으면 현재가로 폴백
+    BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate);
 }

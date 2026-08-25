@@ -111,6 +111,35 @@ class TossPriceApiTest {
     }
 
     @Test
+    @DisplayName("getClosingPrice: 해당 거래일 봉이 있으면 그 봉의 종가 반환 (라이브 현재가 아님)")
+    void getClosingPrice_returnsCandleCloseForTradeDate() {
+        LocalDate tradeDate = LocalDate.of(2026, 8, 21);
+        TossCandle candle = new TossCandle(tradeDate, new BigDecimal("70.00"),
+                new BigDecimal("72.00"), new BigDecimal("69.00"), new BigDecimal("71.05"), 5000L);
+        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(tradeDate), eq(tradeDate)))
+                .thenReturn(List.of(candle));
+
+        BigDecimal result = tossPriceApi.getClosingPrice(Ticker.TQQQ, tradeDate);
+
+        assertThat(result).isEqualByComparingTo("71.05");
+    }
+
+    @Test
+    @DisplayName("getClosingPrice: 해당 거래일 봉이 없으면 현재가로 폴백")
+    void getClosingPrice_noCandleForTradeDate_fallsBackToLivePrice() {
+        LocalDate tradeDate = LocalDate.of(2026, 8, 23); // 휴장일(일요일) — 봉 없음
+        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(tradeDate), eq(tradeDate)))
+                .thenReturn(List.of());
+        var item = new TossPriceApi.PriceItem("TQQQ", "69.09", "USD");
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrap(item));
+
+        BigDecimal result = tossPriceApi.getClosingPrice(Ticker.TQQQ, tradeDate);
+
+        assertThat(result).isEqualByComparingTo("69.09");
+    }
+
+    @Test
     @DisplayName("캔들이 없으면 empty 반환 (호출부에서 current로 fallback)")
     void fetchPrevCloseUncached_noCandle_returnsEmpty() {
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());

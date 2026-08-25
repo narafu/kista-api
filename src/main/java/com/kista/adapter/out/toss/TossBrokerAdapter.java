@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 // Toss 증권사 어댑터 — 공통 7개 + Toss 전용 5개 Port 구현
@@ -139,15 +140,19 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
         return tossPriceApi.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
-    // Toss 일봉이 애프터마켓 체결을 포함하는지 미검증 — 검증 전까지는 기존 라이브 현재가를 그대로 유지
+    // tradeDate 일봉 확정 종가 — 라이브 현재가 아님 (TossCandleApi.getCandles 경유, TossPriceApi.getClosingPrice)
     @Override
     public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
-        return tossPriceApi.getPrice(ticker); // 공통 API — account 불필요
+        return tossPriceApi.getClosingPrice(ticker, tradeDate); // 공통 API — account 불필요
     }
 
     @Override
     public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
-        return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        for (Ticker ticker : tickers) {
+            result.put(ticker, tossPriceApi.getClosingPrice(ticker, tradeDate));
+        }
+        return result;
     }
 
     @Override

@@ -18,7 +18,7 @@ public interface BrokerPricePort {
     // 전일종가만 필요한 경우 전용 — Toss는 현재가 API 호출 없이 캔들 API만 호출 (KIS는 현재가와 응답이 묶여 있어 절감 없음)
     BigDecimal getPrevClose(Ticker ticker, Account account);
     Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account);
-    // 정규장 확정 종가 — 마감 리포트 전용(getPrevClose와 별도). KIS는 dailyprice 확정 종가, Toss는 라이브 현재가 위임
+    // 정규장 확정 종가 — 마감 리포트 전용(getPrevClose와 별도). KIS는 dailyprice, Toss/MOCK은 일봉 캔들(TossCandleApi) 기반 확정 종가 (봉 없으면 라이브가 폴백)
     BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account);
     Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account);
 }

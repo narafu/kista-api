@@ -31,6 +31,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -97,7 +99,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.MOC, Order.OrderDirection.BUY, 10,
                 new BigDecimal("100.00"), "MOCK-1");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("999.99"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("999.99"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -116,7 +118,7 @@ class MockBrokerAdapterTest {
         Order fillable = placedOrder(Order.OrderType.LOC, Order.OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-2");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("95.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -131,7 +133,7 @@ class MockBrokerAdapterTest {
         Order unfillable = placedOrder(Order.OrderType.LOC, Order.OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-3");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("105.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -145,7 +147,7 @@ class MockBrokerAdapterTest {
         Order fillable = placedOrder(Order.OrderType.LOC, Order.OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-4");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("105.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -160,7 +162,7 @@ class MockBrokerAdapterTest {
         Order unfillable = placedOrder(Order.OrderType.LOC, Order.OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-5");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("95.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -174,7 +176,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.LIMIT, Order.OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-6");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("90.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -190,7 +192,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.LIMIT, Order.OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-7");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("110.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -204,7 +206,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.LIMIT, Order.OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-8");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("110.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -219,7 +221,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.LIMIT, Order.OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-9");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("90.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -233,7 +235,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.LOC, Order.OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-10");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("100.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 
@@ -260,7 +262,7 @@ class MockBrokerAdapterTest {
         Order order = placedOrder(Order.OrderType.MOC, Order.OrderDirection.BUY, 3,
                 new BigDecimal("100.00"), "MOCK-CYCLE-SCOPED");
         when(orderPort.findPlacedByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("100.00"));
+        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
 

@@ -1,6 +1,7 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.service.strategy.VrStrategyLifecycle;
+import com.kista.common.TimeZones;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.CyclePosition;
 import com.kista.domain.model.strategy.StrategyCycle;
@@ -42,16 +43,28 @@ class CycleSnapshotCreator {
         return newCycle;
     }
 
-    // VR 롤오버 전용: StrategyCycle + holdings 승계 스냅샷 + VR 사이클 상세를 원자적으로 저장
-    // holdings 승계: 이전 사이클의 보유량·평단가·예수금을 새 사이클 첫 스냅샷으로 이어받음
+    // VR 운영 중 재설정 전용 — "지금 당장" 실행되는 액션이라 시작일은 오늘(KST)
     @Transactional
     StrategyCycle createVrCycleAndSnapshot(UUID strategyId, UUID strategyVersionId,
                                            AccountBalance postBalance, BigDecimal closingPrice,
                                            BigDecimal newValue, int gradient, BigDecimal poolLimitRate) {
+        return createVrCycleAndSnapshot(strategyId, strategyVersionId, postBalance, closingPrice,
+                newValue, gradient, poolLimitRate, LocalDate.now(TimeZones.KST));
+    }
+
+    // VR N주 롤오버 전용: StrategyCycle + holdings 승계 스냅샷 + VR 사이클 상세를 원자적으로 저장
+    // holdings 승계: 이전 사이클의 보유량·평단가·예수금을 새 사이클 첫 스냅샷으로 이어받음
+    // startDate: 배치가 실제로 도는 날(휴장·주말로 며칠 밀릴 수 있음)이 아닌 evaluationDate(due일 기준 실제 거래일) —
+    // 밀린 실행일을 새 기준일로 삼으면 다음 due일도 함께 밀려 N주 스케줄이 매번 누적 drift된다 (VrCycleRolloverService.rollIfDue 참고)
+    @Transactional
+    StrategyCycle createVrCycleAndSnapshot(UUID strategyId, UUID strategyVersionId,
+                                           AccountBalance postBalance, BigDecimal closingPrice,
+                                           BigDecimal newValue, int gradient, BigDecimal poolLimitRate,
+                                           LocalDate startDate) {
         // 새 사이클 생성 — 시드(startAmount)는 롤오버 후 예수금과 보유 주식 평가액의 합계
         BigDecimal startAmount = totalAssets(postBalance, closingPrice);
         StrategyCycle newCycle = strategyCyclePort.save(
-                StrategyCycle.start(strategyId, strategyVersionId, startAmount));
+                StrategyCycle.start(strategyId, strategyVersionId, startAmount, startDate));
         // holdings 승계 스냅샷: 이전 사이클 보유량·평단가·예수금·종가 그대로 기록
         cyclePositionPort.save(CyclePosition.tradeSnapshot(newCycle.id(), postBalance, closingPrice));
         // VR 사이클 상세 저장 — V′·gradient·poolLimitRate 스냅샷

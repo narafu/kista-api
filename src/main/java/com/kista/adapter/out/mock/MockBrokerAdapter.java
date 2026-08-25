@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -110,15 +111,19 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         return priceFeed.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
-    // 모의계좌는 확정 종가 API가 없음 — Toss와 동일하게 라이브 현재가를 확정 종가로 대체 사용
+    // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(CommonMarketPriceFeed.getClosingPrice)
     @Override
     public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
-        return priceFeed.getPrice(ticker);
+        return priceFeed.getClosingPrice(ticker, tradeDate);
     }
 
     @Override
     public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
-        return priceFeed.getPrices(tickers);
+        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        for (Ticker ticker : tickers) {
+            result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
+        }
+        return result;
     }
 
     // --- LiveBalancePort ---

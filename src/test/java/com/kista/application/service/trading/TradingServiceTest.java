@@ -71,6 +71,7 @@ class TradingServiceTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
     @Mock StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 조회 (CycleOrderComputer용)
     @Mock VrStrategy vrStrategy; // VR 전략 주문 생성 mock (VrCycleOrderStrategy 조립용)
+    @Mock VrCycleRolloverService vrRolloverService; // VR 롤오버 mock — 마감 리포트 도달 여부 검증용
     @Mock ApplicationEventPublisher eventPublisher; // 사이클 완료/시작·리포트 이벤트 발행 (헬퍼 컴포넌트 조립용)
     TradingService service;
 
@@ -149,7 +150,6 @@ class TradingServiceTest {
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, notifyPort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, notifyPort, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
-        VrCycleRolloverService vrRolloverService = mock(VrCycleRolloverService.class); // VR 롤오버 mock
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService);
@@ -1792,6 +1792,10 @@ class TradingServiceTest {
         // buildOrders: VR 전략은 LIMIT + AT_OPEN 주문만 반환
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
                 .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
+        // 당일 AT_CLOSE 생성 주문 0건(AT_OPEN만 존재)이어도 마감 리포트까지 도달해야 함 — 아래 rollIfDue 검증 대상
+        when(kisExecutionPort.getExecutions(any(), any(), eq(Ticker.SOXL), eq(ACCOUNT))).thenReturn(List.of());
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT)))
+                .thenReturn(Map.of(Ticker.SOXL, PRICE));
 
         service.executeBatch(List.of(new BatchContext(vrStrat, vrCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -1804,6 +1808,10 @@ class TradingServiceTest {
         verify(brokerOrderPort, never()).place(any(), any());
         // VR only 배치 — PRIVACY 기준매매표 조회가 발생하지 않아야 함
         verify(privacyTradePort, never()).findTodayTrade(any());
+        // 당일 생성 가능한 AT_CLOSE 주문이 0건이어도 마감 리포트(saveCyclePosition→rollIfDue)까지는 실행돼야 한다
+        // (예수금 부족으로 사다리를 못 만드는 날에도 롤오버 판정이 매일 돌아야 영구 데드락에 빠지지 않음)
+        verify(cycleHistoryPort).save(any());
+        verify(vrRolloverService).rollIfDue(any(), any(), any(), any());
     }
 
     private Account account(String accountId) {

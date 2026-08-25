@@ -144,7 +144,7 @@ class TradingService {
         waitFor("마감 시각", dst.waitUntilPostClose(), dst);
         marketEventNotifier.notifyMarketClose();
 
-        // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss는 라이브 위임)
+        // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss/MOCK은 일봉 캔들 기반 확정 종가)
         Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
 
         // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
@@ -164,7 +164,10 @@ class TradingService {
         SaveAllocationResult result = saveAllocatedOrders(candidates, today);
         return candidates.stream()
                 .filter(candidate -> candidate.hasExistingOrders()
-                        || result.savedContexts().contains(candidate.state().ctx()))
+                        || result.savedContexts().contains(candidate.state().ctx())
+                        // 롤오버 판정이 필요한 전략(VR)은 당일 주문 0건이어도 마감 리포트까지 흘려보내야
+                        // saveCyclePosition→rollIfDue가 매일 실행된다 (예수금 0으로 사다리를 못 만드는 날에도 롤오버는 계속 판정돼야 함)
+                        || cycleOrderStrategies.of(candidate.state().ctx().strategy().type()).requiresRolloverCheck())
                 .map(CyclePlanCandidate::state)
                 .toList();
     }

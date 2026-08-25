@@ -1,11 +1,13 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.event.NewCycleStartedEvent;
+import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.broker.BrokerPricePort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +42,9 @@ class VrCycleRolloverServiceTest {
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock MarketCalendarPort marketCalendarPort;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock BrokerPricePort brokerPricePort;
 
     VrCycleRolloverService service;
 
@@ -88,11 +93,16 @@ class VrCycleRolloverServiceTest {
     void setUp() {
         service = new VrCycleRolloverService(
                 strategyCycleVrPort, strategyVrDetailPort, strategyCyclePort,
-                cycleSnapshotCreator, notifyPort, userNotificationPort, eventPublisher);
+                cycleSnapshotCreator, notifyPort, userNotificationPort, eventPublisher,
+                marketCalendarPort, registry);
         ctx = new BatchContext(VR_STRATEGY, CYCLE, ACCOUNT, USER);
         // 램프 재계산 기준 — 최초 사이클 시작일 조회 기본 stub (CYCLE 자신이 최초 사이클인 케이스)
         // due 미도래·cycleVr 미존재 등 조기 return 테스트는 호출 자체가 없어 unnecessary stub 문제 없음(lenient)
         lenient().when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
+        // due일 확정 종가 조회 — 기본은 항상 거래일(휴장 역탐색 불필요) + CLOSING_PRICE 반환
+        lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        lenient().when(registry.require(any(Account.class), eq(BrokerPricePort.class))).thenReturn(brokerPricePort);
+        lenient().when(brokerPricePort.getClosingPrice(any(), any(), any())).thenReturn(CLOSING_PRICE);
     }
 
     @Test
@@ -106,7 +116,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any());
+        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -116,7 +126,7 @@ class VrCycleRolloverServiceTest {
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -127,24 +137,60 @@ class VrCycleRolloverServiceTest {
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID),
                 eq(POST_BALANCE), eq(CLOSING_PRICE),
-                any(BigDecimal.class), eq(10), any(BigDecimal.class));
+                any(BigDecimal.class), eq(10), any(BigDecimal.class), eq(today));
     }
 
     @Test
-    @DisplayName("due 지난 후 도래 — markEnded + 새 사이클 생성 (지연 이월)")
+    @DisplayName("due 지난 후 도래 — markEnded + 새 사이클 생성은 due일 기준(배치 실행일 아님, 지연 이월)")
     void due_afterDueDate_rollsOver() {
         // 휴장일로 밀린 케이스: today = dueDate + 1일
-        LocalDate today = CYCLE_START.plusWeeks(4).plusDays(1);
+        LocalDate dueDate = CYCLE_START.plusWeeks(4);
+        LocalDate today = dueDate.plusDays(1);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
-                        USD_DEPOSIT, null, today, null, Instant.now(), null));
+                        USD_DEPOSIT, null, dueDate, null, Instant.now(), null));
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("1500.00"), today);
-        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any());
+        // 종료일/신규 시작일 모두 due일 그대로 — 배치가 밀려 실행된 today가 아님 (스케쥴 앵커 고정)
+        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("1500.00"), dueDate);
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), any(), any(), any(), anyInt(), any(), eq(dueDate));
+    }
+
+    @Test
+    @DisplayName("due일이 휴장(주말)이면 종료일/시작일/평가종가 모두 그 직전 거래일 기준 — due일 자체가 아님")
+    void dueDateOnHoliday_anchorsToLastTradingDay() {
+        // CYCLE_START(2026-06-01)는 월요일 — +2주(due=06-15, 월요일)로 만들고, due일 자체를 휴장으로 만들어
+        // 직전 거래일(06-12, 금요일)로 역탐색되는지 검증한다
+        StrategyVrDetail twoWeekDetail = new StrategyVrDetail(STRATEGY_VERSION_ID, 2, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        LocalDate dueDate = CYCLE_START.plusWeeks(2); // 2026-06-15
+        LocalDate lastTradingDay = dueDate.minusDays(3); // 2026-06-12 (금)
+        LocalDate today = dueDate; // 배치는 due일 당일에 정상 실행됐다고 가정 — due일 자체가 휴장인 케이스
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(twoWeekDetail));
+        // due일과 그 사이 이틀은 휴장, 그 이전(lastTradingDay)부터는 거래일
+        when(marketCalendarPort.isMarketOpen(dueDate)).thenReturn(false);
+        when(marketCalendarPort.isMarketOpen(dueDate.minusDays(1))).thenReturn(false);
+        when(marketCalendarPort.isMarketOpen(dueDate.minusDays(2))).thenReturn(false);
+        when(marketCalendarPort.isMarketOpen(lastTradingDay)).thenReturn(true);
+        BigDecimal holidayEvalPrice = new BigDecimal("60.00");
+        when(brokerPricePort.getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT)).thenReturn(holidayEvalPrice);
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
+                .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                        USD_DEPOSIT, null, lastTradingDay, null, Instant.now(), null));
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        // 평가금 = holdings(10) × 직전 거래일 종가(60.00) = 600.00 — due일 자체가 아닌 직전 거래일 종가로 계산됨
+        verify(brokerPricePort).getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT);
+        verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("1600.00")), eq(lastTradingDay));
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), any(), eq(holidayEvalPrice), any(), anyInt(), any(), eq(lastTradingDay));
     }
 
     @Test
@@ -157,7 +203,7 @@ class VrCycleRolloverServiceTest {
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -166,7 +212,7 @@ class VrCycleRolloverServiceTest {
         // newValue 캡처 후 범위 검증 (소수점 반올림 허용 ±0.01)
         ArgumentCaptor<BigDecimal> newValueCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), newValueCaptor.capture(), anyInt(), any());
+                any(), any(), any(), any(), newValueCaptor.capture(), anyInt(), any(), any());
         BigDecimal expectedNewValue = VrPosition.nextValue(
                 CYCLE_VR.value(), USD_DEPOSIT, CYCLE_VR.gradient(), DETAIL.recurringAmount(),
                 BigDecimal.valueOf(POST_BALANCE.holdings()).multiply(CLOSING_PRICE));
@@ -180,7 +226,7 @@ class VrCycleRolloverServiceTest {
         // gradient=10 (cycleVr 고정값)
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -188,7 +234,7 @@ class VrCycleRolloverServiceTest {
 
         ArgumentCaptor<Integer> gradientCaptor = ArgumentCaptor.forClass(Integer.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), gradientCaptor.capture(), any());
+                any(), any(), any(), any(), any(), gradientCaptor.capture(), any(), any());
         assertThat(gradientCaptor.getValue()).isEqualTo(CYCLE_VR.gradient()); // 10 이월
     }
 
@@ -200,7 +246,7 @@ class VrCycleRolloverServiceTest {
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -208,7 +254,7 @@ class VrCycleRolloverServiceTest {
 
         ArgumentCaptor<BigDecimal> poolLimitRateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), anyInt(), poolLimitRateCaptor.capture());
+                any(), any(), any(), any(), any(), anyInt(), poolLimitRateCaptor.capture(), any());
         assertThat(poolLimitRateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.50"));
     }
 
@@ -232,7 +278,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, zeroHoldingsBalance, CLOSING_PRICE, today);
 
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any());
+        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
         verify(notifyPort).notifyError(any(IllegalStateException.class)); // 관리자 알림
         verify(userNotificationPort).notifyError(eq(USER), any(IllegalStateException.class)); // 사용자 알림
     }
@@ -253,13 +299,62 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, postBalance, CLOSING_PRICE, today);
 
-        // nextValue(0, pool=0, G=10, recurring=200, eval=0) = 0 + 0/10 + 200 + (0-0)/(2√10) = 200.00
+        // markEnded는 적립 반영 전(pre-injection) 총자산 기준 — evaluation=0, pool=0 → 0.00
         verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("0.00")), eq(today));
+        // V′ 공식은 원래 pool(0, 적립 반영 전) 사용 — recurringAmount는 별도 항으로만 더해짐
+        // nextValue(0, pool=0, G=10, recurring=200, eval=0) = 0 + 0/10 + 200 + (0-0)/(2√10) = 200.00
+        // 다음 사이클 실 현금(pool)만 adjustedPool = pool(0) + recurringAmount(200) = 200으로 승계
+        AccountBalance expectedNewCycleBalance = new AccountBalance(0, null, new BigDecimal("200.00"));
         // poolLimitRate는 달러 파생 없이 그대로 전달 — depositDetail은 램프 미개입(gMax/floor=initial)이라 initialPoolLimitRate(0.75) 그대로
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(postBalance), eq(CLOSING_PRICE),
-                eq(new BigDecimal("200.00")), eq(10), eq(new BigDecimal("0.75")));
+                eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(expectedNewCycleBalance), eq(CLOSING_PRICE),
+                eq(new BigDecimal("200.00")), eq(10), eq(new BigDecimal("0.75")), eq(today));
         verify(userNotificationPort, never()).notifyError(eq(USER), any(IllegalStateException.class));
+    }
+
+    @Test
+    @DisplayName("인출식 롤오버 — 예수금에서 recurringAmount(음수)만큼 실제 차감된 pool로 새 사이클 개장")
+    void rollIfDue_withdrawal_deductsFromPool() {
+        // pool=1000, recurringAmount=-100 → adjustedPool=900
+        StrategyVrDetail withdrawDetail = new StrategyVrDetail(
+                STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), -100,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        LocalDate today = CYCLE_START.plusWeeks(4);
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(withdrawDetail));
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
+                .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
+                        USD_DEPOSIT, null, today, null, Instant.now(), null));
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        // markEnded는 인출 반영 전 pool(1000) 기준 총자산 그대로
+        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("1500.00"), today);
+        ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
+        verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
+                any(), any(), balanceCaptor.capture(), any(), any(), anyInt(), any(), any());
+        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo(new BigDecimal("900.00"));
+    }
+
+    @Test
+    @DisplayName("인출식이 예수금을 초과 — pool 음수 전환 시 롤오버 보류, 관리자+사용자 알림")
+    void rollIfDue_withdrawalExceedsPool_abortsRollover() {
+        // pool=1000, recurringAmount=-2000 → adjustedPool=-1000 (음수) → 롤오버 보류
+        StrategyVrDetail overWithdrawDetail = new StrategyVrDetail(
+                STRATEGY_VERSION_ID, 4, new BigDecimal("15.00"), -2000,
+                20, 52, 26, 20, new BigDecimal("0.25"), 52, 26, new BigDecimal("0.25"));
+        LocalDate today = CYCLE_START.plusWeeks(4);
+
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(overWithdrawDetail));
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        verify(strategyCyclePort, never()).markEnded(any(), any(), any());
+        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(notifyPort).notifyError(any(IllegalStateException.class));
+        verify(userNotificationPort).notifyError(eq(USER), any(IllegalStateException.class));
     }
 
     @Test
@@ -272,7 +367,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, null, today);
 
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any());
+        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
         verify(notifyPort).notifyError(any(IllegalStateException.class));
     }
 
@@ -295,7 +390,7 @@ class VrCycleRolloverServiceTest {
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -304,7 +399,7 @@ class VrCycleRolloverServiceTest {
         // postBalance가 새 사이클 스냅샷에 그대로 전달됨 확인
         ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), balanceCaptor.capture(), any(), any(), anyInt(), any());
+                any(), any(), balanceCaptor.capture(), any(), any(), anyInt(), any(), any());
         AccountBalance captured = balanceCaptor.getValue();
         assertThat(captured.holdings()).isEqualTo(10);
         assertThat(captured.avgPrice()).isEqualByComparingTo(new BigDecimal("45.00"));
@@ -317,7 +412,7 @@ class VrCycleRolloverServiceTest {
         LocalDate today = CYCLE_START.plusWeeks(4);
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -343,7 +438,7 @@ class VrCycleRolloverServiceTest {
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR)); // 스냅샷 gradient=10
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
         when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -356,7 +451,7 @@ class VrCycleRolloverServiceTest {
 
         ArgumentCaptor<Integer> gradientCaptor = ArgumentCaptor.forClass(Integer.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), gradientCaptor.capture(), any());
+                any(), any(), any(), any(), any(), gradientCaptor.capture(), any(), any());
         // 스냅샷(cycleVr.gradient()=10)이 아니라 램프 재계산값이 사용돼야 함
         assertThat(gradientCaptor.getValue()).isEqualTo(expectedGradient);
         assertThat(gradientCaptor.getValue()).isNotEqualTo(CYCLE_VR.gradient());
@@ -376,7 +471,7 @@ class VrCycleRolloverServiceTest {
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
         when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -388,7 +483,7 @@ class VrCycleRolloverServiceTest {
 
         ArgumentCaptor<BigDecimal> rateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), anyInt(), rateCaptor.capture());
+                any(), any(), any(), any(), any(), anyInt(), rateCaptor.capture(), any());
         assertThat(rateCaptor.getValue()).isEqualByComparingTo(expectedRate);
     }
 
@@ -405,7 +500,7 @@ class VrCycleRolloverServiceTest {
         when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(rampingDetail));
         when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(firstCycle));
-        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any()))
+        when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, today, null, Instant.now(), null));
 
@@ -414,7 +509,7 @@ class VrCycleRolloverServiceTest {
         ArgumentCaptor<Integer> gradientCaptor = ArgumentCaptor.forClass(Integer.class);
         ArgumentCaptor<BigDecimal> rateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
-                any(), any(), any(), any(), any(), gradientCaptor.capture(), rateCaptor.capture());
+                any(), any(), any(), any(), any(), gradientCaptor.capture(), rateCaptor.capture(), any());
         assertThat(gradientCaptor.getValue()).isEqualTo(10); // initialGradient
         assertThat(rateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.75")); // initialPoolLimitRate
     }

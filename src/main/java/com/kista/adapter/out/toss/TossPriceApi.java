@@ -121,6 +121,24 @@ class TossPriceApi implements CommonMarketPriceFeed {
                 () -> fetchPrevCloseUncached(symbol, before));
     }
 
+    // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
+    // 애프터마켓 체결 포함 여부는 Toss 캔들 API 스펙상 정규장 마감 기준 확정 봉으로 간주 — 봉 없으면 현재가 폴백
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate) {
+        try {
+            return tossCandleApi.getCandles(ticker.name(), "1d", tradeDate, tradeDate).stream()
+                    .filter(c -> c.date().equals(tradeDate))
+                    .findFirst()
+                    .map(TossCandle::close)
+                    .orElseGet(() -> {
+                        log.warn("Toss {} 확정 종가 캔들 없음, 현재가로 폴백: tradeDate={}", ticker, tradeDate);
+                        return getPrice(ticker);
+                    });
+        } catch (Exception e) {
+            log.warn("Toss {} 확정 종가 조회 실패, 현재가로 폴백: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
+            return getPrice(ticker);
+        }
+    }
+
     // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate() 실시간 호출 우회)
     Optional<BigDecimal> fetchPrevCloseUncached(String symbol, Instant before) {
         try {
