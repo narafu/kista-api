@@ -308,7 +308,7 @@ class TradingCycleControllerTest {
                 Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
         StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
                 new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
-                new BigDecimal("1000.00"), new BigDecimal("0.75"), 10,
+                new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 10,
                 10, 52, 26, 10,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
         StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
@@ -362,7 +362,7 @@ class TradingCycleControllerTest {
                 Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
         StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
                 new BigDecimal("3000"), new BigDecimal("20.00"), 8, 0,
-                new BigDecimal("1500.00"), new BigDecimal("0.75"), 12,
+                new BigDecimal("1500.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 12,
                 12, 52, 26, 20,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
         StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);

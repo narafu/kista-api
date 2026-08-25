@@ -96,6 +96,9 @@ class VrStrategyLifecycleTest {
                 cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
                 new BigDecimal("1000"), null, null, 0, null, null);
+        // 최신 포지션 pool(282.83)은 개장 pool(1000)과 달라야 currentPool이 개장값 재사용이 아님을 검증할 수 있다
+        CyclePosition latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("282.83"), new BigDecimal("71.17"), null, 1, null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         // 총 시작금액 1600과 개장 USD pool 1000은 분리된다. poolLimit은 1000 × 0.50 = 500.00이다.
@@ -105,13 +108,39 @@ class VrStrategyLifecycleTest {
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
         Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
-                strategyId, Optional.of(latestCycle), Optional.of(openingPosition));
+                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.of(latestPosition));
 
         assertThat(result).isPresent();
         assertThat(result.get().intervalWeeks()).isEqualTo(4);
         assertThat(result.get().poolLimit()).isEqualByComparingTo("500.00");
         assertThat(result.get().poolLimitRate()).isEqualByComparingTo("0.50");
         assertThat(result.get().gradient()).isEqualTo(10);
+        // currentPool은 최신 포지션 값(282.83) — 개장값(1000)이 아님
+        assertThat(result.get().currentPool()).isEqualByComparingTo("282.83");
+    }
+
+    @Test
+    @DisplayName("findSummary() 최신 포지션이 없으면 currentPool은 null")
+    void findSummary_missingLatestPosition_currentPoolIsNull() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        StrategyCycle latestCycle = new StrategyCycle(
+                cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
+        CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("1000"), null, null, 0, null, null);
+        StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
+                cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
+        when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
+        when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
+
+        Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
+                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.empty());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().currentPool()).isNull();
     }
 
     @Test
@@ -129,7 +158,8 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(strategyId, Optional.of(latestCycle), Optional.empty()))
+        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(
+                strategyId, Optional.of(latestCycle), Optional.empty(), Optional.empty()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음")
                 .hasMessageContaining(cycleId.toString());
@@ -145,7 +175,7 @@ class VrStrategyLifecycleTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
-        assertThatThrownBy(() -> vrStrategyLifecycle.buildSummary(vrDetail, cycleVr, null))
+        assertThatThrownBy(() -> vrStrategyLifecycle.buildSummary(vrDetail, cycleVr, null, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음");
     }

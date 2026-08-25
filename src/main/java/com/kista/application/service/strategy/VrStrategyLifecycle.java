@@ -49,8 +49,10 @@ public class VrStrategyLifecycle {
     }
 
     // openingPosition: 호출측(StrategyService.toDetail)이 이미 조회한 개장 포지션 — 여기서 재조회하지 않는다
+    // latestPosition: 라이브 pool(currentPool) 노출용 — 없으면(이력 없음) currentPool=null
     Optional<StrategyDetail.VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
-                                                    Optional<CyclePosition> openingPosition) {
+                                                    Optional<CyclePosition> openingPosition,
+                                                    Optional<CyclePosition> latestPosition) {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
@@ -59,7 +61,8 @@ public class VrStrategyLifecycle {
                                             .map(CyclePosition::usdDeposit)
                                             .orElseThrow(() -> new IllegalStateException(
                                                     "VR 시작 포지션 없음: cycleId=" + cycle.id()));
-                                    return buildSummary(vrDetail, cycleVr, openingPool);
+                                    BigDecimal currentPool = latestPosition.map(CyclePosition::usdDeposit).orElse(null);
+                                    return buildSummary(vrDetail, cycleVr, openingPool, currentPool);
                                 })));
     }
 
@@ -73,7 +76,9 @@ public class VrStrategyLifecycle {
     }
 
     // openingPool: 조회 대상 사이클 개장 포지션의 USD pool — poolLimit 달러 파생(openingPool × poolLimitRate)에 사용
-    StrategyDetail.VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr, BigDecimal openingPool) {
+    // currentPool: 최신 cycle_position 기준 현재 pool — null이면(이력 없음) 그대로 null 노출
+    StrategyDetail.VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr,
+                                          BigDecimal openingPool, BigDecimal currentPool) {
         if (vrDetail == null || cycleVr == null) return null;
         if (openingPool == null) {
             throw new IllegalStateException("VR 시작 포지션 없음: openingPool=null");
@@ -82,7 +87,7 @@ public class VrStrategyLifecycle {
                 .setScale(2, RoundingMode.HALF_UP);
         return new StrategyDetail.VrSummary(
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
-                vrDetail.recurringAmount(), poolLimit, cycleVr.poolLimitRate(), cycleVr.gradient(),
+                vrDetail.recurringAmount(), poolLimit, currentPool, cycleVr.poolLimitRate(), cycleVr.gradient(),
                 vrDetail.initialGradient(), vrDetail.gGraceWeeks(), vrDetail.gStepWeeks(), vrDetail.gMax(),
                 vrDetail.initialPoolLimitRate(), vrDetail.pGraceWeeks(), vrDetail.pStepWeeks(), vrDetail.poolLimitFloor());
     }
