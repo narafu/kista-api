@@ -64,7 +64,7 @@ class BacktestControllerTest {
     void 백테스트_결과를_반환한다() throws Exception {
         when(backtestUseCase.run(any())).thenReturn(result());
 
-        mockMvc.perform(get("/api/backtest")
+        mockMvc.perform(get("/api/strategy-simulations")
                         .param("type", "VR").param("ticker", "TQQQ")
                         .param("from", "2024-01-01").param("to", "2024-01-05")
                         .param("seed", "1000")
@@ -98,7 +98,7 @@ class BacktestControllerTest {
     void vrRecurringAmount는_생략하면_0으로_기본값을_쓴다() throws Exception {
         when(backtestUseCase.run(any())).thenReturn(result());
 
-        mockMvc.perform(get("/api/backtest")
+        mockMvc.perform(get("/api/strategy-simulations")
                         .param("type", "INFINITE").param("ticker", "TQQQ")
                         .param("from", "2024-01-01").param("to", "2024-01-05")
                         .param("seed", "1000")
@@ -112,7 +112,7 @@ class BacktestControllerTest {
 
     @Test
     void 필수_파라미터가_없으면_400이다() throws Exception {
-        mockMvc.perform(get("/api/backtest")
+        mockMvc.perform(get("/api/strategy-simulations")
                         .param("ticker", "TQQQ")
                         .param("from", "2024-01-01").param("to", "2024-01-05")
                         .param("seed", "1000")
@@ -126,7 +126,7 @@ class BacktestControllerTest {
     void 서비스가_던진_IllegalArgumentException은_400으로_매핑된다() throws Exception {
         when(backtestUseCase.run(any())).thenThrow(new IllegalArgumentException("시드(seed)는 0보다 커야 합니다"));
 
-        mockMvc.perform(get("/api/backtest")
+        mockMvc.perform(get("/api/strategy-simulations")
                         .param("type", "INFINITE").param("ticker", "TQQQ")
                         .param("from", "2024-01-01").param("to", "2024-01-05")
                         .param("seed", "0")
@@ -136,7 +136,7 @@ class BacktestControllerTest {
 
     @Test
     void 인증이_없으면_401이다() throws Exception {
-        mockMvc.perform(get("/api/backtest")
+        mockMvc.perform(get("/api/strategy-simulations")
                         .param("type", "INFINITE").param("ticker", "TQQQ")
                         .param("from", "2024-01-01").param("to", "2024-01-05")
                         .param("seed", "1000"))

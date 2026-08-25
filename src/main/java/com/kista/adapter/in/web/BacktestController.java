@@ -20,7 +20,7 @@ import java.util.UUID;
 
 @Tag(name = "백테스트", description = "과거 일봉 기반 전략 시뮬레이션")
 @RestController
-@RequestMapping("/api/backtest")
+@RequestMapping("/api/strategy-simulations")
 @RequiredArgsConstructor
 public class BacktestController {
 
