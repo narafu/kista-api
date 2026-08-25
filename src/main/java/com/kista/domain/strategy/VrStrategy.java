@@ -36,6 +36,14 @@ public class VrStrategy {
             return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
         }
 
+        // holdings>0인데 value=0인 상태 — bootstrap 매수 체결로 holdings가 생겼지만 V는 롤오버 전까지
+        // 스냅샷 그대로 0으로 고정되는 갭 구간. lowerBand/upperBand가 모두 0이 되어 사다리 전 단이
+        // $0 가격으로 계산되므로(매수·매도 전부 무의미) 이 구간은 신규 사다리 생성을 skip한다.
+        // 다음 롤오버에서 nextValue()가 evaluation(holdings×종가) 기준으로 V를 정상 재확립한다.
+        if (position.value().signum() == 0) {
+            return List.of();
+        }
+
         List<Order> orders = new ArrayList<>();
         orders.addAll(buildBuyOrders(position, ticker, tradeDate));
         orders.addAll(buildSellOrders(position, ticker, tradeDate));

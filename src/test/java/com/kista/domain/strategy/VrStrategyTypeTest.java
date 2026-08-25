@@ -140,6 +140,20 @@ class VrStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("holdings>0인데 value=0이면(bootstrap 매수 체결 후 롤오버 전 V 미갱신 갭) 사다리 skip — " +
+            "lowerBand/upperBand가 0이 되어 $0 가격 주문이 나가는 버그 회귀 방지")
+    void holdingsPositive_valueZero_skipsLadder() {
+        AccountBalance balance = new AccountBalance(2, new BigDecimal("71.05"), new BigDecimal("57.90"));
+        VrPosition position = new VrPosition(
+                balance, BigDecimal.ZERO, new BigDecimal("15.00"),
+                new BigDecimal("150.00"), BigDecimal.ZERO, 100);
+
+        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
+
+        assertThat(orders).isEmpty();
+    }
+
+    @Test
     @DisplayName("poolLimit=0(완전 무일푼으로 개장해 영구 고정)이어도 pool()>0이면 그 예수금을 예산으로 대신 쓴다")
     void poolLimitZero_fallsBackToLivePoolAsBudget() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("200.00"));
