@@ -318,8 +318,10 @@ class TradingPreviewServiceTest {
 
         Map<UUID, StrategyCycle> cyclesById = new java.util.HashMap<>();
         for (Strategy s : strategies) {
+            // startDate는 과거로 고정 — LocalDate.now()면 KST 00:00~04:30 사이 실행 시 DstInfo.nextTradeDate()가
+            // 오늘 날짜를 반환해 SCHEDULED_START_NOT_REACHED skip과 경합하는 flaky 테스트가 됨 (58번째 줄 주석 참고)
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
-                    new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                    new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
             cyclesById.put(s.id(), cycle);
             Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LIMIT,
                     Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
@@ -359,8 +361,9 @@ class TradingPreviewServiceTest {
 
         Map<UUID, StrategyCycle> cycles = new java.util.HashMap<>();
         for (Strategy s : strategies) {
+            // startDate는 과거로 고정 — 위 previewBatch_callsSumPlannedBuyByAccountAndDateOnce...와 동일한 이유
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
-                    new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                    new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
             cycles.put(s.id(), cycle);
 
             Order buy = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LOC,
