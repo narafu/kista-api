@@ -84,11 +84,8 @@ class BacktestEngineTest {
         // 2일차 bootstrap: 캡가 = 전일종가 100 × 1.05 = 105.00, 수량 = 500/105 내림 = 4주
         // 3일차: LOC은 종가 기준 판정 — 종가 90 ≤ 105 → 4주×90 = 360.00 체결
         // 3일차 총자산(1000)은 체결가·평가가가 둘 다 종가 90이라 매수수량과 무관하게 항상 seed와 같다 — 수량 자체는 증명하지 못한다
-        // holdings=4가 되는 순간(3일차 주문생성 단계) V=0인 채로 매도 사다리도 함께 생성된다 — upperBand=V×1.15=0이라 매도가가 전부 0.00
-        // (테스트 "V가_0인_상태에서_보유가_생기면..."과 동일 근본원인) → 4일차 고가는 항상 0 이상이라 4주 전량이 무조건 0달러에 체결된다
-        // 매도 체결가가 0이라 현금은 변화가 없으므로 4일차 총자산 = 3일차 체결 직후 현금(1000 − 매수수량×90) 그대로 남는다
-        // 이 값은 매수수량에 직접 의존한다(수량이 4가 아니면 640이 아님) — 4일차 종가를 90과 다르게 잡아(90=우연한 상쇄값) 확인하되,
-        // 매도가 지정가 0.00 그대로 체결되므로 4일차 종가 자체는 결과값에 영향이 없다(보유분이 이미 0이 된 뒤 평가되기 때문)
+        // holdings=4가 되는 순간(3일차 주문생성 단계) V=0이라 사다리 생성이 skip된다(VrStrategy value=0 가드) — 매도 주문 없음, 보유 유지
+        // 4일차 총자산 = 3일차 체결 직후 현금(1000 − 4주×90 = 640) + 4주 × 4일차 종가(110) = 640 + 440 = 1080
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-02", 100, 105, 95, 100),
                 candle("2024-01-03", 100, 105, 95, 100),
@@ -101,8 +98,8 @@ class BacktestEngineTest {
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차: 주문 없음
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 아직 미체결(주문만 생성)
                         p -> assertThat(p).isEqualByComparingTo("1000"),  // 3일차: 예수금 640 + 4주×90 (수량과 무관하게 항상 seed와 동일)
-                        p -> assertThat(p).isEqualByComparingTo("640"));  // 4일차: 0달러 매도로 전량 청산, 현금 640 그대로 — 매수수량이 4가 아니면 이 값이 어긋난다
-        assertThat(output.tradeCount()).isEqualTo(5); // 매수 1건(4주) + 0달러 매도 사다리 4건(1주씩, holdings=4)
+                        p -> assertThat(p).isEqualByComparingTo("1080")); // 4일차: 매도 사다리 skip → 보유 유지, 640 + 4주×110
+        assertThat(output.tradeCount()).isEqualTo(1); // bootstrap 매수 1건뿐 — V=0 구간 매도 사다리 없음
     }
 
     @Test
@@ -234,10 +231,9 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("알려진 한계: V=0인 채로 보유가 생기면 0달러 매도 사다리가 나와 보유분이 증발한다")
-    void V가_0인_상태에서_보유가_생기면_0달러_매도로_청산된다() {
-        // upperBand = 0 × (1+밴드) = 0.00 → sellPrice(s)=0.00, FillSimulator는 high ≥ 0을 항상 만족시킨다.
-        // 운영에서는 증권사가 0달러 지정가를 거부해 드러나지 않는 경로 — 백테스트 입력 검증(V > 0 요구)이 필요하다는 근거 테스트.
+    @DisplayName("V=0인 채로 보유가 생겨도 매도 사다리 생성이 skip되어 보유분이 유지된다")
+    void V가_0인_상태에서_보유가_생겨도_매도_사다리가_생성되지_않는다() {
+        // VrStrategy의 value=0 가드(commit d0056372)로 upperBand=0인 $0 매도 사다리 생성 자체가 막힌다.
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-02", 100, 105, 95, 100),
                 candle("2024-01-03", 100, 105, 95, 100),
@@ -245,9 +241,9 @@ class BacktestEngineTest {
                 candle("2024-01-05", 100, 105, 95, 100)
         ), vrCommand("1000", "0", 52, 0));
 
-        // 3일차 bootstrap 체결(4주×100=400) 후, 4일차에 0.00 매도가 전량 체결돼 예수금만 600 남는다
+        // 3일차 bootstrap 체결(4주×100=400) 후, 4일차엔 매도 주문이 없어 보유 그대로 평가(4주×종가100=400 + 예수금600)
         assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("1000");
-        assertThat(output.points().get(3).totalAsset()).isEqualByComparingTo("600");
+        assertThat(output.points().get(3).totalAsset()).isEqualByComparingTo("1000");
     }
 
     // --- INFINITE 픽스처 헬퍼 ---
