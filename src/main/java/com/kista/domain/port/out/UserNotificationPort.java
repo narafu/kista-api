@@ -21,4 +21,5 @@ public interface UserNotificationPort {
     void notifyBatchInterrupted(User user, Account account);                                  // 사용자에게 스케쥴러 인터럽트(배포·재기동) 알림
     void notifyMarketOpen(User user);                                                        // 사용자에게 장 개시 알림
     void notifyMarketClose(User user);                                                       // 사용자에게 장 마감 알림
+    void notifyFinanceRegistrationReminder(User user, String month);                          // 사용자에게 이번 달(month) 가계부 미등록 알림
 }

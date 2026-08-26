@@ -1,6 +1,8 @@
 package com.kista.adapter.out.notify;
 
+import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.MulticastMessage;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.out.FcmDeviceTokenPort;
@@ -15,6 +17,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -54,5 +59,18 @@ class FcmAdapterTest {
         noFirebaseAdapter.notifyApproved(user(userId));
 
         verifyNoInteractions(fcmDeviceTokenPort);
+    }
+
+    @Test
+    void 가계부_미등록_알림을_전송한다() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(fcmDeviceTokenPort.findTokensByUserId(userId)).thenReturn(List.of("token-1"));
+        BatchResponse batchResponse = mock(BatchResponse.class);
+        when(batchResponse.getResponses()).thenReturn(List.of());
+        when(firebaseMessaging.sendEachForMulticast(any(MulticastMessage.class))).thenReturn(batchResponse);
+
+        adapter.notifyFinanceRegistrationReminder(user(userId), "8월");
+
+        verify(firebaseMessaging).sendEachForMulticast(any(MulticastMessage.class));
     }
 }

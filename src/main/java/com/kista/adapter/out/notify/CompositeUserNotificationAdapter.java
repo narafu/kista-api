@@ -41,6 +41,7 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     @Override public void notifyBatchInterrupted(User user, Account account)                        { route(user, p -> p.notifyBatchInterrupted(user, account)); }
     @Override public void notifyMarketOpen(User user)                                                   { route(user, p -> p.notifyMarketOpen(user)); }
     @Override public void notifyMarketClose(User user)                                                  { route(user, p -> p.notifyMarketClose(user)); }
+    @Override public void notifyFinanceRegistrationReminder(User user, String month)                     { route(user, p -> p.notifyFinanceRegistrationReminder(user, month)); }
 
     // notificationChannel 기반 어댑터 라우팅 — Telegram/FCM 순서 고정
     private void route(User user, Consumer<UserNotificationPort> action) {
