@@ -95,6 +95,12 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.id(), "KISTA 알림", "🔴 미국 장이 마감되었습니다.");
     }
 
+    @Override
+    public void notifyFinanceRegistrationReminder(User user, String month) {
+        send(user.id(), "가계부 등록을 아직 안 하셨어요",
+                month + " 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
+    }
+
     private void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             return;
