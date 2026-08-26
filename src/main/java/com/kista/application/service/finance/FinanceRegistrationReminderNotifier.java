@@ -29,7 +29,7 @@ import java.util.concurrent.Semaphore;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminderUseCase {
+class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminderUseCase {
 
     private static final int MAX_CONCURRENT_SENDS = 10;
 
@@ -55,9 +55,27 @@ public class FinanceRegistrationReminderNotifier implements FinanceRegistrationR
             users.forEach(user -> {
                 UserSettings settings = settingsMap.get(user.id());
                 if (!settings.isNotificationEnabled(NotificationType.FINANCE_REMINDER)) return;
-                if (hasRegistrationThisMonth(user.id(), from, to)) return;
-                executor.submit(() -> sendWithLimit(limiter, user, monthLabel));
+                executor.submit(() -> checkAndSendWithLimit(limiter, user, monthLabel, from, to));
             });
+        }
+    }
+
+    // 스코프 조회(2회 DB 왕복)와 발송을 함께 virtual thread로 팬아웃 — 조회만 호출 스레드에서 순차 실행하면
+    // 세마포어가 발송만 병렬화하고 정작 느린 조회는 직렬로 남는다
+    private void checkAndSendWithLimit(Semaphore limiter, User user, String monthLabel, LocalDate from, LocalDate to) {
+        try {
+            limiter.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        try {
+            if (hasRegistrationThisMonth(user.id(), from, to)) return;
+            userNotificationPort.notifyFinanceRegistrationReminder(user, monthLabel);
+        } catch (Exception e) {
+            log.warn("[userId={}] 가계부 등록 알림 발송 실패: {}", user.id(), e.getMessage());
+        } finally {
+            limiter.release();
         }
     }
 
@@ -68,19 +86,4 @@ public class FinanceRegistrationReminderNotifier implements FinanceRegistrationR
         return hasAsset || hasTransaction;
     }
 
-    private void sendWithLimit(Semaphore limiter, User user, String monthLabel) {
-        try {
-            limiter.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
-        }
-        try {
-            userNotificationPort.notifyFinanceRegistrationReminder(user, monthLabel);
-        } catch (Exception e) {
-            log.warn("[userId={}] 가계부 등록 알림 발송 실패: {}", user.id(), e.getMessage());
-        } finally {
-            limiter.release();
-        }
-    }
 }

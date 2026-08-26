@@ -13,10 +13,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// 소스월 자산/거래 기록을 대상월로 일괄 등록하는 요청 — 필드 shape는 AssetSnapshotRequest/FinanceTransactionRequest와 동일
+// 자산/거래 기록을 한 번에 등록하는 요청 — 필드 shape는 AssetSnapshotRequest/FinanceTransactionRequest와 동일.
+// 소스월→대상월 복제는 프론트(kista-ui)에서 각 항목의 entryDate/transactionDate를 대상월로 채워 보내는 방식으로
+// 처리하고, 이 API 자체는 순수 flat 배치 등록만 담당한다.
 public record BulkFinanceRegisterRequest(
-        @Valid List<AssetItem> assets,
-        @Valid List<TransactionItem> transactions
+        @Valid @Size(max = 500) List<AssetItem> assets,
+        @Valid @Size(max = 500) List<TransactionItem> transactions
 ) {
     public record AssetItem(
             @NotNull UUID categoryId,

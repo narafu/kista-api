@@ -29,7 +29,7 @@ public class FinanceBulkController {
 
     private final BulkFinanceRegisterUseCase bulkFinanceRegisterUseCase;
 
-    @Operation(summary = "가계부 일괄 등록", description = "소스월 자산/수입/소비/저축 기록을 대상월로 한 번에 복제 등록합니다.")
+    @Operation(summary = "가계부 일괄 등록", description = "자산/수입/소비/저축 기록 여러 건을 한 번에 등록합니다 (항목별 날짜는 요청 값 그대로 사용).")
     @ApiResponse(responseCode = "200", description = "등록 처리 완료 (항목별 성공/실패는 응답 본문 참고)")
     @PostMapping
     public BulkFinanceRegisterResponse register(
