@@ -4,8 +4,8 @@ import com.kista.domain.port.out.TelegramBotInfoPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
@@ -16,14 +16,14 @@ class TelegramBotInfoAdapter implements TelegramBotInfoPort {
 
     private static final String API_BASE = "https://api.telegram.org";
 
-    private final RestTemplate telegramRestTemplate; // 빈 이름: telegramRestTemplate
+    private final RestClient telegramRestClient; // 빈 이름: telegramRestClient
 
     @Override
     @SuppressWarnings("unchecked")
     public String getUsername(String botToken) {
         try {
             String url = API_BASE + "/bot" + botToken + "/getMe";
-            Map<String, Object> response = telegramRestTemplate.getForObject(url, Map.class);
+            Map<String, Object> response = telegramRestClient.get().uri(url).retrieve().body(Map.class);
             if (response == null || !Boolean.TRUE.equals(response.get("ok"))) {
                 throw new IllegalArgumentException("유효하지 않은 Bot Token입니다");
             }

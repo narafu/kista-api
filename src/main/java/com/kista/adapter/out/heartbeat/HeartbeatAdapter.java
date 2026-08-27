@@ -4,14 +4,14 @@ import com.kista.domain.port.out.HeartbeatPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class HeartbeatAdapter implements HeartbeatPort {
 
-    private final RestTemplate heartbeatRestTemplate; // 빈 이름과 필드명 일치 필수
+    private final RestClient heartbeatRestClient; // 빈 이름과 필드명 일치 필수
     private final HeartbeatProperties properties;
 
     @Override
@@ -28,7 +28,7 @@ class HeartbeatAdapter implements HeartbeatPort {
     private void ping(String url, String name) {
         if (url == null || url.isBlank()) return;
         try {
-            heartbeatRestTemplate.getForObject(url, String.class);
+            heartbeatRestClient.get().uri(url).retrieve().body(String.class);
             log.info("heartbeat {} 핑 완료", name);
         } catch (Exception e) {
             log.warn("heartbeat {} 핑 실패: {}", name, e.getMessage());

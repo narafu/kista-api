@@ -20,7 +20,7 @@ import java.util.function.Supplier;
 class TossDistributedTokenCoordinator implements TokenCoordinator {
 
     private static final String ADMIN_SCOPE = "admin"; // 모든 계좌·인스턴스가 공유하는 admin 토큰 발급 lease scope
-    // TossConfig의 OAuth RestTemplate 타임아웃(connect 3s + response 10s ≈ 13s 최악 케이스)보다
+    // TossConfig의 OAuth RestClient 타임아웃(connect 3s + response 10s ≈ 13s 최악 케이스)보다
     // 여유 있게, 그러나 owner crash 시 lease가 회수 불가 상태로 남는 blast radius를 최소화하도록 짧게 설정
     private static final Duration LEASE_TTL = Duration.ofSeconds(20);
     private static final Duration POLL_INTERVAL = Duration.ofMillis(50); // lease/canonical polling 간격

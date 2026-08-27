@@ -10,10 +10,11 @@ import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +28,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TelegramUserNotificationAdapterTest {
 
-    @Mock RestTemplate restTemplate;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+    RestClient restClient;
 
     TelegramUserNotificationAdapter adapter;
 
@@ -35,7 +37,7 @@ class TelegramUserNotificationAdapterTest {
 
     @BeforeEach
     void setUp() {
-        TelegramHttpClient httpClient = new TelegramHttpClient(restTemplate);
+        TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
         adapter = new TelegramUserNotificationAdapter(httpClient, PROPS);
     }
 
@@ -47,7 +49,7 @@ class TelegramUserNotificationAdapterTest {
 
         adapter.notifyTradingReport(user, account, buildTestReport());
 
-        verify(restTemplate).postForObject(contains("/botuser-bot-token/sendMessage"), any(), eq(String.class));
+        verify(restClient.post()).uri(contains("/botuser-bot-token/sendMessage"));
     }
 
     @Test
@@ -57,7 +59,7 @@ class TelegramUserNotificationAdapterTest {
 
         adapter.notifyTradingReport(user, account, buildTestReport());
 
-        verify(restTemplate, never()).postForObject(any(), any(), any());
+        verifyNoInteractions(restClient);
     }
 
     @Test
@@ -68,7 +70,7 @@ class TelegramUserNotificationAdapterTest {
 
         adapter.notifyBatchInterrupted(user, account);
 
-        verify(restTemplate).postForObject(contains("/botuser-bot-token/sendMessage"), any(), eq(String.class));
+        verify(restClient.post()).uri(contains("/botuser-bot-token/sendMessage"));
     }
 
     @Test
@@ -76,12 +78,12 @@ class TelegramUserNotificationAdapterTest {
     void notifyRejected_withReason_appendsReasonToMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection("서류 미비");
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.notifyRejected(user);
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
         assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.\n사유: 서류 미비");
     }
 
@@ -90,12 +92,12 @@ class TelegramUserNotificationAdapterTest {
     void notifyRejected_withNullReason_sendsUnchangedMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection(null);
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.notifyRejected(user);
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
         assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.");
     }
 
@@ -105,12 +107,12 @@ class TelegramUserNotificationAdapterTest {
         // UserService.reject()가 blank -> null로 정규화하지만, 어댑터 자체 방어 로직(isBlank 가드)을 직접 검증
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection("   ");
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.notifyRejected(user);
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
         assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.");
     }
 
@@ -120,7 +122,7 @@ class TelegramUserNotificationAdapterTest {
 
         adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
 
-        verify(restTemplate).postForObject(contains("/sendMessage"), any(), eq(String.class));
+        verify(restClient.post()).uri(contains("/sendMessage"));
     }
 
     @Test
@@ -128,12 +130,12 @@ class TelegramUserNotificationAdapterTest {
     void onNewUserRegistered_activeNonAdmin_sendsAutoApprovedInfoMessage() {
         // 승인 불필요 설정으로 즉시 ACTIVE 등록된 일반 사용자 — 관리자에게 정보성 알림
         User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.USER);
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        assertThat(bodyCaptor.getValue().get("text")).contains("자동 승인");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        assertThat(((Map<String, String>) bodyCaptor.getValue()).get("text")).contains("자동 승인");
     }
 
     @Test
@@ -143,7 +145,7 @@ class TelegramUserNotificationAdapterTest {
 
         adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
 
-        verify(restTemplate, never()).postForObject(any(), any(), any());
+        verifyNoInteractions(restClient);
     }
 
     // TradingReport 생성 헬퍼

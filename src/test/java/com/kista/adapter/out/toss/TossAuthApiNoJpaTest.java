@@ -8,10 +8,11 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import javax.sql.DataSource;
 import java.time.Duration;
@@ -24,6 +25,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @DisplayName("TossAuthApi Redis canonical token JPA 격리")
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest 컨텍스트·HikariCP 풀 공유 — activeConnections 단언이 병렬 실행 중 다른 테스트와 경합하지 않도록
@@ -44,18 +48,23 @@ class TossAuthApiNoJpaTest extends DataJpaTestBase {
         UUID accountId = UUID.randomUUID();
         String scope = TossDistributedTokenCoordinator.accountScope(accountId);
         TossTokenStore tokenStore = mock(TossTokenStore.class);
-        RestTemplate restTemplate = mock(RestTemplate.class);
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        RestClient restClient = restClientBuilder.build();
         when(tokenStore.find(scope)).thenReturn(Optional.empty());
         when(tokenStore.tryAcquire(eq(scope), anyString(), eq(Duration.ofSeconds(20))))
                 .thenReturn(Optional.of(new TossTokenStore.Lease(scope, "owner", 1L)));
         when(tokenStore.storeIfCurrent(any(), any(), eq(Duration.ofHours(23).plusMinutes(55))))
                 .thenReturn(TossTokenStore.StoreResult.STORED);
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(TossAuthApi.TokenResponse.class)))
-                .thenReturn(ResponseEntity.ok(new TossAuthApi.TokenResponse("redis-token", 86_400L)));
+        server.expect(requestTo("http://toss.test/oauth2/token"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"access_token":"redis-token","expires_in":86400}
+                        """, MediaType.APPLICATION_JSON));
         TossDistributedTokenCoordinator coordinator = new TossDistributedTokenCoordinator(
                 tokenStore, ignored -> {}, () -> "owner", 3);
         TossAuthApi api = new TossAuthApi(
-                restTemplate, coordinator, "http://toss.test", "admin-id", "admin-secret");
+                restClient, coordinator, "http://toss.test", "admin-id", "admin-secret");
 
         int rowsBefore = brokerTokenRows(accountId);
         int activeConnectionsBefore = hikari.getHikariPoolMXBean().getActiveConnections();

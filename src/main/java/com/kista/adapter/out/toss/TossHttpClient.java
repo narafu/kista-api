@@ -6,15 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Objects;
@@ -27,7 +25,7 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 class TossHttpClient {
 
-    private final RestTemplate tossRestTemplate;
+    private final RestClient tossRestClient;
     private final TossAuthApi tossAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${toss.base-url}")
     private final String baseUrl;
@@ -49,15 +47,17 @@ class TossHttpClient {
                 tossAuthApi::recoverAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
-                    return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
+                    return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
                 });
     }
 
     public <T> T post(String path, Account account, Object body, Class<T> responseType) {
-        return executeWithRetry(account, path, token -> tossRestTemplate.exchange(
-                baseUrl + path, HttpMethod.POST,
-                new HttpEntity<>(body, buildHeaders(account, token)), responseType
-        ).getBody());
+        return executeWithRetry(account, path, token -> tossRestClient.post()
+                .uri(baseUrl + path)
+                .headers(h -> h.addAll(buildHeaders(account, token)))
+                .body(body)
+                .retrieve()
+                .body(responseType));
     }
 
     // ParameterizedTypeReference 오버로드 — 제네릭 래퍼 타입(TossResult<T> 등) 역직렬화용
@@ -68,7 +68,7 @@ class TossHttpClient {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = buildHeaders(account, token);
-            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
         });
     }
 
@@ -78,7 +78,7 @@ class TossHttpClient {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = buildHeadersNoAccount(token);
-            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
         });
     }
 
@@ -90,16 +90,18 @@ class TossHttpClient {
                 tossAuthApi::recoverAdminToken,
                 token -> {
                     HttpHeaders headers = buildAdminHeaders(token);
-                    return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), typeRef).getBody();
+                    return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
                 });
     }
 
     // POST 요청 (ParameterizedTypeReference 버전)
     public <T> T post(String path, Account account, Object body, ParameterizedTypeReference<T> typeRef) {
-        return executeWithRetry(account, path, token -> tossRestTemplate.exchange(
-                baseUrl + path, HttpMethod.POST,
-                new HttpEntity<>(body, buildHeaders(account, token)), typeRef
-        ).getBody());
+        return executeWithRetry(account, path, token -> tossRestClient.post()
+                .uri(baseUrl + path)
+                .headers(h -> h.addAll(buildHeaders(account, token)))
+                .body(body)
+                .retrieve()
+                .body(typeRef));
     }
 
     // ── private helpers ────────────────────────────────────────────────────────
@@ -109,7 +111,7 @@ class TossHttpClient {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = withAccountHeader ? buildHeaders(account, token) : buildHeadersNoAccount(token);
-            return tossRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
+            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
         });
     }
 

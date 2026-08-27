@@ -11,12 +11,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -25,15 +23,20 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("KisAuthApi 단위 테스트")
 class KisAuthApiTest {
 
-    @Mock RestTemplate kisRestTemplate;
     @Mock BrokerTokenCachePort brokerTokenCachePort;
     @Mock KisTokenCoordinator tokenCoordinator;
 
+    RestClient.Builder restClientBuilder;
+    MockRestServiceServer server;
     KisAuthApi api;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -41,12 +44,27 @@ class KisAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        api = new KisAuthApi(kisRestTemplate, brokerTokenCachePort, tokenCoordinator, BASE_URL);
+        restClientBuilder = RestClient.builder();
+        server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator, BASE_URL);
     }
 
-    // getToken/recoverToken의 캐시·락 동작 자체는 KisTokenCoordinatorTest가 검증한다.
-    // 여기서는 KisAuthApi가 tokenCoordinator에 올바르게 위임하는지, issuer가 KIS OAuth 응답을
-    // IssuedToken으로 정확히 변환하는지만 검증한다.
+    private void expectOAuthToken(String accessToken, String expiredAt) {
+        server.expect(requestTo(BASE_URL + "/oauth2/tokenP"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"access_token":"%s","access_token_token_expired":"%s"}
+                        """.formatted(accessToken, expiredAt), MediaType.APPLICATION_JSON));
+    }
+
+    private void expectOAuthTokenFails() {
+        server.expect(requestTo(BASE_URL + "/oauth2/tokenP"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withUnauthorizedRequest().body("""
+                        {"error_description":"Unauthorized"}
+                        """));
+    }
+
     @Nested
     @DisplayName("KisAuthApi — getToken / recoverToken")
     class TokenTests {
@@ -64,8 +82,7 @@ class KisAuthApiTest {
         @Test
         @DisplayName("getToken이 넘기는 issuer는 KIS OAuth를 호출해 IssuedToken(accessToken, expiresInSeconds)으로 변환한다")
         void getToken_issuerConvertsKisOAuthResponse_toIssuedToken() {
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("new-token", "2099-12-31 23:59:59")));
+            expectOAuthToken("new-token", "2099-12-31 23:59:59");
             ArgumentCaptor<TokenCoordinator.TokenIssuer> issuerCaptor =
                     ArgumentCaptor.forClass(TokenCoordinator.TokenIssuer.class);
             when(tokenCoordinator.obtain(eq(ACCOUNT_ID), issuerCaptor.capture())).thenReturn("new-token");
@@ -76,6 +93,7 @@ class KisAuthApiTest {
             assertThat(issued.accessToken()).isEqualTo("new-token");
             // 2099년 만료이므로 충분히 큰 양수 초
             assertThat(issued.expiresInSeconds()).isGreaterThan(0);
+            server.verify();
         }
 
         @Test
@@ -111,22 +129,22 @@ class KisAuthApiTest {
         @Test
         @DisplayName("KIS OAuth 2xx 응답 시 정상 완료 — accountId null이면 캐시 저장 생략")
         void verifyCredentials_whenKisReturns2xx_completesWithoutCaching() {
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
+            expectOAuthToken("tok", "2099-12-31 23:59:59");
 
             assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", null));
             verifyNoInteractions(brokerTokenCachePort);
+            server.verify();
         }
 
         @Test
         @DisplayName("accountId 있고 캐시 미스 시 KIS 호출 후 토큰 캐시 저장")
         void verifyCredentials_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenReturn(ResponseEntity.ok(new KisAuthApi.TokenResponse("tok", "2099-12-31 23:59:59")));
+            expectOAuthToken("tok", "2099-12-31 23:59:59");
 
             assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
             verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
+            server.verify();
         }
 
         @Test
@@ -135,20 +153,18 @@ class KisAuthApiTest {
             when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
 
             assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
-            verifyNoInteractions(kisRestTemplate);
             verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
+            server.verify(); // 등록된 expectation 없음 — KIS 호출 없었음을 함께 확인
         }
 
         @Test
         @DisplayName("KIS OAuth 4xx 응답 시 InvalidBrokerKeyException throw")
         void verifyCredentials_whenKisReturns4xx_throwsInvalidBrokerKeyException() {
-            when(kisRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(KisAuthApi.TokenResponse.class)))
-                    .thenThrow(HttpClientErrorException.create(
-                            HttpStatus.UNAUTHORIZED, "Unauthorized",
-                            HttpHeaders.EMPTY, new byte[]{}, null));
+            expectOAuthTokenFails();
 
             assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret", null))
                     .isInstanceOf(Account.InvalidBrokerKeyException.class);
+            server.verify();
         }
     }
 }

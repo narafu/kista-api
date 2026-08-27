@@ -96,7 +96,7 @@ class KakaoOAuthAdapterTest {
                         {"error":"invalid_grant","error_description":"authorization code not found"}
                         """));
 
-        // RestTemplate 기본 오류 핸들러가 예외를 던지므로 어댑터의 !is2xxSuccessful() 분기는 도달하지 않음
+        // RestClient retrieve() 기본 오류 핸들러가 예외를 던진다
         assertThatThrownBy(() -> adapter.exchangeCodeForToken("expired-code", "http://localhost:3000/callback"))
                 .isInstanceOf(HttpClientErrorException.class);
         server.verify();

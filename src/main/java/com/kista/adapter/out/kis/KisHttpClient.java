@@ -5,16 +5,14 @@ import com.kista.domain.model.kis.KisApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,7 +25,7 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 class KisHttpClient {
 
-    private final RestTemplate kisRestTemplate;
+    private final RestClient kisRestClient;
     private final KisAuthApi kisAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${kis.base-url}")
     private final String baseUrl;
@@ -61,13 +59,15 @@ class KisHttpClient {
                 .fromUriString(baseUrl + path)
                 .queryParams(params)
                 .toUriString();
-        return kisRestTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), responseType).getBody();
+        return kisRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
     }
 
     public <T> T post(String path, HttpHeaders headers, Object body, Class<T> responseType) {
-        return kisRestTemplate.exchange(
-                baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers), responseType
-        ).getBody();
+        return kisRestClient.post().uri(baseUrl + path)
+                .headers(h -> h.addAll(headers))
+                .body(body)
+                .retrieve()
+                .body(responseType);
     }
 
     // 계좌 기반 POST — buildHeaders + post + 401 재시도 일괄 처리 (KisOrderApi 등)

@@ -2,7 +2,7 @@ package com.kista.adapter.out.notify;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +14,7 @@ class TelegramHttpClient {
 
     private static final String API_BASE = "https://api.telegram.org";
 
-    private final RestTemplate telegramRestTemplate;
+    private final RestClient telegramRestClient;
 
     // 일반 텍스트 메시지 전송
     void sendMessage(String chatId, String text, String botToken) {
@@ -22,7 +22,7 @@ class TelegramHttpClient {
         try {
             String url = API_BASE + "/bot" + botToken + "/sendMessage";
             Map<String, String> body = Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML");
-            telegramRestTemplate.postForObject(url, body, String.class);
+            telegramRestClient.post().uri(url).body(body).retrieve().body(String.class);
         } catch (Exception e) {
             log.error("Telegram 메시지 전송 실패: {}", e.getMessage());
         }
@@ -42,7 +42,7 @@ class TelegramHttpClient {
                     "parse_mode", "HTML",
                     "reply_markup", Map.of("inline_keyboard", List.of(buttons))
             );
-            telegramRestTemplate.postForObject(url, body, String.class);
+            telegramRestClient.post().uri(url).body(body).retrieve().body(String.class);
         } catch (Exception e) {
             log.error("Telegram 인라인 버튼 메시지 전송 실패: {}", e.getMessage());
         }
