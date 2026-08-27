@@ -1,12 +1,13 @@
 [versions]
-spring-boot              = "3.5.16"
+spring-boot              = "4.1.1"
 spring-dependency-mgmt   = "1.1.7"
-archunit                 = "1.3.0"
-springdoc                = "2.8.4"
-flyway                   = "10.21.0"
-lombok                   = "1.18.36"
-jjwt                     = "0.12.6"
-firebase-admin           = "9.4.1"
+archunit                 = "1.5.0"
+springdoc                = "3.1.0"
+lombok                   = "1.18.46"
+jjwt                     = "0.13.0"
+firebase-admin           = "9.10.0"
+gson                     = "2.14.0"
+testcontainers           = "1.21.4"
 
 [libraries]
 # Spring Boot Starters
@@ -18,8 +19,10 @@ spring-boot-starter-test       = { module = "org.springframework.boot:spring-boo
 
 # Database
 postgresql                     = { module = "org.postgresql:postgresql" }
-flyway-core                    = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
-flyway-postgresql               = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+# Flyway — Boot 4부터 flyway-core 직접 의존 대신 스타터 필수 (자동설정 트리거 조건 변경), 버전은 Boot BOM 관리
+spring-boot-starter-flyway     = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+# 스타터가 DB별 플러그인을 자동 포함하지 않음 — PostgreSQL 타입 감지에 필수
+flyway-postgresql              = { module = "org.flywaydb:flyway-database-postgresql" }
 
 # API Documentation
 springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
@@ -34,19 +37,34 @@ lombok                         = { module = "org.projectlombok:lombok", version.
 # Security
 spring-boot-starter-security   = { module = "org.springframework.boot:spring-boot-starter-security" }
 spring-security-test           = { module = "org.springframework.security:spring-security-test" }
+# Boot 4부터 @WebMvcTest의 SecurityFilterChain 자동 감지가 이 스타터 존재 여부에 좌우됨 (없으면 보안 미적용으로 401 기대 테스트가 200 반환)
+spring-boot-starter-security-test = { module = "org.springframework.boot:spring-boot-starter-security-test" }
 jjwt-api                       = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jjwt" }
 jjwt-impl                      = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
-jjwt-jackson                   = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
+# jjwt-gson — jjwt는 Jackson 3 미지원이라 gson 직렬화로 대체 (Boot 4 Jackson 3 전환에 따른 조치)
+jjwt-gson                      = { module = "io.jsonwebtoken:jjwt-gson", version.ref = "jjwt" }
+gson                           = { module = "com.google.code.gson:gson", version.ref = "gson" }
 
 # Testing
 archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
-# Testcontainers — 버전은 Spring Boot BOM이 관리
+# Boot 4부터 기술별 테스트 슬라이스가 spring-boot-starter-test에서 분리된 개별 스타터로 이동
+spring-boot-starter-webmvc-test    = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
+spring-boot-starter-data-jpa-test  = { module = "org.springframework.boot:spring-boot-starter-data-jpa-test" }
+spring-boot-starter-jdbc-test      = { module = "org.springframework.boot:spring-boot-starter-jdbc-test" }
+spring-boot-resttestclient          = { module = "org.springframework.boot:spring-boot-resttestclient" } # TestRestTemplate 제공
+spring-boot-http-client             = { module = "org.springframework.boot:spring-boot-http-client" } # TestRestTemplate이 참조하는 ClientHttpRequestFactoryBuilder
+spring-boot-restclient              = { module = "org.springframework.boot:spring-boot-restclient" } # TestRestTemplate이 참조하는 RestTemplateBuilder
+# Testcontainers — Boot 4 BOM이 더 이상 버전 관리하지 않아 직접 핀
 spring-boot-testcontainers     = { module = "org.springframework.boot:spring-boot-testcontainers" }
-testcontainers-junit-jupiter   = { module = "org.testcontainers:junit-jupiter" }
-testcontainers-postgresql      = { module = "org.testcontainers:postgresql" }
+testcontainers-junit-jupiter   = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql      = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
+
+# Jackson 2 호환 — Boot 4 기본은 Jackson 3(tools.jackson)이나 앱 전체가 com.fasterxml.jackson(ObjectMapper) API를
+# 사용 중이라 전면 재작성 대신 공식 호환 모듈로 ObjectMapper 자동설정 유지 (deprecated, 향후 Jackson 3 전환 검토)
+spring-boot-jackson2            = { module = "org.springframework.boot:spring-boot-jackson2" }
 
 [plugins]
 spring-boot            = { id = "org.springframework.boot", version.ref = "spring-boot" }

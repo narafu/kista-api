@@ -28,7 +28,7 @@ class CnnFearGreedAdapterTest {
                 .andExpect(header("Accept-Language", "en-US,en;q=0.9"))
                 .andExpect(header("Referer", "https://edition.cnn.com/markets/fear-and-greed"))
                 .andExpect(header("Origin", "https://edition.cnn.com"))
-                .andExpect(request -> assertThat(request.getHeaders().containsKey("Accept-Encoding")).isFalse())
+                .andExpect(request -> assertThat(request.getHeaders().containsHeader("Accept-Encoding")).isFalse())
                 .andRespond(withSuccess("""
                         {
                           "fear_and_greed": {

@@ -39,7 +39,7 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort, HistoricalCa
     @Override
     public List<IndexPrice> fetchDailyCloses(String symbol, LocalDate from, LocalDate to) {
         String url = UriComponentsBuilder
-                .fromHttpUrl(alpacaProperties.dataBaseUrl() + "/v2/stocks/" + symbol + "/bars")
+                .fromUriString(alpacaProperties.dataBaseUrl() + "/v2/stocks/" + symbol + "/bars")
                 .queryParam("timeframe", "1Day")
                 .queryParam("start", from.toString())
                 .queryParam("end", to.toString())
@@ -77,7 +77,7 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort, HistoricalCa
         }
 
         String url = UriComponentsBuilder
-                .fromHttpUrl(alpacaProperties.dataBaseUrl() + "/v2/stocks/" + symbol + "/bars")
+                .fromUriString(alpacaProperties.dataBaseUrl() + "/v2/stocks/" + symbol + "/bars")
                 .queryParam("timeframe", "1Day")
                 .queryParam("start", from.toString())
                 .queryParam("end", clampedTo.toString())

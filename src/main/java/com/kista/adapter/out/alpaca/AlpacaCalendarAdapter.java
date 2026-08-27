@@ -68,7 +68,7 @@ public class AlpacaCalendarAdapter implements MarketCalendarRefreshPort {
 
     private List<CalendarEntry> fetchTradingDays(LocalDate start, LocalDate end) {
         String url = UriComponentsBuilder
-                .fromHttpUrl(alpacaProperties.baseUrl() + CALENDAR_PATH)
+                .fromUriString(alpacaProperties.baseUrl() + CALENDAR_PATH)
                 .queryParam("start", start.toString())
                 .queryParam("end", end.toString())
                 .toUriString();
