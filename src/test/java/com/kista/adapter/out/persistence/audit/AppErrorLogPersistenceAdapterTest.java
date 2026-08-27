@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.audit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.admin.AppErrorLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

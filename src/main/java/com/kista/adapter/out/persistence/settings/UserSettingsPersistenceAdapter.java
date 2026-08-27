@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.settings;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.UserSettingsPort;
@@ -87,7 +87,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
     private String serializeSuggestions(List<String> suggestions) {
         try {
             return objectMapper.writeValueAsString(suggestions);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("strategySuggestions 직렬화 실패", e);
         }
     }
@@ -96,7 +96,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
         if (json == null) return UserSettings.DEFAULT_STRATEGY_SUGGESTIONS;
         try {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {});
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("strategySuggestions 역직렬화 실패", e);
         }
     }

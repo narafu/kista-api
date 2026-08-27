@@ -1,6 +1,6 @@
 package com.kista.adapter.out.alpaca;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.port.out.MarketHolidayStorePort;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

@@ -29,7 +29,6 @@ dependencies {
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
-    implementation(libs.spring.boot.jackson2) // ObjectMapper(com.fasterxml.jackson) 자동설정 호환 유지
 
     // Database
     runtimeOnly(libs.postgresql)

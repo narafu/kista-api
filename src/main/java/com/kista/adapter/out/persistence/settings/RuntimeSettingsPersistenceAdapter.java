@@ -1,9 +1,9 @@
 package com.kista.adapter.out.persistence.settings;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.port.out.RuntimeSettingsPort;
 import lombok.AccessLevel;
@@ -51,7 +51,7 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
     private String serialize(RuntimeSettings settings) {
         try {
             return objectMapper.writeValueAsString(settings);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("runtime settings serialization failed", e);
         }
     }
@@ -60,7 +60,7 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
         try {
             JsonNode root = backfillMissingEnumKeys(objectMapper.readTree(json));
             return objectMapper.treeToValue(root, RuntimeSettings.class);
-        } catch (JsonProcessingException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException e) {
             throw new IllegalStateException("runtime settings deserialization failed", e);
         }
     }
@@ -77,7 +77,7 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
     private void backfillSection(ObjectNode root, JsonNode defaultsNode, String section) {
         ObjectNode sectionNode = (ObjectNode) root.get(section);
         ObjectNode defaultsSection = (ObjectNode) defaultsNode.get(section);
-        Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.fields();
+        Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.properties().iterator();
         while (defaultFields.hasNext()) {
             Map.Entry<String, JsonNode> entry = defaultFields.next();
             if (!sectionNode.has(entry.getKey())) {

@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.UpdateBalanceCheckUseCase;

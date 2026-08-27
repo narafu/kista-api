@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;

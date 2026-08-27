@@ -62,10 +62,6 @@ testcontainers-postgresql      = { module = "org.testcontainers:postgresql", ver
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 
-# Jackson 2 호환 — Boot 4 기본은 Jackson 3(tools.jackson)이나 앱 전체가 com.fasterxml.jackson(ObjectMapper) API를
-# 사용 중이라 전면 재작성 대신 공식 호환 모듈로 ObjectMapper 자동설정 유지 (deprecated, 향후 Jackson 3 전환 검토)
-spring-boot-jackson2            = { module = "org.springframework.boot:spring-boot-jackson2" }
-
 [plugins]
 spring-boot            = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-mgmt = { id = "io.spring.dependency-management", version.ref = "spring-dependency-mgmt" }

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
@@ -83,7 +83,7 @@ class HousingBenchmarkApiDocsTest {
 
     private static List<String> propertyNames(JsonNode schema) {
         List<String> names = new ArrayList<>();
-        schema.path("properties").fieldNames().forEachRemaining(names::add);
+        names.addAll(schema.path("properties").propertyNames());
         return names;
     }
 
