@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/narafu/kista-api/actions/workflows/ci.yml/badge.svg)](https://github.com/narafu/kista-api/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-21-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3-brightgreen)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-brightgreen)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
 
 KISTA(Key Investment Strategy & Trading Automation) — 정밀한 투자 전략을 기반으로 작동하는 다중 증권사 통합 자동매매 SaaS의 백엔드.
@@ -10,7 +10,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 정밀한 투자 전략�
 
 ## 기술 스택
 
-Java 21 · Spring Boot 3 · Hexagonal Architecture · PostgreSQL · Redis · Flyway · OCI
+Java 21 · Spring Boot 4 · Hexagonal Architecture · PostgreSQL · Redis · Flyway · OCI
 
 ## 아키텍처
 

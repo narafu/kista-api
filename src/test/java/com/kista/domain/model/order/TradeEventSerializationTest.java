@@ -1,7 +1,6 @@
 package com.kista.domain.model.order;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,8 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("TradeEvent 직렬화 — SSE 페이로드 계약")
 class TradeEventSerializationTest {
 
-    // Spring Boot ObjectMapper와 동일하게 JavaTimeModule 등록 (Instant 직렬화)
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    // Jackson 3 databind는 java.time(Instant 등)을 기본 내장 지원 — 별도 JavaTimeModule 불필요
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     @DisplayName("BUY 이벤트 — kind 필드가 문자열 'BUY'로 직렬화")

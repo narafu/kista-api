@@ -6,7 +6,7 @@ import com.kista.domain.port.out.CnnFearGreedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 // https://production.dataviz.cnn.io/index/fearandgreed/graphdata — CNN Fear & Greed Index
 @Slf4j
@@ -16,11 +16,11 @@ class CnnFearGreedAdapter implements CnnFearGreedPort {
 
     private static final String URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
 
-    private final RestTemplate fearGreedRestTemplate;
+    private final RestClient fearGreedRestClient;
 
     @Override
     public CnnFearGreedData fetch() {
-        CnnResponse response = fearGreedRestTemplate.getForObject(URL, CnnResponse.class);
+        CnnResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(CnnResponse.class);
         if (response == null || response.fearAndGreed() == null) {
             throw new IllegalStateException("CNN Fear & Greed Index API 응답이 비어있음");
         }

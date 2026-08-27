@@ -5,7 +5,7 @@ import com.kista.domain.model.stats.IndexPrice;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,14 +19,18 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class AlpacaIndexPriceAdapterTest {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestClient.Builder builder = RestClient.builder();
     private final AlpacaProperties properties = new AlpacaProperties(
             "https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
-    private final AlpacaIndexPriceAdapter adapter = new AlpacaIndexPriceAdapter(restTemplate, properties);
+
+    private AlpacaIndexPriceAdapter buildAdapter() {
+        return new AlpacaIndexPriceAdapter(builder.build(), properties);
+    }
 
     @Test
     void 일별_종가를_미국_거래일로_변환해_반환한다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         // t는 UTC — 2024-01-02T05:00:00Z = 뉴욕 2024-01-02 00:00 (미국 거래일 2024-01-02)
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test/v2/stocks/SPY/bars")))
                 .andExpect(header("APCA-API-KEY-ID", "test-key"))
@@ -49,7 +53,8 @@ class AlpacaIndexPriceAdapterTest {
 
     @Test
     void bars가_null이면_빈_목록을_반환한다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test")))
                 .andRespond(withSuccess("{\"bars\":null,\"symbol\":\"SPY\"}", MediaType.APPLICATION_JSON));
 
@@ -59,7 +64,8 @@ class AlpacaIndexPriceAdapterTest {
 
     @Test
     void 과거_일봉을_OHLC로_매핑해_반환한다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test/v2/stocks/TQQQ/bars")))
                 .andExpect(header("APCA-API-KEY-ID", "test-key"))
                 // 백테스트용 조회는 수정주가 sip 피드 사용(증분 동기화용 fetchDailyCloses와 대비되는 회귀 방지 포인트)
@@ -84,7 +90,8 @@ class AlpacaIndexPriceAdapterTest {
 
     @Test
     void 과거_일봉_응답이_비어있으면_예외를_던진다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test")))
                 .andRespond(withSuccess("{\"bars\":null,\"symbol\":\"TQQQ\"}", MediaType.APPLICATION_JSON));
 
@@ -96,7 +103,8 @@ class AlpacaIndexPriceAdapterTest {
 
     @Test
     void 과거_일봉_응답이_빈_리스트여도_예외를_던진다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test")))
                 .andRespond(withSuccess("{\"bars\":[],\"symbol\":\"TQQQ\"}", MediaType.APPLICATION_JSON));
 
@@ -107,7 +115,8 @@ class AlpacaIndexPriceAdapterTest {
 
     @Test
     void to가_오늘이면_전일_이전으로_클램프되어_요청된다() {
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AlpacaIndexPriceAdapter adapter = buildAdapter();
         LocalDate today = LocalDate.now(ZoneId.of("America/New_York"));
         LocalDate yesterday = today.minusDays(1);
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test/v2/stocks/TQQQ/bars")))

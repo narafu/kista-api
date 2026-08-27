@@ -4,7 +4,7 @@ import com.kista.adapter.out.notify.TelegramProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
@@ -15,7 +15,7 @@ class TelegramApiClient {
 
     private static final String API_BASE = "https://api.telegram.org";
 
-    private final RestTemplate telegramRestTemplate; // 빈 이름: telegramRestTemplate
+    private final RestClient telegramRestClient; // 빈 이름: telegramRestClient
     private final TelegramProperties props;
 
     void sendMessage(String chatId, String text) {
@@ -24,10 +24,10 @@ class TelegramApiClient {
         }
         try {
             String url = API_BASE + "/bot" + props.botToken() + "/sendMessage";
-            telegramRestTemplate.postForObject(url, Map.of(
+            telegramRestClient.post().uri(url).body(Map.of(
                     "chat_id", chatId,
                     "text", text,
-                    "parse_mode", "HTML"), String.class);
+                    "parse_mode", "HTML")).retrieve().body(String.class);
         } catch (Exception e) {
             log.error("Telegram 메시지 전송 실패: {}", e.getMessage());
         }
@@ -38,8 +38,10 @@ class TelegramApiClient {
         if (!props.hasBot()) return;
         try {
             String url = API_BASE + "/bot" + props.botToken() + "/answerCallbackQuery";
-            telegramRestTemplate.postForObject(url,
-                    Map.of("callback_query_id", callbackQueryId), String.class);
+            telegramRestClient.post().uri(url)
+                    .body(Map.of("callback_query_id", callbackQueryId))
+                    .retrieve()
+                    .body(String.class);
         } catch (Exception e) {
             log.error("answerCallbackQuery 실패: {}", e.getMessage());
         }

@@ -1,13 +1,13 @@
 package com.kista.adapter.out.alpaca;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.port.out.MarketHolidayStorePort;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -29,11 +29,11 @@ class AlpacaCalendarAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void refreshMonth_거래일_목록에_없는_평일을_휴장일로_저장한다() throws Exception {
-        RestTemplate restTemplate = new AlpacaConfig().alpacaRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(AlpacaConfig.alpacaRequestFactory());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
-        AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(restTemplate, properties, holidayStorePort);
+        AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(builder.build(), properties, holidayStorePort);
 
         LocalDate start = LocalDate.of(2026, 1, 1);
         LocalDate end = LocalDate.of(2026, 1, 31);
@@ -64,11 +64,11 @@ class AlpacaCalendarAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void 거래일_응답이_비어있으면_해당_월_평일_전체를_휴장일로_처리한다() {
-        RestTemplate restTemplate = new AlpacaConfig().alpacaRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(AlpacaConfig.alpacaRequestFactory());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
-        AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(restTemplate, properties, holidayStorePort);
+        AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(builder.build(), properties, holidayStorePort);
 
         // 거래일 응답 자체가 빈 배열인 엣지 케이스 — null 대신 빈 리스트로 파싱되어야 함
         server.expect(requestTo("https://paper-api.alpaca.markets/v2/calendar?start=2026-02-01&end=2026-02-28"))

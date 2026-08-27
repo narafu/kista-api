@@ -10,14 +10,12 @@ import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
@@ -32,7 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 // BrokerConnectionTestPort 구현체 — getToken/recoverToken은 KisHttpClient에 직접 주입되는 구체 메서드
-// OAuth 호출은 RestTemplate 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
+// OAuth 호출은 RestClient 직접 사용 — KisHttpClient 미사용(순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -46,7 +44,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
-    private final RestTemplate kisRestTemplate;
+    private final RestClient kisRestClient;
     // verifyCredentials/verifyAccount(계좌 등록 전, accountId 없을 수 있음) 전용 — 코디네이터를 거치지 않는 단순 캐시 접근
     private final BrokerTokenCachePort brokerTokenCachePort;
     // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
@@ -151,9 +149,10 @@ class KisAuthApi implements BrokerConnectionTestPort {
                 .toUriString();
 
         try {
-            AccountNoCheckResponse response = kisRestTemplate.exchange(
-                    url, HttpMethod.GET, new HttpEntity<>(headers), AccountNoCheckResponse.class
-            ).getBody();
+            AccountNoCheckResponse response = kisRestClient.get().uri(url)
+                    .headers(h -> h.addAll(headers))
+                    .retrieve()
+                    .body(AccountNoCheckResponse.class);
             if (response == null || !"0".equals(response.rtCd())) {
                 // rt_cd != "0" = 계좌번호 불일치 또는 KIS 오류 → 422
                 log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
@@ -185,12 +184,12 @@ class KisAuthApi implements BrokerConnectionTestPort {
                 "appkey", appKey,
                 "appsecret", appSecret
         );
-        TokenResponse response = kisRestTemplate.exchange(
-                kisBaseUrl + "/oauth2/tokenP",
-                HttpMethod.POST,
-                new HttpEntity<>(body, headers),
-                TokenResponse.class
-        ).getBody();
+        TokenResponse response = kisRestClient.post()
+                .uri(kisBaseUrl + "/oauth2/tokenP")
+                .headers(h -> h.addAll(headers))
+                .body(body)
+                .retrieve()
+                .body(TokenResponse.class);
         if (response == null) throw new Account.InvalidBrokerKeyException();
         return response;
     }

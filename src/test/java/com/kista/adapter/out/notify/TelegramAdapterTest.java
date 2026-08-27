@@ -6,10 +6,11 @@ import com.kista.domain.model.strategy.Strategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -17,13 +18,14 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramAdapterTest {
 
-    @Mock RestTemplate restTemplate;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+    RestClient restClient;
 
     TelegramAdapter adapter;
 
@@ -34,7 +36,7 @@ class TelegramAdapterTest {
 
     @BeforeEach
     void setUp() {
-        TelegramHttpClient httpClient = new TelegramHttpClient(restTemplate);
+        TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
         adapter = new TelegramAdapter(httpClient, PROPS);
     }
 
@@ -49,20 +51,18 @@ class TelegramAdapterTest {
     void notifyMarketClosed_sendsCorrectUrl() {
         adapter.notifyMarketClosed();
 
-        verify(restTemplate).postForObject(
-                contains("/bottest-token/sendMessage"),
-                any(), eq(String.class));
+        verify(restClient.post()).uri(contains("/bottest-token/sendMessage"));
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void notifyMarketClosed_bodyContainsChatId() {
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.notifyMarketClosed();
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        assertThat(bodyCaptor.getValue()).containsEntry("chat_id", "chat-123");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        assertThat((Map<String, String>) bodyCaptor.getValue()).containsEntry("chat_id", "chat-123");
     }
 
     @Test
@@ -72,34 +72,34 @@ class TelegramAdapterTest {
                 new BigDecimal("5.00")); // usdDeposit=5.00
 
         Account acc = account(UUID.randomUUID(), "테스트");
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
         adapter.notifyInsufficientBalance(acc, balance, Strategy.Ticker.SOXL);
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        String text = bodyCaptor.getValue().get("text");
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
         assertThat(text).contains("0주").contains("5.00");
     }
 
     @Test
-    void send_withEmptyToken_skipsRestTemplateCall() {
-        TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restTemplate);
+    void send_withEmptyToken_skipsRestClientCall() {
+        TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restClient);
         TelegramAdapter noTokenAdapter = new TelegramAdapter(emptyHttpClient, EMPTY_PROPS);
 
         noTokenAdapter.notifyMarketClosed();
 
-        verify(restTemplate, never()).postForObject(any(), any(), any());
+        verifyNoInteractions(restClient);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void notifyError_bodyContainsExceptionMessage() {
         Exception ex = new RuntimeException("KIS API 호출 실패");
-        ArgumentCaptor<Map<String, String>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
         adapter.notifyError(ex);
 
-        verify(restTemplate).postForObject(any(String.class), bodyCaptor.capture(), eq(String.class));
-        assertThat(bodyCaptor.getValue().get("text"))
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        assertThat(((Map<String, String>) bodyCaptor.getValue()).get("text"))
                 .contains("⚠️ 관리자 알림")
                 .contains("KIS API 호출 실패");
     }

@@ -11,9 +11,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.transaction.TestTransaction;
 
 import java.nio.charset.StandardCharsets;
@@ -40,8 +40,8 @@ class TokenServiceRotationRollbackIT extends DataJpaTestBase {
 
     @Autowired TokenUseCase tokenUseCase;
     @Autowired JdbcTemplate jdbcTemplate;
-    @MockBean BlacklistPort blacklistPort;
-    @MockBean UserPort userPort;
+    @MockitoBean BlacklistPort blacklistPort;
+    @MockitoBean UserPort userPort;
 
     private UUID userId;
 

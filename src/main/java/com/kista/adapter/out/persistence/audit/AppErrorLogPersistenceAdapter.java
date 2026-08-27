@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.audit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.port.out.AppErrorLogPort;
 import lombok.AccessLevel;
@@ -56,7 +56,7 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         String contextJson;
         try {
             contextJson = objectMapper.writeValueAsString(context != null ? context : Map.of());
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             contextJson = "{}";
         }
         return new AppErrorLogEntity(
@@ -97,7 +97,7 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         if (entity.getContext() != null) {
             try {
                 ctx = objectMapper.readValue(entity.getContext(), new TypeReference<>() {});
-            } catch (JsonProcessingException ex) {
+            } catch (JacksonException ex) {
                 log.warn("context 역직렬화 실패: {}", ex.getMessage());
             }
         }

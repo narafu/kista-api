@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;

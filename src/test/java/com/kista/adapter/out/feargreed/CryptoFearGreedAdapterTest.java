@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -17,9 +17,9 @@ class CryptoFearGreedAdapterTest {
 
     @Test
     void fetch_parses_plain_json_response_without_accept_encoding_header() {
-        RestTemplate restTemplate = new FearGreedConfig().fearGreedRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        CryptoFearGreedAdapter adapter = new CryptoFearGreedAdapter(restTemplate);
+        RestClient.Builder builder = RestClient.builder().requestInterceptor(FearGreedConfig.fearGreedHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CryptoFearGreedAdapter adapter = new CryptoFearGreedAdapter(builder.build());
 
         server.expect(requestTo("https://api.alternative.me/fng/"))
                 .andExpect(method(HttpMethod.GET))
@@ -28,7 +28,7 @@ class CryptoFearGreedAdapterTest {
                 .andExpect(header("Accept-Language", "en-US,en;q=0.9"))
                 .andExpect(header("Referer", "https://edition.cnn.com/markets/fear-and-greed"))
                 .andExpect(header("Origin", "https://edition.cnn.com"))
-                .andExpect(request -> assertThat(request.getHeaders().containsKey("Accept-Encoding")).isFalse())
+                .andExpect(request -> assertThat(request.getHeaders().containsHeader("Accept-Encoding")).isFalse())
                 .andRespond(withSuccess("""
                         {
                           "data": [

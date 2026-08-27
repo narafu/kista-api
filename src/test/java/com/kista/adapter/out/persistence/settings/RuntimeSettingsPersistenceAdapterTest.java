@@ -1,9 +1,9 @@
 package com.kista.adapter.out.persistence.settings;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.kista.domain.model.settings.RuntimeSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +32,9 @@ class RuntimeSettingsPersistenceAdapterTest {
         // 그 빈을 그대로 쓰지 않고 직접 ObjectMapper를 만들므로(Jackson 기본값은 true), 프로덕션 동작을
         // 재현하려면 여기서도 명시적으로 꺼야 한다. 끄지 않으면 loadIgnoresRemovedAssetFormOptionsFieldFromLegacyJson이
         // "실제로는 성공해야 하는데 테스트 ObjectMapper 설정 차이 때문에 실패"하는 거짓 실패가 난다.
-        objectMapper = new ObjectMapper().registerModule(new Jdk8Module())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        objectMapper = JsonMapper.builder() // Jackson 3부터 JDK8 타입(Optional 등) 기본 지원 — Jdk8Module 불필요, ObjectMapper는 불변이라 builder로 설정
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
         adapter = new RuntimeSettingsPersistenceAdapter(repository, objectMapper);
     }
 

@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.audit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.domain.port.out.AuditLogPort;
 import lombok.AccessLevel;
@@ -28,7 +28,7 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
         String payloadJson;
         try {
             payloadJson = objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("payload 직렬화 실패", e);
         }
         // 엔티티 생성 후 저장 (id·createdAt은 DB 자동 부여)
@@ -62,7 +62,7 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
         if (entity.getPayload() != null) {
             try {
                 p = objectMapper.readValue(entity.getPayload(), new TypeReference<>() {});
-            } catch (JsonProcessingException ex) {
+            } catch (JacksonException ex) {
                 throw new IllegalStateException("payload 역직렬화 실패", ex);
             }
         }

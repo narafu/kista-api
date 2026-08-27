@@ -12,20 +12,20 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.UUID;
 
 // BrokerConnectionTestPort 구현체 — getToken/getAdminToken/recover* 는 TossHttpClient에 직접 주입되는 구체 메서드
-// OAuth form-encoded 호출 — tossRestTemplate 직접 사용 (TossHttpClient 순환 의존 회피)
+// OAuth form-encoded 호출 — tossRestClient 직접 사용 (TossHttpClient 순환 의존 회피)
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class TossAuthApi implements BrokerConnectionTestPort {
 
-    private final RestTemplate tossRestTemplate;
+    private final RestClient tossRestClient;
     private final TossDistributedTokenCoordinator tokenCoordinator;
     @Value("${toss.base-url}")
     private final String tossBaseUrl;
@@ -108,15 +108,16 @@ class TossAuthApi implements BrokerConnectionTestPort {
         body.add("client_id", clientId);
         body.add("client_secret", clientSecret);
         try {
-            ResponseEntity<TokenResponse> response = tossRestTemplate.exchange(
-                    tossBaseUrl + "/oauth2/token",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    TokenResponse.class);
-            if (response.getBody() == null || response.getBody().accessToken() == null) {
+            TokenResponse response = tossRestClient.post()
+                    .uri(tossBaseUrl + "/oauth2/token")
+                    .headers(h -> h.addAll(headers))
+                    .body(body)
+                    .retrieve()
+                    .body(TokenResponse.class);
+            if (response == null || response.accessToken() == null) {
                 throw new Account.InvalidBrokerKeyException();
             }
-            return response.getBody();
+            return response;
         } catch (RestClientException e) {
             log.warn("Toss OAuth 토큰 발급 실패: {}", e.getMessage());
             throw new Account.InvalidBrokerKeyException();
@@ -128,12 +129,12 @@ class TossAuthApi implements BrokerConnectionTestPort {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         try {
-            ResponseEntity<TossResult<List<AccountItem>>> response = tossRestTemplate.exchange(
-                    tossBaseUrl + "/api/v1/accounts",
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});
-            List<AccountItem> accounts = response.getBody() == null ? null : response.getBody().result();
+            TossResult<List<AccountItem>> response = tossRestClient.get()
+                    .uri(tossBaseUrl + "/api/v1/accounts")
+                    .headers(h -> h.addAll(headers))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});
+            List<AccountItem> accounts = response == null ? null : response.result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
                 throw new Account.InvalidBrokerKeyException();

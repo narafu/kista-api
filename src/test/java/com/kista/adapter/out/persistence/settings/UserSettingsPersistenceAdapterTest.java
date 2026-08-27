@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.settings;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
 import org.junit.jupiter.api.BeforeEach;

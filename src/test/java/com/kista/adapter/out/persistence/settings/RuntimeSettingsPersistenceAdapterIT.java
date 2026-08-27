@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.settings;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.account.Account.Broker;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.support.DataJpaTestBase;

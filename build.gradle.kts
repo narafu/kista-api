@@ -32,7 +32,7 @@ dependencies {
 
     // Database
     runtimeOnly(libs.postgresql)
-    implementation(libs.flyway.core)
+    implementation(libs.spring.boot.starter.flyway)
     runtimeOnly(libs.flyway.postgresql)
 
     // Redis (Upstash 블랙리스트 + 캐시)
@@ -43,7 +43,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // NimbusJwtDecoder (ECC P-256 JWKS 검증)
     implementation(libs.jjwt.api) // DevAuthController(local) HS256 토큰 생성용
     runtimeOnly(libs.jjwt.impl)
-    runtimeOnly(libs.jjwt.jackson)
+    runtimeOnly(libs.jjwt.gson) // jjwt는 Jackson 3 미지원 — gson 직렬화로 대체
+    runtimeOnly(libs.gson)
 
     // API Documentation
     implementation(libs.springdoc.openapi.webmvc.ui)
@@ -67,7 +68,15 @@ dependencies {
     // Testing
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.security.test)
+    testImplementation(libs.spring.boot.starter.security.test)
     testImplementation(libs.archunit.junit5)
+    // Boot 4 기술별 테스트 슬라이스 분리 — @WebMvcTest / @DataJpaTest+@AutoConfigureTestDatabase / TestRestTemplate
+    testImplementation(libs.spring.boot.starter.webmvc.test)
+    testImplementation(libs.spring.boot.starter.data.jpa.test)
+    testImplementation(libs.spring.boot.starter.jdbc.test)
+    testImplementation(libs.spring.boot.resttestclient)
+    testImplementation(libs.spring.boot.http.client)
+    testImplementation(libs.spring.boot.restclient)
     // Testcontainers — @DataJpaTest + PostgreSQL 통합 테스트 (*IT.java)
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.junit.jupiter)
@@ -83,6 +92,7 @@ tasks.named<Test>("test") {
         // Docker/Testcontainers 필요 테스트는 기본 test 태스크에서 제외 — 별도 integration 태스크 사용
         excludeTags("integration")
     }
+    maxHeapSize = "2g" // Boot 4 테스트 슬라이스 세분화로 캐시되는 ApplicationContext 수 증가 — 기본 힙으로 OOM 발생
     jvmArgs("-XX:+EnableDynamicAgentLoading")
     systemProperty("user.timezone", "Asia/Seoul") // 테스트도 KST로 고정 — host TZ 무관하게 일관성 보장
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")

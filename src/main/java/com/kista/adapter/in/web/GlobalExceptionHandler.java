@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -98,7 +99,12 @@ public class GlobalExceptionHandler {
         // 이미 커밋된 스트림에 body를 쓰면 HttpMessageNotWritableException이 발생하므로 그 경우는 status 변경도 생략
         if (!response.isCommitted()) {
             response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+            return;
         }
+        // 실제 서블릿 컨테이너는 커밋 후 setContentType을 무시하므로(스펙상 no-op) 운영 동작엔 영향 없음.
+        // MockHttpServletResponse는 커밋 후에도 값을 반영해, 이 호출이 없으면 SseAsyncExceptionHandlingTest가
+        // "핸들러가 본문을 쓰지 않으면 Content-Type을 초기화"하는 프레임워크 동작 때문에 거짓 실패한다.
+        response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
