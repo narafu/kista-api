@@ -3,11 +3,11 @@ package com.kista.adapter.out.kakao;
 import com.kista.domain.port.out.KakaoOAuthPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
@@ -16,14 +16,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KakaoOAuthAdapter implements KakaoOAuthPort {
 
-    private final RestTemplate kakaoRestTemplate;
+    private final RestClient kakaoRestClient;
     private final KakaoProperties kakaoProperties;
 
     @Override
     public String exchangeCodeForToken(String code, String redirectUri) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", "authorization_code");
         body.add("client_id", kakaoProperties.clientId());
@@ -33,33 +30,32 @@ public class KakaoOAuthAdapter implements KakaoOAuthPort {
             body.add("client_secret", kakaoProperties.clientSecret());
         }
 
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = kakaoRestTemplate.postForEntity(
-                "https://kauth.kakao.com/oauth/token", request, Map.class);
+        // 4xx/5xx는 RestClient 기본 오류 핸들러가 HttpClientErrorException/HttpServerErrorException으로 전파
+        Map<?, ?> response = kakaoRestClient.post()
+                .uri("https://kauth.kakao.com/oauth/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .body(Map.class);
 
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            throw new IllegalStateException("카카오 토큰 교환 실패: " + response.getStatusCode());
+        if (response == null) {
+            throw new IllegalStateException("카카오 토큰 교환 실패: 응답 본문 없음");
         }
-        return (String) response.getBody().get("access_token");
+        return (String) response.get("access_token");
     }
 
     @Override
     public KakaoUserInfo getUserInfo(String kakaoAccessToken) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(kakaoAccessToken);
+        Map<?, ?> responseBody = kakaoRestClient.get()
+                .uri("https://kapi.kakao.com/v2/user/me")
+                .headers(headers -> headers.setBearerAuth(kakaoAccessToken))
+                .retrieve()
+                .body(Map.class);
 
-        ResponseEntity<Map> response = kakaoRestTemplate.exchange(
-                "https://kapi.kakao.com/v2/user/me",
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                Map.class
-        );
-
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+        if (responseBody == null) {
             throw new IllegalStateException("카카오 사용자 정보 조회 실패");
         }
 
-        Map<?, ?> responseBody = response.getBody();
         Map<?, ?> account = (Map<?, ?>) responseBody.get("kakao_account");
         String kakaoId = String.valueOf(responseBody.get("id"));
         String nickname = extractNickname(responseBody, account);

@@ -6,7 +6,7 @@ import com.kista.domain.port.out.CryptoFearGreedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
@@ -18,11 +18,11 @@ class CryptoFearGreedAdapter implements CryptoFearGreedPort {
 
     private static final String URL = "https://api.alternative.me/fng/";
 
-    private final RestTemplate fearGreedRestTemplate;
+    private final RestClient fearGreedRestClient;
 
     @Override
     public CryptoFearGreedData fetch() {
-        FngResponse response = fearGreedRestTemplate.getForObject(URL, FngResponse.class);
+        FngResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(FngResponse.class);
         if (response == null || response.data() == null || response.data().isEmpty()) {
             throw new IllegalStateException("Crypto Fear & Greed Index API 응답이 비어있음");
         }

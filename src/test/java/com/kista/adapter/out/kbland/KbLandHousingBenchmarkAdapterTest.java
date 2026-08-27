@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,10 +23,10 @@ class KbLandHousingBenchmarkAdapterTest {
 
     @Test
     void fetchAptQteSalePrices_parsesRegionQuintileMonthlyPrices() {
-        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), properties);
 
         String responseBody = """
                 {
@@ -85,10 +85,10 @@ class KbLandHousingBenchmarkAdapterTest {
 
     @Test
     void fetchAptQteSalePrices_skipsRowsWithMissingQuintileData() {
-        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), properties);
 
         String responseBody = """
                 {
@@ -160,10 +160,10 @@ class KbLandHousingBenchmarkAdapterTest {
 
     @Test
     void fetchWeeklyAptSalePriceIndex_parsesRegionWeeklyIndexAndDropsTrailingChangeRateElement() {
-        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), properties);
 
         // 날짜리스트 3개, dataList 4개 — 마지막 원소(전주대비 변동률)는 zip에서 잘려야 한다.
         String responseBody = """
@@ -211,10 +211,10 @@ class KbLandHousingBenchmarkAdapterTest {
 
     @Test
     void fetchWeeklyAptSalePriceIndex_skipsNullIndexValues() {
-        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), properties);
 
         String responseBody = """
                 {
@@ -250,10 +250,10 @@ class KbLandHousingBenchmarkAdapterTest {
 
     @Test
     void fetchWeeklyAptSalePriceIndex_throwsWhenResultCodeIsNotSuccess() {
-        RestTemplate restTemplate = new KbLandConfig().kbLandRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KbLandProperties properties = new KbLandProperties("https://data-api.kbland.kr");
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(restTemplate, properties);
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), properties);
 
         String responseBody = """
                 {

@@ -6,11 +6,8 @@ import com.kista.domain.port.out.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.DayOfWeek;
@@ -26,7 +23,7 @@ public class AlpacaCalendarAdapter implements MarketCalendarRefreshPort {
 
     private static final String CALENDAR_PATH = "/v2/calendar";
 
-    private final RestTemplate alpacaRestTemplate;
+    private final RestClient alpacaRestClient;
     private final AlpacaProperties alpacaProperties;
     private final MarketHolidayStorePort marketHolidayStorePort; // DB 저장 위임
 
@@ -73,15 +70,12 @@ public class AlpacaCalendarAdapter implements MarketCalendarRefreshPort {
                 .queryParam("end", end.toString())
                 .toUriString();
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("APCA-API-KEY-ID", alpacaProperties.apiKey());
-        headers.set("APCA-API-SECRET-KEY", alpacaProperties.apiSecret());
-
-        var response = alpacaRestTemplate.exchange(
-                url, HttpMethod.GET, new HttpEntity<>(headers),
-                new ParameterizedTypeReference<List<CalendarEntry>>() {}
-        );
-        List<CalendarEntry> entries = response.getBody();
+        List<CalendarEntry> entries = alpacaRestClient.get()
+                .uri(url)
+                .header("APCA-API-KEY-ID", alpacaProperties.apiKey())
+                .header("APCA-API-SECRET-KEY", alpacaProperties.apiSecret())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<CalendarEntry>>() {});
         log.info("{} ~ {} 거래일 {}건 수신", start, end, entries == null ? 0 : entries.size());
         return entries == null ? List.of() : entries;
     }

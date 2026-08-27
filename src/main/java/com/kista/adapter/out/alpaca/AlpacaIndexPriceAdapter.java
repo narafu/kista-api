@@ -7,11 +7,8 @@ import com.kista.domain.port.out.HistoricalCandlePort;
 import com.kista.domain.port.out.IndexPriceFeedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
@@ -27,7 +24,7 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort, HistoricalCa
 
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
-    private final RestTemplate alpacaRestTemplate;
+    private final RestClient alpacaRestClient;
     private final AlpacaProperties alpacaProperties;
 
     // Alpaca Market Data /v2/stocks/{symbol}/bars — 일봉 limit 10000이면 약 40년치라 페이지네이션 불필요
@@ -48,12 +45,12 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort, HistoricalCa
                 .queryParam("limit", 10000)
                 .toUriString();
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("APCA-API-KEY-ID", alpacaProperties.apiKey());
-        headers.set("APCA-API-SECRET-KEY", alpacaProperties.apiSecret());
-
-        BarsResponse response = alpacaRestTemplate.exchange(
-                url, HttpMethod.GET, new HttpEntity<>(headers), BarsResponse.class).getBody();
+        BarsResponse response = alpacaRestClient.get()
+                .uri(url)
+                .header("APCA-API-KEY-ID", alpacaProperties.apiKey())
+                .header("APCA-API-SECRET-KEY", alpacaProperties.apiSecret())
+                .retrieve()
+                .body(BarsResponse.class);
         List<Bar> bars = response != null && response.bars() != null ? response.bars() : List.of();
         log.info("{} 지수 종가 {}건 수신 ({} ~ {})", symbol, bars.size(), from, to);
         return bars.stream()
@@ -86,12 +83,12 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort, HistoricalCa
                 .queryParam("limit", 10000)
                 .toUriString();
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("APCA-API-KEY-ID", alpacaProperties.apiKey());
-        headers.set("APCA-API-SECRET-KEY", alpacaProperties.apiSecret());
-
-        BarsResponse response = alpacaRestTemplate.exchange(
-                url, HttpMethod.GET, new HttpEntity<>(headers), BarsResponse.class).getBody();
+        BarsResponse response = alpacaRestClient.get()
+                .uri(url)
+                .header("APCA-API-KEY-ID", alpacaProperties.apiKey())
+                .header("APCA-API-SECRET-KEY", alpacaProperties.apiSecret())
+                .retrieve()
+                .body(BarsResponse.class);
         List<Bar> bars = response != null ? response.bars() : null;
         if (bars == null || bars.isEmpty()) {
             throw new IllegalArgumentException(

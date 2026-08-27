@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -17,9 +17,9 @@ class CnnFearGreedAdapterTest {
 
     @Test
     void fetch_parses_plain_json_response_without_accept_encoding_header() {
-        RestTemplate restTemplate = new FearGreedConfig().fearGreedRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        CnnFearGreedAdapter adapter = new CnnFearGreedAdapter(restTemplate);
+        RestClient.Builder builder = RestClient.builder().requestInterceptor(FearGreedConfig.fearGreedHeaderInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CnnFearGreedAdapter adapter = new CnnFearGreedAdapter(builder.build());
 
         server.expect(requestTo("https://production.dataviz.cnn.io/index/fearandgreed/graphdata"))
                 .andExpect(method(HttpMethod.GET))

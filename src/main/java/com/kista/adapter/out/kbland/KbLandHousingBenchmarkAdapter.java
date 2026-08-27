@@ -7,7 +7,7 @@ import com.kista.domain.port.out.HousingBenchmarkFeedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -40,12 +40,12 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
     private static final DateTimeFormatter BASE_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
     private static final DateTimeFormatter UPDATED_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private final RestTemplate kbLandRestTemplate; // 빈 이름: kbLandRestTemplate
+    private final RestClient kbLandRestClient; // 빈 이름: kbLandRestClient
     private final KbLandProperties properties;
 
     @Override
     public List<HousingBenchmarkPrice> fetchAptQteSalePrices() {
-        KbLandResponse response = kbLandRestTemplate.getForObject(requestUri(), KbLandResponse.class);
+        KbLandResponse response = kbLandRestClient.get().uri(requestUri()).retrieve().body(KbLandResponse.class);
         if (response == null) {
             throw new IllegalStateException("KB Land 주택 벤치마크 API 응답이 비어있음");
         }
@@ -83,7 +83,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
 
     @Override
     public List<HousingPriceIndex> fetchWeeklyAptSalePriceIndex(int years) {
-        KbLandIndexResponse response = kbLandRestTemplate.getForObject(weeklyIndexRequestUri(years), KbLandIndexResponse.class);
+        KbLandIndexResponse response = kbLandRestClient.get().uri(weeklyIndexRequestUri(years)).retrieve().body(KbLandIndexResponse.class);
         if (response == null) {
             throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
         }

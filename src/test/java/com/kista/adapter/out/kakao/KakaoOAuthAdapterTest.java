@@ -8,7 +8,7 @@ import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,10 +23,10 @@ class KakaoOAuthAdapterTest {
 
     @Test
     void 인가_코드로_토큰을_교환하고_사용자_정보를_조회한다() {
-        RestTemplate restTemplate = new KakaoConfig().kakaoRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KakaoProperties properties = new KakaoProperties("test-client-id", "test-secret");
-        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(restTemplate, properties);
+        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(builder.build(), properties);
 
         // 토큰 교환 요청 — grant_type/client_id/redirect_uri/code/client_secret 폼 파라미터 검증
         server.expect(requestTo("https://kauth.kakao.com/oauth/token"))
@@ -84,10 +84,10 @@ class KakaoOAuthAdapterTest {
 
     @Test
     void 토큰_교환_시_카카오가_4xx를_응답하면_HttpClientErrorException이_전파된다() {
-        RestTemplate restTemplate = new KakaoConfig().kakaoRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KakaoProperties properties = new KakaoProperties("test-client-id", "test-secret");
-        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(restTemplate, properties);
+        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(builder.build(), properties);
 
         // 만료·재사용된 인가 코드 — 카카오는 400 Bad Request로 응답
         server.expect(requestTo("https://kauth.kakao.com/oauth/token"))
@@ -104,10 +104,10 @@ class KakaoOAuthAdapterTest {
 
     @Test
     void 사용자_정보_조회_시_카카오가_5xx를_응답하면_HttpServerErrorException이_전파된다() {
-        RestTemplate restTemplate = new KakaoConfig().kakaoRestTemplate();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KakaoProperties properties = new KakaoProperties("test-client-id", "test-secret");
-        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(restTemplate, properties);
+        KakaoOAuthAdapter adapter = new KakaoOAuthAdapter(builder.build(), properties);
 
         server.expect(requestTo("https://kapi.kakao.com/v2/user/me"))
                 .andExpect(method(HttpMethod.GET))
