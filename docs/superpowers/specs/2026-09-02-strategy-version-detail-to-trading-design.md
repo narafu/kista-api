@@ -2,7 +2,7 @@
 
 ## 배경/목적
 
-strategy-config 이전([[2026-08-31-legacy-module-catalog-design]] 4단계, account 완료 후 마지막 잔여 모듈)을 세 서브프로젝트로 쪼갠다 — **A(완료, 커밋 4bc7c6f3)**: `Strategy` nested enum 4종을 `com.kista.sharedkernel`로 이관. **B(이 문서)**: `StrategyVersion`/`StrategyInfiniteDetail`/`StrategyVrDetail` + `VrStrategyLifecycle`을 trading 소유로 이관. **C(후속 스펙)**: 남는 `Strategy` 애그리게이트로 얇은 strategy-config 모듈 신설 + admin↔strategy-config 순환 해소.
+strategy-config 이전([[2026-08-31-legacy-module-catalog-design]] 4단계, account 완료 후 마지막 잔여 모듈)을 세 서브프로젝트로 쪼갠다 — **A(완료, 커밋 a81e76eb)**: `Strategy` nested enum 4종을 `com.kista.sharedkernel`로 이관. **B(이 문서)**: `StrategyVersion`/`StrategyInfiniteDetail`/`StrategyVrDetail` + `VrStrategyLifecycle`을 trading 소유로 이관. **C(후속 스펙)**: 남는 `Strategy` 애그리게이트로 얇은 strategy-config 모듈 신설 + admin↔strategy-config 순환 해소.
 
 **B가 필요한 이유**: `CycleSnapshotCreator.reconfigureVrCycle()`(trading, `@Transactional`)이 VR 운영 중 재설정 시 `StrategyVersionPort`(버전 소프트삭제+신규저장)와 `VrStrategyLifecycle.saveVersionDetail()`(`strategy_vr_version` 저장)을 `StrategyCycleVrPort`/`CyclePositionPort`(trading 소유)와 같은 트랜잭션에서 호출한다. 애초 이 계획을 처음 브리핑할 때는 "strategy-config↔trading 원자적 트랜잭션 결합이라 own-type/이벤트로 못 푼다"고 판단했으나, 이번 설계 과정에서 다시 짚어보니 **Spring Modulith는 모듈마다 별도 트랜잭션 매니저를 두지 않는다** — `@Transactional` 메서드가 다른 CLOSED 모듈의 공개 "port"를 호출하는 것 자체는 이미 이 코드베이스에 흔한 정상 forward 의존(예: 레거시 `StrategyService`가 trading의 `CyclePositionPort`/`StrategyCyclePort`를 지금도 직접 호출)이라 원자성 자체는 문제가 아니었다. 진짜 논점은 소유권이다 — `StrategyVersion`/`StrategyInfiniteDetail`/`StrategyVrDetail`을 실제로 참조하는 코드를 grep했더니 trading(`CycleSnapshotCreator`/`VrStrategyLifecycle`/`CycleOrderComputer` 등 실행 로직)과 레거시 `StrategyService`(등록·조회 조립) 뿐이었다 — 이 세 타입은 "전략 등록 설정"이 아니라 **버전별 실행 파라미터**다. trading 소유로 옮기면 `reconfigureVrCycle`은 trading 내부 호출이 되어 모듈 경계 자체가 사라진다.
 

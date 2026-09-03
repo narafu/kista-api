@@ -2,7 +2,7 @@
 
 ## 배경/목적
 
-strategy-config 이전([[2026-08-31-legacy-module-catalog-design]] 4단계)을 A(완료, 커밋 `4bc7c6f3`)/B(완료, 커밋 `46d1612b`..`0f5a771c`)/C(이 문서) 3단계로 분해해 진행 중이다. A는 `Strategy` nested enum 4종을 sharedkernel로, B는 `StrategyVersion`/`StrategyInfiniteDetail`/`StrategyVrDetail`+`VrStrategyLifecycle`을 trading 소유로 이관했다. C는 얇아진 `Strategy` 애그리게이트(`Strategy`/`StrategyPort`/`StrategyUseCase`/`RegisterStrategyCommand`/`UpdateStrategyCommand`/`StrategySeedPreview`/`StrategyDetail`)로 신모듈 `com.kista.strategyconfig`를 CLOSED 선언하고, 그 과정에서 실측 발견된 모듈 순환을 전부 해소한다.
+strategy-config 이전([[2026-08-31-legacy-module-catalog-design]] 4단계)을 A(완료, 커밋 `a81e76eb`)/B(완료, 커밋 `46d1612b`..`0f5a771c`)/C(이 문서) 3단계로 분해해 진행 중이다. A는 `Strategy` nested enum 4종을 sharedkernel로, B는 `StrategyVersion`/`StrategyInfiniteDetail`/`StrategyVrDetail`+`VrStrategyLifecycle`을 trading 소유로 이관했다. C는 얇아진 `Strategy` 애그리게이트(`Strategy`/`StrategyPort`/`StrategyUseCase`/`RegisterStrategyCommand`/`UpdateStrategyCommand`/`StrategySeedPreview`/`StrategyDetail`)로 신모듈 `com.kista.strategyconfig`를 CLOSED 선언하고, 그 과정에서 실측 발견된 모듈 순환을 전부 해소한다.
 
 ## 원래 브리핑과 실제 결합도의 차이
 
@@ -137,7 +137,7 @@ account 서브프로젝트 Task 4 1차 시도가 "먼저 옮기고 나중에 `ve
 2. `TradingCycleResponse.java` 죽은 import(`com.kista.trading.domain.model.VrSummary`, 6번 줄) + 낡은 주석(78번 줄) 정리
 3. `StrategyServiceTest`의 `buildSummary` any() 매처 stub 회귀탐지력 약화 — `VrStrategyLifecycleTest`가 포뮬러 자체는 독립 커버 중이므로 스킵 가능(급하지 않으면 생략)
 4. `constraints.md:83` — Strategy 4종 이관 서술이 옛 dotted 표기(`Strategy.Ticker` 등) 사용, sibling 서술(`architecture.md:46`, `constraints.md:47`)은 개명된 이름(`StrategyTicker` 등) 사용 — 통일
-5. `constraints.md:47` — "이관 완료(2026-09-03, ...)" 날짜 오기재, 실제 커밋 `4bc7c6f3` 날짜는 **2026-09-02**(git log 확인 완료) — 정정
+5. `constraints.md:47` — "이관 완료(2026-09-03, ...)" 날짜 오기재, 실제 커밋 `a81e76eb` 날짜는 **2026-09-02**(git log 확인 완료) — 정정
 6. `constraints.md:102-104` — `VrSummary`가 아직 "nested"로 서술됨(B단계에서 top-level `com.kista.trading.domain.model.VrSummary`로 승격됨), `StrategyVersion`/`InfiniteDetail`/`VrDetail`의 trading 소유권 이전도 미반영 — 갱신
 
 ## 스코프 아웃

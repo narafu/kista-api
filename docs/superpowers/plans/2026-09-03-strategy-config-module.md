@@ -172,13 +172,13 @@ import com.kista.trading.domain.model.VrSummary;
 
 `docs/agents/constraints.md`의 "Account ↔ Strategy 분리" 절에서 `Strategy.Ticker/Type/Status/CycleSeedType` dotted 표기를 개명된 이름으로 통일:
 ```
-- `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType` — **이관 완료(2026-09-03, 커밋 `4bc7c6f3`)**: ...
+- `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType` — **이관 완료(2026-09-03, 커밋 `a81e76eb`)**: ...
 ```
 →
 ```
-- `Strategy`: `StrategyType`/`StrategyStatus`/`StrategyTicker`/`StrategyCycleSeedType` — **이관 완료(2026-09-02, 커밋 `4bc7c6f3`)**: ...
+- `Strategy`: `StrategyType`/`StrategyStatus`/`StrategyTicker`/`StrategyCycleSeedType` — **이관 완료(2026-09-02, 커밋 `a81e76eb`)**: ...
 ```
-(날짜도 실제 커밋 날짜 2026-09-02로 정정 — `git log -1 --format=%ad --date=format:%Y-%m-%d 4bc7c6f3` 확인 완료)
+(날짜도 실제 커밋 날짜 2026-09-02로 정정 — `git log -1 --format=%ad --date=format:%Y-%m-%d a81e76eb` 확인 완료)
 
 "VR 전략 패턴" 절 근처(constraints.md 102-104줄 부근)에서 `VrSummary`가 여전히 "nested"로 서술된 부분을 찾아 아래처럼 갱신:
 ```

@@ -32,7 +32,7 @@
 - admin↔strategy-config 사례(own-type 8번째 인스턴스, 포트 역전 변형): strategy-config가 admin의 `RuntimeSettingsPort`를 직접 참조하는 대신 `StrategyCreationPolicyPort`(`com.kista.strategyconfig.application.port.output`)를 자체 정의하고 admin의 `RuntimeSettingsService`가 구현 — `ApprovalPolicyPort`/`BrokerEnabledPort`와 동일 패턴, 물리 이전 전 사전 해소
 - user↔strategy-config 사례(own-type 9번째 인스턴스, 포트 역전 변형): user의 `UserSettingsService`가 strategy-config 소유 활성 전략 개수를 직접 조회하는 대신 `ActiveStrategyCountPort`(`com.kista.user.application.port.output`)를 user가 자체 정의하고 strategy-config가 구현 — 동일 패턴, 물리 이전 전 사전 해소. 삭제 cascade는 `UserDeletedEvent` 리스너(strategy-config 소유)로 별도 해소(`AccountCascadeListener`/`UserCascadeListener` 선례와 동일)
 - trading↔strategy-config 사례(own-type 10번째 인스턴스, 값 타입 복제 + ISP): trading이 스케쥴러·실행 코어 39개 파일에서 legacy `Strategy`를 상시 참조하던 것을 trading 소유 읽기 전용 `StrategyRef` + 조회/명령 분리 포트(`StrategyLookupPort`/`StrategyPausePort`, Interface Segregation)로 끊었다 — broker `BrokerAccountRef` 패턴과 동일하되 조회/명령 포트를 분리한 점이 다름. `StrategyCreationResolver`도 strategy-config 소유 `RegisterStrategyCommand` 대신 trading 소유 `StrategyCreationRequest`(원시값 5개)로 시그니처를 좁혔다. 물리 이전 전 사전 해소
-- strategyconfig↔admin 사례(own-type 11번째 인스턴스, 값 타입 복제): `StrategyPort.findSummariesByCycleIds`가 admin 소유 `AdminCycleStrategySummary`를 그대로 반환하던 것을 strategy-config 자체 소유 `StrategySummary`(`com.kista.strategyconfig.domain.model`)로 좁히고 admin의 `AdminQueryService`가 admin 타입으로 매핑 — 물리 이전 **후** `verify()` 실측으로 발견(사전조사 미포착), Task 12(커밋 ab82b48a)에서 해소
+- strategyconfig↔admin 사례(own-type 11번째 인스턴스, 값 타입 복제): `StrategyPort.findSummariesByCycleIds`가 admin 소유 `AdminCycleStrategySummary`를 그대로 반환하던 것을 strategy-config 자체 소유 `StrategySummary`(`com.kista.strategyconfig.domain.model`)로 좁히고 admin의 `AdminQueryService`가 admin 타입으로 매핑 — 물리 이전 **후** `verify()` 실측으로 발견(사전조사 미포착), Task 12(커밋 0cfc6fea)에서 해소
 - 신규 broker/notify 포트 추가 시에도 이 원칙 적용 — trading의 record/enum을 그대로 파라미터·반환 타입에 쓰지 말 것, 필요하면 해당 모듈 소유의 대응 타입을 새로 정의
 
 ### adapter/out 간 JpaRepository 접근 제한
@@ -49,7 +49,7 @@
 ### Account ↔ Strategy 분리
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
 - `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
-- `Strategy`: `StrategyType`/`StrategyStatus`/`StrategyTicker`/`StrategyCycleSeedType` — **이관 완료(2026-09-02, 커밋 `4bc7c6f3`)**: 전역 공용 어휘(176/101/48/48개 파일 사용)라 nested 유지가 broker/trading/notify와 순환을 유발하던 문제를 `com.kista.sharedkernel.{StrategyType,StrategyStatus,StrategyTicker,StrategyCycleSeedType}` 독립 타입 이관으로 해소했다(User 3종 선례와 동일 패턴). DB `@Enumerated(STRING)` 컬럼 상수명은 byte-identical 유지. `Strategy` record 자체(id/accountId/type/status/ticker/cycleSeedType)는 여전히 레거시 위치(향후 strategy-config 모듈 후보, 서브프로젝트 C 대상)
+- `Strategy`: `StrategyType`/`StrategyStatus`/`StrategyTicker`/`StrategyCycleSeedType` — **이관 완료(2026-09-02, 커밋 `a81e76eb`)**: 전역 공용 어휘(176/101/48/48개 파일 사용)라 nested 유지가 broker/trading/notify와 순환을 유발하던 문제를 `com.kista.sharedkernel.{StrategyType,StrategyStatus,StrategyTicker,StrategyCycleSeedType}` 독립 타입 이관으로 해소했다(User 3종 선례와 동일 패턴). DB `@Enumerated(STRING)` 컬럼 상수명은 byte-identical 유지. `Strategy` record 자체(id/accountId/type/status/ticker/cycleSeedType)는 여전히 레거시 위치(향후 strategy-config 모듈 후보, 서브프로젝트 C 대상)
 - 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드) — 이 셋은 B단계(2026-09-02~03)에서 `com.kista.trading.domain.model`로 이관됐다(trading "domain" NamedInterface 공개). `Strategy` 애그리게이트 자체는 여전히 레거시 위치(서브프로젝트 C 대상)
 - 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount` 계약 → 아래 "VR 공식"의 "개장 금액 계약")은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `vr` 필드는 top-level `com.kista.trading.domain.model.VrSummary`(B단계에서 승격, VR 외 null)
@@ -85,7 +85,7 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴 — sharedkernel 이관 완료 (2026-09-01 정정)
-- ~~`User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum~~ **폐기**: user 모듈 CLOSED 전환 시 `com.kista.sharedkernel.{UserRole,UserStatus,NotificationChannel}` 독립 타입으로 이관 완료(Strategy 4종보다 먼저 이관됨 — Strategy.Ticker/Type/Status/CycleSeedType도 이후 동일 패키지로 합류 완료(커밋 4bc7c6f3, 위 "Account ↔ Strategy 분리" 참고)). DB `@Enumerated(STRING)` 컬럼 상수명은 byte-identical 유지.
+- ~~`User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum~~ **폐기**: user 모듈 CLOSED 전환 시 `com.kista.sharedkernel.{UserRole,UserStatus,NotificationChannel}` 독립 타입으로 이관 완료(Strategy 4종보다 먼저 이관됨 — Strategy.Ticker/Type/Status/CycleSeedType도 이후 동일 패키지로 합류 완료(커밋 a81e76eb, 위 "Account ↔ Strategy 분리" 참고)). DB `@Enumerated(STRING)` 컬럼 상수명은 byte-identical 유지.
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수, `User`에 유지) — 서비스/컨트롤러에서 직접 하드코딩 금지
 
 ### 도메인 Command 명명 규칙
