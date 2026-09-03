@@ -1,6 +1,6 @@
-package com.kista.application.port.output;
+package com.kista.trading.application.port.output;
 
-import com.kista.domain.model.strategy.StrategyVersion;
+import com.kista.trading.domain.model.StrategyVersion;
 
 import java.time.Instant;
 import java.util.Collection;

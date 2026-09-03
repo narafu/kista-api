@@ -1,6 +1,6 @@
-package com.kista.adapter.out.persistence.strategy;
+package com.kista.trading.adapter.out.persistence;
 
-import com.kista.domain.model.strategy.StrategyVersion;
+import com.kista.trading.domain.model.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

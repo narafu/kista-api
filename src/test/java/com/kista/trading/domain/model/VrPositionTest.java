@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.domain.model.VrPosition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,17 +1,17 @@
 package com.kista.trading.application.service;
 
-import com.kista.application.service.strategy.VrStrategyLifecycle;
 import com.kista.common.TimeZones;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.domain.model.strategy.StrategyVersion;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVersion;
+import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyVersionPort;
+import com.kista.trading.application.port.output.StrategyVersionPort;
+import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,7 @@ class CycleSnapshotCreator {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 저장
     private final StrategyVersionPort strategyVersionPort; // VR 재설정 시 버전 교체
-    private final VrStrategyLifecycle vrStrategyLifecycle;  // VR 재설정 시 새 버전 상세 저장
+    private final VrStrategyDetailUseCase vrStrategyLifecycle;  // VR 재설정 시 새 버전 상세 저장
 
     // 새 StrategyCycle + 시작 스냅샷을 하나의 트랜잭션으로 저장 — 중간 실패 시 고아 사이클 방지
     @Transactional

@@ -36,7 +36,7 @@ import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.MarginPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyVrDetailPort;
+import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

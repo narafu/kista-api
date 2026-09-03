@@ -1,15 +1,14 @@
 package com.kista.trading.application.service;
 
-import com.kista.application.service.strategy.VrStrategyLifecycle;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.domain.model.strategy.StrategyVersion;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVersion;
+import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyVersionPort;
+import com.kista.trading.application.port.output.StrategyVersionPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

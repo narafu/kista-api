@@ -1,4 +1,4 @@
-package com.kista.adapter.out.persistence.strategy;
+package com.kista.trading.adapter.out.persistence;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;

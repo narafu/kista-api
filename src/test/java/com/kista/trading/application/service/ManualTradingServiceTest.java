@@ -17,7 +17,7 @@ import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyVrDetailPort;
+import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.support.DomainFixtures;

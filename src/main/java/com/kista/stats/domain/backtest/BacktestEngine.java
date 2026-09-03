@@ -9,7 +9,7 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;

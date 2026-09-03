@@ -20,6 +20,7 @@ import com.kista.broker.application.port.output.MarginPort;
 import com.kista.trading.domain.strategy.StrategyCreationResolver;
 import com.kista.trading.domain.strategy.StrategyCreationResolver.ResolvedCreation;
 import com.kista.trading.domain.strategy.StrategyCreationResolvers;
+import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,7 @@ class StrategyService implements StrategyUseCase {
     private final StrategyPort strategyPort;
     private final StrategyVersionPort strategyVersionPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final VrStrategyLifecycle vrStrategyLifecycle;          // VR 전략 전용 상세 저장·조회
+    private final VrStrategyDetailUseCase vrStrategyLifecycle;      // VR 전략 전용 상세 저장·조회
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -114,7 +115,7 @@ class StrategyService implements StrategyUseCase {
 
         // VR 응답은 개장 포지션의 USD pool을 기준으로 조립한다.
         if (persisted.strategy().isVr()) {
-            StrategyDetail.VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
+            VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
                     persisted.vrDetail(), initialResult.cycleVr(), initialResult.initialPosition().usdDeposit(),
                     initialResult.initialPosition().usdDeposit()); // 등록 직후엔 개장 pool=현재 pool 동일
             return new StrategyDetail(persisted.strategy(), initialResult.initialPosition().usdDeposit(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
@@ -351,7 +352,7 @@ class StrategyService implements StrategyUseCase {
             return new InitialCycleResult(cycle, initialPosition, null);
         } else if (saved.isVr()) {
             StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
-                    cycle.id(), normalizedInitialUsdDeposit, vrValue, vrDetail);
+                    cycle.id(), vrValue, vrDetail);
             return new InitialCycleResult(cycle, initialPosition, savedCycleVr);
         } else {
             // PRIVACY
@@ -508,7 +509,7 @@ class StrategyService implements StrategyUseCase {
                 .orElse(false);
 
         // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition/latestPos는 위에서 이미 조회한 값 재사용
-        StrategyDetail.VrSummary vrSummary = strategy.isVr()
+        VrSummary vrSummary = strategy.isVr()
                 ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
                 : null;
 
@@ -566,7 +567,7 @@ class StrategyService implements StrategyUseCase {
                     .map(CyclePositionInfiniteDetail::isReverseMode)
                     .orElse(false);
 
-            StrategyDetail.VrSummary vrSummary = strategy.isVr()
+            VrSummary vrSummary = strategy.isVr()
                     ? activeVersion.map(StrategyVersion::id)
                             .flatMap(versionId -> Optional.ofNullable(vrDetails.get(versionId)))
                             .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
@@ -583,7 +584,7 @@ class StrategyService implements StrategyUseCase {
     // 이미 조회된 입력들을 조합만 하는 순수 조립 메서드 — toDetail/toDetails 공용
     private StrategyDetail assemble(Strategy strategy, Optional<StrategyCycle> latestCycle,
                                      Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
-                                     Integer divisionCount, boolean isReverseMode, StrategyDetail.VrSummary vrSummary) {
+                                     Integer divisionCount, boolean isReverseMode, VrSummary vrSummary) {
         BigDecimal initialUsdDeposit = strategy.isVr()
                 ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
                 : latestCycle.map(StrategyCycle::startAmount).orElse(null);

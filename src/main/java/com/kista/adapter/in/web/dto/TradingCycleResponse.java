@@ -74,8 +74,8 @@ public record TradingCycleResponse(
             @Schema(description = "poolLimitRate 램프 하한값", example = "0.50")
             BigDecimal poolLimitFloor
     ) {
-        // StrategyDetail.VrSummary → 응답 DTO 변환
-        static VrSummary from(StrategyDetail.VrSummary s) {
+        // trading 소유 VrSummary(com.kista.trading.domain.model.VrSummary) → 응답 DTO 변환
+        static VrSummary from(com.kista.trading.domain.model.VrSummary s) {
             return new VrSummary(s.value(), s.bandWidth(), s.intervalWeeks(),
                     s.recurringAmount(), s.poolLimit(), s.currentPool(), s.poolLimitRate(), s.gradient(),
                     s.initialGradient(), s.gGraceWeeks(), s.gStepWeeks(), s.gMax(),

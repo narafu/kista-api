@@ -1,8 +1,8 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyInfiniteDetail;
-import com.kista.domain.model.strategy.StrategyVersion;
+import com.kista.trading.domain.model.StrategyInfiniteDetail;
+import com.kista.trading.domain.model.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +20,8 @@ import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.trading.adapter.out.persistence.StrategyInfiniteDetailPersistenceAdapter;
+import com.kista.trading.adapter.out.persistence.StrategyVersionPersistenceAdapter;
 
 @Import({
         StrategyPersistenceAdapter.class,

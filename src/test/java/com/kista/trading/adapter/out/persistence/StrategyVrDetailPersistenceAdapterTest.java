@@ -1,8 +1,9 @@
-package com.kista.adapter.out.persistence.strategy;
+package com.kista.trading.adapter.out.persistence;
 
+import com.kista.adapter.out.persistence.strategy.StrategyPersistenceAdapter;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyVersion;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVersion;
+import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.support.DataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;

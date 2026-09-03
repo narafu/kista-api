@@ -1,7 +1,7 @@
-package com.kista.adapter.out.persistence.strategy;
+package com.kista.trading.adapter.out.persistence;
 
-import com.kista.domain.model.strategy.StrategyInfiniteDetail;
-import com.kista.application.port.output.StrategyInfiniteDetailPort;
+import com.kista.trading.domain.model.StrategyInfiniteDetail;
+import com.kista.trading.application.port.output.StrategyInfiniteDetailPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,9 +13,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+// 레거시 com.kista.adapter.out.persistence.strategy의 StrategyPersistenceAdapterTest가
+// @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지 (모듈 경계상 레거시는 OPEN이라 안전)
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
+public class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {
 
     private final StrategyInfiniteJpaRepository jpaRepository;
 

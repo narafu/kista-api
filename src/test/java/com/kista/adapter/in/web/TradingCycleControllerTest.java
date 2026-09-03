@@ -13,6 +13,7 @@ import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
+import com.kista.trading.domain.model.VrSummary;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -310,7 +311,7 @@ class TradingCycleControllerTest {
         Strategy vrStrategy = new com.kista.domain.model.strategy.Strategy(
                 UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
+        VrSummary vrSummary = new VrSummary(
                 new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
                 new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 10,
                 10, 52, 26, 10,
@@ -364,7 +365,7 @@ class TradingCycleControllerTest {
         // VR 전략 운영 중 재설정 — PUT /api/trading-cycles/{id}/vr-config 200 케이스
         Strategy vrStrategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
+        VrSummary vrSummary = new VrSummary(
                 new BigDecimal("3000"), new BigDecimal("20.00"), 8, 0,
                 new BigDecimal("1500.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 12,
                 12, 52, 26, 20,

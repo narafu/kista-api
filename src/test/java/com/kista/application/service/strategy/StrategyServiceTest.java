@@ -18,6 +18,7 @@ import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.MarginPort;
+import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.trading.domain.strategy.InfiniteCreationResolver;
 import com.kista.trading.domain.strategy.PrivacyCreationResolver;
 import com.kista.trading.domain.strategy.StrategyCreationResolvers;
@@ -42,6 +43,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyType;
@@ -58,6 +60,7 @@ class StrategyServiceTest {
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyVrDetailPort strategyVrDetailPort;       // VR 버전 상세 포트
     @Mock StrategyCycleVrPort strategyCycleVrPort;         // VR 사이클 상세 포트
+    @Mock VrStrategyDetailUseCase vrStrategyLifecycle;      // trading "usecase" — buildSummary/findSummary는 포뮬러를 담고 있어 테스트에서 재구현하지 않고 직접 모킹
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -97,8 +100,6 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
-        VrStrategyLifecycle vrStrategyLifecycle = new VrStrategyLifecycle(
-                strategyVrDetailPort, strategyCycleVrPort);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -137,8 +138,34 @@ class StrategyServiceTest {
         lenient().when(cyclePositionInfiniteDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(strategyVrDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(strategyCycleVrPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(strategyCycleVrPort.findByCycleId(any())).thenReturn(Optional.empty());
-        lenient().when(strategyVrDetailPort.findActiveByStrategyId(any())).thenReturn(Optional.empty());
+
+        // vrStrategyLifecycle(VrStrategyDetailUseCase mock) — 순수 위임(포뮬러 없음) 4개 메서드는
+        // 기존 strategyVrDetailPort/strategyCycleVrPort mock으로 그대로 전달해 그 mock들을 검증하는
+        // 기존 테스트들(verify(strategyVrDetailPort)... 등)을 건드리지 않는다.
+        // buildSummary()/findSummary()는 poolLimit 계산·null 처리 분기(실제 포뮬러)를 담고 있어
+        // 여기서 재구현하지 않고 각 테스트가 필요할 때 직접 stub한다(미stub 시 기본값 null/Optional.empty()).
+        lenient().when(vrStrategyLifecycle.saveVersionDetail(any(), any(), any(), any(),
+                        anyInt(), anyInt(), anyInt(), anyInt(), any(), anyInt(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    Integer recurringAmount = invocation.getArgument(3);
+                    return strategyVrDetailPort.save(new StrategyVrDetail(
+                            invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2),
+                            recurringAmount != null ? recurringAmount : 0,
+                            invocation.getArgument(4), invocation.getArgument(5), invocation.getArgument(6), invocation.getArgument(7),
+                            invocation.getArgument(8), invocation.getArgument(9), invocation.getArgument(10), invocation.getArgument(11)));
+                });
+        lenient().when(vrStrategyLifecycle.saveInitialCycleDetail(any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    BigDecimal initialValue = invocation.getArgument(2);
+                    StrategyVrDetail vrDetail = invocation.getArgument(3);
+                    return strategyCycleVrPort.save(new StrategyCycleVrDetail(
+                            invocation.getArgument(0), initialValue != null ? initialValue : BigDecimal.ZERO,
+                            vrDetail.gradientAt(0), vrDetail.poolLimitRateAt(0)));
+                });
+        lenient().when(vrStrategyLifecycle.findVrDetailsByVersionIds(any()))
+                .thenAnswer(invocation -> strategyVrDetailPort.findByStrategyVersionIds(invocation.getArgument(0)));
+        lenient().when(vrStrategyLifecycle.findCycleVrDetailsByCycleIds(any()))
+                .thenAnswer(invocation -> strategyCycleVrPort.findByCycleIds(invocation.getArgument(0)));
     }
 
     private Account ownerAccount() {
@@ -842,6 +869,11 @@ class StrategyServiceTest {
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
         when(strategyCycleVrPort.save(any(StrategyCycleVrDetail.class))).thenReturn(savedCycleVr);
+        // poolLimit = 개장 pool(2000) × poolLimitRate(0.75) = 1500.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 0,
+                        new BigDecimal("1500.00"), new BigDecimal("2000"), new BigDecimal("0.75"), 10,
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -935,6 +967,11 @@ class StrategyServiceTest {
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
         when(strategyCycleVrPort.save(any(StrategyCycleVrDetail.class))).thenReturn(savedCycleVr);
+        // 개장 pool=0 → poolLimit = 0 × 1.0 = 0.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 2, 200,
+                        new BigDecimal("0.00"), BigDecimal.ZERO, BigDecimal.ONE, 10,
+                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50")));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1022,6 +1059,11 @@ class StrategyServiceTest {
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        // poolLimit = 개장 pool(2000) × poolLimitRate(0.75) = 1500.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 0,
+                        new BigDecimal("1500.00"), new BigDecimal("2000"), new BigDecimal("0.75"), 10,
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
@@ -1122,6 +1164,11 @@ class StrategyServiceTest {
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
+        // poolLimit = 개장 pool(1000) × poolLimitRate(1.0) = 1000.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 100,
+                        new BigDecimal("1000.00"), new BigDecimal("1000"), BigDecimal.ONE, 10,
+                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50")));
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyCycleVrPort).save(argThat(cv ->
@@ -1332,6 +1379,11 @@ class StrategyServiceTest {
         when(strategyVersionPort.findActiveByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrVersion));
         when(strategyVrDetailPort.findByStrategyVersionIds(List.of(vrVersionId))).thenReturn(Map.of(vrVersionId, vrDetail));
         when(strategyCycleVrPort.findByCycleIds(List.of(vrCycleId))).thenReturn(Map.of(vrCycleId, cycleVr));
+        // poolLimit = 개장 pool(1000) × poolLimitRate(0.50) = 500.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
+                        new BigDecimal("500.00"), new BigDecimal("700"), new BigDecimal("0.50"), 10,
+                        10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50")));
 
         List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
 
@@ -1435,14 +1487,19 @@ class StrategyServiceTest {
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(cycleId, new BigDecimal("3000.00"), 10, new BigDecimal("0.50"));
 
+        // 단건 경로와 배치 경로가 동일한 VrSummary를 조립해야 동등성 검증이 성립 — 두 경로 모두 같은 fixture를 stub
+        VrSummary vrSummaryFixture = new VrSummary(new BigDecimal("3000.00"), new BigDecimal("15.00"), 4, 0,
+                new BigDecimal("500.00"), null, new BigDecimal("0.50"), 10,
+                10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        when(vrStrategyLifecycle.findSummary(any(), any(), any(), any())).thenReturn(Optional.of(vrSummaryFixture));
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(vrSummaryFixture);
+
         // 단건 경로
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
         when(cyclePositionPort.findFirstOne(cycleId)).thenReturn(Optional.of(openingPosition));
         when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.empty());
-        when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
-        when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
         StrategyDetail single = strategyService.getById(strategyId, USER_ID);
 
@@ -1709,6 +1766,11 @@ class StrategyServiceTest {
                     cycle.startAmount(), null, cycle.startDate(), null, null, null);
         });
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // poolLimit = 개장 pool(1000) × poolLimitRate(0.75) = 750.00 (hand-computed, VrStrategyLifecycle 공식과 동일)
+        when(vrStrategyLifecycle.buildSummary(any(), any(), any(), any())).thenReturn(
+                new VrSummary(new BigDecimal("600.00"), new BigDecimal("15.00"), 4, 0,
+                        new BigDecimal("750.00"), new BigDecimal("1000"), new BigDecimal("0.75"), 10,
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 

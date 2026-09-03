@@ -1,12 +1,12 @@
-package com.kista.application.service.strategy;
+package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.domain.model.strategy.StrategyDetail;
-import com.kista.domain.model.strategy.StrategyVrDetail;
+import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.trading.domain.model.VrSummary;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyVrDetailPort;
+import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +63,7 @@ class VrStrategyLifecycleTest {
         when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         StrategyCycleVrDetail result = vrStrategyLifecycle.saveInitialCycleDetail(
-                cycleId, new BigDecimal("1000"), new BigDecimal("3000"), vrDetail);
+                cycleId, new BigDecimal("3000"), vrDetail);
 
         assertThat(result.strategyCycleId()).isEqualTo(cycleId);
         assertThat(result.value()).isEqualByComparingTo("3000");
@@ -81,7 +81,7 @@ class VrStrategyLifecycleTest {
         when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         StrategyCycleVrDetail result = vrStrategyLifecycle.saveInitialCycleDetail(
-                cycleId, BigDecimal.ZERO, null, vrDetail);
+                cycleId, null, vrDetail);
 
         assertThat(result.value()).isEqualByComparingTo(BigDecimal.ZERO);
     }
@@ -107,7 +107,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
+        Optional<VrSummary> result = vrStrategyLifecycle.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.of(latestPosition));
 
         assertThat(result).isPresent();
@@ -136,7 +136,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        Optional<StrategyDetail.VrSummary> result = vrStrategyLifecycle.findSummary(
+        Optional<VrSummary> result = vrStrategyLifecycle.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.empty());
 
         assertThat(result).isPresent();

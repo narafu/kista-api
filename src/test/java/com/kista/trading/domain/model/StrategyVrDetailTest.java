@@ -1,4 +1,4 @@
-package com.kista.domain.model.strategy;
+package com.kista.trading.domain.model;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

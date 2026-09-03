@@ -1,6 +1,6 @@
-package com.kista.application.port.output;
+package com.kista.trading.application.port.output;
 
-import com.kista.domain.model.strategy.StrategyInfiniteDetail;
+import com.kista.trading.domain.model.StrategyInfiniteDetail;
 
 import java.util.Collection;
 import java.util.Map;

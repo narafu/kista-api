@@ -1,4 +1,4 @@
-package com.kista.domain.model.strategy;
+package com.kista.trading.domain.model;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
