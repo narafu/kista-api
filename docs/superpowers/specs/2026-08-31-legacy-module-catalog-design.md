@@ -4,7 +4,7 @@
 
 ## 배경/목적
 
-Spring Modulith 4모듈(finance→notify→broker→trading) 이전([[project_modulith_migration]])이 2026-08-30 완료됐다. 원본 스펙(`2026-08-27-spring-modulith-migration-design.md`)의 "전체 모듈 카탈로그"엔 애초에 15개 모듈이 명시돼 있었다: `finance, notify, broker, kis, toss, user, account, strategy, trading, auth, market, stats, admin, privacy, settings`. kis/toss는 broker로 흡수됐으니 실질 이전 완료는 4/12, 나머지 8개(user/account/strategy/auth/market/stats/admin/privacy/settings — strategy는 실행 이력만 trading으로 갔고 설정 이력은 레거시 잔류)는 미착수 상태로 레거시 최상위 4패키지(`com.kista.domain`/`application`/`adapter`, `Type.OPEN`)에 377개 파일로 남아있다.
+Spring Modulith 4모듈(finance→notify→broker→trading) 이전([[project_modulith_migration]])이 2026-08-30 완료됐다. 원본 스펙(`2026-08-27-spring-modulith-migration-design.md`)의 "전체 모듈 카탈로그"엔 애초에 15개 모듈이 명시돼 있었다: `finance, notify, broker, kis, toss, user, account, strategy, trading, auth, market, stats, admin, privacy, settings`. kis/toss는 broker로 흡수됐으니 실질 이전 완료는 4/12, 나머지 8개(user/account/strategy/auth/market/stats/admin/privacy/settings — strategy는 실행 이력만 trading으로 갔고 설정 이력은 레거시 잔류)가 이 문서 작성 시점 미착수 상태로 레거시 최상위 4패키지(`com.kista.domain`/`application`/`adapter`, `Type.OPEN`)에 남아있었다(이후 market·privacy 이전 완료 — 아래 "착수 순서" 각주 참고).
 
 이 문서는 이 잔여분의 **목표 모듈 카탈로그**와 **실측 기반 착수 순서**를 정의한다.
 
