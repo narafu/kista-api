@@ -8,7 +8,6 @@ import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,7 +22,6 @@ import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
 import static com.kista.trading.domain.model.Order.OrderTiming.AT_CLOSE;
 
 @Slf4j
-@Component
 public class PrivacyStrategy {
 
     // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출

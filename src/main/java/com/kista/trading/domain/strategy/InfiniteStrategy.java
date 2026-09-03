@@ -2,7 +2,6 @@ package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.InfinitePosition;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,7 +14,6 @@ import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
 import static com.kista.trading.domain.model.Order.OrderTiming.AT_OPEN;
 import static com.kista.trading.domain.model.Order.OrderType.*;
 
-@Component
 public class InfiniteStrategy {
 
     // 가격 캡 보정 주문 추가 횟수

@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 // 체결 판정 SSOT — MockBrokerAdapter(모의계좌, 종가 기준)와 BacktestEngine(백테스트, OHLC 기준)이 공용
-// domain/backtest는 ArchUnit @Component 허용 예외(domain/strategy)에 없으므로 Spring 빈 금지 — 순수 static 유틸
+// domain 레이어는 Spring 빈 금지(HexagonalArchitectureTest) — 순수 static 유틸
 public final class FillSimulator {
 
     private FillSimulator() {

@@ -4,7 +4,6 @@ import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.ReverseModePosition;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,7 +17,6 @@ import static com.kista.trading.domain.model.Order.OrderType.MOC;
 
 // 리버스모드(소진 후) 전략 — 별지점 기준 분할 매도 + 쿼터 매수
 @Slf4j
-@Component
 public class ReverseInfiniteStrategy {
 
     // 소진 직후 첫날: MOC 매도만 생성 (별지점 계산 없이 즉시 청산 시작)

@@ -2,7 +2,6 @@ package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.VrPosition;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,7 +17,6 @@ import static com.kista.trading.domain.model.Order.OrderType.LIMIT;
 import com.kista.sharedkernel.StrategyTicker;
 
 // VR(밸류리밸런싱) 전략 — 매수·매도 사다리 주문 생성
-@Component
 public class VrStrategy {
 
     // 매수·매도 사다리 최대 단 수

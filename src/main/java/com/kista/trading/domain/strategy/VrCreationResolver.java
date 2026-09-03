@@ -1,13 +1,11 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.sharedkernel.StrategyDefaults;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
-@Component
 public class VrCreationResolver implements StrategyCreationResolver {
 
     @Override

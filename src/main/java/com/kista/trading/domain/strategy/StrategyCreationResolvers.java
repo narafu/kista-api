@@ -1,6 +1,5 @@
 package com.kista.trading.domain.strategy;
 
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
@@ -9,7 +8,6 @@ import java.util.stream.Collectors;
 import com.kista.sharedkernel.StrategyType;
 
 // StrategyCreationResolver 구현체들을 type() 키로 묶어 조회 — 서비스 레이어의 if/else 타입 분기를 대체
-@Component
 public class StrategyCreationResolvers {
 
     private final Map<StrategyType, StrategyCreationResolver> byType;

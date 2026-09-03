@@ -1,10 +1,8 @@
 package com.kista.trading.domain.strategy;
 
-import org.springframework.stereotype.Component;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
-@Component
 public class InfiniteCreationResolver implements StrategyCreationResolver {
 
     @Override

@@ -37,7 +37,7 @@ import com.kista.sharedkernel.StrategyDefaults;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
 // 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 domain/strategy·domain/model/strategy에 위임
-// domain/backtest는 ArchUnit @Component 허용 예외(domain/strategy)에 없으므로 Spring 빈 금지 — 평범한 생성자 주입
+// domain 레이어는 Spring 빈 금지(HexagonalArchitectureTest) — 평범한 생성자 주입
 public class BacktestEngine {
 
     // 캡 재산정(사다리 재생성) 전용 — VrStrategy는 무상태라 인스턴스 공유 가능

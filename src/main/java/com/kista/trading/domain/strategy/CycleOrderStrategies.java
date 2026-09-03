@@ -1,7 +1,6 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.StrategyRef;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
@@ -9,7 +8,6 @@ import java.util.function.Function;
 import com.kista.sharedkernel.StrategyType;
 
 // CycleOrderStrategy 구현체들을 cycleType() 키로 묶어 조회 — 서비스 레이어의 switch 분기를 대체
-@Component
 public class CycleOrderStrategies {
 
     private final Map<StrategyType, CycleOrderStrategy> byType;

@@ -5,7 +5,6 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,7 +15,6 @@ import com.kista.sharedkernel.StrategyTicker;
 // VR(밸류리밸런싱) 전략의 주문 계획 + capability 정책
 // holdings=0에도 사이클 유지 — endsCycleOnLiquidation()=false
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class VrCycleOrderStrategy implements CycleOrderStrategy {
 

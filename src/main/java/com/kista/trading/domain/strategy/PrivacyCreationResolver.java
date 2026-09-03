@@ -1,11 +1,9 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.sharedkernel.StrategyDefaults;
-import org.springframework.stereotype.Component;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
-@Component
 public class PrivacyCreationResolver implements StrategyCreationResolver {
 
     @Override

@@ -1,6 +1,6 @@
 ## 아키텍처
 
-Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의존성을 강제 검증**한다 (`HexagonalArchitectureTest`).
+Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의존성을 강제 검증**한다 (`HexagonalArchitectureTest`). `domain_must_not_depend_on_outer_layers`는 `com.kista..domain..` 전체를 예외 없이 커버한다 — 과거 `domain.strategy`가 `@Component`를 달아 걸려 있던 carve-out은 제거됐다(전략 구현체 Spring 배선을 `CycleStrategyBeanConfig` 팩토리로 이전).
 클래스·필드 상세는 코드가 SSOT — 아래 맵은 위치·역할·비자명한 규칙만 기록한다 (record aggregate 분리 제약 → constraints.md "Account ↔ Strategy 분리").
 
 ```
@@ -76,7 +76,7 @@ com.kista.broker/    ← Spring Modulith 3번째 이전 모듈(CLOSED) — KIS/T
 
 com.kista.trading/   ← Spring Modulith 4번째 이전 모듈(CLOSED) — 주문/사이클 실행 이력/주문생성 전략 애그리게이트, 위 레거시 4패키지와 별개 최상위. "domain"·"usecase"·"port"·"event"·"schedule" 5개 NamedInterface 공개 — application.service·adapter.out.*은 의도적으로 비공개(모듈 내부 구현)
   domain/model/       ← 주문(Order 등 8개 전체) + 사이클 실행 이력(AccountBalance/BatchContext/BootstrapPosition/CycleHistoryPage/CyclePosition/CyclePositionHistoryEntry/CyclePositionInfiniteDetail/DstInfo/InfinitePosition/PriceSnapshot/ReconfigureVrCommand/ReverseModePosition/StrategyCycle/StrategyCycleVrDetail/TradingReport/TradingSnapshot/VrPosition 등) + 버전별 실행 파라미터(StrategyVersion/StrategyInfiniteDetail/StrategyVrDetail — strategy-config 이전 서브프로젝트 B 1/2) + VrSummary(VR 전략 조회 응답 요약, 옛 legacy `StrategyDetail.VrSummary` 승격 — B 2/2) 불변 값 객체 — domain.strategy와 함께 "domain" NamedInterface로 병합 공개. legacy `Strategy` 등 나머지 설정 이력 계층은 레거시 최상위 `domain/model/strategy`에 남아있다(향후 strategy-config 모듈 후보)
-  domain/strategy/    ← CycleOrderStrategy 계열 전략 구현 클래스(Infinite/ReverseInfinite/Privacy/VrStrategy) 14개 전체 — CycleOrderStrategy capability 패턴 SSOT(아래 "CycleOrderStrategy Capability 패턴" 참고), PriceCapPolicy(매수 가격 캡 배수 SSOT). "domain" 이름으로 병합 공개
+  domain/strategy/    ← CycleOrderStrategy 계열 전략 구현 클래스(Infinite/ReverseInfinite/Privacy/VrStrategy) 14개 전체 — CycleOrderStrategy capability 패턴 SSOT(아래 "CycleOrderStrategy Capability 패턴" 참고), PriceCapPolicy(매수 가격 캡 배수 SSOT). "domain" 이름으로 병합 공개. 전부 Spring 비의존 순수 계산 클래스(`@Component` 없음) — Spring 빈 배선은 `com.kista.trading.application.service.CycleStrategyBeanConfig`(`@Configuration` 팩토리)가 담당한다(stats `BacktestEngine`이 순수 도메인 원칙으로 직접 `new` 하는 것과 동일 취지)
   application/usecase/ ← TradingExecutionUseCase/VrReconfigureUseCase/VrStrategyDetailUseCase(VR 버전·사이클 상세 저장·요약 조립, 레거시 StrategyService가 크로스모듈로 소비 — strategy-config 이전 서브프로젝트 B 2/2) — legacy TradingCycleController/StrategyService가 참조. "usecase" 이름으로 공개
   application/port/output/ ← OrderPort/CyclePositionPort/CyclePositionInfiniteDetailPort/StrategyCyclePort/StrategyCycleVrPort/TradingErrorReportPort/StrategyVersionPort/StrategyInfiniteDetailPort/StrategyVrDetailPort(9개, 뒤 3개는 strategy-config 이전 서브프로젝트 B 1/2로 합류) + HeartbeatPort(스케쥴러 dead-man's switch, 레거시 `com.kista.application.port.output`에서 이전 — trading 스케쥴러 전용이지만 기존 관례대로 "port"로 공개, 외부 소비자 0) — "port" 이름으로 공개
   application/service/ ← internal(비공개) — TradingExecutionFacade(preview/executeManually/cancelOrder/cancelByCycle/execute/executeBatch 단일 진입점), TradingService(배치·단건 실행 코어)

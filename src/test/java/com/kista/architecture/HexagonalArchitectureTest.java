@@ -49,7 +49,6 @@ class HexagonalArchitectureTest {
     void domain_must_not_depend_on_outer_layers() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista..domain..")
-                .and().resideOutsideOfPackage("com.kista..domain.strategy..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
                         "com.kista..application..",

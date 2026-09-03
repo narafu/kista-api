@@ -6,7 +6,6 @@ import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.ReverseModePosition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,7 +21,6 @@ import com.kista.sharedkernel.StrategyDefaults;
 // INFINITE 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcInfinite + CycleRotationService.resolveMinRequired(INFINITE) 이전
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
