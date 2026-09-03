@@ -14,7 +14,7 @@ import com.kista.domain.model.toss.TossApiException;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.UserSettingsPort;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;

@@ -7,7 +7,7 @@ import com.kista.finance.domain.port.in.FinanceRegistrationReminderUseCase;
 import com.kista.finance.domain.port.out.AssetSnapshotPort;
 import com.kista.finance.domain.port.out.FinanceGroupPort;
 import com.kista.finance.domain.port.out.FinanceTransactionPort;
-import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.UserSettingsPort;
 import lombok.RequiredArgsConstructor;

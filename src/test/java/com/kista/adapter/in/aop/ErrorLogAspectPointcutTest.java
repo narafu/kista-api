@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.AppErrorLogPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

@@ -3,7 +3,7 @@ package com.kista.application.service.stats;
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
 import com.kista.domain.port.out.HousingBenchmarkFeedPort;
 import com.kista.domain.port.out.HousingBenchmarkPricePort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

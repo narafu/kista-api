@@ -8,6 +8,8 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

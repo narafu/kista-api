@@ -5,7 +5,7 @@ import com.kista.domain.port.in.FetchFearGreedUseCase;
 import com.kista.domain.port.out.CnnFearGreedPort;
 import com.kista.domain.port.out.CryptoFearGreedPort;
 import com.kista.domain.port.out.FearGreedSnapshotPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -22,6 +22,8 @@ import com.kista.domain.port.out.broker.SellableQuantityPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
+import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

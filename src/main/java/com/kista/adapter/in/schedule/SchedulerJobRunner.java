@@ -1,7 +1,7 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.domain.model.strategy.BatchContext;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

@@ -11,6 +11,7 @@ import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.domain.port.out.HeartbeatPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

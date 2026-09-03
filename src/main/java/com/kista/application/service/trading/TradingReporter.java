@@ -14,6 +14,7 @@ import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
 import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

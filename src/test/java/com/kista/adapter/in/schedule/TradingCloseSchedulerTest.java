@@ -7,7 +7,7 @@ import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.HeartbeatPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

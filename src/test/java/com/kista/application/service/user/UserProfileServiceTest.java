@@ -1,8 +1,8 @@
 package com.kista.application.service.user;
 
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.FcmDeviceTokenPort;
-import com.kista.domain.port.out.TelegramBotInfoPort;
+import com.kista.notify.domain.port.out.FcmDeviceTokenPort;
+import com.kista.notify.domain.port.out.TelegramBotInfoPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;

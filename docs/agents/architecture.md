@@ -42,7 +42,6 @@ adapter/in/
   web/           ← REST Controller + DTO — Auth/Account/TradingCycle/Dashboard/Statistics(KIS 전용 live)/TossStatistics(Toss 전용 live)/Stats(DB 근사 집계)/FearGreed/Meta(enum SSOT)/OrderCancel/MarketHoliday/Backtest(과거 일봉 시뮬레이션, 계좌 무관)/FidaOrder(`/api/internal/**`)/Settings/Fcm/TradeStream(SSE)/Admin*/Asset/AssetMonthlyCheck/RuntimeConfig/AdminSettings/AdminObservability/AdminScheduler/AdminPing/DevAuth(local 전용)/ClientErrorLog
                    상세 라우팅·응답 형식 차이 → 아래 "DashboardController vs StatisticsController" 참고
   web/security/  ← JwtAuthFilter (Bearer JWT), InternalTokenAuthFilter (X-Internal-Token 서버간 인증)
-  telegram/      ← TelegramWebhookController + TelegramBotService
 
 adapter/out/
   broker/        ← TokenCoordinator — 계좌 토큰 obtain/recover 공통 계약(domain/port/out 아닌 순수 adapter 내부 인터페이스). KIS/Toss 둘 다 구현하지만 폴리모픽 주입 지점은 없음: KisAuthApi/TossAuthApi 각자 구체 타입을 직접 주입
@@ -60,7 +59,6 @@ adapter/out/
   redis/         ← RedisBlacklistAdapter (BlacklistPort — userId/JTI 단위 JWT 블랙리스트, TTL 기반)
   persistence/   ← JPA 인프라 + 어그리게이트별 서브패키지, 각각 Entity + *JpaRepository(package-private) + *PersistenceAdapter(Port 구현) 3종 구성
                    DB 스키마 3분리(kista/finance/reference, V15 마이그레이션): kista=순수 매매 도메인(계좌·주문·전략·포지션), finance=가계부, reference=외부 참조·시장 데이터(FIDA PRIVACY 기준 매매표 포함, 전역 공유·비개인 데이터가 기준). 인증/관리자/로그/알림 성격 테이블(users/user_settings/user_notification_prefs/refresh_tokens/broker_tokens/admin_runtime_settings/audit_logs/app_error_logs/fcm_device_tokens/scheduler_locks)은 플랫폼 공통이라 public 유지. 신규 테이블은 이 기준으로 분류해 Entity에 `@Table(schema=...)` 명시(public도 명시 — search_path 첫 스키마가 kista라 생략 시 validate 실패) — nativeQuery/JdbcTemplate/raw SQL은 DB 유저 search_path(`kista, finance, reference, public`)로 unqualified 이름이 자동 해석되므로 스키마 접두사 불필요
-  notify/        ← TelegramAdapter(관리자봇), CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter(사용자 알림)
   sse/           ← SseEmitterRegistry(사용자별 SSE), TradeSseEmitterRegistry(매매 이벤트 SSE)
   kakao/         ← KakaoOAuthAdapter — 카카오 소셜 로그인
   alpaca/        ← AlpacaCalendarAdapter, AlpacaIndexPriceAdapter — Alpaca Markets API
@@ -74,10 +72,16 @@ com.kista.finance/   ← Spring Modulith 첫 이전 모듈(CLOSED) — 가계부
   adapter/in/web/     ← Finance*Controller/AssetSnapshotController/MonthlyClosingController/AdminFinanceCategoryController(경로만 /api/admin/**, finance 소유 유지) + dto/
   adapter/in/schedule/ ← FinanceRegistrationReminderScheduler
   adapter/out/persistence/ ← Entity + *JpaRepository + *PersistenceAdapter 3종
+
+com.kista.notify/    ← Spring Modulith 2번째 이전 모듈(CLOSED) — Telegram/FCM 알림 발송 애그리게이트, 위 레거시 4패키지와 별개 최상위. domain/model·application 레이어 없이 domain/port/out(공개 계약) + adapter만 존재하는 얇은 게이트웨이 모듈(자체 UseCase 없음, 레거시 domain/port/in을 그대로 소비)
+  domain/port/out/    ← NotifyPort/UserNotificationPort/FcmDeviceTokenPort/TelegramBotInfoPort — "domain" NamedInterface로 공개
+  adapter/in/telegram/ ← TelegramWebhookController + TelegramBotService, TelegramApiClient(package-private) + TelegramUpdate
+  adapter/out/gateway/ ← TelegramAdapter(관리자봇), CompositeUserNotificationAdapter → TelegramUserNotificationAdapter + FcmAdapter(사용자 알림), TelegramBotInfoAdapter/TelegramHttpClient/TelegramConfig/TelegramProperties/FcmConfig + 이벤트 리스너 5종(CycleEndedNotifier/CycleLifecycleNotifier/OrderCancelFailureNotifier/TradingReportNotifier/UserDeletedNotifier)
+  adapter/out/persistence/ ← FcmDeviceTokenEntity + FcmDeviceTokenJpaRepository + FcmDeviceTokenPersistenceAdapter
 ```
 
 ### Spring Modulith 점진 도입
-`finance`가 첫 이전 모듈이다(`@ApplicationModule` CLOSED, `domain` 레이어만 `@NamedInterface("domain")`으로 공개). 레거시 최상위 4패키지(`common`/`domain`/`application`/`adapter`)는 아직 옮기지 않은 코드가 담긴 임시 이전 shim으로 `Type.OPEN` 선언돼 있어 외부 참조를 계속 허용한다 — 내용물이 모두 새 모듈로 옮겨지면 package-info와 함께 자연 소멸한다. `ApplicationModules.verify()`(`ModulithArchitectureTest`)와 일반화된 `HexagonalArchitectureTest`(`..domain..` 등 와일드카드 매처로 옛 최상위 구조·새 모듈 구조를 규칙 하나로 동시 커버) 둘 다 `com.kista.architecture` 패키지에서 실행된다 — 전자는 모듈 **간** 경계, 후자는 모듈 **내부** 레이어 방향을 각각 담당하는 직교 축. 전체 계획·향후 모듈 순서(finance → notify → broker/kis/toss → trading)는 `docs/superpowers/specs/2026-08-27-spring-modulith-migration-design.md` 참고.
+`finance`가 첫 이전 모듈이다(`@ApplicationModule` CLOSED, `domain` 레이어만 `@NamedInterface("domain")`으로 공개). 레거시 최상위 4패키지(`common`/`domain`/`application`/`adapter`)는 아직 옮기지 않은 코드가 담긴 임시 이전 shim으로 `Type.OPEN` 선언돼 있어 외부 참조를 계속 허용한다 — 내용물이 모두 새 모듈로 옮겨지면 package-info와 함께 자연 소멸한다. `ApplicationModules.verify()`(`ModulithArchitectureTest`)와 일반화된 `HexagonalArchitectureTest`(`..domain..` 등 와일드카드 매처로 옛 최상위 구조·새 모듈 구조를 규칙 하나로 동시 커버) 둘 다 `com.kista.architecture` 패키지에서 실행된다 — 전자는 모듈 **간** 경계, 후자는 모듈 **내부** 레이어 방향을 각각 담당하는 직교 축. `notify`가 두 번째 이전 모듈이다(`@ApplicationModule` CLOSED, 자체 domain/model·application 없이 domain/port/out만 "domain" NamedInterface로 공개). 전체 계획·향후 모듈 순서(finance✅ → notify✅ → broker/kis/toss → trading)는 `docs/superpowers/specs/2026-08-27-spring-modulith-migration-design.md` 참고.
 
 ### DashboardController vs StatisticsController 응답 형식 차이
 - `DashboardController`: DB 기반 전용 DTO 반환 — `GET /api/accounts/{accountId}/cycle-history` → `CycleHistoryPageResponse` (커서 페이지네이션)

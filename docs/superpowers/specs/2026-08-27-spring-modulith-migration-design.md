@@ -53,7 +53,7 @@ com.kista.finance/
 
 빅뱅이 아닌 점진적 공존. 애그리게이트 하나씩 모듈로 옮기면서 그 김에 도메인 구성·코드 리팩토링도 함께 진행한다.
 
-**순서**: 의존성 낮은 것부터 — `finance` → `notify` → `broker`/`kis`/`toss` → `trading` 코어. `finance`가 최근 추가돼 매매 코어와 거의 안 얽혀 1번 타깃으로 선정, 여기서 확립한 패턴을 이후 모듈에 확장 적용한다.
+**순서**: 의존성 낮은 것부터 — `finance`✅ → `notify`✅ → `broker`/`kis`/`toss` → `trading` 코어. `finance`가 최근 추가돼 매매 코어와 거의 안 얽혀 1번 타깃으로 선정, 여기서 확립한 패턴을 이후 모듈에 확장 적용한다.
 
 **각 모듈은 독립 사이클**: 이 스펙은 원칙(모듈 템플릿·common 정책·포트 위치·테스트 전략)만 정의한다. `finance` 이후 모듈들(notify/broker/kis/toss/trading)의 구체 파일 인벤토리·크로스모듈 의존 분석은 해당 모듈 착수 시점에 별도로 브레인스토밍/계획한다 — 스코프 폭발 방지.
 
@@ -89,7 +89,7 @@ com.kista.finance/
 두 테스트가 직교하는 축을 각각 담당:
 
 1. **`HexagonalArchitectureTest` 일반화** — 기존 `"com.kista.domain.."` 같은 리터럴 최상위 패키지 매처를 `"..domain.."` 식 ArchUnit 관용 와일드카드로 변경. 옛 최상위 구조(`com.kista.domain.*`)와 새 모듈 구조(`com.kista.finance.domain.*`)를 규칙 하나로 동시에 커버 — 이전 기간 내내 규칙을 이중 유지할 필요 없음. 레이어 **방향**(모듈 내부) 검증 담당.
-2. **신규 `ModulithArchitectureTest`** — `ApplicationModules.of(KistaApplication.class).verify()` 추가. 모듈 **간** 경계(누가 누굴 참조 가능한지) 검증 담당. 아직 안 옮긴 옛 `domain`/`application`/`adapter` 최상위 패키지도 Modulith 입장에선 모듈 후보로 잡히므로, 이전 완료 전까지는 이들에 느슨한 `allowedDependencies`를 걸어 사실상 개방 — 이전이 끝나 해당 패키지가 비면 자연 소멸.
+2. **신규 `ModulithArchitectureTest`** — `ApplicationModules.of(KistaApplication.class).verify()` 추가. 모듈 **간** 경계(누가 누굴 참조 가능한지) 검증 담당. 아직 안 옮긴 옛 `common`/`domain`/`application`/`adapter` 최상위 4패키지도 Modulith 입장에선 모듈 후보로 잡히므로, 이전 완료 전까지는 이들에 `@ApplicationModule(type = Type.OPEN)`을 선언해 사실상 개방 — 이전이 끝나 해당 패키지가 비면 package-info와 함께 자연 소멸.
 
 ## 보류 항목 (이번 스코프 아님, 별도 작업으로 추후 진행)
 

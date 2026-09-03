@@ -7,7 +7,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
 import com.kista.domain.port.in.TradingExecutionUseCase;
 import com.kista.domain.port.out.HeartbeatPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
 import lombok.RequiredArgsConstructor;

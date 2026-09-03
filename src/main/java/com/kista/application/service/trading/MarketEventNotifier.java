@@ -3,7 +3,7 @@ package com.kista.application.service.trading;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.UserNotificationPort;
+import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.UserSettingsPort;
 import lombok.RequiredArgsConstructor;

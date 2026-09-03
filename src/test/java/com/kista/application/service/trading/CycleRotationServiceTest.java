@@ -13,6 +13,7 @@ import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.MarginPort;
 import com.kista.domain.strategy.*;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

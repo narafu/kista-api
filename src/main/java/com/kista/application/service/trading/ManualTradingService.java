@@ -12,6 +12,7 @@ import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.LiveBalancePort;
 import com.kista.domain.port.out.broker.SellableQuantityPort;
 import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -5,6 +5,8 @@ import com.kista.application.service.broker.BrokerAdapterRegistry;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.port.out.*;
 import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

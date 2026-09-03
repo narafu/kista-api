@@ -4,7 +4,7 @@ import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.port.in.PrivacyUseCase;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

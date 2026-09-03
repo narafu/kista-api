@@ -10,6 +10,7 @@
 
 ### Spring Modulith 이전 중 신규 파일 배치
 - 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/{model,port/in,port/out}` + `application/service` + `adapter/{in,out}` 서브구조를 그대로 따른다 (→ architecture.md "Spring Modulith 점진 도입")
+- notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model·application 레이어가 없는 얇은 게이트웨이 모듈이라 `domain/port/out`(공개 계약, "domain" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `domain/port/in`을 그대로 참조
 
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
@@ -192,8 +193,8 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
 
 ### TelegramApiClient package-private 제약
-- `TelegramApiClient` (`adapter/in/telegram/`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가
-- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `domain/port/out/` 포트 + `adapter/out/notify/` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
+- `TelegramApiClient` (`com.kista.notify.adapter.in.telegram`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가
+- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `com.kista.notify.domain.port.out` 포트 + `com.kista.notify.adapter.out.gateway` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
 - 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
 
 ### Spring Security Filter 이중 등록 방지

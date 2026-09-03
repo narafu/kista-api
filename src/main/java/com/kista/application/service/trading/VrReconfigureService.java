@@ -23,7 +23,7 @@ import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.domain.port.out.broker.BrokerPricePort;
 import lombok.RequiredArgsConstructor;

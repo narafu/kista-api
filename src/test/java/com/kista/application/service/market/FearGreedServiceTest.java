@@ -5,7 +5,7 @@ import com.kista.domain.model.market.FearGreedSnapshot;
 import com.kista.domain.port.out.CnnFearGreedPort;
 import com.kista.domain.port.out.CryptoFearGreedPort;
 import com.kista.domain.port.out.FearGreedSnapshotPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

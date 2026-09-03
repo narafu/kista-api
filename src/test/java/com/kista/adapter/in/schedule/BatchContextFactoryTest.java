@@ -6,7 +6,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.UserPort;
 import com.kista.support.DomainFixtures;

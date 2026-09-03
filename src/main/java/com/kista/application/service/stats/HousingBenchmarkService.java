@@ -4,7 +4,7 @@ import com.kista.domain.model.stats.HousingBenchmarkPrice;
 import com.kista.domain.port.in.FetchHousingBenchmarkUseCase;
 import com.kista.domain.port.out.HousingBenchmarkFeedPort;
 import com.kista.domain.port.out.HousingBenchmarkPricePort;
-import com.kista.domain.port.out.NotifyPort;
+import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
