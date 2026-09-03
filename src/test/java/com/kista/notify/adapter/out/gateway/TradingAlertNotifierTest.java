@@ -3,7 +3,6 @@ package com.kista.notify.adapter.out.gateway;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.NotifyPort;

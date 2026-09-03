@@ -1,8 +1,9 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
+import com.kista.sharedkernel.StrategyDefaults;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ class CyclePositionPersistor {
     // execute() 종료 시 포지션 1건 적재, holdings==0이면 사이클 rotation 정책 처리
     void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
                            BigDecimal price, PrivacyTradeBase privacyBase) {
-        Strategy strategy = ctx.strategy();
+        StrategyRef strategy = ctx.strategy();
         StrategyCycle currentCycle = ctx.currentCycle();
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
         boolean newReverseMode = false;
@@ -71,13 +72,13 @@ class CyclePositionPersistor {
 
     // 체결 후 포지션 기반 리버스모드 상태 머신
     // 직전 행 is_reverse_mode → 진입/유지/종료 판정
-    private boolean computeNewReverseMode(StrategyCycle currentCycle, Strategy strategy,
+    private boolean computeNewReverseMode(StrategyCycle currentCycle, StrategyRef strategy,
                                           AccountBalance balance, BigDecimal closingPrice) {
         List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 1);
         boolean prevReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
         int divisionCount = strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                 .map(StrategyInfiniteDetail::divisionCount)
-                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+                .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
 
         // closingPrice를 prevClosePrice로 사용 (holdings>0이면 averagePrice로 자동 대체됨)
         InfinitePosition ip = new InfinitePosition(balance, strategy.ticker(), closingPrice, divisionCount);

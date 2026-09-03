@@ -1,10 +1,10 @@
 package com.kista.admin.application.service;
 
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.strategyconfig.application.port.output.StrategyPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

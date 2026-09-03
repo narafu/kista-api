@@ -8,7 +8,7 @@ import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.domain.model.AuditLog;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 
 import java.time.Instant;
 import java.time.LocalDate;

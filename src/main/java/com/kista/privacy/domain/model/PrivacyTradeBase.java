@@ -1,7 +1,5 @@
 package com.kista.privacy.domain.model;
 
-import com.kista.domain.model.strategy.Strategy;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

@@ -11,7 +11,7 @@ import com.kista.stats.adapter.in.web.dto.EtfPriceSeriesResponse;
 import com.kista.stats.domain.model.BenchmarkAssetType;
 import com.kista.stats.domain.model.BenchmarkScope;
 import com.kista.stats.domain.model.EtfBenchmarkSymbol;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.usecase.UserStatsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

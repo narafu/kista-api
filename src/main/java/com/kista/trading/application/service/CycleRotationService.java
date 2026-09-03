@@ -9,7 +9,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyInfiniteDetail;
 import com.kista.trading.domain.model.StrategyVersion;
@@ -26,8 +26,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.Optional;
-import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.sharedkernel.StrategyDefaults;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
 // NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
@@ -38,7 +38,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class CycleRotationService {
 
     private final BrokerAdapterRegistry registry;               // USD 매수가능금액 조회 (MAX 재등록)
-    private final StrategyPort strategyPort;                   // 전략 상태 갱신
+    private final StrategyPausePort strategyPausePort;         // 시스템 자동 일시정지(사이클 재등록 실패)
     private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final CyclePositionPort cyclePositionPort;         // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)
@@ -47,12 +47,12 @@ class CycleRotationService {
     private final CycleOrderStrategies cycleStrategies;        // 전략 타입별 최소금액 정책
     private final UserSettingsPort userSettingsPort; // 잔고 검증 설정 조회 (user_settings)
 
-    void rotate(Strategy strategy, StrategyCycle currentCycle, Account account, User user,
+    void rotate(StrategyRef strategy, StrategyCycle currentCycle, Account account, User user,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
 
         if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
             // NONE → 전략 PAUSED (연속 없음)
-            strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
+            strategyPausePort.pause(strategy.id());
             log.info("[strategyId={}] 사이클 종료 (NONE) → PAUSED", strategy.id());
             return;
         }
@@ -72,7 +72,7 @@ class CycleRotationService {
         // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임
         int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
-                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+                .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
         BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 재등록 취소 — 최소금액 미달: {} < {}", strategy.id(), targetSeed, minRequired);
@@ -91,7 +91,7 @@ class CycleRotationService {
     }
 
     // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환
-    private BigDecimal resolveTargetSeed(Strategy strategy, BigDecimal actualBalance,
+    private BigDecimal resolveTargetSeed(StrategyRef strategy, BigDecimal actualBalance,
                                          BigDecimal maintainSeed, BigDecimal maxSeed) {
         if (strategy.cycleSeedType() == StrategyCycleSeedType.MAX && actualBalance.compareTo(maxSeed) >= 0) {
             return maxSeed;
@@ -106,12 +106,12 @@ class CycleRotationService {
         // 실잔고가 maintainSeed에도 못 미침 → PAUSE
         log.warn("[strategyId={}] MAINTAIN 잔고 부족 → PAUSED: actual={}, maintain={}",
                 strategy.id(), actualBalance, maintainSeed);
-        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
+        strategyPausePort.pause(strategy.id());
         return null;
     }
 
     // 잔고검증 설정에 따라 시드 결정 정책 선택
-    private SeedResolutionPolicy resolvePolicy(User user, Account account, Strategy strategy) {
+    private SeedResolutionPolicy resolvePolicy(User user, Account account, StrategyRef strategy) {
         UserSettings settings = userSettingsPort.findOrDefault(user.id()); // 미설정 시 기본값(검증 ON)
         if (!settings.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
@@ -123,14 +123,14 @@ class CycleRotationService {
     }
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준
-    private BigDecimal calcLastPositionDeposit(Strategy strategy, StrategyCycle currentCycle) {
+    private BigDecimal calcLastPositionDeposit(StrategyRef strategy, StrategyCycle currentCycle) {
         return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(CyclePosition::usdDeposit)
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }
 
     // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
-    private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
+    private BigDecimal fetchUsdBalance(StrategyRef strategy, Account account) {
         try {
             BigDecimal usdAmount = registry.require(toBrokerRef(account), MarginPort.class).getUsdBuyableAmount(toBrokerRef(account));
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {

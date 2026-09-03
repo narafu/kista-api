@@ -8,21 +8,19 @@ import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
-import com.kista.application.usecase.StrategyUseCase;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -63,7 +61,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @DisplayName("VrReconfigureService 단위 테스트")
 class VrReconfigureServiceTest {
 
-    @Mock StrategyPort strategyPort;
+    @Mock StrategyLookupPort strategyPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -74,7 +72,6 @@ class VrReconfigureServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock OrderCancelService orderCancelService;
     @Mock ApplicationEventPublisher eventPublisher;
-    @Mock StrategyUseCase strategyUseCase;
     @Mock BrokerPricePort pricePort; // registry.require(account, BrokerPricePort.class) 반환값
 
     @InjectMocks VrReconfigureService service;
@@ -86,13 +83,12 @@ class VrReconfigureServiceTest {
     private final UUID cycleId = UUID.randomUUID();
 
     private Account account;
-    private Strategy vrStrategy;
+    private StrategyRef vrStrategy;
     private StrategyCycle currentCycle;
     private StrategyVrDetail currentDetail;
     private StrategyCycleVrDetail currentCycleVr;
     private CyclePosition latestPosition;
     private StrategyCycle newCycleAfterReconfigure;
-    private StrategyDetail expectedDetail;
     private User user;
     private BigDecimal currentPrice;
     private LocalDate today;
@@ -100,7 +96,7 @@ class VrReconfigureServiceTest {
     @BeforeEach
     void setUp() {
         account = DomainFixtures.kisAccount(accountId, requesterId);
-        vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
+        vrStrategy = new StrategyRef(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
                 BigDecimal.valueOf(1000), null, LocalDate.now().minusWeeks(4), null, null, null);
@@ -112,7 +108,6 @@ class VrReconfigureServiceTest {
                 new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("50.00"), 10, null, null);
         newCycleAfterReconfigure = new StrategyCycle(UUID.randomUUID(), strategyId, UUID.randomUUID(),
                 BigDecimal.valueOf(500), null, LocalDate.now(), null, null, null);
-        expectedDetail = new StrategyDetail(vrStrategy, BigDecimal.ZERO, LocalDate.now(), null, false, null, null, null);
         user = DomainFixtures.activeUser(requesterId, NotificationChannel.NONE);
         currentPrice = new BigDecimal("120.00");
         // 서비스 내부와 동일한 SSOT 호출 — DstInfo.nextTradeDate()는 실제 시각 기준이라 테스트에서도 그대로 재사용
@@ -141,7 +136,6 @@ class VrReconfigureServiceTest {
                         any(), any(), any(), anyLong()))
                 .thenReturn(newCycleAfterReconfigure);
         lenient().when(userPort.findByIdOrThrow(requesterId)).thenReturn(user);
-        lenient().when(strategyUseCase.getById(strategyId, requesterId)).thenReturn(expectedDetail);
     }
 
     private void stubHappyPathChain() {
@@ -207,7 +201,7 @@ class VrReconfigureServiceTest {
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
-        StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
+        service.reconfigure(strategyId, requesterId, cmd);
 
         CapturedCall captured = captureReconfigureCall();
         assertThat(captured.bandWidth()).isEqualByComparingTo("20.00");
@@ -228,8 +222,6 @@ class VrReconfigureServiceTest {
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
         verify(orderCancelService).cancelByCycle(strategyId, requesterId);
-        verify(strategyUseCase).getById(strategyId, requesterId);
-        assertThat(result).isSameAs(expectedDetail);
     }
 
     // --- 2) 수량 주입 ---
@@ -266,9 +258,8 @@ class VrReconfigureServiceTest {
         ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
-        StrategyDetail result = service.reconfigure(strategyId, requesterId, cmd);
+        service.reconfigure(strategyId, requesterId, cmd);
 
-        assertThat(result).isEqualTo(expectedDetail);
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent));
     }
 
@@ -387,7 +378,7 @@ class VrReconfigureServiceTest {
     @Test
     @DisplayName("비-VR 전략 재설정 시도 → IllegalArgumentException")
     void reconfigure_nonVrStrategy_throwsIllegalArgumentException() {
-        Strategy infiniteStrategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+        StrategyRef infiniteStrategy = new StrategyRef(strategyId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(infiniteStrategy);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);

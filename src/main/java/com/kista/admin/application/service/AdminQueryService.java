@@ -9,12 +9,12 @@ import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.domain.model.AuditLog;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.strategyconfig.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -121,7 +121,11 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     public Map<UUID, AdminCycleStrategySummary> getStrategySummariesByCycleIds(Set<UUID> cycleIds) {
-        return strategyPort.findSummariesByCycleIds(cycleIds);
+        return strategyPort.findSummariesByCycleIds(cycleIds).entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> new AdminCycleStrategySummary(e.getValue().strategyId(), e.getValue().strategyType())
+                ));
     }
 
     @Override

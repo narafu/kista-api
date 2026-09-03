@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.VrPosition;
 
 import java.math.BigDecimal;
@@ -68,7 +68,7 @@ public interface CycleOrderStrategy {
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
     record PlanContext(
             AccountBalance balance,
-            Strategy strategy,
+            StrategyRef strategy,
             LocalDate tradeDate,
             String label,
             InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY·VR은 무시)

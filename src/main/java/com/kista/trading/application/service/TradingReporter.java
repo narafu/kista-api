@@ -8,7 +8,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.User;
@@ -47,7 +47,7 @@ class TradingReporter {
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
-        Strategy strategy = ctx.strategy();
+        StrategyRef strategy = ctx.strategy();
         Account account = ctx.account();
         User user = ctx.user();
         // 장마감 후에도 체결 가능한 잔여 PLACED 주문을 취소 — 애프터마켓 체결이 CANCELLED로 오기록되는 것을 방지

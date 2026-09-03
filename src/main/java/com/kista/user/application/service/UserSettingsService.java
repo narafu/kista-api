@@ -6,8 +6,7 @@ import com.kista.user.application.usecase.GetUserSettingsQuery;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;
 import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.user.application.port.output.ActiveStrategyCountPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +24,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         UpdateStrategySuggestionsUseCase {
 
     private final UserSettingsPort userSettingsPort;
-    private final AccountPort accountPort;
-    private final StrategyPort strategyPort;
+    private final ActiveStrategyCountPort activeStrategyCountPort;
 
     @Override
     public UserSettings getByUserId(UUID userId) {
@@ -54,7 +52,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", command.userId(), previous, command.enabled());
 
         // 활성 전략 수 계산 — 잔고검증 전환 시 경고 로그 출력
-        long activeCount = countActiveStrategies(command.userId());
+        long activeCount = activeStrategyCountPort.countActiveByUserId(command.userId());
         if (!previous && command.enabled() && activeCount > 0) {
             // OFF→ON 전환: 활성 전략 존재 시 시드 초과 가능성 경고
             log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략 {}개. 시드가 실잔고 초과 시 다음 사이클에서 PAUSED됩니다.", command.userId(), activeCount);
@@ -71,13 +69,5 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         UserSettings current = getByUserId(command.userId());
         userSettingsPort.save(current.withStrategySuggestions(command.suggestions()));
         log.info("운영전략 추천 목록 변경: userId={}, count={}", command.userId(), command.suggestions().size());
-    }
-
-    // 사용자의 모든 계좌에서 ACTIVE 상태 전략 총 개수 반환
-    private long countActiveStrategies(UUID userId) {
-        return accountPort.findByUserId(userId).stream()
-                .flatMap(account -> strategyPort.findByAccountId(account.id()).stream())
-                .filter(strategy -> strategy.isActive())
-                .count();
     }
 }

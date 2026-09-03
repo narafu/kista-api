@@ -6,7 +6,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
@@ -48,7 +48,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 class ManualTradingServiceTest {
 
-    @Mock StrategyPort strategyPort;
+    @Mock StrategyLookupPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock AccountPort accountPort;
     @Mock OrderPort orderPort;
@@ -73,7 +73,7 @@ class ManualTradingServiceTest {
     static final UUID REQUESTER_ID = UUID.randomUUID();
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
     static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
-    static final Strategy STRATEGY = new Strategy(
+    static final StrategyRef STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
@@ -231,11 +231,11 @@ class ManualTradingServiceTest {
     }
 
     // VR 수동 실행 공용 테스트 픽스처 — 개장 전/후 분기를 나누는 두 테스트가 공유
-    private record VrFixture(Strategy vrStrat, StrategyCycle vrCycle, UUID vrVersionId,
+    private record VrFixture(StrategyRef vrStrat, StrategyCycle vrCycle, UUID vrVersionId,
                               Order vrBuyPlanned, Order vrSellPlanned) {}
 
     private VrFixture setUpVrManualExecution() {
-        Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+        StrategyRef vrStrat = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,

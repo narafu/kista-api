@@ -21,7 +21,7 @@ import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.UserSettings;
@@ -74,7 +74,7 @@ class TradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
-    @Mock StrategyPort cyclePort;
+    @Mock StrategyPausePort cyclePort; // CycleRotationService 전용 — 시스템 자동 일시정지
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -102,8 +102,8 @@ class TradingServiceTest {
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
 
-    // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
-    static final Strategy STRATEGY = new Strategy(
+    // StrategyRef + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
+    static final StrategyRef STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
@@ -614,11 +614,11 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_allocatesBuyBudgetByStrategyPriorityPerAccount() throws InterruptedException {
-        Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+        StrategyRef vr = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        Strategy infinite = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef infinite = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+        StrategyRef privacy = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -695,7 +695,7 @@ class TradingServiceTest {
     // (수정 전에는 placeGiven()이 캡 보정 없이 그대로 접수해 89.00 초과 주문이 그대로 증권사에 나갔다).
     @Test
     void placeOpenOrders_vrLadderBuyStalePrice_appliesCapAtOpenBeforePlacing() throws InterruptedException {
-        Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+        StrategyRef vr = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -918,8 +918,8 @@ class TradingServiceTest {
     void executeBatch_liveBalanceFailure_doesNotStopOtherAccount() throws InterruptedException {
         Account failingAccount = account("00000000-0000-0000-0000-000000000001");
         Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
-        Strategy failingStrategy = strategy(failingAccount);
-        Strategy succeedingStrategy = strategy(succeedingAccount);
+        StrategyRef failingStrategy = strategy(failingAccount);
+        StrategyRef succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
         User failingUser = DomainFixtures.activeUserWithTelegram(failingAccount.userId());
@@ -959,8 +959,8 @@ class TradingServiceTest {
     void executeBatch_saveFailure_doesNotStopOtherAccount() throws InterruptedException {
         Account failingAccount = account("00000000-0000-0000-0000-000000000001");
         Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
-        Strategy failingStrategy = strategy(failingAccount);
-        Strategy succeedingStrategy = strategy(succeedingAccount);
+        StrategyRef failingStrategy = strategy(failingAccount);
+        StrategyRef succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
         User failingUser = DomainFixtures.activeUserWithTelegram(failingAccount.userId());
@@ -1003,8 +1003,8 @@ class TradingServiceTest {
     void executeBatch_rejectionNotificationFailure_doesNotStopOtherAccount() throws InterruptedException {
         Account failingAccount = account("00000000-0000-0000-0000-000000000001");
         Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
-        Strategy failingStrategy = strategy(failingAccount);
-        Strategy succeedingStrategy = strategy(succeedingAccount);
+        StrategyRef failingStrategy = strategy(failingAccount);
+        StrategyRef succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
         User failingUser = DomainFixtures.activeUserWithTelegram(failingAccount.userId());
@@ -1040,7 +1040,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_privacyBuyRejected_stillSavesApprovedSell() throws InterruptedException {
-        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+        StrategyRef privacy = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -1443,7 +1443,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_computeEmptyWithExistingOrders_preservesPlacement() throws InterruptedException {
-        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+        StrategyRef privacy = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -1517,7 +1517,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_fetchesPricesThreeTimes_startPlacementAndClose_notPerCycle() throws InterruptedException {
         // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(접수 직전 재조회), getClosingPrices() 1회(종가), 단건 fallback 없음
-        Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
+        StrategyRef strategy2 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
@@ -1598,7 +1598,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_oneCycleFails_continuesWithNextAndNotifiesAdmin() throws InterruptedException {
         // STRATEGY → 예외 발생, strategy2 → 정상 실행
-        Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
+        StrategyRef strategy2 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
@@ -1672,7 +1672,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_MAINTAIN_holdingsZero_rotatesWithSameDepositAndNotifiesUser() throws InterruptedException {
         BigDecimal initDeposit = new BigDecimal("1000.00");
-        Strategy maintainStrategy = new Strategy(
+        StrategyRef maintainStrategy = new StrategyRef(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
         StrategyCycle maintainCycle = new StrategyCycle(
@@ -1704,7 +1704,7 @@ class TradingServiceTest {
         BigDecimal marginAmount = new BigDecimal("2000.00");
         // MAX: maxSeed = 마지막 CyclePosition.usdDeposit = FRESH_HISTORY.usdDeposit = 1000
         // actualBalance(2000) >= maxSeed(1000) → targetSeed = 1000
-        Strategy maxStrategy = new Strategy(
+        StrategyRef maxStrategy = new StrategyRef(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
@@ -1736,7 +1736,7 @@ class TradingServiceTest {
         // PRICE=22, minRequired = 22 × (20 × 2.2) = 968
         // actualBalance=500, maintainSeed=500 → targetSeed=500 < 968 → notifyInsufficientBalance
         BigDecimal marginAmount = new BigDecimal("500.00");
-        Strategy maxStrategy = new Strategy(
+        StrategyRef maxStrategy = new StrategyRef(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
@@ -1788,7 +1788,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_vrStrategy_doesNotRecreateAtOpenOrdersAtClose() throws InterruptedException {
         // VR 전략 + 사이클 픽스처 (STRATEGY/STRATEGY_CYCLE은 INFINITE 전용이므로 별도 생성)
-        Strategy vrStrat = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+        StrategyRef vrStrat = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
@@ -1856,12 +1856,12 @@ class TradingServiceTest {
         return DomainFixtures.kisAccount(id, UUID.nameUUIDFromBytes(("user-" + accountId).getBytes()));
     }
 
-    private Strategy strategy(Account account) {
-        return new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
+    private StrategyRef strategy(Account account) {
+        return new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
-    private StrategyCycle cycle(Strategy strategy) {
+    private StrategyCycle cycle(StrategyRef strategy) {
         return new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
     }
@@ -1887,7 +1887,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_MAX_marginFails_skipsRotationAndNotifiesError() throws InterruptedException {
-        Strategy maxStrategy = new Strategy(
+        StrategyRef maxStrategy = new StrategyRef(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(

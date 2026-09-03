@@ -4,7 +4,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -35,7 +35,7 @@ class CycleEndedNotifierTest {
         UUID userId = UUID.randomUUID();
         Account account = DomainFixtures.kisAccount(UUID.randomUUID(), userId);
         User user = DomainFixtures.activeUserWithTelegram(userId);
-        Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+        StrategyRef strategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
                 StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(accountPort.findByIdOrThrow(account.id())).thenReturn(account);

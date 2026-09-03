@@ -3,7 +3,7 @@ package com.kista.trading.adapter.in.schedule;
 import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.account.application.port.output.AccountPort;
@@ -33,17 +33,17 @@ class BatchContextFactory {
     private final TradingErrorReportPort errorReportPort; // 조회 실패 관리자 알림 (출력 포트 경유 — application.event/service 미직접의존)
 
     // 전략별 현재 사이클·계좌·사용자 조회 — 조회 실패한 전략은 skip + notifyError
-    List<BatchContext> buildAll(List<Strategy> strategies) {
+    List<BatchContext> buildAll(List<StrategyRef> strategies) {
         // 계좌·사용자·사이클은 전략 수만큼 개별 조회하지 않고 배치로 1회씩 조회해 N+1 제거
         Map<UUID, Account> accountsById = accountPort.findAll().stream()
                 .collect(Collectors.toMap(Account::id, a -> a));
         Map<UUID, User> usersById = userPort.findAll().stream()
                 .collect(Collectors.toMap(User::id, u -> u));
-        var strategyIds = strategies.stream().map(Strategy::id).toList();
+        var strategyIds = strategies.stream().map(StrategyRef::id).toList();
         Map<UUID, StrategyCycle> cyclesById = strategyCyclePort.findLatestByStrategyIds(strategyIds);
 
         List<BatchContext> contexts = new ArrayList<>();
-        for (Strategy strategy : strategies) {
+        for (StrategyRef strategy : strategies) {
             try {
                 StrategyCycle currentCycle = cyclesById.get(strategy.id());
                 if (currentCycle == null) {

@@ -5,12 +5,12 @@ import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +35,7 @@ import com.kista.sharedkernel.StrategyTicker;
 @Slf4j
 class TradingBuyCompetitionSimulator {
 
-    private final StrategyPort strategyPort;              // 계좌 내 전략 전체 조회
+    private final StrategyLookupPort strategyPort;              // 계좌 내 전략 전체 조회
     private final StrategyCyclePort strategyCyclePort;    // 경쟁 전략의 현재 사이클 조회
     private final OrderPort orderPort;                    // 경쟁 전략의 당일 기존 주문 유무 확인
     private final StrategyOrderPlanBuilder planBuilder;   // 경쟁 전략 가상 계산
@@ -50,17 +50,17 @@ class TradingBuyCompetitionSimulator {
     // 미리 계산해 재사용한다. 대상 전략 N개를 순회할 때마다 경쟁 시뮬레이션을 처음부터 다시 계산하던
     // O(N²) KIS 시세 조회·DB 조회를 O(N)으로 줄인다. planResultsByStrategyId에 없는 전략은 캐시 미스로 보고
     // 즉시 재계산을 시도하며, 재계산마저 실패하면 그때 uncertain 처리한다.
-    record BatchContext(List<Strategy> strategies, Map<UUID, StrategyCycle> cyclesByStrategyId,
+    record BatchContext(List<StrategyRef> strategies, Map<UUID, StrategyCycle> cyclesByStrategyId,
                          Map<UUID, List<Order>> todayOrdersByStrategyId,
                          Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId) {}
 
-    BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
+    BuyCompetitionPreview simulate(StrategyRef currentStrategy, Account account, StrategyCycle currentCycle,
                                     List<Order> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd) {
         return simulate(currentStrategy, account, currentCycle, currentBuyOrders, today, otherStrategiesPlannedBuyUsd, null);
     }
 
-    BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
+    BuyCompetitionPreview simulate(StrategyRef currentStrategy, Account account, StrategyCycle currentCycle,
                                     List<Order> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd, BatchContext context) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);
@@ -84,8 +84,8 @@ class TradingBuyCompetitionSimulator {
         ranked.add(new RankedCandidate(currentStrategy.id(), currentCycle.id(), currentStrategy.type(),
                 currentStrategy.ticker(), requiredForThis, true));
 
-        List<Strategy> candidates = context != null ? context.strategies() : strategyPort.findByAccountId(account.id());
-        for (Strategy other : candidates) {
+        List<StrategyRef> candidates = context != null ? context.strategies() : strategyPort.findByAccountId(account.id());
+        for (StrategyRef other : candidates) {
             if (other.id().equals(currentStrategy.id()) || other.status() != StrategyStatus.ACTIVE) {
                 continue;
             }

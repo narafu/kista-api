@@ -8,7 +8,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
@@ -61,7 +61,7 @@ class TradingReporterTest {
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
-    static final Strategy STRATEGY = new Strategy(
+    static final StrategyRef STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
@@ -76,7 +76,7 @@ class TradingReporterTest {
     // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
     static final Account TOSS_ACCOUNT = DomainFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef TOSS_ACCOUNT_REF = toBrokerRef(TOSS_ACCOUNT);
-    static final Strategy TOSS_STRATEGY = new Strategy(
+    static final StrategyRef TOSS_STRATEGY = new StrategyRef(
             UUID.randomUUID(), TOSS_ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );

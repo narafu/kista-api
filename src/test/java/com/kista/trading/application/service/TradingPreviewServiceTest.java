@@ -5,13 +5,13 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +42,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class TradingPreviewServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock StrategyPort strategyPort;
+    @Mock StrategyLookupPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderPort orderPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
@@ -54,7 +54,7 @@ class TradingPreviewServiceTest {
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
-    static final Strategy STRATEGY = new Strategy(
+    static final StrategyRef STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
@@ -312,15 +312,15 @@ class TradingPreviewServiceTest {
     // 대상 전략 개수만큼 반복 실행되지 않고 previewBatch()에서 1회만 조회돼야 한다
     @Test
     void previewBatch_callsSumPlannedBuyByAccountAndDateOnce_regardlessOfStrategyCount() {
-        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef s1 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef s2 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        List<Strategy> strategies = List.of(s1, s2);
+        List<StrategyRef> strategies = List.of(s1, s2);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
         Map<UUID, StrategyCycle> cyclesById = new java.util.HashMap<>();
-        for (Strategy s : strategies) {
+        for (StrategyRef s : strategies) {
             // startDate는 과거로 고정 — LocalDate.now()면 KST 00:00~04:30 사이 실행 시 DstInfo.nextTradeDate()가
             // 오늘 날짜를 반환해 SCHEDULED_START_NOT_REACHED skip과 경합하는 flaky 테스트가 됨 (58번째 줄 주석 참고)
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
@@ -353,17 +353,17 @@ class TradingPreviewServiceTest {
     // (전략 3개 기준 최대 9회). 전략별 계산을 1회로 캐싱한 뒤에는 전략당 정확히 1회씩, 총 N회만 호출돼야 한다.
     @Test
     void previewBatch_callsPlanBuilderBuildOncePerStrategy_evenWithCrossCompetition() {
-        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef s1 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef s2 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        Strategy s3 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef s3 = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        List<Strategy> strategies = List.of(s1, s2, s3);
+        List<StrategyRef> strategies = List.of(s1, s2, s3);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
         Map<UUID, StrategyCycle> cycles = new java.util.HashMap<>();
-        for (Strategy s : strategies) {
+        for (StrategyRef s : strategies) {
             // startDate는 과거로 고정 — 위 previewBatch_callsSumPlannedBuyByAccountAndDateOnce...와 동일한 이유
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                     new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
@@ -382,7 +382,7 @@ class TradingPreviewServiceTest {
         com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
         com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
         lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(StrategyRef.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
@@ -392,7 +392,7 @@ class TradingPreviewServiceTest {
 
         realService.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
-        for (Strategy s : strategies) {
+        for (StrategyRef s : strategies) {
             verify(planBuilder, times(1)).build(eq(s), eq(ACCOUNT), eq(cycles.get(s.id())), any(), anyString(), any());
         }
     }
@@ -402,11 +402,11 @@ class TradingPreviewServiceTest {
     // 실제 TradingBuyCompetitionSimulator를 그대로 사용해 대상 전략의 경쟁 결과에 영향이 없는지 검증한다.
     @Test
     void previewBatch_excludesScheduledStartNotReachedStrategy_fromCompetitionBudget() {
-        Strategy started = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef started = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        Strategy notStarted = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+        StrategyRef notStarted = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        List<Strategy> strategies = List.of(started, notStarted);
+        List<StrategyRef> strategies = List.of(started, notStarted);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
         StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), started.id(), UUID.randomUUID(),
@@ -427,7 +427,7 @@ class TradingPreviewServiceTest {
         com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
         com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
         lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(StrategyRef.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(

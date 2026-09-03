@@ -9,7 +9,7 @@ import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
@@ -44,7 +44,7 @@ class TradingOrderExecutor {
     // AT_OPEN PLANNED만 재조회해 접수한다 — 동일 사이클에 공존 가능한 AT_CLOSE PLANNED(미도래)는 건드리지 않는다
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
     List<Order> placeAtOpenOrders(LocalDate tradeDate, Account account, UUID strategyCycleId,
-                                  BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+                                  BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, StrategyRef strategy) {
         if (currentPrice != null) {
             CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
             if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
@@ -69,7 +69,7 @@ class TradingOrderExecutor {
     // INFINITE_POSITION이어도 position이 null(재계산 skip 케이스)이면 캡 미적용 — 기존 동작 그대로
     // VR_POSITION이어도 vrPosition이 null(재계산 skip 케이스)이면 캡 미적용 — 동일 원칙
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
-                            BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+                            BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, StrategyRef strategy) {
         if (currentPrice != null) {
             CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
             if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {

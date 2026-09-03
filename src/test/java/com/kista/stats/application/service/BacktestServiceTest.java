@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;

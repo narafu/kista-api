@@ -1,8 +1,8 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.UpdateStrategyCommand;
+import com.kista.strategyconfig.domain.model.RegisterStrategyCommand;
+import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.strategyconfig.domain.model.UpdateStrategyCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 

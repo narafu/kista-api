@@ -1,6 +1,5 @@
 package com.kista.trading.domain.model;
 
-import com.kista.domain.model.strategy.Strategy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

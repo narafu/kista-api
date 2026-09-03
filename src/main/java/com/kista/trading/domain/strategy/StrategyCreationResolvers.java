@@ -1,6 +1,5 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.domain.model.strategy.Strategy;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

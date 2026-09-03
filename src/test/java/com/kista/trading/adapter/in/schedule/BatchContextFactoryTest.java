@@ -2,7 +2,7 @@ package com.kista.trading.adapter.in.schedule;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.account.application.port.output.AccountPort;
@@ -43,8 +43,8 @@ class BatchContextFactoryTest {
     private static final UUID USER_ID    = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
-    private Strategy mockStrategy(UUID accountId) {
-        return new Strategy(UUID.randomUUID(), accountId, StrategyType.INFINITE,
+    private StrategyRef mockStrategy(UUID accountId) {
+        return new StrategyRef(UUID.randomUUID(), accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
@@ -69,7 +69,7 @@ class BatchContextFactoryTest {
 
     @Test
     void buildAll_returnsContextsForAllStrategies() {
-        Strategy strategy = mockStrategy(ACCOUNT_ID);
+        StrategyRef strategy = mockStrategy(ACCOUNT_ID);
         StrategyCycle cycle = mockCycle(strategy.id());
         Account account = mockAccount(ACCOUNT_ID);
         User user = mockUser();
@@ -97,9 +97,9 @@ class BatchContextFactoryTest {
     @Test
     void buildAll_contextBuildFails_skipsFailedStrategyAndNotifiesAdmin() {
         // strategy1 계좌를 배치 조회 결과에서 찾을 수 없음 → skip + notifyError, strategy2는 포함
-        Strategy strategy1 = mockStrategy(ACCOUNT_ID);
+        StrategyRef strategy1 = mockStrategy(ACCOUNT_ID);
         UUID accountId2 = UUID.randomUUID();
-        Strategy strategy2 = mockStrategy(accountId2);
+        StrategyRef strategy2 = mockStrategy(accountId2);
         StrategyCycle cycle2 = mockCycle(strategy2.id());
         Account account2 = mockAccount(accountId2);
         User user = mockUser();
@@ -120,7 +120,7 @@ class BatchContextFactoryTest {
     @Test
     void buildAll_latestCycleAlreadyEnded_skipsAndNotifiesAdmin() {
         // rotation 실패로 새 사이클이 없는 좀비 상태 — 종료 사이클에 주문이 나가면 안 됨
-        Strategy strategy = mockStrategy(ACCOUNT_ID);
+        StrategyRef strategy = mockStrategy(ACCOUNT_ID);
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategy.id())))
                 .thenReturn(Map.of(strategy.id(), mockEndedCycle(strategy.id())));
         when(accountPort.findAll()).thenReturn(List.of());

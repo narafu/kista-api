@@ -1,7 +1,7 @@
 package com.kista.stats.adapter.in.web;
 
 import com.kista.stats.domain.model.*;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.stats.application.usecase.UserStatsUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;

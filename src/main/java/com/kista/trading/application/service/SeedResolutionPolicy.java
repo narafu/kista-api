@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import java.math.BigDecimal;
 import java.util.Optional;
 
@@ -11,5 +11,5 @@ import java.util.Optional;
 interface SeedResolutionPolicy {
 
     // 가용 잔고를 반환. 증권사 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
-    Optional<BigDecimal> resolveAvailableBalance(Strategy strategy, BigDecimal maintainSeed, BigDecimal maxSeed);
+    Optional<BigDecimal> resolveAvailableBalance(StrategyRef strategy, BigDecimal maintainSeed, BigDecimal maxSeed);
 }

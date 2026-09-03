@@ -5,7 +5,7 @@ import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -34,7 +34,7 @@ class CycleLifecycleNotifierTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), USER_ID);
     private static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
-    private static final Strategy STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+    private static final StrategyRef STRATEGY = new StrategyRef(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
 
     @Test

@@ -2,25 +2,18 @@ package com.kista.privacy.adapter.out.persistence;
 
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.PrivacyDates;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
 class PrivacyTradePersistenceAdapterTest {
 
@@ -89,37 +82,4 @@ class PrivacyTradePersistenceAdapterTest {
                 PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL);
     }
 
-    @Test
-    void findBaseIfPrivacy_is_implemented_on_adapter_so_transaction_applies_to_order_mapping() throws NoSuchMethodException {
-        Method method = PrivacyTradePersistenceAdapter.class
-                .getDeclaredMethod("findBaseIfPrivacy", Strategy.class, LocalDate.class);
-
-        assertThat(method.getAnnotation(Transactional.class)).isNotNull();
-        assertThat(method.getAnnotation(Transactional.class).readOnly()).isTrue();
-    }
-
-    @Test
-    void findBaseIfPrivacy_uses_order_fetch_query_for_privacy_strategy() {
-        LocalDate todayKst = LocalDate.of(2026, 7, 15);
-        LocalDate dbReleaseDate = LocalDate.of(2026, 7, 14);
-        Strategy strategy = new Strategy(
-                UUID.randomUUID(), UUID.randomUUID(), StrategyType.PRIVACY,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
-        base.setReleaseDate(dbReleaseDate);
-        base.setTicker(StrategyTicker.SOXL);
-        base.setCurrentCycleStart(new BigDecimal("28.50"));
-        base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
-        base.setHoldings(10);
-
-        when(baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL))
-                .thenReturn(Optional.of(base));
-
-        var result = adapter.findBaseIfPrivacy(strategy, todayKst);
-
-        assertThat(result).isNotNull();
-        verify(baseRepository).findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL);
-    }
 }

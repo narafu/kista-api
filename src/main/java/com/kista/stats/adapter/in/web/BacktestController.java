@@ -2,7 +2,7 @@ package com.kista.stats.adapter.in.web;
 
 import com.kista.stats.adapter.in.web.dto.BacktestResponse;
 import com.kista.stats.domain.model.backtest.BacktestCommand;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.usecase.BacktestUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -6,7 +6,7 @@ import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;

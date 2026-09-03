@@ -1,7 +1,7 @@
 package com.kista.notify.application.port.output;
 
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 
@@ -15,8 +15,8 @@ public interface UserNotificationPort {
     void notifyApproved(User user);                                                         // 사용자에게 승인 알림
     void notifyRejected(User user);                                                         // 사용자에게 거절 알림
     void notifyTradingReport(User user, Account account, TradingReport report);             // 사용자에게 매매 결과 알림
-    void notifyCycleCompleted(User user, Account account, Strategy strategy);               // 사용자에게 사이클 종료(holdings=0) 알림
-    void notifyNewCycleStarted(User user, Account account, Strategy strategy,
+    void notifyCycleCompleted(User user, Account account, StrategyRef strategy);               // 사용자에게 사이클 종료(holdings=0) 알림
+    void notifyNewCycleStarted(User user, Account account, StrategyRef strategy,
                                BigDecimal initialUsdDeposit);                              // 사용자에게 새 사이클 시작 알림
     void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker); // 사용자에게 예수금 부족 알림
     void notifyError(User user, Exception e);                                              // 사용자에게 매매 오류 알림

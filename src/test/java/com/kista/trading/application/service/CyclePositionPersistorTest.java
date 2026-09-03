@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
@@ -65,13 +65,13 @@ class CyclePositionPersistorTest {
                 Instant.now(), null);
     }
 
-    private Strategy vrStrategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
+    private StrategyRef vrStrategy() {
+        return new StrategyRef(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.MAINTAIN);
     }
 
-    private Strategy infiniteStrategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE,
+    private StrategyRef infiniteStrategy() {
+        return new StrategyRef(STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
     }
 
@@ -97,7 +97,7 @@ class CyclePositionPersistorTest {
     @Test
     @DisplayName("VR holdings=0 — markEnded 미호출, rollIfDue 호출")
     void vr_holdingsZero_noCycleEnd_rollIfDueCalled() {
-        Strategy strategy = vrStrategy();
+        StrategyRef strategy = vrStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         // 이전 포지션: holdings=5 (prevHadHoldings=true)
         CyclePosition prevPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
@@ -123,7 +123,7 @@ class CyclePositionPersistorTest {
     @Test
     @DisplayName("VR holdings>0 — rollIfDue 호출, markEnded 미호출")
     void vr_holdingsPositive_rollIfDueCalled_noMarkEnded() {
-        Strategy strategy = vrStrategy();
+        StrategyRef strategy = vrStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 10, Instant.now(), null);
@@ -144,7 +144,7 @@ class CyclePositionPersistorTest {
     @Test
     @DisplayName("INFINITE holdings=0 + prevHadHoldings=true — markEnded + rotate 호출 (기존 동작 무회귀)")
     void infinite_holdingsZero_prevHadHoldings_marksEndedAndRotates() {
-        Strategy strategy = infiniteStrategy();
+        StrategyRef strategy = infiniteStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         // 이전 포지션: holdings=5
         CyclePosition prevPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
@@ -176,7 +176,7 @@ class CyclePositionPersistorTest {
     @Test
     @DisplayName("INFINITE holdings=0 + prevHadHoldings=false (0회차 매수 실패) — markEnded 미호출")
     void infinite_holdingsZero_noPrevHoldings_noMarkEnded() {
-        Strategy strategy = infiniteStrategy();
+        StrategyRef strategy = infiniteStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         // 이전 포지션 없음 (첫 실행 실패)
         when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of());

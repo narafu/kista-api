@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.user.adapter.in.web.security.JwtAuthFilter;
 import com.kista.user.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;

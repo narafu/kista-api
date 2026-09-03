@@ -2,7 +2,6 @@ package com.kista.privacy.adapter.out.persistence;
 
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.*;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
@@ -139,12 +138,6 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                     return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
                             entity.getCurrentCycleStart(), trades);
                 });
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public PrivacyTradeBase findBaseIfPrivacy(Strategy strategy, LocalDate today) {
-        return strategy.isPrivacy() ? findTodayTrade(today).orElse(null) : null;
     }
 
     @Override

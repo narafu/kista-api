@@ -3,7 +3,6 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;

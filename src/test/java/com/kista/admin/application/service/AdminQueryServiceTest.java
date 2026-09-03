@@ -2,11 +2,11 @@ package com.kista.admin.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminStats;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.strategyconfig.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.*;
 import org.junit.jupiter.api.Test;

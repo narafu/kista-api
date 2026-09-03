@@ -2,9 +2,7 @@ package com.kista.broker.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.application.port.output.StrategyPort;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -29,7 +27,6 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         BrokerPricePort, LiveBalancePort {
 
     private final CommonMarketPriceFeed priceFeed;               // 시세 재사용 — Spring이 TossPriceApi 빈을 이 인터페이스로 주입 (이미 broker 소유 PriceSnapshot 반환)
-    private final StrategyPort strategyPort;                     // 계좌+ticker → strategy 해석 (legacy 공개 포트)
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
@@ -39,8 +36,8 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     // --- 계좌+ticker → 전략 해석 공통 헬퍼 ---
     // Account에는 ticker 정보가 없다(전략이 소유) — 계좌에 속한 전략 중 ticker가 일치하는 것을 찾는다
-    private Strategy resolveStrategy(BrokerAccountRef account, StrategyTicker ticker) {
-        return strategyPort.findByAccountId(account.id()).stream()
+    private StrategyRefLite resolveStrategy(BrokerAccountRef account, StrategyTicker ticker) {
+        return mockSimulationDataPort.findStrategiesByAccountId(account.id()).stream()
                 .filter(s -> s.ticker() == ticker)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
@@ -49,7 +46,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     // --- 계좌+ticker → 최신 포지션 해석 공통 헬퍼 ---
     private PositionView resolveLatestPosition(BrokerAccountRef account, StrategyTicker ticker) {
-        Strategy strategy = resolveStrategy(account, ticker);
+        StrategyRefLite strategy = resolveStrategy(account, ticker);
         return mockSimulationDataPort.findLatestPosition(strategy.id())
                 .orElseThrow(() -> new IllegalStateException(
                         "모의계좌 포지션 이력이 없습니다: strategyId=" + strategy.id()));
@@ -59,7 +56,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // 대표 전략 1개로 getLiveBalance를 호출해 계좌의 모든 BUY 후보에 그대로 적용) 모의계좌도 전략별 usdDeposit을
     // 합산해 계좌 단위 값으로 맞춘다 — 전략별 값을 그대로 반환하면 다른 전략의 잔고로 매수 승인/거절이 오염된다
     private BigDecimal sumUsdDepositAcrossStrategies(BrokerAccountRef account) {
-        return strategyPort.findByAccountId(account.id()).stream()
+        return mockSimulationDataPort.findStrategiesByAccountId(account.id()).stream()
                 .map(s -> mockSimulationDataPort.findLatestPosition(s.id()))
                 .flatMap(Optional::stream)
                 .map(PositionView::usdDeposit)
@@ -151,7 +148,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용
         // cycleId로 스코프 — account+ticker만으로 조회하면 사이클 롤오버 당일 종료된 이전 사이클의
         // 잔류 PLACED 주문(취소 실패 등)이 새 사이클의 체결에 잘못 합산될 수 있어 활성 사이클 격리 조회를 재사용한다
-        Strategy strategy = resolveStrategy(account, ticker);
+        StrategyRefLite strategy = resolveStrategy(account, ticker);
         UUID cycleId = mockSimulationDataPort.findActiveCycleId(strategy.id());
         List<PlacedOrderView> placed = mockSimulationDataPort.findPlacedOrders(cycleId, to);
         if (placed.isEmpty()) return List.of();
@@ -199,10 +196,10 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     @Override
     public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
-        List<Strategy> strategies = strategyPort.findByAccountId(account.id());
+        List<StrategyRefLite> strategies = mockSimulationDataPort.findStrategiesByAccountId(account.id());
         List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
         BigDecimal totalUsdDeposit = BigDecimal.ZERO;
-        for (Strategy strategy : strategies) {
+        for (StrategyRefLite strategy : strategies) {
             Optional<PositionView> latest = mockSimulationDataPort.findLatestPosition(strategy.id());
             if (latest.isEmpty()) continue;
             PositionView position = latest.get();

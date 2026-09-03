@@ -4,7 +4,7 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.BacktestResult;
 import com.kista.stats.domain.model.backtest.BacktestSummary;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.usecase.BacktestUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;

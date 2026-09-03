@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.CyclePositionInfiniteDetailPort;
 import com.kista.trading.application.port.output.OrderPort;
@@ -43,7 +44,7 @@ class CycleOrderComputer {
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
     // currentPrice: PRIVACY allocateRemainingBudget 분모 산출용, VR 실주문 기준가격 — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
-    Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
+    Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, StrategyRef strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
                                                    PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice) {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
@@ -111,17 +112,17 @@ class CycleOrderComputer {
         return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
     }
 
-    private Integer resolveDivisionCount(Strategy strategy, StrategyCycle currentCycle) {
+    private Integer resolveDivisionCount(StrategyRef strategy, StrategyCycle currentCycle) {
         if (!strategy.isInfinite()) {
             return null;
         }
         if (currentCycle != null && currentCycle.strategyVersionId() != null) {
             return strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                     .map(StrategyInfiniteDetail::divisionCount)
-                    .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+                    .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
         }
         return strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
-                .orElse(Strategy.DEFAULT_DIVISION_COUNT);
+                .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
     }
 }

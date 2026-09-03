@@ -6,7 +6,7 @@ import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -96,7 +96,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
+    public void notifyCycleCompleted(User user, Account account, StrategyRef strategy) {
         String text = String.format(
                 "🔄 <b>사이클 종료</b> — %s%n"
                 + "[%s] %s 사이클이 완료되었습니다.%n"
@@ -108,7 +108,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
+    public void notifyNewCycleStarted(User user, Account account, StrategyRef strategy, java.math.BigDecimal initialUsdDeposit) {
         String text = String.format(
                 "🚀 <b>새 사이클 시작</b> — %s%n"
                 + "[%s] %s 사이클이 시작되었습니다.%n"

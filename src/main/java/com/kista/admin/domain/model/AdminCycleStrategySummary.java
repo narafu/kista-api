@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 
 import java.util.UUID;
 import com.kista.sharedkernel.StrategyType;

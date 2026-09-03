@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.strategy.StrategyPersistenceAdapter;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.adapter.out.persistence.StrategyPersistenceAdapter;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.trading.domain.model.StrategyVersion;

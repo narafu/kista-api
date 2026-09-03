@@ -13,8 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-// 레거시 com.kista.adapter.out.persistence.strategy의 StrategyPersistenceAdapterTest가
-// @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지 (모듈 경계상 레거시는 OPEN이라 안전)
+// com.kista.strategyconfig.adapter.out.persistence의 StrategyPersistenceAdapterTest가
+// @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfiniteDetailPort {

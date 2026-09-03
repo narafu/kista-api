@@ -13,7 +13,7 @@ import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ class OrderCancelService {
     private final OrderPort orderPort;
     private final BrokerAdapterRegistry registry;
     private final AccountPort accountPort;
-    private final StrategyPort strategyPort;
+    private final StrategyLookupPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
     private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈

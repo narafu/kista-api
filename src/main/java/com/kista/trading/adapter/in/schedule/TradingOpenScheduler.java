@@ -5,13 +5,13 @@ import com.kista.adapter.in.schedule.SchedulerLockService;
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.application.port.output.HeartbeatPort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,7 +30,7 @@ import java.util.List;
 public class TradingOpenScheduler {
 
     private final TradingExecutionUseCase useCase;
-    private final StrategyPort strategyPort;
+    private final StrategyLookupPort strategyPort;
     private final TradingErrorReportPort errorReportPort;  // guardPrivacyStrategies 오류 알림 (출력 포트 경유)
     private final SchedulerLockService schedulerLockService;
     private final PrivacyTradePort privacyTradePort;
@@ -62,9 +62,9 @@ public class TradingOpenScheduler {
     }
 
     // PRIVACY 기준 매매표가 위험 패턴이면 그 실행에서만 주문 생성 skip + 관리자 알림
-    private List<Strategy> guardPrivacyStrategies(List<Strategy> strategies, LocalDate today) {
-        List<Strategy> privacyStrategies = strategies.stream()
-                .filter(Strategy::isPrivacy)
+    private List<StrategyRef> guardPrivacyStrategies(List<StrategyRef> strategies, LocalDate today) {
+        List<StrategyRef> privacyStrategies = strategies.stream()
+                .filter(StrategyRef::isPrivacy)
                 .toList();
         if (privacyStrategies.isEmpty()) return strategies;
 

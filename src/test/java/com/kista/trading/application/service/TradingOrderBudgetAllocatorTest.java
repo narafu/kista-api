@@ -6,7 +6,7 @@ import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.port.output.OrderPort;
@@ -353,7 +353,7 @@ class TradingOrderBudgetAllocatorTest {
 
     private TradingOrderBudgetAllocator.Candidate candidate(UUID strategyId, UUID cycleId, StrategyType type,
                                                              Order... orders) {
-        Strategy strategy = new Strategy(strategyId, account.id(), type,
+        StrategyRef strategy = new StrategyRef(strategyId, account.id(), type,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, tradeDate, null, null, null);

@@ -1,9 +1,9 @@
 package com.kista.admin.domain.model;
 
 import com.kista.account.domain.model.Account.Broker;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyDefaults;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
@@ -41,7 +41,7 @@ public record RuntimeSettings(
         Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
         strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
                 field(true, List.of(StrategyTicker.values()), StrategyTicker.SOXL),
-                field(true, List.of(20, 30, 40), Strategy.DEFAULT_DIVISION_COUNT), null, null, null));
+                field(true, List.of(20, 30, 40), StrategyDefaults.DEFAULT_DIVISION_COUNT), null, null, null));
         strategies.put(StrategyType.PRIVACY, new StrategyCreationSettings(true,
                 field(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL), null, null, null, null));
         strategies.put(StrategyType.VR, new StrategyCreationSettings(true,

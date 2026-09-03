@@ -5,7 +5,7 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
@@ -49,14 +49,14 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
+    public void notifyCycleCompleted(User user, Account account, StrategyRef strategy) {
         String body = String.format("[%s] %s %s 사이클 완료",
                 account.nickname(), strategy.type().name(), strategy.ticker().name());
         send(user.id(), "사이클 종료", body);
     }
 
     @Override
-    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
+    public void notifyNewCycleStarted(User user, Account account, StrategyRef strategy, java.math.BigDecimal initialUsdDeposit) {
         String body = String.format("[%s] %s %s — 시드 $%.2f",
                 account.nickname(), strategy.type().name(), strategy.ticker().name(), initialUsdDeposit);
         send(user.id(), "새 사이클 시작", body);

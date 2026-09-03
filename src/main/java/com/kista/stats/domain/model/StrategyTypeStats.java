@@ -1,6 +1,6 @@
 package com.kista.stats.domain.model;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 
 import java.math.BigDecimal;
 import com.kista.sharedkernel.StrategyType;

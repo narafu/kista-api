@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
@@ -46,11 +46,11 @@ class CycleOrderComputerTest {
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     // INFINITE 전략
-    static final Strategy INFINITE_STRATEGY = new Strategy(
+    static final StrategyRef INFINITE_STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     // VR 전략
-    static final Strategy VR_STRATEGY = new Strategy(
+    static final StrategyRef VR_STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     // VR 사이클 (strategyVersionId 포함)

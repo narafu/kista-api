@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

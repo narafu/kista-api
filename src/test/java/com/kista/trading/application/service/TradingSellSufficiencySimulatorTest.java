@@ -6,7 +6,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
@@ -42,7 +42,7 @@ class TradingSellSufficiencySimulatorTest {
 
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
-    Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+    StrategyRef strategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
 
     @BeforeEach

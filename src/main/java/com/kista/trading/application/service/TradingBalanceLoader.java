@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +25,14 @@ class TradingBalanceLoader {
     }
 
     // 잔고 로드 — preview용: 이력 없음은 skip, 있으면 그대로 반환
-    BalanceLoad tryLoadBalance(Strategy strategy) {
+    BalanceLoad tryLoadBalance(StrategyRef strategy) {
         return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(h -> new BalanceLoad(new AccountBalance(h.holdings(), h.avgPrice(), h.usdDeposit()), null))
                 .orElse(new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
     }
 
     // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
-    BalanceLoad loadBalanceOrThrow(Strategy strategy) {
+    BalanceLoad loadBalanceOrThrow(StrategyRef strategy) {
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("전략 이력 없음: strategyId=" + strategy.id()));
         return new BalanceLoad(new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit()), null);

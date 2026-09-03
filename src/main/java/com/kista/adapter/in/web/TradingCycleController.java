@@ -2,9 +2,9 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
 import com.kista.common.TimeZones;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.application.usecase.AccountStatisticsUseCase;
-import com.kista.application.usecase.StrategyUseCase;
+import com.kista.strategyconfig.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -89,9 +89,8 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestBody VrConfigRequest request) {
-        return TradingCycleResponse.from(
-                vrReconfigure.reconfigure(id, userId, request.toCommand())
-        );
+        vrReconfigure.reconfigure(id, userId, request.toCommand());
+        return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
     // 거래 사이클 삭제

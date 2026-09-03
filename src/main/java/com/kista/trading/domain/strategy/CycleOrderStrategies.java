@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,7 +26,7 @@ public class CycleOrderStrategies {
         return s;
     }
 
-    public CycleOrderStrategy of(Strategy strategy) {
+    public CycleOrderStrategy of(StrategyRef strategy) {
         return of(strategy.type());
     }
 }

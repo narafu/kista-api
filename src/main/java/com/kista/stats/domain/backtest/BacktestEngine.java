@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
@@ -33,6 +33,7 @@ import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.sharedkernel.StrategyDefaults;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
 // 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 domain/strategy·domain/model/strategy에 위임
@@ -370,8 +371,8 @@ public class BacktestEngine {
     }
 
     // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 type·ticker만 참조)
-    private static Strategy syntheticStrategy(BacktestCommand command) {
-        return new Strategy(null, null, command.type(), StrategyStatus.ACTIVE,
+    private static StrategyRef syntheticStrategy(BacktestCommand command) {
+        return new StrategyRef(null, null, command.type(), StrategyStatus.ACTIVE,
                 command.ticker(), StrategyCycleSeedType.NONE);
     }
 
@@ -484,7 +485,7 @@ public class BacktestEngine {
         InfiniteState(BacktestCommand command) {
             super(command);
             this.divisionCount = command.divisionCount() != null
-                    ? command.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+                    ? command.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
             // 시작 보유분이 있으면 청산 판정 기준선도 그만큼에서 출발 — 0으로 두면 매매 없는 첫날에도 오탐은 없지만(§엔진 주석 참고) 명시적으로 맞춰둔다
             this.prevDayHoldings = this.balance.holdings();
         }

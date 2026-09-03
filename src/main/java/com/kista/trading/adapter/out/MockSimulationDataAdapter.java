@@ -1,9 +1,11 @@
 package com.kista.trading.adapter.out;
 
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.model.PlacedOrderView;
 import com.kista.broker.domain.model.PositionView;
+import com.kista.broker.domain.model.StrategyRefLite;
 import com.kista.broker.application.port.output.MockSimulationDataPort;
 import com.kista.common.CycleLookups;
 import com.kista.trading.domain.model.CyclePosition;
@@ -29,6 +31,14 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
     private final OrderPort orderPort;
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
+    private final StrategyLookupPort strategyPort;
+
+    @Override
+    public List<StrategyRefLite> findStrategiesByAccountId(UUID accountId) {
+        return strategyPort.findByAccountId(accountId).stream()
+                .map(s -> new StrategyRefLite(s.id(), s.ticker()))
+                .toList();
+    }
 
     @Override
     public UUID findActiveCycleId(UUID strategyId) {

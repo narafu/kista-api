@@ -4,7 +4,6 @@ import com.kista.user.application.event.UserDeletedEvent;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
-import com.kista.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,6 @@ import static org.mockito.Mockito.verify;
 @DisplayName("UserCascadeDeleter 단위 테스트")
 class UserCascadeDeleterTest {
 
-    @Mock StrategyPort strategyPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock RefreshTokenPort refreshTokenPort;
@@ -35,13 +33,12 @@ class UserCascadeDeleterTest {
     @InjectMocks UserCascadeDeleter deleter;
 
     @Test
-    @DisplayName("account/strategy는 직접 소프트 삭제하고, 나머지 cascade는 UserDeletedEvent로 위임한다")
+    @DisplayName("account는 직접 소프트 삭제하고, 나머지 cascade는 UserDeletedEvent로 위임한다")
     void deleteCascade_softDeletesAndPublishesEvent() {
         UUID userId = UUID.randomUUID();
 
         deleter.deleteCascade(userId);
 
-        verify(strategyPort).deleteByUserId(userId);
         verify(accountPort).deleteByUserId(userId);
         verify(userPort).delete(userId);
         verify(refreshTokenPort).deleteAllByUserId(userId);

@@ -17,10 +17,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
 
@@ -106,6 +109,20 @@ class RuntimeSettingsServiceTest {
         boolean result = service.enabled(Account.Broker.KIS);
 
         assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("find() — 활성 전략 타입의 설정을 trading 소유 타입으로 매핑해 반환한다")
+    void find_mapsAdminSettingsToTradingType() {
+        RuntimeSettings settings = RuntimeSettings.defaults();
+        when(settingsPort.load()).thenReturn(settings);
+
+        Optional<com.kista.trading.domain.strategy.StrategyCreationSettings> result =
+                service.find(StrategyType.INFINITE);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().enabled()).isTrue();
+        assertThat(result.get().divisionCount().defaultValue()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
     }
 
     @Test

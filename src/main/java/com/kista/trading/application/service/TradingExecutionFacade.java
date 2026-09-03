@@ -6,7 +6,7 @@ import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     private final TradingPreviewService tradingPreviewService;
 
     @Override
-    public void execute(Strategy strategy, Account account, User user) throws InterruptedException {
+    public void execute(StrategyRef strategy, Account account, User user) throws InterruptedException {
         tradingService.execute(strategy, account, user);
     }
 

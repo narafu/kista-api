@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 // 전략 생성 필드 정책 wrapper(허용값·기본값·고정여부) — admin RuntimeSettings 트리의 trading 자체 복제본.
-// resolve()/valuesEqual() 로직은 레거시 원본(com.kista.domain.model.settings.StrategyFieldSettings)과 byte-identical 유지.
+// resolve()/valuesEqual() 로직은 원본(com.kista.admin.domain.model.StrategyFieldSettings)과 byte-identical 유지.
 public record StrategyFieldSettings<T>(
         boolean customizable, // 사용자 입력 허용 여부
         List<T> allowedValues, // 허용 값 목록

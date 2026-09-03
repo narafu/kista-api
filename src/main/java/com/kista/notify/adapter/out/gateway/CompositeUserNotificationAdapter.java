@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -35,8 +35,8 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     // 사용자 알림 — notificationChannel에 따라 라우팅
     @Override public void notifyApproved(User user)                                                     { route(user, p -> p.notifyApproved(user)); }
     @Override public void notifyRejected(User user)                                                     { route(user, p -> p.notifyRejected(user)); }
-    @Override public void notifyCycleCompleted(User user, Account account, Strategy strategy)           { route(user, p -> p.notifyCycleCompleted(user, account, strategy)); }
-    @Override public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal d) { route(user, p -> p.notifyNewCycleStarted(user, account, strategy, d)); }
+    @Override public void notifyCycleCompleted(User user, Account account, StrategyRef strategy)           { route(user, p -> p.notifyCycleCompleted(user, account, strategy)); }
+    @Override public void notifyNewCycleStarted(User user, Account account, StrategyRef strategy, java.math.BigDecimal d) { route(user, p -> p.notifyNewCycleStarted(user, account, strategy, d)); }
     @Override public void notifyTradingReport(User user, Account account, TradingReport report)         { route(user, p -> p.notifyTradingReport(user, account, report)); }
     @Override public void notifyInsufficientBalance(User user, Account account, StrategyType t, StrategyTicker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
     @Override public void notifyError(User user, Exception e)                                           { route(user, p -> p.notifyError(user, e)); }

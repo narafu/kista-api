@@ -1,8 +1,5 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.Strategy;
-
 import java.math.BigDecimal;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
@@ -15,13 +12,13 @@ public interface StrategyCreationResolver {
     StrategyType type();
 
     // ticker는 모든 전략 유형에서 생략 기본값·허용값·고정값 정책을 동일하게 적용한다.
-    default ResolvedCreation resolve(RegisterStrategyCommand cmd, StrategyCreationSettings settings) {
-        StrategyTicker ticker = settings.ticker().resolve(cmd.ticker());
-        return resolveTypeFields(cmd, settings, ticker);
+    default ResolvedCreation resolve(StrategyCreationRequest request, StrategyCreationSettings settings) {
+        StrategyTicker ticker = settings.ticker().resolve(request.ticker());
+        return resolveTypeFields(request, settings, ticker);
     }
 
     // 전략 타입별 고유 필드(division count / VR 파라미터 등) 해석
-    ResolvedCreation resolveTypeFields(RegisterStrategyCommand cmd, StrategyCreationSettings settings, StrategyTicker ticker);
+    ResolvedCreation resolveTypeFields(StrategyCreationRequest request, StrategyCreationSettings settings, StrategyTicker ticker);
 
     // signed recurringAmount를 런타임 설정의 UI 방향 enum으로 변환 — VR 리졸버 공용
     static RecurringMode recurringModeOf(int recurringAmount) {

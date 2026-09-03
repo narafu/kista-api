@@ -2,8 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회
-    private final StrategyPort strategyPort;                 // ticker 조회: strategy_cycle → strategy (legacy strategy 패키지 소유 Entity라 포트 경유)
+    private final StrategyLookupPort strategyPort;            // ticker 조회: strategy_cycle → strategy (trading own-type 포트 경유)
 
     @Override
     public CyclePosition save(CyclePosition position) {
@@ -85,8 +84,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdAndDateRange(UUID strategyId, Instant from, Instant to) {
         // ticker는 strategy에서 한 번만 조회
-        StrategyTicker ticker = strategyPort.findById(strategyId)
-                .map(Strategy::ticker).orElse(null);
+        StrategyTicker ticker = strategyPort.findTickerById(strategyId);
         return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to).stream()
                 .map(e -> toEntry(e, ticker))
                 .toList();
@@ -125,8 +123,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdWithCursor(UUID strategyId, Instant from,
                                                                        Instant cursor, int limit) {
-        StrategyTicker ticker = strategyPort.findById(strategyId)
-                .map(Strategy::ticker).orElse(null);
+        StrategyTicker ticker = strategyPort.findTickerById(strategyId);
         return positionRepo.findByStrategyIdWithCursor(strategyId, from, cursor, PageRequest.of(0, limit))
                 .stream().map(e -> toEntry(e, ticker)).toList();
     }

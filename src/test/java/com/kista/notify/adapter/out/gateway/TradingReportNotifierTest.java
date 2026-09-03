@@ -6,7 +6,6 @@ import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;

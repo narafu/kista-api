@@ -4,13 +4,13 @@ import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.CycleHistoryPage;
-import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyDetail;
-import com.kista.domain.model.strategy.RegisterStrategyCommand;
-import com.kista.domain.model.strategy.StrategySeedPreview;
+import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.strategyconfig.domain.model.StrategyDetail;
+import com.kista.strategyconfig.domain.model.RegisterStrategyCommand;
+import com.kista.strategyconfig.domain.model.StrategySeedPreview;
 import com.kista.application.usecase.AccountStatisticsUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
-import com.kista.application.usecase.StrategyUseCase;
+import com.kista.strategyconfig.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.trading.domain.model.VrSummary;
@@ -224,7 +224,7 @@ class TradingCycleControllerTest {
     @Test
     void listMine_returns200_with_strategy_list() throws Exception {
         StrategyDetail detail = new StrategyDetail(
-                new com.kista.domain.model.strategy.Strategy(
+                new Strategy(
                         CYCLE_ID, UUID.randomUUID(),
                         com.kista.sharedkernel.StrategyType.INFINITE,
                         com.kista.sharedkernel.StrategyStatus.ACTIVE,
@@ -308,7 +308,7 @@ class TradingCycleControllerTest {
     @Test
     void register_vr_returns201_withVrField() throws Exception {
         // VR 전략 등록 201 응답 + vr 필드 포함 검증
-        Strategy vrStrategy = new com.kista.domain.model.strategy.Strategy(
+        Strategy vrStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         VrSummary vrSummary = new VrSummary(
@@ -371,7 +371,7 @@ class TradingCycleControllerTest {
                 12, 52, 26, 20,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
         StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
-        when(vrReconfigure.reconfigure(eq(CYCLE_ID), any(), any())).thenReturn(detail);
+        when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))

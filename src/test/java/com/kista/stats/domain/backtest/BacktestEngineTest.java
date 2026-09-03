@@ -10,7 +10,7 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;

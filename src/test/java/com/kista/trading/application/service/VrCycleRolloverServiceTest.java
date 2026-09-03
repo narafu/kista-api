@@ -4,7 +4,7 @@ import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
@@ -79,7 +79,7 @@ class VrCycleRolloverServiceTest {
             CYCLE_START, null,
             Instant.now(), null);
 
-    static final Strategy VR_STRATEGY = new Strategy(
+    static final StrategyRef VR_STRATEGY = new StrategyRef(
             STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
             StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.MAINTAIN);
 

@@ -3,12 +3,12 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
@@ -35,7 +35,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 class TradingBuyCompetitionSimulatorTest {
 
-    @Mock StrategyPort strategyPort;
+    @Mock StrategyLookupPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderPort orderPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
@@ -49,7 +49,7 @@ class TradingBuyCompetitionSimulatorTest {
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
 
-    Strategy currentStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
+    StrategyRef currentStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     StrategyCycle currentCycle = new StrategyCycle(UUID.randomUUID(), currentStrategy.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
@@ -87,7 +87,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_excludesCompetitor_thatAlreadyHasOrdersToday() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
@@ -110,7 +110,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_blocksCurrentStrategy_whenHigherPriorityCompetitorConsumesBudget() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
@@ -137,7 +137,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_treatsFailedCompetitorAsZero_andRecordsUncertain() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
@@ -161,7 +161,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_treatsSkippedCompetitorAsZero_andRecordsUncertain() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
@@ -189,7 +189,7 @@ class TradingBuyCompetitionSimulatorTest {
         // 버그 재현: 배치 사전 계산(planResultsByStrategyId)이 실패해 competitor 항목이 없을 때
         // 과거에는 IllegalStateException으로 즉시 uncertain·0 처리했으나, 이제는 즉시 재계산을 시도해
         // 실제 경쟁 금액을 반영해야 한다.
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
@@ -221,7 +221,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_excludesPausedStrategy() {
-        Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+        StrategyRef pausedVr = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
         when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))

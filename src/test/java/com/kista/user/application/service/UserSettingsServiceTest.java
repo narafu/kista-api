@@ -5,8 +5,7 @@ import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
 import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.user.application.port.output.ActiveStrategyCountPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,8 +26,7 @@ import static org.mockito.Mockito.when;
 class UserSettingsServiceTest {
 
     @Mock UserSettingsPort userSettingsPort;
-    @Mock AccountPort accountPort;
-    @Mock StrategyPort strategyPort;
+    @Mock ActiveStrategyCountPort activeStrategyCountPort;
     @InjectMocks UserSettingsService service;
 
     private final UUID USER_ID = UUID.randomUUID();
@@ -64,7 +62,7 @@ class UserSettingsServiceTest {
     void updateBalanceCheck_saves_updated_value() {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of());
+        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
 
         service.update(new UpdateBalanceCheckCommand(USER_ID, false));
 

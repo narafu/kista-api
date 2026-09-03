@@ -10,7 +10,7 @@ import com.kista.privacy.domain.model.PrivacyDates;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.stats.domain.model.ReturnMetrics;
 import com.kista.trading.domain.model.BootstrapPosition;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.usecase.BacktestUseCase;
 import com.kista.stats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;

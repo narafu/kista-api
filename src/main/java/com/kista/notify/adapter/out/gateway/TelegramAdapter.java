@@ -2,7 +2,6 @@ package com.kista.notify.adapter.out.gateway;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

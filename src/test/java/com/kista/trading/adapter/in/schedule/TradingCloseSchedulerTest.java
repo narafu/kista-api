@@ -4,13 +4,13 @@ import com.kista.adapter.in.schedule.SchedulerJobRunner;
 import com.kista.adapter.in.schedule.SchedulerLockService;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.application.port.output.HeartbeatPort;
 import com.kista.notify.application.port.output.NotifyPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class TradingCloseSchedulerTest {
 
     @Mock TradingExecutionUseCase useCase;
-    @Mock StrategyPort strategyPort;
+    @Mock StrategyLookupPort strategyPort;
     @Mock SchedulerLockService schedulerLockService;
     @Mock BatchContextFactory contextFactory;
     @Mock NotifyPort notifyPort;
@@ -54,8 +54,8 @@ class TradingCloseSchedulerTest {
         return DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
     }
 
-    private Strategy mockStrategy() {
-        return new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.INFINITE,
+    private StrategyRef mockStrategy() {
+        return new StrategyRef(CYCLE_ID, ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
@@ -88,7 +88,7 @@ class TradingCloseSchedulerTest {
 
     @Test
     void run_callsExecuteBatchWithAllContexts() throws InterruptedException {
-        Strategy strategy = mockStrategy();
+        StrategyRef strategy = mockStrategy();
         StrategyCycle cycle = mockStrategyCycle(strategy.id());
         Account account = mockAccount();
         User user = mockUser();
@@ -116,7 +116,7 @@ class TradingCloseSchedulerTest {
 
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
-        Strategy strategy = mockStrategy();
+        StrategyRef strategy = mockStrategy();
         BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
@@ -139,7 +139,7 @@ class TradingCloseSchedulerTest {
 
     @Test
     void run_executeBatchException_notifiesAdminViaNotifyPort() throws InterruptedException {
-        Strategy strategy = mockStrategy();
+        StrategyRef strategy = mockStrategy();
         BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
 

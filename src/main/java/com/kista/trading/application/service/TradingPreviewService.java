@@ -6,12 +6,12 @@ import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import com.kista.sharedkernel.StrategyTicker;
 class TradingPreviewService {
 
     private final AccountPort accountPort;
-    private final StrategyPort strategyPort;
+    private final StrategyLookupPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
     private final StrategyOrderPlanBuilder planBuilder;
@@ -45,7 +45,7 @@ class TradingPreviewService {
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        StrategyRef strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 현재 StrategyCycle — initialUsdDeposit 조회(PRIVACY) 및 경쟁 시뮬레이션에 사용
@@ -65,13 +65,13 @@ class TradingPreviewService {
     Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         LocalDate today = DstInfo.nextTradeDate();
-        List<Strategy> strategies = strategyPort.findByAccountId(accountId);
+        List<StrategyRef> strategies = strategyPort.findByAccountId(accountId);
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
-        List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
+        List<UUID> strategyIds = strategies.stream().map(StrategyRef::id).toList();
         Map<UUID, StrategyCycle> latestCycles = strategyCyclePort.findLatestByStrategyIds(strategyIds);
         Map<UUID, StrategyCycle> cyclesByStrategyId = new LinkedHashMap<>();
-        for (Strategy strategy : strategies) {
+        for (StrategyRef strategy : strategies) {
             StrategyCycle cycle = latestCycles.get(strategy.id());
             if (cycle != null) cyclesByStrategyId.put(strategy.id(), cycle);
         }
@@ -86,7 +86,7 @@ class TradingPreviewService {
         // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 KIS 왕복을 생략
         List<StrategyTicker> tickers = strategies.stream()
                 .filter(s -> cyclesByStrategyId.containsKey(s.id()))
-                .map(Strategy::ticker)
+                .map(StrategyRef::ticker)
                 .distinct()
                 .toList();
         Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account);
@@ -95,7 +95,7 @@ class TradingPreviewService {
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, today);
 
         Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId = new LinkedHashMap<>();
-        for (Strategy strategy : strategies) {
+        for (StrategyRef strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
             if (!today.isAfter(cycle.startDate())) {
@@ -123,7 +123,7 @@ class TradingPreviewService {
                 strategies, cyclesByStrategyId, todayOrdersByStrategyId, planResultsByStrategyId);
 
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
-        for (Strategy strategy : strategies) {
+        for (StrategyRef strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
@@ -133,7 +133,7 @@ class TradingPreviewService {
         return previews;
     }
 
-    private NextOrdersPreview buildPreview(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today,
+    private NextOrdersPreview buildPreview(StrategyRef strategy, Account account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> precomputedTodayOrders,
                                             StrategyOrderPlanBuilder.PlanResult precomputedPlanResult,
                                             TradingBuyCompetitionSimulator.BatchContext context,

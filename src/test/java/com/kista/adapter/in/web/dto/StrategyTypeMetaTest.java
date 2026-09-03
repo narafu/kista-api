@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;

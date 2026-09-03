@@ -9,7 +9,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
@@ -35,7 +35,7 @@ import com.kista.sharedkernel.StrategyTicker;
 @RequiredArgsConstructor
 class ManualTradingService {
 
-    private final StrategyPort strategyPort;
+    private final StrategyLookupPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final AccountPort accountPort;
     private final OrderPort orderPort;
@@ -56,7 +56,7 @@ class ManualTradingService {
     // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
     List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        StrategyRef strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isActive())
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
@@ -81,7 +81,8 @@ class ManualTradingService {
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
 
         // PRIVACY는 당일 기준매매표 조회, INFINITE는 null (PlanContext에서 무시됨)
-        PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
+        // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
+        PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), null)
@@ -111,7 +112,7 @@ class ManualTradingService {
     }
 
     // 시세 조회 실패 시 ManualTradingException으로 래핑
-    private BigDecimal fetchPrevCloseOrThrow(Strategy strategy, Account account) {
+    private BigDecimal fetchPrevCloseOrThrow(StrategyRef strategy, Account account) {
         try {
             Map<StrategyTicker, PriceSnapshot> snapshots =
                     priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
@@ -125,7 +126,7 @@ class ManualTradingService {
     }
 
     // live 잔고 조회 실패 시 ManualTradingException으로 래핑
-    private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
+    private AccountBalance fetchLiveBalanceOrThrow(Account account, StrategyRef strategy) {
         try {
             BrokerBalance bb = registry.require(toBrokerRef(account), LiveBalancePort.class).getLiveBalance(toBrokerRef(account), strategy.ticker());
             AccountBalance lb = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
@@ -142,7 +143,7 @@ class ManualTradingService {
     }
 
     // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
-    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
+    private void checkSellableOrThrow(Account account, StrategyRef strategy, LocalDate tradeDate, List<Order> orders) {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
@@ -160,7 +161,7 @@ class ManualTradingService {
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
-    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today,
+    private void placeAtOpenOrdersIfMarketOpen(StrategyRef strategy, Account account, UUID cycleId, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다

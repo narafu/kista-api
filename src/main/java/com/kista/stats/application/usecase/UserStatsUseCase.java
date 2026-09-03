@@ -10,7 +10,7 @@ import com.kista.stats.domain.model.HousingBenchmarkRegion;
 import com.kista.stats.domain.model.HousingPriceIndex;
 import com.kista.stats.domain.model.IndexPrice;
 import com.kista.stats.domain.model.StatsSummary;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 
 import java.time.Instant;
 import java.time.LocalDate;

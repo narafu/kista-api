@@ -1,20 +1,25 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.strategy.StrategyPersistenceAdapter;
+import com.kista.strategyconfig.adapter.out.persistence.StrategyPersistenceAdapter;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.CyclePositionInfiniteDetail;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyVersion;
 import com.kista.support.DataJpaTestBase;
+import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.domain.model.StrategyRef;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.Collection;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -39,10 +44,47 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
         StrategyVersionPersistenceAdapter.class,
         StrategyCyclePersistenceAdapter.class,
         CyclePositionPersistenceAdapter.class,
-        CyclePositionInfiniteDetailPersistenceAdapter.class
+        CyclePositionInfiniteDetailPersistenceAdapter.class,
+        CyclePositionPersistenceAdapterTest.StrategyLookupTestConfig.class
 })
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
+
+    // CyclePositionPersistenceAdapter가 요구하는 StrategyLookupPort — 슬라이스 테스트라 실제 구현체
+    // (com.kista.strategyconfig..., package-private)를 가져올 수 없어 이미 @Import된 legacy
+    // StrategyPersistenceAdapter를 감싸는 최소 구현을 둔다(테스트에서 실제 호출되는 2개 메서드만 구현)
+    @TestConfiguration
+    static class StrategyLookupTestConfig {
+        @Bean
+        StrategyLookupPort strategyLookupPort(StrategyPersistenceAdapter strategyPort) {
+            return new StrategyLookupPort() {
+                @Override
+                public List<StrategyRef> findAllActive() {
+                    throw new UnsupportedOperationException("테스트에서 미사용");
+                }
+
+                @Override
+                public List<StrategyRef> findByAccountId(UUID accountId) {
+                    throw new UnsupportedOperationException("테스트에서 미사용");
+                }
+
+                @Override
+                public Optional<StrategyRef> findById(UUID id) {
+                    throw new UnsupportedOperationException("테스트에서 미사용");
+                }
+
+                @Override
+                public StrategyTicker findTickerById(UUID id) {
+                    return strategyPort.findById(id).map(Strategy::ticker).orElse(null);
+                }
+
+                @Override
+                public Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> ids) {
+                    return strategyPort.findTickersByIds(ids);
+                }
+            };
+        }
+    }
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired EntityManager entityManager;

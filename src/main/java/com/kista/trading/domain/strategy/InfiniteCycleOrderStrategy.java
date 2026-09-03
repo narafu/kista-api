@@ -4,7 +4,6 @@ import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.ReverseModePosition;
-import com.kista.domain.model.strategy.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,6 +16,7 @@ import java.util.stream.Collectors;
 
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyDefaults;
 
 
 // INFINITE 전략의 주문 계획 + 최소금액 정책
@@ -135,7 +135,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         if (ctx.balance().holdings() == 0 && inputs.prevClosePrice() == null) {
             throw new IllegalStateException("전일종가 조회 실패: " + ctx.strategy().ticker().name());
         }
-        int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT;
+        int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
         InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), inputs.prevClosePrice(), divisionCount);
         List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
@@ -151,7 +151,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         ReverseModePosition position = ReverseModePosition.of(
                 ctx.balance(),
                 ctx.strategy().ticker(),
-                inputs.divisionCount() != null ? inputs.divisionCount() : Strategy.DEFAULT_DIVISION_COUNT,
+                inputs.divisionCount() != null ? inputs.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT,
                 inputs.starPointPrice(),
                 inputs.isFirstReverseDay()
         );

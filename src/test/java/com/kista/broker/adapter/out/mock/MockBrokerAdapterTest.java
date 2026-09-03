@@ -14,10 +14,9 @@ import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.model.PlacedOrderView;
 import com.kista.broker.domain.model.PositionView;
 import com.kista.broker.domain.model.PresentBalanceResult;
+import com.kista.broker.domain.model.StrategyRefLite;
 import com.kista.broker.application.port.output.MockSimulationDataPort;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.application.port.output.StrategyPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,9 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 모의계좌 어댑터 — DB 스냅샷 기반 잔고·체결 시뮬레이션 검증
 @ExtendWith(MockitoExtension.class)
@@ -50,13 +46,10 @@ class MockBrokerAdapterTest {
     private CommonMarketPriceFeed priceFeed;
 
     @Mock
-    private StrategyPort strategyPort;
-
-    @Mock
     private MockSimulationDataPort mockSimulationDataPort;
 
     private MockBrokerAdapter adapter() {
-        return new MockBrokerAdapter(priceFeed, strategyPort, mockSimulationDataPort);
+        return new MockBrokerAdapter(priceFeed, mockSimulationDataPort);
     }
 
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -65,12 +58,11 @@ class MockBrokerAdapterTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(ACCOUNT_ID, "key", "secret",
             "12345678", null, BrokerAccountRef.Broker.MOCK);
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
-    private static final Strategy TQQQ_STRATEGY = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
-            StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+    private static final StrategyRefLite TQQQ_STRATEGY = new StrategyRefLite(STRATEGY_ID, StrategyTicker.TQQQ);
 
     // getExecutions()가 strategy→cycle을 해석할 수 있도록 공통 stub — 개별 테스트는 findPlacedOrders만 stub하면 된다
     private void stubTqqqCycle() {
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         when(mockSimulationDataPort.findActiveCycleId(STRATEGY_ID)).thenReturn(CYCLE_ID);
     }
 
@@ -286,7 +278,7 @@ class MockBrokerAdapterTest {
 
         adapter().cancel(instruction, ACCOUNT);
 
-        verifyNoInteractions(mockSimulationDataPort, strategyPort, priceFeed);
+        verifyNoInteractions(mockSimulationDataPort, priceFeed);
     }
 
     // --- getLiveBalance() ---
@@ -294,9 +286,8 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getLiveBalance는 holdings/avgPrice는 해당 ticker 전략 값, usdDeposit은 계좌 전체 전략 합산 값을 반환한다")
     void getLiveBalanceSumsUsdDepositAcrossStrategiesButKeepsTickerSpecificHoldings() {
-        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.PRIVACY,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy, TQQQ_STRATEGY));
+        StrategyRefLite soxlStrategy = new StrategyRefLite(UUID.randomUUID(), StrategyTicker.SOXL);
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy, TQQQ_STRATEGY));
 
         PositionView soxlPosition = new PositionView(4, new BigDecimal("38.00"), new BigDecimal("300.00"));
         PositionView tqqqPosition = new PositionView(10, new BigDecimal("48.00"), new BigDecimal("500.00"));
@@ -315,9 +306,8 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getLiveBalance는 해당 ticker 전략이 없으면 IllegalStateException을 던진다")
     void getLiveBalanceThrowsWhenNoMatchingStrategy() {
-        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.PRIVACY,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy));
+        StrategyRefLite soxlStrategy = new StrategyRefLite(UUID.randomUUID(), StrategyTicker.SOXL);
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy));
 
         MockBrokerAdapter adapter = adapter();
         assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, StrategyTicker.TQQQ))
@@ -327,7 +317,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getLiveBalance는 전략은 있지만 포지션 이력이 없으면 IllegalStateException을 던진다")
     void getLiveBalanceThrowsWhenNoPositionHistory() {
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.empty());
 
         MockBrokerAdapter adapter = adapter();
@@ -340,7 +330,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getSellableQuantity는 최신 포지션의 holdings를 반환한다")
     void getSellableQuantityReturnsLatestHoldings() {
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         PositionView position = new PositionView(7, new BigDecimal("48.00"), new BigDecimal("500.00"));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(position));
 
@@ -387,7 +377,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getPresentBalance는 예외 없이 값을 채워 반환한다")
     void getPresentBalanceSmokeTest() {
-        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
+        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         PositionView position = new PositionView(7, new BigDecimal("48.00"), new BigDecimal("500.00"));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(position));
         when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("55.00"));

@@ -2,7 +2,6 @@ package com.kista.notify.application.port.output;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 
 public interface NotifyPort {

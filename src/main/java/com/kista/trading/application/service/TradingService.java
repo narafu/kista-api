@@ -5,7 +5,7 @@ import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.domain.model.strategy.*;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.StrategyTicker;
@@ -91,7 +91,7 @@ class TradingService {
             PrivacyTradeBase privacyBase
     ) {}
 
-    void execute(Strategy strategy, Account account, User user) throws InterruptedException {
+    void execute(StrategyRef strategy, Account account, User user) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)));
@@ -228,7 +228,7 @@ class TradingService {
     }
 
     // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
-    private AccountBalance loadBalance(Strategy strategy, Account account) {
+    private AccountBalance loadBalance(StrategyRef strategy, Account account) {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
@@ -259,7 +259,7 @@ class TradingService {
     private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
             LocalDate tradeDate, Set<Order.OrderTiming> creatableTimings) {
-        Strategy strategy = ctx.strategy();
+        StrategyRef strategy = ctx.strategy();
         Account account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
@@ -295,7 +295,7 @@ class TradingService {
         return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
     }
 
-    private void validateConcreteOrderLegs(Strategy strategy, List<Order> orders) {
+    private void validateConcreteOrderLegs(StrategyRef strategy, List<Order> orders) {
         List<Order> unknownLegOrders = orders.stream()
                 .filter(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
                 .toList();
@@ -310,7 +310,7 @@ class TradingService {
     private CycleState buildCycleStateFromExistingOrders(BatchContext ctx, AccountBalance balance,
             PriceSnapshot priceSnapshot, PrivacyTradeBase privacyBase, LocalDate today, int existingCount,
             boolean recalculateInfinitePosition) {
-        Strategy strategy = ctx.strategy();
+        StrategyRef strategy = ctx.strategy();
         Account account = ctx.account();
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
@@ -330,7 +330,7 @@ class TradingService {
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
-    void execute(Strategy strategy, Account account, User user, DstInfo dst) throws InterruptedException {
+    void execute(StrategyRef strategy, Account account, User user, DstInfo dst) throws InterruptedException {
         StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)), dst);
     }

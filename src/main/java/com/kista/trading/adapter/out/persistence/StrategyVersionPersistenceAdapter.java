@@ -13,8 +13,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 // com.kista.trading.adapter.out.persistence의 CyclePositionPersistenceAdapterTest/StrategyCycleVrPersistenceAdapterTest가
-// @DataJpaTest 픽스처로 직접 @Import/@Autowired하고, 레거시 com.kista.adapter.out.persistence.strategy의
-// StrategyPersistenceAdapterTest도 크로스모듈로 동일하게 픽스처 삼으므로 public 유지 (모듈 경계상 레거시는 OPEN이라 안전)
+// @DataJpaTest 픽스처로 직접 @Import/@Autowired하고, com.kista.strategyconfig.adapter.out.persistence의
+// StrategyPersistenceAdapterTest도 크로스모듈로 동일하게 픽스처 삼으므로 public 유지
 @Component
 @RequiredArgsConstructor
 public class StrategyVersionPersistenceAdapter implements StrategyVersionPort {

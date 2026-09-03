@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web.dto;
 import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.AccountNumberMasker;
 import com.kista.user.domain.model.AdminUserView;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;

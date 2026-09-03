@@ -6,7 +6,6 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
-import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.application.port.output.LiveBalancePort;

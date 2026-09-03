@@ -3,7 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 

@@ -11,19 +11,17 @@ import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
-import com.kista.domain.model.strategy.Strategy;
+import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.user.domain.model.User;
-import com.kista.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -46,7 +44,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class VrReconfigureService implements VrReconfigureUseCase {
 
-    private final StrategyPort strategyPort;
+    private final StrategyLookupPort strategyPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -57,11 +55,10 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;   // 새 사이클 시작 이벤트 발행 + 사용자 알림 실패 시 관리자 알림 이벤트
-    private final StrategyUseCase strategyUseCase; // 재설정 후 최신 StrategyDetail 응답 조립에 재사용
 
     @Override
-    public StrategyDetail reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+    public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
+        StrategyRef strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isVr()) {
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다: " + strategyId);
@@ -133,8 +130,6 @@ class VrReconfigureService implements VrReconfigureUseCase {
             log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
             eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
         }
-
-        return strategyUseCase.getById(strategyId, requesterId);
     }
 
     // 자본 주입/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X

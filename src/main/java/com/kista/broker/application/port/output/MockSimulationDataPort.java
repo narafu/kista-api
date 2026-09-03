@@ -2,6 +2,7 @@ package com.kista.broker.application.port.output;
 
 import com.kista.broker.domain.model.PlacedOrderView;
 import com.kista.broker.domain.model.PositionView;
+import com.kista.broker.domain.model.StrategyRefLite;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,4 +24,7 @@ public interface MockSimulationDataPort {
 
     // 전략 기준 최신 포지션 스냅샷 (없으면 empty — 아직 체결 이력 없음)
     Optional<PositionView> findLatestPosition(UUID strategyId);
+
+    // 계좌에 속한 전략 목록(id+ticker만) — MockBrokerAdapter가 계좌+ticker로 전략을 해석할 때 사용
+    List<StrategyRefLite> findStrategiesByAccountId(UUID accountId);
 }
