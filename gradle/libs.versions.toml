@@ -8,6 +8,8 @@ jjwt                     = "0.13.0"
 firebase-admin           = "9.10.0"
 gson                     = "2.14.0"
 testcontainers           = "1.21.4"
+# Spring Modulith — 2.x가 Boot 4/Spring Framework 7 baseline (Boot 자체 BOM은 버전 미관리, 별도 BOM platform import 필요). 2.1.1이 최신 GA(2.2.0-M1은 마일스톤)
+spring-modulith           = "2.1.1"
 
 [libraries]
 # Spring Boot Starters
@@ -61,6 +63,12 @@ testcontainers-postgresql      = { module = "org.testcontainers:postgresql", ver
 
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
+
+# Spring Modulith
+spring-modulith-bom            = { module = "org.springframework.modulith:spring-modulith-bom", version.ref = "spring-modulith" }
+spring-modulith-starter-core   = { module = "org.springframework.modulith:spring-modulith-starter-core" }
+spring-modulith-starter-test   = { module = "org.springframework.modulith:spring-modulith-starter-test" }
+spring-modulith-docs           = { module = "org.springframework.modulith:spring-modulith-docs" } # 모듈 구조 다이어그램(PlantUML/C4) 생성용 — 후속 태스크에서 사용
 
 [plugins]
 spring-boot            = { id = "org.springframework.boot", version.ref = "spring-boot" }

@@ -32,12 +32,12 @@ class HexagonalArchitectureTest {
     @DisplayName("도메인은 어떤 외부 레이어도 의존하지 않는다")
     void domain_must_not_depend_on_outer_layers() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.domain..")
-                .and().resideOutsideOfPackage("com.kista.domain.strategy..")
+                .that().resideInAPackage("com.kista..domain..")
+                .and().resideOutsideOfPackage("com.kista..domain.strategy..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
-                        "com.kista.application..",
-                        "com.kista.adapter..",
+                        "com.kista..application..",
+                        "com.kista..adapter..",
                         "org.springframework.stereotype..",
                         "jakarta.persistence.."
                 );
@@ -48,9 +48,9 @@ class HexagonalArchitectureTest {
     @DisplayName("인바운드 어댑터는 application 레이어 구현체에 직접 의존하지 않는다")
     void inbound_adapters_must_not_depend_on_application_layer() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.adapter.in..")
+                .that().resideInAPackage("com.kista..adapter.in..")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista.application..");
+                .resideInAPackage("com.kista..application..");
         rule.check(classes);
     }
 
@@ -58,9 +58,9 @@ class HexagonalArchitectureTest {
     @DisplayName("application 레이어는 adapter 레이어를 의존하지 않는다")
     void application_must_not_depend_on_adapter() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.application..")
+                .that().resideInAPackage("com.kista..application..")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista.adapter..");
+                .resideInAPackage("com.kista..adapter..");
         rule.check(classes);
     }
 
@@ -68,7 +68,7 @@ class HexagonalArchitectureTest {
     @DisplayName("Service 클래스는 @Service 어노테이션을 가져야 한다")
     void service_classes_must_be_annotated_with_service() {
         ArchRule rule = classes()
-                .that().resideInAPackage("com.kista.application.service..")
+                .that().resideInAPackage("com.kista..application.service..")
                 .and().haveSimpleNameEndingWith("Service")
                 .should().beAnnotatedWith(org.springframework.stereotype.Service.class);
         rule.check(classes);
@@ -78,7 +78,7 @@ class HexagonalArchitectureTest {
     @DisplayName("domain/port/out 인터페이스는 *Port 접미사를 가져야 한다")
     void outbound_port_interfaces_must_have_Port_suffix() {
         ArchRule rule = classes()
-                .that().resideInAPackage("com.kista.domain.port.out..")
+                .that().resideInAPackage("com.kista..domain.port.out..")
                 .and().areInterfaces()
                 .should().haveSimpleNameEndingWith("Port");
         rule.check(classes);
@@ -88,7 +88,7 @@ class HexagonalArchitectureTest {
     @DisplayName("persistence JpaRepository는 *JpaRepository 접미사를 가져야 한다")
     void persistence_jpa_repositories_must_have_JpaRepository_suffix() {
         ArchRule rule = classes()
-                .that().resideInAPackage("com.kista.adapter.out.persistence..")
+                .that().resideInAPackage("com.kista..adapter.out.persistence..")
                 .and().areInterfaces()
                 .and().areAssignableTo(org.springframework.data.jpa.repository.JpaRepository.class)
                 .should().haveSimpleNameEndingWith("JpaRepository");
@@ -99,7 +99,7 @@ class HexagonalArchitectureTest {
     @DisplayName("persistence JpaRepository는 package-private이어야 한다")
     void persistence_jpa_repositories_must_be_package_private() {
         ArchRule rule = classes()
-                .that().resideInAPackage("com.kista.adapter.out.persistence..")
+                .that().resideInAPackage("com.kista..adapter.out.persistence..")
                 .and().areInterfaces()
                 .and().haveSimpleNameEndingWith("JpaRepository")
                 .should().bePackagePrivate();
@@ -110,7 +110,7 @@ class HexagonalArchitectureTest {
     @DisplayName("application.service는 org.springframework.web에 의존하지 않는다")
     void application_service_must_not_depend_on_spring_web() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.application.service..")
+                .that().resideInAPackage("com.kista..application.service..")
                 .should().dependOnClassesThat()
                 .resideInAPackage("org.springframework.web..");
         rule.check(classes);
@@ -120,7 +120,7 @@ class HexagonalArchitectureTest {
     @DisplayName("application.service는 org.springframework.http.HttpStatus에 의존하지 않는다")
     void application_service_must_not_depend_on_http_status() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.application.service..")
+                .that().resideInAPackage("com.kista..application.service..")
                 .should().dependOnClassesThat()
                 .haveFullyQualifiedName("org.springframework.http.HttpStatus");
         rule.check(classes);
@@ -131,10 +131,10 @@ class HexagonalArchitectureTest {
     void kis_parser_must_not_depend_on_application_layer() {
         // adapter.out은 domain.model 사용이 정상 — application 서비스 직접 의존만 금지
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.adapter.out.kis..")
+                .that().resideInAPackage("com.kista..adapter.out.kis..")
                 .and().haveSimpleNameEndingWith("Parser")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista.application..");
+                .resideInAPackage("com.kista..application..");
         rule.check(classes);
     }
 
@@ -142,9 +142,9 @@ class HexagonalArchitectureTest {
     @DisplayName("SSE EmitterRegistry는 adapter.in (controller)에서만 주입된다 — application 직접 의존 금지")
     void sse_emitter_registry_must_not_be_used_in_application_layer() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.application..")
+                .that().resideInAPackage("com.kista..application..")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista.adapter.out.sse..");
+                .resideInAPackage("com.kista..adapter.out.sse..");
         rule.check(classes);
     }
 
@@ -152,10 +152,10 @@ class HexagonalArchitectureTest {
     @DisplayName("RestController는 domain port 인터페이스(UseCase/Port)에만 의존하고 application 구현체에 직접 의존하지 않는다")
     void rest_controllers_must_not_depend_on_application_implementations() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.adapter.in.web..")
+                .that().resideInAPackage("com.kista..adapter.in.web..")
                 .and().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista.application.service..");
+                .resideInAPackage("com.kista..application.service..");
         rule.check(classes);
     }
 

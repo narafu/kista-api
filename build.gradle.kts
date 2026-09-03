@@ -23,6 +23,13 @@ repositories {
     mavenCentral()
 }
 
+// Spring Boot BOM은 Spring Modulith 버전을 관리하지 않으므로 별도 BOM platform import 필요
+dependencyManagement {
+    imports {
+        mavenBom(libs.spring.modulith.bom.get().toString())
+    }
+}
+
 dependencies {
     // Spring Boot Core
     implementation(libs.spring.boot.starter.web)
@@ -56,6 +63,9 @@ dependencies {
     // Firebase
     implementation(libs.firebase.admin)
 
+    // Spring Modulith (버전은 위 dependencyManagement BOM import가 관리)
+    implementation(libs.spring.modulith.starter.core)
+
     // Apache HttpClient 5 — HttpComponentsClientHttpRequestFactory (에러 응답 바디 정상 읽기)
     implementation("org.apache.httpcomponents.client5:httpclient5")
 
@@ -81,6 +91,9 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
+    // Spring Modulith 테스트 지원 (ApplicationModuleTest) + 모듈 구조 다이어그램 생성
+    testImplementation(libs.spring.modulith.starter.test)
+    testImplementation(libs.spring.modulith.docs)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
