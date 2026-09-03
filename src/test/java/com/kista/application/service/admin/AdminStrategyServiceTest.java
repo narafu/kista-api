@@ -2,9 +2,9 @@ package com.kista.application.service.admin;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.StrategyPort;
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.AuditLogPort;
+import com.kista.application.port.output.StrategyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

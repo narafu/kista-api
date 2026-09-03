@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminSettingsRequest;
 import com.kista.adapter.in.web.dto.RuntimeSettingsResponse;
-import com.kista.domain.port.in.AdminSettingsUseCase;
+import com.kista.application.usecase.AdminSettingsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

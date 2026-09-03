@@ -2,8 +2,8 @@ package com.kista.application.service.portfolio;
 
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.trading.domain.port.out.CyclePositionPort;
-import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.application.port.output.CyclePositionPort;
+import com.kista.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

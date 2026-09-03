@@ -3,8 +3,8 @@ package com.kista.application.service.admin;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.trading.domain.port.out.StrategyCyclePort;
-import com.kista.domain.port.out.StrategyPort;
+import com.kista.trading.application.port.output.StrategyCyclePort;
+import com.kista.application.port.output.StrategyPort;
 
 import java.time.LocalDate;
 

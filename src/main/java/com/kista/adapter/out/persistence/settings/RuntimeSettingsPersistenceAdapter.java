@@ -5,7 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.kista.domain.model.settings.RuntimeSettings;
-import com.kista.domain.port.out.RuntimeSettingsPort;
+import com.kista.application.port.output.RuntimeSettingsPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

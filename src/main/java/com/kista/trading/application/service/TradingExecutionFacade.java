@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
-import com.kista.trading.domain.port.in.TradingExecutionUseCase;
+import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

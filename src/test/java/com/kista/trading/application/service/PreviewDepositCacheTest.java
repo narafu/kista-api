@@ -4,7 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.broker.domain.port.out.LiveBalancePort;
+import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

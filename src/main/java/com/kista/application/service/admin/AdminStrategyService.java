@@ -2,10 +2,10 @@ package com.kista.application.service.admin;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.AdminStrategyUseCase;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.StrategyPort;
+import com.kista.application.usecase.AdminStrategyUseCase;
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.AuditLogPort;
+import com.kista.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

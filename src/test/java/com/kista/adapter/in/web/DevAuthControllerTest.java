@@ -2,10 +2,10 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.security.*;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.TokenUseCase;
-import com.kista.domain.port.in.UserUseCase;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.usecase.TokenUseCase;
+import com.kista.application.usecase.UserUseCase;
+import com.kista.application.port.output.UserPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(DevAuthController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})

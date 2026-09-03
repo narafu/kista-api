@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.feargreed;
 
 import com.kista.domain.model.market.FearGreedSnapshot;
-import com.kista.domain.port.out.FearGreedSnapshotPort;
+import com.kista.application.port.output.FearGreedSnapshotPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

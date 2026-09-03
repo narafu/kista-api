@@ -7,12 +7,12 @@ import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.finance.domain.port.out.AssetSnapshotPort;
-import com.kista.finance.domain.port.out.FinanceGroupPort;
-import com.kista.finance.domain.port.out.FinanceTransactionPort;
-import com.kista.notify.domain.port.out.UserNotificationPort;
-import com.kista.domain.port.out.UserPort;
-import com.kista.domain.port.out.UserSettingsPort;
+import com.kista.finance.application.port.output.AssetSnapshotPort;
+import com.kista.finance.application.port.output.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceTransactionPort;
+import com.kista.notify.application.port.output.UserNotificationPort;
+import com.kista.application.port.output.UserPort;
+import com.kista.application.port.output.UserSettingsPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 

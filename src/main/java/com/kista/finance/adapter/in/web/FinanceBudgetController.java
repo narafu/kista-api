@@ -2,7 +2,7 @@ package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.adapter.in.web.dto.FinanceBudgetRequest;
 import com.kista.finance.adapter.in.web.dto.FinanceBudgetResponse;
-import com.kista.finance.domain.port.in.FinanceBudgetUseCase;
+import com.kista.finance.application.usecase.FinanceBudgetUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

@@ -3,7 +3,7 @@ package com.kista.broker.adapter.out.kis;
 import com.kista.broker.adapter.out.internal.DoubleCheckedTokenCache;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.common.TimeZones;
-import com.kista.broker.domain.port.out.BrokerTokenCachePort;
+import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

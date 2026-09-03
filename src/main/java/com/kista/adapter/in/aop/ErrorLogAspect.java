@@ -1,6 +1,6 @@
 package com.kista.adapter.in.aop;
 
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -17,7 +17,7 @@ public class ErrorLogAspect {
 
     private final AppErrorLogPort appErrorLogPort;
 
-    @Around("execution(* com.kista.notify.domain.port.out.NotifyPort+.notifyError(..))")
+    @Around("execution(* com.kista.notify.application.port.output.NotifyPort+.notifyError(..))")
     public Object intercept(ProceedingJoinPoint pjp) throws Throwable {
         Exception e = (Exception) pjp.getArgs()[0];
         // DB 저장 실패가 텔레그램 알림을 막지 않도록 격리

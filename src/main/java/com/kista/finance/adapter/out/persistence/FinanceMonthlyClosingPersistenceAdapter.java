@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.finance.domain.port.out.MonthlyClosingPort;
+import com.kista.finance.application.port.output.MonthlyClosingPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

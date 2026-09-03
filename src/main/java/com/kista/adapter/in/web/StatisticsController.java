@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.in.AccountStatisticsUseCase;
+import com.kista.application.usecase.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

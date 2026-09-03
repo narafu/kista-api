@@ -8,8 +8,8 @@ import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeSaveResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.PrivacyUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.usecase.PrivacyUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -32,7 +32,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(FidaOrderController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})

@@ -2,8 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
-import com.kista.domain.port.in.AccountUseCase;
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.AccountUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(AccountController.class)
 @Execution(ExecutionMode.SAME_THREAD)

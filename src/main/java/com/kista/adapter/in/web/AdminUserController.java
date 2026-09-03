@@ -5,7 +5,7 @@ import com.kista.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.adapter.in.web.dto.AdminUserResponse;
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

@@ -4,8 +4,8 @@ import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshotCommand;
 import com.kista.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.finance.domain.model.Market;
-import com.kista.finance.domain.port.in.AssetSnapshotUseCase;
-import com.kista.finance.domain.port.in.FinanceTransactionUseCase;
+import com.kista.finance.application.usecase.AssetSnapshotUseCase;
+import com.kista.finance.application.usecase.FinanceTransactionUseCase;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

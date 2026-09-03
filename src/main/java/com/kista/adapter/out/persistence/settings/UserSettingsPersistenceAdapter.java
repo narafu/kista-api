@@ -5,7 +5,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.UserSettingsPort;
+import com.kista.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

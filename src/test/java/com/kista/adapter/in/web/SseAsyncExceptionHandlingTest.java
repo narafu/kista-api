@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;

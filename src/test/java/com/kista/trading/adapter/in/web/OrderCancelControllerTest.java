@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.in.web;
 
 import com.kista.trading.domain.model.OrderCancelException;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.trading.domain.port.in.TradingExecutionUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -23,7 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(OrderCancelController.class)
 @Execution(ExecutionMode.SAME_THREAD)

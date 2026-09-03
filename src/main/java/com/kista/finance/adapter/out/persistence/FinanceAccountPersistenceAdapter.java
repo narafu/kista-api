@@ -3,7 +3,7 @@ package com.kista.finance.adapter.out.persistence;
 import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.finance.domain.model.FinanceAccount;
-import com.kista.finance.domain.port.out.FinanceAccountPort;
+import com.kista.finance.application.port.output.FinanceAccountPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

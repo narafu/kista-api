@@ -1,9 +1,9 @@
 package com.kista.application.service.auth;
 
-import com.kista.domain.port.in.TokenUseCase;
-import com.kista.domain.port.out.BlacklistPort;
-import com.kista.domain.port.out.RefreshTokenPort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.usecase.TokenUseCase;
+import com.kista.application.port.output.BlacklistPort;
+import com.kista.application.port.output.RefreshTokenPort;
+import com.kista.application.port.output.UserPort;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 

@@ -12,7 +12,7 @@ import com.kista.domain.model.stats.BenchmarkAssetType;
 import com.kista.domain.model.stats.BenchmarkScope;
 import com.kista.domain.model.stats.EtfBenchmarkSymbol;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.UserStatsUseCase;
+import com.kista.application.usecase.UserStatsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

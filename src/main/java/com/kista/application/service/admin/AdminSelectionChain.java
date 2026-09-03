@@ -4,9 +4,9 @@ import com.kista.domain.model.account.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.StrategyPort;
+import com.kista.application.port.output.UserPort;
 
 import java.util.UUID;
 

@@ -2,7 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.application.port.output.OrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

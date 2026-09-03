@@ -2,7 +2,7 @@ package com.kista.application.service.market;
 
 import com.kista.domain.model.market.FearGreedRating;
 import com.kista.domain.model.market.FearGreedSnapshot;
-import com.kista.domain.port.out.FearGreedSnapshotPort;
+import com.kista.application.port.output.FearGreedSnapshotPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

@@ -2,9 +2,9 @@ package com.kista.adapter.out.persistence.auth;
 
 import com.kista.application.service.auth.TokenUseCaseTestConfig;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
-import com.kista.domain.port.in.TokenUseCase;
-import com.kista.domain.port.out.BlacklistPort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.usecase.TokenUseCase;
+import com.kista.application.port.output.BlacklistPort;
+import com.kista.application.port.output.UserPort;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

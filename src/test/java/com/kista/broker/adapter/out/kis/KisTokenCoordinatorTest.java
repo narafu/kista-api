@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.broker.domain.port.out.BrokerTokenCachePort;
+import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -2,10 +2,10 @@ package com.kista.application.service.market;
 
 import com.kista.domain.model.market.FearGreedRating;
 import com.kista.domain.model.market.FearGreedSnapshot;
-import com.kista.domain.port.out.CnnFearGreedPort;
-import com.kista.domain.port.out.CryptoFearGreedPort;
-import com.kista.domain.port.out.FearGreedSnapshotPort;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.application.port.output.CnnFearGreedPort;
+import com.kista.application.port.output.CryptoFearGreedPort;
+import com.kista.application.port.output.FearGreedSnapshotPort;
+import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

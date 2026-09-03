@@ -2,11 +2,11 @@ package com.kista.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.UpdateBalanceCheckUseCase;
-import com.kista.domain.port.in.UpdateNotificationPrefUseCase;
-import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase;
-import com.kista.domain.port.in.UserProfileUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.usecase.UpdateBalanceCheckUseCase;
+import com.kista.application.usecase.UpdateNotificationPrefUseCase;
+import com.kista.application.usecase.UpdateStrategySuggestionsUseCase;
+import com.kista.application.usecase.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(SettingsController.class)
 @Execution(ExecutionMode.SAME_THREAD)

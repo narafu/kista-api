@@ -4,7 +4,7 @@ import com.kista.application.event.UserApprovedEvent;
 import com.kista.application.event.UserRejectedEvent;
 import com.kista.trading.domain.model.TradeEvent;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.RealtimeNotificationPort;
+import com.kista.application.port.output.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

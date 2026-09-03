@@ -10,8 +10,8 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 ## 레이어 규칙 (HexagonalArchitectureTest 기준)
 
 ### 허용된 의존 방향
-- `adapter.in` → `domain.port.in` (UseCase 인터페이스)
-- `adapter.out` → `domain.port.out` (Port 구현)
+- `adapter.in` → `application.usecase` (UseCase/Query 인터페이스, 레거시 `domain.port.in` 폐지됨)
+- `adapter.out` → `application.port.output` (Port 구현, 레거시 `domain.port.out` 폐지됨)
 - `application` → `domain` (model + port)
 - `adapter.out` → `application` (이벤트 리스너용, ArchUnit 예외 처리됨)
 
@@ -39,9 +39,9 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 | 위반 | 올바른 해결 |
 |------|------------|
 | `application` 레이어에서 `ResponseStatusException` import | Controller에서 변환, service는 순수 예외만 throw |
-| `adapter.out.kis.*` 에서 다른 `adapter.out.*` JpaRepository 직접 참조 | `domain.port.out.*Port` 경유 |
+| `adapter.out.*` 에서 다른 `adapter.out.*` JpaRepository 직접 참조 | Port 경유 (legacy는 `application.port.output.*Port`, broker/finance/notify/trading 등 모듈 소속은 해당 모듈 자체 `domain.port.out.*Port`) |
 | `domain.model.*` 에 `@Component`, `@Service` 등 Spring 어노테이션 | application 또는 adapter 레이어로 이동 |
-| `adapter.in.web.dto.*` 타입을 `domain.port.*` 파라미터로 사용 | `domain.model.*` 로 타입 이동 |
+| `adapter.in.web.dto.*` 타입을 포트 파라미터로 사용 | `domain.model.*` 로 타입 이동 |
 
 ## 실행 방법
 

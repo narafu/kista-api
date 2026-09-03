@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

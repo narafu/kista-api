@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.user;
 
 import com.kista.domain.model.admin.AdminUserView;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.AdminUserViewPort;
+import com.kista.application.port.output.AdminUserViewPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

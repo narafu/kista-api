@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.auth;
 
 import com.kista.domain.model.auth.RefreshToken;
-import com.kista.domain.port.out.RefreshTokenPort;
+import com.kista.application.port.output.RefreshTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

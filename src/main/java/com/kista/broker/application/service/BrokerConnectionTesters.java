@@ -1,7 +1,7 @@
 package com.kista.broker.application.service;
 
 import com.kista.domain.model.account.Account;
-import com.kista.broker.domain.port.out.BrokerConnectionTestPort;
+import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.broker.domain.port.out.LiveBalancePort;
+import com.kista.broker.application.port.output.LiveBalancePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

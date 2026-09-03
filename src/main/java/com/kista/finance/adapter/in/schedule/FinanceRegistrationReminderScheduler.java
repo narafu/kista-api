@@ -2,7 +2,7 @@ package com.kista.finance.adapter.in.schedule;
 
 import com.kista.adapter.in.schedule.SchedulerLockService;
 import com.kista.common.TimeZones;
-import com.kista.finance.domain.port.in.FinanceRegistrationReminderUseCase;
+import com.kista.finance.application.usecase.FinanceRegistrationReminderUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.trading.application.event.OrderCancelFailedEvent;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

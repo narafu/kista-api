@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
@@ -22,7 +22,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(MetaController.class)
 @Execution(ExecutionMode.SAME_THREAD)

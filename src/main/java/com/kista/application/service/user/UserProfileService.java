@@ -2,10 +2,10 @@ package com.kista.application.service.user;
 
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.port.in.UserProfileUseCase;
-import com.kista.notify.domain.port.out.FcmDeviceTokenPort;
-import com.kista.notify.domain.port.out.TelegramBotInfoPort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.usecase.UserProfileUseCase;
+import com.kista.notify.application.port.output.FcmDeviceTokenPort;
+import com.kista.notify.application.port.output.TelegramBotInfoPort;
+import com.kista.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

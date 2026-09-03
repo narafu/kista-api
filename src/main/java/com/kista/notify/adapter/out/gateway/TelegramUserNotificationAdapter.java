@@ -8,7 +8,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.domain.model.user.User;
-import com.kista.notify.domain.port.out.UserNotificationPort;
+import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

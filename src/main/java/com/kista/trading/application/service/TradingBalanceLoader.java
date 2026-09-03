@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.trading.domain.port.out.CyclePositionPort;
+import com.kista.trading.application.port.output.CyclePositionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

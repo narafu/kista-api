@@ -93,7 +93,7 @@ com.kista.finance/
 
 ## 보류 항목 (이번 스코프 아님, 별도 작업으로 추후 진행)
 
-1. **포트 위치 전환**: `domain/port/{in,out}` → `application/{usecase,port/output}`. 참고 글 예시와 동일한 형태지만, 이번 마이그레이션 목적(모듈 경계)과 무관한 축이라 함께 하면 diff에 무관한 컨벤션 전면 교체가 얹혀 리뷰·리스크만 커진다. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요.
+1. **포트 위치 전환**: `domain/port/{in,out}` → `application/{usecase,port/output}`. 참고 글 예시와 동일한 형태지만, 이번 마이그레이션 목적(모듈 경계)과 무관한 축이라 함께 하면 diff에 무관한 컨벤션 전면 교체가 얹혀 리뷰·리스크만 커진다. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(`docs/superpowers/specs/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 전부 완료.
 2. **이벤트 퍼블리케이션 레지스트리 전면 전환**: 기존 `@TransactionalEventListener` 패턴 전체(사용자 승인/거부/재신청/신규가입, 사이클 종료/신규시작, 매매리포트, 주문취소실패, 사용자탈퇴 등, `application/event/`)를 Modulith Event Publication Registry로 교체. DB에 `event_publication` 테이블 신규 Flyway 필요. 실패 이벤트가 지금은 `log.warn`으로 유실되는데 재시도 가능해지는 효과. finance→notify 같은 신규 모듈간 호출은 이번 스펙에선 이벤트가 아닌 Named Interface 직접 호출로 경계만 긋는다.
 
 ## 미해결 확인 필요 항목

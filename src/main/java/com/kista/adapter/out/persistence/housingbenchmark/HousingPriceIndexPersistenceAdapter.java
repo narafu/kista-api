@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.housingbenchmark;
 
 import com.kista.domain.model.stats.HousingBenchmarkRegion;
 import com.kista.domain.model.stats.HousingPriceIndex;
-import com.kista.domain.port.out.HousingPriceIndexPort;
+import com.kista.application.port.output.HousingPriceIndexPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;

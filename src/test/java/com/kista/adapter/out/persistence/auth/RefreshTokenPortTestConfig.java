@@ -1,6 +1,6 @@
 package com.kista.adapter.out.persistence.auth;
 
-import com.kista.domain.port.out.RefreshTokenPort;
+import com.kista.application.port.output.RefreshTokenPort;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 

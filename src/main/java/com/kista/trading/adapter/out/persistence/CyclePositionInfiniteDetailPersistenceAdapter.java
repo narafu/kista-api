@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.CyclePositionInfiniteDetail;
-import com.kista.trading.domain.port.out.CyclePositionInfiniteDetailPort;
+import com.kista.trading.application.port.output.CyclePositionInfiniteDetailPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

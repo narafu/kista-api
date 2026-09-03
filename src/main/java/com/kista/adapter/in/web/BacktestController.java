@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.BacktestResponse;
 import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.BacktestUseCase;
+import com.kista.application.usecase.BacktestUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

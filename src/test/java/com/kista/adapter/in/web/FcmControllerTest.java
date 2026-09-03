@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.UserProfileUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.usecase.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -22,7 +22,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(FcmController.class)
 @Execution(ExecutionMode.SAME_THREAD)

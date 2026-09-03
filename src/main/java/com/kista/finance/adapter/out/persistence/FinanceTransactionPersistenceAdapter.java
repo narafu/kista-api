@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.FinanceTransaction;
-import com.kista.finance.domain.port.out.FinanceTransactionPort;
+import com.kista.finance.application.port.output.FinanceTransactionPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

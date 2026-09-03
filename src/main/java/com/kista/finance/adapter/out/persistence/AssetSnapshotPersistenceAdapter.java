@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.AssetSnapshot;
-import com.kista.finance.domain.port.out.AssetSnapshotPort;
+import com.kista.finance.application.port.output.AssetSnapshotPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

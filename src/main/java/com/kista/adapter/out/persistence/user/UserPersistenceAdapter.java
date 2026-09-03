@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.user;
 
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.port.output.UserPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -3,7 +3,7 @@ package com.kista.finance.application.service;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.finance.domain.port.out.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceGroupPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

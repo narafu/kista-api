@@ -5,25 +5,25 @@
 - 커밋 전 author 확인 (`git config user.name`/`user.email`): `narafu <narafu@kakao.com>`
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
 
-### domain/port/out/ 네이밍 규칙
+### application/port/output/ 네이밍 규칙
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
 ### Spring Modulith 이전 중 신규 파일 배치
-- 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/{model,port/in,port/out}` + `application/service` + `adapter/{in,out}` 서브구조를 그대로 따른다 (→ architecture.md "Spring Modulith 점진 도입")
-- notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model·application 레이어가 없는 얇은 게이트웨이 모듈이라 `domain/port/out`(공개 계약, "domain" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `domain/port/in`을 그대로 참조
-- 브로커 애그리게이트(KIS/Toss/Mock 연동)는 `com.kista.broker`로 이미 옮겨졌다 — 신규 KIS/Toss/Mock 코드는 `com.kista.broker.adapter.out.*` 안에 추가. finance/notify와 달리 이 adapter/out은 NamedInterface로 공개되지 않아 모듈 밖에서 완전히 접근 불가 — 레거시 코드가 새 기능을 호출해야 하면 adapter 패키지에 직접 접근하지 말고 `com.kista.broker.domain.port.out`에 신규 `*Port` 인터페이스를 만들어 노출한다("domain" NamedInterface로 공개)
-- 매매 코어 애그리게이트(주문/사이클 실행 이력/주문생성 전략)는 `com.kista.trading`으로 이미 옮겨졌다 — 신규 trading 관련 코드도 레거시 최상위가 아닌 `com.kista.trading` 안에 추가. `domain/{model,strategy,port/in,port/out}`이 "domain"으로, `application/event`가 "event"로, `adapter/in/schedule`이 "schedule"로 NamedInterface 공개 — `application/service`·`adapter/out/*`은 비공개(internal)
+- 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조를 그대로 따른다 — 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치 (→ architecture.md "Spring Modulith 점진 도입", constraints.md "포트 인터페이스 위치 규칙")
+- notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model 레이어가 없는 얇은 게이트웨이 모듈이라 `application/port/output`(공개 계약, "port" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `application.usecase`를 그대로 참조
+- 브로커 애그리게이트(KIS/Toss/Mock 연동)는 `com.kista.broker`로 이미 옮겨졌다 — 신규 KIS/Toss/Mock 코드는 `com.kista.broker.adapter.out.*` 안에 추가. finance/notify와 달리 이 adapter/out은 NamedInterface로 공개되지 않아 모듈 밖에서 완전히 접근 불가 — 레거시 코드가 새 기능을 호출해야 하면 adapter 패키지에 직접 접근하지 말고 `com.kista.broker.application.port.output`에 신규 `*Port` 인터페이스를 만들어 노출한다("port" NamedInterface로 공개)
+- 매매 코어 애그리게이트(주문/사이클 실행 이력/주문생성 전략)는 `com.kista.trading`으로 이미 옮겨졌다 — 신규 trading 관련 코드도 레거시 최상위가 아닌 `com.kista.trading` 안에 추가. `domain/{model,strategy}`가 "domain"으로, `application/usecase`가 "usecase"로, `application/port/output`이 "port"로, `application/event`가 "event"로, `adapter/in/schedule`이 "schedule"로 NamedInterface 공개 — `application/service`·`adapter/out/*`은 비공개(internal)
 
 ### 모듈 경계 포트 시그니처 — 각 모듈은 자기 소유 타입만 사용
-- broker/notify 포트(`domain/port/out/*Port`)는 시그니처(파라미터·반환 타입)에 trading 타입을 직접 참조하지 않는다 — 각 모듈이 경계에서 자기 소유 타입을 쓰고, trading이 양쪽을 매핑한다
+- broker/notify 포트(둘 다 `application/port/output/*Port`)는 시그니처(파라미터·반환 타입)에 trading 타입을 직접 참조하지 않는다 — 각 모듈이 경계에서 자기 소유 타입을 쓰고, trading이 양쪽을 매핑한다
 - 근거: `broker↔trading`/`notify↔trading`/`broker→trading→notify→broker` 3개 Modulith 모듈 순환이 trading 타입을 포트 시그니처에 직접 노출한 데서 발생 — broker는 `Direction`/`OrderType`/`PriceSnapshot`/`BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(trading 동명 타입과 값 집합·필드만 동일한 별도 소유, `com.kista.broker.domain.model`)을 자체 정의해 `LiveBalancePort`/`BrokerOrderCorrectionPort` 등에 사용하고, trading 호출부가 양방향 변환한다. notify는 trading을 직접 호출하는 대신 trading이 발행하는 도메인 이벤트(`trading.application.event`, "event" NamedInterface)를 `@TransactionalEventListener`로 구독한다(`TradingAlertNotifier`)
 - 신규 broker/notify 포트 추가 시에도 이 원칙 적용 — trading의 record/enum을 그대로 파라미터·반환 타입에 쓰지 말 것, 필요하면 해당 모듈 소유의 대응 타입을 새로 정의
 
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
-- 다른 패키지 adapter에서 DB 조작이 필요하면 도메인 포트(`domain/port/out/`) 경유 필수
-- 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(domain.port.out) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
-- 참고: `com.kista.broker.adapter.out.kis.KisAuthApi` → `com.kista.broker.domain.port.out.BrokerTokenCachePort` → `com.kista.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
+- 다른 패키지 adapter에서 DB 조작이 필요하면 아웃바운드 포트(`application/port/output/`) 경유 필수
+- 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(application.port.output) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
+- 참고: `com.kista.broker.adapter.out.kis.KisAuthApi` → `com.kista.broker.application.port.output.BrokerTokenCachePort` → `com.kista.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
 
 
 ### GlobalExceptionHandler 자동 예외 처리
@@ -73,7 +73,7 @@
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE` (domain 상수 — 서비스/컨트롤러에서 직접 하드코딩 금지)
 
 ### 도메인 Command 명명 규칙
-- 도메인 포트 인바운드 파라미터/입력 모델: `*Command` suffix, `*Request` suffix 금지(외부 HTTP DTO 성격 오인), `domain/model/<도메인>/` 하위 위치
+- `application.usecase` 인바운드 포트 파라미터/입력 모델: `*Command` suffix, `*Request` suffix 금지(외부 HTTP DTO 성격 오인), `domain/model/<도메인>/` 하위 위치
 
 ### Ticker enum (Strategy.Ticker nested enum)
 - KIS 거래소 코드는 `com.kista.broker.adapter.out.kis.KisExchangeRegistry` 전용 — 새 종목 추가 시 양쪽 갱신 필수
@@ -201,7 +201,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 
 ### TelegramApiClient package-private 제약
 - `TelegramApiClient` (`com.kista.notify.adapter.in.telegram`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가
-- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `com.kista.notify.domain.port.out` 포트 + `com.kista.notify.adapter.out.gateway` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
+- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `com.kista.notify.application.port.output` 포트 + `com.kista.notify.adapter.out.gateway` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
 - 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
 
 ### Spring Security Filter 이중 등록 방지
@@ -248,10 +248,12 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)`
 - 이벤트 위치: `application/event/`, 리스너 위치: `adapter/out/` (ArchUnit: adapter.out → application 의존 허용)
 
-### 도메인 포트 인터페이스와 타입 위치 규칙
-- `domain/port/in` 또는 `domain/port/out` 인터페이스의 파라미터·반환 타입으로 쓰이는 record/class는 반드시 `domain/model/` 하위에 위치 — `adapter/in/web/dto/`에 두면 `domain → adapter` ArchUnit 규칙 위반
-- `application/service`도 마찬가지로 `adapter` 패키지 import 금지 (`application → adapter` 규칙)
-- 컨트롤러 DTO와 겹치는 타입이 있으면 `domain/model/<도메인>` 패키지로 이동 후 DTO에서 re-import
+### 포트 인터페이스 위치 규칙
+- 인바운드 포트(UseCase/Query 인터페이스)는 `application/usecase/`, 아웃바운드 포트(`*Port`)는 `application/port/output/`에 위치 — `domain/port/{in,out}`은 더 이상 사용하지 않는다
+- 포트의 파라미터·반환 타입으로 쓰이는 record/class는 여전히 `domain/model/` 하위에 위치 — 포트 위치가 옮겨가도 타입 소유는 domain 유지. `adapter/in/web/dto/`에 두면 `domain → adapter` ArchUnit 규칙 위반
+- `adapter/in`(컨트롤러 등)은 `application.usecase`/`application.port.output`(인터페이스)에는 의존 가능하지만 `application.service`(구현체)에는 의존 금지 — ArchUnit이 이 경계만 강제
+- `application.service`도 마찬가지로 `adapter` 패키지 import 금지 (`application → adapter` 규칙, 변경 없음)
+- 컨트롤러 DTO와 겹치는 타입이 있으면 `domain/model/<도메인>` 패키지로 이동 후 DTO에서 re-import (변경 없음)
 
 ### 공유 DTO @Valid 제약
 - `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)

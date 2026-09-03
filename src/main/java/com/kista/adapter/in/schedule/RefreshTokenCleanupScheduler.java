@@ -1,7 +1,7 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.port.in.TokenUseCase;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.application.usecase.TokenUseCase;
+import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

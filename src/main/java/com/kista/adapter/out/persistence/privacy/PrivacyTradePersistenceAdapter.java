@@ -5,7 +5,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.*;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.PrivacyTradePort;
+import com.kista.application.port.output.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

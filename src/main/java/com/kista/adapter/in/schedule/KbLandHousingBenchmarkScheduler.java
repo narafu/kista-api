@@ -1,7 +1,7 @@
 package com.kista.adapter.in.schedule;
 
 import com.kista.common.TimeZones;
-import com.kista.domain.port.in.FetchHousingBenchmarkUseCase;
+import com.kista.application.usecase.FetchHousingBenchmarkUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.RuntimeSettingsResponse;
-import com.kista.domain.port.in.RuntimeSettingsUseCase;
+import com.kista.application.usecase.RuntimeSettingsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;

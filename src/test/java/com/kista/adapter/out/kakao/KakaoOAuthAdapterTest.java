@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kakao;
 
-import com.kista.domain.port.out.KakaoOAuthPort.KakaoUserInfo;
+import com.kista.application.port.output.KakaoOAuthPort.KakaoUserInfo;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;

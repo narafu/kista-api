@@ -1,7 +1,7 @@
 package com.kista.application.service.auth;
 
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.out.BlacklistPort;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.port.output.BlacklistPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

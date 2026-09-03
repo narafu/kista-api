@@ -6,10 +6,10 @@ import com.kista.trading.domain.model.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.user.User;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.trading.domain.port.out.StrategyCyclePort;
-import com.kista.trading.domain.port.out.TradingErrorReportPort;
-import com.kista.domain.port.out.UserPort;
+import com.kista.application.port.output.AccountPort;
+import com.kista.trading.application.port.output.StrategyCyclePort;
+import com.kista.trading.application.port.output.TradingErrorReportPort;
+import com.kista.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,7 +30,7 @@ class BatchContextFactory {
     private final AccountPort accountPort;
     private final StrategyCyclePort strategyCyclePort;
     private final UserPort userPort;
-    private final TradingErrorReportPort errorReportPort; // 조회 실패 관리자 알림 (도메인 포트 경유 — application 레이어 미직접의존)
+    private final TradingErrorReportPort errorReportPort; // 조회 실패 관리자 알림 (출력 포트 경유 — application.event/service 미직접의존)
 
     // 전략별 현재 사이클·계좌·사용자 조회 — 조회 실패한 전략은 skip + notifyError
     List<BatchContext> buildAll(List<Strategy> strategies) {

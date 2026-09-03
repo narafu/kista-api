@@ -2,12 +2,12 @@ package com.kista.application.service.user;
 
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.in.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
-import com.kista.domain.port.in.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
-import com.kista.domain.port.in.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
-import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.UserSettingsPort;
+import com.kista.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
+import com.kista.application.usecase.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
+import com.kista.application.usecase.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.StrategyPort;
+import com.kista.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

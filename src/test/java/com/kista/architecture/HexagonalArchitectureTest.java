@@ -45,12 +45,12 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("인바운드 어댑터는 application 레이어 구현체에 직접 의존하지 않는다")
+    @DisplayName("인바운드 어댑터는 application.service(구현체)에 직접 의존하지 않는다")
     void inbound_adapters_must_not_depend_on_application_layer() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista..adapter.in..")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista..application..");
+                .resideInAPackage("com.kista..application.service..");
         rule.check(classes);
     }
 
@@ -75,14 +75,27 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("domain/port/out 인터페이스는 *Port 접미사를 가져야 한다")
+    @DisplayName("아웃바운드 포트 인터페이스는 *Port 접미사를 가져야 한다")
     void outbound_port_interfaces_must_have_Port_suffix() {
         ArchRule rule = classes()
-                .that().resideInAPackage("com.kista..domain.port.out..")
+                .that().resideInAPackage("com.kista..application.port.output..")
                 .and().areInterfaces()
                 // package-info.class는 ACC_INTERFACE 플래그로 컴파일되어 areInterfaces()에 오탐 매칭됨 — 제외
                 .and().doNotHaveSimpleName("package-info")
                 .should().haveSimpleNameEndingWith("Port");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("인바운드 포트 인터페이스는 *UseCase 또는 *Query 접미사를 가져야 한다")
+    void inbound_port_interfaces_must_have_UseCase_or_Query_suffix() {
+        ArchRule rule = classes()
+                .that().resideInAPackage("com.kista..application.usecase..")
+                .and().areInterfaces()
+                // package-info.class는 ACC_INTERFACE 플래그로 컴파일되어 areInterfaces()에 오탐 매칭됨 — 제외
+                .and().doNotHaveSimpleName("package-info")
+                .should().haveSimpleNameEndingWith("UseCase")
+                .orShould().haveSimpleNameEndingWith("Query");
         rule.check(classes);
     }
 
@@ -151,7 +164,7 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("RestController는 domain port 인터페이스(UseCase/Port)에만 의존하고 application 구현체에 직접 의존하지 않는다")
+    @DisplayName("RestController는 application.usecase/application.port.output 인터페이스에만 의존하고 application 구현체에 직접 의존하지 않는다")
     void rest_controllers_must_not_depend_on_application_implementations() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista..adapter.in.web..")

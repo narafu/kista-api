@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
-import com.kista.domain.port.out.StrategyInfiniteDetailPort;
+import com.kista.application.port.output.StrategyInfiniteDetailPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

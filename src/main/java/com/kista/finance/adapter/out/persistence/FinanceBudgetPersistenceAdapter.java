@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.FinanceBudget;
-import com.kista.finance.domain.port.out.FinanceBudgetPort;
+import com.kista.finance.application.port.output.FinanceBudgetPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;

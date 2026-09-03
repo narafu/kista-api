@@ -3,8 +3,8 @@ package com.kista.adapter.in.web;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.in.AccountStatisticsUseCase;
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -28,7 +28,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(StatisticsController.class)
 @Execution(ExecutionMode.SAME_THREAD)

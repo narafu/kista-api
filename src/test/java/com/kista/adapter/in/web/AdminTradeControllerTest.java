@@ -7,12 +7,12 @@ import com.kista.domain.model.admin.AdminReorderResult;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.AdminQueryUseCase;
-import com.kista.domain.port.in.AdminReorderUseCase;
-import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
-import com.kista.domain.port.in.AdminUserUseCase;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.out.MarketCalendarPort;
+import com.kista.application.usecase.AdminQueryUseCase;
+import com.kista.application.usecase.AdminReorderUseCase;
+import com.kista.application.usecase.AdminTradeCorrectionUseCase;
+import com.kista.application.usecase.AdminUserUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.port.output.MarketCalendarPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(AdminTradeController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})

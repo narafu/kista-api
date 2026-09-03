@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.AdminPrivacyBaseResponse;
-import com.kista.domain.port.in.AdminQueryUseCase;
+import com.kista.application.usecase.AdminQueryUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

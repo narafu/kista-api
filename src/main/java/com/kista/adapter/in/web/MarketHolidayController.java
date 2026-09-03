@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.MarketSessionResponse;
 import com.kista.adapter.in.web.dto.TossCandleResponse;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.domain.port.in.MarketUseCase;
+import com.kista.application.usecase.MarketUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

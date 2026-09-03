@@ -5,7 +5,7 @@ import com.kista.finance.adapter.in.web.dto.BulkFinanceRegisterResponse;
 import com.kista.finance.domain.model.AssetSnapshotCommand;
 import com.kista.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.finance.domain.model.FinanceTransactionCommand;
-import com.kista.finance.domain.port.in.BulkFinanceRegisterUseCase;
+import com.kista.finance.application.usecase.BulkFinanceRegisterUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

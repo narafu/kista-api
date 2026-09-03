@@ -1,10 +1,10 @@
 package com.kista.application.service.stats;
 
 import com.kista.domain.model.stats.HousingPriceIndex;
-import com.kista.domain.port.in.FetchHousingPriceIndexUseCase;
-import com.kista.domain.port.out.HousingBenchmarkFeedPort;
-import com.kista.domain.port.out.HousingPriceIndexPort;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.application.usecase.FetchHousingPriceIndexUseCase;
+import com.kista.application.port.output.HousingBenchmarkFeedPort;
+import com.kista.application.port.output.HousingPriceIndexPort;
+import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

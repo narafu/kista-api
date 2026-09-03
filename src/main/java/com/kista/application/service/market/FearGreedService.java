@@ -1,11 +1,11 @@
 package com.kista.application.service.market;
 
 import com.kista.domain.model.market.FearGreedSnapshot;
-import com.kista.domain.port.in.FetchFearGreedUseCase;
-import com.kista.domain.port.out.CnnFearGreedPort;
-import com.kista.domain.port.out.CryptoFearGreedPort;
-import com.kista.domain.port.out.FearGreedSnapshotPort;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.application.usecase.FetchFearGreedUseCase;
+import com.kista.application.port.output.CnnFearGreedPort;
+import com.kista.application.port.output.CryptoFearGreedPort;
+import com.kista.application.port.output.FearGreedSnapshotPort;
+import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

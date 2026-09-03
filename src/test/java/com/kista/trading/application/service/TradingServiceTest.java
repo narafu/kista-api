@@ -24,15 +24,15 @@ import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
-import com.kista.domain.port.out.*; import com.kista.trading.domain.port.out.*;
-import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
-import com.kista.broker.domain.port.out.BrokerPricePort;
-import com.kista.broker.domain.port.out.ExecutionPort;
-import com.kista.broker.domain.port.out.LiveBalancePort;
-import com.kista.broker.domain.port.out.MarginPort;
-import com.kista.broker.domain.port.out.SellableQuantityPort;
-import com.kista.trading.domain.port.out.StrategyCycleVrPort;
-import com.kista.domain.port.out.StrategyVrDetailPort;
+import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.broker.application.port.output.BrokerPricePort;
+import com.kista.broker.application.port.output.ExecutionPort;
+import com.kista.broker.application.port.output.LiveBalancePort;
+import com.kista.broker.application.port.output.MarginPort;
+import com.kista.broker.application.port.output.SellableQuantityPort;
+import com.kista.trading.application.port.output.StrategyCycleVrPort;
+import com.kista.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +73,7 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock com.kista.broker.domain.port.out.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
+    @Mock com.kista.broker.application.port.output.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock UserSettingsPort userSettingsPort;

@@ -1,6 +1,6 @@
 package com.kista.adapter.out.redis;
 
-import com.kista.domain.port.out.BlacklistPort;
+import com.kista.application.port.output.BlacklistPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;

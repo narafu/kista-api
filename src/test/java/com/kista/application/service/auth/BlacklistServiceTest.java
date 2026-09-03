@@ -1,6 +1,6 @@
 package com.kista.application.service.auth;
 
-import com.kista.domain.port.out.BlacklistPort;
+import com.kista.application.port.output.BlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

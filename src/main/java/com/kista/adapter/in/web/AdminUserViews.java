@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.port.in.AdminUserUseCase;
+import com.kista.application.usecase.AdminUserUseCase;
 
 import java.util.Map;
 import java.util.UUID;

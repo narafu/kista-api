@@ -1,7 +1,7 @@
 package com.kista.common;
 
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.trading.domain.port.out.StrategyCyclePort;
+import com.kista.trading.application.port.output.StrategyCyclePort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

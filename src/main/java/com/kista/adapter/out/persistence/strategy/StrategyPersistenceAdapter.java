@@ -2,7 +2,7 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.out.StrategyPort;
+import com.kista.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

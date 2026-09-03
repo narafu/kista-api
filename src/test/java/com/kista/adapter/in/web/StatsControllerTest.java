@@ -2,9 +2,9 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.stats.*;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.port.in.UserStatsUseCase;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.application.usecase.UserStatsUseCase;
+import com.kista.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

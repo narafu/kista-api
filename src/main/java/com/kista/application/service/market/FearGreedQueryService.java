@@ -2,8 +2,8 @@ package com.kista.application.service.market;
 
 import com.kista.common.TimeZones;
 import com.kista.domain.model.market.FearGreedSnapshot;
-import com.kista.domain.port.in.GetFearGreedUseCase;
-import com.kista.domain.port.out.FearGreedSnapshotPort;
+import com.kista.application.usecase.GetFearGreedUseCase;
+import com.kista.application.port.output.FearGreedSnapshotPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.StrategyVersion;
-import com.kista.domain.port.out.StrategyVersionPort;
+import com.kista.application.port.output.StrategyVersionPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

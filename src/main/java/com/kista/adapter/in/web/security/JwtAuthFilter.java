@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.security;
 
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +25,7 @@ import java.util.UUID;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtDecoder jwtDecoder;
-    private final BlacklistUseCase blacklistUseCase; // Redis 블랙리스트 체크 (adapter.in → domain.port.in)
+    private final BlacklistUseCase blacklistUseCase; // Redis 블랙리스트 체크 (adapter.in → application.usecase)
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

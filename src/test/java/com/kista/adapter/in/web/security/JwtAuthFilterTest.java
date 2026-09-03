@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.security;
 
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 

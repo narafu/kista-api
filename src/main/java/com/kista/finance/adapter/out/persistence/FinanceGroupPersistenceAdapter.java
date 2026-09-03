@@ -3,7 +3,7 @@ package com.kista.finance.adapter.out.persistence;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.finance.domain.port.out.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceGroupPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;

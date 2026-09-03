@@ -2,7 +2,7 @@ package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.adapter.in.web.dto.MonthlyClosingRequest;
 import com.kista.finance.adapter.in.web.dto.MonthlyClosingResponse;
-import com.kista.finance.domain.port.in.MonthlyClosingUseCase;
+import com.kista.finance.application.usecase.MonthlyClosingUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

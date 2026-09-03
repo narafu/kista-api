@@ -1,6 +1,6 @@
 package com.kista.adapter.out.kakao;
 
-import com.kista.domain.port.out.KakaoOAuthPort;
+import com.kista.application.port.output.KakaoOAuthPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

@@ -3,7 +3,7 @@ package com.kista.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.domain.model.account.Account;
-import com.kista.broker.domain.port.out.BrokerConnectionTestPort;
+import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

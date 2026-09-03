@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.FidaOrderCommand;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
-import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
+import com.kista.application.usecase.PrivacyTradeValidationUseCase;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;

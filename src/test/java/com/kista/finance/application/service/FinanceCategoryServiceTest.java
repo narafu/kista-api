@@ -2,8 +2,8 @@ package com.kista.finance.application.service;
 
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceCategoryCommand;
-import com.kista.finance.domain.port.out.FinanceCategoryPort;
-import com.kista.finance.domain.port.out.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceCategoryPort;
+import com.kista.finance.application.port.output.FinanceGroupPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,8 +1,8 @@
 package com.kista.application.service.stats;
 
 import com.kista.domain.model.stats.IndexPrice;
-import com.kista.domain.port.out.IndexPriceFeedPort;
-import com.kista.domain.port.out.IndexPricePort;
+import com.kista.application.port.output.IndexPriceFeedPort;
+import com.kista.application.port.output.IndexPricePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

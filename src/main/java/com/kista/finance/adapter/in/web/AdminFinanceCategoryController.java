@@ -3,7 +3,7 @@ package com.kista.finance.adapter.in.web;
 import com.kista.finance.adapter.in.web.dto.FinanceCategoryRequest;
 import com.kista.finance.adapter.in.web.dto.FinanceCategoryResponse;
 import com.kista.finance.domain.model.FinanceCategory;
-import com.kista.finance.domain.port.in.FinanceCategoryUseCase;
+import com.kista.finance.application.usecase.FinanceCategoryUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

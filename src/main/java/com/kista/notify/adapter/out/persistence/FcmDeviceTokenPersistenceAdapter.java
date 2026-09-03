@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.persistence;
 
-import com.kista.notify.domain.port.out.FcmDeviceTokenPort;
+import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;

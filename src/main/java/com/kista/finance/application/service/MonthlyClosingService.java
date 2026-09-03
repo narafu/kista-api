@@ -1,9 +1,9 @@
 package com.kista.finance.application.service;
 
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.finance.domain.port.in.MonthlyClosingUseCase;
-import com.kista.finance.domain.port.out.FinanceGroupPort;
-import com.kista.finance.domain.port.out.MonthlyClosingPort;
+import com.kista.finance.application.usecase.MonthlyClosingUseCase;
+import com.kista.finance.application.port.output.FinanceGroupPort;
+import com.kista.finance.application.port.output.MonthlyClosingPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

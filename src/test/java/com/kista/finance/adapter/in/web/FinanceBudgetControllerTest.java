@@ -2,9 +2,9 @@ package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceBudgetCommand;
-import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.finance.domain.port.in.FinanceBudgetUseCase;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.finance.application.usecase.FinanceBudgetUseCase;
+import com.kista.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

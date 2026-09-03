@@ -5,8 +5,8 @@ import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
-import com.kista.trading.domain.port.out.StrategyCycleVrPort;
-import com.kista.domain.port.out.StrategyVrDetailPort;
+import com.kista.trading.application.port.output.StrategyCycleVrPort;
+import com.kista.application.port.output.StrategyVrDetailPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

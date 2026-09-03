@@ -2,7 +2,7 @@ package com.kista.notify.adapter.out.gateway;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.NewCycleStartedEvent;
-import com.kista.notify.domain.port.out.UserNotificationPort;
+import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;

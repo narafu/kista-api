@@ -1,6 +1,6 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.port.in.FetchFearGreedUseCase;
+import com.kista.application.usecase.FetchFearGreedUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

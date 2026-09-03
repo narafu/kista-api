@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.trading.domain.port.in.TradingExecutionUseCase;
+import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

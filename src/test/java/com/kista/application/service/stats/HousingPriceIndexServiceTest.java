@@ -1,9 +1,9 @@
 package com.kista.application.service.stats;
 
 import com.kista.domain.model.stats.HousingPriceIndex;
-import com.kista.domain.port.out.HousingBenchmarkFeedPort;
-import com.kista.domain.port.out.HousingPriceIndexPort;
-import com.kista.notify.domain.port.out.NotifyPort;
+import com.kista.application.port.output.HousingBenchmarkFeedPort;
+import com.kista.application.port.output.HousingPriceIndexPort;
+import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

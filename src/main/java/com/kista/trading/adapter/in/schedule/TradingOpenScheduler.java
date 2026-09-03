@@ -6,12 +6,12 @@ import com.kista.common.TimeZones;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.privacy.PrivacyTradeValidationReport;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.PrivacyTradeValidationUseCase;
-import com.kista.trading.domain.port.in.TradingExecutionUseCase;
-import com.kista.domain.port.out.HeartbeatPort;
-import com.kista.trading.domain.port.out.TradingErrorReportPort;
-import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.port.out.StrategyPort;
+import com.kista.application.usecase.PrivacyTradeValidationUseCase;
+import com.kista.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.TradingErrorReportPort;
+import com.kista.application.port.output.PrivacyTradePort;
+import com.kista.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,7 +31,7 @@ public class TradingOpenScheduler {
 
     private final TradingExecutionUseCase useCase;
     private final StrategyPort strategyPort;
-    private final TradingErrorReportPort errorReportPort;  // guardPrivacyStrategies 오류 알림 (도메인 포트 경유)
+    private final TradingErrorReportPort errorReportPort;  // guardPrivacyStrategies 오류 알림 (출력 포트 경유)
     private final SchedulerLockService schedulerLockService;
     private final PrivacyTradePort privacyTradePort;
     private final PrivacyTradeValidationUseCase validationService;

@@ -5,7 +5,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.trading.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.broker.domain.port.out.BrokerPricePort;
+import com.kista.broker.application.port.output.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

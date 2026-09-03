@@ -4,10 +4,10 @@ import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.port.in.AdminQueryUseCase;
-import com.kista.domain.port.in.AdminStrategyUseCase;
-import com.kista.domain.port.in.AdminUserUseCase;
-import com.kista.domain.port.in.BlacklistUseCase;
+import com.kista.application.usecase.AdminQueryUseCase;
+import com.kista.application.usecase.AdminStrategyUseCase;
+import com.kista.application.usecase.AdminUserUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.domain.port.out.AppErrorLogPort;
+import com.kista.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(AdminAccountController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})

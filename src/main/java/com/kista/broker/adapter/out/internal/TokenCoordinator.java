@@ -8,7 +8,7 @@ import java.util.UUID;
 // fencing generation CAS. 이 인터페이스는 "발급/복구" 연산의 형태만 통일한다 — 재시도 횟수·
 // 백오프 여부는 각 브로커의 HttpClient가 결정하며 freshlyIssued는 그 판단을 위한 신호일 뿐
 // 구현체에 특정 정책을 강제하지 않는다. application/domain 레이어를 넘나들지 않는 순수
-// adapter 내부 계약이라 domain/port/out에 두지 않는다(ArchUnit *Port 접미사 규칙 대상 아님).
+// adapter 내부 계약이라 application/port/output에 두지 않는다(ArchUnit *Port 접미사 규칙 대상 아님).
 public interface TokenCoordinator {
 
     // 정상 조회 — 캐시 히트 시 즉시 반환, 미스 시 issuer로 신규 발급 후 캐시에 저장

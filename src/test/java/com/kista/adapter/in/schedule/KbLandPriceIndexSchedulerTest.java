@@ -1,6 +1,6 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.port.in.FetchHousingPriceIndexUseCase;
+import com.kista.application.usecase.FetchHousingPriceIndexUseCase;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 

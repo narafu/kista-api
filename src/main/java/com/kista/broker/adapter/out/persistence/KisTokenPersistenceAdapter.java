@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.persistence;
 
-import com.kista.broker.domain.port.out.BrokerTokenCachePort;
+import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

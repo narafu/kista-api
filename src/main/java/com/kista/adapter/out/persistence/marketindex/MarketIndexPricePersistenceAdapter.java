@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.marketindex;
 
 import com.kista.domain.model.stats.IndexPrice;
-import com.kista.domain.port.out.IndexPricePort;
+import com.kista.application.port.output.IndexPricePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

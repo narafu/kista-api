@@ -2,7 +2,7 @@ package com.kista.adapter.out.feargreed;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.market.FearGreedRating;
-import com.kista.domain.port.out.CnnFearGreedPort;
+import com.kista.application.port.output.CnnFearGreedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

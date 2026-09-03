@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.trading.domain.port.out.StrategyCycleVrPort;
+import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

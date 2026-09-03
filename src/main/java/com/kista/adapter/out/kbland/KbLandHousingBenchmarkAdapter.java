@@ -3,7 +3,7 @@ package com.kista.adapter.out.kbland;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.stats.HousingBenchmarkPrice;
 import com.kista.domain.model.stats.HousingPriceIndex;
-import com.kista.domain.port.out.HousingBenchmarkFeedPort;
+import com.kista.application.port.output.HousingBenchmarkFeedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
