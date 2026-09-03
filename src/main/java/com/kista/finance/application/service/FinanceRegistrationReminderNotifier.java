@@ -1,15 +1,15 @@
 package com.kista.finance.application.service;
 
-import com.kista.domain.model.user.NotificationType;
-import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserSettings;
+import com.kista.sharedkernel.NotificationType;
+import com.kista.user.domain.model.User;
+import com.kista.user.domain.model.UserSettings;
 import com.kista.finance.application.usecase.FinanceRegistrationReminderUseCase;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
-import com.kista.application.port.output.UserPort;
-import com.kista.application.port.output.UserSettingsPort;
+import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import com.kista.sharedkernel.UserStatus;
 
 // 이번 달 가계부(자산/거래) 등록이 전혀 없는 ACTIVE 사용자에게 알림 — MarketEventNotifier와 동일한
 // 배치 조회 + virtual thread 팬아웃 패턴. 그룹 소속 유저는 findMyScope가 이미 groupId 스코프로 조회하므로
@@ -45,7 +46,7 @@ class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminder
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
 
-        List<User> users = userPort.findAllByStatus(User.UserStatus.ACTIVE);
+        List<User> users = userPort.findAllByStatus(UserStatus.ACTIVE);
         List<UUID> userIds = users.stream().map(User::id).toList();
         Map<UUID, UserSettings> settingsMap = userSettingsPort.findOrDefaultByUserIds(userIds);
         String monthLabel = month.getMonthValue() + "월";

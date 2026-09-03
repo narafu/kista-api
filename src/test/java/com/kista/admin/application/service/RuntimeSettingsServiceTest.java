@@ -3,11 +3,11 @@ package com.kista.admin.application.service;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.domain.model.user.User;
-import com.kista.application.usecase.UserUseCase;
+import com.kista.user.domain.model.User;
+import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +19,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class RuntimeSettingsServiceTest {
@@ -46,19 +48,19 @@ class RuntimeSettingsServiceTest {
     @Test
     void updateSettings_whenApprovalTurnsOff_savesOnceAndApprovesOnlyPendingUsers() {
         UUID adminId = UUID.randomUUID();
-        User pending = user(User.UserStatus.PENDING);
+        User pending = user(UserStatus.PENDING);
         RuntimeSettings previous = RuntimeSettings.defaults();
         RuntimeSettings updated = new RuntimeSettings(false, previous.brokers(), previous.strategies());
         when(settingsPort.loadForUpdate()).thenReturn(previous);
         when(settingsPort.save(updated)).thenReturn(updated);
-        when(userPort.findAllByStatus(User.UserStatus.PENDING)).thenReturn(List.of(pending));
+        when(userPort.findAllByStatus(UserStatus.PENDING)).thenReturn(List.of(pending));
 
         assertThat(service.updateSettings(adminId, updated, true)).isEqualTo(updated);
 
         verify(settingsPort, times(1)).save(updated);
-        verify(userPort).findAllByStatus(User.UserStatus.PENDING);
+        verify(userPort).findAllByStatus(UserStatus.PENDING);
         verify(userUseCase).approve(pending.id());
-        verify(userPort, never()).findAllByStatus(User.UserStatus.REJECTED);
+        verify(userPort, never()).findAllByStatus(UserStatus.REJECTED);
         verify(auditLogPort).log(eq(adminId), eq("RUNTIME_SETTINGS_UPDATE"), eq("RUNTIME_SETTINGS"),
                 isNull(), anyMap());
     }
@@ -85,6 +87,16 @@ class RuntimeSettingsServiceTest {
     }
 
     @Test
+    void approvalRequiredForUpdate_delegatesToLoadForUpdate() {
+        when(settingsPort.loadForUpdate()).thenReturn(settingsWithApprovalRequired(true));
+
+        boolean result = service.approvalRequiredForUpdate();
+
+        assertThat(result).isTrue();
+        verify(settingsPort).loadForUpdate();
+    }
+
+    @Test
     void updateSettings_whenApprovalRemainsOff_doesNotApproveUsersAgain() {
         UUID adminId = UUID.randomUUID();
         RuntimeSettings defaults = RuntimeSettings.defaults();
@@ -97,8 +109,13 @@ class RuntimeSettingsServiceTest {
         verifyNoInteractions(userPort, userUseCase);
     }
 
-    private User user(User.UserStatus status) {
-        return new User(UUID.randomUUID(), "kakao", "nickname", null, status, User.UserRole.USER,
+    private User user(UserStatus status) {
+        return new User(UUID.randomUUID(), "kakao", "nickname", null, status, UserRole.USER,
                 null, null, null, null, null, User.DEFAULT_CHANNEL);
+    }
+
+    private RuntimeSettings settingsWithApprovalRequired(boolean approvalRequired) {
+        RuntimeSettings defaults = RuntimeSettings.defaults();
+        return new RuntimeSettings(approvalRequired, defaults.brokers(), defaults.strategies());
     }
 }

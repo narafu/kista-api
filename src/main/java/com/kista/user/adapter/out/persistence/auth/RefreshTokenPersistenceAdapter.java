@@ -1,0 +1,66 @@
+package com.kista.user.adapter.out.persistence.auth;
+
+import com.kista.user.domain.auth.RefreshToken;
+import com.kista.user.application.port.output.RefreshTokenPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+@Component
+@RequiredArgsConstructor
+class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
+
+    private final RefreshTokenJpaRepository repository;
+
+    @Override
+    @Transactional
+    public void save(RefreshToken token) {
+        repository.save(RefreshTokenEntity.from(token));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<RefreshToken> findByTokenHash(String tokenHash) {
+        return repository.findByTokenHash(tokenHash).map(RefreshTokenEntity::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public void deleteByTokenHash(String tokenHash) {
+        repository.deleteByTokenHash(tokenHash);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllByUserId(UUID userId) {
+        repository.deleteAllByUserId(userId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteByUserIdAndUserAgent(UUID userId, String userAgent) {
+        repository.deleteAllByUserIdAndUserAgent(userId, userAgent);
+    }
+
+    @Override
+    @Transactional
+    public int deleteAllExpired() {
+        return repository.deleteAllByExpiresAtBefore(Instant.now());
+    }
+
+    @Override
+    @Transactional
+    public int markRotated(String tokenHash, Instant now) {
+        return repository.markRotated(tokenHash, now);
+    }
+
+    @Override
+    @Transactional
+    public int deleteAllRotatedBefore(Instant threshold) {
+        return repository.deleteAllByRotatedAtBefore(threshold);
+    }
+}

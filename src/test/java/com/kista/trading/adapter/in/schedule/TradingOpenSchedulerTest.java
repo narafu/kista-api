@@ -8,7 +8,7 @@ import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.privacy.application.port.output.PrivacyTradePort;

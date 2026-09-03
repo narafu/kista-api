@@ -6,7 +6,8 @@ import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.domain.model.PriceSnapshot;
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.NotificationChannel;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradingServiceTest {
@@ -74,7 +76,7 @@ class ManualTradingServiceTest {
             UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null,
             LocalDate.now(), null, null, null
     );
-    static final User USER = DomainFixtures.activeUser(REQUESTER_ID, User.NotificationChannel.NONE);
+    static final User USER = DomainFixtures.activeUser(REQUESTER_ID, NotificationChannel.NONE);
     // DB 잔고 이력 — cycle_position 기반 (TradingBalanceLoader가 읽음)
     static final CyclePosition HISTORY = new CyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),

@@ -3,12 +3,11 @@ package com.kista.admin.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.admin.domain.model.AdminStats;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
 import com.kista.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class AdminQueryServiceTest {
@@ -44,10 +44,10 @@ class AdminQueryServiceTest {
 
     @Test
     void getStats_상태별_카운트를_단일_GROUP_BY_조회로_합산한다() {
-        Map<User.UserStatus, Long> byStatus = new EnumMap<>(User.UserStatus.class);
-        byStatus.put(User.UserStatus.PENDING, 3L);
-        byStatus.put(User.UserStatus.ACTIVE, 10L);
-        byStatus.put(User.UserStatus.REJECTED, 2L);
+        Map<UserStatus, Long> byStatus = new EnumMap<>(UserStatus.class);
+        byStatus.put(UserStatus.PENDING, 3L);
+        byStatus.put(UserStatus.ACTIVE, 10L);
+        byStatus.put(UserStatus.REJECTED, 2L);
         when(userPort.countGroupByStatus()).thenReturn(byStatus);
         when(accountPort.countAll()).thenReturn(7L);
 
@@ -60,8 +60,8 @@ class AdminQueryServiceTest {
     @Test
     void getStats_특정_상태가_결과에_없으면_0으로_처리한다() {
         // ACTIVE만 존재 — PENDING/REJECTED 상태의 사용자가 아예 없는 경우
-        Map<User.UserStatus, Long> byStatus = new EnumMap<>(User.UserStatus.class);
-        byStatus.put(User.UserStatus.ACTIVE, 5L);
+        Map<UserStatus, Long> byStatus = new EnumMap<>(UserStatus.class);
+        byStatus.put(UserStatus.ACTIVE, 5L);
         when(userPort.countGroupByStatus()).thenReturn(byStatus);
         when(accountPort.countAll()).thenReturn(0L);
 

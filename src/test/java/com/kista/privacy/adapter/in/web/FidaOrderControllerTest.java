@@ -1,16 +1,16 @@
 package com.kista.privacy.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.adapter.in.web.security.JwtAuthFilter;
-import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.user.adapter.in.web.security.JwtAuthFilter;
+import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.privacy.application.usecase.PrivacyUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

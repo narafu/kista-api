@@ -7,7 +7,7 @@ import com.kista.finance.adapter.in.web.dto.FinanceGroupMemberResponse;
 import com.kista.finance.adapter.in.web.dto.FinanceGroupResponse;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
-import com.kista.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

@@ -7,7 +7,7 @@ import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.finance.application.port.output.FinanceAccountPort;
 import com.kista.finance.application.port.output.FinanceCategoryPort;

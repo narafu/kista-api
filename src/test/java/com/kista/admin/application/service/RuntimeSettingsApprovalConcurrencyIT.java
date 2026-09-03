@@ -1,9 +1,9 @@
 package com.kista.admin.application.service;
 
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
-import com.kista.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;

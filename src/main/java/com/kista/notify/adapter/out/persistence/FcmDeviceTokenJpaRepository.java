@@ -11,6 +11,7 @@ import java.util.UUID;
 interface FcmDeviceTokenJpaRepository extends JpaRepository<FcmDeviceTokenEntity, UUID> {
     List<FcmDeviceTokenEntity> findAllByUserId(UUID userId);
     void deleteByUserIdAndToken(UUID userId, String token);
+    void deleteAllByUserId(UUID userId); // 탈퇴 cascade — 파생 삭제 쿼리(@Modifying 불필요)
 
     // token 유니크 제약 위 네이티브 upsert — 동시 요청 race를 애플리케이션 레벨 조회-후-저장 없이 원천 차단
     @Modifying

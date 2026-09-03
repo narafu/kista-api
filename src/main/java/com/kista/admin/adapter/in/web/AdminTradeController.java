@@ -9,7 +9,7 @@ import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.admin.domain.model.AdminCycleStrategySummary;
-import com.kista.admin.domain.model.AdminUserView;
+import com.kista.user.domain.model.AdminUserView;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.admin.application.usecase.AdminQueryUseCase;

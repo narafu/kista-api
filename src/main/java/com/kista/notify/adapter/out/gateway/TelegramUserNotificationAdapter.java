@@ -1,14 +1,14 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.event.NewUserRegisteredEvent;
-import com.kista.application.event.UserApprovedEvent;
-import com.kista.application.event.UserRejectedEvent;
-import com.kista.application.event.UserReappliedEvent;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.event.NewUserRegisteredEvent;
+import com.kista.user.application.event.UserApprovedEvent;
+import com.kista.user.application.event.UserRejectedEvent;
+import com.kista.user.application.event.UserReappliedEvent;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +18,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.Map;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @Slf4j
 @Component
@@ -32,10 +34,10 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNewUserRegistered(NewUserRegisteredEvent event) {
         User user = userPort.findByIdOrThrow(event.userId());
-        if (user.role() == User.UserRole.ADMIN) {
+        if (user.role() == UserRole.ADMIN) {
             return; // 관리자 seed 부트스트랩은 알림 불필요
         }
-        if (user.status() == User.UserStatus.ACTIVE) {
+        if (user.status() == UserStatus.ACTIVE) {
             notifyAutoApprovedUser(user); // 승인 불필요 설정이라 즉시 활성화된 신규 가입 — 정보성 알림만
         } else {
             notifyNewUser(user); // 승인 대기 — 승인/거절 버튼 포함

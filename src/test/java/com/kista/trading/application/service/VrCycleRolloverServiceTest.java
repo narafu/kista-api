@@ -5,7 +5,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerPricePort;

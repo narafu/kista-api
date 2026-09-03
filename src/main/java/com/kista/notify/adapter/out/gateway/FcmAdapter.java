@@ -7,7 +7,7 @@ import com.google.firebase.messaging.Notification;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;

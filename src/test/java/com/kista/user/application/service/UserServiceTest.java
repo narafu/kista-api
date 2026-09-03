@@ -1,0 +1,563 @@
+package com.kista.user.application.service;
+
+import com.kista.user.config.AdminBootstrapProperties;
+import com.kista.user.application.event.NewUserRegisteredEvent;
+import com.kista.user.application.event.UserApprovedEvent;
+import com.kista.user.application.event.UserRejectedEvent;
+import com.kista.user.application.event.UserReappliedEvent;
+import com.kista.user.domain.model.User;
+import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.application.usecase.UserUseCase;
+import com.kista.user.application.port.output.*; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.finance.application.port.output.*;
+import com.kista.notify.application.port.output.UserNotificationPort;
+import com.kista.support.DomainFixtures;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("UserService 단위 테스트")
+class UserServiceTest {
+
+    @Mock UserPort userPort;
+    @Mock UserCascadeDeleter userCascadeDeleter;
+    @Mock UserNotificationPort notificationPort;
+    @Mock RealtimeNotificationPort realtimeNotificationPort;
+    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock AdminBootstrapProperties bootstrapProps;
+    @Mock KakaoOAuthPort kakaoOAuthPort;
+    @Mock BlacklistPort blacklistPort;
+    @Mock RefreshTokenPort refreshTokenPort;
+    @Mock ApprovalPolicyPort approvalPolicyPort;
+    @Mock ObjectProvider<ApprovalPolicyPort> approvalPolicyPortProvider;
+    @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
+    @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩
+
+    UserService userService;
+
+    // 두 ObjectProvider<T> 필드가 제네릭 소거로 동일한 raw 타입이 되어 @InjectMocks의 타입 기반
+    // 자동 주입이 모호해진다(실제로 서로 바뀌어 주입되어 ClassCastException 발생) — 생성자 직접 호출로 명시 주입한다.
+    @BeforeEach
+    void setUpRuntimeSettings() {
+        userService = new UserService(userPort, userCascadeDeleter, eventPublisher, bootstrapProps,
+                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPortProvider, userUseCaseProvider);
+        lenient().when(approvalPolicyPortProvider.getObject()).thenReturn(approvalPolicyPort);
+        lenient().when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(true);
+        lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
+    }
+
+    private User pendingUser(UUID id) {
+        // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
+        return DomainFixtures.userWithStatus(id, UserStatus.PENDING, (Instant) null);
+    }
+
+    private User rejectedUser(UUID id) {
+        // 25h 전 거절 → 24h 쿨다운 경과
+        return DomainFixtures.userWithStatus(id, UserStatus.REJECTED,
+                Instant.now().minus(25, ChronoUnit.HOURS));
+    }
+
+    private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
+        return DomainFixtures.userWithStatus(id, UserStatus.PENDING, lastReappliedAt);
+    }
+
+    private User rejectedUserWithCooldown(UUID id, Instant lastReappliedAt) {
+        return DomainFixtures.userWithStatus(id, UserStatus.REJECTED, lastReappliedAt);
+    }
+
+    @Test
+    @DisplayName("신규 사용자 등록 시 PENDING 저장 + 커밋 후 알림 이벤트 발행")
+    void register_new_user_saves_pending_and_publishes_event() {
+        UUID uid = UUID.randomUUID();
+        when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        User result = userService.register("kakao-123", "홍길동", uid, null);
+
+        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+        assertThat(result.id()).isEqualTo(uid);
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any()); // 직접 호출하지 않음
+    }
+
+    @Test
+    @DisplayName("승인 불필요 시 일반 신규 사용자를 ACTIVE로 등록")
+    void register_normalUser_whenApprovalNotRequired_returnsActiveUser() {
+        UUID uid = UUID.randomUUID();
+        when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(false);
+        when(userPort.findByKakaoId("kakao-active")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        User result = userService.register("kakao-active", "즉시가입", uid, null);
+
+        assertThat(result.role()).isEqualTo(UserRole.USER);
+        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 등록 요청 시 기존 사용자 반환 (중복 저장 없음)")
+    void register_existing_user_returns_without_saving() {
+        UUID uid = UUID.randomUUID();
+        User existing = pendingUser(uid);
+        when(userPort.findByKakaoId("kakao-123")).thenReturn(Optional.of(existing));
+
+        User result = userService.register("kakao-123", "홍길동", uid, null);
+
+        assertThat(result).isEqualTo(existing);
+        verify(userPort, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("REJECTED 상태 사용자 재신청 시 PENDING 전환 + 이벤트 발행 (직접 알림 호출 없음)")
+    void reapply_rejected_user_sets_pending_and_notifies() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserApprovedEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any());
+    }
+
+    @Test
+    @DisplayName("승인 불필요 시 REJECTED 사용자는 재신청하면 ACTIVE 전환")
+    void reapply_rejected_whenApprovalNotRequired_setsActive() {
+        UUID userId = UUID.randomUUID();
+        when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(false);
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.ACTIVE && u.lastReappliedAt() != null));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserReappliedEvent.class));
+    }
+
+    @Test
+    @DisplayName("승인 필요 시 REJECTED 사용자는 재신청하면 PENDING 전환")
+    void reapply_rejected_whenApprovalRequired_setsPending() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.PENDING));
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserApprovedEvent.class));
+    }
+
+    @Test
+    @DisplayName("승인 불필요 시 쿨다운 중인 PENDING 사용자도 재신청하면 ACTIVE 전환")
+    void reapply_pendingWithinCooldown_whenApprovalNotRequired_setsActive() {
+        UUID userId = UUID.randomUUID();
+        when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(false);
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(UserReappliedEvent.class));
+    }
+
+    @Test
+    @DisplayName("PENDING 1시간 이내 재신청 시 CooldownException")
+    void reapply_pending_within_1h_throws_cooldown() {
+        UUID userId = UUID.randomUUID();
+        // 30분 전에 마지막 재신청
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
+
+        assertThatThrownBy(() -> userService.reapply(userId))
+                .isInstanceOf(User.CooldownException.class);
+    }
+
+    @Test
+    @DisplayName("PENDING 1시간 경과 후 재신청 성공 + 이벤트 발행")
+    void reapply_pending_after_1h_succeeds() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS)));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.PENDING && u.lastReappliedAt() != null));
+        verify(eventPublisher).publishEvent(any(UserReappliedEvent.class));
+        verify(notificationPort, never()).notifyNewUser(any());
+    }
+
+    @Test
+    @DisplayName("PENDING lastReappliedAt=null 이면 즉시 재신청 허용")
+    void reapply_pending_null_lastReappliedAt_succeeds() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.PENDING));
+    }
+
+    @Test
+    @DisplayName("REJECTED 24시간 이내 재신청 시 CooldownException")
+    void reapply_rejected_within_24h_throws_cooldown() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(
+                rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS)));
+
+        assertThatThrownBy(() -> userService.reapply(userId))
+                .isInstanceOf(User.CooldownException.class);
+    }
+
+    @Test
+    @DisplayName("REJECTED lastReappliedAt=null 이면 즉시 재신청 허용 (기존 DB 사용자)")
+    void reapply_rejected_null_lastReappliedAt_succeeds() {
+        UUID userId = UUID.randomUUID();
+        User user = DomainFixtures.userWithStatus(userId, UserStatus.REJECTED, (Instant) null);
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reapply(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.PENDING));
+    }
+
+    @Test
+    @DisplayName("거절 시 lastReappliedAt 갱신 (24h 카운트다운 시작)")
+    void reject_sets_lastReappliedAt() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, null);
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.REJECTED && u.lastReappliedAt() != null));
+    }
+
+    @Test
+    @DisplayName("거절 시 reason 저장 (trim 적용)")
+    void reject_storesTrimmedReason() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, "  허위 정보 기재  ");
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.REJECTED && "허위 정보 기재".equals(u.rejectReason())));
+    }
+
+    @Test
+    @DisplayName("거절 시 reason blank -> null 정규화")
+    void reject_blankReason_normalizesToNull() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, "   ");
+
+        verify(userPort).save(argThat(u ->
+                u.status() == UserStatus.REJECTED && u.rejectReason() == null));
+    }
+
+    @Test
+    @DisplayName("승인 시 ACTIVE 전환 + 이벤트 발행 (직접 알림 호출 없음)")
+    void approve_sets_active_and_notifies() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.approve(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+        verify(notificationPort, never()).notifyApproved(any());
+    }
+
+    @Test
+    @DisplayName("거절 시 REJECTED 전환 + 이벤트 발행 (직접 알림 호출 없음)")
+    void reject_sets_rejected_and_notifies() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, null);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.REJECTED));
+        verify(eventPublisher).publishEvent(any(UserRejectedEvent.class));
+        verify(notificationPort, never()).notifyRejected(any());
+    }
+
+    @Test
+    @DisplayName("거절 시 블랙리스트 즉시 등재 (AT 만료까지 15분 차단)")
+    void reject_blacklistsUser() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.reject(userId, null);
+
+        verify(blacklistPort).add(eq(userId), eq(Duration.ofMinutes(15)));
+        verify(refreshTokenPort).deleteAllByUserId(userId);
+    }
+
+    @Test
+    @DisplayName("ADMIN seed kakaoId 신규 등록 시 ACTIVE + ADMIN 역할로 생성")
+    void register_adminSeed_returnsActiveAdmin() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("12345")).thenReturn(true);
+        when(userPort.findByKakaoId("12345")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("12345", "adminName", uid, null);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        assertThat(result.status()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("일반 사용자 신규 등록 시 PENDING + USER 역할로 생성")
+    void register_normalUser_returnsPendingUser() {
+        // given
+        UUID uid = UUID.randomUUID();
+        when(bootstrapProps.isAdmin("99999")).thenReturn(false);
+        when(userPort.findByKakaoId("99999")).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.register("99999", "userName", uid, null);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.USER);
+        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 시 userPort.delete 호출")
+    void deleteMe_removesUser() {
+        UUID id = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(id)).thenReturn(pendingUser(id));
+
+        userService.deleteMe(id);
+
+        verify(userCascadeDeleter).deleteCascade(id);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자 탈퇴 시 NoSuchElementException")
+    void deleteMe_userNotFound_throws() {
+        UUID id = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(id)).thenThrow(new NoSuchElementException("사용자를 찾을 수 없습니다: " + id));
+
+        assertThatThrownBy(() -> userService.deleteMe(id))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    // ─── login() 시나리오 ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("신규 사용자 login: findByKakaoId 결과 없으면 register 경로 → 새 User 반환")
+    void login_newUser_registersAndReturns() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-new-001";
+        String accessToken = "kakao-access-token";
+        UUID newUserId = UUID.randomUUID();
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "신규사용자", null));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → empty → save 경로
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.empty());
+        when(userPort.save(any())).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            // UUID가 null이 아닌 User를 그대로 반환 (id는 register()에서 전달된 UUID)
+            return u;
+        });
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.kakaoId()).isEqualTo(kakaoId);
+        assertThat(result.status()).isEqualTo(UserStatus.PENDING);
+        assertThat(result.role()).isEqualTo(UserRole.USER);
+        verify(userPort).save(any()); // 신규 저장 1회
+        verify(userUseCaseProvider).getObject(); // 트랜잭션 프록시를 통해 register 호출
+        verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: findByKakaoId 결과 있으면 기존 User 반환 (register 내 save 미호출)")
+    void login_existingUser_returnsExistingWithoutSave() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-001";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", null, UserStatus.ACTIVE, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", null));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → 기존 사용자 반환 → orElseGet 미실행
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result).isEqualTo(existingUser);
+        verify(userPort, never()).save(any()); // 기존 사용자 → 저장 없음
+        verify(eventPublisher, never()).publishEvent(any()); // 이벤트 발행 없음
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: email 미보유 + 카카오 응답에 email 있으면 백필 저장")
+    void login_existingUserWithoutEmail_backfillsEmailFromKakao() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-002";
+        String accessToken = "kakao-access-token";
+        String kakaoEmail = "user@example.com";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", null, UserStatus.ACTIVE, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", kakaoEmail));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo(kakaoEmail);
+        verify(userPort).save(argThat(u -> kakaoEmail.equals(u.email())));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: 카카오 이메일이 기존과 다르면 최신값으로 갱신")
+    void login_existingUserWithDifferentEmail_updatesToLatest() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-003";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", "old@example.com", UserStatus.ACTIVE, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", "new@example.com"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo("new@example.com");
+        verify(userPort).save(argThat(u -> "new@example.com".equals(u.email())));
+    }
+
+    @Test
+    @DisplayName("기존 사용자 login: 카카오 이메일이 기존과 동일하면 저장 없음")
+    void login_existingUserWithSameEmail_doesNotSave() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-existing-004";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "기존사용자", "same@example.com", UserStatus.ACTIVE, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "기존사용자", "same@example.com"));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(existingUser));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.email()).isEqualTo("same@example.com");
+        verify(userPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("중복 등록 경쟁 조건: save에서 DataIntegrityViolationException → findByKakaoId 재조회로 fallback")
+    void login_duplicateRegistration_fallbacksToExistingUser() {
+        // given
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-race-001";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User existingUser = new User(existingId, kakaoId, "경쟁사용자", null, UserStatus.PENDING, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "경쟁사용자", null));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(false);
+        // register() 내부: findByKakaoId → empty → save → DataIntegrityViolationException
+        when(userPort.findByKakaoId(kakaoId))
+                .thenReturn(Optional.empty())             // register() 내 첫 조회: empty
+                .thenReturn(Optional.of(existingUser));  // catch 블록의 fallback 재조회
+        when(userPort.save(any())).thenThrow(new DataIntegrityViolationException("UK constraint"));
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result).isEqualTo(existingUser);
+        verify(userPort, times(2)).findByKakaoId(kakaoId); // 1차(register내) + 2차(catch fallback)
+    }
+}

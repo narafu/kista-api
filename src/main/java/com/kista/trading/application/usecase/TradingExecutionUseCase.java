@@ -6,7 +6,7 @@ import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 
 import java.util.List;
 import java.util.Map;

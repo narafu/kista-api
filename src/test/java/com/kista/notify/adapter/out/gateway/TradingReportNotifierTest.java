@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.application.port.output.AccountPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.Direction;
@@ -9,7 +9,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.trading.domain.model.TradingReport;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.application.port.output.RealtimeNotificationPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;

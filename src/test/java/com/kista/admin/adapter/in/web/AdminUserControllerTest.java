@@ -1,13 +1,12 @@
 package com.kista.admin.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.adapter.in.web.security.JwtAuthFilter;
-import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.admin.domain.model.AdminUserView;
-import com.kista.domain.model.user.User;
+import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.user.adapter.in.web.security.JwtAuthFilter;
+import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -32,6 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @WebMvcTest(AdminUserController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -49,7 +50,7 @@ class AdminUserControllerTest {
 
     // 테스트용 샘플 AdminUserView 생성
     private AdminUserView sampleUser(UUID id) {
-        return new AdminUserView(id, "테스트유저", User.UserStatus.PENDING, User.UserRole.USER, Instant.now());
+        return new AdminUserView(id, "테스트유저", UserStatus.PENDING, UserRole.USER, Instant.now());
     }
 
     @Test

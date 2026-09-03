@@ -3,10 +3,10 @@ package com.kista.finance.adapter.in.web;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.domain.model.user.User;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.domain.model.User;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
-import com.kista.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -32,6 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @WebMvcTest(FinanceGroupController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -64,7 +66,7 @@ class FinanceGroupControllerTest {
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
-        User user = new User(USER_ID, "kakao", "홍길동", null, User.UserStatus.ACTIVE, User.UserRole.USER,
+        User user = new User(USER_ID, "kakao", "홍길동", null, UserStatus.ACTIVE, UserRole.USER,
                 null, null, null, null, null, User.DEFAULT_CHANNEL);
         when(userUseCase.getById(USER_ID)).thenReturn(user);
 
@@ -86,9 +88,9 @@ class FinanceGroupControllerTest {
                 FinanceGroup.MemberRole.MEMBER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(owner, other));
         when(userUseCase.getById(USER_ID)).thenReturn(new User(USER_ID, "kakao", "홍길동", null,
-                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
+                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
         when(userUseCase.getById(otherUserId)).thenReturn(new User(otherUserId, "kakao2", "김철수", null,
-                User.UserStatus.ACTIVE, User.UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
+                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))

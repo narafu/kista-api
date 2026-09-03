@@ -1,16 +1,15 @@
 package com.kista.admin.application.service;
 
-import com.kista.application.service.user.UserCascadeDeleter;
 import com.kista.common.TimeZones;
-import com.kista.admin.domain.model.AdminUserView;
-import com.kista.domain.model.auth.TokenConstants;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.auth.TokenConstants;
+import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.application.usecase.UserUseCase;
-import com.kista.admin.application.port.output.AdminUserViewPort;
+import com.kista.user.application.usecase.UserUseCase;
+import com.kista.user.application.port.output.AdminUserViewPort;
 import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.application.port.output.BlacklistPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.BlacklistPort;
+import com.kista.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @Slf4j
 @Service
@@ -31,8 +32,7 @@ class AdminService implements AdminUserUseCase {
 
     private final UserPort userPort;
     private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
-    private final UserCascadeDeleter userCascadeDeleter;
-    private final UserUseCase userUseCase; // 승인/거절 위임 (텔레그램 알림 + SSE 포함)
+    private final UserUseCase userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
     private final BlacklistPort blacklistPort;           // role 변경 시 stale AT 무효화 기록
 
@@ -44,7 +44,7 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUserView> listByStatus(User.UserStatus status, LocalDate from, LocalDate to) {
+    public List<AdminUserView> listByStatus(UserStatus status, LocalDate from, LocalDate to) {
         return filterByDate(adminUserViewPort.findAllByStatus(status), from, to);
     }
 
@@ -77,14 +77,14 @@ class AdminService implements AdminUserUseCase {
     }
 
     @Override
-    public void changeRole(UUID adminId, UUID targetUserId, User.UserRole role) {
-        if (role == User.UserRole.USER) {
+    public void changeRole(UUID adminId, UUID targetUserId, UserRole role) {
+        if (role == UserRole.USER) {
             // 자기 자신 강등 방지
             if (adminId.equals(targetUserId)) {
                 throw new IllegalArgumentException("자기 자신의 역할을 강등할 수 없습니다");
             }
             // 마지막 ADMIN 강등 방지
-            if (userPort.countByRole(User.UserRole.ADMIN) <= 1) {
+            if (userPort.countByRole(UserRole.ADMIN) <= 1) {
                 throw new IllegalStateException("최소 1명의 관리자가 존재해야 합니다");
             }
         }
@@ -100,7 +100,7 @@ class AdminService implements AdminUserUseCase {
     @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
         userPort.findByIdOrThrow(targetUserId); // 존재 확인
-        userCascadeDeleter.deleteCascade(targetUserId);
+        userUseCase.deleteMe(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
     }

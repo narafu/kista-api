@@ -4,7 +4,7 @@ import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.application.usecase.AccountStatisticsUseCase;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

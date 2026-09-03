@@ -2,7 +2,7 @@ package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceCategoryCommand;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.finance.application.usecase.FinanceCategoryUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;

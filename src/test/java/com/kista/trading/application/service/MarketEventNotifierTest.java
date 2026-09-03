@@ -1,13 +1,13 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.user.NotificationType;
-import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.model.user.UserSettings;
+import com.kista.sharedkernel.NotificationType;
+import com.kista.user.domain.model.User;
+import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.UserSettings;
 import com.kista.trading.application.event.MarketCloseEvent;
 import com.kista.trading.application.event.MarketOpenEvent;
-import com.kista.application.port.output.UserPort;
-import com.kista.application.port.output.UserSettingsPort;
+import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +29,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -56,7 +57,7 @@ class MarketEventNotifierTest {
                 .collect(java.util.stream.Collectors.toMap(User::id,
                         u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
 
         // 모든 스레드가 barrier에 동시 도달해야만 통과 — 순차 실행이면 타임아웃되어 실패 기록됨
@@ -90,7 +91,7 @@ class MarketEventNotifierTest {
                 .collect(java.util.stream.Collectors.toMap(User::id,
                         u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
 
         AtomicInteger current = new AtomicInteger(0);
@@ -122,7 +123,7 @@ class MarketEventNotifierTest {
                 .collect(java.util.stream.Collectors.toMap(User::id,
                         u -> new UserSettings(u.id(), true, Map.of(NotificationType.MARKET_ALERT, true), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)));
 
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
 
         doThrow(new RuntimeException("텔레그램 발송 실패")).when(eventPublisher).publishEvent(new MarketOpenEvent(failingUser.id()));
@@ -144,7 +145,7 @@ class MarketEventNotifierTest {
                 disabledUser.id(), new UserSettings(disabledUser.id(), true, Map.of(NotificationType.MARKET_ALERT, false), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS)
         );
 
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
 
         notifier.notifyMarketOpen();

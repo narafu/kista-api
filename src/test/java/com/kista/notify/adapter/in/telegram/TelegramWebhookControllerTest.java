@@ -1,9 +1,9 @@
 package com.kista.notify.adapter.in.telegram;
 
-import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.adapter.in.web.security.JwtAuthFilter;
-import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.user.adapter.in.web.security.JwtAuthFilter;
+import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;

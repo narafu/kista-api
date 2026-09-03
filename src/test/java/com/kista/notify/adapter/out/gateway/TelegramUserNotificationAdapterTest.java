@@ -1,12 +1,12 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.event.NewUserRegisteredEvent;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.event.NewUserRegisteredEvent;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
-import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
+import com.kista.user.domain.model.User;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramUserNotificationAdapterTest {
@@ -124,7 +126,7 @@ class TelegramUserNotificationAdapterTest {
 
     @Test
     void onNewUserRegistered_pending_sendsApprovalRequestWithButtons() {
-        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.PENDING);
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), UserStatus.PENDING);
         when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
 
         adapter.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
@@ -136,7 +138,7 @@ class TelegramUserNotificationAdapterTest {
     @SuppressWarnings("unchecked")
     void onNewUserRegistered_activeNonAdmin_sendsAutoApprovedInfoMessage() {
         // 승인 불필요 설정으로 즉시 ACTIVE 등록된 일반 사용자 — 관리자에게 정보성 알림
-        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.USER);
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), UserStatus.ACTIVE, UserRole.USER);
         when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
@@ -149,7 +151,7 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void onNewUserRegistered_activeAdmin_skipsNotification() {
         // 관리자 seed 부트스트랩 — 알림 불필요
-        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.ADMIN);
+        User user = DomainFixtures.userWithStatus(UUID.randomUUID(), UserStatus.ACTIVE, UserRole.ADMIN);
         when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
 
         adapter.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));

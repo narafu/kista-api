@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.FcmTokenRequest;
-import com.kista.application.usecase.UserProfileUseCase;
+import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FcmController {
 
-    private final UserProfileUseCase userProfileUseCase;
-
-
+    private final FcmDeviceTokenPort fcmDeviceTokenPort;
 
     // FCM 디바이스 토큰 등록 (WEB | ANDROID | IOS)
     @Operation(summary = "FCM 토큰 등록", description = "body: {\"token\": \"...\", \"platform\": \"WEB\"}")
@@ -30,7 +28,7 @@ public class FcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void registerToken(@AuthenticationPrincipal UUID userId,
                               @Valid @RequestBody FcmTokenRequest body) {
-        userProfileUseCase.registerFcmToken(userId, body.token(), body.platform());
+        fcmDeviceTokenPort.save(userId, body.token(), body.platform());
     }
 
     // FCM 디바이스 토큰 삭제
@@ -40,6 +38,6 @@ public class FcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unregisterToken(@AuthenticationPrincipal UUID userId,
                                 @PathVariable String token) {
-        userProfileUseCase.unregisterFcmToken(userId, token);
+        fcmDeviceTokenPort.delete(userId, token);
     }
 }

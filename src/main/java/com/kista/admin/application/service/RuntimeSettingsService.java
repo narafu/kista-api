@@ -3,13 +3,14 @@ package com.kista.admin.application.service;
 import com.kista.domain.model.account.Account.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
-import com.kista.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.ApprovalPolicyPort;
+import com.kista.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import com.kista.sharedkernel.UserStatus;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
-class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUseCase {
+class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUseCase, ApprovalPolicyPort {
 
     private final RuntimeSettingsPort settingsPort; // 런타임 설정 영속화 포트
     private final UserPort userPort; // 승인 대기 사용자 조회 포트
@@ -32,6 +34,12 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
     @Transactional(readOnly = true)
     public RuntimeSettings getSettings() {
         return settingsPort.load();
+    }
+
+    @Override
+    @Transactional
+    public boolean approvalRequiredForUpdate() {
+        return settingsPort.loadForUpdate().approvalRequired();
     }
 
     @Override
@@ -51,7 +59,7 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
 
         // 승인 설정을 끄는 순간의 PENDING 사용자만 기존 승인 흐름으로 활성화한다.
         if (previous.approvalRequired() && !saved.approvalRequired()) {
-            userPort.findAllByStatus(User.UserStatus.PENDING).stream()
+            userPort.findAllByStatus(UserStatus.PENDING).stream()
                     .map(User::id)
                     .forEach(userUseCase::approve);
         }

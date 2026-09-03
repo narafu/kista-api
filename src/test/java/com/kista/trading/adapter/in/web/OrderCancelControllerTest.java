@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.in.web;
 
 import com.kista.trading.domain.model.OrderCancelException;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

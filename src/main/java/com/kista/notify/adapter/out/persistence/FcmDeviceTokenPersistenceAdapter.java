@@ -32,6 +32,12 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     }
 
     @Override
+    @Transactional
+    public void deleteAllByUserId(UUID userId) {
+        repository.deleteAllByUserId(userId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<String> findTokensByUserId(UUID userId) {
         return repository.findAllByUserId(userId).stream()

@@ -1,12 +1,12 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.user.NotificationType;
-import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.UserSettings;
+import com.kista.sharedkernel.NotificationType;
+import com.kista.user.domain.model.User;
+import com.kista.user.domain.model.UserSettings;
 import com.kista.trading.application.event.MarketCloseEvent;
 import com.kista.trading.application.event.MarketOpenEvent;
-import com.kista.application.port.output.UserPort;
-import com.kista.application.port.output.UserSettingsPort;
+import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
+import com.kista.sharedkernel.UserStatus;
 
 // 장 이벤트(개장·마감) 사용자 알림 발송 — TradingService에서 분리
 // ACTIVE 사용자 중 해당 NotificationType이 활성화된 사용자에게만 발송
@@ -40,7 +41,7 @@ class MarketEventNotifier {
 
     private void notify(NotificationType type, Consumer<User> action) {
         // 배치 조회로 N+1 제거
-        var users = userPort.findAllByStatus(User.UserStatus.ACTIVE);
+        var users = userPort.findAllByStatus(UserStatus.ACTIVE);
         var userIds = users.stream().map(User::id).toList();
         var settingsMap = userSettingsPort.findOrDefaultByUserIds(userIds);
 

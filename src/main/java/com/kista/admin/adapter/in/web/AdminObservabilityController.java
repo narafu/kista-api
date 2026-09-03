@@ -5,7 +5,7 @@ import com.kista.admin.adapter.in.web.dto.AnomaliesResponse;
 import com.kista.admin.adapter.in.web.dto.AuditLogResponse;
 import com.kista.admin.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.admin.domain.model.AdminAnomalies;
-import com.kista.admin.domain.model.AdminUserView;
+import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;

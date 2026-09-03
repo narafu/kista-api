@@ -1,7 +1,6 @@
 package com.kista.adapter.out.sse;
 
 import com.kista.trading.domain.model.TradeEvent;
-import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +13,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.verify;
+import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class SseEmitterRegistryTest {
@@ -36,7 +36,7 @@ class SseEmitterRegistryTest {
     @Test
     void notifyStatusChange_unknown_user_is_safe() {
         UUID userId = UUID.randomUUID(); // 연결 없는 사용자
-        assertThatCode(() -> registry.notifyStatusChange(userId, User.UserStatus.ACTIVE))
+        assertThatCode(() -> registry.notifyStatusChange(userId, UserStatus.ACTIVE))
                 .doesNotThrowAnyException();
     }
 
@@ -44,7 +44,7 @@ class SseEmitterRegistryTest {
     void notifyStatusChange_connected_user_sends_event() {
         UUID userId = UUID.randomUUID();
         registry.connect(userId);
-        assertThatCode(() -> registry.notifyStatusChange(userId, User.UserStatus.ACTIVE))
+        assertThatCode(() -> registry.notifyStatusChange(userId, UserStatus.ACTIVE))
                 .doesNotThrowAnyException();
     }
 

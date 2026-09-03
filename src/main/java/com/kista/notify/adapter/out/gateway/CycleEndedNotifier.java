@@ -1,9 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.application.port.output.AccountPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;

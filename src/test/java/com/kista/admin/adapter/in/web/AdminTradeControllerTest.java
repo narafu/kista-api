@@ -1,8 +1,8 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.adapter.in.web.security.JwtAuthFilter;
-import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.user.adapter.in.web.security.JwtAuthFilter;
+import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
@@ -11,7 +11,7 @@ import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -39,6 +39,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
+import com.kista.sharedkernel.UserRole;
+import com.kista.sharedkernel.UserStatus;
 
 @WebMvcTest(AdminTradeController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -103,11 +105,11 @@ class AdminTradeControllerTest {
                 )
         ));
         when(adminUser.findUser(UUID.fromString("00000000-0000-0000-0000-000000000010"))).thenReturn(Optional.of(
-                new com.kista.admin.domain.model.AdminUserView(
+                new com.kista.user.domain.model.AdminUserView(
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "privacy-user",
-                        com.kista.domain.model.user.User.UserStatus.ACTIVE,
-                        com.kista.domain.model.user.User.UserRole.USER,
+                        UserStatus.ACTIVE,
+                        UserRole.USER,
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));

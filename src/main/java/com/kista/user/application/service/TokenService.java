@@ -1,0 +1,151 @@
+package com.kista.user.application.service;
+
+import com.kista.common.Sha256;
+import com.kista.user.domain.auth.InvalidRefreshTokenException;
+import com.kista.user.domain.auth.RefreshToken;
+import com.kista.user.domain.auth.TokenConstants;
+import com.kista.user.domain.auth.TokenRefreshResult;
+import com.kista.user.domain.model.User;
+import com.kista.user.application.usecase.TokenUseCase;
+import com.kista.user.application.port.output.BlacklistPort;
+import com.kista.user.application.port.output.RefreshTokenPort;
+import com.kista.user.application.port.output.UserPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@Transactional
+@RequiredArgsConstructor
+class TokenService implements TokenUseCase {
+
+    private static final Duration RT_TTL = Duration.ofDays(5); // 리프레시 토큰 유효 기간
+    private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
+    // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 동시 요청 패자로 허용
+    static final Duration RT_GRACE = Duration.ofSeconds(60);
+
+    private final RefreshTokenPort refreshTokenPort;
+    private final BlacklistPort blacklistPort;
+    private final UserPort userPort;
+
+    @Override
+    public String issueRefreshToken(UUID userId, String userAgent) {
+        // 동일 기기(User-Agent) 기존 RT 교체 — 따닥 로그인 고아 토큰 방지, 다른 기기 세션은 유지
+        refreshTokenPort.deleteByUserIdAndUserAgent(userId, userAgent);
+        return issueNewRt(userId, userAgent);
+    }
+
+    /**
+     * RTR + 60초 grace window.
+     * <p>
+     * 미회전 RT → markRotated(원자적 UPDATE) → 새 RT 발급 (회전 승자).
+     * 이미 회전된 RT 재제시:
+     *   - grace 이내  → 동시 요청의 패자로 허용, 새 RT 발급
+     *   - grace 초과  → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
+     */
+    // grace 초과 시 revokeAllSessionsAndReject()가 deleteAllByUserId 후 InvalidRefreshTokenException을 던지는데,
+    // unchecked 예외가 전파되면 클래스 레벨 @Transactional 기본 롤백 규칙에 의해 방금 실행한 세션 폐기(delete)까지
+    // 롤백되어 재사용 공격 탐지가 무력화됨 — noRollbackFor로 폐기 커밋 보장
+    @Override
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
+    public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
+        String hash = sha256Hex(rawRefreshToken);
+        Instant now = Instant.now();
+
+        RefreshToken rt = refreshTokenPort.findByTokenHash(hash)
+                .orElseThrow(() -> {
+                    log.warn("[RT] refresh 거부: 알 수 없는 토큰 (uaHash={})", userAgent != null ? userAgent.hashCode() : "null");
+                    return new InvalidRefreshTokenException("유효하지 않은 refresh token");
+                });
+
+        if (rt.expiresAt().isBefore(now)) {
+            refreshTokenPort.deleteByTokenHash(hash);
+            log.warn("[RT] refresh 거부: 만료된 토큰 (userId={})", rt.userId());
+            throw new InvalidRefreshTokenException("만료된 refresh token");
+        }
+
+        if (rt.rotatedAt() != null) {
+            // 이미 회전된 RT 재제시
+            if (Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) <= 0) {
+                // grace 이내 → 동시 경쟁의 패자, 정상 처리
+                User user = userPort.findByIdOrThrow(rt.userId());
+                return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
+            }
+            // grace 초과 → 재사용 공격 의심, 해당 사용자 전체 세션 폐기
+            throw revokeAllSessionsAndReject(rt.userId(), "재사용 공격 의심: grace 초과 회전 토큰 재제시");
+        }
+
+        // 미회전 RT — markRotated로 원자적 회전 마킹 (동시 요청 시 1건만 1 반환)
+        int rotated = refreshTokenPort.markRotated(hash, now);
+        if (rotated == 0) {
+            // 다른 스레드/인스턴스가 먼저 회전 — 최신 상태 재조회 후 grace 판정
+            rt = refreshTokenPort.findByTokenHash(hash)
+                    .orElseThrow(() -> new InvalidRefreshTokenException("유효하지 않은 refresh token"));
+            if (rt.rotatedAt() == null || Duration.between(rt.rotatedAt(), now).compareTo(RT_GRACE) > 0) {
+                throw revokeAllSessionsAndReject(rt.userId(), "refresh 거부: markRotated 경쟁 후 grace 초과");
+            }
+            // grace 이내 경쟁 패자 → 정상 처리
+        }
+        User user = userPort.findByIdOrThrow(rt.userId());
+        return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
+    }
+
+    @Override
+    public void logout(String rawRefreshToken, String jti, Instant atExpiresAt) {
+        String hash = sha256Hex(rawRefreshToken);
+        refreshTokenPort.findByTokenHash(hash).ifPresent(rt -> {
+            refreshTokenPort.deleteByTokenHash(hash);
+            // AT jti만 차단 — 재로그인 후 새 AT는 영향 없음
+            if (jti != null && atExpiresAt != null) {
+                Duration remaining = Duration.between(Instant.now(), atExpiresAt);
+                if (remaining.isPositive()) {
+                    blacklistPort.addJti(jti, remaining);
+                }
+            }
+        });
+    }
+
+    @Override
+    public int cleanupExpiredTokens() {
+        return refreshTokenPort.deleteAllExpired();
+    }
+
+    @Override
+    public int cleanupRotatedTokens() {
+        // grace 2배 여유를 두어 극단적 지연 요청도 처리 후 삭제
+        return refreshTokenPort.deleteAllRotatedBefore(Instant.now().minus(RT_GRACE.multipliedBy(2)));
+    }
+
+    // package-private — TokenServiceTest에서 직접 테스트
+    static String sha256Hex(String input) {
+        return Sha256.hex(input);
+    }
+
+    private String issueNewRt(UUID userId, String userAgent) {
+        String newRaw = generateRawToken();
+        // RefreshToken.issue() — id·rotatedAt·createdAt은 DB가 채움
+        refreshTokenPort.save(RefreshToken.issue(userId, sha256Hex(newRaw), userAgent, Instant.now().plus(RT_TTL)));
+        return newRaw;
+    }
+
+    // grace 초과 — 해당 사용자 전체 세션 폐기 후 거부 예외 반환 (throw 용)
+    private InvalidRefreshTokenException revokeAllSessionsAndReject(UUID userId, String warnContext) {
+        log.warn("[RT] {} (userId={})", warnContext, userId);
+        refreshTokenPort.deleteAllByUserId(userId);
+        return new InvalidRefreshTokenException("유효하지 않은 refresh token");
+    }
+
+    private static String generateRawToken() {
+        byte[] bytes = new byte[32]; // 256비트 엔트로피
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+}

@@ -1,9 +1,8 @@
 package com.kista.adapter.out.sse;
 
-import com.kista.application.event.UserApprovedEvent;
-import com.kista.application.event.UserRejectedEvent;
+import com.kista.user.application.event.UserApprovedEvent;
+import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.trading.domain.model.TradeEvent;
-import com.kista.domain.model.user.User;
 import com.kista.application.port.output.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,6 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import com.kista.sharedkernel.UserStatus;
 
 @Component
 @RequiredArgsConstructor
@@ -33,7 +33,7 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
     }
 
     @Override
-    public void notifyStatusChange(UUID userId, User.UserStatus status) {
+    public void notifyStatusChange(UUID userId, UserStatus status) {
         SseEmitter emitter = emitters.get(userId);
         if (emitter == null) return;
         try {
@@ -51,11 +51,11 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserApproved(UserApprovedEvent event) {
-        notifyStatusChange(event.userId(), User.UserStatus.ACTIVE);
+        notifyStatusChange(event.userId(), UserStatus.ACTIVE);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRejected(UserRejectedEvent event) {
-        notifyStatusChange(event.userId(), User.UserStatus.REJECTED);
+        notifyStatusChange(event.userId(), UserStatus.REJECTED);
     }
 }

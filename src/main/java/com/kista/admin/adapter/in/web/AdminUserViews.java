@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.admin.domain.model.AdminUserView;
+import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 
 import java.util.Map;

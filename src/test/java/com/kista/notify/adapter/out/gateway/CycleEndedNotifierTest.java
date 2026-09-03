@@ -1,12 +1,12 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.application.port.output.AccountPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;

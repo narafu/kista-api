@@ -55,6 +55,15 @@ class FcmDeviceTokenPersistenceAdapterTest {
     }
 
     @Test
+    void deleteAllByUserId_delegatesToRepository() {
+        UUID userId = UUID.randomUUID();
+
+        adapter.deleteAllByUserId(userId);
+
+        verify(repository).deleteAllByUserId(userId);
+    }
+
+    @Test
     void findTokensByUserId_returnsDistinctTokens() {
         UUID userId = UUID.randomUUID();
         when(repository.findAllByUserId(userId)).thenReturn(List.of(

@@ -2,7 +2,7 @@ package com.kista.stats.adapter.in.web;
 
 import com.kista.stats.domain.model.*;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.application.usecase.BlacklistUseCase;
+import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.stats.application.usecase.UserStatsUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;

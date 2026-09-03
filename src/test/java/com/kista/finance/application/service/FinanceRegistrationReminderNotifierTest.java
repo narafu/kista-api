@@ -3,16 +3,16 @@ package com.kista.finance.application.service;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
-import com.kista.domain.model.user.NotificationType;
-import com.kista.domain.model.user.User;
-import com.kista.domain.model.user.User.NotificationChannel;
-import com.kista.domain.model.user.UserSettings;
+import com.kista.sharedkernel.NotificationType;
+import com.kista.user.domain.model.User;
+import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.UserSettings;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
-import com.kista.application.port.output.UserPort;
-import com.kista.application.port.output.UserSettingsPort;
+import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.UserStatus;
 
 class FinanceRegistrationReminderNotifierTest {
 
@@ -44,7 +45,7 @@ class FinanceRegistrationReminderNotifierTest {
         User userWithData = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
         User userWithoutData = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
 
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(List.of(userWithData, userWithoutData));
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(List.of(userWithData, userWithoutData));
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(Map.of(
                 userWithData.id(), UserSettings.defaultFor(userWithData.id()),
                 userWithoutData.id(), UserSettings.defaultFor(userWithoutData.id())));
@@ -78,7 +79,7 @@ class FinanceRegistrationReminderNotifierTest {
         FinanceTransactionPort financeTransactionPort = mock(FinanceTransactionPort.class);
 
         User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
-        when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(List.of(user));
+        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(List.of(user));
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(Map.of(
                 user.id(), UserSettings.defaultFor(user.id()).withNotificationPrefs(Map.of(NotificationType.FINANCE_REMINDER, false))));
 

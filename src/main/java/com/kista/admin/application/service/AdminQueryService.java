@@ -10,13 +10,12 @@ import com.kista.admin.domain.model.AuditLog;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
 import com.kista.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.UserStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -49,10 +49,10 @@ class AdminQueryService implements AdminQueryUseCase {
     @Override
     public AdminStats getStats() {
         // 상태별 카운트를 단일 GROUP BY 쿼리로 조회 (countAll+countByStatus×3 직렬 호출 대체)
-        Map<User.UserStatus, Long> byStatus = userPort.countGroupByStatus();
-        long pendingCount = byStatus.getOrDefault(User.UserStatus.PENDING, 0L);
-        long activeCount = byStatus.getOrDefault(User.UserStatus.ACTIVE, 0L);
-        long rejectedCount = byStatus.getOrDefault(User.UserStatus.REJECTED, 0L);
+        Map<UserStatus, Long> byStatus = userPort.countGroupByStatus();
+        long pendingCount = byStatus.getOrDefault(UserStatus.PENDING, 0L);
+        long activeCount = byStatus.getOrDefault(UserStatus.ACTIVE, 0L);
+        long rejectedCount = byStatus.getOrDefault(UserStatus.REJECTED, 0L);
         long totalUsers = pendingCount + activeCount + rejectedCount;
         long totalAccounts = accountPort.countAll();
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);

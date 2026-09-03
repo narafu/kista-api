@@ -3,10 +3,10 @@ package com.kista.admin.application.service;
 import com.kista.domain.model.account.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.User;
 import com.kista.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
-import com.kista.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.NotificationChannel;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminSelectionChain 단위 테스트")
@@ -40,7 +41,7 @@ class AdminSelectionChainTest {
 
     // 소속 관계가 일치하는 user/account/strategy 세트 생성
     private User user() {
-        return DomainFixtures.activeUser(userId, User.NotificationChannel.NONE);
+        return DomainFixtures.activeUser(userId, NotificationChannel.NONE);
     }
 
     private Account account() {

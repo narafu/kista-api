@@ -3,8 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminRoleRequest;
 import com.kista.admin.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.admin.adapter.in.web.dto.AdminUserResponse;
-import com.kista.admin.domain.model.AdminUserView;
-import com.kista.domain.model.user.User;
+import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.UserStatus;
 
 @Tag(name = "Admin", description = "관리자 API")
 @RestController
@@ -31,7 +31,7 @@ public class AdminUserController {
     @Operation(summary = "사용자 목록 조회")
     @GetMapping
     public List<AdminUserResponse> listUsers(
-            @RequestParam(required = false) User.UserStatus status,
+            @RequestParam(required = false) UserStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @AuthenticationPrincipal UUID adminId) {
