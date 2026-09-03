@@ -33,7 +33,7 @@
 ### Account ↔ Strategy 분리
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
 - `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
-- `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지)
+- `Strategy`: `Type`/`Status`/`Ticker`/`CycleSeedType`는 모두 `Strategy` record의 **nested enum** (독립 파일 금지) — **변경 예정**: strategy-config 모듈화 시 이 4개는 전역 공용 어휘(176/101/48/48개 파일 사용)라 nested 유지가 broker/trading/notify와 순환을 유발함, `com.kista.sharedkernel`(가칭) 독립 타입으로 이관 계획 → `docs/superpowers/specs/2026-08-31-legacy-module-catalog-design.md` "nested enum 정책 개정" 참고, 실제 이관 전까지는 이 규칙 그대로 유효
 - 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드)
 - 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount` 계약 → 아래 "VR 공식"의 "개장 금액 계약")은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `VrSummary` nested(VR 외 null)
@@ -69,7 +69,7 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User nested enum 패턴
-- `User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum
+- `User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum — **변경 예정**: user 모듈화 시 일관성을 위해 동일하게 sharedkernel 이관 검토(Strategy 4종보다 시급성 낮음 — 이미 CLOSED 4모듈 포트 시그니처엔 0건) → 위 스펙 문서 참고, 실제 이관 전까지는 이 규칙 그대로 유효
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE` (domain 상수 — 서비스/컨트롤러에서 직접 하드코딩 금지)
 
 ### 도메인 Command 명명 규칙
