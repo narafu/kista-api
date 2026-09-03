@@ -4,6 +4,7 @@ import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.application.usecase.AccountUseCase;
+import com.kista.sharedkernel.Broker;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -107,7 +108,7 @@ class AccountControllerTest {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Account.Broker.TOSS, null));
+                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Broker.TOSS, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -123,7 +124,7 @@ class AccountControllerTest {
         // KIS 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "KIS계좌", "74420614", "appKey", "appSecret", null, Account.Broker.KIS, null));
+                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

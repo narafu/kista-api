@@ -2,6 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.PriceSnapshot;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class KisPriceApiTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
             UUID.randomUUID(), "appKey", "appSecret",
             "74420614", null,
-            BrokerAccountRef.Broker.KIS
+            Broker.KIS
     );
 
     @Test

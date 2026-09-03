@@ -1,6 +1,5 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.application.port.output.BrokerAccountPort;
 import com.kista.broker.application.port.output.BrokerAdapterPort;
 import com.kista.broker.application.port.output.BrokerMarketCalendarPort;
@@ -14,6 +13,7 @@ import com.kista.broker.application.port.output.MarginPort;
 import com.kista.broker.application.port.output.PortfolioPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.broker.application.port.output.StockInfoPort;
+import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +45,7 @@ class KisBrokerAdapterTest {
     @Test
     @DisplayName("supports()는 KIS를 반환한다")
     void supportsReturnsKis() {
-        assertThat(adapter().supports()).isEqualTo(BrokerAccountRef.Broker.KIS);
+        assertThat(adapter().supports()).isEqualTo(Broker.KIS);
     }
 
     @Test

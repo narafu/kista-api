@@ -2,6 +2,7 @@ package com.kista.broker.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,8 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
-    public BrokerAccountRef.Broker supports() {
-        return BrokerAccountRef.Broker.MOCK;
+    public Broker supports() {
+        return Broker.MOCK;
     }
 
     // --- 계좌+ticker → 전략 해석 공통 헬퍼 ---

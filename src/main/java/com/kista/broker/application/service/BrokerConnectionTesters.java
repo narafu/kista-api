@@ -1,7 +1,7 @@
 package com.kista.broker.application.service;
 
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.sharedkernel.Broker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @Component
 public class BrokerConnectionTesters {
 
-    private final Map<BrokerAccountRef.Broker, BrokerConnectionTestPort> testers;
+    private final Map<Broker, BrokerConnectionTestPort> testers;
 
     BrokerConnectionTesters(List<BrokerConnectionTestPort> list) {
         testers = list.stream()
@@ -24,7 +24,7 @@ public class BrokerConnectionTesters {
     }
 
     // 미지원 증권사면 IllegalArgumentException → GlobalExceptionHandler 400
-    public BrokerConnectionTestPort of(BrokerAccountRef.Broker broker) {
+    public BrokerConnectionTestPort of(Broker broker) {
         BrokerConnectionTestPort tester = testers.get(broker);
         if (tester == null) {
             throw new IllegalArgumentException("지원하지 않는 증권사: " + broker);

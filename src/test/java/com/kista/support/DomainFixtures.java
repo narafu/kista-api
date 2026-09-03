@@ -1,6 +1,7 @@
 package com.kista.support;
 
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 
@@ -53,11 +54,11 @@ public final class DomainFixtures {
 
     // 기본 KIS 계좌 (accountNo/appKey/secretKey 기본값 고정)
     public static Account kisAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Account.Broker.KIS, null);
+        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Broker.KIS, null);
     }
 
     // 기본 Toss 계좌 (accountNo/appKey/secretKey/brokerAccountCode 기본값 고정)
     public static Account tossAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Account.Broker.TOSS, null);
+        return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Broker.TOSS, null);
     }
 }

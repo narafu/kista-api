@@ -1,6 +1,7 @@
 package com.kista.admin.application.service;
 
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.admin.application.port.output.AuditLogPort;
@@ -43,7 +44,7 @@ class AdminStrategyServiceTest {
     void pauseStrategy_updatesStatusAndLogs() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(
-                new Account(ACCOUNT_ID, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Account.Broker.KIS, null));
+                new Account(ACCOUNT_ID, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Broker.KIS, null));
 
         service.pauseStrategy(ADMIN_ID, ACCOUNT_ID, STRATEGY_ID);
 
@@ -55,7 +56,7 @@ class AdminStrategyServiceTest {
     void resumeStrategy_updatesStatusAndLogs() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY.withStatus(StrategyStatus.PAUSED));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(
-                new Account(ACCOUNT_ID, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Account.Broker.KIS, null));
+                new Account(ACCOUNT_ID, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Broker.KIS, null));
 
         service.resumeStrategy(ADMIN_ID, ACCOUNT_ID, STRATEGY_ID);
 

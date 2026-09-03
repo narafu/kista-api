@@ -1,5 +1,6 @@
 package com.kista.admin.adapter.out.persistence.settings;
 
+import com.kista.sharedkernel.Broker;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -98,8 +99,8 @@ class RuntimeSettingsPersistenceAdapterTest {
 
         RuntimeSettings loaded = adapter.load();
 
-        assertThat(loaded.brokers()).containsKey(com.kista.account.domain.model.Account.Broker.MOCK);
-        assertThat(loaded.brokers().get(com.kista.account.domain.model.Account.Broker.MOCK).enabled()).isTrue();
+        assertThat(loaded.brokers()).containsKey(Broker.MOCK);
+        assertThat(loaded.brokers().get(Broker.MOCK).enabled()).isTrue();
     }
 
     @Test

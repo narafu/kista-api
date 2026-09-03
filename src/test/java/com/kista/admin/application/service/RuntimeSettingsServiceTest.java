@@ -3,7 +3,7 @@ package com.kista.admin.application.service;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
@@ -104,9 +104,9 @@ class RuntimeSettingsServiceTest {
     @Test
     @DisplayName("enabled는 저장된 브로커 설정을 그대로 반환한다")
     void enabled_delegatesToLoadedSettings() {
-        when(settingsPort.load()).thenReturn(settingsWithBroker(Account.Broker.KIS, false));
+        when(settingsPort.load()).thenReturn(settingsWithBroker(Broker.KIS, false));
 
-        boolean result = service.enabled(Account.Broker.KIS);
+        boolean result = service.enabled(Broker.KIS);
 
         assertThat(result).isFalse();
     }
@@ -148,7 +148,7 @@ class RuntimeSettingsServiceTest {
         return new RuntimeSettings(approvalRequired, defaults.brokers(), defaults.strategies());
     }
 
-    private RuntimeSettings settingsWithBroker(Account.Broker broker, boolean enabled) {
+    private RuntimeSettings settingsWithBroker(Broker broker, boolean enabled) {
         RuntimeSettings defaults = RuntimeSettings.defaults();
         // 지정된 broker의 enabled 상태를 변경한 새 설정 반환
         var brokers = new java.util.EnumMap<>(defaults.brokers());

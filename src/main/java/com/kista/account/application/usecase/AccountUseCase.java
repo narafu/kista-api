@@ -4,6 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
 
+import com.kista.sharedkernel.Broker;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,5 +24,5 @@ public interface AccountUseCase {
 
     // --- 증권사 연결 테스트 ---
     // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). 실패 시 BrokerCredentialException throw
-    void test(Account.Broker broker, String appKey, String appSecret, UUID accountId);
+    void test(Broker broker, String appKey, String appSecret, UUID accountId);
 }

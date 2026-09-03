@@ -16,6 +16,7 @@ import com.kista.broker.domain.model.PositionView;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.StrategyRefLite;
 import com.kista.broker.application.port.output.MockSimulationDataPort;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class MockBrokerAdapterTest {
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final UUID CYCLE_ID = UUID.randomUUID();
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(ACCOUNT_ID, "key", "secret",
-            "12345678", null, BrokerAccountRef.Broker.MOCK);
+            "12345678", null, Broker.MOCK);
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
     private static final StrategyRefLite TQQQ_STRATEGY = new StrategyRefLite(STRATEGY_ID, StrategyTicker.TQQQ);
 
@@ -75,7 +76,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("supports()는 MOCK을 반환한다")
     void supportsReturnsMock() {
-        assertThat(adapter().supports()).isEqualTo(BrokerAccountRef.Broker.MOCK);
+        assertThat(adapter().supports()).isEqualTo(Broker.MOCK);
     }
 
     // --- getExecutions() 체결 시뮬레이션 규칙표 ---

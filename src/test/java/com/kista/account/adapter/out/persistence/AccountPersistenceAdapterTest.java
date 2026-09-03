@@ -3,6 +3,7 @@ package com.kista.account.adapter.out.persistence;
 import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class AccountPersistenceAdapterTest {
         e.setAppKey("enc:appKey");
         e.setSecretKey("enc:appSecret");
         e.setBrokerAccountCode("01");
-        e.setBroker(Account.Broker.KIS);
+        e.setBroker(Broker.KIS);
         return e;
     }
 
@@ -59,7 +60,7 @@ class AccountPersistenceAdapterTest {
         // given: id=null 신규 계좌 (10개 필드)
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Account.Broker.KIS, null);
+                Broker.KIS, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);

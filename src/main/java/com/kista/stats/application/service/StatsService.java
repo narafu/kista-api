@@ -2,6 +2,7 @@ package com.kista.stats.application.service;
 
 import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.stats.domain.model.*;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.strategyconfig.domain.model.Strategy;
@@ -315,7 +316,7 @@ class StatsService implements UserStatsUseCase {
         } else {
             // 벤치마크 "전체 포트폴리오"는 실제 투자 성과 비교 목적이므로 모의계좌(MOCK)를 제외한다
             List<UUID> accountIds = accountPort.findByUserId(userId).stream()
-                    .filter(account -> account.broker() != Account.Broker.MOCK)
+                    .filter(account -> account.broker() != Broker.MOCK)
                     .map(Account::id)
                     .toList();
             strategies = accountIds.isEmpty() ? List.of() : strategyPort.findByAccountIds(accountIds).values().stream()
@@ -394,7 +395,7 @@ class StatsService implements UserStatsUseCase {
     // 사이클 성과 목록은 계좌별 이력 확인이 목적이라 모의계좌도 포함(excludeMock=false)한다.
     private List<CycleView> loadCycles(UUID userId, boolean excludeMock) {
         List<UUID> accountIds = accountPort.findByUserId(userId).stream()
-                .filter(a -> !excludeMock || a.broker() != Account.Broker.MOCK)
+                .filter(a -> !excludeMock || a.broker() != Broker.MOCK)
                 .map(Account::id)
                 .toList();
         if (accountIds.isEmpty()) return List.of();

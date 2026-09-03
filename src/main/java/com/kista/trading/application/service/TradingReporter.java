@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
@@ -76,7 +77,7 @@ class TradingReporter {
     // Toss 전용 — 정규장 지정가 주문이 애프터장까지 이어져 다음날 09:00 KST에야 자동 취소되므로 명시적 취소가 필요.
     // KIS는 정규장 종료 시 자동 취소되어 이 호출이 불필요 — 스킵해 마감 시점 KIS API 호출량(rate-limit 위험)도 함께 줄인다.
     private void cancelUnresolvedOrders(List<Order> mainOrders, Account account) {
-        if (account.broker() != Account.Broker.TOSS) return;
+        if (account.broker() != Broker.TOSS) return;
         for (Order order : mainOrders) {
             if (order.status() != Order.OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {

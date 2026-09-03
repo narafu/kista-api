@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.mock;
 
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
+import com.kista.sharedkernel.Broker;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -11,8 +11,8 @@ import java.util.UUID;
 class MockAuthApi implements BrokerConnectionTestPort {
 
     @Override
-    public BrokerAccountRef.Broker supports() {
-        return BrokerAccountRef.Broker.MOCK;
+    public Broker supports() {
+        return Broker.MOCK;
     }
 
     @Override

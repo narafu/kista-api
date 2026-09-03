@@ -4,6 +4,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,7 +36,7 @@ class KisTradingApiTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
             UUID.randomUUID(), "appKey", "appSecret",
             "74420614", null,
-            BrokerAccountRef.Broker.KIS
+            Broker.KIS
     );
 
     @Nested

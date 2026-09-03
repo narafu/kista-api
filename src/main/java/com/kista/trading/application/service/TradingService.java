@@ -3,6 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.StrategyRef;
@@ -495,7 +496,7 @@ class TradingService {
     private Account selectPriceAccount(List<BatchContext> contexts) {
         return contexts.stream()
                 .map(BatchContext::account)
-                .filter(a -> a.broker() == Account.Broker.TOSS)
+                .filter(a -> a.broker() == Broker.TOSS)
                 .findFirst()
                 .orElseGet(() -> contexts.getFirst().account());
     }

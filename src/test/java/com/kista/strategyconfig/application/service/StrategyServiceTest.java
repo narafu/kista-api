@@ -4,6 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.common.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.*; import com.kista.trading.domain.model.*;
 import com.kista.trading.domain.strategy.RecurringMode;
 import com.kista.trading.domain.strategy.StrategyCreationSettings;
@@ -410,8 +411,8 @@ class StrategyServiceTest {
     void listByUserId_aggregatesStrategiesAcrossAccounts() {
         UUID accountAId = UUID.randomUUID();
         UUID accountBId = UUID.randomUUID();
-        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", null, Account.Broker.KIS, null);
-        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", null, Account.Broker.KIS, null);
+        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", null, Broker.KIS, null);
+        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", null, Broker.KIS, null);
 
         UUID strategyAId = UUID.randomUUID();
         UUID strategyBId = UUID.randomUUID();

@@ -3,6 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
@@ -56,7 +57,7 @@ class TradingOrderExecutorTest {
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", null,
-            Account.Broker.KIS, null);
+            Broker.KIS, null);
 
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 

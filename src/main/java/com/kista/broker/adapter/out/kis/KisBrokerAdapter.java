@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.*;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +26,8 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     private final KisPriceApi kisPriceApi;     // price/snapshot
 
     @Override
-    public BrokerAccountRef.Broker supports() {
-        return BrokerAccountRef.Broker.KIS;
+    public Broker supports() {
+        return Broker.KIS;
     }
 
     // CTRP6504R 결과에 TTTC2101R(margin)에서 예수금·환율 보정

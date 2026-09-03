@@ -7,6 +7,7 @@ import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class KisOrderApiTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
             UUID.randomUUID(), "appKey", "appSecret",
             "74420614", null,
-            BrokerAccountRef.Broker.KIS
+            Broker.KIS
     );
 
     @Test

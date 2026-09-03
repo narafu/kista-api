@@ -7,6 +7,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,7 @@ class TossOrderApiTest {
 
     static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
         UUID.randomUUID(), "cid", "csecret",
-        "12345678901", "1", BrokerAccountRef.Broker.TOSS
+        "12345678901", "1", Broker.TOSS
     );
 
     @BeforeEach

@@ -4,11 +4,11 @@ import com.kista.adapter.in.web.dto.EnumMeta;
 import com.kista.adapter.in.web.dto.MetaBundle;
 import com.kista.adapter.in.web.dto.StrategyTypeMeta;
 import com.kista.adapter.in.web.dto.TickerMeta;
-import com.kista.account.domain.model.Account;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,7 +62,7 @@ public class MetaController {
     }
 
     private List<EnumMeta> getBrokerList() {
-        return Arrays.stream(Account.Broker.values())
+        return Arrays.stream(Broker.values())
                 .map(b -> new EnumMeta(b.name(), b.getLabel(), b.getShortLabel()))
                 .toList();
     }

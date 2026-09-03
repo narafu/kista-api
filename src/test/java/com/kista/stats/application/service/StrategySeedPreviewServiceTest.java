@@ -3,6 +3,7 @@ package com.kista.stats.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.strategyconfig.domain.model.StrategySeedPreview;
@@ -67,7 +68,7 @@ class StrategySeedPreviewServiceTest {
                 privacyTradePort, cycleStrategies
         );
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
-        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Account.Broker.KIS, null);
+        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());

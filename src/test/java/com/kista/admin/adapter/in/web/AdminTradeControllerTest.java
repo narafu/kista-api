@@ -1,5 +1,6 @@
 package com.kista.admin.adapter.in.web;
 
+import com.kista.sharedkernel.Broker;
 import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.user.adapter.in.web.security.JwtAuthFilter;
 import com.kista.user.adapter.in.web.security.SecurityConfig;
@@ -103,7 +104,7 @@ class AdminTradeControllerTest {
                         null,
                         null,
                         null,
-                        com.kista.account.domain.model.Account.Broker.TOSS,
+                        Broker.TOSS,
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));

@@ -2,6 +2,7 @@ package com.kista.admin.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminStats;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
@@ -159,7 +160,7 @@ class AdminQueryServiceTest {
     void findAccount_ID로_단일_계좌를_조회한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         Account account = new Account(accountId, UUID.randomUUID(), "test", "74420614",
-                null, null, "01", Account.Broker.KIS, null);
+                null, null, "01", Broker.KIS, null);
         when(accountPort.findById(accountId)).thenReturn(Optional.of(account));
 
         Optional<Account> result = service.findAccount(accountId);

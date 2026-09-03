@@ -1,7 +1,7 @@
 package com.kista.account.adapter.out.persistence;
 
 import com.kista.adapter.out.persistence.BaseAuditEntity;
-import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -33,7 +33,7 @@ class AccountEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Account.Broker broker;       // 증권사
+    private Broker broker;       // 증권사
 
     @Column(name = "account_no", nullable = false, length = 512)
     private String accountNo;            // AES-256 암호화 저장

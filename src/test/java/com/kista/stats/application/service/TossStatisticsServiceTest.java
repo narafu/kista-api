@@ -5,6 +5,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.broker.application.port.output.ExchangeRatePort;
+import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,13 +39,13 @@ class TossStatisticsServiceTest {
     // Toss 계좌 stub 생성 헬퍼 — 정상 경로용
     private Account tossAccount() {
         return new Account(accountId, requesterId, "테스트계좌", "1234567890", "appKey", "secretKey",
-                "seq", Account.Broker.TOSS, Instant.now());
+                "seq", Broker.TOSS, Instant.now());
     }
 
     // KIS 계좌 stub 생성 헬퍼 — Toss 전용 API 미지원 시나리오용
     private Account kisAccount() {
         return new Account(accountId, requesterId, "테스트계좌", "74420614-01", "appKey", "secretKey",
-                null, Account.Broker.KIS, Instant.now());
+                null, Broker.KIS, Instant.now());
     }
 
     @Test

@@ -3,8 +3,8 @@ package com.kista.account.adapter.in.web;
 import com.kista.account.adapter.in.web.dto.AccountRequest;
 import com.kista.account.adapter.in.web.dto.AccountResponse;
 import com.kista.account.adapter.in.web.dto.TestConnectionRequest;
-import com.kista.account.domain.model.Account;
 import com.kista.account.application.usecase.AccountUseCase;
+import com.kista.sharedkernel.Broker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -98,7 +98,7 @@ public class AccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody TestConnectionRequest request) {
         // broker null이면 KIS 기본값 적용 — 실패 시 BrokerCredentialException → GlobalExceptionHandler → 422
-        accountUseCase.test(request.broker() != null ? request.broker() : Account.Broker.KIS,
+        accountUseCase.test(request.broker() != null ? request.broker() : Broker.KIS,
                 request.appKey(), request.appSecret(), request.accountId());
     }
 }

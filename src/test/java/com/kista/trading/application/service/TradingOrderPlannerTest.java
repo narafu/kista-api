@@ -1,6 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
@@ -33,7 +34,7 @@ class TradingOrderPlannerTest {
     static final Account ACCOUNT = new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", null,
-            Account.Broker.KIS, null);
+            Broker.KIS, null);
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 

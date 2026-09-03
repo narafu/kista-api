@@ -2,6 +2,7 @@ package com.kista.stats.application.service;
 
 import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.stats.domain.model.*;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.strategyconfig.domain.model.Strategy;
@@ -73,7 +74,7 @@ class StatsServiceTest {
     private static Account testAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Account.Broker.KIS, null);
+                Broker.KIS, null);
     }
 
     private void stubUserWithStrategy() {
@@ -632,7 +633,7 @@ class StatsServiceTest {
     void 벤치마크_전체_포트폴리오는_모의계좌를_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
@@ -729,7 +730,7 @@ class StatsServiceTest {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(new Account(
                 ACCOUNT_ID, otherUserId, "타인계좌", "1", "key", "secret", null,
-                Account.Broker.KIS, null));
+                Broker.KIS, null));
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000", FROM, TO))
@@ -1100,7 +1101,7 @@ class StatsServiceTest {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(new Account(
                 ACCOUNT_ID, otherUserId, "타인계좌", "1", "key", "secret", null,
-                Account.Broker.KIS, null));
+                Broker.KIS, null));
 
         assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.SPY, FROM, TO))
@@ -1143,7 +1144,7 @@ class StatsServiceTest {
     void 요약_전략유형비교는_모의계좌_사이클을_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
@@ -1160,7 +1161,7 @@ class StatsServiceTest {
     void 누적자산추이는_모의계좌_사이클을_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle active = activeCycle("1000.00", "2026-06-01");
@@ -1179,7 +1180,7 @@ class StatsServiceTest {
     void 사이클_성과_목록은_모의계좌_사이클도_포함한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Account.Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null);
         UUID mockStrategyId = UUID.randomUUID();
         Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);

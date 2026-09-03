@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kista.account.domain.model.Account.Broker;
+import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;

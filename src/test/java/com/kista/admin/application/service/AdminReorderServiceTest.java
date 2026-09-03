@@ -4,6 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.strategyconfig.domain.model.Strategy;
@@ -232,7 +233,7 @@ class AdminReorderServiceTest {
 
     private Account account() {
         return new Account(ACCOUNT_ID, USER_ID, "Toss", "1234-56", "app", "secret", "seq-1",
-                Account.Broker.TOSS, null);
+                Broker.TOSS, null);
     }
 
     private Strategy strategy() {

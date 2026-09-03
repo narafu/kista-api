@@ -1,8 +1,7 @@
 package com.kista.account.domain.model;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import com.kista.sharedkernel.Broker;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -18,17 +17,6 @@ public record Account(
         Broker broker,            // 증권사 (기본: KIS)
         Instant createdAt         // DB created_at, 신규 등록 시 null
 ) {
-    @Getter
-    @RequiredArgsConstructor
-    public enum Broker {
-        TOSS("토스증권",    "토스"),  // 토스증권 Open API
-        KIS("한국투자증권", "한투"),  // 한국투자증권 Open API
-        MOCK("모의계좌",    "모의");  // 증권사 연동 없는 DB 기반 모의매매
-
-        private final String label;      // 한국어 전체 이름
-        private final String shortLabel; // UI 모바일 약칭
-    }
-
     // nickname만 교체 — AccountService.update 전용
     public Account withNickname(String newNickname) {
         return new Account(id, userId, newNickname != null ? newNickname : nickname,
@@ -36,10 +24,9 @@ public record Account(
     }
 
     // broker 포트 시그니처용 자격증명 투영 — broker 모듈이 account.Account를 참조하지 않도록 Account가 스스로 변환한다
-    // (broker↔account 순환 해소 산물: broker는 BrokerAccountRef만 알고 역방향 참조는 0. 이전엔 각 호출부가 private 헬퍼로 중복 보유했음)
+    // (broker↔account 순환 해소 산물: broker는 BrokerAccountRef만 알고 역방향 참조는 0. broker enum은 sharedkernel 공용)
     public BrokerAccountRef toBrokerRef() {
-        return new BrokerAccountRef(id, appKey, secretKey, accountNo, brokerAccountCode,
-                BrokerAccountRef.Broker.valueOf(broker.name()));
+        return new BrokerAccountRef(id, appKey, secretKey, accountNo, brokerAccountCode, broker);
     }
 
     // 소유권 불일치 시 SecurityException → 컨트롤러에서 403 매핑

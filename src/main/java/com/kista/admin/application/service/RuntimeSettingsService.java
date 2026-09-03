@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.account.domain.model.Account.Broker;
+import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.user.domain.model.User;

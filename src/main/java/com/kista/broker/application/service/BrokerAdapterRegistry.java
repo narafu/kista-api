@@ -2,6 +2,7 @@ package com.kista.broker.application.service;
 
 import com.kista.broker.application.port.output.BrokerAdapterPort;
 import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.sharedkernel.Broker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 @Component
 public class BrokerAdapterRegistry {
 
-    private final Map<BrokerAccountRef.Broker, BrokerAdapterPort> registry;
+    private final Map<Broker, BrokerAdapterPort> registry;
 
     BrokerAdapterRegistry(List<BrokerAdapterPort> adapters) {
         registry = adapters.stream()

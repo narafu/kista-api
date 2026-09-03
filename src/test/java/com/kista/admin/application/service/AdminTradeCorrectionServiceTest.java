@@ -1,5 +1,6 @@
 package com.kista.admin.application.service;
 
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
@@ -68,7 +69,7 @@ class AdminTradeCorrectionServiceTest {
     @Test
     void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
         User user = DomainFixtures.activeUserWithTelegram(USER_ID);
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -108,7 +109,7 @@ class AdminTradeCorrectionServiceTest {
     @Test
     void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
         User user = DomainFixtures.activeUserWithTelegram(USER_ID);
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),

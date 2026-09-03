@@ -1,6 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.AccountBalance;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class TelegramAdapterTest {
     private Account account(UUID userId, String nickname) {
         return new Account(UUID.randomUUID(), userId, nickname,
                 "74420614", "key", "secret", null,
-                Account.Broker.KIS, null);
+                Broker.KIS, null);
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.account.domain.model.Account.Broker;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyDefaults;

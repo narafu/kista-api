@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.*;
+import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
 import com.kista.broker.application.port.output.*;
@@ -31,8 +32,8 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     private final TossCandleApi tossCandleApi;         // candle
 
     @Override
-    public BrokerAccountRef.Broker supports() {
-        return BrokerAccountRef.Broker.TOSS;
+    public Broker supports() {
+        return Broker.TOSS;
     }
 
     // --- 공통 Capability ---

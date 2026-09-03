@@ -3,6 +3,7 @@ package com.kista.broker.adapter.out.kis;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
+import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class KisHttpClientTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
             UUID.randomUUID(), "appKey", "appSecret",
             "74420614", null,
-            BrokerAccountRef.Broker.KIS
+            Broker.KIS
     );
 
     @BeforeEach

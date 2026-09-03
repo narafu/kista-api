@@ -4,6 +4,7 @@ import com.kista.adapter.out.crypto.AccountNoHasher;
 import com.kista.adapter.out.crypto.AesCryptoService;
 import com.kista.account.domain.model.Account;
 import com.kista.account.application.port.output.AccountPort;
+import com.kista.sharedkernel.Broker;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -84,7 +85,7 @@ public class AccountPersistenceAdapter implements AccountPort {
         e.setAppKey(crypto.encrypt(a.appKey()));
         e.setSecretKey(crypto.encrypt(a.secretKey()));
         e.setBrokerAccountCode(a.brokerAccountCode());
-        e.setBroker(a.broker() != null ? a.broker() : Account.Broker.KIS); // null 방어 — persistence 경계에서 보장
+        e.setBroker(a.broker() != null ? a.broker() : Broker.KIS); // null 방어 — persistence 경계에서 보장
         return e;
     }
 

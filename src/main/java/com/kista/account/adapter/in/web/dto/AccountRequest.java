@@ -1,8 +1,8 @@
 package com.kista.account.adapter.in.web.dto;
 
-import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
+import com.kista.sharedkernel.Broker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -18,7 +18,7 @@ public record AccountRequest(
         @Schema(description = "API 앱 시크릿 (KIS App Secret / Toss Client Secret)")
         String secretKey,
         @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS", "MOCK"})
-        Account.Broker broker
+        Broker broker
 ) {
     public RegisterAccountCommand toRegisterCommand() {
         // accountNo를 그대로 저장 — KIS: "74420614-01", TOSS: "131-01-001931"

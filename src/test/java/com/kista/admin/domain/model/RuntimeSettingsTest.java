@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.account.domain.model.Account.Broker;
+import com.kista.sharedkernel.Broker;
 import com.kista.strategyconfig.domain.model.Strategy;
 import org.junit.jupiter.api.Test;
 
