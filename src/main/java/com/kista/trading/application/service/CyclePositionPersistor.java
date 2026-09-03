@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;

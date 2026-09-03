@@ -1,8 +1,10 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.privacy.PrivacyTradeBase.PrivacyTrade;
+import com.kista.privacy.domain.model.PrivacyOrderDirection;
+import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import lombok.extern.slf4j.Slf4j;
@@ -39,14 +41,15 @@ public class PrivacyStrategy {
 
         // BUY/SELL 분리 — BUY null은 skip, SELL null은 단 1개만 허용
         for (PrivacyTrade t : privacyTradeBase.trades()) {
-            if (t.direction() == BUY) {
+            // privacy enum 비교 — trading Order.OrderDirection.BUY(static import)와 별개
+            if (t.direction() == PrivacyOrderDirection.BUY) {
                 if (t.quantity() == null) {
                     log.warn("[PRIVACY] BUY 수량 미정 건너뜀: ticker={}, price={}", t.ticker(), t.price());
                     continue;
                 }
                 // 배수 적용 — 버림은 Order 생성 직전에만 (중간 버림 시 소수점 배수에서 수량 손실 발생)
                 BigDecimal qty = BigDecimal.valueOf(t.quantity()).multiply(multiple);
-                buyEntries.add(new BuyEntry(t.price(), qty, t.orderType(), t.tradeDate(), t.ticker()));
+                buyEntries.add(new BuyEntry(t.price(), qty, toTradingType(t.orderType()), t.tradeDate(), t.ticker()));
             } else {
                 if (t.quantity() == null) {
                     if (nullSellTemplate != null) {
@@ -125,7 +128,7 @@ public class PrivacyStrategy {
         for (int i = 0; i < explicit.size(); i++) {
             PrivacyTrade t = explicit.get(i);
             int qty = rawQtys.get(i).setScale(0, RoundingMode.DOWN).intValue();
-            result.add(Order.planned(t.tradeDate(), t.ticker(), t.orderType(), SELL, qty, t.price(), AT_CLOSE));
+            result.add(Order.planned(t.tradeDate(), t.ticker(), toTradingType(t.orderType()), SELL, qty, t.price(), AT_CLOSE));
         }
 
         // null SELL 없는 경우만 fraction 보정 — null SELL이 있으면 remaining이 자동 흡수
@@ -169,7 +172,7 @@ public class PrivacyStrategy {
             return result;
         }
         result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
-                nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
+                toTradingType(nullTemplate.orderType()), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return result;
     }
 
@@ -225,6 +228,12 @@ public class PrivacyStrategy {
                 remaining = remaining.subtract(take);
             }
         }
+    }
+
+    // privacy 자체 소유 주문유형 → trading Order.OrderType 매핑.
+    // 두 enum의 상수명이 byte-identical(LOC/MOC/LIMIT)이라는 계약에 의존 — PrivacyOrderType 주석 참고.
+    private static Order.OrderType toTradingType(PrivacyOrderType type) {
+        return Order.OrderType.valueOf(type.name());
     }
 
     // BUY 주문 quantity 조정을 위한 가변 컨테이너 (record 불가 — quantity 변경 필요)

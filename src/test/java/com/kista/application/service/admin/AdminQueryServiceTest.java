@@ -4,7 +4,7 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
-import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

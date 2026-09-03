@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
-import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.broker.application.port.output.BrokerPricePort;

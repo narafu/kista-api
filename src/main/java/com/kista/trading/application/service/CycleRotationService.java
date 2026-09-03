@@ -5,7 +5,7 @@ import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;

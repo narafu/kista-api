@@ -23,12 +23,14 @@ v1은 grep 스팟체크로 "어느 후보가 싼가"를 예측했는데, 이 방
 | **market** | 없음[^1] | forward만 존재(FearGreedService→notify, MarketHolidayService→broker), backward 0건 | 즉시 착수 가능 |
 | **stats**(+backtest+portfolio) | 없음 | forward 다수(broker/trading 전역 소비), backward 0건(usecase/port/persistence까지 정밀 확인 완료. notify의 `TelegramBotService`가 `PortfolioUseCase` 참조하지만 단방향이라 순환 아님) | 즉시 착수 가능 |
 | **admin** | 없음 | forward 다수(broker/trading/account/strategy-config/stats까지), backward 0건(usecase 6개·port 2개까지 정밀 확인) | 즉시 착수 가능 |
-| **privacy** | **있음**(v1에서 놓쳤던 발견) | privacy 4개 파일(`PrivacyTradeBase`/`FidaOrderCommand`/`PrivacyTradePersistenceAdapter`/`PrivacyTradeBaseOrderEntity`)이 `trading.domain.model.Order`를 그대로 빌려씀(forward) ↔ trading 13개 파일이 `PrivacyTradeBase`/`PrivacyTradePort` 참조(backward) | 작음 — privacy가 자체 경량 타입(`PlannedOrder` 등)으로 교체하면 forward 자체가 사라짐, 4개 파일만 수정 |
+| **privacy** | **있음**(v1에서 놓쳤던 발견)[^4] | privacy **6개** 파일(`PrivacyTradeBase`/`FidaOrderCommand`/`PrivacyTradeValidationService`/`PrivacyTradePersistenceAdapter`/`PrivacyTradeBaseOrderEntity`/`FidaOrderResponse`)이 `trading.domain.model.Order`(nested enum + 주문 4필드)를 그대로 빌려씀(forward) ↔ trading 18개 파일(main 13 + test 5)이 `PrivacyTradeBase`/`PrivacyTradePort` 참조(backward, 실제 코드 변경은 `PrivacyStrategy` 1개 — 나머지는 import 경로 기계적 교체) | 작음 — privacy가 자체 타입(`PrivacyOrderType`/`PrivacyOrderDirection`/`FidaPlannedOrder`)으로 교체하면 forward 자체가 사라짐 |
 | **user**(+auth) | **있음**(notify만) | `User` 전체 레코드가 notify `UserNotificationPort` 13개 메서드에 직접 시그니처로 박혀있음(backward). forward는 `UserProfileService`→notify(`FcmDeviceTokenPort`/`TelegramBotInfoPort`) 1개 파일. `User`의 nested enum(UserRole/UserStatus/NotificationChannel)은 이미 CLOSED 4모듈 포트에 0건 — Strategy/Account보다 훨씬 깨끗함. user↔trading·user↔finance는 순환 아님(단방향) | 중간 — notify 13개 메서드를 EPR 이벤트 전환 때 이미 쓴 패턴(User 전체 대신 UUID+포트 재조회)으로 통일하면 해소 |
 | **account** | **있음** | forward: `AccountService.register()`의 `BrokerConnectionTesters` 호출 1곳(정당) + `AccountStatisticsService`/`TossStatisticsService`/`BrokerStatisticsRouter`(통계 서비스, 성격상 stats 소유가 맞음) 3곳. backward: `Account` 전체 레코드가 broker 포트 8개(`BrokerPricePort`×6메서드/`LiveBalancePort`/`SellableQuantityPort`/`BrokerOrderCorrectionPort`×2/`BrokerAccountPort`/`MarginPort`×2/`ExecutionPort`) + notify 2개(`UserNotificationPort`×5/`NotifyPort`×1) + trading 1개(`TradingExecutionUseCase.execute`) 시그니처에 직접 박혀있음 | 중간 — 통계 서비스 3개를 stats로 재배치하면 forward가 1곳으로 축소(공짜). backward(broker 8개 포트)는 별도 리트로핏 필요 |
 | **strategy-config** | **있음**(v1이 "가장 싸다"고 틀리게 판단했던 대상) | forward: `StrategyService`→broker(`BrokerAdapterRegistry`/`BrokerCallGuard`/`BrokerPricePort`/`MarginPort`, 등록 시 검증 — 정당) + trading(`StrategyCreationResolver(s)`, 등록 시 기본 종목 결정 — 정당), `VrStrategyLifecycle`→trading(`CyclePosition`/`StrategyCycle`/`StrategyCycleVrDetail`/`StrategyCycleVrPort` — 이건 사이클 상태 조작이라 trading 소유가 맞음). backward: `Strategy` 전체 레코드 3곳(notify 2+trading 1) + nested enum(주로 Ticker) 9개 인터페이스 약 15개 메서드(broker `StockInfoPort`/`SellableQuantityPort`/`ExecutionPort`/`LiveBalancePort`/`BrokerPricePort`×4, trading `OrderPort`×2, notify `UserNotificationPort`/`NotifyPort`) | 중간 — `VrStrategyLifecycle`을 trading으로 재배치하면 forward 절반 축소. backward(broker 9개 인터페이스)는 별도 리트로핏 필요 |
 
 [^1]: **정정(2026-08-31, market 이전 완료 후)**: 실제로는 순환이 있었다. 이 표의 pairwise 검증(각 후보를 CLOSED 4모듈과 1:1로만 대조)이 `market→notify→trading→market` 3단 전이 순환을 놓쳤음 — market→notify(정당), notify→trading(기존 CLOSED 이벤트 구독, 정당), 그런데 trading이 다시 market을 참조(`MarketHolidayController`의 `trading.domain.model.DstInfo` 직접 사용)하는 3번째 변까지 이어봐야 순환이 닫히는데, pairwise 대조는 이런 전이 경로를 구조적으로 볼 수 없다. Task 2(어댑터 이전) 리뷰에서 실측 발견돼 Task 3에서 이벤트 기반 패턴(`FearGreedFetchFailedEvent`)으로 해소했다(→ architecture.md "Spring Modulith 점진 도입" market 절). **다음 모듈 착수 시**: pairwise 대조만으로 "순환 없음" 확정하지 말고, 후보가 참조하는 CLOSED 모듈이 역으로 후보를 참조하는 3단 이상 경로도 함께 확인할 것.
+
+[^4]: **정정(2026-08-31, privacy 이전 완료 후)**: 이 행이 잡아낸 `privacy↔trading` 직접 순환(Task 1에서 privacy 자체 타입 소유로 해소)에 더해, pairwise 분석이 놓친 `privacy→notify→trading→privacy` 전이 순환이 실재했다 — `PrivacyService`→notify(정당), notify→trading(기존 CLOSED 이벤트 구독, 정당), trading→privacy(`PrivacyTradeBase` 등 참조)의 3번째 변까지 이어야 닫힌다. market의 `market→notify→trading→market`과 동일한 맹점. Task 4에서 `PrivacyService`의 notify 직접 호출을 `PrivacyAlertRaisedEvent` 발행으로 전환(`PrivacyAlertNotifier` 구독)해 해소. **다음 모듈(user) 착수 시**: 사전 분석 단계에서 임시 `@ApplicationModule` 선언 + `ApplicationModules.verify()`를 실제로 1회 돌려 전이 순환을 기계적으로 노출시킬 것 — pairwise 표만으로는 반복해서 놓친다.
 
 **규모 비용에 대한 정정**: `Strategy.Ticker`(176개 파일)/`Strategy.Type`(101)/`Strategy.Status`(48)/`Strategy.CycleSeedType`(48) 사용 파일 수는 대부분 기계적 import 경로 교체(2026-08-30 포트 위치 전환 때 103개 파일 규모로 이미 검증된 작업 유형)라 비용의 핵심이 아니다. 진짜 비용은 **포트 시그니처 소유권**(broker 8~9개 인터페이스, notify 2개, trading 3~4곳)이며 이 개수는 기존 `trading-broker-notify 디커플링`(2026-08-29, 8태스크)과 동급이거나 작다.
 
@@ -71,7 +73,7 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 ## 착수 순서 (실측 기반, v2)
 
 1. **market**[^2], stats(+backtest+portfolio), admin(+settings) — 순환 없음 확정, 즉시 착수. 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능.
-2. **privacy** — trading.Order 직접 참조 4개 파일을 자체 타입으로 교체 후 착수. 소규모.
+2. **privacy**[^3] — trading.Order 직접 참조 4개 파일을 자체 타입으로 교체 후 착수. 소규모.
 3. **user(+auth)** — notify `UserNotificationPort` 13개 메서드 + `NotifyPort`류를 EPR 이벤트 전환 때 쓴 ID+포트재조회 패턴으로 통일 후 착수. nested enum 3개 sharedkernel 이관도 이 단계에서 함께.
 4. **account, strategy-config** — 서로 얽혀있어 분리 착수 어려움, 묶어서 별도 서브스펙 진행:
    - broker 8~9개 포트 인터페이스를 own-type 패턴(Direction/OrderType 선례)으로 전환
@@ -81,6 +83,8 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
    - 이 묶음은 규모·성격상 `trading-broker-notify 디커플링`(2026-08-29)과 동급 — 별도 스펙+계획 문서로 진행
 
 [^2]: ✅ 완료(2026-08-31, commit 범위는 이 계획의 6개 태스크 — `2026-08-31-modulith-market-migration` 실행 계획, 실측 발견된 순환 2건 해소 태스크 포함).
+
+[^3]: ✅ 완료(2026-08-31, `2026-08-31-modulith-privacy-migration` 실행 계획 5개 태스크). CLOSED 6번째 모듈, 4개 NamedInterface("domain"/"port"/"usecase"/"event"). 아래 "결합도 실측" 표 privacy 행 각주 참고 — forward 6개 파일, 순환 2건 해소.
 
 ## 스코프 아웃
 

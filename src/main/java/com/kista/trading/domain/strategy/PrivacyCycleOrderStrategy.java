@@ -1,7 +1,7 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

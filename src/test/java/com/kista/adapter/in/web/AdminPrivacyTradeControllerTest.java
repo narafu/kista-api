@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;
-import com.kista.domain.model.privacy.PrivacyTradeBaseView;
+import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import com.kista.application.usecase.AdminQueryUseCase;
 import com.kista.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;

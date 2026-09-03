@@ -1,14 +1,14 @@
 package com.kista.application.service.account;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.privacy.PrivacyCurrentBase;
+import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
-import com.kista.application.port.output.PrivacyTradePort;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;

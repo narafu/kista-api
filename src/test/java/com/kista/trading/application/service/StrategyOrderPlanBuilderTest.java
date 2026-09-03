@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.application.port.output.PrivacyTradePort;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;

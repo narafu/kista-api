@@ -7,7 +7,7 @@ import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.model.admin.AuditLog;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBaseView;
+import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import com.kista.domain.model.strategy.Strategy;
 
 import java.time.Instant;

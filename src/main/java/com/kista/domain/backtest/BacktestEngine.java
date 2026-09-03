@@ -5,7 +5,7 @@ import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;

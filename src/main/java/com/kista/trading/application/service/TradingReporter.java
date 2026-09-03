@@ -6,7 +6,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.domain.model.user.NotificationType;

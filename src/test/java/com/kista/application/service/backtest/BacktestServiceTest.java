@@ -4,10 +4,12 @@ import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.backtest.BacktestResult;
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyOrderDirection;
+import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.application.port.output.HistoricalCandlePort;
-import com.kista.application.port.output.PrivacyTradePort;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import org.junit.jupiter.api.Test;
@@ -403,7 +405,7 @@ class BacktestServiceTest {
     private static PrivacyTradeBase baseFor(LocalDate tradeDate) {
         return new PrivacyTradeBase(UUID.randomUUID(), bd("100"), 0, bd("100"),
                 List.of(new PrivacyTradeBase.PrivacyTrade(tradeDate, Strategy.Ticker.SOXL,
-                        Order.OrderType.LOC, Order.OrderDirection.BUY, 1, bd("100"))));
+                        PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, bd("100"))));
     }
 
     // 지정가 100 매수 1주 — position=null이라 엔진의 캡 재산정 대상에서 제외된다

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.privacy.PrivacyTradeBase;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.CyclePositionInfiniteDetailPort;

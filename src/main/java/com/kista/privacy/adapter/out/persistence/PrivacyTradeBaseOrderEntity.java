@@ -1,0 +1,44 @@
+package com.kista.privacy.adapter.out.persistence;
+
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.privacy.domain.model.PrivacyOrderDirection;
+import com.kista.privacy.domain.model.PrivacyOrderType;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "privacy_trade_base_orders", schema = "reference")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 전용
+class PrivacyTradeBaseOrderEntity extends BaseCreatedAtEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "UUID")
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "privacy_trade_id", nullable = false)
+    private PrivacyTradeBaseEntity privacyBase;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 5)
+    private PrivacyOrderDirection direction;    // BUY / SELL
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private PrivacyOrderType orderType;         // LOC / MOC / LIMIT
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal price;
+
+    @Column
+    private Integer quantity;
+}

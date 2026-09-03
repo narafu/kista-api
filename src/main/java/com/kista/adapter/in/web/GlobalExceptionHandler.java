@@ -10,7 +10,7 @@ import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.OrderCancelException;
-import com.kista.domain.model.privacy.PrivacyTradeConflictException;
+import com.kista.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.application.port.output.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;

@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.privacy.PrivacyTradeBaseView;
+import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
