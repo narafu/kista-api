@@ -21,7 +21,7 @@ v1은 grep 스팟체크로 "어느 후보가 싼가"를 예측했는데, 이 방
 | 후보 | 순환 여부 | 원인 | 해소 난이도 |
 |---|---|---|---|
 | **market** | 없음[^1] | forward만 존재(FearGreedService→notify, MarketHolidayService→broker), backward 0건 | 즉시 착수 가능 |
-| **stats**(+backtest+portfolio) | 없음 | forward 다수(broker/trading 전역 소비), backward 0건(usecase/port/persistence까지 정밀 확인 완료. notify의 `TelegramBotService`가 `PortfolioUseCase` 참조하지만 단방향이라 순환 아님) | 즉시 착수 가능 |
+| **stats**(+backtest+portfolio) | ~~없음~~ → **있음**(실측 정정)[^5] | forward 다수(broker/trading 전역 소비). backward: notify의 `TelegramBotService`가 `PortfolioUseCase` 참조 — 이 표는 "단방향이라 순환 아님"으로 판정했으나, `PortfolioUseCase`가 stats 모듈로 이동하면서 기존 `stats→notify`(`HousingBenchmarkService`/`HousingPriceIndexService`의 `notifyError`)와 합쳐져 `stats↔notify` 직접 2-cycle이 됐다 | 작음 — `stats→notify` 2곳을 `StatsAlertRaisedEvent` 발행으로 전환하면 해소(market/privacy 선례) |
 | **admin** | 없음 | forward 다수(broker/trading/account/strategy-config/stats까지), backward 0건(usecase 6개·port 2개까지 정밀 확인) | 즉시 착수 가능 |
 | **privacy** | **있음**(v1에서 놓쳤던 발견)[^4] | privacy **6개** 파일(`PrivacyTradeBase`/`FidaOrderCommand`/`PrivacyTradeValidationService`/`PrivacyTradePersistenceAdapter`/`PrivacyTradeBaseOrderEntity`/`FidaOrderResponse`)이 `trading.domain.model.Order`(nested enum + 주문 4필드)를 그대로 빌려씀(forward) ↔ trading 18개 파일(main 13 + test 5)이 `PrivacyTradeBase`/`PrivacyTradePort` 참조(backward, 실제 코드 변경은 `PrivacyStrategy` 1개 — 나머지는 import 경로 기계적 교체) | 작음 — privacy가 자체 타입(`PrivacyOrderType`/`PrivacyOrderDirection`/`FidaPlannedOrder`)으로 교체하면 forward 자체가 사라짐 |
 | **user**(+auth) | **있음**(notify만) | `User` 전체 레코드가 notify `UserNotificationPort` 13개 메서드에 직접 시그니처로 박혀있음(backward). forward는 `UserProfileService`→notify(`FcmDeviceTokenPort`/`TelegramBotInfoPort`) 1개 파일. `User`의 nested enum(UserRole/UserStatus/NotificationChannel)은 이미 CLOSED 4모듈 포트에 0건 — Strategy/Account보다 훨씬 깨끗함. user↔trading·user↔finance는 순환 아님(단방향) | 중간 — notify 13개 메서드를 EPR 이벤트 전환 때 이미 쓴 패턴(User 전체 대신 UUID+포트 재조회)으로 통일하면 해소 |
@@ -72,7 +72,7 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 
 ## 착수 순서 (실측 기반, v2)
 
-1. **market**[^2], stats(+backtest+portfolio), admin(+settings) — 순환 없음 확정, 즉시 착수. 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능.
+1. **market**[^2], stats(+backtest+portfolio)[^5], admin(+settings) — (market/stats 착수 완료). 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능.
 2. **privacy**[^3] — trading.Order 직접 참조 4개 파일을 자체 타입으로 교체 후 착수. 소규모.
 3. **user(+auth)** — notify `UserNotificationPort` 13개 메서드 + `NotifyPort`류를 EPR 이벤트 전환 때 쓴 ID+포트재조회 패턴으로 통일 후 착수. nested enum 3개 sharedkernel 이관도 이 단계에서 함께.
 4. **account, strategy-config** — 서로 얽혀있어 분리 착수 어려움, 묶어서 별도 서브스펙 진행:
@@ -85,6 +85,8 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 [^2]: ✅ 완료(2026-08-31, commit 범위는 이 계획의 6개 태스크 — `2026-08-31-modulith-market-migration` 실행 계획, 실측 발견된 순환 2건 해소 태스크 포함).
 
 [^3]: ✅ 완료(2026-08-31, `2026-08-31-modulith-privacy-migration` 실행 계획 5개 태스크). CLOSED 6번째 모듈, 4개 NamedInterface("domain"/"port"/"usecase"/"event"). 아래 "결합도 실측" 표 privacy 행 각주 참고 — forward 6개 파일, 순환 2건 해소.
+
+[^5]: ✅ 완료(2026-09-01, `2026-09-01-modulith-stats-migration` 실행 계획 4개 태스크). CLOSED 7번째 모듈, 5개 NamedInterface("domain"/"usecase"/"port"/"event"/"schedule" — "schedule"은 `AdminSchedulerController`가 KbLand 스케쥴러를 직접 주입하는 trading 선례와 동일). **실측 정정**: 이 표는 stats를 "순환 없음"으로 판정했으나 사전 실측 결과 `stats↔notify` 직접 2-cycle이 실재했다 — `notify→stats`(`TelegramBotService`→`PortfolioUseCase`)는 표의 "단방향이라 순환 아님" 판정이 그 시점엔 옳았지만, `PortfolioUseCase`가 stats로 이동하면서 기존 `stats→notify`(`HousingBenchmarkService`/`HousingPriceIndexService`의 `NotifyPort.notifyError`)와 방향이 맞물렸다. Task 3에서 `StatsAlertRaisedEvent`/`StatsAlertNotifier` 이벤트 전환으로 해소(market `FearGreedFetchFailedEvent`, privacy `PrivacyAlertRaisedEvent`와 동일 패턴 — 3번째 인스턴스). **다음 모듈(user) 착수 시 교훈**: 이 표가 "단방향이라 안전"으로 적은 forward/backward도, 참조되는 타입 자체가 이동 대상이면 이동 후 방향이 뒤집혀 순환이 될 수 있으니 CLOSED 전환 전 재확인.
 
 ## 스코프 아웃
 

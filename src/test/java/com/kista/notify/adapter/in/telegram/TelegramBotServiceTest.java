@@ -2,7 +2,7 @@ package com.kista.notify.adapter.in.telegram;
 
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.application.usecase.PortfolioUseCase;
+import com.kista.stats.application.usecase.PortfolioUseCase;
 import com.kista.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

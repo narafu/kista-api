@@ -169,7 +169,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         return executions;
     }
 
-    // 체결 판정 SSOT는 com.kista.domain.backtest.FillSimulator.fills(Order, BigDecimal)이지만 trading의 Order를 받는다 —
+    // 체결 판정 SSOT는 com.kista.stats.domain.backtest.FillSimulator.fills(Order, BigDecimal)이지만 trading의 Order를 받는다 —
     // broker는 더 이상 trading 타입을 참조할 수 없으므로 동일 판정 로직을 broker 소유 타입으로 재구현한다.
     // 순수 3줄 판정이라 포트 우회보다 저비용 복제로 판단(PersistenceSupport/DstInfo 부분 복제와 동일 기준, 변경 금지)
     private static boolean fills(PlacedOrderView order, BigDecimal closingPrice) {

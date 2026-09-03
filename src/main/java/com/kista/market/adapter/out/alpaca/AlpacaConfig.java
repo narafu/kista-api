@@ -6,12 +6,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-// 레거시 com.kista.adapter.out.alpaca.AlpacaConfig와 클래스명이 같아 빈 이름 충돌 방지용으로 명시적 이름 지정
+// stats 모듈 com.kista.stats.adapter.out.alpaca.AlpacaConfig와 클래스명이 같아 빈 이름 충돌 방지용으로 명시적 이름 지정
 @Configuration("marketAlpacaConfig")
 @EnableConfigurationProperties(AlpacaProperties.class)
 public class AlpacaConfig {
 
-    // 레거시 alpacaRestClient 빈과 이름 충돌 방지 — 소비자(AlpacaCalendarAdapter) 필드명도 동일하게 맞춤
+    // stats 모듈 alpacaRestClient 빈과 이름 충돌 방지 — 소비자(AlpacaCalendarAdapter) 필드명도 동일하게 맞춤
     @Bean
     public RestClient marketAlpacaRestClient() {
         return RestClient.builder().requestFactory(alpacaRequestFactory()).build();

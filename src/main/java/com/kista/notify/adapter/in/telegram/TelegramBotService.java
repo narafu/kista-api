@@ -4,7 +4,7 @@ import com.kista.common.TimeZones;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.application.usecase.PortfolioUseCase;
+import com.kista.stats.application.usecase.PortfolioUseCase;
 import com.kista.application.usecase.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

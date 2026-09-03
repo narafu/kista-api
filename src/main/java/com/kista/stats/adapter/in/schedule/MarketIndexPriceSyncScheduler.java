@@ -1,0 +1,36 @@
+package com.kista.stats.adapter.in.schedule;
+
+import com.kista.adapter.in.schedule.SchedulerJobRunner;
+import com.kista.adapter.in.schedule.SchedulerLockService;
+import com.kista.common.TimeZones;
+import com.kista.stats.application.usecase.SyncMarketIndexPricesUseCase;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+public class MarketIndexPriceSyncScheduler {
+
+    private final SyncMarketIndexPricesUseCase syncMarketIndexPricesUseCase;
+    private final SchedulerJobRunner jobRunner;
+    private final SchedulerLockService schedulerLockService;
+
+    // 매일 09:00 KST — 미국 장마감(EDT 기준 KST 05:00, EST 기준 KST 06:00)보다 충분히 뒤라
+    // 표준시 구간에도 IEX 종가 확정 시간을 넉넉히 벌고, 비거래일엔 Alpaca가 빈 배열을 반환하는
+    // 무해한 no-op이라 요일 조건 없이 매일 실행
+    @Scheduled(cron = "0 0 9 * * *", zone = TimeZones.KST_ID)
+    public void run() throws InterruptedException {
+        schedulerLockService.tryRun("market-index-price-sync", Duration.ofMinutes(30), this::runLocked);
+    }
+
+    private void runLocked() {
+        jobRunner.run("벤치마크 ETF 지수 종가 동기화 스케쥴러", syncMarketIndexPricesUseCase::syncAndSave);
+    }
+}

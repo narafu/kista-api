@@ -7,7 +7,7 @@ import com.kista.domain.model.settings.RecurringMode;
 import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.settings.StrategyFieldSettings;
-import com.kista.domain.model.stats.EtfBenchmarkSymbol;
+import com.kista.stats.domain.model.EtfBenchmarkSymbol;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.Strategy.Type;
 import io.swagger.v3.oas.annotations.media.Schema;
