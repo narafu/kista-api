@@ -1,7 +1,7 @@
 package com.kista.application.service.strategy;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.broker.BrokerCallGuard;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
@@ -10,8 +10,8 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.in.StrategyUseCase;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerPricePort;
-import com.kista.domain.port.out.broker.MarginPort;
+import com.kista.broker.domain.port.out.BrokerPricePort;
+import com.kista.broker.domain.port.out.MarginPort;
 import com.kista.domain.strategy.StrategyCreationResolver;
 import com.kista.domain.strategy.StrategyCreationResolver.ResolvedCreation;
 import com.kista.domain.strategy.StrategyCreationResolvers;

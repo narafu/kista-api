@@ -1,12 +1,12 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.toss.*;
+import com.kista.broker.domain.model.toss.*;
 import com.kista.domain.port.in.TossStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.broker.*;
+import com.kista.broker.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

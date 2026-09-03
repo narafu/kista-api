@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.toss.TossCandle;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

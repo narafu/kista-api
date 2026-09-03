@@ -1,9 +1,9 @@
 package com.kista.application.service.market;
 
-import com.kista.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.toss.TossCandle;
 import com.kista.domain.port.in.MarketUseCase;
 import com.kista.domain.port.out.MarketCalendarPort;
-import com.kista.domain.port.out.broker.CandlePort;
+import com.kista.broker.domain.port.out.CandlePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

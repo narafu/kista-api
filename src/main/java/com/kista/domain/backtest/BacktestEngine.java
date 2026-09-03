@@ -3,7 +3,7 @@ package com.kista.domain.backtest;
 import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
-import com.kista.domain.model.broker.Execution;
+import com.kista.broker.domain.model.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.AccountBalance;

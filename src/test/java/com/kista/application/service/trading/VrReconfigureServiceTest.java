@@ -1,6 +1,6 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.strategy.AccountBalance;
@@ -23,7 +23,7 @@ import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.port.out.UserPort;
-import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.broker.domain.port.out.BrokerPricePort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

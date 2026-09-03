@@ -237,7 +237,7 @@ class TradingBuyCompetitionSimulatorTest {
     @Test
     void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
         when(depositCache.getUsdDeposit(account, Ticker.SOXL))
-                .thenThrow(new com.kista.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
+                .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(

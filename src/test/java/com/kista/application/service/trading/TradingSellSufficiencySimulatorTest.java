@@ -1,6 +1,6 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.domain.model.order.Order;
@@ -8,7 +8,7 @@ import com.kista.domain.model.order.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.broker.domain.port.out.SellableQuantityPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -116,7 +116,7 @@ class TradingSellSufficiencySimulatorTest {
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
         when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
-                .thenThrow(new com.kista.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
+                .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);

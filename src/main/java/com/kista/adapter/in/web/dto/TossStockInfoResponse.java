@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.toss.TossStockInfo;
+import com.kista.broker.domain.model.toss.TossStockInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // Toss /api/v1/stocks 응답 DTO — 가격 정보 없음 (현재가는 /prices 별도 조회)

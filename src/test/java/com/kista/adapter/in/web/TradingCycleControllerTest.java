@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.kis.KisApiException;
+import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.CancelResult;
 import com.kista.domain.model.order.ManualTradingException;
 import com.kista.domain.model.strategy.CycleHistoryPage;

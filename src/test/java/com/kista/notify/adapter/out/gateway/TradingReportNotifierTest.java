@@ -2,7 +2,7 @@ package com.kista.notify.adapter.out.gateway;
 
 import com.kista.application.event.TradingReportReadyEvent;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.broker.Execution;
+import com.kista.broker.domain.model.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;

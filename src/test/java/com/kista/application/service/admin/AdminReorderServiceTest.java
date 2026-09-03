@@ -1,6 +1,6 @@
 package com.kista.application.service.admin;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminReorderCommand;
 import com.kista.domain.model.admin.AdminReorderResult;
@@ -16,7 +16,7 @@ import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
-import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,14 +1,14 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.KisApiException;
+import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.order.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.broker.domain.port.out.SellableQuantityPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

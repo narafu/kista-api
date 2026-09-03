@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.broker.Currency;
-import com.kista.domain.model.broker.MarginItem;
+import com.kista.broker.domain.model.Currency;
+import com.kista.broker.domain.model.MarginItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

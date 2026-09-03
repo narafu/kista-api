@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.toss.TossMarketSession;
-import com.kista.domain.model.toss.TossMarketSession.SessionHours;
+import com.kista.broker.domain.model.toss.TossMarketSession;
+import com.kista.broker.domain.model.toss.TossMarketSession.SessionHours;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;

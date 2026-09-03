@@ -1,19 +1,19 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.event.TradingReportReadyEvent;
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.broker.Execution;
+import com.kista.broker.domain.model.Execution;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
-import com.kista.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.domain.model.user.NotificationType;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
-import com.kista.domain.port.out.broker.ExecutionPort;
+import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
+import com.kista.broker.domain.port.out.ExecutionPort;
 import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

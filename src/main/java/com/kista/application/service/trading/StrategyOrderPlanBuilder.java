@@ -1,7 +1,7 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
-import com.kista.application.service.broker.BrokerCallGuard;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.NextOrdersPreview.SkipReason;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
@@ -9,7 +9,7 @@ import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
 import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.broker.domain.port.out.BrokerPricePort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.toss.TossCandle;
 
 import java.time.LocalDate;
 import java.util.List;

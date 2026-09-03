@@ -1,6 +1,6 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.broker.BrokerConnectionTesters;
+import com.kista.broker.application.service.BrokerConnectionTesters;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
@@ -8,7 +8,7 @@ import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.RuntimeSettingsPort;
 import com.kista.domain.port.out.StrategyPort;
-import com.kista.domain.port.out.broker.BrokerConnectionTestPort;
+import com.kista.broker.domain.port.out.BrokerConnectionTestPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,10 +1,10 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.toss.TossExchangeRate;
+import com.kista.broker.domain.model.toss.TossExchangeRate;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.broker.ExchangeRatePort;
+import com.kista.broker.domain.port.out.ExchangeRatePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

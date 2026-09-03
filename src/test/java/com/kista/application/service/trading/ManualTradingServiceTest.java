@@ -8,9 +8,9 @@ import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerPricePort;
-import com.kista.domain.port.out.broker.LiveBalancePort;
-import com.kista.domain.port.out.broker.SellableQuantityPort;
+import com.kista.broker.domain.port.out.BrokerPricePort;
+import com.kista.broker.domain.port.out.LiveBalancePort;
+import com.kista.broker.domain.port.out.SellableQuantityPort;
 import com.kista.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import com.kista.domain.strategy.*;
@@ -49,7 +49,7 @@ class ManualTradingServiceTest {
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock LiveBalancePort liveBalancePort;   // LiveBalancePort 직접 mock
-    @Mock com.kista.application.service.broker.BrokerAdapterRegistry brokerAdapterRegistry;
+    @Mock com.kista.broker.application.service.BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
     @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능

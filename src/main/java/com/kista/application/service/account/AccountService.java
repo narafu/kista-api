@@ -1,6 +1,6 @@
 package com.kista.application.service.account;
 
-import com.kista.application.service.broker.BrokerConnectionTesters;
+import com.kista.broker.application.service.BrokerConnectionTesters;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;

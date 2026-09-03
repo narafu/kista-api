@@ -1,13 +1,13 @@
 package com.kista.application.service.trading;
 
 import com.kista.application.event.NewCycleStartedEvent;
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.*;
-import com.kista.domain.port.out.broker.BrokerPricePort;
+import com.kista.broker.domain.port.out.BrokerPricePort;
 import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.support.DomainFixtures;

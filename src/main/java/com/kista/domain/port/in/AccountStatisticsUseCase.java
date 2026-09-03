@@ -1,8 +1,8 @@
 package com.kista.domain.port.in;
 
-import com.kista.domain.model.broker.DailyTransactionResult;
-import com.kista.domain.model.broker.MarginItem;
-import com.kista.domain.model.broker.PresentBalanceResult;
+import com.kista.broker.domain.model.DailyTransactionResult;
+import com.kista.broker.domain.model.MarginItem;
+import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy;

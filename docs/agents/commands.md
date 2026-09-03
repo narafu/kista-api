@@ -8,7 +8,7 @@
 ./gradlew compileJava                                           # 컴파일만
 ./gradlew test --tests 'com.kista.architecture.*'               # ArchUnit 규칙만
 ./gradlew test --tests 'com.kista.domain.*'                     # 도메인 단위 테스트
-./gradlew test --tests 'com.kista.adapter.out.kis.*'            # KIS Adapter 테스트
+./gradlew test --tests 'com.kista.broker.adapter.out.kis.*'     # KIS Adapter 테스트
 ./gradlew test --rerun-tasks                                    # 캐시 무시 강제 재실행
 ./gradlew clean compileJava                                     # QueryDSL 생성파일 캐시 오염 시 (QXxxEntity.java "error reading")
 # 테스트 실패 진단: stdout보다 XML이 신뢰성 높음

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.broker.PresentBalanceResult;
-import com.kista.domain.model.broker.PresentBalanceResult.Item;
+import com.kista.broker.domain.model.PresentBalanceResult;
+import com.kista.broker.domain.model.PresentBalanceResult.Item;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 

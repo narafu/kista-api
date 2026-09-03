@@ -11,12 +11,13 @@
 ### Spring Modulith 이전 중 신규 파일 배치
 - 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/{model,port/in,port/out}` + `application/service` + `adapter/{in,out}` 서브구조를 그대로 따른다 (→ architecture.md "Spring Modulith 점진 도입")
 - notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model·application 레이어가 없는 얇은 게이트웨이 모듈이라 `domain/port/out`(공개 계약, "domain" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `domain/port/in`을 그대로 참조
+- 브로커 애그리게이트(KIS/Toss/Mock 연동)는 `com.kista.broker`로 이미 옮겨졌다 — 신규 KIS/Toss/Mock 코드는 `com.kista.broker.adapter.out.*` 안에 추가. finance/notify와 달리 이 adapter/out은 NamedInterface로 공개되지 않아 모듈 밖에서 완전히 접근 불가 — 레거시 코드가 새 기능을 호출해야 하면 adapter 패키지에 직접 접근하지 말고 `com.kista.broker.domain.port.out`에 신규 `*Port` 인터페이스를 만들어 노출한다("domain" NamedInterface로 공개)
 
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
 - 다른 패키지 adapter에서 DB 조작이 필요하면 도메인 포트(`domain/port/out/`) 경유 필수
 - 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(domain.port.out) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
-- 참고: `KisAuthApi`(adapter.out.kis) → `BrokerTokenCachePort` → `KisTokenPersistenceAdapter`(persistence.kistoken)
+- 참고: `com.kista.broker.adapter.out.kis.KisAuthApi` → `com.kista.broker.domain.port.out.BrokerTokenCachePort` → `com.kista.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
 
 
 ### GlobalExceptionHandler 자동 예외 처리
@@ -69,7 +70,7 @@
 - 도메인 포트 인바운드 파라미터/입력 모델: `*Command` suffix, `*Request` suffix 금지(외부 HTTP DTO 성격 오인), `domain/model/<도메인>/` 하위 위치
 
 ### Ticker enum (Strategy.Ticker nested enum)
-- KIS 거래소 코드는 `KisExchangeRegistry`(adapter/out/kis) 전용 — 새 종목 추가 시 양쪽 갱신 필수
+- KIS 거래소 코드는 `com.kista.broker.adapter.out.kis.KisExchangeRegistry` 전용 — 새 종목 추가 시 양쪽 갱신 필수
 - PRIVACY·VR 신규 등록 ticker는 `StrategyCreationSettings.ticker()`의 고정값 정책으로 결정되며, 다른 명시 입력은 거부한다 (기본값: PRIVACY=SOXL, VR=TQQQ)
 - ticker는 `Account` 아닌 `strategy.ticker()` — 매매 시 strategy에서 참조
 
@@ -183,7 +184,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 
 ### Adapter 내부 중첩 타입 접근 제어자
 - 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
-- 예: `KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
+- 예: `com.kista.broker.adapter.out.kis.KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### Lombok 패턴

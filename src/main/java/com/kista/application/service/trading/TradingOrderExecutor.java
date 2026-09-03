@@ -1,6 +1,6 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.InfinitePosition;
@@ -8,7 +8,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.VrPosition;
 import com.kista.notify.domain.port.out.NotifyPort;
 import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.broker.BrokerOrderCorrectionPort;
+import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
 import com.kista.domain.strategy.CycleOrderStrategies;
 import com.kista.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;

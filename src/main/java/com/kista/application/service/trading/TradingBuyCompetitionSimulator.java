@@ -1,13 +1,13 @@
 package com.kista.application.service.trading;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.kis.KisApiException;
+import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.domain.model.order.BuyCompetitionPreview;
 import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.OrderPort;
 import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;

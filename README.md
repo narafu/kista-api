@@ -16,7 +16,7 @@ Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith(점진 도
 
 ### 계층 구조 (Hexagonal Architecture)
 
-레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 아직 레거시 최상위 구조(`com.kista.{domain,application,adapter}`)에 남은 애그리게이트 기준이다 — 가계부(`finance`)는 Spring Modulith 첫 이전 모듈로 별도 최상위 패키지(`com.kista.finance`)에서 동일한 레이어 구조를 유지하며 `ApplicationModules.verify()`로 모듈 경계까지 추가 검증받는다 (상세 → `docs/agents/architecture.md` "Spring Modulith 점진 도입").
+레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 아직 레거시 최상위 구조(`com.kista.{domain,application,adapter}`)에 남은 애그리게이트 기준이다 — 가계부(`finance`)·알림(`notify`)·증권사 연동(`broker`)은 Spring Modulith 이전 모듈로 각각 별도 최상위 패키지(`com.kista.finance`/`com.kista.notify`/`com.kista.broker`)에서 동일한 레이어 구조를 유지하며 `ApplicationModules.verify()`로 모듈 경계까지 추가 검증받는다 (상세 → `docs/agents/architecture.md` "Spring Modulith 점진 도입").
 
 ```mermaid
 graph TB
@@ -35,8 +35,6 @@ graph TB
 
     subgraph out["adapter/out"]
         persistence["persistence/ JPA"]
-        broker["kis/ · toss/ · mock/ BrokerAdapter"]
-        notify["notify/ Telegram · FCM"]
         sse["sse/ SseEmitterRegistry"]
         kakao_out["kakao/ OAuth"]
         redis_out["redis/ Blacklist"]
@@ -49,8 +47,6 @@ graph TB
     service --> domain
     service --> portout
     portout -.구현.-> persistence
-    portout -.구현.-> broker
-    portout -.구현.-> notify
     portout -.구현.-> sse
     portout -.구현.-> kakao_out
     portout -.구현.-> redis_out

@@ -64,7 +64,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 프리마켓·정규장·애프터마켓 전 구간에서 LOC/MOC 모두 지원하므로 예약주문 API 불필요 — kista에서 완전 제거됨
 
 ### KIS 어댑터 공통 파싱 헬퍼 (KisResponseParser)
-- `adapter/out/kis/KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
+- `com.kista.broker.adapter.out.kis.KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
 - 어댑터 내부에 파싱 헬퍼 직접 정의 금지 — KisResponseParser 사용
 - `parseIntSafe`: `(int) Double.parseDouble()` 경유 — KIS 응답이 `"5.0"` 같은 소수 형식일 수 있음
 - `KisTradingApi.getMargin()`: MarginPort 구현 (TTTC2101R) — USD 행 필터는 `currency()` 필드 기준
@@ -80,7 +80,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   - 응답: `output2[]` 종목별 — `symb`(종목코드), `last`(현재가) 필드 사용
 - `getPrice(Ticker, Account)` — 단건 API(`HHDFS00000300`) 유지
 - KIS 거래소 코드 두 체계 혼용 주의: `OVRS_EXCG_CD` (주문·체결·잔고 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
-- `KisExchangeRegistry`(adapter/out/kis): `Ticker → (ovrsExcgCd, excd)` 매핑 전담 — TQQQ=NASD/NAS, SOXL/USD/MAGX=AMEX/AMS
+- `KisExchangeRegistry`(com.kista.broker.adapter.out.kis): `Ticker → (ovrsExcgCd, excd)` 매핑 전담 — TQQQ=NASD/NAS, SOXL/USD/MAGX=AMEX/AMS
 
 ### 전일종가(prevClose) 조회 — KisPriceApi.getPriceSnapshot()/getPriceSnapshots()
 

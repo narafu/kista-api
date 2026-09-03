@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.broker.DailyTransactionResult;
-import com.kista.domain.model.broker.DailyTransactionSummary;
+import com.kista.broker.domain.model.DailyTransactionResult;
+import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.domain.model.strategy.CycleHistoryPage;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;

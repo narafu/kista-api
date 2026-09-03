@@ -1,10 +1,10 @@
 package com.kista.application.service.trading;
 
-import com.kista.application.service.broker.BrokerAdapterRegistry;
+import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.port.out.broker.LiveBalancePort;
+import com.kista.broker.domain.port.out.LiveBalancePort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,11 +87,11 @@ class PreviewDepositCacheTest {
     @Test
     void getUsdDeposit_doesNotCache_whenFetchFails() {
         when(liveBalancePort.getLiveBalance(account, Ticker.SOXL))
-                .thenThrow(new com.kista.domain.model.kis.KisApiException("일시 오류", null))
+                .thenThrow(new com.kista.broker.domain.model.kis.KisApiException("일시 오류", null))
                 .thenReturn(new AccountBalance(0, null, new BigDecimal("1000.00")));
 
         assertThatThrownBy(() -> cache.getUsdDeposit(account, Ticker.SOXL))
-                .isInstanceOf(com.kista.domain.model.kis.KisApiException.class);
+                .isInstanceOf(com.kista.broker.domain.model.kis.KisApiException.class);
         BigDecimal result = cache.getUsdDeposit(account, Ticker.SOXL);
 
         assertThat(result).isEqualByComparingTo("1000.00");
