@@ -1,11 +1,11 @@
 package com.kista.application.service.strategy;
 
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.model.strategy.StrategyCycleVrDetail;
+import com.kista.trading.domain.model.CyclePosition;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.StrategyVrDetail;
-import com.kista.domain.port.out.StrategyCycleVrPort;
+import com.kista.trading.domain.port.out.StrategyCycleVrPort;
 import com.kista.domain.port.out.StrategyVrDetailPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -3,7 +3,7 @@ package com.kista.broker.adapter.out.kis;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.PresentBalanceResult;
-import com.kista.domain.model.order.Order;
+import com.kista.broker.domain.model.Direction;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -126,7 +126,7 @@ class KisTradingApiTest {
             List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
 
             assertThat(result).hasSize(1);
-            assertThat(result.getFirst().direction()).isEqualTo(Order.OrderDirection.SELL);
+            assertThat(result.getFirst().direction()).isEqualTo(Direction.SELL);
         }
 
         @Test
@@ -143,7 +143,7 @@ class KisTradingApiTest {
 
             assertThat(result).hasSize(1);
             Execution e = result.getFirst();
-            assertThat(e.direction()).isEqualTo(Order.OrderDirection.BUY);
+            assertThat(e.direction()).isEqualTo(Direction.BUY);
             assertThat(e.quantity()).isEqualTo(10);
             assertThat(e.price()).isEqualByComparingTo("30.50");
             assertThat(e.amountUsd()).isEqualByComparingTo("305.00");

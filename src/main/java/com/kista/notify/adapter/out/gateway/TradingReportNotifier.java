@@ -1,8 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.event.TradingReportReadyEvent;
+import com.kista.trading.application.event.TradingReportReadyEvent;
+import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.TradeEvent;
+import com.kista.trading.domain.model.TradeEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.notify.domain.port.out.UserNotificationPort;
@@ -10,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import static com.kista.domain.model.order.Order.OrderDirection.SELL;
 
 // 매매 리포트 알림(Telegram/FCM)과 체결 건별 SSE 알림을 채널 라우팅과 분리 — 발행처가 트랜잭션 안이든 밖이든 fallbackExecution으로 항상 실행되게 함
 @Component
@@ -36,7 +35,7 @@ class TradingReportNotifier {
 
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
         for (Execution e : event.executions()) {
-            TradeEvent tradeEvent = e.direction() == SELL
+            TradeEvent tradeEvent = e.direction() == Direction.SELL
                     ? TradeEvent.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.account().nickname())
                     : TradeEvent.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.account().nickname());
             realtimeNotificationPort.notifyTrade(user.id(), tradeEvent);

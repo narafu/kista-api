@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.order.Order;
+import com.kista.broker.domain.model.Direction;
+import com.kista.broker.domain.model.OrderType;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.Test;
 
@@ -59,33 +60,33 @@ class KisResponseParserTest {
     // parseDirection: "01"→SELL, 나머지→BUY
     @Test
     void parseDirection_01_returnsSell() {
-        assertThat(KisResponseParser.parseDirection("01")).isEqualTo(Order.OrderDirection.SELL);
+        assertThat(KisResponseParser.parseDirection("01")).isEqualTo(Direction.SELL);
     }
 
     @Test
     void parseDirection_02_returnsBuy() {
-        assertThat(KisResponseParser.parseDirection("02")).isEqualTo(Order.OrderDirection.BUY);
+        assertThat(KisResponseParser.parseDirection("02")).isEqualTo(Direction.BUY);
     }
 
     @Test
     void parseDirection_unknown_returnsBuy() {
-        assertThat(KisResponseParser.parseDirection("99")).isEqualTo(Order.OrderDirection.BUY);
+        assertThat(KisResponseParser.parseDirection("99")).isEqualTo(Direction.BUY);
     }
 
     // formatPrice: MOC→"0", LOC/LIMIT→소수 2자리
     @Test
     void formatPrice_moc_returnsZeroString() {
-        assertThat(KisResponseParser.formatPrice(Order.OrderType.MOC, new BigDecimal("22.5"))).isEqualTo("0");
+        assertThat(KisResponseParser.formatPrice(OrderType.MOC, new BigDecimal("22.5"))).isEqualTo("0");
     }
 
     @Test
     void formatPrice_loc_returnsTwoDecimalPlaces() {
-        assertThat(KisResponseParser.formatPrice(Order.OrderType.LOC, new BigDecimal("22.5"))).isEqualTo("22.50");
+        assertThat(KisResponseParser.formatPrice(OrderType.LOC, new BigDecimal("22.5"))).isEqualTo("22.50");
     }
 
     @Test
     void formatPrice_limit_returnsTwoDecimalPlaces() {
-        assertThat(KisResponseParser.formatPrice(Order.OrderType.LIMIT, new BigDecimal("22"))).isEqualTo("22.00");
+        assertThat(KisResponseParser.formatPrice(OrderType.LIMIT, new BigDecimal("22"))).isEqualTo("22.00");
     }
 
     // resolvePrice: last 유효→last, last 빈+base 유효→base, 둘 다 빈→empty

@@ -1,9 +1,9 @@
 package com.kista.adapter.in.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.order.CancelResult;
-import com.kista.domain.model.order.ManualTradingException;
-import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.trading.domain.model.CancelResult;
+import com.kista.trading.domain.model.ManualTradingException;
+import com.kista.trading.domain.model.CycleHistoryPage;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyDetail;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
@@ -11,8 +11,8 @@ import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
 import com.kista.domain.port.in.StrategyUseCase;
-import com.kista.domain.port.in.TradingExecutionUseCase;
-import com.kista.domain.port.in.VrReconfigureUseCase;
+import com.kista.trading.domain.port.in.TradingExecutionUseCase;
+import com.kista.trading.domain.port.in.VrReconfigureUseCase;
 import com.kista.domain.port.out.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -258,7 +258,7 @@ class TradingCycleControllerTest {
     @Test
     void previewBatch_returns200_withMapKeyedByStrategyId() throws Exception {
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        var preview = new com.kista.domain.model.order.NextOrdersPreview(
+        var preview = new com.kista.trading.domain.model.NextOrdersPreview(
                 java.time.LocalDate.of(2026, 1, 5), null, List.of(),
                 null, List.of(), BigDecimal.ZERO, null, null);
         when(tradingExecution.previewBatch(eq(ACCOUNT_ID), any()))

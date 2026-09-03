@@ -1,23 +1,23 @@
 package com.kista.application.service.admin;
 
-import com.kista.application.event.CycleEndedEvent;
+import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.common.CycleLookups;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
 import com.kista.domain.model.admin.AdminTradeCorrectionResult;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.CyclePosition;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.AccountBalance;
+import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminTradeCorrectionUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.trading.domain.port.out.CyclePositionPort;
+import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -120,10 +120,18 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     private AccountBalance applyFillAndSnapshot(AdminManualTradeCorrectionCommand.Fill fill, Strategy strategy,
                                                 AccountBalance balance, StrategyCycle currentCycle) {
         Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
-                fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
-        AccountBalance updated = balance.applyExecutions(List.of(execution));
+                toDirection(fill.direction()), fill.quantity(), fill.price(), fill.externalOrderId());
+        AccountBalance updated = balance.applyExecutions(List.of(AccountBalance.Fill.of(execution)));
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
+    }
+
+    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static com.kista.broker.domain.model.Direction toDirection(Order.OrderDirection direction) {
+        return switch (direction) {
+            case BUY -> com.kista.broker.domain.model.Direction.BUY;
+            case SELL -> com.kista.broker.domain.model.Direction.SELL;
+        };
     }
 
     private AdminTradeCorrectionResult buildResult(User user, Account account, Strategy strategy,

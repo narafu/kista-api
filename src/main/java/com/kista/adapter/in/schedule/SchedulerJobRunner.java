@@ -1,6 +1,6 @@
 package com.kista.adapter.in.schedule;
 
-import com.kista.domain.model.strategy.BatchContext;
+import com.kista.trading.domain.model.BatchContext;
 import com.kista.notify.domain.port.out.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,15 +10,16 @@ import java.util.List;
 import java.util.function.Supplier;
 
 // 스케쥴러 공통 실행 골격 — "알림 시작 → try(contexts 빌드 → 실행) → 인터럽트/예외 처리 → 알림 완료"
+// com.kista.trading.adapter.in.schedule의 TradingOpenScheduler/TradingCloseScheduler가 모듈 경계 밖에서 참조하므로 public 유지
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class SchedulerJobRunner {
+public class SchedulerJobRunner {
 
     private final NotifyPort notifyPort;
 
     // BatchContext 없이 단순 Runnable 작업 실행 — FearGreed·MarketCalendar 스케쥴러용
-    void run(String name, Runnable job) {
+    public void run(String name, Runnable job) {
         notifyPort.notifyInfo(name + " 시작");
         log.info("{} 시작", name);
         try {
@@ -32,7 +33,7 @@ class SchedulerJobRunner {
     }
 
     // name: 스케쥴러 표시명 (e.g., "장 개시 스케쥴러", "마감 매매 스케쥴러 수동")
-    void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) throws InterruptedException {
+    public void run(String name, Supplier<List<BatchContext>> contextSupplier, Action action) throws InterruptedException {
         notifyPort.notifyInfo(name + " 시작");
         try {
             List<BatchContext> contexts = contextSupplier.get(); // try 안으로 이동 — 조회 자체가 실패해도 오류 알림 누락 없이 잡히도록
@@ -53,7 +54,7 @@ class SchedulerJobRunner {
     }
 
     @FunctionalInterface
-    interface Action {
+    public interface Action {
         void accept(List<BatchContext> contexts) throws Exception;
     }
 }

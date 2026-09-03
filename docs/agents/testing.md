@@ -54,8 +54,8 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
 ### 전략 테스트 분리 원칙
-- `InfinitePositionTest` (`domain/model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
-- `InfiniteStrategyTypeTest` (`domain/strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
+- `InfinitePositionTest` (`com.kista.trading.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
+- `InfiniteStrategyTypeTest` (`com.kista.trading.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
 
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`

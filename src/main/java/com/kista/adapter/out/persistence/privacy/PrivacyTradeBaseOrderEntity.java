@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

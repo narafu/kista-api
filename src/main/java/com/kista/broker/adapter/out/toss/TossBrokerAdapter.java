@@ -3,8 +3,6 @@ package com.kista.broker.adapter.out.toss;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.*;
 import com.kista.broker.domain.port.out.*;
@@ -67,13 +65,13 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public void cancel(com.kista.domain.model.order.Order order, Account account) {
-        tossOrderApi.cancel(order, account);
+    public void cancel(CancelInstruction instruction, Account account) {
+        tossOrderApi.cancel(instruction, account);
     }
 
     @Override
-    public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
-        return tossOrderApi.place(order, account);
+    public OrderResult place(OrderInstruction instruction, Account account) {
+        return tossOrderApi.place(instruction, account);
     }
 
     // --- Toss 전용 Capability ---
@@ -156,7 +154,7 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public AccountBalance getLiveBalance(Account account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(Account account, Ticker ticker) {
         return tossHoldingsApi.getBalance(account, ticker);
     }
 

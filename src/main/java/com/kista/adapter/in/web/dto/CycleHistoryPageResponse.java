@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.trading.domain.model.CycleHistoryPage;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;

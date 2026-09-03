@@ -6,7 +6,7 @@ import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.Currency;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
-import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
@@ -46,7 +46,7 @@ class TossHoldingsApi {
     // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
     private final UsdKrwRateCache exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), Instant::now);
 
-    public AccountBalance getBalance(Account account, Ticker ticker) {
+    public BrokerBalance getBalance(Account account, Ticker ticker) {
         // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
         TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
@@ -57,19 +57,19 @@ class TossHoldingsApi {
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
 
         if (holdingsResponse == null || holdingsResponse.items() == null) {
-            return new AccountBalance(0, null, usdDeposit);
+            return new BrokerBalance(0, null, usdDeposit);
         }
 
-        // 요청 종목 필터링 후 AccountBalance 구성 (미보유 시 holdings=0, avgPrice=null)
+        // 요청 종목 필터링 후 BrokerBalance 구성 (미보유 시 holdings=0, avgPrice=null)
         return holdingsResponse.items().stream()
                 .filter(i -> ticker.name().equals(i.symbol()))
                 .findFirst()
                 .map(i -> {
                     int quantity = Integer.parseInt(i.quantity());
                     BigDecimal avg = quantity > 0 ? new BigDecimal(i.averagePurchasePrice()) : null;
-                    return new AccountBalance(quantity, avg, usdDeposit);
+                    return new BrokerBalance(quantity, avg, usdDeposit);
                 })
-                .orElse(new AccountBalance(0, null, usdDeposit));
+                .orElse(new BrokerBalance(0, null, usdDeposit));
     }
 
     // ── TossMarginPort ─────────────────────────────────────────────────────────

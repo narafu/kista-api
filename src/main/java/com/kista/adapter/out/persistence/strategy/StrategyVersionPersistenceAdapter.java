@@ -2,7 +2,6 @@ package com.kista.adapter.out.persistence.strategy;
 
 import com.kista.domain.model.strategy.StrategyVersion;
 import com.kista.domain.port.out.StrategyVersionPort;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +12,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+// com.kista.trading.adapter.out.persistence의 CyclePositionPersistenceAdapterTest/StrategyCycleVrPersistenceAdapterTest가
+// @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지 (모듈 경계상 legacy는 OPEN이라 안전)
 @Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
+@RequiredArgsConstructor
+public class StrategyVersionPersistenceAdapter implements StrategyVersionPort {
 
     private final StrategyVersionJpaRepository jpaRepository;
 

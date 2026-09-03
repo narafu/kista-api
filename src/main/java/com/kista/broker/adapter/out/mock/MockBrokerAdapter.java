@@ -1,21 +1,11 @@
 package com.kista.broker.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
-import com.kista.common.CycleLookups;
-import com.kista.domain.backtest.FillSimulator;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.broker.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 // 모의계좌 어댑터 — 실제 증권사 접수 없이 DB 스냅샷 기반으로 잔고·체결을 시뮬레이션
+// trading 소유 영속 데이터는 MockSimulationDataPort(broker 소유 포트, trading이 구현) 경유로만 접근 — trading 타입 직접 참조 없음
 @Component
 @RequiredArgsConstructor
 public class MockBrokerAdapter implements BrokerAdapterPort,
@@ -39,11 +30,9 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         ExecutionPort,
         BrokerPricePort, LiveBalancePort {
 
-    private final CommonMarketPriceFeed priceFeed;     // 시세 재사용 — Spring이 TossPriceApi 빈을 이 인터페이스로 주입
-    private final OrderPort orderPort;                  // 사이클 기준 PLACED 주문 조회 (체결 시뮬레이션 대상)
-    private final StrategyPort strategyPort;             // 계좌+ticker → strategy 해석
-    private final StrategyCyclePort strategyCyclePort;   // strategy → 현재 활성 사이클 해석 (getExecutions의 cycle 격리용)
-    private final CyclePositionPort cyclePositionPort;   // 최신 잔고 스냅샷 조회
+    private final CommonMarketPriceFeed priceFeed;               // 시세 재사용 — Spring이 TossPriceApi 빈을 이 인터페이스로 주입 (이미 broker 소유 PriceSnapshot 반환)
+    private final StrategyPort strategyPort;                     // 계좌+ticker → strategy 해석 (legacy 공개 포트)
+    private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
     public Account.Broker supports() {
@@ -61,9 +50,9 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     }
 
     // --- 계좌+ticker → 최신 포지션 해석 공통 헬퍼 ---
-    private CyclePosition resolveLatestPosition(Account account, Ticker ticker) {
+    private PositionView resolveLatestPosition(Account account, Ticker ticker) {
         Strategy strategy = resolveStrategy(account, ticker);
-        return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
+        return mockSimulationDataPort.findLatestPosition(strategy.id())
                 .orElseThrow(() -> new IllegalStateException(
                         "모의계좌 포지션 이력이 없습니다: strategyId=" + strategy.id()));
     }
@@ -73,9 +62,9 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // 합산해 계좌 단위 값으로 맞춘다 — 전략별 값을 그대로 반환하면 다른 전략의 잔고로 매수 승인/거절이 오염된다
     private BigDecimal sumUsdDepositAcrossStrategies(Account account) {
         return strategyPort.findByAccountId(account.id()).stream()
-                .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id()))
+                .map(s -> mockSimulationDataPort.findLatestPosition(s.id()))
                 .flatMap(Optional::stream)
-                .map(CyclePosition::usdDeposit)
+                .map(PositionView::usdDeposit)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -93,7 +82,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     @Override
     public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
-        return priceFeed.getPriceSnapshot(ticker); // 공통 API — account 불필요
+        return priceFeed.getPriceSnapshot(ticker); // 공통 API — account 불필요, priceFeed가 이미 broker 소유 PriceSnapshot 반환
     }
 
     @Override
@@ -129,10 +118,10 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- LiveBalancePort ---
 
     @Override
-    public AccountBalance getLiveBalance(Account account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(Account account, Ticker ticker) {
         // usdDeposit은 계좌 전체 합산(위 sumUsdDepositAcrossStrategies 주석 참고), holdings/avgPrice는 해당 ticker 전략 값
-        CyclePosition position = resolveLatestPosition(account, ticker);
-        return new AccountBalance(position.holdings(), position.avgPrice(), sumUsdDepositAcrossStrategies(account));
+        PositionView position = resolveLatestPosition(account, ticker);
+        return new BrokerBalance(position.holdings(), position.avgPrice(), sumUsdDepositAcrossStrategies(account));
     }
 
     // --- SellableQuantityPort ---
@@ -146,13 +135,13 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- BrokerOrderCorrectionPort ---
 
     @Override
-    public Order place(Order order, Account account) {
+    public OrderResult place(OrderInstruction instruction, Account account) {
         // 실제 증권사 접수 없이 합성 주문번호 부여 — 이 ID를 getExecutions()가 그대로 echo해 TradingReporter.markFilledOrders와 매칭시킨다
-        return order.withPlaced("MOCK-" + UUID.randomUUID());
+        return new OrderResult("MOCK-" + UUID.randomUUID());
     }
 
     @Override
-    public void cancel(Order order, Account account) {
+    public void cancel(CancelInstruction instruction, Account account) {
         // no-op — 모의계좌는 별도 취소 대상이 없음(getExecutions에서 미체결 주문은 TradingReporter가 자체적으로 CANCELLED 처리)
     }
 
@@ -162,22 +151,32 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용
-        // strategyCycleId로 스코프 — account+ticker만으로 조회하면 사이클 롤오버 당일 종료된 이전 사이클의
-        // 잔류 PLACED 주문(취소 실패 등)이 새 사이클의 체결에 잘못 합산될 수 있어 기존 사이클 격리 조회를 재사용한다
+        // cycleId로 스코프 — account+ticker만으로 조회하면 사이클 롤오버 당일 종료된 이전 사이클의
+        // 잔류 PLACED 주문(취소 실패 등)이 새 사이클의 체결에 잘못 합산될 수 있어 활성 사이클 격리 조회를 재사용한다
         Strategy strategy = resolveStrategy(account, ticker);
-        StrategyCycle cycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
-        List<Order> placed = orderPort.findPlacedByCycleAndDate(cycle.id(), to);
+        UUID cycleId = mockSimulationDataPort.findActiveCycleId(strategy.id());
+        List<PlacedOrderView> placed = mockSimulationDataPort.findPlacedOrders(cycleId, to);
         if (placed.isEmpty()) return List.of();
 
         BigDecimal closingPrice = getClosingPrice(ticker, to, account);
         List<Execution> executions = new ArrayList<>();
-        for (Order order : placed) {
-            if (!FillSimulator.fills(order, closingPrice)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
+        for (PlacedOrderView order : placed) {
+            if (!fills(order, closingPrice)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
             // LIMIT은 지정가 그대로 체결, LOC/MOC는 종가 기준 체결
-            BigDecimal fillPrice = order.orderType() == Order.OrderType.LIMIT ? order.price() : closingPrice;
+            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? order.price() : closingPrice;
             executions.add(Execution.ofManualFill(to, ticker, order.direction(), order.quantity(), fillPrice, order.externalOrderId()));
         }
         return executions;
+    }
+
+    // 체결 판정 SSOT는 com.kista.domain.backtest.FillSimulator.fills(Order, BigDecimal)이지만 trading의 Order를 받는다 —
+    // broker는 더 이상 trading 타입을 참조할 수 없으므로 동일 판정 로직을 broker 소유 타입으로 재구현한다.
+    // 순수 3줄 판정이라 포트 우회보다 저비용 복제로 판단(PersistenceSupport/DstInfo 부분 복제와 동일 기준, 변경 금지)
+    private static boolean fills(PlacedOrderView order, BigDecimal closingPrice) {
+        if (order.orderType() == OrderType.MOC) return true;
+        return order.direction() == Direction.BUY
+                ? closingPrice.compareTo(order.price()) <= 0
+                : closingPrice.compareTo(order.price()) >= 0;
     }
 
     // --- MarginPort ---
@@ -206,9 +205,9 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
         List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
         BigDecimal totalUsdDeposit = BigDecimal.ZERO;
         for (Strategy strategy : strategies) {
-            Optional<CyclePosition> latest = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
+            Optional<PositionView> latest = mockSimulationDataPort.findLatestPosition(strategy.id());
             if (latest.isEmpty()) continue;
-            CyclePosition position = latest.get();
+            PositionView position = latest.get();
             totalUsdDeposit = totalUsdDeposit.add(position.usdDeposit());
             if (position.holdings() > 0 && position.avgPrice() != null) {
                 BigDecimal currentPrice = priceFeed.getPrice(strategy.ticker());

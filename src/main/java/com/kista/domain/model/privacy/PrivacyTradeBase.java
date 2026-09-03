@@ -1,6 +1,6 @@
 package com.kista.domain.model.privacy;
 
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
 
 import java.math.BigDecimal;

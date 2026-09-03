@@ -1,7 +1,7 @@
 package com.kista.adapter.out.sse;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.domain.model.order.TradeEvent;
+import com.kista.trading.domain.model.TradeEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

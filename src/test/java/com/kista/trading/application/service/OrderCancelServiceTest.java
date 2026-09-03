@@ -1,0 +1,337 @@
+package com.kista.trading.application.service;
+
+import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.domain.model.account.Account;
+import com.kista.trading.domain.model.CancelResult;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.OrderCancelException;
+import com.kista.domain.model.strategy.Strategy;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.trading.application.event.OrderCancelFailedEvent;
+import com.kista.domain.port.out.AccountPort;
+import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
+import com.kista.domain.port.out.StrategyPort;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
+import com.kista.support.DomainFixtures;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("OrderCancelService 단위 테스트")
+class OrderCancelServiceTest {
+
+    @Mock OrderPort orderPort;
+    @Mock BrokerAdapterRegistry registry;
+    @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
+    @Mock AccountPort accountPort;
+    @Mock StrategyPort cyclePort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock ApplicationEventPublisher eventPublisher;
+    OrderCancelService service;
+
+    private final UUID requesterId = UUID.randomUUID();
+    private final UUID cycleId = UUID.randomUUID();
+    private final UUID accountId = UUID.randomUUID();
+    private final UUID orderId = UUID.randomUUID();
+    private final UUID strategyCycleId = UUID.randomUUID();
+
+    private Account ownedAccount;
+    private Strategy cycle;
+    private StrategyCycle currentCycle;
+
+    @BeforeEach
+    void setUp() {
+        ownedAccount = DomainFixtures.kisAccount(accountId, requesterId);
+        cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
+                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
+                null, LocalDate.now(), null, null, null);
+        // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().doReturn(brokerPort).when(registry).require(any(), any());
+        // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
+        service = new OrderCancelService(orderPort, registry, accountPort, cyclePort, strategyCyclePort,
+                eventPublisher, new OrderCancelStateWriter(orderPort));
+    }
+
+    private static CancelInstruction cancelOf(Order order) {
+        return new CancelInstruction(order.ticker(), order.externalOrderId());
+    }
+
+    // --- cancelByCycle ---
+
+    @Test
+    @DisplayName("cancelByCycle: 오늘 PLANNED 삭제 + PLACED 취소 성공 → CancelResult(n, 0)")
+    void cancelByCycle_allSuccess() {
+        Order plannedOrder = plannedOrder(UUID.randomUUID());
+        Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
+        Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(plannedOrder));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(order1, order2));
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(3);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
+        verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount));
+        verify(orderPort, times(2)).markCancelled(any());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: KIS 취소 일부 실패 시 best-effort → CancelResult(1, 1)")
+    void cancelByCycle_partialFailure() {
+        Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
+        Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(order1, order2));
+        // order1은 성공, order2는 KIS 오류
+        doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
+        doThrow(new RuntimeException("KIS 오류")).when(brokerPort).cancel(eq(cancelOf(order2)), any());
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(1);
+        verify(orderPort, times(1)).markCancelled(order1.id());
+        verify(orderPort, never()).markCancelled(order2.id());
+
+        ArgumentCaptor<OrderCancelFailedEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelFailedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().strategyId()).isEqualTo(cycleId);
+        assertThat(eventCaptor.getValue().failedCount()).isEqualTo(1);
+        assertThat(eventCaptor.getValue().summary()).contains(order2.id().toString());
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수 → CancelResult(2, 0), 알림 없음")
+    void cancelByCycle_alreadyCanceledConflict_absorbedAsSuccess() {
+        Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
+        Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of(order1, order2));
+        // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
+        doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
+        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(eq(cancelOf(order2)), any());
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(2);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(orderPort).markCancelled(order1.id());
+        verify(orderPort).markCancelled(order2.id());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: PLANNED·PLACED 주문 없으면 CancelResult(0, 0)")
+    void cancelByCycle_noPlacedOrders() {
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(0);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verifyNoInteractions(brokerPort);
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: 소유권 불일치 → SecurityException")
+    void cancelByCycle_ownershipMismatch_throwsSecurityException() {
+        UUID otherUser = UUID.randomUUID();
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, otherUser))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
+
+        assertThatThrownBy(() -> service.cancelByCycle(cycleId, otherUser))
+                .isInstanceOf(SecurityException.class);
+    }
+
+    // --- cancelOrder ---
+
+    @Test
+    @DisplayName("cancelOrder: PLACED 주문 취소 성공")
+    void cancelOrder_success() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(brokerPort).cancel(cancelOf(order), ownedAccount);
+        verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: PLANNED 주문은 증권사 취소 없이 DB 취소만 수행")
+    void cancelOrder_planned_success() {
+        Order order = plannedOrder(orderId);
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(orderPort).markCancelled(orderId);
+        verifyNoInteractions(brokerPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수해 DB만 CANCELLED 처리")
+    void cancelOrder_alreadyCanceledConflict_absorbedAsSuccess() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커 취소가 그 외 사유로 실패하면 예외가 그대로 전파된다")
+    void cancelOrder_otherBrokerFailure_propagates() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(cancelOf(order), ownedAccount);
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("네트워크 오류");
+        verify(orderPort, never()).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 주문 없으면 NoSuchElementException")
+    void cancelOrder_notFound() {
+        when(orderPort.findById(orderId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 소유권 불일치 → SecurityException")
+    void cancelOrder_ownershipMismatch() {
+        Order order = placedOrder(orderId, "ORD_99");
+        UUID otherUser = UUID.randomUUID();
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, otherUser))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, otherUser))
+                .isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
+    void cancelOrder_notPlaced_throwsIllegalStateException() {
+        Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                Order.OrderStatus.FILLED, "ORD_99", null, null);
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(OrderCancelException.class);
+    }
+
+    // --- 트랜잭션 분리 검증 ---
+
+    @Test
+    @DisplayName("OrderCancelService는 클래스·메서드 어디에도 @Transactional이 없다 — 브로커 취소 HTTP가 트랜잭션 밖에서 실행됨")
+    void orderCancelService_hasNoTransactionalAnnotation() throws NoSuchMethodException {
+        assertThat(OrderCancelService.class.isAnnotationPresent(Transactional.class)).isFalse();
+
+        Method cancelByCycle = OrderCancelService.class.getDeclaredMethod("cancelByCycle", UUID.class, UUID.class);
+        Method cancelOrder = OrderCancelService.class.getDeclaredMethod("cancelOrder", UUID.class, UUID.class);
+        assertThat(cancelByCycle.isAnnotationPresent(Transactional.class)).isFalse();
+        assertThat(cancelOrder.isAnnotationPresent(Transactional.class)).isFalse();
+    }
+
+    @Test
+    @DisplayName("OrderCancelStateWriter의 DB 쓰기 메서드에는 @Transactional이 있다")
+    void orderCancelStateWriter_dbWritesAreTransactional() throws NoSuchMethodException {
+        Method deletePlanned = OrderCancelStateWriter.class.getDeclaredMethod("deletePlanned", UUID.class, LocalDate.class);
+        Method markCancelled = OrderCancelStateWriter.class.getDeclaredMethod("markCancelled", UUID.class);
+        assertThat(deletePlanned.isAnnotationPresent(Transactional.class)).isTrue();
+        assertThat(markCancelled.isAnnotationPresent(Transactional.class)).isTrue();
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커 취소 성공 이후에만 markCancelled가 호출된다")
+    void cancelOrder_marksCancelledOnlyAfterBrokerCancelSucceeds() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+
+        service.cancelOrder(orderId, requesterId);
+
+        InOrder inOrder = inOrder(brokerPort, orderPort);
+        inOrder.verify(brokerPort).cancel(cancelOf(order), ownedAccount);
+        inOrder.verify(orderPort).markCancelled(orderId);
+    }
+
+    // ---
+
+    private Order placedOrder(UUID id, String externalOrderId) {
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                Order.OrderStatus.PLACED, externalOrderId, null, null);
+    }
+
+    private Order plannedOrder(UUID id) {
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                Order.OrderStatus.PLANNED, null, null, null);
+    }
+}

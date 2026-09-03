@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

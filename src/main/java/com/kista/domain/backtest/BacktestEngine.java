@@ -4,18 +4,18 @@ import com.kista.domain.model.backtest.BacktestCommand;
 import com.kista.domain.model.backtest.BacktestPoint;
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.trading.domain.model.AccountBalance;
+import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.StrategyVrDetail;
-import com.kista.domain.model.strategy.VrPosition;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.CycleOrderStrategy;
-import com.kista.domain.strategy.InfiniteStrategy;
-import com.kista.domain.strategy.PriceCapPolicy;
-import com.kista.domain.strategy.VrStrategy;
+import com.kista.trading.domain.model.VrPosition;
+import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.trading.domain.strategy.InfiniteStrategy;
+import com.kista.trading.domain.strategy.PriceCapPolicy;
+import com.kista.trading.domain.strategy.VrStrategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.kista.domain.model.order.Order.OrderDirection.BUY;
+import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
@@ -420,7 +420,7 @@ public class BacktestEngine {
         // 체결 반영 — 잔고·체결건수 갱신
         void applyFills(List<Execution> executions) {
             if (executions.isEmpty()) return;
-            balance = balance.applyExecutions(executions);
+            balance = balance.applyExecutions(AccountBalance.Fill.listOf(executions));
             tradeCount += executions.size();
         }
     }
@@ -448,7 +448,7 @@ public class BacktestEngine {
             if (executions.isEmpty()) return;
             super.applyFills(executions);
             poolUsed = poolUsed.add(executions.stream()
-                    .filter(e -> e.direction() == BUY)
+                    .filter(e -> e.direction() == com.kista.broker.domain.model.Direction.BUY)
                     .map(Execution::amountUsd)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }

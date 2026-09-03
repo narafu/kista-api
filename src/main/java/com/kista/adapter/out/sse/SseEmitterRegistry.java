@@ -2,7 +2,7 @@ package com.kista.adapter.out.sse;
 
 import com.kista.application.event.UserApprovedEvent;
 import com.kista.application.event.UserRejectedEvent;
-import com.kista.domain.model.order.TradeEvent;
+import com.kista.trading.domain.model.TradeEvent;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;

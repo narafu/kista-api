@@ -1,6 +1,6 @@
 package com.kista.adapter.out.sse;
 
-import com.kista.domain.model.order.TradeEvent;
+import com.kista.trading.domain.model.TradeEvent;
 import com.kista.domain.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

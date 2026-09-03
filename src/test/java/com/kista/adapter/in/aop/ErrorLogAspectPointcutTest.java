@@ -1,7 +1,7 @@
 package com.kista.adapter.in.aop;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.AppErrorLogPort;
 import com.kista.notify.domain.port.out.NotifyPort;

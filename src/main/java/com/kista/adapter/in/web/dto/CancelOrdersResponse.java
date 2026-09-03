@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.order.CancelResult;
+import com.kista.trading.domain.model.CancelResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record CancelOrdersResponse(

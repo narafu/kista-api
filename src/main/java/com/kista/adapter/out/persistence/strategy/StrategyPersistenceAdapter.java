@@ -3,7 +3,6 @@ package com.kista.adapter.out.persistence.strategy;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.out.StrategyPort;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,9 +14,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+// com.kista.trading.adapter.out.persistence의 CyclePositionPersistenceAdapterTest/StrategyCycleVrPersistenceAdapterTest가
+// @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지 (모듈 경계상 legacy는 OPEN이라 안전)
 @Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class StrategyPersistenceAdapter implements StrategyPort {
+@RequiredArgsConstructor
+public class StrategyPersistenceAdapter implements StrategyPort {
 
     private final StrategyJpaRepository jpaRepository;
 
@@ -85,6 +86,13 @@ class StrategyPersistenceAdapter implements StrategyPort {
     @Override
     public boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker) {
         return jpaRepository.existsByAccountIdAndTicker(accountId, ticker);
+    }
+
+    @Override
+    public Map<UUID, Strategy.Ticker> findTickersByIds(Collection<UUID> strategyIds) {
+        if (strategyIds.isEmpty()) return Map.of();
+        return jpaRepository.findAllById(strategyIds).stream()
+                .collect(Collectors.toMap(StrategyEntity::getId, StrategyEntity::getTicker));
     }
 
     private Strategy toDomain(StrategyEntity e) {

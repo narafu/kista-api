@@ -6,7 +6,7 @@ import com.kista.domain.model.admin.AdminAnomalies;
 import com.kista.domain.model.admin.AdminStats;
 import com.kista.domain.model.admin.AppErrorLog;
 import com.kista.domain.model.admin.AuditLog;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.PrivacyTradeBaseView;
 import com.kista.domain.model.strategy.Strategy;
 

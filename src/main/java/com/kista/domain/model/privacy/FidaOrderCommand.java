@@ -1,7 +1,7 @@
 package com.kista.domain.model.privacy;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;

@@ -2,8 +2,12 @@ package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
+import com.kista.broker.domain.model.OrderInstruction;
+import com.kista.broker.domain.model.OrderResult;
+import com.kista.broker.domain.model.OrderType;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
@@ -30,15 +34,15 @@ class TossOrderApi {
 
     private final TossHttpClient tossHttpClient;
 
-    public Order place(Order order, Account account) {
+    public OrderResult place(OrderInstruction instruction, Account account) {
         // Toss는 MARKET 주문 미지원 — MOC도 LIMIT+CLS로 대체
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("symbol", order.ticker().name());              // 종목 코드 (예: SOXL)
-        body.put("side", order.direction().name());             // BUY / SELL
-        body.put("orderType", "LIMIT");                         // Toss 지원 타입: LIMIT만
-        body.put("timeInForce", resolveTimeInForce(order.orderType())); // CLS(장마감) or DAY(정규장)
-        body.put("quantity", order.quantity());
-        body.put("price", resolvePrice(order.orderType(), order.price()));
+        body.put("symbol", instruction.ticker().name());              // 종목 코드 (예: SOXL)
+        body.put("side", instruction.direction().name());             // BUY / SELL
+        body.put("orderType", "LIMIT");                                // Toss 지원 타입: LIMIT만
+        body.put("timeInForce", resolveTimeInForce(instruction.orderType())); // CLS(장마감) or DAY(정규장)
+        body.put("quantity", instruction.quantity());
+        body.put("price", resolvePrice(instruction.orderType(), instruction.price()));
 
         // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} — TossResult 언랩
         OrderResponse resp = TossResponseParser.unwrap(
@@ -50,13 +54,13 @@ class TossOrderApi {
             throw new TossApiException("Toss 주문 실패: 응답에 orderId 없음", null);
         }
 
-        // id=null — KIS와 동일하게 호출자가 DB 저장(plan/markPlaced) 처리
-        return order.withPlaced(resp.orderId());
+        // broker는 결과만 반환 — id=null, DB PLACED 기록은 trading 호출부(order.withPlaced())가 담당
+        return new OrderResult(resp.orderId());
     }
 
-    public void cancel(Order order, Account account) {
+    public void cancel(CancelInstruction instruction, Account account) {
         // POST /api/v1/orders/{externalOrderId}/cancel — DELETE 아님 (Toss 공식 스펙, cancelOrder)
-        tossHttpClient.post(ORDER_PATH + "/" + order.externalOrderId() + "/cancel", account, Map.of(), Void.class);
+        tossHttpClient.post(ORDER_PATH + "/" + instruction.externalOrderId() + "/cancel", account, Map.of(), Void.class);
     }
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
@@ -130,9 +134,7 @@ class TossOrderApi {
         // queryFrom~to로 넓게 조회했으므로 체결일이 요청 범위(from~to) 밖이면 제외
         if (tradeDate.isBefore(from) || tradeDate.isAfter(to)) return Optional.empty();
 
-        Order.OrderDirection direction = "BUY".equals(order.side())
-                ? Order.OrderDirection.BUY
-                : Order.OrderDirection.SELL;
+        Direction direction = "BUY".equals(order.side()) ? Direction.BUY : Direction.SELL;
 
         return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amountUsd, order.orderId()));
     }
@@ -153,7 +155,7 @@ class TossOrderApi {
     }
 
     // LOC/MOC → 장마감 지정가(CLS), LIMIT → 정규장 지정가(DAY)
-    private String resolveTimeInForce(Order.OrderType type) {
+    private String resolveTimeInForce(OrderType type) {
         return switch (type) {
             case LOC, MOC -> "CLS"; // MOC 미지원 → LIMIT+CLS로 장마감 경매 참여
             case LIMIT -> "DAY";
@@ -161,8 +163,8 @@ class TossOrderApi {
     }
 
     // MOC 대체 주문: 최저가(0.01)로 장마감 경매에서 시장가처럼 체결되도록 유도
-    private BigDecimal resolvePrice(Order.OrderType type, BigDecimal price) {
-        return type == Order.OrderType.MOC ? new BigDecimal("0.01") : price;
+    private BigDecimal resolvePrice(OrderType type, BigDecimal price) {
+        return type == OrderType.MOC ? new BigDecimal("0.01") : price;
     }
 
     // package-private — TossOrderApiTest에서 직접 생성하여 stub에 사용

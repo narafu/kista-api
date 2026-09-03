@@ -6,19 +6,24 @@ import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminReorderCommand;
 import com.kista.domain.model.admin.AdminReorderResult;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.DstInfo;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.in.AdminReorderUseCase;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.MarketCalendarPort;
-import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.model.Direction;
+import com.kista.broker.domain.model.OrderInstruction;
+import com.kista.broker.domain.model.OrderResult;
+import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +117,8 @@ class AdminReorderService implements AdminReorderUseCase {
         switch (order.status()) {
             case PLANNED -> orderPort.markCancelled(order.id());
             case PLACED -> {
-                brokerAdapterRegistry.require(account, BrokerOrderCorrectionPort.class).cancel(order, account);
+                brokerAdapterRegistry.require(account, BrokerOrderCorrectionPort.class)
+                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account);
                 orderPort.markCancelled(order.id());
             }
             default -> {} // FILLED/PARTIALLY_FILLED/FAILED/CANCELLED: 이미 종료 상태, no-op
@@ -124,7 +130,10 @@ class AdminReorderService implements AdminReorderUseCase {
         if (timing == Order.OrderTiming.IMMEDIATE) {
             BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account, BrokerOrderCorrectionPort.class);
             try {
-                Order placed = broker.place(newOrder, account);
+                OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), toDirection(newOrder.direction()),
+                        toOrderType(newOrder.orderType()), newOrder.quantity(), newOrder.price());
+                OrderResult result = broker.place(instruction, account);
+                Order placed = newOrder.withPlaced(result.externalOrderId());
                 orderPort.saveAll(List.of(placed));
                 return new PlacementResult(Order.OrderStatus.PLACED, placed.externalOrderId());
             } catch (Exception e) {
@@ -135,6 +144,23 @@ class AdminReorderService implements AdminReorderUseCase {
         }
         orderPort.saveAll(List.of(newOrder));
         return new PlacementResult(Order.OrderStatus.PLANNED, null);
+    }
+
+    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static Direction toDirection(Order.OrderDirection direction) {
+        return switch (direction) {
+            case BUY -> Direction.BUY;
+            case SELL -> Direction.SELL;
+        };
+    }
+
+    // trading Order.OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
+    private static OrderType toOrderType(Order.OrderType orderType) {
+        return switch (orderType) {
+            case LOC -> OrderType.LOC;
+            case MOC -> OrderType.MOC;
+            case LIMIT -> OrderType.LIMIT;
+        };
     }
 
     private record PlacementResult(Order.OrderStatus status, String externalOrderId) {}

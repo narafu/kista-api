@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.order.Order;
+import com.kista.broker.domain.model.Direction;
+import com.kista.broker.domain.model.OrderType;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;
@@ -32,12 +33,12 @@ final class KisResponseParser {
     }
 
     // sll_buy_dvsn_cd: 01=매도, 02=매수
-    static Order.OrderDirection parseDirection(String sllBuyDvsnCd) {
-        return "01".equals(sllBuyDvsnCd) ? Order.OrderDirection.SELL : Order.OrderDirection.BUY;
+    static Direction parseDirection(String sllBuyDvsnCd) {
+        return "01".equals(sllBuyDvsnCd) ? Direction.SELL : Direction.BUY;
     }
 
     // KIS 요청 가격 포맷팅: MOC(시장가)만 "0", LOC/LIMIT(지정가)는 실제 가격 소수 2자리
-    static String formatPrice(Order.OrderType type, BigDecimal price) {
+    static String formatPrice(OrderType type, BigDecimal price) {
         return switch (type) {
             case MOC            -> "0";
             case LOC, LIMIT     -> price.setScale(2, RoundingMode.HALF_UP).toPlainString();

@@ -4,8 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.PrevCloseCache;
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.common.TimeZones;
-import com.kista.domain.model.strategy.DstInfo;
-import com.kista.domain.model.strategy.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.TossCandle;
 import com.kista.broker.domain.model.toss.TossStockInfo;
@@ -17,9 +16,13 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -111,14 +114,56 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
     // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
     private Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
-        DstInfo dstInfo = DstInfo.calculate();
-        boolean regularSessionActive = dstInfo.isRegularSessionActive();
-        Instant before = regularSessionActive
-                ? dstInfo.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
+        MarketSessionInfo session = resolveMarketSession();
+        Instant before = session.regularSessionActive()
+                ? session.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
                 : Instant.now();                                   // 이미 확정된 봉만 존재
-        String bucket = regularSessionActive ? "ACTIVE" : "CLOSED";
+        String bucket = session.regularSessionActive() ? "ACTIVE" : "CLOSED";
         return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST), bucket,
                 () -> fetchPrevCloseUncached(symbol, before));
+    }
+
+    // ── trading DstInfo.isRegularSessionActive()/lastSessionOpenInstant() 복제 ──────────────
+    // 스케쥴러 오케스트레이션(waitUntilOrderTime 등)과 무관한 "정규장 진행 여부 + 마지막 개장 시각"
+    // 순수 KST/DST 계산만 필요하므로 DstInfo 전체를 참조하지 않고 이 2개 계산만 좁게 복제한다
+    // (common/ 승격 대상 아님 — trading 스케쥴링 도메인 클래스 전체를 끌어오는 것이 과함)
+
+    private static final ZoneId NY = ZoneId.of("America/New_York");
+
+    // 미국 뉴욕 기준 DST 여부에 따른 개장/마감/프리마켓 시각(KST) — DstInfo와 동일 시각표
+    private static LocalTime marketOpenTime(boolean isDst)     { return isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); }
+    private static LocalTime marketCloseTime(boolean isDst)    { return isDst ? LocalTime.of(5, 0)   : LocalTime.of(6, 0); }
+    private static LocalTime premarketStartTime(boolean isDst) { return isDst ? LocalTime.of(17, 0)  : LocalTime.of(18, 0); }
+
+    // 정규장 진행 여부 + 가장 최근 개장 시각을 한 번에 계산한 결과
+    // package-private — 테스트에서 시각 주입 시드로 직접 호출 (private record는 같은 패키지 테스트에서도 참조 불가)
+    record MarketSessionInfo(boolean regularSessionActive, Instant lastSessionOpenInstant) {}
+
+    // 현재 KST 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산
+    private static MarketSessionInfo resolveMarketSession() {
+        return resolveMarketSessionAt(ZonedDateTime.now(TimeZones.KST));
+    }
+
+    // 시각 주입 테스트 시드 — DstInfo의 sessionAt()/lastSessionOpenInstantAt() 패턴과 동일
+    static MarketSessionInfo resolveMarketSessionAt(ZonedDateTime nowKst) {
+        boolean isDst = NY.getRules().isDaylightSavings(nowKst.toInstant());
+        DayOfWeek day = nowKst.getDayOfWeek();
+        LocalTime time = nowKst.toLocalTime();
+
+        // 주말이거나 [장마감, 프리마켓시작) 구간이면 BLOCKED — 정규장 진행 중일 수 없음
+        boolean blocked = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY
+                || (!time.isBefore(marketCloseTime(isDst)) && time.isBefore(premarketStartTime(isDst)));
+        // marketOpen~자정~marketClose 래핑 구간만 정규장 진행 중 (그 외 DIRECT 구간은 프리마켓)
+        boolean regularSessionActive = !blocked
+                && (!time.isBefore(marketOpenTime(isDst)) || time.isBefore(marketCloseTime(isDst)));
+
+        // 가장 최근 개장 시각 — 자정~개장 전(00:00~marketOpen)이면 전날 저녁 개장을 가리켜야 함(날짜 롤백)
+        LocalDate sessionDate = time.isBefore(marketOpenTime(isDst))
+                ? nowKst.toLocalDate().minusDays(1)
+                : nowKst.toLocalDate();
+        Instant lastSessionOpenInstant = sessionDate.atTime(marketOpenTime(isDst)).atZone(TimeZones.KST).toInstant();
+
+        return new MarketSessionInfo(regularSessionActive, lastSessionOpenInstant);
     }
 
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)

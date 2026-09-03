@@ -4,18 +4,20 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminReorderCommand;
 import com.kista.domain.model.admin.AdminReorderResult;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.DstInfo;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.AccountPort;
 import com.kista.domain.port.out.AuditLogPort;
 import com.kista.domain.port.out.MarketCalendarPort;
-import com.kista.domain.port.out.OrderPort;
-import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.trading.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.domain.port.out.UserPort;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.port.out.BrokerOrderCorrectionPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
@@ -98,7 +100,7 @@ class AdminReorderServiceTest {
 
         reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
-        verify(brokerOrderCorrectionPort).cancel(placedOrder(), account()); // 증권사 취소
+        verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), account()); // 증권사 취소
         verify(orderPort).markCancelled(ORDER_ID);
         verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_CLOSE));
     }
@@ -129,8 +131,7 @@ class AdminReorderServiceTest {
     void reorder_immediate_success_savesPlaced() {
         stubCommon(plannedOrder());
         when(brokerAdapterRegistry.require(account(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
-        when(brokerOrderCorrectionPort.place(any(), any()))
-                .thenAnswer(inv -> ((Order) inv.getArgument(0)).withPlaced("NEW-EXT-1"));
+        when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
 
         AdminReorderResult result = reorder(command(Order.OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
 

@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.domain.model.strategy.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +13,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -249,5 +252,52 @@ class TossPriceApiTest {
         tossPriceApi.getStockInfo(Ticker.SOXL);
 
         verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class));
+    }
+
+    // resolveMarketSessionAt: 시각 주입 시드 — DstInfo와 동일 KST/DST 시각표 검증
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    @Test
+    @DisplayName("resolveMarketSessionAt: DST 기간 정규장 진행 중(당일 개장)")
+    void resolveMarketSessionAt_dst_regularSessionActive_sameDayOpen() {
+        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(23, 0), KST); // 수요일, DST
+
+        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
+
+        assertThat(session.regularSessionActive()).isTrue();
+        assertThat(session.lastSessionOpenInstant())
+                .isEqualTo(ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(22, 30), KST).toInstant());
+    }
+
+    @Test
+    @DisplayName("resolveMarketSessionAt: 자정 이후~개장 전 구간은 전날 저녁 개장을 가리킴 (날짜 롤백)")
+    void resolveMarketSessionAt_dst_beforeMarketOpen_rollsBackToPreviousDayOpen() {
+        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(1, 0), KST); // 수요일 새벽, DST
+
+        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
+
+        assertThat(session.regularSessionActive()).isTrue();
+        assertThat(session.lastSessionOpenInstant())
+                .isEqualTo(ZonedDateTime.of(LocalDate.of(2026, 7, 14), LocalTime.of(22, 30), KST).toInstant());
+    }
+
+    @Test
+    @DisplayName("resolveMarketSessionAt: 주말은 시각과 무관하게 BLOCKED")
+    void resolveMarketSessionAt_weekend_blocked() {
+        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(23, 0), KST); // 토요일
+
+        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
+
+        assertThat(session.regularSessionActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("resolveMarketSessionAt: 비-DST 기간 [장마감, 프리마켓시작) 구간은 BLOCKED")
+    void resolveMarketSessionAt_nonDst_afterCloseBeforePremarket_blocked() {
+        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 1, 14), LocalTime.of(10, 0), KST); // 수요일, 비-DST
+
+        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
+
+        assertThat(session.regularSessionActive()).isFalse();
     }
 }

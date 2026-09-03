@@ -1,6 +1,6 @@
 package com.kista.adapter.out.marketdata;
 
-import com.kista.domain.model.strategy.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 
 import java.math.BigDecimal;

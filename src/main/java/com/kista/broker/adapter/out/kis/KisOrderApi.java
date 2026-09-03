@@ -3,7 +3,11 @@ package com.kista.broker.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.order.Order;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.model.Direction;
+import com.kista.broker.domain.model.OrderInstruction;
+import com.kista.broker.domain.model.OrderResult;
+import com.kista.broker.domain.model.OrderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +25,8 @@ class KisOrderApi {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    public Order place(Order order, Account account) {
-        String trId = order.direction() == Order.OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
+    public OrderResult place(OrderInstruction instruction, Account account) {
+        String trId = instruction.direction() == Direction.BUY ? BUY_TR_ID : SELL_TR_ID;
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
         String acntPrdtCd = acctParts[1];
@@ -44,12 +48,12 @@ class KisOrderApi {
                 }""".formatted(
                 cano,
                 acntPrdtCd,
-                resolveOrderDvsn(order.orderType()),
-                exchangeRegistry.ovrsExcgCd(order.ticker()),
-                order.ticker().name(),
-                KisResponseParser.formatPrice(order.orderType(), order.price()),
-                order.quantity(),
-                order.direction().kisSllType());
+                resolveOrderDvsn(instruction.orderType()),
+                exchangeRegistry.ovrsExcgCd(instruction.ticker()),
+                instruction.ticker().name(),
+                KisResponseParser.formatPrice(instruction.orderType(), instruction.price()),
+                instruction.quantity(),
+                kisSllType(instruction.direction()));
 
         OrderResponse response = kisHttpClient.post(trId, PATH, account, body, OrderResponse.class);
 
@@ -61,12 +65,10 @@ class KisOrderApi {
         }
 
         String odno = response.output() != null ? response.output().odno() : null;
-
-        // id=null, accountId=null, strategyCycleId=null — KIS 응답 객체이므로 DB PK 없음, 호출자가 markPlaced()로 별도 처리
-        return order.withPlaced(odno);
+        return new OrderResult(odno);
     }
 
-    public void cancel(Order order, Account account) {
+    public void cancel(CancelInstruction instruction, Account account) {
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
         String acntPrdtCd = acctParts[1];
@@ -87,11 +89,16 @@ class KisOrderApi {
                 }""".formatted(
                 cano,
                 acntPrdtCd,
-                exchangeRegistry.ovrsExcgCd(order.ticker()),
-                order.ticker().name(),
-                order.externalOrderId());
+                exchangeRegistry.ovrsExcgCd(instruction.ticker()),
+                instruction.ticker().name(),
+                instruction.externalOrderId());
 
         kisHttpClient.post(CANCEL_TR_ID, CANCEL_PATH, account, body, Void.class);
+    }
+
+    // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열) — trading.Order.OrderDirection.kisSllType()에 있던 KIS 전용 인코딩을 broker로 이동
+    private static String kisSllType(Direction direction) {
+        return direction == Direction.SELL ? "00" : "";
     }
 
     // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KisHttpClient 공용 헬퍼 위임)
@@ -99,7 +106,7 @@ class KisOrderApi {
         return KisHttpClient.splitAccountNo(account.accountNo());
     }
 
-    private String resolveOrderDvsn(Order.OrderType type) {
+    private String resolveOrderDvsn(OrderType type) {
         return switch (type) {
             case LOC   -> "34"; // 장마감지정가(LOC)
             case MOC   -> "33"; // 장마감시장가(MOC)

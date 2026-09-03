@@ -1,10 +1,10 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.order.BuyCompetitionPreview;
-import com.kista.domain.model.order.NextOrdersPreview;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.SellSufficiencyPreview;
-import com.kista.domain.model.strategy.InfinitePosition;
+import com.kista.trading.domain.model.BuyCompetitionPreview;
+import com.kista.trading.domain.model.NextOrdersPreview;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.SellSufficiencyPreview;
+import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;

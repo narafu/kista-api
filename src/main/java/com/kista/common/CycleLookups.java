@@ -1,7 +1,7 @@
 package com.kista.common;
 
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
 
 import java.util.UUID;
 

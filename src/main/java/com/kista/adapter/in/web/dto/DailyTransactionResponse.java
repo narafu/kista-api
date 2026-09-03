@@ -3,7 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.broker.domain.model.DailyTransaction;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
-import com.kista.domain.model.order.Order.OrderDirection;
+import com.kista.broker.domain.model.Direction;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -21,7 +21,7 @@ public record DailyTransactionResponse(
             @Schema(description = "매매일 (KST 기준)")
             String tradeDate,
             @Schema(description = "매수/매도 방향", example = "BUY")
-            OrderDirection direction,
+            Direction direction,
             @Schema(description = "종목코드")
             Ticker ticker,
             @Schema(description = "종목명")

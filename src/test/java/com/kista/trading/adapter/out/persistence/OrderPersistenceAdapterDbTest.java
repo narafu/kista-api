@@ -1,0 +1,184 @@
+package com.kista.trading.adapter.out.persistence;
+
+import com.kista.trading.domain.model.Order;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.support.DataJpaTestBase;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+// sumFilledBuyAmountByCycleId SQL 필터(direction/status/cycle) 실효성 검증 — 실 DB 왕복 테스트
+@Import(OrderPersistenceAdapter.class)
+@Execution(ExecutionMode.SAME_THREAD)
+class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
+
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired OrderPersistenceAdapter adapter;
+
+    private UUID userId;
+    private UUID accountId;
+    private UUID cycleId;    // 합산 대상 사이클
+    private UUID otherCycleId; // 제외 대상 타 사이클
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+        UUID strategyId = UUID.randomUUID();
+        UUID strategyVersionId = UUID.randomUUID();
+        cycleId = UUID.randomUUID();
+        otherCycleId = UUID.randomUUID();
+
+        // FK 선행 행: user → account → strategy → strategy_version → strategy_cycle
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                userId, "kakao_" + userId, "ACTIVE", "USER");
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+        jdbcTemplate.update(
+                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
+                strategyId, accountId, "VR", "SOXL", "ACTIVE", "NONE");
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                strategyVersionId, strategyId, 1);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                cycleId, strategyId, strategyVersionId, new BigDecimal("1000.00"), LocalDate.now());
+        jdbcTemplate.update(
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                otherCycleId, strategyId, strategyVersionId, new BigDecimal("2000.00"), LocalDate.now());
+    }
+
+    @Test
+    void saveAll_persistsAndLoadsOrderLeg() {
+        Order order = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+                        Order.OrderDirection.BUY, 1, new BigDecimal("22.00"))
+                .withLeg("INFINITE_EARLY_AVG_BUY");
+
+        adapter.saveAll(List.of(Order.plan(order, accountId, cycleId)));
+
+        List<Order> result = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now());
+
+        assertThat(result).singleElement()
+                .satisfies(saved -> assertThat(saved.orderLeg()).isEqualTo("INFINITE_EARLY_AVG_BUY"));
+    }
+
+    // 주문 1건 직접 삽입 헬퍼
+    private void insertOrder(UUID cId, String direction, String status,
+                             Integer filledQuantity, BigDecimal filledPrice) {
+        insertOrderForAccount(accountId, cId, direction, status, filledQuantity, filledPrice);
+    }
+
+    private void insertOrderForAccount(UUID accId, UUID cId, String direction, String status,
+                             Integer filledQuantity, BigDecimal filledPrice) {
+        insertOrderForAccount(accId, cId, LocalDate.now(), "SOXL", direction, status, filledQuantity, filledPrice);
+    }
+
+    private void insertOrderForAccount(UUID accId, UUID cId, LocalDate tradeDate, String ticker,
+                                       String direction, String status, Integer filledQuantity, BigDecimal filledPrice) {
+        jdbcTemplate.update(
+                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, filled_quantity, filled_price, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accId, cId, tradeDate, ticker, "LOC", "AT_CLOSE",
+                direction, Order.UNKNOWN_LEG, new BigDecimal("22.00"), 5, status, filledQuantity, filledPrice);
+    }
+
+    private void insertAccount(UUID accId, UUID ownerUserId, boolean deleted) {
+        String accountNo = accId.toString().replace("-", "").substring(0, 8);
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at, deleted_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)",
+                accId, ownerUserId, "테스트계좌-" + accId, "KIS", accountNo, "01", "key", "secret",
+                deleted ? java.sql.Timestamp.from(java.time.Instant.now()) : null);
+    }
+
+    @Test
+    void sumFilledBuyAmountByCycleId_sumsOnlyFilledAndPartiallyFilledBuy() {
+        // 대상 사이클: FILLED BUY 2건 + PARTIALLY_FILLED BUY 1건 + FILLED SELL 1건 + PLANNED BUY 1건
+        insertOrder(cycleId, "BUY",  "FILLED",           5, new BigDecimal("10.00")); // 50.00
+        insertOrder(cycleId, "BUY",  "FILLED",           3, new BigDecimal("20.00")); // 60.00
+        insertOrder(cycleId, "BUY",  "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 30.00
+        insertOrder(cycleId, "SELL", "FILLED",           4, new BigDecimal("25.00")); // 제외 (SELL)
+        insertOrder(cycleId, "BUY",  "PLANNED",          null, null);                 // 제외 (status 불일치)
+
+        // 타 사이클: FILLED BUY 1건 — cycle_id 필터로 제외
+        insertOrder(otherCycleId, "BUY", "FILLED", 10, new BigDecimal("30.00")); // 제외 (다른 사이클)
+
+        // 기대값: 50.00 + 60.00 + 30.00 = 140.00
+        BigDecimal result = adapter.sumFilledBuyAmountByCycleId(cycleId);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("140.00"));
+    }
+
+    @Test
+    void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_sumsOnlyMatchingReservations() {
+        LocalDate databaseTradeDate = LocalDate.of(2026, 7, 14);
+        LocalDate domainTradeDate = databaseTradeDate; // DB와 도메인이 같은 KST 일자
+        UUID otherAccountId = UUID.randomUUID();
+        insertAccount(otherAccountId, userId, false);
+
+        // 대상 계좌·거래일·종목의 PLANNED/PLACED SELL 수량만 예약분으로 합산한다.
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLANNED", null, null); // 5
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLACED", null, null);  // 5
+
+        // 각 필터를 실제 행으로 교차 검증한다.
+        insertOrderForAccount(otherAccountId, cycleId, databaseTradeDate, "SOXL", "SELL", "PLANNED", null, null); // 다른 계좌
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate.plusDays(1), "SOXL", "SELL", "PLACED", null, null); // 다른 날짜
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "TQQQ", "SELL", "PLANNED", null, null); // 다른 종목
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "FILLED", null, null); // 체결 완료
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "SELL", "CANCELLED", null, null); // 취소됨
+        insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "BUY", "PLANNED", null, null); // 다른 방향
+
+        int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                accountId, domainTradeDate, Ticker.SOXL);
+
+        assertThat(result).isEqualTo(10);
+    }
+
+    @Test
+    void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_returnsZeroWhenNoReservationMatches() {
+        // SQL COALESCE로 매칭 주문이 없어도 0을 반환한다
+        int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                accountId, LocalDate.now().plusDays(1), Ticker.TQQQ);
+
+        assertThat(result).isZero();
+    }
+
+    @Test
+    void findFilledByUser_aggregatesOwnedAccountsExcludingOtherUsersAndDeleted() {
+        UUID secondAccountId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID otherUserAccountId = UUID.randomUUID();
+        UUID deletedAccountId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
+        insertAccount(secondAccountId, userId, false);       // 동일 유저 2번째 계좌 — 포함
+        insertAccount(otherUserAccountId, otherUserId, false); // 타 유저 계좌 — 제외
+        insertAccount(deletedAccountId, userId, true);        // 소프트 삭제 계좌 — 제외
+
+        insertOrderForAccount(accountId, cycleId, "BUY", "FILLED", 5, new BigDecimal("10.00"));           // 포함 (50.00)
+        insertOrderForAccount(secondAccountId, cycleId, "SELL", "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 포함 (30.00)
+        insertOrderForAccount(accountId, cycleId, "BUY", "PLANNED", null, null);                          // 제외 (status 불일치)
+        insertOrderForAccount(otherUserAccountId, cycleId, "BUY", "FILLED", 10, new BigDecimal("30.00")); // 제외 (다른 유저)
+        insertOrderForAccount(deletedAccountId, cycleId, "BUY", "FILLED", 1, new BigDecimal("5.00"));     // 제외 (삭제된 계좌)
+
+        var result = adapter.findFilledByUser(userId, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(o -> o.accountId()).containsExactlyInAnyOrder(accountId, secondAccountId);
+    }
+}

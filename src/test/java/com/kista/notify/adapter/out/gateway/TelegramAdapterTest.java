@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

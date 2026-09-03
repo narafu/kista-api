@@ -1,6 +1,6 @@
 package com.kista.domain.port.out;
 
-import com.kista.domain.model.order.TradeEvent;
+import com.kista.trading.domain.model.TradeEvent;
 import com.kista.domain.model.user.User;
 
 import java.util.UUID;

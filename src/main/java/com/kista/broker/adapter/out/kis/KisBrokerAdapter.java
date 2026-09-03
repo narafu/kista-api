@@ -3,8 +3,6 @@ package com.kista.broker.adapter.out.kis;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.strategy.AccountBalance;
-import com.kista.domain.model.strategy.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
@@ -73,13 +71,13 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public void cancel(com.kista.domain.model.order.Order order, Account account) {
-        kisOrderApi.cancel(order, account);
+    public void cancel(CancelInstruction instruction, Account account) {
+        kisOrderApi.cancel(instruction, account);
     }
 
     @Override
-    public com.kista.domain.model.order.Order place(com.kista.domain.model.order.Order order, Account account) {
-        return kisOrderApi.place(order, account);
+    public OrderResult place(OrderInstruction instruction, Account account) {
+        return kisOrderApi.place(instruction, account);
     }
 
     @Override
@@ -123,7 +121,7 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public AccountBalance getLiveBalance(Account account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(Account account, Ticker ticker) {
         return kisTradingApi.getBalance(account, ticker);
     }
 }

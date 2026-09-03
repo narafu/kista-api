@@ -1,0 +1,74 @@
+package com.kista.trading.domain.model;
+
+import com.kista.domain.model.strategy.Strategy;
+
+import java.math.BigDecimal;
+
+import static java.math.RoundingMode.FLOOR;
+import static java.math.RoundingMode.HALF_UP;
+
+// 리버스모드(소진 후) 포지션 — 소진 발동 이후 사이클에서 별지점 기준 매수/매도 계산
+public record ReverseModePosition(
+        int holdings,                   // 현재 보유 수량
+        BigDecimal avgPrice,            // 평단가
+        BigDecimal usdDeposit,          // 가용 잔금
+        Strategy.Ticker ticker,         // 거래 종목
+        int divisionCount,              // 분할 수 (20/30/40)
+        BigDecimal starPointPrice,      // 별지점 = 직전 5거래일 종가 평균 (null이면 계산 불가)
+        boolean isFirstDay              // 소진 직후 첫날 여부
+) {
+    // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
+    public static ReverseModePosition of(AccountBalance balance, Strategy.Ticker ticker, int divisionCount,
+                                         BigDecimal starPointPrice, boolean isFirstDay) {
+        return new ReverseModePosition(balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+                ticker, divisionCount, starPointPrice, isFirstDay);
+    }
+
+    // 첫날 MOC 매도 수량 — holdings / (divisionCount/2)
+    // 20분할이면 holdings/10, 40분할이면 holdings/20
+    public int calcMocSellQuantity() {
+        int divisor = divisionCount / 2;
+        return divisor > 0 ? holdings / divisor : 0;
+    }
+
+    // 이후 LOC 매도 수량 — 직전보유 / (divisionCount/2)
+    public int calcLocSellQuantity() {
+        int divisor = divisionCount / 2;
+        return divisor > 0 ? holdings / divisor : 0;
+    }
+
+    // 쿼터매수 금액 — usdDeposit / SELL_QUARTER_DIVISOR(4)
+    public BigDecimal calcLocBuyAmount() {
+        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), 2, HALF_UP);
+    }
+
+    // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - TICK_SIZE($0.01)
+    // starPointPrice가 null이거나 0 이하이면 매수 불가 (0 반환)
+    public int calcLocBuyQuantity() {
+        if (starPointPrice == null || starPointPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
+        BigDecimal buyPrice = starPointPrice.subtract(InfinitePosition.TICK_SIZE);
+        if (buyPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
+        return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
+    }
+
+    // 예산 소진 판정: 별지점은 계산됐지만(데이터 존재) 쿼터매수 예산으로 1주도 못 사는 경우
+    // starPointPrice==null(별지점 데이터 미계산)은 별개 상태이므로 제외
+    public boolean isQuotaBuyExhausted() {
+        return starPointPrice != null && starPointPrice.compareTo(BigDecimal.ZERO) > 0
+                && calcLocBuyQuantity() == 0;
+    }
+
+    // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
+    // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
+    public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
+        return shouldExit(avgPrice, closingPrice, targetProfitRate);
+    }
+
+    // static 헬퍼: 포지션 객체 없이 종료 조건만 판단 — InfinitePosition.nextReverseMode에서 재사용
+    public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
+        if (closingPrice == null || avgPrice == null) return false;
+        BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
+                .setScale(2, HALF_UP);
+        return closingPrice.compareTo(threshold) >= 0;
+    }
+}

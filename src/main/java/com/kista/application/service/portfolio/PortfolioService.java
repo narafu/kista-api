@@ -1,11 +1,11 @@
 package com.kista.application.service.portfolio;
 
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.PortfolioUseCase;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.CyclePositionPort;
+import com.kista.trading.domain.port.out.OrderPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

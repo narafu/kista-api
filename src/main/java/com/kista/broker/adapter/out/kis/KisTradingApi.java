@@ -6,7 +6,6 @@ import com.kista.domain.model.account.Account;
 import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.strategy.AccountBalance;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,11 +42,11 @@ class KisTradingApi {
 
     // ── getBalance() ─────────────────────────────────────────────────────────
 
-    public AccountBalance getBalance(Account account, Ticker ticker) {
+    public BrokerBalance getBalance(Account account, Ticker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
         BigDecimal avgPrice = holding.quantity() > 0 ? holding.avgPrice() : null;
-        return new AccountBalance(holding.quantity(), avgPrice, usdDeposit);
+        return new BrokerBalance(holding.quantity(), avgPrice, usdDeposit);
     }
 
     private HoldingResult fetchHolding(Account account, Ticker ticker) {

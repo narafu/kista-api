@@ -2,7 +2,7 @@ package com.kista.domain.backtest;
 
 import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

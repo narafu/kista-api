@@ -1,6 +1,6 @@
 package com.kista.domain.model.admin;
 
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

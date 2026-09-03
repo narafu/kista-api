@@ -9,7 +9,7 @@ import com.kista.domain.model.settings.RuntimeSettings;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.user.User.NotificationChannel;
 import com.kista.domain.port.in.UserUseCase;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.*; import com.kista.trading.domain.port.out.*;
 import com.kista.finance.domain.port.out.*;
 import com.kista.notify.domain.port.out.UserNotificationPort;
 import com.kista.support.DomainFixtures;

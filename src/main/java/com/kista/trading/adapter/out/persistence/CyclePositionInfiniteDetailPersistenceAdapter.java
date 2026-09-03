@@ -1,0 +1,64 @@
+package com.kista.trading.adapter.out.persistence;
+
+import com.kista.trading.domain.model.CyclePositionInfiniteDetail;
+import com.kista.trading.domain.port.out.CyclePositionInfiniteDetailPort;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfiniteDetailPort {
+
+    private final CyclePositionInfiniteJpaRepository jpaRepository;
+
+    @Override
+    public Optional<CyclePositionInfiniteDetail> findByCyclePositionId(UUID cyclePositionId) {
+        return jpaRepository.findById(cyclePositionId).map(this::toDomain);
+    }
+
+    @Override
+    public List<CyclePositionInfiniteDetail> findLatestByCycleId(UUID cycleId, int limit) {
+        return jpaRepository.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Map<UUID, CyclePositionInfiniteDetail> findByCyclePositionIds(Collection<UUID> cyclePositionIds) {
+        if (cyclePositionIds.isEmpty()) return Map.of();
+        return jpaRepository.findAllById(cyclePositionIds).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(CyclePositionInfiniteDetail::cyclePositionId, d -> d));
+    }
+
+    @Override
+    public CyclePositionInfiniteDetail save(CyclePositionInfiniteDetail detail) {
+        return toDomain(jpaRepository.save(toEntity(detail)));
+    }
+
+    @Override
+    public void deleteByStrategyId(UUID strategyId) {
+        jpaRepository.softDeleteByStrategyId(strategyId);
+    }
+
+    private CyclePositionInfiniteDetail toDomain(CyclePositionInfiniteEntity entity) {
+        return new CyclePositionInfiniteDetail(entity.getCyclePositionId(), entity.isReverseMode());
+    }
+
+    private CyclePositionInfiniteEntity toEntity(CyclePositionInfiniteDetail detail) {
+        CyclePositionInfiniteEntity entity = PersistenceSupport.findOrCreate(detail.cyclePositionId(), jpaRepository, CyclePositionInfiniteEntity::new);
+        entity.setCyclePositionId(detail.cyclePositionId());
+        entity.setReverseMode(detail.isReverseMode());
+        return entity;
+    }
+}

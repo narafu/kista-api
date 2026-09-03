@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

@@ -1,9 +1,9 @@
 package com.kista.application.service.admin;
 
-import com.kista.domain.model.strategy.AccountBalance;
+import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.StrategyCycle;
-import com.kista.domain.port.out.StrategyCyclePort;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.trading.domain.port.out.StrategyCyclePort;
 import com.kista.domain.port.out.StrategyPort;
 
 import java.time.LocalDate;

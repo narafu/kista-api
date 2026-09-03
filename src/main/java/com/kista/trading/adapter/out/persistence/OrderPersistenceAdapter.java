@@ -1,0 +1,226 @@
+package com.kista.trading.adapter.out.persistence;
+
+import com.kista.trading.domain.model.Order;
+import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.trading.domain.port.out.OrderPort;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
+@Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
+public class OrderPersistenceAdapter implements OrderPort {
+
+    private final OrderJpaRepository repository;
+
+    @Override
+    public void saveAll(List<Order> orders) {
+        // Order → Entity 변환 후 일괄 저장 (id=null → Hibernate UUID 자동 생성)
+        repository.saveAll(orders.stream().map(this::toEntity).toList());
+    }
+
+    @Override
+    public List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // PLANNED 상태인 오늘 계획 주문만 조회
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, tradeDate, Order.OrderStatus.PLANNED));
+    }
+
+    @Override
+    public List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, tradeDate, Order.OrderStatus.PLACED));
+    }
+
+
+    @Override
+    public void markPlaced(UUID orderId, String externalOrderId) {
+        // 명시적 save로 dirty checking 의존 없이 PLACED + externalOrderId 기록
+        mutate(orderId, e -> {
+            e.setStatus(Order.OrderStatus.PLACED);
+            e.setExternalOrderId(externalOrderId);
+        });
+    }
+
+    @Override
+    public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
+        // native query는 enum을 name() 문자열로 전달 — DB VARCHAR 컬럼과 매칭
+        return toDomainList(repository.findByUserIdAndTradeDateBetweenAndTicker(
+                userId, from, to, ticker.name()));
+    }
+
+    @Override
+    public List<Order> findAll(LocalDate from, LocalDate to) {
+        return toDomainList(repository.findByTradeDateBetweenOrderByTradeDateDescCreatedAtDesc(from, to));
+    }
+
+    @Override
+    public List<UUID> findDistinctAccountIdsByTradeDateBetween(LocalDate from, LocalDate to) {
+        return repository.findDistinctAccountIdsByTradeDateBetween(from, to);
+    }
+
+    @Override
+    public Optional<Order> findById(UUID orderId) {
+        return repository.findById(orderId).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // 증권사 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
+        repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, tradeDate, Order.OrderStatus.PLANNED);
+    }
+
+    @Override
+    public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
+                strategyCycleId, tradeDate,
+                List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)));
+    }
+
+    @Override
+    public Map<UUID, List<Order>> findPlannedOrPlacedByCycleIdsAndDate(
+            Collection<UUID> strategyCycleIds, LocalDate tradeDate) {
+        // 미리보기 배치 조회 — 계좌 내 전략 N개의 사이클마다 개별 조회하던 것을 1회로 축소
+        if (strategyCycleIds.isEmpty()) return Map.of();
+        return toDomainList(repository.findByStrategyCycleIdInAndTradeDateAndStatusIn(
+                strategyCycleIds, tradeDate,
+                List.of(Order.OrderStatus.PLANNED, Order.OrderStatus.PLACED)))
+                .stream()
+                .collect(Collectors.groupingBy(Order::strategyCycleId));
+    }
+
+    @Override
+    public BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate) {
+        // 계좌 기준 당일 PLANNED BUY 합계 — 타 전략 점유분 차감 계산에 사용
+        return repository.sumPlannedBuyAmountByAccountIdAndTradeDate(accountId, tradeDate);
+    }
+
+    @Override
+    public int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+            UUID accountId, LocalDate tradeDate, Ticker ticker) {
+        // 같은 계좌·거래일(KST)·ticker의 미체결 SELL 예약 수량을 합산한다
+        Long quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+                accountId, tradeDate, ticker.name());
+        return quantity != null ? Math.toIntExact(quantity) : 0;
+    }
+
+    @Override
+    public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
+        return toDomainList(repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
+                accountId,
+                from,
+                to,
+                List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
+    }
+
+    @Override
+    public List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to) {
+        return toDomainList(repository.findByUserIdAndTradeDateBetweenAndStatusIn(
+                userId,
+                from,
+                to,
+                List.of(Order.OrderStatus.FILLED.name(), Order.OrderStatus.PARTIALLY_FILLED.name())));
+    }
+
+    @Override
+    public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
+        return toDomainList(repository.findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
+                strategyId, from, to));
+    }
+
+    @Override
+    public List<LocalDate> findTradeDatesByStrategyId(UUID strategyId) {
+        return repository.findDistinctTradeDatesByStrategyId(strategyId);
+    }
+
+    @Override
+    public List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // AT_OPEN + PLANNED 주문만 조회 — 개장 시 즉시 선접수 대상
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
+                strategyCycleId, tradeDate, Order.OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
+    }
+
+    @Override
+    public BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId) {
+        // FILLED/PARTIALLY_FILLED BUY 체결금액 합계 — 결과 없으면 ZERO (COALESCE 보장)
+        BigDecimal result = repository.sumFilledBuyAmountByCycleId(strategyCycleId);
+        return result != null ? result : BigDecimal.ZERO;
+    }
+
+    @Override
+    public void markCancelled(UUID orderId) {
+        // 명시적 save로 CANCELLED 상태 기록
+        mutate(orderId, e -> e.setStatus(Order.OrderStatus.CANCELLED));
+    }
+
+    @Override
+    public void markFailed(UUID orderId) {
+        // 증권사 접수 실패 — FAILED 상태 기록
+        mutate(orderId, e -> e.setStatus(Order.OrderStatus.FAILED));
+    }
+
+    @Override
+    public void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, Order.OrderStatus status) {
+        // 체결 완료: 상태 + 체결 수량/가중평균가 기록
+        mutate(orderId, e -> {
+            e.setStatus(status);
+            e.setFilledQuantity(filledQuantity);
+            e.setFilledPrice(filledPrice);
+        });
+    }
+
+    // 엔티티 목록 → 도메인 목록 일괄 변환
+    private List<Order> toDomainList(List<OrderEntity> entities) {
+        return entities.stream().map(this::toDomain).toList();
+    }
+
+    // 주문 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)
+    private void mutate(UUID orderId, Consumer<OrderEntity> change) {
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+        change.accept(e);
+        repository.save(e);
+    }
+
+    private OrderEntity toEntity(Order o) {
+        OrderEntity e = new OrderEntity();
+        e.setAccountId(o.accountId());
+        e.setStrategyCycleId(o.strategyCycleId());
+        e.setTradeDate(o.tradeDate()); // KST 거래일 그대로 저장 (변환 없음)
+        e.setTicker(o.ticker());
+        e.setOrderType(o.orderType());
+        e.setTiming(o.timing());
+        e.setDirection(o.direction());
+        e.setOrderLeg(o.orderLeg());
+        e.setQuantity(o.quantity()); // quantity는 모든 저장 경로에서 non-null 보장 (Order.planned/withPrice 팩토리 int 파라미터)
+        e.setPrice(o.price());
+        e.setStatus(o.status());
+        e.setExternalOrderId(o.externalOrderId());
+        e.setFilledQuantity(o.filledQuantity());
+        e.setFilledPrice(o.filledPrice());
+        return e;
+    }
+
+    private Order toDomain(OrderEntity e) {
+        return new Order(
+                e.getId(), e.getAccountId(), e.getStrategyCycleId(), e.getTradeDate(), e.getTicker(), // KST 거래일 그대로 복원
+                e.getOrderType(), e.getTiming(), e.getDirection(), e.getOrderLeg(), e.getQuantity(), e.getPrice(),
+                e.getStatus(), e.getExternalOrderId(), e.getFilledQuantity(), e.getFilledPrice()
+        );
+    }
+}

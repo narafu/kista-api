@@ -9,12 +9,12 @@ import com.kista.domain.model.backtest.DailyCandle;
 import com.kista.domain.model.privacy.PrivacyDates;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
 import com.kista.domain.model.stats.ReturnMetrics;
-import com.kista.domain.model.strategy.BootstrapPosition;
+import com.kista.trading.domain.model.BootstrapPosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.BacktestUseCase;
 import com.kista.domain.port.out.HistoricalCandlePort;
 import com.kista.domain.port.out.PrivacyTradePort;
-import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

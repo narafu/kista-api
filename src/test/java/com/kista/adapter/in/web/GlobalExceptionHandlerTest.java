@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.order.ManualTradingException;
+import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.domain.port.out.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;

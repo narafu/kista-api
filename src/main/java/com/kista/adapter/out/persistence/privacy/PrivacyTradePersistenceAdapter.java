@@ -1,7 +1,7 @@
 package com.kista.adapter.out.persistence.privacy;
 
 import com.kista.common.TimeZones;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.*;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.domain.model.admin.AdminManualTradeCorrectionCommand;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;

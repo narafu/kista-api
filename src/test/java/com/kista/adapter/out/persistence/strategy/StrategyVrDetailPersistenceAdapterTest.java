@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
         StrategyPersistenceAdapter.class,
         StrategyVersionPersistenceAdapter.class,
-        StrategyCyclePersistenceAdapter.class,
         StrategyVrDetailPersistenceAdapter.class
 })
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
@@ -32,7 +31,6 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     @Autowired EntityManager entityManager;
     @Autowired StrategyPersistenceAdapter strategyAdapter;
     @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
-    @Autowired StrategyCyclePersistenceAdapter strategyCycleAdapter;
     @Autowired StrategyVrDetailPersistenceAdapter vrDetailAdapter;
 
     private UUID accountId;

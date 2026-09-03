@@ -2,7 +2,7 @@ package com.kista.application.service.user;
 
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.domain.port.out.*;
+import com.kista.domain.port.out.*; import com.kista.trading.domain.port.out.*;
 import com.kista.finance.domain.port.out.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

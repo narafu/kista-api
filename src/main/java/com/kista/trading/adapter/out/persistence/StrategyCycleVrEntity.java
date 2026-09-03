@@ -1,0 +1,35 @@
+package com.kista.trading.adapter.out.persistence;
+
+import com.kista.adapter.out.persistence.BaseAuditEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "strategy_cycle_vr", schema = "kista")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+class StrategyCycleVrEntity extends BaseAuditEntity {
+
+    @Id
+    @Column(name = "strategy_cycle_id", nullable = false, columnDefinition = "UUID")
+    private UUID strategyCycleId; // FK → strategy_cycle.id (ON DELETE CASCADE)
+
+    @Column(name = "value", nullable = false, precision = 20, scale = 2)
+    private BigDecimal value; // VR 사이클 기준값
+
+    @Column(name = "gradient", nullable = false)
+    private int gradient; // VR 사이클 기울기
+
+    @Column(name = "pool_limit_rate", nullable = false, precision = 6, scale = 2)
+    private BigDecimal poolLimitRate; // VR 사이클에 고정된 pool 상한 비율
+}

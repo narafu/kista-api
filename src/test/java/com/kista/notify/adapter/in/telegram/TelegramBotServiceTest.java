@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.in.telegram;
 
-import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.port.in.PortfolioUseCase;
 import com.kista.domain.port.in.UserUseCase;

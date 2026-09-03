@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
-import com.kista.domain.model.strategy.CycleHistoryPage;
+import com.kista.trading.domain.model.CycleHistoryPage;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.in.BlacklistUseCase;
 import org.junit.jupiter.api.Test;

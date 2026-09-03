@@ -1,12 +1,12 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.event.TradingReportReadyEvent;
+import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.TradingReport;
+import com.kista.trading.domain.model.TradingReport;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.RealtimeNotificationPort;
 import com.kista.notify.domain.port.out.UserNotificationPort;
@@ -41,12 +41,12 @@ class TradingReportNotifierTest {
             TODAY, Strategy.Type.INFINITE, Ticker.SOXL, new BigDecimal("100.00"), new BigDecimal("50.00"));
 
     private static Execution buyExecution() {
-        return new Execution(TODAY, Ticker.SOXL, Order.OrderDirection.BUY,
+        return new Execution(TODAY, Ticker.SOXL, Direction.BUY,
                 3, new BigDecimal("20.00"), new BigDecimal("60.00"), "E-BUY");
     }
 
     private static Execution sellExecution() {
-        return new Execution(TODAY, Ticker.SOXL, Order.OrderDirection.SELL,
+        return new Execution(TODAY, Ticker.SOXL, Direction.SELL,
                 2, new BigDecimal("21.00"), new BigDecimal("42.00"), "E-SELL");
     }
 

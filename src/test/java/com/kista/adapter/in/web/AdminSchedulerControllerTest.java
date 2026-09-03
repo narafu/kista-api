@@ -2,8 +2,8 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.adapter.in.schedule.KbLandPriceIndexScheduler;
-import com.kista.adapter.in.schedule.TradingCloseScheduler;
-import com.kista.adapter.in.schedule.TradingOpenScheduler;
+import com.kista.trading.adapter.in.schedule.TradingCloseScheduler;
+import com.kista.trading.adapter.in.schedule.TradingOpenScheduler;
 import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.adapter.in.web.security.JwtAuthFilter;
 import com.kista.adapter.in.web.security.SecurityConfig;

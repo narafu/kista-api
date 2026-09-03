@@ -3,7 +3,7 @@ package com.kista.adapter.in.web.dto;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.admin.AdminCycleStrategySummary;
 import com.kista.domain.model.admin.AdminUserView;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

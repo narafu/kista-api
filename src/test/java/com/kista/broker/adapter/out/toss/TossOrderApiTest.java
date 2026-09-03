@@ -1,9 +1,12 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.CancelInstruction;
+import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
-import com.kista.domain.model.order.Order;
-import com.kista.domain.model.order.Order.OrderDirection;
+import com.kista.broker.domain.model.OrderInstruction;
+import com.kista.broker.domain.model.OrderResult;
+import com.kista.broker.domain.model.OrderType;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
@@ -57,17 +59,16 @@ class TossOrderApiTest {
     }
 
     @Test
-    @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, PLACED 상태 반환")
+    @DisplayName("LOC 주문 → orderType=LIMIT, timeInForce=CLS, externalOrderId 반환")
     void place_loc_mapsToLimitCls() {
-        Order order = locBuyOrder();
+        OrderInstruction instruction = locBuyInstruction();
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id"));
 
-        Order placed = tossOrderApi.place(order, ACCOUNT);
+        OrderResult result = tossOrderApi.place(instruction, ACCOUNT);
 
-        // PLACED 상태, externalOrderId 설정 확인
-        assertThat(placed.externalOrderId()).isEqualTo("toss-order-id");
-        assertThat(placed.status()).isEqualTo(Order.OrderStatus.PLACED);
+        // externalOrderId 설정 확인
+        assertThat(result.externalOrderId()).isEqualTo("toss-order-id");
 
         // 요청 body 검증
         @SuppressWarnings("unchecked")
@@ -81,11 +82,11 @@ class TossOrderApiTest {
     @Test
     @DisplayName("MOC 주문 → timeInForce=CLS, price=0.01 (장마감 LIMIT 대체)")
     void place_moc_usesLimitClsWithMinPrice() {
-        Order order = mocSellOrder();
+        OrderInstruction instruction = mocSellInstruction();
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id-2"));
 
-        tossOrderApi.place(order, ACCOUNT);
+        tossOrderApi.place(instruction, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -98,11 +99,11 @@ class TossOrderApiTest {
     @Test
     @DisplayName("LIMIT 주문 → timeInForce=DAY")
     void place_limit_mapsToLimitDay() {
-        Order order = limitBuyOrder();
+        OrderInstruction instruction = limitBuyInstruction();
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id-3"));
 
-        tossOrderApi.place(order, ACCOUNT);
+        tossOrderApi.place(instruction, ACCOUNT);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -113,22 +114,20 @@ class TossOrderApiTest {
     @Test
     @DisplayName("응답 orderId null → TossApiException")
     void place_nullOrderId_throwsTossApiException() {
-        Order order = locBuyOrder();
+        OrderInstruction instruction = locBuyInstruction();
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null, null)));
 
-        assertThatThrownBy(() -> tossOrderApi.place(order, ACCOUNT))
+        assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT))
             .isInstanceOf(TossApiException.class);
     }
 
     @Test
     @DisplayName("취소: POST /api/v1/orders/{externalOrderId}/cancel")
     void cancel_callsPostCancelWithOrderId() {
-        Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
-            Order.OrderStatus.PLACED, "toss-oid-123", null, null);
+        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-123");
 
-        tossOrderApi.cancel(order, ACCOUNT);
+        tossOrderApi.cancel(instruction, ACCOUNT);
 
         verify(tossHttpClient).post(eq("/api/v1/orders/toss-oid-123/cancel"), any(), any(), eq(Void.class));
     }
@@ -136,26 +135,22 @@ class TossOrderApiTest {
     @Test
     @DisplayName("취소 실패(500)는 그대로 전파된다")
     void cancel_serverError_rethrows() {
-        Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
-            Order.OrderStatus.PLACED, "toss-oid-500", null, null);
+        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-500");
         doThrow(new TossApiException("Toss API 요청 실패: 500", new RuntimeException("boom")))
             .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
-        assertThatThrownBy(() -> tossOrderApi.cancel(order, ACCOUNT))
+        assertThatThrownBy(() -> tossOrderApi.cancel(instruction, ACCOUNT))
             .isInstanceOf(TossApiException.class);
     }
 
     @Test
     @DisplayName("취소 실패(404)도 이미 체결/만료로 추정하지 않고 그대로 전파된다")
     void cancel_notFound_rethrows() {
-        Order order = new Order(UUID.randomUUID(), null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
-            Order.OrderStatus.PLACED, "toss-oid-404", null, null);
+        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-404");
         doThrow(new TossApiException("Toss API 오류: 404 NOT_FOUND", new RuntimeException("not found")))
             .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
-        assertThatThrownBy(() -> tossOrderApi.cancel(order, ACCOUNT))
+        assertThatThrownBy(() -> tossOrderApi.cancel(instruction, ACCOUNT))
             .isInstanceOf(TossApiException.class);
     }
 
@@ -180,7 +175,7 @@ class TossOrderApiTest {
         assertThat(e.quantity()).isEqualTo(3);
         assertThat(e.price()).isEqualByComparingTo("25.50");
         assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
-        assertThat(e.direction()).isEqualTo(OrderDirection.BUY);
+        assertThat(e.direction()).isEqualTo(Direction.BUY);
         assertThat(e.externalOrderId()).isEqualTo("oid-1");
         assertThat(e.ticker()).isEqualTo(Ticker.SOXL);
     }
@@ -221,7 +216,7 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).direction()).isEqualTo(OrderDirection.SELL);
+        assertThat(result.get(0).direction()).isEqualTo(Direction.SELL);
         assertThat(result.get(0).quantity()).isEqualTo(2);
     }
 
@@ -247,21 +242,15 @@ class TossOrderApiTest {
 
     // --- helpers ---
 
-    private Order locBuyOrder() {
-        return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 2, new BigDecimal("25.50"),
-            Order.OrderStatus.PLANNED, null, null, null);
+    private OrderInstruction locBuyInstruction() {
+        return new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 2, new BigDecimal("25.50"));
     }
 
-    private Order mocSellOrder() {
-        return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.MOC, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1, BigDecimal.ZERO,
-            Order.OrderStatus.PLANNED, null, null, null);
+    private OrderInstruction mocSellInstruction() {
+        return new OrderInstruction(Ticker.SOXL, Direction.SELL, OrderType.MOC, 1, BigDecimal.ZERO);
     }
 
-    private Order limitBuyOrder() {
-        return new Order(null, null, null, LocalDate.now(), Ticker.SOXL,
-            Order.OrderType.LIMIT, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal("25.00"),
-            Order.OrderStatus.PLANNED, null, null, null);
+    private OrderInstruction limitBuyInstruction() {
+        return new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
     }
 }

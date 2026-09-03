@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.common.UsTradeDates;
 import com.kista.domain.model.account.Account;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.strategy.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

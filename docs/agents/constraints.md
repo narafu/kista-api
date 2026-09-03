@@ -12,6 +12,12 @@
 - 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/{model,port/in,port/out}` + `application/service` + `adapter/{in,out}` 서브구조를 그대로 따른다 (→ architecture.md "Spring Modulith 점진 도입")
 - notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model·application 레이어가 없는 얇은 게이트웨이 모듈이라 `domain/port/out`(공개 계약, "domain" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `domain/port/in`을 그대로 참조
 - 브로커 애그리게이트(KIS/Toss/Mock 연동)는 `com.kista.broker`로 이미 옮겨졌다 — 신규 KIS/Toss/Mock 코드는 `com.kista.broker.adapter.out.*` 안에 추가. finance/notify와 달리 이 adapter/out은 NamedInterface로 공개되지 않아 모듈 밖에서 완전히 접근 불가 — 레거시 코드가 새 기능을 호출해야 하면 adapter 패키지에 직접 접근하지 말고 `com.kista.broker.domain.port.out`에 신규 `*Port` 인터페이스를 만들어 노출한다("domain" NamedInterface로 공개)
+- 매매 코어 애그리게이트(주문/사이클 실행 이력/주문생성 전략)는 `com.kista.trading`으로 이미 옮겨졌다 — 신규 trading 관련 코드도 레거시 최상위가 아닌 `com.kista.trading` 안에 추가. `domain/{model,strategy,port/in,port/out}`이 "domain"으로, `application/event`가 "event"로, `adapter/in/schedule`이 "schedule"로 NamedInterface 공개 — `application/service`·`adapter/out/*`은 비공개(internal)
+
+### 모듈 경계 포트 시그니처 — 각 모듈은 자기 소유 타입만 사용
+- broker/notify 포트(`domain/port/out/*Port`)는 시그니처(파라미터·반환 타입)에 trading 타입을 직접 참조하지 않는다 — 각 모듈이 경계에서 자기 소유 타입을 쓰고, trading이 양쪽을 매핑한다
+- 근거: `broker↔trading`/`notify↔trading`/`broker→trading→notify→broker` 3개 Modulith 모듈 순환이 trading 타입을 포트 시그니처에 직접 노출한 데서 발생 — broker는 `Direction`/`OrderType`/`PriceSnapshot`/`BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(trading 동명 타입과 값 집합·필드만 동일한 별도 소유, `com.kista.broker.domain.model`)을 자체 정의해 `LiveBalancePort`/`BrokerOrderCorrectionPort` 등에 사용하고, trading 호출부가 양방향 변환한다. notify는 trading을 직접 호출하는 대신 trading이 발행하는 도메인 이벤트(`trading.application.event`, "event" NamedInterface)를 `@TransactionalEventListener`로 구독한다(`TradingAlertNotifier`)
+- 신규 broker/notify 포트 추가 시에도 이 원칙 적용 — trading의 record/enum을 그대로 파라미터·반환 타입에 쓰지 말 것, 필요하면 해당 모듈 소유의 대응 타입을 새로 정의
 
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류

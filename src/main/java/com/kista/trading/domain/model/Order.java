@@ -1,0 +1,158 @@
+package com.kista.trading.domain.model;
+
+import com.kista.domain.model.strategy.Strategy.Ticker;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public record Order(
+        UUID id,                         // PK (null = 신규 PLANNED)
+        UUID accountId,                  // FK → accounts.id
+        UUID strategyCycleId,            // FK → strategy_cycle.id (멀티 전략 주문 격리)
+        LocalDate tradeDate,             // 거래일
+        Ticker ticker,                   // 거래 종목
+        OrderType orderType,             // 주문 유형 (LOC/MOC/LIMIT) — 증권사 실행 지시
+        OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
+        OrderDirection direction,        // 매수/매도 방향
+        String orderLeg,                 // 전략 주문 다리 식별자
+        Integer quantity,                // 주문 수량(nullable)
+        BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
+        OrderStatus status,              // 주문 상태
+        String externalOrderId,          // 증권사 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
+        Integer filledQuantity,          // 체결 수량 (null=미확인, 0=미체결)
+        BigDecimal filledPrice           // 체결 가중평균가 (null=미체결)
+) {
+    public static final String UNKNOWN_LEG = "UNKNOWN";
+
+    public Order(UUID id, UUID accountId, UUID strategyCycleId, LocalDate tradeDate, Ticker ticker,
+                 OrderType orderType, OrderTiming timing, OrderDirection direction,
+                 Integer quantity, BigDecimal price, OrderStatus status, String externalOrderId,
+                 Integer filledQuantity, BigDecimal filledPrice) {
+        this(id, accountId, strategyCycleId, tradeDate, ticker, orderType, timing, direction,
+                UNKNOWN_LEG, quantity, price, status, externalOrderId, filledQuantity, filledPrice);
+    }
+
+    public Order {
+        if (orderLeg == null || orderLeg.isBlank()) orderLeg = UNKNOWN_LEG;
+    }
+
+    public enum OrderType {
+        LOC,   // Limit On Close: 종가 지정가 주문
+        MOC,   // Market On Close: 종가 시장가 주문
+        LIMIT  // 일반 지정가 주문
+    }
+
+    public enum OrderTiming {
+        AT_CLOSE,   // 마감 배치(04:30 KST)에 접수 — 기본값
+        AT_OPEN,    // 개장 시점(22:30 KST)에 선접수
+        IMMEDIATE   // 관리자 재주문 즉시 접수 (정규장 중에만 사용)
+    }
+
+    public enum OrderDirection {
+        BUY,
+        SELL
+    }
+
+    public enum OrderStatus {
+        PLANNED,           // DB 저장, 증권사 접수 대기
+        PLACED,            // 증권사 접수 완료
+        FILLED,            // 전량 체결
+        PARTIALLY_FILLED,  // 부분 체결 (filledQuantity < quantity)
+        FAILED,            // 증권사 접수 실패
+        CANCELLED          // 사용자 취소 또는 미체결로 취소 처리 완료
+    }
+
+    // 전략 계산 결과(template)를 특정 계좌·사이클의 PLANNED 주문으로 변환 (timing 전파)
+    public static Order plan(Order template, UUID accountId, UUID strategyCycleId) {
+        return new Order(null, accountId, strategyCycleId, template.tradeDate(), template.ticker(),
+                template.orderType(), template.timing(), template.direction(), template.orderLeg(), template.quantity(),
+                template.price(), OrderStatus.PLANNED, null, null, null);
+
+    }
+
+    // 전략 계산용 PLANNED 템플릿 주문 — AT_CLOSE 기본값 (매수·PRIVACY 등 대부분)
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price) {
+        return planned(tradeDate, ticker, orderType, direction, quantity, price, OrderTiming.AT_CLOSE);
+    }
+
+    // 전략 계산용 PLANNED 템플릿 주문 — 접수 시점 명시 (INFINITE SELL → AT_OPEN)
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price,
+                                 OrderTiming timing) {
+        return planned(tradeDate, ticker, orderType, direction, quantity, price, timing, UNKNOWN_LEG);
+    }
+
+    // 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price,
+                                 String orderLeg) {
+        return planned(tradeDate, ticker, orderType, direction, quantity, price, OrderTiming.AT_CLOSE, orderLeg);
+    }
+
+    // 접수 시점과 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
+    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+                                 OrderDirection direction, int quantity, BigDecimal price,
+                                 OrderTiming timing, String orderLeg) {
+        return new Order(null, null, null, tradeDate, ticker, orderType, timing, direction,
+                orderLeg, quantity, price, OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록
+    public static Order filledManual(UUID accountId, UUID strategyCycleId, LocalDate tradeDate,
+                                     Ticker ticker, OrderTiming timing, OrderDirection direction,
+                                     int quantity, BigDecimal price, String externalOrderId) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
+                timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,
+                quantity, price);
+    }
+
+    // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
+    public Order withPlaced(String externalOrderId) {
+        return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, orderLeg, quantity, price,
+                OrderStatus.PLACED, externalOrderId, null, null);
+    }
+
+    // 가격만 교체한 새 PLANNED 주문 — 보정 주문 재저장 시 기존 id·체결 정보 초기화
+    public Order withPrice(BigDecimal newPrice) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, orderLeg, quantity, newPrice,
+                OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 수량만 교체한 새 PLANNED 주문 — 보유수량 캡 보정 재계산 시 기존 id·체결 정보 초기화
+    public Order withQuantity(int newQuantity) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, orderLeg, newQuantity, price,
+                OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 관리자 재주문용 PLANNED 신규 주문 — 원본에서 계좌·사이클·종목·주문유형 승계, direction/price/timing 명시 재정의
+    public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
+                                int quantity, BigDecimal price, OrderTiming timing) {
+        return new Order(null, source.accountId(), source.strategyCycleId(), tradeDate,
+                source.ticker(), source.orderType(), timing, direction, source.orderLeg(), quantity, price,
+                OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 즉시 접수 실패 시 FAILED 주문으로 변환 — id·접수번호·체결 정보 초기화
+    public Order withFailed() {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, orderLeg, quantity, price,
+                OrderStatus.FAILED, null, null, null);
+    }
+
+    // 전략 주문 다리 식별자만 교체한 새 주문
+    public Order withLeg(String newLeg) {
+        return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
+                orderType, timing, direction, newLeg, quantity, price, status,
+                externalOrderId, filledQuantity, filledPrice);
+    }
+
+    public static String leg(String prefix, int index) {
+        if (index < 1) throw new IllegalArgumentException("order leg index must be positive: " + index);
+        return "%s_%02d".formatted(prefix, index);
+    }
+}

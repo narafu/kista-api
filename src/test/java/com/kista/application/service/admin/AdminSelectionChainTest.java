@@ -1,7 +1,7 @@
 package com.kista.application.service.admin;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.user.User;
 import com.kista.domain.port.out.AccountPort;

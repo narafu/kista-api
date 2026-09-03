@@ -34,6 +34,9 @@ public interface StrategyPort {
     // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역용)
     Map<UUID, AdminCycleStrategySummary> findSummariesByCycleIds(Collection<UUID> cycleIds);
 
+    // strategyId 집합 → ticker 배치 조회 (com.kista.trading의 CyclePositionPersistenceAdapter가 StrategyEntity 직접 접근 불가라 포트 경유)
+    Map<UUID, Strategy.Ticker> findTickersByIds(Collection<UUID> strategyIds);
+
     // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
     boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker);
 }

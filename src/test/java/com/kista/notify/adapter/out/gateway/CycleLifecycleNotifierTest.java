@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.event.CycleCompletedEvent;
-import com.kista.application.event.NewCycleStartedEvent;
+import com.kista.trading.application.event.CycleCompletedEvent;
+import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;

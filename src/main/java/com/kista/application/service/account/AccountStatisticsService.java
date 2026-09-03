@@ -9,23 +9,23 @@ import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
-import com.kista.domain.model.order.Order;
+import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.privacy.PrivacyCurrentBase;
 import com.kista.domain.model.privacy.PrivacyTradeBase;
-import com.kista.domain.model.strategy.CycleHistoryPage;
-import com.kista.domain.model.strategy.CyclePositionHistoryEntry;
+import com.kista.trading.domain.model.CycleHistoryPage;
+import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.domain.port.in.AccountStatisticsUseCase;
 import com.kista.domain.port.out.AccountPort;
-import com.kista.domain.port.out.CyclePositionPort;
-import com.kista.domain.port.out.OrderPort;
+import com.kista.trading.domain.port.out.CyclePositionPort;
+import com.kista.trading.domain.port.out.OrderPort;
 import com.kista.domain.port.out.PrivacyTradePort;
 import com.kista.domain.port.out.StrategyPort;
 import com.kista.broker.domain.port.out.BrokerPricePort;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.CycleOrderStrategy;
+import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -81,7 +81,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                     return new DailyTransaction(
                             o.tradeDate().toString(),
                             null,
-                            o.direction(),
+                            toDirection(o.direction()),
                             o.ticker(),
                             o.ticker().name(),
                             qty,
@@ -95,16 +95,24 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 .toList();
 
         BigDecimal buyTotal = items.stream()
-                .filter(t -> t.direction() == Order.OrderDirection.BUY)
+                .filter(t -> t.direction() == com.kista.broker.domain.model.Direction.BUY)
                 .map(DailyTransaction::tradeAmountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal sellTotal = items.stream()
-                .filter(t -> t.direction() == Order.OrderDirection.SELL)
+                .filter(t -> t.direction() == com.kista.broker.domain.model.Direction.SELL)
                 .map(DailyTransaction::tradeAmountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new DailyTransactionResult(items,
                 new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
+    }
+
+    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static com.kista.broker.domain.model.Direction toDirection(Order.OrderDirection direction) {
+        return switch (direction) {
+            case BUY -> com.kista.broker.domain.model.Direction.BUY;
+            case SELL -> com.kista.broker.domain.model.Direction.SELL;
+        };
     }
 
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일

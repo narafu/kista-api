@@ -6,7 +6,7 @@ import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.TradingReport;
+import com.kista.trading.domain.model.TradingReport;
 import com.kista.domain.model.user.User;
 import com.kista.notify.domain.port.out.FcmDeviceTokenPort;
 import com.kista.notify.domain.port.out.UserNotificationPort;

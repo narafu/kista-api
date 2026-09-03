@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.DstInfo;
+import com.kista.trading.domain.model.DstInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // 재주문 시점 가용성 응답 — UI 주문시점 셀렉터 활성화 판단

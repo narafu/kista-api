@@ -3,8 +3,8 @@ package com.kista.application.service.stats;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.stats.BenchmarkGranularity;
 import com.kista.domain.model.stats.InvestmentPoint;
-import com.kista.domain.model.strategy.CyclePosition;
-import com.kista.domain.model.strategy.StrategyCycle;
+import com.kista.trading.domain.model.CyclePosition;
+import com.kista.trading.domain.model.StrategyCycle;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

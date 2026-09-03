@@ -10,7 +10,7 @@ import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.strategy.CycleOrderStrategies;
+import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

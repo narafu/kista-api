@@ -2,10 +2,10 @@ package com.kista.adapter.in.web;
 
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.port.in.BlacklistUseCase;
-import com.kista.domain.strategy.CycleOrderStrategies;
-import com.kista.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.domain.strategy.VrCycleOrderStrategy;
+import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
