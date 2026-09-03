@@ -31,11 +31,11 @@ class MarketEventNotifier {
     private final ApplicationEventPublisher eventPublisher;
 
     void notifyMarketOpen() {
-        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketOpenEvent(user)));
+        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketOpenEvent(user.id())));
     }
 
     void notifyMarketClose() {
-        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketCloseEvent(user)));
+        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketCloseEvent(user.id())));
     }
 
     private void notify(NotificationType type, Consumer<User> action) {

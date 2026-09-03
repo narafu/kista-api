@@ -65,6 +65,9 @@ dependencies {
 
     // Spring Modulith (버전은 위 dependencyManagement BOM import가 관리)
     implementation(libs.spring.modulith.starter.core)
+    implementation(libs.spring.modulith.events.api)
+    implementation(libs.spring.modulith.events.jdbc)
+    implementation(libs.spring.modulith.events.jackson) // EventSerializer 빈 제공 (JdbcEventPublicationAutoConfiguration 필수 의존성 — 브리프 미기재)
 
     // Apache HttpClient 5 — HttpComponentsClientHttpRequestFactory (에러 응답 바디 정상 읽기)
     implementation("org.apache.httpcomponents.client5:httpclient5")

@@ -35,6 +35,14 @@ spring:
     validate-on-migrate: true
     default-schema: public
 
+  modulith:
+    events:
+      jdbc:
+        schema: public
+        schema-initialization:
+          enabled: false   # event_publication 테이블은 Flyway(V21)가 소유 — Modulith 자동 생성 비활성화
+      republish-outstanding-events-on-restart: true   # 재기동 시 미완료 이벤트 자동 재시도
+
   task:
     scheduling:
       thread-name-prefix: kista-api-scheduler-

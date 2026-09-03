@@ -72,7 +72,7 @@ class CycleRotationService {
         BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 재등록 취소 — 최소금액 미달: {} < {}", strategy.id(), targetSeed, minRequired);
-            eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account,
+            eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(),
                     new AccountBalance(0, null, targetSeed), strategy.ticker(), null));
             return;
         }
@@ -83,7 +83,7 @@ class CycleRotationService {
         StrategyCycle newCycle = cycleSnapshotCreator.createCycleAndSnapshot(
                 strategy.id(), activeVersion.id(), targetSeed, price);
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
-        eventPublisher.publishEvent(new NewCycleStartedEvent(user, account, strategy, targetSeed)); // 사용자 알림 이벤트
+        eventPublisher.publishEvent(new NewCycleStartedEvent(user.id(), account.id(), strategy, targetSeed)); // 사용자 알림 이벤트
     }
 
     // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환
@@ -132,13 +132,13 @@ class CycleRotationService {
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
                 eventPublisher.publishEvent(new TradingErrorEvent(null,
-                        new IllegalStateException("재등록 실패: USD 잔고 없음 strategyId=" + strategy.id())));
+                        "재등록 실패: USD 잔고 없음 strategyId=" + strategy.id()));
                 return null;
             }
             return usdAmount;
         } catch (Exception e) {
             log.error("[strategyId={}] 재등록 — USD 잔고 조회 실패: {}", strategy.id(), e.getMessage());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             return null;
         }
     }

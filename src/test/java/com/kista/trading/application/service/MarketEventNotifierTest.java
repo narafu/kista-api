@@ -125,7 +125,7 @@ class MarketEventNotifierTest {
         when(userPort.findAllByStatus(User.UserStatus.ACTIVE)).thenReturn(users);
         when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(settingsMap);
 
-        doThrow(new RuntimeException("텔레그램 발송 실패")).when(eventPublisher).publishEvent(new MarketOpenEvent(failingUser));
+        doThrow(new RuntimeException("텔레그램 발송 실패")).when(eventPublisher).publishEvent(new MarketOpenEvent(failingUser.id()));
 
         notifier.notifyMarketOpen();
 
@@ -149,7 +149,7 @@ class MarketEventNotifierTest {
 
         notifier.notifyMarketOpen();
 
-        verify(eventPublisher, times(1)).publishEvent(new MarketOpenEvent(enabledUser));
-        verify(eventPublisher, never()).publishEvent(new MarketOpenEvent(disabledUser));
+        verify(eventPublisher, times(1)).publishEvent(new MarketOpenEvent(enabledUser.id()));
+        verify(eventPublisher, never()).publishEvent(new MarketOpenEvent(disabledUser.id()));
     }
 }

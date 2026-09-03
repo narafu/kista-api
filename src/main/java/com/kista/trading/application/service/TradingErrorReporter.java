@@ -15,6 +15,6 @@ class TradingErrorReporter implements TradingErrorReportPort {
 
     @Override
     public void reportError(Exception e) {
-        eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+        eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
     }
 }

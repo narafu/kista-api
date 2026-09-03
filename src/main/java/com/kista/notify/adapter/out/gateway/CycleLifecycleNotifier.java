@@ -1,5 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.UserPort;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -12,17 +16,21 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 class CycleLifecycleNotifier {
 
-    private final UserNotificationPort userNotificationPort; // 채널 라우팅 담당 어댑터
+    private final UserNotificationPort userNotificationPort;
+    private final UserPort userPort;
+    private final AccountPort accountPort;
 
-    // 트랜잭션 있으면 커밋 후, 없으면 즉시 동기 실행
     @TransactionalEventListener(fallbackExecution = true)
     public void onCycleCompleted(CycleCompletedEvent event) {
-        userNotificationPort.notifyCycleCompleted(event.user(), event.account(), event.strategy());
+        User user = userPort.findByIdOrThrow(event.userId());
+        Account account = accountPort.findByIdOrThrow(event.accountId());
+        userNotificationPort.notifyCycleCompleted(user, account, event.strategy());
     }
 
-    // 트랜잭션 있으면 커밋 후, 없으면 즉시 동기 실행
     @TransactionalEventListener(fallbackExecution = true)
     public void onNewCycleStarted(NewCycleStartedEvent event) {
-        userNotificationPort.notifyNewCycleStarted(event.user(), event.account(), event.strategy(), event.initialUsdDeposit());
+        User user = userPort.findByIdOrThrow(event.userId());
+        Account account = accountPort.findByIdOrThrow(event.accountId());
+        userNotificationPort.notifyNewCycleStarted(user, account, event.strategy(), event.initialUsdDeposit());
     }
 }

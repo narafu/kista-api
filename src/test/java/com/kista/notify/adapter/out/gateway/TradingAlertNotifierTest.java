@@ -1,5 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -23,8 +25,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 // trading이 발행하는 관리자/사용자 알림 이벤트 6종이 기존 NotifyPort/UserNotificationPort 메서드로 정확히 라우팅되는지 검증
 @ExtendWith(MockitoExtension.class)
@@ -32,40 +37,41 @@ class TradingAlertNotifierTest {
 
     @Mock NotifyPort notifyPort;
     @Mock UserNotificationPort userNotificationPort;
+    @Mock UserPort userPort;
+    @Mock AccountPort accountPort;
 
     private final UUID userId = UUID.randomUUID();
     private final Account account = DomainFixtures.kisAccount(UUID.randomUUID(), userId);
     private final User user = DomainFixtures.activeUserWithTelegram(userId);
 
     private TradingAlertNotifier notifier() {
-        return new TradingAlertNotifier(notifyPort, userNotificationPort);
+        return new TradingAlertNotifier(notifyPort, userNotificationPort, userPort, accountPort);
     }
 
     @Test
     void onTradingError_adminPath_callsNotifyPortWhenUserIsNull() {
-        Exception e = new IllegalStateException("배치 오류");
+        notifier().onTradingError(new TradingErrorEvent(null, "배치 오류"));
 
-        notifier().onTradingError(new TradingErrorEvent(null, e));
-
-        verify(notifyPort).notifyError(e);
+        verify(notifyPort).notifyError(argThat(e -> "배치 오류".equals(e.getMessage())));
         verify(userNotificationPort, never()).notifyError(any(), any());
     }
 
     @Test
     void onTradingError_userPath_callsUserNotificationPortWhenUserPresent() {
-        Exception e = new IllegalStateException("사용자 매매 오류");
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
 
-        notifier().onTradingError(new TradingErrorEvent(user, e));
+        notifier().onTradingError(new TradingErrorEvent(userId, "사용자 매매 오류"));
 
-        verify(userNotificationPort).notifyError(user, e);
+        verify(userNotificationPort).notifyError(eq(user), argThat(e -> "사용자 매매 오류".equals(e.getMessage())));
         verify(notifyPort, never()).notifyError(any());
     }
 
     @Test
     void onInsufficientBalance_adminPath_callsNotifyPortWithAccountBalance() {
+        when(accountPort.findByIdOrThrow(account.id())).thenReturn(account);
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("100.00"));
 
-        notifier().onInsufficientBalance(new InsufficientBalanceEvent(null, account, balance, Ticker.SOXL, null));
+        notifier().onInsufficientBalance(new InsufficientBalanceEvent(null, account.id(), balance, Ticker.SOXL, null));
 
         verify(notifyPort).notifyInsufficientBalance(account, balance, Ticker.SOXL);
         verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any());
@@ -73,8 +79,11 @@ class TradingAlertNotifierTest {
 
     @Test
     void onInsufficientBalance_userPath_callsUserNotificationPortWithStrategyType() {
+        when(accountPort.findByIdOrThrow(account.id())).thenReturn(account);
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
+
         notifier().onInsufficientBalance(
-                new InsufficientBalanceEvent(user, account, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(userId, account.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
 
         verify(userNotificationPort).notifyInsufficientBalance(user, account, Strategy.Type.INFINITE, Ticker.SOXL);
         verify(notifyPort, never()).notifyInsufficientBalance(any(), any(), any());
@@ -89,21 +98,28 @@ class TradingAlertNotifierTest {
 
     @Test
     void onMarketOpen_callsUserNotificationPort() {
-        notifier().onMarketOpen(new MarketOpenEvent(user));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
+
+        notifier().onMarketOpen(new MarketOpenEvent(userId));
 
         verify(userNotificationPort).notifyMarketOpen(user);
     }
 
     @Test
     void onMarketClose_callsUserNotificationPort() {
-        notifier().onMarketClose(new MarketCloseEvent(user));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
+
+        notifier().onMarketClose(new MarketCloseEvent(userId));
 
         verify(userNotificationPort).notifyMarketClose(user);
     }
 
     @Test
     void onBatchInterrupted_callsUserNotificationPort() {
-        notifier().onBatchInterrupted(new BatchInterruptedEvent(user, account));
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user);
+        when(accountPort.findByIdOrThrow(account.id())).thenReturn(account);
+
+        notifier().onBatchInterrupted(new BatchInterruptedEvent(userId, account.id()));
 
         verify(userNotificationPort).notifyBatchInterrupted(user, account);
     }

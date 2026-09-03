@@ -105,7 +105,7 @@ class TradingOrderExecutor {
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
-                eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+                eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
                 orderPort.markFailed(p.id()); // 접수 실패 → FAILED
                 // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 예외로 전파한다 — 이 경우 이 주문만
                 // FAILED로 남기고 나머지 주문은 다음 반복 상단의 체크에서 중단된다
@@ -122,8 +122,8 @@ class TradingOrderExecutor {
             } catch (Exception e) {
                 log.error("[{}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
                         account.nickname(), p.direction(), p.ticker(), result.externalOrderId(), e.getMessage());
-                eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                        "[DB 불일치] 증권사 접수 완료 후 PLACED 기록 실패 — externalOrderId=" + result.externalOrderId(), e)));
+                eventPublisher.publishEvent(new TradingErrorEvent(null,
+                        "[DB 불일치] 증권사 접수 완료 후 PLACED 기록 실패 — externalOrderId=" + result.externalOrderId()));
             }
         }
         return placed;

@@ -64,7 +64,7 @@ class TradingReporter {
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
         UserSettings settings = userSettingsPort.findOrDefault(user.id());
         boolean reportEnabled = settings.isNotificationEnabled(NotificationType.TRADING_ALERT);
-        eventPublisher.publishEvent(new TradingReportReadyEvent(user, account, report, executions, reportEnabled));
+        eventPublisher.publishEvent(new TradingReportReadyEvent(user.id(), account.id(), report, executions, reportEnabled));
         log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
     }
 
@@ -85,7 +85,7 @@ class TradingReporter {
                     log.info("[orderId={}] 취소 시점 이미 체결 완료 — 취소 생략", order.id());
                 } else {
                     log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
-                    eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+                    eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
                 }
             }
         }

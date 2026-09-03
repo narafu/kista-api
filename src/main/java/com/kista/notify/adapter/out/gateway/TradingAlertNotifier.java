@@ -1,5 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.UserPort;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.trading.application.event.BatchInterruptedEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.MarketClosedEvent;
@@ -22,22 +26,27 @@ public class TradingAlertNotifier {
 
     private final NotifyPort notifyPort;                       // 관리자 알림
     private final UserNotificationPort userNotificationPort;   // 사용자 알림
+    private final UserPort userPort;       // Task 4에서 신규 추가 — onMarketOpen/onMarketClose/onBatchInterrupted용
+    private final AccountPort accountPort; // Task 4에서 신규 추가 — onBatchInterrupted용
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onTradingError(TradingErrorEvent event) {
-        if (event.user() == null) {
-            notifyPort.notifyError(event.e());
+        if (event.userId() == null) {
+            notifyPort.notifyError(new RuntimeException(event.message()));
         } else {
-            userNotificationPort.notifyError(event.user(), event.e());
+            User user = userPort.findByIdOrThrow(event.userId());
+            userNotificationPort.notifyError(user, new RuntimeException(event.message()));
         }
     }
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onInsufficientBalance(InsufficientBalanceEvent event) {
-        if (event.user() == null) {
-            notifyPort.notifyInsufficientBalance(event.account(), event.b(), event.ticker());
+        Account account = accountPort.findByIdOrThrow(event.accountId());
+        if (event.userId() == null) {
+            notifyPort.notifyInsufficientBalance(account, event.b(), event.ticker());
         } else {
-            userNotificationPort.notifyInsufficientBalance(event.user(), event.account(), event.strategyType(), event.ticker());
+            User user = userPort.findByIdOrThrow(event.userId());
+            userNotificationPort.notifyInsufficientBalance(user, account, event.strategyType(), event.ticker());
         }
     }
 
@@ -48,16 +57,20 @@ public class TradingAlertNotifier {
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onMarketOpen(MarketOpenEvent event) {
-        userNotificationPort.notifyMarketOpen(event.user());
+        User user = userPort.findByIdOrThrow(event.userId());
+        userNotificationPort.notifyMarketOpen(user);
     }
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onMarketClose(MarketCloseEvent event) {
-        userNotificationPort.notifyMarketClose(event.user());
+        User user = userPort.findByIdOrThrow(event.userId());
+        userNotificationPort.notifyMarketClose(user);
     }
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onBatchInterrupted(BatchInterruptedEvent event) {
-        userNotificationPort.notifyBatchInterrupted(event.user(), event.account());
+        User user = userPort.findByIdOrThrow(event.userId());
+        Account account = accountPort.findByIdOrThrow(event.accountId());
+        userNotificationPort.notifyBatchInterrupted(user, account);
     }
 }

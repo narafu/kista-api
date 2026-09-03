@@ -23,7 +23,7 @@ application/
                    StatsResultCache — summary/equity-curve 5분, 벤치마크 비교(housing-benchmark, ETF 포함) 10분 인메모리 TTL 캐시. 매매 직후 통계가 해당 TTL만큼 stale할 수 있음. 단일 인스턴스 전제 — 다중 인스턴스 시 인스턴스별 캐시가 최대 TTL만큼 상이할 수 있음
                    MonthlyReturnCalculator/HousingBenchmarkComparisonBuilder — Spring·포트 비의존 순수 계산 클래스(TWR·정규화 비교 조립). HousingBenchmarkComparisonBuilder는 ETF 비교에도 재사용됨(이름은 HousingBenchmark)
                    getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary 계산에는 미반영(조회 실패 시 null 처리, 200 정상 반환) — 투자(USD)·벤치마크(HOUSING=KRW/ETF=USD) 현지통화 그대로 비교, 환율 변환 없음
-  event/         ← @TransactionalEventListener용 도메인 이벤트(application 레이어) — 사용자 승인/거부/재신청/신규가입/탈퇴 (사이클 종료/신규시작·매매리포트·주문취소실패 등 매매 관련 이벤트는 com.kista.trading.application.event로 이전됨)
+  event/         ← 도메인 이벤트(application 레이어) — 사용자 승인/거부/재신청/신규가입/탈퇴 (사이클 종료/신규시작·매매리포트·주문취소실패 등 매매 관련 이벤트는 com.kista.trading.application.event로 이전됨). 전부 Spring Modulith Event Publication Registry로 추적됨(`event_publication` 테이블, 재기동 시 미완료 이벤트 자동 재시도) — 리스너 annotation은 기존 @TransactionalEventListener 그대로, User/Account를 담던 이벤트는 평문 비밀값이 DB에 저장되지 않도록 ID(userId/accountId)만 담고 리스너가 UserPort/AccountPort로 재조회한다
 
 adapter/in/
   schedule/      ← 시세·캘린더·KB Land 등 배치 스케쥴러 (매매 스케쥴러 TradingOpenScheduler/TradingCloseScheduler/BatchContextFactory는 com.kista.trading.adapter.in.schedule로 이전됨) — 정확한 실행 시각·락 TTL은 `scheduler-time-table.md` 참고
@@ -88,7 +88,7 @@ com.kista.trading/   ← Spring Modulith 4번째(마지막) 이전 모듈(CLOSED
                          TradingOrderBudgetAllocator — 계좌별 slot-aware BUY/SELL 독립 예산 배정 (우선순위·실패 격리·제외 규칙 상세 → workflow.md "스케쥴러 주문 예산 배정")
                          live 잔고·판매가능수량 조회는 com.kista.broker.application.service.BrokerAdapterRegistry.require(account, LiveBalancePort/SellableQuantityPort.class) 직접 라우팅 — 별도 Router 클래스 없음 (KIS: TTTS3012R fetchHolding 재사용 / Toss: /api/v1/sellable-quantity)
                          CyclePositionPersistor: 포지션 스냅샷 저장 + 사이클 종료·rotation + VrCycleRolloverService.rollIfDue() 호출 (VR 예외 → "VR 전략 패턴")
-  application/event/  ← trading 모듈의 공개 계약 — CycleCompletedEvent/CycleEndedEvent/NewCycleStartedEvent/OrderCancelFailedEvent/TradingReportReadyEvent/TradingErrorEvent/InsufficientBalanceEvent/MarketClosedEvent/MarketOpenEvent/MarketCloseEvent/BatchInterruptedEvent 11개 — notify 모듈이 `@TransactionalEventListener`로 구독(TradingAlertNotifier 등). "event" 이름으로 공개
+  application/event/  ← trading 모듈의 공개 계약 — CycleCompletedEvent/CycleEndedEvent/NewCycleStartedEvent/OrderCancelFailedEvent/TradingReportReadyEvent/TradingErrorEvent/InsufficientBalanceEvent/MarketClosedEvent/MarketOpenEvent/MarketCloseEvent/BatchInterruptedEvent 11개 — notify 모듈이 `@TransactionalEventListener`로 구독(TradingAlertNotifier 등, EPR로 추적되어 재기동 시 실패분 자동 재시도). User/Account를 담던 이벤트는 userId/accountId만 담아 EPR 직렬화에 평문 비밀값이 노출되지 않게 함. "event" 이름으로 공개
   adapter/in/schedule/ ← TradingOpenScheduler/TradingCloseScheduler/BatchContextFactory(전략 목록 → BatchContext 빌드, 조회 실패 시 skip + notifyError) — legacy AdminSchedulerController가 수동 트리거용으로 구체 클래스를 직접 주입하는 기존 관례(KbLand 스케쥴러와 동일 패턴)를 유지하기 위해 공개. "schedule" 이름으로 공개
   adapter/in/web/      ← internal(비공개) — OrderCancelController
   adapter/out/         ← internal(비공개) — MockSimulationDataAdapter(broker.application.port.output.MockSimulationDataPort 구현 — broker의 MockBrokerAdapter가 필요로 하는 cycle_position/orders 데이터를 trading이 제공, 위 "com.kista.broker/" 참고)

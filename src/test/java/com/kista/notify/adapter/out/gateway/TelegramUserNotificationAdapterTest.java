@@ -1,6 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.application.event.NewUserRegisteredEvent;
+import com.kista.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
@@ -19,9 +20,11 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -31,6 +34,9 @@ class TelegramUserNotificationAdapterTest {
     @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     RestClient restClient;
 
+    @Mock
+    UserPort userPort;
+
     TelegramUserNotificationAdapter adapter;
 
     static final TelegramProperties PROPS = new TelegramProperties("admin-token", "admin-chat");
@@ -38,7 +44,7 @@ class TelegramUserNotificationAdapterTest {
     @BeforeEach
     void setUp() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
-        adapter = new TelegramUserNotificationAdapter(httpClient, PROPS);
+        adapter = new TelegramUserNotificationAdapter(httpClient, PROPS, userPort);
     }
 
     @Test
@@ -119,8 +125,9 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void onNewUserRegistered_pending_sendsApprovalRequestWithButtons() {
         User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.PENDING);
+        when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
 
-        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
 
         verify(restClient.post()).uri(contains("/sendMessage"));
     }
@@ -130,9 +137,10 @@ class TelegramUserNotificationAdapterTest {
     void onNewUserRegistered_activeNonAdmin_sendsAutoApprovedInfoMessage() {
         // 승인 불필요 설정으로 즉시 ACTIVE 등록된 일반 사용자 — 관리자에게 정보성 알림
         User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.USER);
+        when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
-        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
 
         verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
         assertThat(((Map<String, String>) bodyCaptor.getValue()).get("text")).contains("자동 승인");
@@ -142,8 +150,21 @@ class TelegramUserNotificationAdapterTest {
     void onNewUserRegistered_activeAdmin_skipsNotification() {
         // 관리자 seed 부트스트랩 — 알림 불필요
         User user = DomainFixtures.userWithStatus(UUID.randomUUID(), User.UserStatus.ACTIVE, User.UserRole.ADMIN);
+        when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
 
-        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user));
+        adapter.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
+
+        verifyNoInteractions(restClient);
+    }
+
+    @Test
+    void onNewUserRegistered_userNotFound_propagatesException() {
+        UUID missingUserId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(missingUserId))
+                .thenThrow(new NoSuchElementException("사용자를 찾을 수 없습니다: " + missingUserId));
+
+        assertThatThrownBy(() -> adapter.onNewUserRegistered(new NewUserRegisteredEvent(missingUserId)))
+                .isInstanceOf(NoSuchElementException.class);
 
         verifyNoInteractions(restClient);
     }

@@ -15,6 +15,7 @@ import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.modulith.events.config.EventPublicationAutoConfiguration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -116,8 +117,9 @@ class HousingBenchmarkApiDocsTest {
             SecurityAutoConfiguration.class,
             UserDetailsServiceAutoConfiguration.class,
             ManagementWebSecurityAutoConfiguration.class,
-            ServletWebSecurityAutoConfiguration.class
-    })
+            ServletWebSecurityAutoConfiguration.class,
+            EventPublicationAutoConfiguration.class // DataSource 없는 최소 컨텍스트라 Modulith EPR도 함께 제외
+    }, excludeName = "org.springframework.modulith.events.jdbc.JdbcEventPublicationAutoConfiguration") // package-private이라 클래스 참조 불가, 이름으로 제외
     @Import({SchemaController.class, HousingBenchmarkOpenApiCustomizer.class})
     static class TestApplication {}
 

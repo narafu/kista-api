@@ -4,6 +4,7 @@ import com.kista.application.event.NewUserRegisteredEvent;
 import com.kista.application.event.UserApprovedEvent;
 import com.kista.application.event.UserRejectedEvent;
 import com.kista.application.event.UserReappliedEvent;
+import com.kista.application.port.output.UserPort;
 import com.kista.domain.model.account.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
@@ -25,11 +26,12 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
+    private final UserPort userPort;                     // 이벤트 payload가 ID만 담아 실행 시점 재조회
 
     // UserService가 발행한 이벤트를 커밋 성공 후에만 수신 — race condition 시 알림 중복 방지
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNewUserRegistered(NewUserRegisteredEvent event) {
-        User user = event.user();
+        User user = userPort.findByIdOrThrow(event.userId());
         if (user.role() == User.UserRole.ADMIN) {
             return; // 관리자 seed 부트스트랩은 알림 불필요
         }
@@ -42,17 +44,17 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserApproved(UserApprovedEvent event) {
-        notifyApproved(event.user());
+        notifyApproved(userPort.findByIdOrThrow(event.userId()));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRejected(UserRejectedEvent event) {
-        notifyRejected(event.user());
+        notifyRejected(userPort.findByIdOrThrow(event.userId()));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserReapplied(UserReappliedEvent event) {
-        notifyNewUser(event.user());
+        notifyNewUser(userPort.findByIdOrThrow(event.userId()));
     }
 
     @Override

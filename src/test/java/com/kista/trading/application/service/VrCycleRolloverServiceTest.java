@@ -279,9 +279,9 @@ class VrCycleRolloverServiceTest {
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null)); // 관리자 알림
+                && tee.userId() == null)); // 관리자 알림
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && USER.equals(tee.user()))); // 사용자 알림
+                && USER.id().equals(tee.userId()))); // 사용자 알림
     }
 
     @Test
@@ -311,7 +311,7 @@ class VrCycleRolloverServiceTest {
                 eq(STRATEGY_ID), eq(STRATEGY_VERSION_ID), eq(expectedNewCycleBalance), eq(CLOSING_PRICE),
                 eq(new BigDecimal("200.00")), eq(10), eq(new BigDecimal("0.75")), eq(today));
         verify(eventPublisher, never()).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && USER.equals(tee.user())));
+                && USER.id().equals(tee.userId())));
     }
 
     @Test
@@ -356,9 +356,9 @@ class VrCycleRolloverServiceTest {
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null));
+                && tee.userId() == null));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && USER.equals(tee.user())));
+                && USER.id().equals(tee.userId())));
     }
 
     @Test
@@ -373,7 +373,7 @@ class VrCycleRolloverServiceTest {
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null));
+                && tee.userId() == null));
     }
 
     @Test
@@ -387,7 +387,7 @@ class VrCycleRolloverServiceTest {
 
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null));
+                && tee.userId() == null));
     }
 
     @Test
@@ -424,7 +424,7 @@ class VrCycleRolloverServiceTest {
 
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
-        verify(eventPublisher).publishEvent(new NewCycleStartedEvent(USER, ACCOUNT, VR_STRATEGY, USD_DEPOSIT));
+        verify(eventPublisher).publishEvent(new NewCycleStartedEvent(USER.id(), ACCOUNT.id(), VR_STRATEGY, USD_DEPOSIT));
     }
 
     // ── 경과주수 기반 램프 재계산 검증 (신규 기능 핵심 회귀) ──────────────────────────

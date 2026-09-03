@@ -132,7 +132,7 @@ class ManualTradingService {
             log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.id(), strategy.ticker().name(), e.getMessage());
             // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
     }

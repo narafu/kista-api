@@ -165,7 +165,7 @@ class CyclePositionPersistorTest {
         verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
         verify(cycleRotationService).rotate(strategy, cycle, ACCOUNT, USER, PRICE, null);
         // 사이클 완료 이벤트 발행 검증
-        verify(eventPublisher).publishEvent(new CycleCompletedEvent(USER, ACCOUNT, strategy));
+        verify(eventPublisher).publishEvent(new CycleCompletedEvent(USER.id(), ACCOUNT.id(), strategy));
         // INFINITE가 아닌 VR이 아니므로 vrCycleRolloverService 미호출
         verifyNoInteractions(vrCycleRolloverService);
     }

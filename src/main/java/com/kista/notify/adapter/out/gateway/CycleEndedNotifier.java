@@ -1,5 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.UserPort;
+import com.kista.domain.model.account.Account;
+import com.kista.domain.model.user.User;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +17,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class CycleEndedNotifier {
 
     private final UserNotificationPort userNotificationPort;
+    private final UserPort userPort;       // 이벤트 payload가 ID만 담아 실행 시점 재조회
+    private final AccountPort accountPort;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCycleEnded(CycleEndedEvent event) {
-        userNotificationPort.notifyCycleCompleted(event.user(), event.account(), event.strategy());
+        User user = userPort.findByIdOrThrow(event.userId());
+        Account account = accountPort.findByIdOrThrow(event.accountId());
+        userNotificationPort.notifyCycleCompleted(user, account, event.strategy());
     }
 }

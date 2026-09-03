@@ -51,11 +51,11 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserApproved(UserApprovedEvent event) {
-        notifyStatusChange(event.user().id(), User.UserStatus.ACTIVE);
+        notifyStatusChange(event.userId(), User.UserStatus.ACTIVE);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRejected(UserRejectedEvent event) {
-        notifyStatusChange(event.user().id(), User.UserStatus.REJECTED);
+        notifyStatusChange(event.userId(), User.UserStatus.REJECTED);
     }
 }

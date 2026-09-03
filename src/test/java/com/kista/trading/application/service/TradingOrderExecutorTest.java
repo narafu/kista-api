@@ -326,6 +326,6 @@ class TradingOrderExecutorTest {
         verify(orderPort, times(2)).markPlaced(orderId, "KIS-202");
         assertThat(result).isEmpty();
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.e() instanceof IllegalStateException));
+                && tee.message() != null && tee.message().contains("DB 불일치")));
     }
 }

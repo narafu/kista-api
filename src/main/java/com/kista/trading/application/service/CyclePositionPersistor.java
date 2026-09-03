@@ -59,7 +59,7 @@ class CyclePositionPersistor {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
-            eventPublisher.publishEvent(new CycleCompletedEvent(ctx.user(), ctx.account(), strategy));
+            eventPublisher.publishEvent(new CycleCompletedEvent(ctx.user().id(), ctx.account().id(), strategy));
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.user(), price, privacyBase);
         }
 

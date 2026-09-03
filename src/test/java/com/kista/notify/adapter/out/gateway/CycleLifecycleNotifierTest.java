@@ -1,5 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.application.port.output.AccountPort;
+import com.kista.application.port.output.UserPort;
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.domain.model.account.Account;
@@ -17,11 +19,14 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CycleLifecycleNotifierTest {
 
     @Mock UserNotificationPort userNotificationPort;
+    @Mock UserPort userPort;
+    @Mock AccountPort accountPort;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), USER_ID);
@@ -31,8 +36,10 @@ class CycleLifecycleNotifierTest {
 
     @Test
     void onCycleCompleted_notifiesUserOfCycleCompletion() {
-        CycleLifecycleNotifier notifier = new CycleLifecycleNotifier(userNotificationPort);
-        CycleCompletedEvent event = new CycleCompletedEvent(USER, ACCOUNT, STRATEGY);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(USER);
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        CycleLifecycleNotifier notifier = new CycleLifecycleNotifier(userNotificationPort, userPort, accountPort);
+        CycleCompletedEvent event = new CycleCompletedEvent(USER_ID, ACCOUNT.id(), STRATEGY);
 
         notifier.onCycleCompleted(event);
 
@@ -41,9 +48,11 @@ class CycleLifecycleNotifierTest {
 
     @Test
     void onNewCycleStarted_notifiesUserOfNewCycle() {
-        CycleLifecycleNotifier notifier = new CycleLifecycleNotifier(userNotificationPort);
+        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(USER);
+        when(accountPort.findByIdOrThrow(ACCOUNT.id())).thenReturn(ACCOUNT);
+        CycleLifecycleNotifier notifier = new CycleLifecycleNotifier(userNotificationPort, userPort, accountPort);
         BigDecimal initialUsdDeposit = new BigDecimal("1000.00");
-        NewCycleStartedEvent event = new NewCycleStartedEvent(USER, ACCOUNT, STRATEGY, initialUsdDeposit);
+        NewCycleStartedEvent event = new NewCycleStartedEvent(USER_ID, ACCOUNT.id(), STRATEGY, initialUsdDeposit);
 
         notifier.onNewCycleStarted(event);
 

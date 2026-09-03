@@ -69,6 +69,9 @@ spring-modulith-bom            = { module = "org.springframework.modulith:spring
 spring-modulith-starter-core   = { module = "org.springframework.modulith:spring-modulith-starter-core" }
 spring-modulith-starter-test   = { module = "org.springframework.modulith:spring-modulith-starter-test" }
 spring-modulith-docs           = { module = "org.springframework.modulith:spring-modulith-docs" } # 모듈 구조 다이어그램(PlantUML/C4) 생성용 — 후속 태스크에서 사용
+spring-modulith-events-api     = { module = "org.springframework.modulith:spring-modulith-events-api" }
+spring-modulith-events-jdbc    = { module = "org.springframework.modulith:spring-modulith-events-jdbc" }
+spring-modulith-events-jackson = { module = "org.springframework.modulith:spring-modulith-events-jackson" } # JdbcEventPublicationAutoConfiguration이 요구하는 EventSerializer 빈 제공 — jar에 없으면 컨텍스트 로딩 실패(브리프 미기재, 스파이크로 발견)
 
 [plugins]
 spring-boot            = { id = "org.springframework.boot", version.ref = "spring-boot" }

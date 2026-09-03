@@ -87,7 +87,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         }
 
         if (cycleEnded) {
-            eventPublisher.publishEvent(new CycleEndedEvent(user, account, updatedStrategy));
+            eventPublisher.publishEvent(new CycleEndedEvent(user.id(), account.id(), updatedStrategy));
         }
         orderPort.saveAll(manualOrders);
         auditLogPort.log(adminId, AUDIT_ACTION, "STRATEGY", strategy.id(),

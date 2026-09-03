@@ -278,7 +278,7 @@ class TradingServiceTest {
                 && h.closingPrice().compareTo(PRICE) == 0));
         verify(eventPublisher).publishEvent(argThat((Object event) ->
                 event instanceof TradingReportReadyEvent e
-                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
+                        && e.userId().equals(USER.id()) && e.accountId().equals(ACCOUNT.id())));
     }
 
     @Test
@@ -371,7 +371,7 @@ class TradingServiceTest {
         // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
         verify(eventPublisher).publishEvent(argThat((Object event) ->
                 event instanceof TradingReportReadyEvent e
-                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
+                        && e.userId().equals(USER.id()) && e.accountId().equals(ACCOUNT.id())));
     }
 
     // ── placeOpenOrders 테스트 ────────────────────────────────────────────────
@@ -482,7 +482,7 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         // 예수금 부족 — 사용자 알람 발송
-        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
         // 저장 건너뜀
         verify(orderPort, never()).saveAll(any());
         // AT_OPEN 접수 단계 자체도 진입하지 않음
@@ -511,7 +511,7 @@ class TradingServiceTest {
 
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
         verify(orderPort, never()).saveAll(any());
         verify(orderPort, never()).findAtOpenPlannedByCycleAndDate(any(), any());
         verify(brokerOrderPort, never()).place(any(), any());
@@ -537,7 +537,7 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == saveFailure));
+                && tee.userId() == null && tee.message().equals(saveFailure.getMessage())));
         verify(orderPort, never()).findAtOpenPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
         verify(brokerOrderPort, never()).place(any(), any());
     }
@@ -566,7 +566,7 @@ class TradingServiceTest {
         verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
                 && saved.getFirst().direction() == Order.OrderDirection.BUY));
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
     }
 
     @Test
@@ -601,7 +601,7 @@ class TradingServiceTest {
         verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
                 && saved.getFirst().direction() == Order.OrderDirection.SELL));
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
     }
 
     @Test
@@ -677,7 +677,7 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(argThat(saved -> saved.stream()
                 .anyMatch(order -> order.strategyCycleId().equals(privacyCycle.id()))));
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.PRIVACY));
+                new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.PRIVACY));
     }
 
     // Task 4: AT_OPEN 접수 경로(placeOpenOrders)도 AT_CLOSE 접수(placeAll)와 동일한 BUY cap 정책을 적용해야 한다.
@@ -800,7 +800,7 @@ class TradingServiceTest {
         List<BatchContext> contexts = List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER));
         assertThrows(InterruptedException.class, () -> service.placeOpenOrders(contexts, interruptingDst));
 
-        verify(eventPublisher).publishEvent(new BatchInterruptedEvent(USER, ACCOUNT));
+        verify(eventPublisher).publishEvent(new BatchInterruptedEvent(USER.id(), ACCOUNT.id()));
         // 대기 단계에서 인터럽트되므로 order 생성·접수 루프는 시작조차 하지 않아야 함
         verify(orderPort, never()).saveAll(anyList());
     }
@@ -828,7 +828,7 @@ class TradingServiceTest {
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         // 알림 발송
-        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
         // 저장 없음
         verify(orderPort, never()).saveAll(any());
         // 증권사 접수 없음
@@ -873,7 +873,7 @@ class TradingServiceTest {
         verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
                 && saved.getFirst().direction() == Order.OrderDirection.SELL));
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
     }
 
     @Test
@@ -903,7 +903,7 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
         verify(orderPort, never()).findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
         verify(cycleHistoryPort, never()).save(any());
-        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.INFINITE));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
     }
 
     @Test
@@ -944,7 +944,7 @@ class TradingServiceTest {
                 .allMatch(order -> order.accountId().equals(succeedingAccount.id()))));
         verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == balanceFailure));
+                && tee.userId() == null && tee.message().equals(balanceFailure.getMessage())));
     }
 
     @Test
@@ -988,7 +988,7 @@ class TradingServiceTest {
         verify(orderPort, times(2)).saveAll(anyList());
         verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == saveFailure));
+                && tee.userId() == null && tee.message().equals(saveFailure.getMessage())));
     }
 
     @Test
@@ -1016,18 +1016,18 @@ class TradingServiceTest {
         when(liveBalancePort.getLiveBalance(any(), eq(Ticker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10.00")));
         doThrow(notificationFailure).when(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(failingUser, failingAccount, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(failingUser.id(), failingAccount.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
         doThrow(new RuntimeException("secondary user notify failure"))
-                .when(eventPublisher).publishEvent(new TradingErrorEvent(failingUser, notificationFailure));
+                .when(eventPublisher).publishEvent(new TradingErrorEvent(failingUser.id(), notificationFailure.getMessage()));
 
         service.executeBatch(List.of(
                 new BatchContext(failingStrategy, failingCycle, failingAccount, failingUser),
                 new BatchContext(succeedingStrategy, succeedingCycle, succeedingAccount, succeedingUser)), PAST_DST);
 
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(succeedingUser, succeedingAccount, null, Ticker.SOXL, Strategy.Type.INFINITE));
+                new InsufficientBalanceEvent(succeedingUser.id(), succeedingAccount.id(), null, Ticker.SOXL, Strategy.Type.INFINITE));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == notificationFailure));
+                && tee.userId() == null && tee.message().equals(notificationFailure.getMessage())));
     }
 
     @Test
@@ -1064,7 +1064,7 @@ class TradingServiceTest {
                 && saved.getFirst().direction() == Order.OrderDirection.SELL
                 && saved.getFirst().timing() == Order.OrderTiming.AT_CLOSE));
         verify(eventPublisher).publishEvent(
-                new InsufficientBalanceEvent(USER, ACCOUNT, null, Ticker.SOXL, Strategy.Type.PRIVACY));
+                new InsufficientBalanceEvent(USER.id(), ACCOUNT.id(), null, Ticker.SOXL, Strategy.Type.PRIVACY));
     }
 
     @Test
@@ -1169,7 +1169,7 @@ class TradingServiceTest {
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT));
         verify(eventPublisher).publishEvent(argThat((Object event) ->
                 event instanceof TradingReportReadyEvent e
-                        && e.user().equals(USER) && e.account().equals(ACCOUNT)));
+                        && e.userId().equals(USER.id()) && e.accountId().equals(ACCOUNT.id())));
     }
 
     @Test
@@ -1264,8 +1264,8 @@ class TradingServiceTest {
 
         verify(orderPort, never()).saveAll(anyList());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() instanceof IllegalStateException
-                && tee.e().getMessage().contains("전략 주문 leg 누락")));
+                && tee.userId() == null
+                && tee.message().contains("전략 주문 leg 누락")));
     }
 
     @Test
@@ -1616,7 +1616,7 @@ class TradingServiceTest {
         ), PAST_DST);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == ex));
+                && tee.userId() == null && tee.message().equals(ex.getMessage())));
         // strategy2는 정상 실행 → cycleHistoryPort.save 호출 확인
         verify(cycleHistoryPort, atLeastOnce()).save(any());
     }
@@ -1642,7 +1642,7 @@ class TradingServiceTest {
         List<BatchContext> contexts = List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER));
         assertThrows(InterruptedException.class, () -> service.executeBatch(contexts, interruptingDst));
 
-        verify(eventPublisher).publishEvent(new BatchInterruptedEvent(USER, ACCOUNT));
+        verify(eventPublisher).publishEvent(new BatchInterruptedEvent(USER.id(), ACCOUNT.id()));
     }
 
     @Test
@@ -1656,7 +1656,7 @@ class TradingServiceTest {
 
         verify(kisPricePort).getPriceSnapshot(Ticker.SOXL, ACCOUNT); // 단건 fallback 시도 확인
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() instanceof IllegalStateException)); // 현재가·전일종가 null → 실패
+                && tee.userId() == null)); // 현재가·전일종가 null → 실패
     }
 
     // ── 연속 정책(cycleSeedType) 재등록 테스트 ─────────────────────────────────
@@ -1750,7 +1750,7 @@ class TradingServiceTest {
 
         verify(strategyCyclePort, never()).save(any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
-                && ibe.user() == null && ACCOUNT.equals(ibe.account()) && ibe.b() != null && ibe.ticker() == Ticker.SOXL));
+                && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId()) && ibe.b() != null && ibe.ticker() == Ticker.SOXL));
     }
 
     @Test
@@ -1902,7 +1902,7 @@ class TradingServiceTest {
 
         verify(strategyCyclePort, never()).save(any());
         // rotateCycleIfConsecutive 내부 catch → notifyError (executeBatch 바깥 catch와 별개)
-        verify(eventPublisher, atLeastOnce()).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee && tee.user() == null));
+        verify(eventPublisher, atLeastOnce()).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee && tee.userId() == null));
     }
 
     // ── filterScheduledStart 경계 테스트 (executeBatch/placeOpenOrders 공통) ───────

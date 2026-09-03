@@ -236,7 +236,7 @@ class TradingService {
     private void notifyBatchInterrupted(List<BatchContext> contexts) {
         contexts.forEach(ctx -> {
             try {
-                eventPublisher.publishEvent(new BatchInterruptedEvent(ctx.user(), ctx.account()));
+                eventPublisher.publishEvent(new BatchInterruptedEvent(ctx.user().id(), ctx.account().id()));
             } catch (Exception notifyEx) {
                 log.warn("[strategyId={}] 인터럽트 알림 발송 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
             }
@@ -448,7 +448,7 @@ class TradingService {
             for (BatchContext ctx : rejectedContexts) {
                 runSafely("예수금 부족 알림", ctx, () -> {
                         eventPublisher.publishEvent(new InsufficientBalanceEvent(
-                                ctx.user(), ctx.account(), null, ctx.strategy().ticker(), ctx.strategy().type()));
+                                ctx.user().id(), ctx.account().id(), null, ctx.strategy().ticker(), ctx.strategy().type()));
                         return null;
                     });
             }
@@ -471,8 +471,8 @@ class TradingService {
             if (ms > 0) Thread.sleep(ms);
         } catch (InterruptedException e) {
             // 배포·재시작으로 인한 강제 종료 — PLANNED 주문이 접수되지 않을 수 있음
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "[스케쥴러 인터럽트] " + label + " 대기 중 강제 종료 — PLANNED 주문 접수 미실행 가능", e)));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "[스케쥴러 인터럽트] " + label + " 대기 중 강제 종료 — PLANNED 주문 접수 미실행 가능"));
             throw e;
         }
         log.info("{} 도달", label);
@@ -556,12 +556,12 @@ class TradingService {
 
     private void notifyErrorSafely(BatchContext ctx, Exception e) {
         try {
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
         } catch (Exception notifyEx) {
             log.warn("[strategyId={}] 관리자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
         }
         try {
-            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user(), e));
+            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user().id(), e.getMessage()));
         } catch (Exception notifyEx) {
             log.warn("[strategyId={}] 사용자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
         }

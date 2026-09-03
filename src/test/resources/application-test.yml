@@ -9,6 +9,12 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false   # event_publication 테이블은 Flyway가 소유 — Modulith 자동 생성 비활성화
+
   jpa:
     hibernate:
       ddl-auto: validate

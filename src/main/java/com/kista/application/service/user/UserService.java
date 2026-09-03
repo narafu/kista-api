@@ -108,7 +108,7 @@ class UserService implements UserUseCase {
             User saved = userPort.save(newUser);
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
-            eventPublisher.publishEvent(new NewUserRegisteredEvent(saved));
+            eventPublisher.publishEvent(new NewUserRegisteredEvent(saved.id()));
             return saved;
         });
     }
@@ -120,7 +120,7 @@ class UserService implements UserUseCase {
         userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
-        eventPublisher.publishEvent(new UserApprovedEvent(updated));
+        eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
     }
 
     @Override
@@ -133,7 +133,7 @@ class UserService implements UserUseCase {
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
-        eventPublisher.publishEvent(new UserRejectedEvent(updated));
+        eventPublisher.publishEvent(new UserRejectedEvent(updated.id()));
         blacklistPort.add(userId, REJECT_BLACKLIST_TTL); // 거절 즉시 AT 차단
         refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
@@ -162,9 +162,9 @@ class UserService implements UserUseCase {
         log.info("사용자 재신청: userId={}", userId);
         // 결과 상태에 맞춰 관리자 승인 요청 또는 사용자 승인 알림과 SSE를 한 번만 발행한다.
         if (approvalRequired) {
-            eventPublisher.publishEvent(new UserReappliedEvent(updated));
+            eventPublisher.publishEvent(new UserReappliedEvent(updated.id()));
         } else {
-            eventPublisher.publishEvent(new UserApprovedEvent(updated));
+            eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
         }
     }
 

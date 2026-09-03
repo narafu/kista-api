@@ -76,7 +76,6 @@ class TradingPriceFetcher {
         }
         // 일괄+단건 fallback 모두 실패한 종목을 모아 알림 1건으로 통지 (실패 종목 수만큼 알림이 반복 발송되는 것 방지)
         List<String> failedTickers = new ArrayList<>();
-        Exception lastFailure = null;
         for (Ticker ticker : tickers) {
             // containsKey가 아닌 값 null 체크 — bulkFetch가 특정 ticker에 null 값을 담아 반환해도 단건 fallback으로 재조회
             if (result.get(ticker) == null) {
@@ -85,13 +84,12 @@ class TradingPriceFetcher {
                 } catch (Exception e) {
                     log.warn("[{}] 단건 {} 조회 실패: {}", ticker.name(), label, e.getMessage());
                     failedTickers.add(ticker.name());
-                    lastFailure = e;
                 }
             }
         }
         if (!failedTickers.isEmpty()) {
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    failedTickers + " " + label + " 조회 실패(일괄+단건 모두 실패)", lastFailure)));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    failedTickers + " " + label + " 조회 실패(일괄+단건 모두 실패)"));
         }
         return result;
     }

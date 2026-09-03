@@ -122,7 +122,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
-                && ACCOUNT.equals(ibe.account()) && ibe.b().usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == Ticker.SOXL));
+                && ACCOUNT.id().equals(ibe.accountId()) && ibe.b().usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == Ticker.SOXL));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
@@ -161,7 +161,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() == kisError));
+                && tee.userId() == null && tee.message().equals(kisError.getMessage())));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
@@ -177,7 +177,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.user() == null && tee.e() instanceof IllegalStateException));
+                && tee.userId() == null));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 

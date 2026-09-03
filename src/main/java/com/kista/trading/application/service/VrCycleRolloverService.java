@@ -47,13 +47,13 @@ class VrCycleRolloverService {
             detail = strategyVrDetailPort.findByStrategyVersionId(cycle.strategyVersionId()).orElse(null);
         } catch (Exception e) {
             log.error("[strategyId={}] VR 롤오버 — 상세 조회 실패", strategy.id(), e);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             return;
         }
         if (cycleVr == null || detail == null) {
             log.warn("[strategyId={}] VR 롤오버 — cycleVr 또는 detail 미존재, skip", strategy.id());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "VR 사이클 상세 누락 strategyId=" + strategy.id() + " cycleId=" + cycle.id())));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR 사이클 상세 누락 strategyId=" + strategy.id() + " cycleId=" + cycle.id()));
             return;
         }
 
@@ -67,8 +67,8 @@ class VrCycleRolloverService {
         // closingPrice 없으면 다음 매매일 재시도 — 알림 후 사이클 유지 (당일 시세 파이프라인 자체가 불통이라는 신호)
         if (closingPrice == null) {
             log.warn("[strategyId={}] VR 롤오버 — 종가 없음, 다음 매매일 재시도", strategy.id());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "VR 롤오버 종가 없음 strategyId=" + strategy.id())));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR 롤오버 종가 없음 strategyId=" + strategy.id()));
             return;
         }
 
@@ -82,13 +82,13 @@ class VrCycleRolloverService {
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
                     strategy.id(), evaluationDate, e);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             return;
         }
         if (evaluationClosingPrice == null) {
             log.warn("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 없음, 다음 매매일 재시도", strategy.id(), evaluationDate);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "VR 롤오버 due일 확정 종가 없음 strategyId=" + strategy.id() + " evaluationDate=" + evaluationDate)));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR 롤오버 due일 확정 종가 없음 strategyId=" + strategy.id() + " evaluationDate=" + evaluationDate));
             return;
         }
 
@@ -105,10 +105,10 @@ class VrCycleRolloverService {
         if (adjustedPool.compareTo(BigDecimal.ZERO) < 0) {
             log.warn("[strategyId={}] VR 롤오버 보류 — 인출 반영 후 예수금 음수 (pool={}, recurringAmount={})",
                     strategy.id(), postBalance.usdDeposit(), recurringAmount);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "VR 인출 반영 후 예수금 음수 — 롤오버 보류: strategyId=" + strategy.id() + " adjustedPool=" + adjustedPool)));
-            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user(),
-                    new IllegalStateException("VR 인출 금액이 예수금을 초과합니다 — 설정 조정 필요: strategyId=" + strategy.id())));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR 인출 반영 후 예수금 음수 — 롤오버 보류: strategyId=" + strategy.id() + " adjustedPool=" + adjustedPool));
+            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user().id(),
+                    "VR 인출 금액이 예수금을 초과합니다 — 설정 조정 필요: strategyId=" + strategy.id()));
             return;
         }
 
@@ -130,10 +130,10 @@ class VrCycleRolloverService {
         //  실제 매수는 항상 pool/poolLimit 실측 잔고 한도 내에서만 이뤄지므로 과다지출 위험이 없다)
         if (newValue.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("[strategyId={}] VR 롤오버 보류 — V′≤0 (newValue={})", strategy.id(), newValue);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, new IllegalStateException(
-                    "VR V′≤0 — 롤오버 보류: strategyId=" + strategy.id() + " newValue=" + newValue)));
-            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user(),
-                    new IllegalStateException("VR V′≤0 — 설정 조정 필요: strategyId=" + strategy.id())));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR V′≤0 — 롤오버 보류: strategyId=" + strategy.id() + " newValue=" + newValue));
+            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user().id(),
+                    "VR V′≤0 — 설정 조정 필요: strategyId=" + strategy.id()));
             return;
         }
 
@@ -163,7 +163,7 @@ class VrCycleRolloverService {
         log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimitRate={}", strategy.id(), newValue, newPoolLimitRate);
 
         // 사용자에게 새 사이클 시작 알림 이벤트 발행 (적립/인출 반영된 개장 예수금)
-        eventPublisher.publishEvent(new NewCycleStartedEvent(ctx.user(), ctx.account(), strategy, adjustedPool));
+        eventPublisher.publishEvent(new NewCycleStartedEvent(ctx.user().id(), ctx.account().id(), strategy, adjustedPool));
     }
 
     // date가 거래일이면 그대로, 아니면 직전 거래일까지 역탐색 (휴장 due일 보정용)

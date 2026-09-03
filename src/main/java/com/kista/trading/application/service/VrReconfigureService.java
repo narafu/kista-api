@@ -127,10 +127,10 @@ class VrReconfigureService implements VrReconfigureUseCase {
         // (향후 @Transactional을 붙이면 리스너가 AFTER_COMMIT으로 지연 실행되어 이 try/catch가 무력화됨에 주의)
         try {
             User user = userPort.findByIdOrThrow(requesterId);
-            eventPublisher.publishEvent(new NewCycleStartedEvent(user, account, strategy, postBalance.usdDeposit()));
+            eventPublisher.publishEvent(new NewCycleStartedEvent(user.id(), account.id(), strategy, postBalance.usdDeposit()));
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
         }
 
         return strategyUseCase.getById(strategyId, requesterId);
