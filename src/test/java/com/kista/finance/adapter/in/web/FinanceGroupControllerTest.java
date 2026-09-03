@@ -7,7 +7,7 @@ import com.kista.domain.model.user.User;
 import com.kista.application.usecase.BlacklistUseCase;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
 import com.kista.application.usecase.UserUseCase;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

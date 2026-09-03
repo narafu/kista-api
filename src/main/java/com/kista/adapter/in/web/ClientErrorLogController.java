@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.ClientErrorLogRequest;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;

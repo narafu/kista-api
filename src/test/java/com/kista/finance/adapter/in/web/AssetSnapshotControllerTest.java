@@ -8,7 +8,7 @@ import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
 import com.kista.application.usecase.BlacklistUseCase;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.finance.application.port.output.FinanceAccountPort;
 import com.kista.finance.application.port.output.FinanceCategoryPort;
 import org.junit.jupiter.api.Test;

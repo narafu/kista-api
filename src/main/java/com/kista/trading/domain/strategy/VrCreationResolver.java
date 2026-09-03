@@ -1,7 +1,5 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.domain.model.settings.RecurringMode;
-import com.kista.domain.model.settings.StrategyCreationSettings;
 import com.kista.domain.model.strategy.RegisterStrategyCommand;
 import com.kista.domain.model.strategy.Strategy;
 import org.springframework.stereotype.Component;

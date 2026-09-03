@@ -31,7 +31,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class,

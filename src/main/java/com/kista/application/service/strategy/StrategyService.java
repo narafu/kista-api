@@ -5,10 +5,11 @@ import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.settings.StrategyCreationSettings;
+import com.kista.admin.domain.model.StrategyCreationSettings;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.user.UserSettings;
 import com.kista.application.usecase.StrategyUseCase;
+import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.MarginPort;
@@ -148,11 +149,42 @@ class StrategyService implements StrategyUseCase {
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
     // 전략 타입별 필드 해석은 CycleOrderStrategy와 동일한 capability 패턴(StrategyCreationResolvers)에 위임한다.
     private ResolvedCreation resolveCreationSettings(RegisterStrategyCommand cmd) {
+        // 레거시 런타임 설정 타입 조회 (Task 2 이후: com.kista.admin.domain.model.StrategyCreationSettings)
         StrategyCreationSettings settings = runtimeSettingsPort.load().strategies().get(cmd.type());
         if (!settings.enabled()) {
             throw new IllegalArgumentException("비활성화된 전략 유형은 새로 등록할 수 없습니다: " + cmd.type());
         }
-        return creationResolvers.of(cmd.type()).resolve(cmd, settings);
+        // 모듈 경계 매핑 — resolver(trading)는 자체 타입만 받는다
+        return creationResolvers.of(cmd.type()).resolve(cmd, toTradingSettings(settings));
+    }
+
+    // 레거시(추후 admin) StrategyCreationSettings → trading 자체 타입. 필드 구조 동일, RecurringMode만 valueOf(name()).
+    private static com.kista.trading.domain.strategy.StrategyCreationSettings toTradingSettings(StrategyCreationSettings s) {
+        return new com.kista.trading.domain.strategy.StrategyCreationSettings(
+                s.enabled(),
+                mapField(s.ticker()),
+                mapField(s.divisionCount()),
+                mapRecurringField(s.recurringMode()),
+                mapField(s.bandWidth()),
+                mapField(s.intervalWeeks()));
+    }
+
+    // 동일 원소 타입 필드는 그대로 재래핑 — trading StrategyFieldSettings 생성자가 List.copyOf로 불변 복제한다.
+    private static <T> com.kista.trading.domain.strategy.StrategyFieldSettings<T> mapField(
+            com.kista.admin.domain.model.StrategyFieldSettings<T> f) {
+        if (f == null) return null;
+        return new com.kista.trading.domain.strategy.StrategyFieldSettings<>(
+                f.customizable(), f.allowedValues(), f.defaultValue());
+    }
+
+    // RecurringMode는 상수명 byte-identical이라 valueOf(name())으로 trading enum에 매핑한다.
+    private static com.kista.trading.domain.strategy.StrategyFieldSettings<com.kista.trading.domain.strategy.RecurringMode> mapRecurringField(
+            com.kista.admin.domain.model.StrategyFieldSettings<com.kista.admin.domain.model.RecurringMode> f) {
+        if (f == null) return null;
+        return new com.kista.trading.domain.strategy.StrategyFieldSettings<>(
+                f.customizable(),
+                f.allowedValues().stream().map(m -> com.kista.trading.domain.strategy.RecurringMode.valueOf(m.name())).toList(),
+                com.kista.trading.domain.strategy.RecurringMode.valueOf(f.defaultValue().name()));
     }
 
     // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException

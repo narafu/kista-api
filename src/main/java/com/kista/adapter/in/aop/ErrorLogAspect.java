@@ -1,6 +1,6 @@
 package com.kista.adapter.in.aop;
 
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;

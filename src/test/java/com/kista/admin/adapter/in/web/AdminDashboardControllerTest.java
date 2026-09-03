@@ -1,0 +1,58 @@
+package com.kista.admin.adapter.in.web;
+
+import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.adapter.in.web.security.JwtAuthFilter;
+import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.admin.domain.model.AdminStats;
+import com.kista.admin.application.usecase.AdminQueryUseCase;
+import com.kista.application.usecase.BlacklistUseCase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.UUID;
+
+import static com.kista.support.WebMvcTestSupport.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.admin.application.port.output.AppErrorLogPort;
+
+@WebMvcTest(AdminDashboardController.class)
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Execution(ExecutionMode.SAME_THREAD)
+class AdminDashboardControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean AdminQueryUseCase adminQuery;
+
+    private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    @Test
+    void getStats_withAdminToken_returns200() throws Exception {
+        when(adminQuery.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
+
+        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalUsers").value(10))
+                .andExpect(jsonPath("$.pendingCount").value(3))
+                .andExpect(jsonPath("$.totalAccounts").value(7));
+    }
+
+    @Test
+    void getStats_withUserToken_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(userTokenWithRole(UUID.randomUUID()))))
+                .andExpect(status().isForbidden());
+    }
+}

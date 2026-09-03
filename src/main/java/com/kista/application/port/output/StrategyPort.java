@@ -1,6 +1,6 @@
 package com.kista.application.port.output;
 
-import com.kista.domain.model.admin.AdminCycleStrategySummary;
+import com.kista.admin.domain.model.AdminCycleStrategySummary;
 import com.kista.domain.model.strategy.Strategy;
 
 import java.util.Collection;

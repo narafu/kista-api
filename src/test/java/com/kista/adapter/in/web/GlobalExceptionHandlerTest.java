@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;

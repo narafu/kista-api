@@ -12,7 +12,7 @@ import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -6,7 +6,7 @@ import com.kista.domain.model.account.RegisterAccountCommand;
 import com.kista.domain.model.account.UpdateAccountCommand;
 import com.kista.application.usecase.AccountUseCase;
 import com.kista.application.port.output.AccountPort;
-import com.kista.application.port.output.RuntimeSettingsPort;
+import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

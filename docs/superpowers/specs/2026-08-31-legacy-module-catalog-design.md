@@ -22,7 +22,7 @@ v1은 grep 스팟체크로 "어느 후보가 싼가"를 예측했는데, 이 방
 |---|---|---|---|
 | **market** | 없음[^1] | forward만 존재(FearGreedService→notify, MarketHolidayService→broker), backward 0건 | 즉시 착수 가능 |
 | **stats**(+backtest+portfolio) | ~~없음~~ → **있음**(실측 정정)[^5] | forward 다수(broker/trading 전역 소비). backward: notify의 `TelegramBotService`가 `PortfolioUseCase` 참조 — 이 표는 "단방향이라 순환 아님"으로 판정했으나, `PortfolioUseCase`가 stats 모듈로 이동하면서 기존 `stats→notify`(`HousingBenchmarkService`/`HousingPriceIndexService`의 `notifyError`)와 합쳐져 `stats↔notify` 직접 2-cycle이 됐다 | 작음 — `stats→notify` 2곳을 `StatsAlertRaisedEvent` 발행으로 전환하면 해소(market/privacy 선례) |
-| **admin** | 없음 | forward 다수(broker/trading/account/strategy-config/stats까지), backward 0건(usecase 6개·port 2개까지 정밀 확인) | 즉시 착수 가능 |
+| **admin** | ~~없음~~ → **있음**(실측 정정)[^6] | forward 다수(broker/trading/account/strategy-config/stats까지). backward: 이 표는 "0건"으로 판정했으나 사전 실측 결과 `trading↔admin` 순환 실재 — 레거시 `StrategyService`/`*CreationResolver` 4파일이 `domain/model/settings`(admin 이전 대상)를 소비 ↔ admin이 trading `Order`/`StrategyCycle` 소비. stats [^5]와 동류(이동 대상 타입의 backward 참조가 이동 후 방향 뒤집힘) | 작음 — Task 1에서 trading own-type로 해소(broker `Direction`/privacy `PrivacyOrderType` 3번째 인스턴스) |
 | **privacy** | **있음**(v1에서 놓쳤던 발견)[^4] | privacy **6개** 파일(`PrivacyTradeBase`/`FidaOrderCommand`/`PrivacyTradeValidationService`/`PrivacyTradePersistenceAdapter`/`PrivacyTradeBaseOrderEntity`/`FidaOrderResponse`)이 `trading.domain.model.Order`(nested enum + 주문 4필드)를 그대로 빌려씀(forward) ↔ trading 18개 파일(main 13 + test 5)이 `PrivacyTradeBase`/`PrivacyTradePort` 참조(backward, 실제 코드 변경은 `PrivacyStrategy` 1개 — 나머지는 import 경로 기계적 교체) | 작음 — privacy가 자체 타입(`PrivacyOrderType`/`PrivacyOrderDirection`/`FidaPlannedOrder`)으로 교체하면 forward 자체가 사라짐 |
 | **user**(+auth) | **있음**(notify만) | `User` 전체 레코드가 notify `UserNotificationPort` 13개 메서드에 직접 시그니처로 박혀있음(backward). forward는 `UserProfileService`→notify(`FcmDeviceTokenPort`/`TelegramBotInfoPort`) 1개 파일. `User`의 nested enum(UserRole/UserStatus/NotificationChannel)은 이미 CLOSED 4모듈 포트에 0건 — Strategy/Account보다 훨씬 깨끗함. user↔trading·user↔finance는 순환 아님(단방향) | 중간 — notify 13개 메서드를 EPR 이벤트 전환 때 이미 쓴 패턴(User 전체 대신 UUID+포트 재조회)으로 통일하면 해소 |
 | **account** | **있음** | forward: `AccountService.register()`의 `BrokerConnectionTesters` 호출 1곳(정당) + `AccountStatisticsService`/`TossStatisticsService`/`BrokerStatisticsRouter`(통계 서비스, 성격상 stats 소유가 맞음) 3곳. backward: `Account` 전체 레코드가 broker 포트 8개(`BrokerPricePort`×6메서드/`LiveBalancePort`/`SellableQuantityPort`/`BrokerOrderCorrectionPort`×2/`BrokerAccountPort`/`MarginPort`×2/`ExecutionPort`) + notify 2개(`UserNotificationPort`×5/`NotifyPort`×1) + trading 1개(`TradingExecutionUseCase.execute`) 시그니처에 직접 박혀있음 | 중간 — 통계 서비스 3개를 stats로 재배치하면 forward가 1곳으로 축소(공짜). backward(broker 8개 포트)는 별도 리트로핏 필요 |
@@ -39,7 +39,7 @@ v1은 grep 스팟체크로 "어느 후보가 싼가"를 예측했는데, 이 방
 | 쌍 | 결과 | 원인 |
 |---|---|---|
 | user↔account | **순환 아님**(재확인 결과 오탐 정정) | `AccountUseCase.listByUser(UUID userId)`의 메서드명 "User" 텍스트를 초기 grep이 오탐 |
-| user↔admin | **순환**(settings 재분류로 해소) | 원인 파일 1개: `RuntimeSettingsService`(`RuntimeSettingsUseCase`+`AdminSettingsUseCase` 동시 구현, `AuditLogPort` 사용) — settings를 user가 아니라 admin으로 재분류하면 해소 |
+| user↔admin | **순환**(부분만 해소, 스펙 v1 4번째 오판) | v1은 "settings 재분류로 해소"라 적었으나 부정확 — 원인이 셋: ① `RuntimeSettingsService`(재분류로 해소됨) ② `AdminUserViewAdapter implements AdminUserViewPort`(미래 `user→admin`, 재분류와 무관) ③ `UserService.runtimeSettingsPort`(미래 `user→admin`, settings를 admin으로 옮겨도 안 사라짐). ②③은 현재 user 레거시 OPEN이라 하드 순환은 아니지만 step 3에서 own-type/이벤트 처리 필요 |
 | user↔strategy | **순환**(부분 해소 가능) | user→strategy 5개 중 3개는 settings 관련(위와 동일 재분류로 해소), 나머지는 `UserCascadeDeleter`(탈퇴 cascade가 `StrategyPort` 직접 호출) ↔ `StrategyService`(등록 시 `UserSettings.balanceCheckEnabled` 조회, 정당한 forward) — cascade 방향만 별도 처리 필요(아래 참고) |
 | account↔strategy | **순환**(부분 해소 가능) | `AccountService`(계좌 삭제 cascade가 `StrategyPort.deleteByAccountId()` 호출) ↔ `StrategyService`(등록 시 `Account`/`AccountPort` 조회, 정당한 forward) — 마찬가지로 cascade 방향만 별도 처리 |
 | privacy↔strategy, privacy↔account, privacy↔user, privacy↔admin | 순환 없음(단방향 또는 무관계) | |
@@ -56,7 +56,7 @@ v1은 grep 스팟체크로 "어느 후보가 싼가"를 예측했는데, 이 방
 - **privacy** (FIDA 기준 매매표 — PRIVACY 전략 실행 로직과는 별개 실체)
 - **market**
 - **stats** (+backtest, +portfolio 흡수)
-- **admin** (+settings 흡수 — v1에서는 user에 붙였으나 실측 결과 admin이 맞음, "결합도 실측 — 후보 간 순환" 표 참고)
+- **admin** (settings API/service/persistence(RuntimeSettings 계열)만 흡수 — v1에서는 user에 붙였으나 실측 결과 admin이 맞음, "결합도 실측 — 후보 간 순환" 표 참고. `domain/model/settings` 6타입 중 trading 소비 3개(`StrategyCreationSettings`/`StrategyFieldSettings`/`RecurringMode`)는 trading own-type, `UserSettings*`/`UserNotificationPref*`는 user 몫으로 레거시 잔류, `SettingsController`는 user 셀프서비스라 레거시 잔류)
 
 모듈 내부 구조 템플릿·포트 위치(`application/usecase`+`application/port/output`)·`common/` 비-모듈 유지 정책은 기존 4모듈과 동일하게 따른다.
 
@@ -72,7 +72,7 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 
 ## 착수 순서 (실측 기반, v2)
 
-1. **market**[^2], stats(+backtest+portfolio)[^5], admin(+settings) — (market/stats 착수 완료). 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능.
+1. **market**[^2], stats(+backtest+portfolio)[^5], admin(+settings)[^6] — ✅ **1단계 전부 완료**. 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능이었음. (2단계 privacy도 완료 — 다음은 3단계 user.)
 2. **privacy**[^3] — trading.Order 직접 참조 4개 파일을 자체 타입으로 교체 후 착수. 소규모.
 3. **user(+auth)** — notify `UserNotificationPort` 13개 메서드 + `NotifyPort`류를 EPR 이벤트 전환 때 쓴 ID+포트재조회 패턴으로 통일 후 착수. nested enum 3개 sharedkernel 이관도 이 단계에서 함께.
 4. **account, strategy-config** — 서로 얽혀있어 분리 착수 어려움, 묶어서 별도 서브스펙 진행:
@@ -85,6 +85,8 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 [^2]: ✅ 완료(2026-08-31, commit 범위는 이 계획의 6개 태스크 — `2026-08-31-modulith-market-migration` 실행 계획, 실측 발견된 순환 2건 해소 태스크 포함).
 
 [^3]: ✅ 완료(2026-08-31, `2026-08-31-modulith-privacy-migration` 실행 계획 5개 태스크). CLOSED 6번째 모듈, 4개 NamedInterface("domain"/"port"/"usecase"/"event"). 아래 "결합도 실측" 표 privacy 행 각주 참고 — forward 6개 파일, 순환 2건 해소.
+
+[^6]: ✅ 완료(2026-09-01, `2026-09-01-modulith-admin-migration` 실행 계획 5개 태스크). CLOSED 8번째 모듈, 3개 NamedInterface("domain"/"usecase"/"port" — event 없음: `admin→notify` 0건이라 `X→notify→trading→X` 전이 순환이 구조적으로 불성립, market/privacy/stats의 이벤트 전환 태스크에 대응하는 작업이 없었다). **실측 정정**: 이 표는 admin backward를 "0건"으로 판정했으나 사전 실측 결과 `trading↔admin` 순환이 실재했다 — 레거시 `StrategyService`/`*CreationResolver` 4파일이 `domain/model/settings`(admin 이전 대상)를 소비 ↔ admin이 trading `Order`/`StrategyCycle` 소비. `[^5]`(stats)와 동류 사례이나 이번엔 **이전 선언 전에** 실측으로 특정해 Task 1에서 trading own-type(`com.kista.trading.domain.strategy.{StrategyCreationSettings,StrategyFieldSettings,RecurringMode}`, broker `Direction`/privacy `PrivacyOrderType` 3번째 인스턴스)로 선제 해소했다 — mid-migration 발견이 아닌 첫 pre-emptive 사례. `[^4]`(privacy)가 권고한 "임시 `@ApplicationModule` 선언 + `ApplicationModules.verify()` 1회 실행으로 전이 순환 기계적 노출"을 이행했고 예측 못한 전이 순환은 0건 — pairwise 분석이 이번엔 처음으로 새지 않았다. **다음 모듈(user) 착수 시 교훈**: 이동 대상 타입의 backward 참조를 이전 선언 전에 재확인하는 규칙(`[^5]`)이 프로스펙티브하게 적용됐을 때 실제로 순환을 사전 포착했다 — 규칙이 작동한다.
 
 [^5]: ✅ 완료(2026-09-01, `2026-09-01-modulith-stats-migration` 실행 계획 4개 태스크). CLOSED 7번째 모듈, 5개 NamedInterface("domain"/"usecase"/"port"/"event"/"schedule" — "schedule"은 `AdminSchedulerController`가 KbLand 스케쥴러를 직접 주입하는 trading 선례와 동일). **실측 정정**: 이 표는 stats를 "순환 없음"으로 판정했으나 사전 실측 결과 `stats↔notify` 직접 2-cycle이 실재했다 — `notify→stats`(`TelegramBotService`→`PortfolioUseCase`)는 표의 "단방향이라 순환 아님" 판정이 그 시점엔 옳았지만, `PortfolioUseCase`가 stats로 이동하면서 기존 `stats→notify`(`HousingBenchmarkService`/`HousingPriceIndexService`의 `NotifyPort.notifyError`)와 방향이 맞물렸다. Task 3에서 `StatsAlertRaisedEvent`/`StatsAlertNotifier` 이벤트 전환으로 해소(market `FearGreedFetchFailedEvent`, privacy `PrivacyAlertRaisedEvent`와 동일 패턴 — 3번째 인스턴스). **다음 모듈(user) 착수 시 교훈**: 이 표가 "단방향이라 안전"으로 적은 forward/backward도, 참조되는 타입 자체가 이동 대상이면 이동 후 방향이 뒤집혀 순환이 될 수 있으니 CLOSED 전환 전 재확인.
 

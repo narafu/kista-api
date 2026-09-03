@@ -1,0 +1,63 @@
+package com.kista.admin.adapter.in.web;
+
+import com.kista.adapter.in.web.security.InternalTokenAuthFilter;
+import com.kista.adapter.in.web.security.JwtAuthFilter;
+import com.kista.adapter.in.web.security.SecurityConfig;
+import com.kista.application.usecase.BlacklistUseCase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.UUID;
+
+import static com.kista.support.WebMvcTestSupport.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.admin.application.port.output.AppErrorLogPort;
+
+@WebMvcTest(AdminPingController.class)
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Execution(ExecutionMode.SAME_THREAD)
+class AdminPingControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean AppErrorLogPort appErrorLogPort;
+    @MockitoBean
+    private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
+    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+
+    private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    @Test
+    void ping_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void ping_userToken_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping")
+                        .with(authentication(userTokenWithRole(USER_UUID))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ping_adminToken_returns200() throws Exception {
+        mockMvc.perform(get("/api/admin/_ping")
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.adminId").value(ADMIN_UUID.toString()));
+    }
+}

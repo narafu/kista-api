@@ -3,7 +3,7 @@ package com.kista.adapter.in.aop;
 import com.kista.domain.model.account.Account;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

@@ -7,7 +7,7 @@ import com.kista.stats.domain.model.backtest.BacktestSummary;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.stats.application.usecase.BacktestUseCase;
 import com.kista.application.usecase.BlacklistUseCase;
-import com.kista.application.port.output.AppErrorLogPort;
+import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

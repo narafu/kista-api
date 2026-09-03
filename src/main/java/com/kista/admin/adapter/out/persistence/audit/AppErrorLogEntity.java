@@ -1,0 +1,42 @@
+package com.kista.admin.adapter.out.persistence.audit;
+
+import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.type.SqlTypes;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "app_error_logs", schema = "public")
+@SQLRestriction("deleted_at IS NULL")
+@Getter
+@Setter(AccessLevel.PACKAGE)
+@NoArgsConstructor
+@AllArgsConstructor
+class AppErrorLogEntity extends BaseCreatedAtEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(updatable = false)
+    private UUID id;
+
+    @Column(name = "error_type", nullable = false, length = 255)
+    private String errorType; // 예외 클래스 단순명
+
+    @Column(columnDefinition = "TEXT")
+    private String message; // e.getMessage()
+
+    @Column(name = "stack_trace", columnDefinition = "TEXT")
+    private String stackTrace; // 전체 스택트레이스
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String context; // 발생 위치 메타 JSON
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // 소프트 삭제 일시 (null = 활성)
+}
