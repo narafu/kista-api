@@ -7,7 +7,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
@@ -125,7 +125,7 @@ class TossOrderApiTest {
     @Test
     @DisplayName("취소: POST /api/v1/orders/{externalOrderId}/cancel")
     void cancel_callsPostCancelWithOrderId() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-123");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "toss-oid-123");
 
         tossOrderApi.cancel(instruction, ACCOUNT);
 
@@ -135,7 +135,7 @@ class TossOrderApiTest {
     @Test
     @DisplayName("취소 실패(500)는 그대로 전파된다")
     void cancel_serverError_rethrows() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-500");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "toss-oid-500");
         doThrow(new TossApiException("Toss API 요청 실패: 500", new RuntimeException("boom")))
             .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
@@ -146,7 +146,7 @@ class TossOrderApiTest {
     @Test
     @DisplayName("취소 실패(404)도 이미 체결/만료로 추정하지 않고 그대로 전파된다")
     void cancel_notFound_rethrows() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "toss-oid-404");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "toss-oid-404");
         doThrow(new TossApiException("Toss API 오류: 404 NOT_FOUND", new RuntimeException("not found")))
             .when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
 
@@ -168,7 +168,7 @@ class TossOrderApiTest {
             .thenReturn(wrapOrders(openResp));
 
         List<Execution> executions = tossOrderApi.getExecutions(
-            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         Execution e = executions.get(0);
@@ -177,7 +177,7 @@ class TossOrderApiTest {
         assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
         assertThat(e.direction()).isEqualTo(Direction.BUY);
         assertThat(e.externalOrderId()).isEqualTo("oid-1");
-        assertThat(e.ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
     }
 
     @Test
@@ -195,7 +195,7 @@ class TossOrderApiTest {
             .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tossOrderApi.getExecutions(
-            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).isEmpty();
     }
@@ -213,7 +213,7 @@ class TossOrderApiTest {
             .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tossOrderApi.getExecutions(
-            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).direction()).isEqualTo(Direction.SELL);
@@ -234,7 +234,7 @@ class TossOrderApiTest {
             .thenReturn(wrapOrders(openResp));
 
         List<Execution> result = tossOrderApi.getExecutions(
-            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), Ticker.SOXL, ACCOUNT);
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).amountUsd()).isEqualByComparingTo("50.00");
@@ -243,14 +243,14 @@ class TossOrderApiTest {
     // --- helpers ---
 
     private OrderInstruction locBuyInstruction() {
-        return new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 2, new BigDecimal("25.50"));
+        return new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LOC, 2, new BigDecimal("25.50"));
     }
 
     private OrderInstruction mocSellInstruction() {
-        return new OrderInstruction(Ticker.SOXL, Direction.SELL, OrderType.MOC, 1, BigDecimal.ZERO);
+        return new OrderInstruction(StrategyTicker.SOXL, Direction.SELL, OrderType.MOC, 1, BigDecimal.ZERO);
     }
 
     private OrderInstruction limitBuyInstruction() {
-        return new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
+        return new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
     }
 }

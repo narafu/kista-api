@@ -8,8 +8,8 @@ import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.StrategyCreationSettings;
 import com.kista.admin.domain.model.StrategyFieldSettings;
 import com.kista.stats.domain.model.EtfBenchmarkSymbol;
-import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.Strategy.Type;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -25,8 +25,8 @@ public record AdminSettingsRequest(
         @NotNull @Valid AuthRequest auth,
         @Schema(description = "증권사별 신규 등록/연결 테스트 활성화 설정 (key=Broker)")
         @NotNull Map<Broker, @Valid BrokerRequest> brokers,
-        @Schema(description = "전략별 신규 생성 정책 설정 (key=Type)")
-        @NotNull Map<Type, @Valid StrategyRequest> strategies,
+        @Schema(description = "전략별 신규 생성 정책 설정 (key=StrategyType)")
+        @NotNull Map<StrategyType, @Valid StrategyRequest> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
         @Valid BenchmarkRequest benchmarks
 ) {
@@ -35,7 +35,7 @@ public record AdminSettingsRequest(
         Map<Broker, RuntimeSettings.BrokerSettings> brokerSettings = new EnumMap<>(Broker.class);
         brokers.forEach((key, value) -> brokerSettings.put(key,
                 new RuntimeSettings.BrokerSettings(require(value, "broker").enabled())));
-        Map<Type, StrategyCreationSettings> strategySettings = new EnumMap<>(Type.class);
+        Map<StrategyType, StrategyCreationSettings> strategySettings = new EnumMap<>(StrategyType.class);
         strategies.forEach((key, value) -> strategySettings.put(key,
                 require(value, "strategy").toDomain(key)));
         BenchmarkSettings benchmarkSettings = benchmarks != null ? benchmarks.toDomain() : null;
@@ -63,7 +63,7 @@ public record AdminSettingsRequest(
             @Schema(description = "전략별 생성 필드 설정")
             @NotNull @Valid FieldRequests fields
     ) { // 전략 생성 관리자 입력
-        StrategyCreationSettings toDomain(Type type) {
+        StrategyCreationSettings toDomain(StrategyType type) {
             FieldRequests value = require(fields, type.name() + " fields");
             return switch (type) {
                 case INFINITE -> new StrategyCreationSettings(enabled,
@@ -79,7 +79,7 @@ public record AdminSettingsRequest(
 
     public record FieldRequests(
             @Schema(description = "종목 생성 필드 설정")
-            @Valid FieldRequest<Ticker> ticker,
+            @Valid FieldRequest<StrategyTicker> ticker,
             @Schema(description = "무한매수 분할 수 필드 설정 (INFINITE 전용)")
             @Valid FieldRequest<Integer> divisionCount,
             @Schema(description = "VR 정기 입출금 방향 필드 설정 (VR 전용)")
@@ -89,7 +89,7 @@ public record AdminSettingsRequest(
             @Schema(description = "VR 롤오버 주기 필드 설정 (주 단위, VR 전용)")
             @Valid FieldRequest<Integer> intervalWeeks
     ) { // 전략별 관리자 생성 필드 입력
-        StrategyFieldSettings<Ticker> tickerValue() { return require(ticker, "ticker").toDomain(); }
+        StrategyFieldSettings<StrategyTicker> tickerValue() { return require(ticker, "ticker").toDomain(); }
 
         StrategyFieldSettings<Integer> divisionCountValue() {
             FieldRequest<Integer> value = require(divisionCount, "divisionCount");

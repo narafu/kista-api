@@ -5,7 +5,7 @@ import com.kista.broker.adapter.out.internal.PrevCloseCache;
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.common.TimeZones;
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossCandle;
 import com.kista.broker.domain.model.toss.TossStockInfo;
 import lombok.RequiredArgsConstructor;
@@ -46,12 +46,12 @@ class TossPriceApi implements CommonMarketPriceFeed {
     private final PrevCloseCache prevCloseCache = new PrevCloseCache();
     private final TossStockInfoCache stockInfoCache = new TossStockInfoCache(Duration.ofHours(6), Instant::now);
 
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers) {
+    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
         // symbols 쿼리 파라미터: 콤마 구분 종목 코드 목록
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("symbols", tickers.stream().map(Ticker::name).collect(Collectors.joining(",")));
+        params.add("symbols", tickers.stream().map(StrategyTicker::name).collect(Collectors.joining(",")));
 
         // 공통 API — 관리자 토큰 사용
         TossResult<List<PriceItem>> wrapper = tossHttpClient.getCommon(PRICES_PATH, params,
@@ -61,23 +61,23 @@ class TossPriceApi implements CommonMarketPriceFeed {
         if (items == null) return Map.of();
 
         return items.stream()
-                .flatMap(item -> Ticker.tryParse(item.symbol())  // Ticker 외 종목(예: AAPL) silent drop
+                .flatMap(item -> StrategyTicker.tryParse(item.symbol())  // StrategyTicker 외 종목(예: AAPL) silent drop
                         .map(t -> Map.entry(t, new BigDecimal(item.lastPrice())))
                         .stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    public BigDecimal getPrice(Ticker ticker) {
+    public BigDecimal getPrice(StrategyTicker ticker) {
         // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일
         return getPrices(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
     }
 
-    public PriceSnapshot getPriceSnapshot(Ticker ticker) {
+    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker) {
         BigDecimal price = getPrice(ticker);
         return new PriceSnapshot(price, fetchPrevCloseCached(ticker.name()).orElse(price));
     }
 
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers) {
+    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers) {
         return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
@@ -86,16 +86,16 @@ class TossPriceApi implements CommonMarketPriceFeed {
 
     // 전일종가만 필요한 경우 — 현재가 API(/api/v1/prices) 미호출, 캔들 API만 호출
     // 캔들 조회가 실패한 종목만 현재가로 fallback (드문 경우라 별도 배치 호출로 보충)
-    public BigDecimal getPrevClose(Ticker ticker) {
+    public BigDecimal getPrevClose(StrategyTicker ticker) {
         return getPrevCloses(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
     }
 
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers) {
+    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-        List<Ticker> needsFallback = new ArrayList<>();
-        for (Ticker ticker : tickers) {
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
+        List<StrategyTicker> needsFallback = new ArrayList<>();
+        for (StrategyTicker ticker : tickers) {
             fetchPrevCloseCached(ticker.name())
                     .ifPresentOrElse(
                             prevClose -> result.put(ticker, prevClose),
@@ -168,7 +168,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
 
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
     // 애프터마켓 체결 포함 여부는 Toss 캔들 API 스펙상 정규장 마감 기준 확정 봉으로 간주 — 봉 없으면 현재가 폴백
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate) {
+    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
         try {
             return tossCandleApi.getCandles(ticker.name(), "1d", tradeDate, tradeDate).stream()
                     .filter(c -> c.date().equals(tradeDate))
@@ -200,13 +200,13 @@ class TossPriceApi implements CommonMarketPriceFeed {
 
     // ── TossStockInfoPort ──────────────────────────────────────────────────────
 
-    public TossStockInfo getStockInfo(Ticker ticker) {
+    public TossStockInfo getStockInfo(StrategyTicker ticker) {
         return stockInfoCache.getOrFetch(ticker.name(), () -> fetchStockInfoUncached(ticker))
                 .orElseGet(() -> new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", ""));
     }
 
     // stocks API 직접 호출 — 성공 응답만 Optional에 담아 캐싱, 실패/empty는 Optional.empty 반환
-    private Optional<TossStockInfo> fetchStockInfoUncached(Ticker ticker) {
+    private Optional<TossStockInfo> fetchStockInfoUncached(StrategyTicker ticker) {
         // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", ticker.name());

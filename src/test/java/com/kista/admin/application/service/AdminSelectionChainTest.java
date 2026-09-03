@@ -23,6 +23,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.NotificationChannel;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminSelectionChain 단위 테스트")
@@ -49,14 +53,14 @@ class AdminSelectionChainTest {
     }
 
     private Strategy strategy() {
-        return new Strategy(strategyId, accountId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        return new Strategy(strategyId, accountId, StrategyType.INFINITE, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
     // account/strategy 소속과 무관한 임의 계좌의 주문
     private Order order(UUID orderAccountId) {
         return new Order(UUID.randomUUID(), orderAccountId, UUID.randomUUID(), LocalDate.now(),
-                Strategy.Ticker.SOXL, Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
+                StrategyTicker.SOXL, Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
                 10, BigDecimal.TEN, Order.OrderStatus.PLANNED, null, null, null);
     }
 
@@ -101,8 +105,8 @@ class AdminSelectionChainTest {
         User user = user();
         Account account = account();
         // strategy가 다른 계좌에 속함
-        Strategy strategy = new Strategy(strategyId, UUID.randomUUID(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, UUID.randomUUID(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(account);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);

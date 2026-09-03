@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -36,7 +36,7 @@ class PreviewDepositCache {
         }
     }
 
-    BigDecimal getUsdDeposit(Account account, Ticker probeTicker) {
+    BigDecimal getUsdDeposit(Account account, StrategyTicker probeTicker) {
         Instant now = Instant.now();
         Entry cached = cache.get(account.id());
         if (cached != null && cached.isValid(now)) {

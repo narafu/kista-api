@@ -16,6 +16,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
 
 @ExtendWith(MockitoExtension.class)
 class BuyPriorityOrderingTest {
@@ -24,13 +25,13 @@ class BuyPriorityOrderingTest {
     @Mock CycleOrderStrategy infiniteStrategy;
 
     // 정렬 대상 최소 형태 — strategyId/cycleId/type/amount만 있으면 됨
-    record Candidate(UUID strategyId, UUID cycleId, Strategy.Type type, BigDecimal amount) {}
+    record Candidate(UUID strategyId, UUID cycleId, StrategyType type, BigDecimal amount) {}
 
     @Test
     void comparator_ordersByPriorityThenAmountThenIds() {
-        when(vrStrategy.cycleType()).thenReturn(Strategy.Type.VR);
+        when(vrStrategy.cycleType()).thenReturn(StrategyType.VR);
         lenient().when(vrStrategy.allocationPriority()).thenReturn(0);
-        when(infiniteStrategy.cycleType()).thenReturn(Strategy.Type.INFINITE);
+        when(infiniteStrategy.cycleType()).thenReturn(StrategyType.INFINITE);
         lenient().when(infiniteStrategy.allocationPriority()).thenReturn(1);
         CycleOrderStrategies strategies = new CycleOrderStrategies(List.of(vrStrategy, infiniteStrategy));
 
@@ -38,9 +39,9 @@ class BuyPriorityOrderingTest {
         UUID id2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
         UUID id3 = UUID.fromString("00000000-0000-0000-0000-000000000003");
 
-        Candidate infiniteBig = new Candidate(id3, id3, Strategy.Type.INFINITE, new BigDecimal("500"));
-        Candidate vrSmall = new Candidate(id1, id1, Strategy.Type.VR, new BigDecimal("100"));
-        Candidate vrBig = new Candidate(id2, id2, Strategy.Type.VR, new BigDecimal("300"));
+        Candidate infiniteBig = new Candidate(id3, id3, StrategyType.INFINITE, new BigDecimal("500"));
+        Candidate vrSmall = new Candidate(id1, id1, StrategyType.VR, new BigDecimal("100"));
+        Candidate vrBig = new Candidate(id2, id2, StrategyType.VR, new BigDecimal("300"));
 
         Comparator<Candidate> comparator = BuyPriorityOrdering.comparator(
                 strategies, Candidate::type, Candidate::amount, Candidate::strategyId, Candidate::cycleId);

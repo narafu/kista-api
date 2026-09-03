@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.UUID;
 import java.util.function.Function;
+import com.kista.sharedkernel.StrategyType;
 
 // BUY 예산 배정 우선순위 정렬 규칙의 단일 소스
 // TradingOrderBudgetAllocator(실제 야간 배치)와 TradingBuyCompetitionSimulator(미리보기 시뮬레이션)가
@@ -18,7 +19,7 @@ final class BuyPriorityOrdering {
 
     // 타입 우선순위(작을수록 먼저) → 금액 오름차순 → strategyId → cycleId
     static <T> Comparator<T> comparator(CycleOrderStrategies cycleOrderStrategies,
-                                         Function<T, Strategy.Type> typeFn,
+                                         Function<T, StrategyType> typeFn,
                                          Function<T, BigDecimal> amountFn,
                                          Function<T, UUID> strategyIdFn,
                                          Function<T, UUID> cycleIdFn) {

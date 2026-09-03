@@ -1,5 +1,5 @@
 package com.kista.broker.domain.model;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,7 +14,7 @@ public record PresentBalanceResult(
         BigDecimal exchangeRateKrwPerUsd  // 환율 (1 USD = ? KRW, TOSS: 실값, KIS: margin 조회값)
 ) {
     public record Item(
-            Ticker ticker,             // pdno: 종목코드
+            StrategyTicker ticker,             // pdno: 종목코드
             int holdings,              // cblc_qty13: 잔고수량
             BigDecimal avgPrice,       // avg_unpr3: 평균단가
             BigDecimal currentPrice,   // ovrs_now_pric1: 현재가
@@ -26,7 +26,7 @@ public record PresentBalanceResult(
 
     // Toss 어댑터가 추출한 원시 보유 종목 값 — KRW 환산·수익률 계산은 aggregateToss()가 담당
     public record TossHolding(
-            Ticker ticker,          // 종목코드
+            StrategyTicker ticker,          // 종목코드
             int holdings,           // 보유 수량
             BigDecimal avgPrice,    // 평균 매입가 (USD)
             BigDecimal currentPrice // 현재가 (USD)

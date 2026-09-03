@@ -4,7 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
@@ -54,7 +54,7 @@ class BuyOrderPriceCapperTest {
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
     static final InfinitePosition POSITION = new InfinitePosition(
-            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
+            new AccountBalance(0, null, new BigDecimal("20000")), StrategyTicker.SOXL, new BigDecimal("10.00"), 20);
 
     static final VrPosition VR_POSITION = new VrPosition(
             new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00")),
@@ -65,28 +65,28 @@ class BuyOrderPriceCapperTest {
     }
 
     private Order buy(String price, int quantity) {
-        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order buy(String price, int quantity, String orderLeg) {
-        return Order.planned(TODAY, Ticker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
+        return Order.planned(TODAY, StrategyTicker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
                 quantity, new BigDecimal(price), orderLeg);
     }
 
     private Order sell(String price, int quantity) {
-        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     // VR 사다리 BUY/SELL은 항상 LIMIT+AT_OPEN(ticker=TQQQ) — bootstrap(LOC+AT_CLOSE)과 구분하기 위해 별도 헬퍼로 생성
     private Order vrLadderBuy(String price, int quantity) {
-        return new Order(null, null, null, TODAY, Ticker.TQQQ, Order.OrderType.LIMIT,
+        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, Order.OrderType.LIMIT,
                 Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order vrLadderSell(String price, int quantity) {
-        return new Order(null, null, null, TODAY, Ticker.TQQQ, Order.OrderType.LIMIT,
+        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, Order.OrderType.LIMIT,
                 Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
@@ -100,7 +100,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of(cappedBuy, correction));
 
         List<Order> prepared = capper().prepareForAllocation(
-                List.of(originalBuy), new BigDecimal("50.00"), POSITION, null, Ticker.SOXL,
+                List.of(originalBuy), new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL,
                 CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, TODAY);
 
         assertThat(prepared).containsExactly(cappedBuy, correction);
@@ -118,7 +118,7 @@ class BuyOrderPriceCapperTest {
         Order withinCapBuy = buy("28.00", 3);
 
         List<Order> prepared = capper().prepareForAllocation(
-                List.of(exceedingBuy, sell, withinCapBuy), new BigDecimal("30.00"), null, null, Ticker.SOXL,
+                List.of(exceedingBuy, sell, withinCapBuy), new BigDecimal("30.00"), null, null, StrategyTicker.SOXL,
                 CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, TODAY);
 
         assertThat(prepared.get(0).price()).isEqualByComparingTo("31.50");
@@ -142,7 +142,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of(firstCappedBuy, secondCappedBuy, correction));
 
         List<Order> prepared = capper().prepareForAllocation(
-                List.of(firstBuy, firstSell, secondBuy, secondSell), new BigDecimal("50.00"), POSITION, null, Ticker.SOXL,
+                List.of(firstBuy, firstSell, secondBuy, secondSell), new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL,
                 CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, TODAY);
 
         assertThat(prepared).containsExactly(
@@ -155,7 +155,7 @@ class BuyOrderPriceCapperTest {
         List<Order> orders = List.of(buy("60.00", 1), sell("70.00", 1));
 
         List<Order> prepared = capper().prepareForAllocation(
-                orders, new BigDecimal("50.00"), POSITION, null, Ticker.SOXL,
+                orders, new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL,
                 CycleOrderStrategy.PriceCapMode.NONE, TODAY);
 
         assertThat(prepared).isSameAs(orders);
@@ -167,7 +167,7 @@ class BuyOrderPriceCapperTest {
         List<Order> orders = List.of(buy("60.00", 1), sell("70.00", 1));
 
         List<Order> prepared = capper().prepareForAllocation(
-                orders, new BigDecimal("50.00"), POSITION, null, Ticker.SOXL, null, TODAY);
+                orders, new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null, TODAY);
 
         assertThat(prepared).isSameAs(orders);
         verifyNoInteractions(orderPort, orderPlanner, infiniteStrategy, vrStrategy);
@@ -181,15 +181,15 @@ class BuyOrderPriceCapperTest {
         Order originalBuy = vrLadderBuy("8500.00", 1);
         Order sell = vrLadderSell("11500.00", 1);
         Order cappedBuy = vrLadderBuy("525.00", 2);
-        when(vrStrategy.buildCappedBuyOrders(VR_POSITION, Ticker.TQQQ, TODAY, new BigDecimal("52.50")))
+        when(vrStrategy.buildCappedBuyOrders(VR_POSITION, StrategyTicker.TQQQ, TODAY, new BigDecimal("52.50")))
                 .thenReturn(List.of(cappedBuy));
 
         List<Order> prepared = capper().prepareForAllocation(
-                List.of(originalBuy, sell), new BigDecimal("50.00"), null, VR_POSITION, Ticker.TQQQ,
+                List.of(originalBuy, sell), new BigDecimal("50.00"), null, VR_POSITION, StrategyTicker.TQQQ,
                 CycleOrderStrategy.PriceCapMode.VR_POSITION, TODAY);
 
         assertThat(prepared).containsExactly(cappedBuy, sell);
-        verify(vrStrategy).buildCappedBuyOrders(VR_POSITION, Ticker.TQQQ, TODAY, new BigDecimal("52.50"));
+        verify(vrStrategy).buildCappedBuyOrders(VR_POSITION, StrategyTicker.TQQQ, TODAY, new BigDecimal("52.50"));
         verifyNoInteractions(orderPort, orderPlanner, infiniteStrategy);
     }
 
@@ -199,7 +199,7 @@ class BuyOrderPriceCapperTest {
         List<Order> orders = List.of(vrLadderBuy("8500.00", 1), vrLadderSell("11500.00", 1));
 
         List<Order> prepared = capper().prepareForAllocation(
-                orders, new BigDecimal("50.00"), null, null, Ticker.TQQQ,
+                orders, new BigDecimal("50.00"), null, null, StrategyTicker.TQQQ,
                 CycleOrderStrategy.PriceCapMode.VR_POSITION, TODAY);
 
         assertThat(prepared).isSameAs(orders);
@@ -220,7 +220,7 @@ class BuyOrderPriceCapperTest {
                 new AccountBalance(0, null, new BigDecimal("10000.00")),
                 BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
         // referencePrice=100.00×1.05=105.00 — VrStrategy가 실제로 생성하는 bootstrap 주문 그대로 사용
-        Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, Ticker.TQQQ,
+        Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, StrategyTicker.TQQQ,
                 new BigDecimal("100.00"), null, TODAY).getFirst();
         assertThat(bootstrapBuy.orderType()).isEqualTo(Order.OrderType.LOC); // 픽스처 전제 확인
         assertThat(bootstrapBuy.timing()).isEqualTo(Order.OrderTiming.AT_CLOSE);
@@ -228,7 +228,7 @@ class BuyOrderPriceCapperTest {
 
         // currentPrice=90.00 → cap=94.50 < 105.00(bootstrap 가격) → cap 로직이 트리거되는 조건
         List<Order> prepared = realCapper.prepareForAllocation(
-                List.of(bootstrapBuy), new BigDecimal("90.00"), null, bootstrapPosition, Ticker.TQQQ,
+                List.of(bootstrapBuy), new BigDecimal("90.00"), null, bootstrapPosition, StrategyTicker.TQQQ,
                 CycleOrderStrategy.PriceCapMode.VR_POSITION, TODAY);
 
         // 가드가 없었다면 value=0 → lowerBand=0 → 사다리 전부 0원으로 재계산돼 qty=19 LIMIT/AT_OPEN 주문으로
@@ -248,11 +248,11 @@ class BuyOrderPriceCapperTest {
         VrPosition bootstrapPosition = new VrPosition(
                 new AccountBalance(0, null, new BigDecimal("10000.00")),
                 BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
-        Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, Ticker.TQQQ,
+        Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, StrategyTicker.TQQQ,
                 new BigDecimal("100.00"), null, TODAY).getFirst();
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(bootstrapBuy));
 
-        realCapper.capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("90.00"), bootstrapPosition, Ticker.TQQQ);
+        realCapper.capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("90.00"), bootstrapPosition, StrategyTicker.TQQQ);
 
         // bootstrap 주문은 접수 전 보정 대상이 아니므로 취소·재저장이 전혀 발생하지 않아야 한다
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
@@ -384,7 +384,7 @@ class BuyOrderPriceCapperTest {
     void capVrIfNeeded_noBuyOrders_doesNothing() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, Ticker.TQQQ);
+        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(vrStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
@@ -398,7 +398,7 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(vrLadderBuy("50.00", 1)));
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, Ticker.TQQQ);
+        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(vrStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
@@ -412,10 +412,10 @@ class BuyOrderPriceCapperTest {
         List<Order> buyOrders = List.of(vrLadderBuy("8500.00", 1));
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
         List<Order> capped = List.of(vrLadderBuy("52.50", 2));
-        when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(Ticker.TQQQ), eq(TODAY), any()))
+        when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(StrategyTicker.TQQQ), eq(TODAY), any()))
                 .thenReturn(capped);
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, Ticker.TQQQ);
+        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
 
         // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증 — VR도 기존 사이클 동시 보정 직렬화 원칙 동일
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
@@ -424,7 +424,7 @@ class BuyOrderPriceCapperTest {
         inOrder.verify(orderPort, times(1)).markCancelled(isNull()); // 테스트 vrLadderBuy()의 id=null
         inOrder.verify(orderPlanner).savePlannedOrders(any(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
 
-        verify(vrStrategy).buildCappedBuyOrders(eq(VR_POSITION), eq(Ticker.TQQQ), eq(TODAY), capCaptor.capture());
+        verify(vrStrategy).buildCappedBuyOrders(eq(VR_POSITION), eq(StrategyTicker.TQQQ), eq(TODAY), capCaptor.capture());
         assertThat(capCaptor.getValue()).isEqualByComparingTo("52.50");
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         assertThat(ordersCaptor.getValue()).isEqualTo(capped);
@@ -434,10 +434,10 @@ class BuyOrderPriceCapperTest {
     void capVrIfNeeded_cappedResultEmpty_deletesWithoutSaving() {
         List<Order> buyOrders = List.of(vrLadderBuy("8500.00", 1));
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
-        when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(Ticker.TQQQ), eq(TODAY), any()))
+        when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(StrategyTicker.TQQQ), eq(TODAY), any()))
                 .thenReturn(List.of());
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, Ticker.TQQQ);
+        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort).markCancelled(isNull()); // 테스트 vrLadderBuy()의 id=null

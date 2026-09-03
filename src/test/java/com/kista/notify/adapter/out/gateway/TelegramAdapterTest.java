@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramAdapterTest {
@@ -73,7 +74,7 @@ class TelegramAdapterTest {
 
         Account acc = account(UUID.randomUUID(), "테스트");
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
-        adapter.notifyInsufficientBalance(acc, balance, Strategy.Ticker.SOXL);
+        adapter.notifyInsufficientBalance(acc, balance, StrategyTicker.SOXL);
 
         verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
         String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");

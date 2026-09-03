@@ -8,7 +8,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
@@ -63,7 +63,7 @@ class TossOrderApi {
         tossHttpClient.post(ORDER_PATH + "/" + instruction.externalOrderId() + "/cancel", account, Map.of(), Void.class);
     }
 
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
         List<Execution> result = new ArrayList<>();
         result.addAll(fetchExecutions("CLOSED", from, to, ticker, account));
@@ -73,7 +73,7 @@ class TossOrderApi {
 
     // status별 GET /api/v1/orders — 페이지네이션 루프 처리 (CLOSED), OPEN은 단일 응답
     private List<Execution> fetchExecutions(String status, LocalDate from, LocalDate to,
-                                             Ticker ticker, BrokerAccountRef account) {
+                                             StrategyTicker ticker, BrokerAccountRef account) {
         List<Execution> result = new ArrayList<>();
         String cursor = null;
         boolean hasNext = true;
@@ -106,7 +106,7 @@ class TossOrderApi {
 
     // API 요청 파라미터 빌드 — KST 날짜 그대로 전달 (KIS와 달리 toUtc 변환 없음)
     private MultiValueMap<String, String> buildOrderParams(String status, LocalDate queryFrom, LocalDate to,
-                                                            Ticker ticker, String cursor) {
+                                                            StrategyTicker ticker, String cursor) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("status", status);
         params.add("symbol", ticker.name());
@@ -118,7 +118,7 @@ class TossOrderApi {
     }
 
     // 주문 1건 → Execution 변환 — filledQuantity=0이거나 날짜 범위 밖이면 empty
-    private Optional<Execution> toExecution(OrderItem order, LocalDate from, LocalDate to, Ticker ticker) {
+    private Optional<Execution> toExecution(OrderItem order, LocalDate from, LocalDate to, StrategyTicker ticker) {
         if (order.execution() == null) return Optional.empty();
 
         // filledQuantity > 0인 주문만 처리

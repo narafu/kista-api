@@ -5,7 +5,7 @@ import com.kista.common.UsTradeDates;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -33,23 +33,23 @@ class KisPriceApi {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
         // 현재가만 필요한 경우 — snapshot 조회 후 current 반환 (KIS API 호출 횟수 동일)
         return getPriceSnapshot(ticker, account).current();
     }
 
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         if (tickers.isEmpty()) return Map.of();
 
         MultiPriceResponse response = fetchMultiPrice(tickers, account);
 
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
         if (response != null && response.output2() != null) {
             for (MultiPriceResponse.Output2 item : response.output2()) {
                 if (item.symb() == null) continue;
                 Optional<BigDecimal> resolved = resolveItemPrice(item, "복수종목 현재가");
                 if (resolved.isEmpty()) continue;
-                Ticker.tryParse(item.symb()).ifPresent(t -> result.put(t, resolved.get()));
+                StrategyTicker.tryParse(item.symb()).ifPresent(t -> result.put(t, resolved.get()));
             }
         } else {
             log.warn("복수종목 현재가 응답 없음: output2 null");
@@ -59,7 +59,7 @@ class KisPriceApi {
         return result;
     }
 
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
+    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
         String excd = exchangeRegistry.excd(ticker);
         PriceResponse response = kisHttpClient.pricingGet(
                 SINGLE_TR_ID, SINGLE_PATH, account, PriceResponse.class,
@@ -82,7 +82,7 @@ class KisPriceApi {
         return new PriceSnapshot(current, prevClose);
     }
 
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
         if (tickers.isEmpty()) return Map.of();
 
         MultiPriceResponse response = fetchMultiPrice(tickers, account);
@@ -91,14 +91,14 @@ class KisPriceApi {
             return Map.of();
         }
 
-        Map<Ticker, PriceSnapshot> result = new LinkedHashMap<>();
+        Map<StrategyTicker, PriceSnapshot> result = new LinkedHashMap<>();
         for (MultiPriceResponse.Output2 item : response.output2()) {
             if (item.symb() == null) continue;
             Optional<BigDecimal> resolved = resolveItemPrice(item, "복수종목 스냅샷");
             if (resolved.isEmpty()) continue;
-            Ticker ticker = Ticker.tryParse(item.symb()).orElse(null);
+            StrategyTicker ticker = StrategyTicker.tryParse(item.symb()).orElse(null);
             if (ticker == null) {
-                log.warn("복수종목 스냅샷 응답 — Ticker 매핑 실패(무시): symb={}", item.symb());
+                log.warn("복수종목 스냅샷 응답 — StrategyTicker 매핑 실패(무시): symb={}", item.symb());
                 continue;
             }
             BigDecimal current = resolved.get();
@@ -114,33 +114,33 @@ class KisPriceApi {
     }
 
     // KIS는 base(전일종가)가 현재가 응답에 묶여 있어 별도 API 없음 — snapshot 재사용 (호출 횟수 절감 없음)
-    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
         return getPriceSnapshot(ticker, account).prevClose();
     }
 
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
+    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
         getPriceSnapshots(tickers, account).forEach((ticker, snapshot) -> result.put(ticker, snapshot.prevClose()));
         return result;
     }
 
     // 정규장 확정 종가 — 마감 리포트 전용(dailyprice, HHDFS76240000). 응답 봉 날짜가 기대 거래일과 다르면
     // (미발행 등) 라이브 현재가로 fallback — "하루 전 종가를 오늘 종가로 오기록"하는 사고를 방지한다.
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> getPrice(ticker, account));
     }
 
     // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-        for (Ticker ticker : tickers) {
+    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
+        for (StrategyTicker ticker : tickers) {
             result.put(ticker, getClosingPrice(ticker, tradeDate, account));
         }
         return result;
     }
 
     // dailyprice 확정 종가 조회 — 응답 봉 날짜(xymd)가 기대 US 거래일과 일치할 때만 신뢰
-    private Optional<BigDecimal> fetchConfirmedClose(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    private Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         String expectedUsDate = UsTradeDates.toUsTradeDate(tradeDate).format(DateTimeFormatter.BASIC_ISO_DATE);
         try {
             DailyPriceResponse response = kisHttpClient.pricingGet(
@@ -174,13 +174,13 @@ class KisPriceApi {
     }
 
     // multprice(HHDFS76220000) 1회 호출 — NREC + 종목별 EXCD_nn/SYMB_nn 파라미터 구성
-    private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, BrokerAccountRef account) {
+    private MultiPriceResponse fetchMultiPrice(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return kisHttpClient.pricingGet(
                 MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
                 p -> {
                     p.add("NREC", String.valueOf(tickers.size()));
                     for (int i = 0; i < tickers.size(); i++) {
-                        Ticker ticker = tickers.get(i);
+                        StrategyTicker ticker = tickers.get(i);
                         String num = String.format("%02d", i + 1);
                         p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
                         p.add("SYMB_" + num, ticker.name());
@@ -202,9 +202,9 @@ class KisPriceApi {
     }
 
     // 복수종목 응답에 없는 종목을 단건 API로 보충 — 실패 종목은 결과에서 제외 (warn)
-    private <V> void fillMissingBySingleCall(List<Ticker> tickers, Map<Ticker, V> result, String label,
-                                             java.util.function.Function<Ticker, V> singleCall) {
-        for (Ticker ticker : tickers) {
+    private <V> void fillMissingBySingleCall(List<StrategyTicker> tickers, Map<StrategyTicker, V> result, String label,
+                                             java.util.function.Function<StrategyTicker, V> singleCall) {
+        for (StrategyTicker ticker : tickers) {
             if (result.containsKey(ticker)) continue;
             log.warn("{} 응답 누락 — 단건 API fallback 시도: ticker={}", label, ticker);
             try {

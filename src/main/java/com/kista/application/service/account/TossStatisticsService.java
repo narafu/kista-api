@@ -3,7 +3,7 @@ package com.kista.application.service.account;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
 import com.kista.application.usecase.TossStatisticsUseCase;
 import com.kista.account.application.port.output.AccountPort;
@@ -23,14 +23,14 @@ class TossStatisticsService implements TossStatisticsUseCase {
     private final BrokerAdapterRegistry registry;
 
     @Override
-    public List<TossCandle> getCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval,
+    public List<TossCandle> getCandles(UUID accountId, UUID requesterId, StrategyTicker ticker, String interval,
                                        LocalDate from, LocalDate to) {
         Account account = requireAccount(accountId, requesterId);
         return registry.require(toBrokerRef(account), CandlePort.class).getCandles(ticker.name(), interval, from, to);
     }
 
     @Override
-    public TossStockInfo getStockInfo(UUID accountId, UUID requesterId, Ticker ticker) {
+    public TossStockInfo getStockInfo(UUID accountId, UUID requesterId, StrategyTicker ticker) {
         Account account = requireAccount(accountId, requesterId);
         return registry.require(toBrokerRef(account), StockInfoPort.class).getStockInfo(ticker);
     }

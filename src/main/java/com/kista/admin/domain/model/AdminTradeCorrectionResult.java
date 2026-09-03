@@ -5,6 +5,7 @@ import com.kista.domain.model.strategy.Strategy;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyStatus;
 
 // 관리자 수동 체결 보정 결과 요약 — UI에서 최종 포지션/상태 확인용
 public record AdminTradeCorrectionResult(
@@ -15,7 +16,7 @@ public record AdminTradeCorrectionResult(
         int finalHoldings,
         BigDecimal finalAvgPrice,
         BigDecimal finalUsdDeposit,
-        Strategy.Status strategyStatus,
+        StrategyStatus strategyStatus,
         boolean cycleEnded,
         LocalDate cycleEndDate
 ) {

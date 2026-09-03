@@ -33,6 +33,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // BacktestEngine VR·INFINITE 경로 — 합성 OHLC 픽스처 기반 결정적 검증 (mock 없음, 기대값은 손계산 상수)
 class BacktestEngineTest {
@@ -54,7 +56,7 @@ class BacktestEngineTest {
 
     // seed·initialValue는 문자열 생성자로 — BigDecimal.valueOf(double)의 소수 자리(예: 300.0)가 경고 문구에 새어나온다
     private static BacktestCommand vrCommand(String seed, String initialValue, int intervalWeeks, int recurringAmount) {
-        return new BacktestCommand(Strategy.Type.VR, Strategy.Ticker.TQQQ,
+        return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 null, BAND_WIDTH, intervalWeeks, recurringAmount, new BigDecimal(initialValue));
     }
@@ -297,19 +299,19 @@ class BacktestEngineTest {
 
         // 전략 계산 시점 포지션 재구성 — currentRound/전후반 판정을 직접 단언하기 위함
         InfinitePosition position(int divisionCount) {
-            return new InfinitePosition(balance, Strategy.Ticker.TQQQ, inputs.prevClosePrice(), divisionCount);
+            return new InfinitePosition(balance, StrategyTicker.TQQQ, inputs.prevClosePrice(), divisionCount);
         }
     }
 
     private static BacktestCommand infiniteCommand(String from, String seed, int divisionCount) {
-        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+        return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 divisionCount, null, null, 0, null);
     }
 
     private static BacktestCommand infiniteCommandWithPosition(String from, String seed, int divisionCount,
                                                                 int holdings, String avgPrice) {
-        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+        return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 divisionCount, null, null, 0, null, holdings, new BigDecimal(avgPrice));
     }
@@ -379,7 +381,7 @@ class BacktestEngineTest {
     void 보유_수량만_있고_평단가가_없으면_명확히_거부한다() {
         RecordingInfinite recorder = new RecordingInfinite();
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
-        BacktestCommand command = new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ,
+        BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-02"), LocalDate.parse("2024-12-31"), new BigDecimal("0"),
                 4, null, null, 0, null, 5, null);
 
@@ -627,13 +629,13 @@ class BacktestEngineTest {
     }
 
     private static BacktestCommand privacyCommand(String seed) {
-        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
+        return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 null, null, null, 0, null);
     }
 
     private static BacktestCommand privacyCommandWithPosition(String seed, int holdings, String avgPrice) {
-        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL,
+        return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 null, null, null, 0, null, holdings, new BigDecimal(avgPrice));
     }
@@ -646,7 +648,7 @@ class BacktestEngineTest {
     // 가격은 문자열 생성자로 — 배수·캡 결과가 소수 자리 없이 그대로 드러나게 한다
     private static PrivacyTrade trade(String date, PrivacyOrderType orderType, PrivacyOrderDirection direction,
                                       Integer quantity, String price) {
-        return new PrivacyTrade(LocalDate.parse(date), Strategy.Ticker.SOXL, orderType, direction,
+        return new PrivacyTrade(LocalDate.parse(date), StrategyTicker.SOXL, orderType, direction,
                 quantity, new BigDecimal(price));
     }
 

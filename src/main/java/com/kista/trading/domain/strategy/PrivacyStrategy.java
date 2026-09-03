@@ -6,7 +6,7 @@ import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -242,9 +242,9 @@ public class PrivacyStrategy {
         BigDecimal quantity; // 배수 적용 실수 — 최종 Order 생성 시에만 버림 적용
         final Order.OrderType orderType;
         final LocalDate tradeDate;
-        final Ticker ticker;
+        final StrategyTicker ticker;
 
-        BuyEntry(BigDecimal price, BigDecimal quantity, Order.OrderType orderType, LocalDate tradeDate, Ticker ticker) {
+        BuyEntry(BigDecimal price, BigDecimal quantity, Order.OrderType orderType, LocalDate tradeDate, StrategyTicker ticker) {
             this.price = price;
             this.quantity = quantity;
             this.orderType = orderType;

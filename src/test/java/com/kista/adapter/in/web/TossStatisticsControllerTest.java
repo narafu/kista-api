@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.application.usecase.TossStatisticsUseCase;
@@ -51,7 +51,7 @@ class TossStatisticsControllerTest {
                 new BigDecimal("24.80"), new BigDecimal("26.00"),
                 1_000_000L
         );
-        when(tossStatistics.getCandles(eq(ACCOUNT_ID), any(), eq(Ticker.SOXL), eq("1D"), any(), any()))
+        when(tossStatistics.getCandles(eq(ACCOUNT_ID), any(), eq(StrategyTicker.SOXL), eq("1D"), any(), any()))
                 .thenReturn(List.of(candle));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/candles")
@@ -113,7 +113,7 @@ class TossStatisticsControllerTest {
     @Test
     void stockInfo_returns_200_with_fields() throws Exception {
         TossStockInfo info = new TossStockInfo("SOXL", "디렉시온 반도체", "Direxion Semi", "NYSE ARCA", "USD", "NORMAL");
-        when(tossStatistics.getStockInfo(eq(ACCOUNT_ID), any(), eq(Ticker.SOXL)))
+        when(tossStatistics.getStockInfo(eq(ACCOUNT_ID), any(), eq(StrategyTicker.SOXL)))
                 .thenReturn(info);
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/stock-info")

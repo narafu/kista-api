@@ -1,6 +1,6 @@
 package com.kista.broker.domain.model;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 주문 취소 지시 — BrokerOrderCorrectionPort.cancel() 요청
-public record CancelInstruction(Ticker ticker, String externalOrderId) {}
+public record CancelInstruction(StrategyTicker ticker, String externalOrderId) {}

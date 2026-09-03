@@ -29,6 +29,10 @@ import java.util.Optional;
 
 import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
 // 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 domain/strategy·domain/model/strategy에 위임
@@ -73,7 +77,7 @@ public class BacktestEngine {
     // PRIVACY 전용 진입점 — 기준 매매표 조회는 DB I/O라 순수 도메인에서 못 하므로 날짜별 맵을 호출측(BacktestService)이 미리 조달한다
     // 맵에 키가 없는 날짜는 "기준 매매표 미수신"과 동일 취급 (그날 주문 없음)
     public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases) {
-        if (command.type() != Strategy.Type.PRIVACY) return run(candles, command);
+        if (command.type() != StrategyType.PRIVACY) return run(candles, command);
         if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of());
         return runPrivacy(candles, command, privacyBases);
     }
@@ -206,7 +210,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", null, null, vrInputs);
 
-        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(Strategy.Type.VR).plan(ctx);
+        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.VR).plan(ctx);
         List<Order> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 캡 재산정에는 plan()이 이미 조립해 실어 보낸 VrPosition을 그대로 재사용한다(운영 BuyOrderPriceCapper와 동일 계약)
         return applyVrBuyCap(orders, prevClose,
@@ -215,7 +219,7 @@ public class BacktestEngine {
 
     // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(VR_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
     private List<Order> applyVrBuyCap(List<Order> orders, BigDecimal prevClose, VrPosition position,
-                                      Strategy.Ticker ticker, LocalDate tradeDate) {
+                                      StrategyTicker ticker, LocalDate tradeDate) {
         if (prevClose == null || position == null) return orders;
         List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         if (buys.isEmpty()) return orders;
@@ -269,7 +273,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", infiniteInputs, null, null);
 
-        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(Strategy.Type.INFINITE).plan(ctx);
+        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
         List<Order> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 리버스모드면 position이 null — 운영 BuyOrderPriceCapper와 동일하게 캡 재산정 대상에서 제외된다
         return applyInfiniteBuyCap(orders, prevClose,
@@ -336,7 +340,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", null, privacyInputs, null);
 
-        List<Order> orders = strategies.of(Strategy.Type.PRIVACY).plan(ctx)
+        List<Order> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
                 .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         return applyPrivacyBuyCap(orders, prevClose);
     }
@@ -367,8 +371,8 @@ public class BacktestEngine {
 
     // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 type·ticker만 참조)
     private static Strategy syntheticStrategy(BacktestCommand command) {
-        return new Strategy(null, null, command.type(), Strategy.Status.ACTIVE,
-                command.ticker(), Strategy.CycleSeedType.NONE);
+        return new Strategy(null, null, command.type(), StrategyStatus.ACTIVE,
+                command.ticker(), StrategyCycleSeedType.NONE);
     }
 
     // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 recurringMode 고정값 표(RAMP_DEFAULTS_BY_MODE와 동기화)를 그대로 쓴다
@@ -492,7 +496,7 @@ public class BacktestEngine {
         }
 
         // 리버스모드 상태 전이 — 전이 공식은 InfinitePosition.nextReverseMode에 그대로 위임
-        void applyReverseModeTransition(Strategy.Ticker ticker, BigDecimal closingPrice) {
+        void applyReverseModeTransition(StrategyTicker ticker, BigDecimal closingPrice) {
             boolean prevReverseMode = reverseMode;
             InfinitePosition probe = new InfinitePosition(balance, ticker, closingPrice, divisionCount);
             boolean nextReverseMode = probe.nextReverseMode(prevReverseMode);

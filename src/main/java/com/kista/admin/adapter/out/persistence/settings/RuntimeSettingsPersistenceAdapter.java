@@ -65,7 +65,7 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
         }
     }
 
-    // DB 행 저장 이후 Broker/Strategy.Type에 신규 enum 상수가 추가된 경우, 관리자가 아직 값을
+    // DB 행 저장 이후 Broker/StrategyType에 신규 enum 상수가 추가된 경우, 관리자가 아직 값을
     // 채워넣지 않은 새 키를 defaults()로 보충해 전체 앱 장애(누락 키 검증 실패) 대신 안전하게 로드되게 한다.
     private JsonNode backfillMissingEnumKeys(JsonNode root) {
         JsonNode defaultsNode = objectMapper.valueToTree(RuntimeSettings.defaults());

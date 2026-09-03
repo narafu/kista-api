@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +26,7 @@ class AdminStrategyService implements AdminStrategyUseCase {
     @Override
     public void pauseStrategy(UUID adminId, UUID accountId, UUID strategyId) {
         Strategy strategy = requireOwnedByAccount(accountId, strategyId);
-        strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
         auditLogPort.log(adminId, "STRATEGY_PAUSE", "STRATEGY", strategyId,
                 Map.of("accountId", accountId.toString()));
     }
@@ -33,7 +34,7 @@ class AdminStrategyService implements AdminStrategyUseCase {
     @Override
     public void resumeStrategy(UUID adminId, UUID accountId, UUID strategyId) {
         Strategy strategy = requireOwnedByAccount(accountId, strategyId);
-        strategyPort.save(strategy.withStatus(Strategy.Status.ACTIVE));
+        strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         auditLogPort.log(adminId, "STRATEGY_RESUME", "STRATEGY", strategyId,
                 Map.of("accountId", accountId.toString()));
     }

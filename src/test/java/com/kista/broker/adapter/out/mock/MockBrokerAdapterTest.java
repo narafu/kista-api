@@ -16,7 +16,7 @@ import com.kista.broker.domain.model.PositionView;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.application.port.output.MockSimulationDataPort;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.port.output.StrategyPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +37,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 모의계좌 어댑터 — DB 스냅샷 기반 잔고·체결 시뮬레이션 검증
 @ExtendWith(MockitoExtension.class)
@@ -62,8 +65,8 @@ class MockBrokerAdapterTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(ACCOUNT_ID, "key", "secret",
             "12345678", null, BrokerAccountRef.Broker.MOCK);
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
-    private static final Strategy TQQQ_STRATEGY = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR,
-            Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+    private static final Strategy TQQQ_STRATEGY = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
+            StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
     // getExecutions()가 strategy→cycle을 해석할 수 있도록 공통 stub — 개별 테스트는 findPlacedOrders만 stub하면 된다
     private void stubTqqqCycle() {
@@ -92,9 +95,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.MOC, Direction.BUY, 10,
                 new BigDecimal("100.00"), "MOCK-1");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("999.99"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("999.99"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         Execution execution = executions.get(0);
@@ -111,9 +114,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView fillable = placedOrder(OrderType.LOC, Direction.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-2");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         assertThat(executions.get(0).price()).isEqualByComparingTo("95.00");
@@ -126,9 +129,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView unfillable = placedOrder(OrderType.LOC, Direction.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-3");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
     }
@@ -140,9 +143,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView fillable = placedOrder(OrderType.LOC, Direction.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-4");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         assertThat(executions.get(0).price()).isEqualByComparingTo("105.00");
@@ -155,9 +158,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView unfillable = placedOrder(OrderType.LOC, Direction.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-5");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
     }
@@ -169,9 +172,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, Direction.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-6");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         // LOC와 달리 체결가는 종가(90.00)가 아니라 지정가(100.00) 그대로
@@ -185,9 +188,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, Direction.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-7");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
     }
@@ -199,9 +202,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, Direction.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-8");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
@@ -214,9 +217,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, Direction.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-9");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
     }
@@ -228,9 +231,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LOC, Direction.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-10");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
@@ -242,7 +245,7 @@ class MockBrokerAdapterTest {
         stubTqqqCycle();
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of());
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
     }
@@ -255,9 +258,9 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.MOC, Direction.BUY, 3,
                 new BigDecimal("100.00"), "MOCK-CYCLE-SCOPED");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(Ticker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
+        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, Ticker.TQQQ, ACCOUNT);
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
         assertThat(executions.get(0).externalOrderId()).isEqualTo("MOCK-CYCLE-SCOPED");
@@ -268,7 +271,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("place()는 MOCK- 접두사 합성 externalOrderId를 담은 OrderResult를 반환한다")
     void placeAssignsSyntheticOrderId() {
-        OrderInstruction instruction = new OrderInstruction(Ticker.TQQQ, Direction.BUY, OrderType.LOC,
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.TQQQ, Direction.BUY, OrderType.LOC,
                 10, new BigDecimal("100.00"));
 
         OrderResult result = adapter().place(instruction, ACCOUNT);
@@ -279,7 +282,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("cancel()은 예외 없이 아무 것도 하지 않는다")
     void cancelIsNoOp() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.TQQQ, "MOCK-11");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.TQQQ, "MOCK-11");
 
         adapter().cancel(instruction, ACCOUNT);
 
@@ -291,8 +294,8 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getLiveBalance는 holdings/avgPrice는 해당 ticker 전략 값, usdDeposit은 계좌 전체 전략 합산 값을 반환한다")
     void getLiveBalanceSumsUsdDepositAcrossStrategiesButKeepsTickerSpecificHoldings() {
-        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy, TQQQ_STRATEGY));
 
         PositionView soxlPosition = new PositionView(4, new BigDecimal("38.00"), new BigDecimal("300.00"));
@@ -300,7 +303,7 @@ class MockBrokerAdapterTest {
         when(mockSimulationDataPort.findLatestPosition(soxlStrategy.id())).thenReturn(Optional.of(soxlPosition));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(tqqqPosition));
 
-        BrokerBalance balance = adapter().getLiveBalance(ACCOUNT, Ticker.TQQQ);
+        BrokerBalance balance = adapter().getLiveBalance(ACCOUNT, StrategyTicker.TQQQ);
 
         // holdings/avgPrice는 TQQQ 전략 고유값
         assertThat(balance.holdings()).isEqualTo(10);
@@ -312,12 +315,12 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getLiveBalance는 해당 ticker 전략이 없으면 IllegalStateException을 던진다")
     void getLiveBalanceThrowsWhenNoMatchingStrategy() {
-        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy soxlStrategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy));
 
         MockBrokerAdapter adapter = adapter();
-        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, Ticker.TQQQ))
+        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, StrategyTicker.TQQQ))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -328,7 +331,7 @@ class MockBrokerAdapterTest {
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.empty());
 
         MockBrokerAdapter adapter = adapter();
-        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, Ticker.TQQQ))
+        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, StrategyTicker.TQQQ))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -341,9 +344,9 @@ class MockBrokerAdapterTest {
         PositionView position = new PositionView(7, new BigDecimal("48.00"), new BigDecimal("500.00"));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(position));
 
-        SellableQuantity sellable = adapter().getSellableQuantity(Ticker.TQQQ, ACCOUNT);
+        SellableQuantity sellable = adapter().getSellableQuantity(StrategyTicker.TQQQ, ACCOUNT);
 
-        assertThat(sellable.symbol()).isEqualTo(Ticker.TQQQ.name());
+        assertThat(sellable.symbol()).isEqualTo(StrategyTicker.TQQQ.name());
         assertThat(sellable.quantity()).isEqualTo(7);
     }
 
@@ -362,9 +365,9 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getPrice는 account와 무관하게 CommonMarketPriceFeed로 위임한다")
     void getPriceDelegatesToPriceFeed() {
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("123.45"));
+        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("123.45"));
 
-        BigDecimal price = adapter().getPrice(Ticker.TQQQ, ACCOUNT);
+        BigDecimal price = adapter().getPrice(StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(price).isEqualByComparingTo("123.45");
     }
@@ -372,9 +375,9 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("getPrevClose는 account와 무관하게 CommonMarketPriceFeed로 위임한다")
     void getPrevCloseDelegatesToPriceFeed() {
-        when(priceFeed.getPrevClose(Ticker.TQQQ)).thenReturn(new BigDecimal("120.00"));
+        when(priceFeed.getPrevClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120.00"));
 
-        BigDecimal prevClose = adapter().getPrevClose(Ticker.TQQQ, ACCOUNT);
+        BigDecimal prevClose = adapter().getPrevClose(StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(prevClose).isEqualByComparingTo("120.00");
     }
@@ -387,7 +390,7 @@ class MockBrokerAdapterTest {
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         PositionView position = new PositionView(7, new BigDecimal("48.00"), new BigDecimal("500.00"));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(position));
-        when(priceFeed.getPrice(Ticker.TQQQ)).thenReturn(new BigDecimal("55.00"));
+        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("55.00"));
 
         PresentBalanceResult result = adapter().getPresentBalance(ACCOUNT);
 

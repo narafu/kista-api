@@ -23,6 +23,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @WebMvcTest(MetaController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -39,9 +42,9 @@ class MetaControllerTest {
         var infinite = new InfiniteCycleOrderStrategy(null, null);
         var privacy = new PrivacyCycleOrderStrategy(null);
         var vr = new VrCycleOrderStrategy(null);
-        when(cycleStrategies.of(Strategy.Type.INFINITE)).thenReturn(infinite);
-        when(cycleStrategies.of(Strategy.Type.PRIVACY)).thenReturn(privacy);
-        when(cycleStrategies.of(Strategy.Type.VR)).thenReturn(vr);
+        when(cycleStrategies.of(StrategyType.INFINITE)).thenReturn(infinite);
+        when(cycleStrategies.of(StrategyType.PRIVACY)).thenReturn(privacy);
+        when(cycleStrategies.of(StrategyType.VR)).thenReturn(vr);
     }
 
     @Test
@@ -52,8 +55,8 @@ class MetaControllerTest {
 
     @Test
     void getBundle_authenticated_returns200WithAllSections() throws Exception {
-        int strategyTypeCount = Strategy.Type.values().length;
-        int tickerCount = Strategy.Ticker.values().length;
+        int strategyTypeCount = StrategyType.values().length;
+        int tickerCount = StrategyTicker.values().length;
 
         mockMvc.perform(get("/api/meta")
                         .with(authentication(userToken(DEV_USER_UUID))))
@@ -72,6 +75,6 @@ class MetaControllerTest {
                         .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cycleSeedTypes").isArray())
-                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(Strategy.CycleSeedType.values().length));
+                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(StrategyCycleSeedType.values().length));
     }
 }

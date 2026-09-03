@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // com.kista.trading.adapter.out.persistence의 CyclePositionPersistenceAdapterTest/StrategyCycleVrPersistenceAdapterTest가
 // @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지 (모듈 경계상 legacy는 OPEN이라 안전)
@@ -78,18 +81,18 @@ public class StrategyPersistenceAdapter implements StrategyPort {
                         StrategyJpaRepository.CycleStrategySummaryProjection::getCycleId,
                         r -> new AdminCycleStrategySummary(
                                 r.getStrategyId(),
-                                Strategy.Type.valueOf(r.getStrategyType())
+                                StrategyType.valueOf(r.getStrategyType())
                         )
                 ));
     }
 
     @Override
-    public boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker) {
+    public boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker) {
         return jpaRepository.existsByAccountIdAndTicker(accountId, ticker);
     }
 
     @Override
-    public Map<UUID, Strategy.Ticker> findTickersByIds(Collection<UUID> strategyIds) {
+    public Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> strategyIds) {
         if (strategyIds.isEmpty()) return Map.of();
         return jpaRepository.findAllById(strategyIds).stream()
                 .collect(Collectors.toMap(StrategyEntity::getId, StrategyEntity::getTicker));
@@ -109,7 +112,7 @@ public class StrategyPersistenceAdapter implements StrategyPort {
         e.setType(s.type());
         e.setStatus(s.status());
         e.setTicker(s.ticker());
-        e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : Strategy.CycleSeedType.NONE);
+        e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : StrategyCycleSeedType.NONE);
         return e;
     }
 }

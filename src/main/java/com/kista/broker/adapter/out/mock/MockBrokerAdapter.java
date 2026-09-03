@@ -3,7 +3,7 @@ package com.kista.broker.adapter.out.mock;
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +39,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     // --- 계좌+ticker → 전략 해석 공통 헬퍼 ---
     // Account에는 ticker 정보가 없다(전략이 소유) — 계좌에 속한 전략 중 ticker가 일치하는 것을 찾는다
-    private Strategy resolveStrategy(BrokerAccountRef account, Ticker ticker) {
+    private Strategy resolveStrategy(BrokerAccountRef account, StrategyTicker ticker) {
         return strategyPort.findByAccountId(account.id()).stream()
                 .filter(s -> s.ticker() == ticker)
                 .findFirst()
@@ -48,7 +48,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     }
 
     // --- 계좌+ticker → 최신 포지션 해석 공통 헬퍼 ---
-    private PositionView resolveLatestPosition(BrokerAccountRef account, Ticker ticker) {
+    private PositionView resolveLatestPosition(BrokerAccountRef account, StrategyTicker ticker) {
         Strategy strategy = resolveStrategy(account, ticker);
         return mockSimulationDataPort.findLatestPosition(strategy.id())
                 .orElseThrow(() -> new IllegalStateException(
@@ -69,45 +69,45 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- BrokerPricePort (account 파라미터 무시, priceFeed에 위임 — Toss 패턴과 동일) ---
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
         return priceFeed.getPrice(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return priceFeed.getPrices(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
+    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
         return priceFeed.getPriceSnapshot(ticker); // 공통 API — account 불필요, priceFeed가 이미 broker 소유 PriceSnapshot 반환
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return priceFeed.getPriceSnapshots(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
         return priceFeed.getPrevClose(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return priceFeed.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
     // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(CommonMarketPriceFeed.getClosingPrice)
     @Override
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return priceFeed.getClosingPrice(ticker, tradeDate);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-        for (Ticker ticker : tickers) {
+    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
+        for (StrategyTicker ticker : tickers) {
             result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
         }
         return result;
@@ -116,7 +116,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- LiveBalancePort ---
 
     @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
         // usdDeposit은 계좌 전체 합산(위 sumUsdDepositAcrossStrategies 주석 참고), holdings/avgPrice는 해당 ticker 전략 값
         PositionView position = resolveLatestPosition(account, ticker);
         return new BrokerBalance(position.holdings(), position.avgPrice(), sumUsdDepositAcrossStrategies(account));
@@ -125,7 +125,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- SellableQuantityPort ---
 
     @Override
-    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         int holdings = resolveLatestPosition(account, ticker).holdings();
         return new SellableQuantity(ticker.name(), holdings);
     }
@@ -147,7 +147,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // MOC: 항상 체결(종가) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
     // LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 지정가 그대로 — LOC와 달리 종가로 재계산하지 않음)
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용
         // cycleId로 스코프 — account+ticker만으로 조회하면 사이클 롤오버 당일 종료된 이전 사이클의
         // 잔류 PLACED 주문(취소 실패 등)이 새 사이클의 체결에 잘못 합산될 수 있어 활성 사이클 격리 조회를 재사용한다

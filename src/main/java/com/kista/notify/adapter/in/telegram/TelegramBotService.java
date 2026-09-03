@@ -3,7 +3,7 @@ package com.kista.notify.adapter.in.telegram;
 import com.kista.common.TimeZones;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.stats.application.usecase.PortfolioUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import lombok.RequiredArgsConstructor;
@@ -138,7 +138,7 @@ class TelegramBotService {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId)
                 .map(userId -> {
-                    List<Order> list = portfolioUseCase.getHistory(userId, from, to, Ticker.SOXL);
+                    List<Order> list = portfolioUseCase.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
                     list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",

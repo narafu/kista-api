@@ -5,6 +5,8 @@ import com.kista.domain.model.strategy.Strategy;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 바로주문 미리보기 시 계좌 내 BUY 예산 경쟁 시뮬레이션 결과 — TradingBuyCompetitionSimulator 산출
 // 실제 야간 배치(TradingOrderBudgetAllocator)와 동일한 우선순위 정렬을 재현한 근사치
@@ -25,8 +27,8 @@ public record BuyCompetitionPreview(
     // 경쟁 전략 1건 — priority는 CycleOrderStrategy.allocationPriority() 값(작을수록 먼저 승인)
     public record CompetingStrategy(
             UUID strategyId,
-            Strategy.Type type,
-            Strategy.Ticker ticker,
+            StrategyType type,
+            StrategyTicker ticker,
             BigDecimal requiredBuyUsd,
             int priority
     ) {}

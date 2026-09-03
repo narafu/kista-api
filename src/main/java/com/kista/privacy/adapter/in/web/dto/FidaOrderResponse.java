@@ -2,7 +2,7 @@ package com.kista.privacy.adapter.in.web.dto;
 
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -16,7 +16,7 @@ public record FidaOrderResponse(
         @Schema(description = "발행일 (요청받은 FIDA 원본 값 그대로 echo, KST — 거래일 아님)")
         LocalDate releaseDate,
         @Schema(description = "거래 종목", example = "SOXL")
-        Ticker ticker,
+        StrategyTicker ticker,
         @Schema(description = "기준가")
         BigDecimal currentCycleStart,
         @Schema(description = "사이클 실현 손익 (USD)")

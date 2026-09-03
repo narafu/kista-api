@@ -16,7 +16,7 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.CycleHistoryPage;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.application.usecase.AccountStatisticsUseCase;
 import com.kista.account.application.port.output.AccountPort;
@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import com.kista.sharedkernel.StrategyType;
 
 @Service
 @RequiredArgsConstructor
@@ -119,7 +120,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일
     // (currentPrice로 보여주면 등록 시점마다 미묘하게 다른 값이 최소 시드 기준으로 오인될 수 있음)
     @Override
-    public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
+    public Map<StrategyTicker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("전일종가 조회",
                 () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevCloses(tickers, toBrokerRef(account)));
@@ -153,7 +154,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
-            Strategy.Type type, Strategy.Ticker ticker, int divisionCount) {
+            StrategyType type, StrategyTicker ticker, int divisionCount) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
 
         // 1단계: 전략 타입별 capability 로드

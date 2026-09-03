@@ -8,16 +8,19 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 public record TradingCycleRequest(
         @Schema(description = "전략 종류 (등록 시 필수)", example = "INFINITE")
-        @NotNull Strategy.Type type,
+        @NotNull StrategyType type,
         @Schema(description = "거래 종목 (null이면 런타임 기본값, PRIVACY=SOXL/VR=TQQQ 외 명시값은 400)", example = "TQQQ")
-        Strategy.Ticker ticker,
+        StrategyTicker ticker,
         @Schema(description = "초기 입금액 (PRIVACY: 배수 자동 산출 기준, VR: 예수금=초기 pool)", example = "2000.00")
         BigDecimal initialUsdDeposit,
         @Schema(description = "연속 사이클 정책 (null이면 NONE)", example = "NONE")
-        Strategy.CycleSeedType cycleSeedType,
+        StrategyCycleSeedType cycleSeedType,
         @Schema(description = "분할 수 (null이면 런타임 기본값)", example = "20")
         Integer divisionCount,
         @Schema(description = "중간부터 시작 — 등록 시점 기존 보유 수량 (null/0이면 빈 포지션에서 시작)", example = "10")

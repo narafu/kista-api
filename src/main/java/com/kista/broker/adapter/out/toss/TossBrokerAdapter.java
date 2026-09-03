@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -53,12 +53,12 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         return tossHoldingsApi.getSellableQuantity(ticker, account);
     }
 
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         return tossOrderApi.getExecutions(from, to, ticker, account);
     }
 
@@ -90,7 +90,7 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public TossStockInfo getStockInfo(Ticker ticker) {
+    public TossStockInfo getStockInfo(StrategyTicker ticker) {
         return tossPriceApi.getStockInfo(ticker);
     }
 
@@ -107,52 +107,52 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
     // --- BrokerPricePort (공통 API — account 불필요) ---
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
         return tossPriceApi.getPrice(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
+    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
         return tossPriceApi.getPriceSnapshot(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return tossPriceApi.getPriceSnapshots(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
         return tossPriceApi.getPrevClose(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return tossPriceApi.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
     // tradeDate 일봉 확정 종가 — 라이브 현재가 아님 (TossCandleApi.getCandles 경유, TossPriceApi.getClosingPrice)
     @Override
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return tossPriceApi.getClosingPrice(ticker, tradeDate); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
-        for (Ticker ticker : tickers) {
+    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
+        for (StrategyTicker ticker : tickers) {
             result.put(ticker, tossPriceApi.getClosingPrice(ticker, tradeDate));
         }
         return result;
     }
 
     @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
         return tossHoldingsApi.getBalance(account, ticker);
     }
 

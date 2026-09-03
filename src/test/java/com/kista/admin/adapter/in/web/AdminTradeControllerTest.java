@@ -41,6 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
 
 @WebMvcTest(AdminTradeController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -119,7 +122,7 @@ class AdminTradeControllerTest {
                         accountId,
                         cycleId,
                         LocalDate.of(2026, 7, 1),
-                        Strategy.Ticker.SOXL,
+                        StrategyTicker.SOXL,
                         Order.OrderType.LIMIT,
                         Order.OrderTiming.AT_OPEN,
                         Order.OrderDirection.SELL,
@@ -134,7 +137,7 @@ class AdminTradeControllerTest {
         when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
                 .thenReturn(java.util.Map.of(
                         cycleId,
-                        new com.kista.admin.domain.model.AdminCycleStrategySummary(strategyId, Strategy.Type.PRIVACY)
+                        new com.kista.admin.domain.model.AdminCycleStrategySummary(strategyId, StrategyType.PRIVACY)
                 ));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
@@ -220,7 +223,7 @@ class AdminTradeControllerTest {
                         0,
                         null,
                         new java.math.BigDecimal("7200.05"),
-                        Strategy.Status.PAUSED,
+                        StrategyStatus.PAUSED,
                         true,
                         java.time.LocalDate.of(2026, 7, 1)
                 ));

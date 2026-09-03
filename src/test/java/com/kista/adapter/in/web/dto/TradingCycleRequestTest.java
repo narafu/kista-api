@@ -7,13 +7,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
 
 class TradingCycleRequestTest {
 
     @Test
     void omittedDivisionCountMapsToCommandSentinel() {
         TradingCycleRequest request = new TradingCycleRequest(
-                Strategy.Type.INFINITE, null, null, null, null,
+                StrategyType.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null);
@@ -25,7 +26,7 @@ class TradingCycleRequestTest {
     void scheduledStartDateIsPassedThroughToRegisterCommand() {
         LocalDate scheduledStartDate = LocalDate.of(2026, 8, 1);
         TradingCycleRequest request = new TradingCycleRequest(
-                Strategy.Type.INFINITE, null, null, null, null,
+                StrategyType.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 scheduledStartDate, null);
@@ -36,7 +37,7 @@ class TradingCycleRequestTest {
     @Test
     void initialVrValueIsPassedThroughToRegisterCommand() {
         TradingCycleRequest request = new TradingCycleRequest(
-                Strategy.Type.VR, null, null, null, null,
+                StrategyType.VR, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, new BigDecimal("5000.00"));

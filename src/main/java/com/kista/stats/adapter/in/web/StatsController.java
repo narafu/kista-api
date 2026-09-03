@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import com.kista.sharedkernel.StrategyType;
 
 @Tag(name = "통계", description = "사용자 전략 수익 통계 (DB 근사 집계)")
 @RestController
@@ -47,7 +48,7 @@ public class StatsController {
     @GetMapping("/equity-curve")
     public EquityCurveResponse getEquityCurve(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) Strategy.Type type,
+            @RequestParam(required = false) StrategyType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return EquityCurveResponse.from(userStats.getEquityCurve(userId, type, from, to));
@@ -57,7 +58,7 @@ public class StatsController {
     @GetMapping("/cycles")
     public CyclePerformancePageResponse getCycles(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) Strategy.Type type,
+            @RequestParam(required = false) StrategyType type,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;

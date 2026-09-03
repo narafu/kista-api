@@ -26,6 +26,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class BatchContextFactoryTest {
@@ -40,8 +44,8 @@ class BatchContextFactoryTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
     private Strategy mockStrategy(UUID accountId) {
-        return new Strategy(UUID.randomUUID(), accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        return new Strategy(UUID.randomUUID(), accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
     private StrategyCycle mockCycle(UUID strategyId) {

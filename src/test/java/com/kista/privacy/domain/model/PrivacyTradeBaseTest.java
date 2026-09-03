@@ -1,6 +1,6 @@
 package com.kista.privacy.domain.model;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ class PrivacyTradeBaseTest {
     @Test
     @DisplayName("PrivacyCurrentBase: currentCycleStart=null이면 생성 실패")
     void privacyCurrentBase_nullCurrentCycleStart_throws() {
-        assertThatThrownBy(() -> new PrivacyCurrentBase(Ticker.SOXL, null, LocalDate.now()))
+        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, null, LocalDate.now()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("currentCycleStart 이상");
     }
@@ -41,7 +41,7 @@ class PrivacyTradeBaseTest {
     @Test
     @DisplayName("PrivacyCurrentBase: currentCycleStart<=0이면 생성 실패")
     void privacyCurrentBase_nonPositiveCurrentCycleStart_throws() {
-        assertThatThrownBy(() -> new PrivacyCurrentBase(Ticker.SOXL, new BigDecimal("-1"), LocalDate.now()))
+        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("-1"), LocalDate.now()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("currentCycleStart 이상");
     }

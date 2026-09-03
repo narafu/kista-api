@@ -3,7 +3,7 @@ package com.kista.stats.domain.backtest;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +19,7 @@ class FillSimulatorTest {
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
 
     private static Order order(Order.OrderType orderType, Order.OrderDirection direction, BigDecimal price) {
-        return Order.planned(TRADE_DATE, Ticker.TQQQ, orderType, direction, 5, price);
+        return Order.planned(TRADE_DATE, StrategyTicker.TQQQ, orderType, direction, 5, price);
     }
 
     // --- fills() 기존 동작 회귀 ---

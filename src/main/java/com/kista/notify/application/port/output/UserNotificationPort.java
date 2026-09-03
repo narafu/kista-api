@@ -6,6 +6,8 @@ import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 
 import java.math.BigDecimal;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 public interface UserNotificationPort {
     void notifyNewUser(User user);                                                          // 관리자에게 신규 가입 승인 요청 알림 (승인 대기, 버튼 포함)
@@ -16,7 +18,7 @@ public interface UserNotificationPort {
     void notifyCycleCompleted(User user, Account account, Strategy strategy);               // 사용자에게 사이클 종료(holdings=0) 알림
     void notifyNewCycleStarted(User user, Account account, Strategy strategy,
                                BigDecimal initialUsdDeposit);                              // 사용자에게 새 사이클 시작 알림
-    void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker); // 사용자에게 예수금 부족 알림
+    void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker); // 사용자에게 예수금 부족 알림
     void notifyError(User user, Exception e);                                              // 사용자에게 매매 오류 알림
     void notifyBatchInterrupted(User user, Account account);                                  // 사용자에게 스케쥴러 인터럽트(배포·재기동) 알림
     void notifyMarketOpen(User user);                                                        // 사용자에게 장 개시 알림

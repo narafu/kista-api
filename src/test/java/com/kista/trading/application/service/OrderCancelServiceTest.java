@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.trading.application.event.OrderCancelFailedEvent;
@@ -42,6 +42,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderCancelService 단위 테스트")
@@ -69,8 +72,8 @@ class OrderCancelServiceTest {
     @BeforeEach
     void setUp() {
         ownedAccount = DomainFixtures.kisAccount(accountId, requesterId);
-        cycle = new Strategy(cycleId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
                 null, LocalDate.now(), null, null, null);
         // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
@@ -276,7 +279,7 @@ class OrderCancelServiceTest {
     @Test
     @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
-        Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+        Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
@@ -325,13 +328,13 @@ class OrderCancelServiceTest {
     // ---
 
     private Order placedOrder(UUID id, String externalOrderId) {
-        return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     private Order plannedOrder(UUID id) {
-        return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLANNED, null, null, null);
     }

@@ -5,7 +5,7 @@ import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;
@@ -18,6 +18,9 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class CycleEndedNotifierTest {
@@ -32,8 +35,8 @@ class CycleEndedNotifierTest {
         UUID userId = UUID.randomUUID();
         Account account = DomainFixtures.kisAccount(UUID.randomUUID(), userId);
         User user = DomainFixtures.activeUserWithTelegram(userId);
-        Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.PRIVACY,
-                Strategy.Status.PAUSED, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+                StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(userPort.findByIdOrThrow(userId)).thenReturn(user);
         when(accountPort.findByIdOrThrow(account.id())).thenReturn(account);
         CycleEndedEvent event = new CycleEndedEvent(userId, account.id(), strategy);

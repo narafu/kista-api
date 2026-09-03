@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Component
@@ -118,7 +120,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
+    public void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker) {
         String text = String.format(
                 "⚠️ <b>예수금 부족</b> — %s%n"
                 + "[%s] %s 장 마감 전 예수금 확인 바랍니다.",

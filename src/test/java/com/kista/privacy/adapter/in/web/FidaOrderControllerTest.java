@@ -9,7 +9,7 @@ import com.kista.privacy.domain.model.FidaPlannedOrder;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.privacy.application.usecase.PrivacyUseCase;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ class FidaOrderControllerTest {
     void placeFidaOrder_returns_201_with_body() throws Exception {
         UUID masterId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         given(privacy.executeFidaOrder(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));
@@ -86,7 +86,7 @@ class FidaOrderControllerTest {
         FidaPlannedOrder buyNullQuantity = new FidaPlannedOrder(
                 PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, null, new BigDecimal("22.00"));
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQuantity));
 
         mockMvc.perform(post("/api/internal/fida-orders")
@@ -109,7 +109,7 @@ class FidaOrderControllerTest {
         // @JsonAlias("tradeDate") 하위호환 — 레거시 키로 전송해도 releaseDate로 역직렬화됨
         UUID masterId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         given(privacy.executeFidaOrder(any())).willReturn(new PrivacyTradeSaveResult(masterId, true));

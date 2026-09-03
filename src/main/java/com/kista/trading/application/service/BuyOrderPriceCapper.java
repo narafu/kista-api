@@ -25,6 +25,7 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
+import com.kista.sharedkernel.StrategyTicker;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
 // 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
@@ -44,7 +45,7 @@ class BuyOrderPriceCapper {
     // 신규 후보의 최종 BUY를 allocator 입력 전에 계산하며 영속화는 수행하지 않는다
     // ticker: VR 전용 — VrPosition은 ticker를 보유하지 않아 별도 전달 필요 (INFINITE_POSITION/PRIVACY_SIMPLE은 무시)
     List<Order> prepareForAllocation(List<Order> orders, BigDecimal currentPrice, InfinitePosition position,
-                                     VrPosition vrPosition, Strategy.Ticker ticker,
+                                     VrPosition vrPosition, StrategyTicker ticker,
                                      CycleOrderStrategy.PriceCapMode mode, LocalDate tradeDate) {
         if (mode == null || mode == CycleOrderStrategy.PriceCapMode.NONE || currentPrice == null) return orders;
 
@@ -144,7 +145,7 @@ class BuyOrderPriceCapper {
     // bootstrap(LOC+AT_CLOSE) 주문은 사다리 재산정 대상이 아니므로 skip한다 (isVrBootstrapShaped 참고)
     @Transactional
     void capVrIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
-                       BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
+                       BigDecimal currentPrice, VrPosition vrPosition, StrategyTicker ticker) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
         applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
@@ -156,7 +157,7 @@ class BuyOrderPriceCapper {
     // AT_CLOSE PLANNED(bootstrap 또는 아직 접수 전인 마감 주문)는 findAtOpenPlannedByCycleAndDate 스코프 밖이라 자연히 제외된다
     @Transactional
     void capVrIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId,
-                            BigDecimal currentPrice, VrPosition vrPosition, Strategy.Ticker ticker) {
+                            BigDecimal currentPrice, VrPosition vrPosition, StrategyTicker ticker) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
         applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,

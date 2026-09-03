@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.in.telegram;
 
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.stats.application.usecase.PortfolioUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +59,7 @@ class TelegramBotServiceTest {
     @Test
     void status_command_returns_portfolio_info() {
         CyclePositionHistoryEntry snap = new CyclePositionHistoryEntry(
-                UUID.randomUUID(), Ticker.SOXL,
+                UUID.randomUUID(), StrategyTicker.SOXL,
                 new BigDecimal("1000.00"), new BigDecimal("26.00"),
                 new BigDecimal("25.0000"), 100, Instant.now());
         when(portfolioUseCase.getCurrent(any())).thenReturn(snap);
@@ -84,12 +84,12 @@ class TelegramBotServiceTest {
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(portfolioUseCase.getHistory(any(), any(), any(), eq(Ticker.SOXL))).thenReturn(List.of());
+        when(portfolioUseCase.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
         verify(portfolioUseCase).getHistory(
-                eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(Ticker.SOXL));
+                eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(StrategyTicker.SOXL));
     }
 
     @Test

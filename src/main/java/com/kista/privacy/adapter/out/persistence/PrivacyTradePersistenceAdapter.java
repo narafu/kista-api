@@ -3,7 +3,7 @@ package com.kista.privacy.adapter.out.persistence;
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.*;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -78,7 +78,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         return new PrivacyTradeSaveResult(baseRepository.save(base).getId(), true); // 201
     }
 
-    private Optional<PrivacyTradeBaseEntity> getByReleaseDateAndTicker(LocalDate releaseDate, Ticker ticker) {
+    private Optional<PrivacyTradeBaseEntity> getByReleaseDateAndTicker(LocalDate releaseDate, StrategyTicker ticker) {
         return baseRepository.findByReleaseDateAndTicker(releaseDate, ticker); // 발행일 정확 일치
     }
 
@@ -118,7 +118,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         LocalDate todayKst = LocalDate.now(TimeZones.KST);
         return baseRepository
                 .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL)
+                        PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
                         PrivacyDates.tradeDateOf(e.getReleaseDate()))); // 발행일 → 적용 거래일
     }
@@ -128,7 +128,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
         // today는 KST 거래일, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
         return baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(today), Ticker.SOXL)
+                        PrivacyDates.releaseDateFor(today), StrategyTicker.SOXL)
                 .map(entity -> {
                     LocalDate kstTradeDate = PrivacyDates.tradeDateOf(entity.getReleaseDate()); // 발행일 → 적용 거래일
                     List<PrivacyTradeBase.PrivacyTrade> trades = entity.getOrders().stream()

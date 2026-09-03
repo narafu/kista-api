@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
 // NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
@@ -48,9 +50,9 @@ class CycleRotationService {
     void rotate(Strategy strategy, StrategyCycle currentCycle, Account account, User user,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
 
-        if (strategy.cycleSeedType() == Strategy.CycleSeedType.NONE) {
+        if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
             // NONE → 전략 PAUSED (연속 없음)
-            strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+            strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
             log.info("[strategyId={}] 사이클 종료 (NONE) → PAUSED", strategy.id());
             return;
         }
@@ -91,11 +93,11 @@ class CycleRotationService {
     // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환
     private BigDecimal resolveTargetSeed(Strategy strategy, BigDecimal actualBalance,
                                          BigDecimal maintainSeed, BigDecimal maxSeed) {
-        if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX && actualBalance.compareTo(maxSeed) >= 0) {
+        if (strategy.cycleSeedType() == StrategyCycleSeedType.MAX && actualBalance.compareTo(maxSeed) >= 0) {
             return maxSeed;
         }
         if (actualBalance.compareTo(maintainSeed) >= 0) {
-            if (strategy.cycleSeedType() == Strategy.CycleSeedType.MAX) {
+            if (strategy.cycleSeedType() == StrategyCycleSeedType.MAX) {
                 log.warn("[strategyId={}] MAX 잔고 부족 → MAINTAIN으로 강등: actual={}, max={}",
                         strategy.id(), actualBalance, maxSeed);
             }
@@ -104,7 +106,7 @@ class CycleRotationService {
         // 실잔고가 maintainSeed에도 못 미침 → PAUSE
         log.warn("[strategyId={}] MAINTAIN 잔고 부족 → PAUSED: actual={}, maintain={}",
                 strategy.id(), actualBalance, maintainSeed);
-        strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
         return null;
     }
 
@@ -114,7 +116,7 @@ class CycleRotationService {
         if (!settings.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
             return (s, maintainSeed, maxSeed) ->
-                    Optional.of(s.cycleSeedType() == Strategy.CycleSeedType.MAX ? maxSeed : maintainSeed);
+                    Optional.of(s.cycleSeedType() == StrategyCycleSeedType.MAX ? maxSeed : maintainSeed);
         }
         // ON: 증권사 실잔고 조회
         return (s, maintainSeed, maxSeed) -> Optional.ofNullable(fetchUsdBalance(s, account));

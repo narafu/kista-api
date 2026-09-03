@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Service
@@ -83,12 +84,12 @@ class TradingPreviewService {
                 ordersByCycleId.getOrDefault(cycle.id(), List.of())));
 
         // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 KIS 왕복을 생략
-        List<Strategy.Ticker> tickers = strategies.stream()
+        List<StrategyTicker> tickers = strategies.stream()
                 .filter(s -> cyclesByStrategyId.containsKey(s.id()))
                 .map(Strategy::ticker)
                 .distinct()
                 .toList();
-        Map<Strategy.Ticker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account);
+        Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account);
 
         // 계좌 내 당일 PLANNED BUY 합계 — accountId+today로만 결정되는 값(전략 무관)이라 1회만 조회해 재사용
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, today);

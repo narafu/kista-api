@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyTicker;
 
 public record PrivacyTradeBase(
         UUID id,
@@ -22,7 +23,7 @@ public record PrivacyTradeBase(
 
     public record PrivacyTrade(
             LocalDate tradeDate,             // 거래일
-            Strategy.Ticker ticker,          // 거래 종목
+            StrategyTicker ticker,          // 거래 종목
             PrivacyOrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
             PrivacyOrderDirection direction, // 매수/매도 방향
             Integer quantity,                // 주문 수량(nullable)

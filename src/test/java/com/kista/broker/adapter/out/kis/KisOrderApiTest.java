@@ -7,7 +7,7 @@ import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +44,7 @@ class KisOrderApiTest {
     @DisplayName("BUY+LOC: TTTT1002U 사용, ORD_DVSN=34, 실제 가격 전달(지정가이므로 0 금지)")
     void place_buyLoc_usesBuyTrIdAndOrdDvsn34() {
         BigDecimal locPrice = new BigDecimal("25.50");
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, locPrice);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LOC, 10, locPrice);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
@@ -60,7 +60,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("BUY+MOC: ORD_DVSN=33, 가격=0")
     void place_buyMoc_usesOrdDvsn33() {
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.MOC, 5, BigDecimal.ZERO);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.MOC, 5, BigDecimal.ZERO);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
@@ -77,7 +77,7 @@ class KisOrderApiTest {
     @DisplayName("BUY+LIMIT: ORD_DVSN=00, 실제 가격 전달")
     void place_buyLimit_usesActualPrice() {
         BigDecimal limitPrice = new BigDecimal("25.50");
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LIMIT, 3, limitPrice);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LIMIT, 3, limitPrice);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
@@ -93,7 +93,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("SELL: TTTT1006U 사용")
     void place_sell_usesSellTrId() {
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.SELL, OrderType.LOC, 8, BigDecimal.ZERO);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.SELL, OrderType.LOC, 8, BigDecimal.ZERO);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
@@ -106,7 +106,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("응답 ODNO → externalOrderId 반환")
     void place_responseWithOdno_returnsExternalOrderId() {
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
         KisOrderApi.OrderResponse response =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD123"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(response);
@@ -119,7 +119,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("KIS 비즈니스 오류(rt_cd!=0): KisApiException 발생")
     void place_kisErrorResponse_throwsKisApiException() {
-        OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
         KisOrderApi.OrderResponse errorResponse =
                 new KisOrderApi.OrderResponse("1", "EGW00202", "GW라우팅 중 오류가 발생했습니다.", null);
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(errorResponse);
@@ -132,7 +132,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("cancel: TTTT1004U + CANCEL_PATH 호출, RVSE_CNCL_DVSN_CD=02, ORGN_ODNO=기존주문번호")
     void cancel_sendsCorrectParameters() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "ORD_123");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "ORD_123");
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
@@ -152,7 +152,7 @@ class KisOrderApiTest {
     @Test
     @DisplayName("cancel: KIS 오류(RuntimeException) 전파")
     void cancel_kisError_propagatesException() {
-        CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "ORD_456");
+        CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "ORD_456");
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
                 .thenThrow(new RuntimeException("KIS 오류"));
 

@@ -33,6 +33,7 @@ import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyType;
 
 @Service
 @RequiredArgsConstructor
@@ -64,7 +65,7 @@ class StatsService implements UserStatsUseCase {
     private record SummaryKey(UUID userId) {}
 
     // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
-    private record EquityCurveKey(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {}
+    private record EquityCurveKey(UUID userId, StrategyType type, LocalDate from, LocalDate to) {}
 
     // 벤치마크 비교 캐시 키 — HOUSING(regionCode 사용, symbol=null) / ETF(symbol 사용, regionCode=null) 공용
     private record BenchmarkComparisonKey(
@@ -92,9 +93,9 @@ class StatsService implements UserStatsUseCase {
         List<CycleView> cycles = loadCycles(userId, true);
         Map<UUID, BigDecimal> unrealizedByCycle = unrealizedByCycle(cycles);
 
-        Map<Strategy.Type, List<CycleView>> byType = cycles.stream()
+        Map<StrategyType, List<CycleView>> byType = cycles.stream()
                 .collect(Collectors.groupingBy(v -> v.strategy().type(),
-                        () -> new EnumMap<>(Strategy.Type.class), Collectors.toList()));
+                        () -> new EnumMap<>(StrategyType.class), Collectors.toList()));
 
         List<StrategyTypeStats> typeStats = byType.entrySet().stream()
                 .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle))
@@ -109,13 +110,13 @@ class StatsService implements UserStatsUseCase {
     }
 
     @Override
-    public EquityCurve getEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {
+    public EquityCurve getEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to) {
         return statsResultCache.getOrCompute(
                 new EquityCurveKey(userId, type, from, to), CURVE_CACHE_TTL,
                 () -> computeEquityCurve(userId, type, from, to));
     }
 
-    private EquityCurve computeEquityCurve(UUID userId, Strategy.Type type, LocalDate from, LocalDate to) {
+    private EquityCurve computeEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
@@ -133,7 +134,7 @@ class StatsService implements UserStatsUseCase {
     }
 
     @Override
-    public CyclePerformancePage getCyclePerformances(UUID userId, Strategy.Type type,
+    public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type,
                                                      Instant cursor, int size) {
         List<CycleView> filtered = loadCycles(userId).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
@@ -517,7 +518,7 @@ class StatsService implements UserStatsUseCase {
         return result;
     }
 
-    private StrategyTypeStats toTypeStats(Strategy.Type type, List<CycleView> views,
+    private StrategyTypeStats toTypeStats(StrategyType type, List<CycleView> views,
                                           Map<UUID, BigDecimal> unrealizedByCycle) {
         List<CycleView> closed = views.stream().filter(CycleView::closed).toList();
         List<CycleView> active = views.stream().filter(v -> !v.closed()).toList();

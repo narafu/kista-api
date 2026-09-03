@@ -6,7 +6,7 @@ import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
@@ -34,6 +34,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingPreviewServiceTest {
@@ -52,8 +55,8 @@ class TradingPreviewServiceTest {
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     static final Strategy STRATEGY = new Strategy(
-            UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
     // startDate는 항상 과거로 고정 — LocalDate.now()를 쓰면 KST 00:00~04:30 사이 테스트 실행 시
     // DstInfo.nextTradeDate()가 오늘 날짜를 반환해 신규 SCHEDULED_START_NOT_REACHED skip과 경합하는 flaky 테스트가 됨
@@ -77,7 +80,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsOrdersWithoutCompetition_whenPlanHasNoBuyOrders() {
-        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -110,7 +113,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSellSufficiencyNull_whenPlanHasNoSellOrders() {
-        Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -124,7 +127,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_callsSellSufficiencySimulator_whenPlanHasSellOrders() {
-        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -144,12 +147,12 @@ class TradingPreviewServiceTest {
     // sellSufficiencySimulator가 "이미 접수된 수량 + 그걸 다시 계산한 수량"을 이중으로 합산하지 않는다.
     @Test
     void preview_excludesAlreadyPlacedSellLeg_fromSellSufficiencyRequiredQuantity() {
-        Order existingSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingSell));
 
-        Order recomputedSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order recomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(recomputedSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -164,14 +167,14 @@ class TradingPreviewServiceTest {
     // 일부만 이미 접수된 경우 — 신규 leg만 sellSufficiencySimulator에 전달돼야 한다
     @Test
     void preview_passesOnlyNewSellLeg_whenPlanHasBothExistingAndNewSellOrders() {
-        Order existingSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingSell));
 
-        Order sameRecomputedSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order sameRecomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
-        Order newSell = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order newSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 5, new BigDecimal("61.00"), Order.OrderTiming.AT_OPEN, "LEG_B");
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sameRecomputedSell, newSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -188,7 +191,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_callsCompetitionSimulator_whenPlanHasBuyOrders() {
-        Order buyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -206,7 +209,7 @@ class TradingPreviewServiceTest {
     @Test
     void preview_propagatesNonZeroOtherStrategiesPlannedBuyUsd_toSimulator() {
         // 이 전략의 사이클에 이미 존재하는 당일 PLANNED BUY (수량 5 @ 10.00 = 50.00)
-        Order existingBuyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order existingBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 5, new BigDecimal("10.00"));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingBuyOrder));
@@ -214,7 +217,7 @@ class TradingPreviewServiceTest {
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any()))
                 .thenReturn(new BigDecimal("300.00"));
 
-        Order newBuyOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order newBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderDirection.BUY, 2, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(newBuyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
@@ -265,7 +268,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void previewBatch_returnsPreviewPerStrategy_keyedByStrategyId() {
-        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
@@ -290,18 +293,18 @@ class TradingPreviewServiceTest {
 
     @Test
     void previewBatch_fetchesPrevClosesOnceInBulk_andPassesCacheToPlanBuilder() {
-        Order sellOrder = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LIMIT,
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
                 Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
-        Map<Ticker, BigDecimal> prevCloseCache = Map.of(Ticker.SOXL, new BigDecimal("22.00"));
-        when(priceFetcher.fetchPrevCloses(List.of(Ticker.SOXL), ACCOUNT)).thenReturn(prevCloseCache);
+        Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
+        when(priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL), ACCOUNT)).thenReturn(prevCloseCache);
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), eq(prevCloseCache)))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
-        verify(priceFetcher, times(1)).fetchPrevCloses(List.of(Ticker.SOXL), ACCOUNT);
+        verify(priceFetcher, times(1)).fetchPrevCloses(List.of(StrategyTicker.SOXL), ACCOUNT);
         verify(planBuilder).build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), eq(prevCloseCache));
     }
 
@@ -309,10 +312,10 @@ class TradingPreviewServiceTest {
     // 대상 전략 개수만큼 반복 실행되지 않고 previewBatch()에서 1회만 조회돼야 한다
     @Test
     void previewBatch_callsSumPlannedBuyByAccountAndDateOnce_regardlessOfStrategyCount() {
-        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         List<Strategy> strategies = List.of(s1, s2);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
@@ -350,12 +353,12 @@ class TradingPreviewServiceTest {
     // (전략 3개 기준 최대 9회). 전략별 계산을 1회로 캐싱한 뒤에는 전략당 정확히 1회씩, 총 N회만 호출돼야 한다.
     @Test
     void previewBatch_callsPlanBuilderBuildOncePerStrategy_evenWithCrossCompetition() {
-        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
-        Strategy s3 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy s1 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy s2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        Strategy s3 = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         List<Strategy> strategies = List.of(s1, s2, s3);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
@@ -378,7 +381,7 @@ class TradingPreviewServiceTest {
         lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
         com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
         com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.Type.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
         lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
@@ -399,10 +402,10 @@ class TradingPreviewServiceTest {
     // 실제 TradingBuyCompetitionSimulator를 그대로 사용해 대상 전략의 경쟁 결과에 영향이 없는지 검증한다.
     @Test
     void previewBatch_excludesScheduledStartNotReachedStrategy_fromCompetitionBudget() {
-        Strategy started = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy notStarted = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy started = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy notStarted = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         List<Strategy> strategies = List.of(started, notStarted);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
@@ -423,7 +426,7 @@ class TradingPreviewServiceTest {
         lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
         com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
         com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.Type.class))).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
         lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 

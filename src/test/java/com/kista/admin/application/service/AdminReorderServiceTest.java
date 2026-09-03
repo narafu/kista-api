@@ -39,6 +39,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class AdminReorderServiceTest {
@@ -233,8 +237,8 @@ class AdminReorderServiceTest {
     }
 
     private Strategy strategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.MAX);
+        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
     }
 
     private StrategyCycle cycle() {
@@ -243,25 +247,25 @@ class AdminReorderServiceTest {
     }
 
     private Order plannedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), Strategy.Ticker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order placedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), Strategy.Ticker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.PLACED, "PLACED-1", null, null);
     }
 
     private Order filledOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), Strategy.Ticker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 2,
                 new BigDecimal("236.54"), Order.OrderStatus.FILLED, "FILLED-1", 2, new BigDecimal("236.54"));
     }
 
     private Order failedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), Strategy.Ticker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
                 Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.FAILED, null, null, null);
     }

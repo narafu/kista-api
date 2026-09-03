@@ -32,6 +32,8 @@ import java.util.stream.Stream;
 
 import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
 import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Component
@@ -51,7 +53,7 @@ class TradingOrderBudgetAllocator {
 
     // 계좌 단위 브로커 선조회 결과 — 실패는 failure로 보존해 allocate 시점에 원본 예외로 rethrow한다
     // (runSafely 격리·알림 1회 계약 유지)
-    record AccountQuote(AccountBalance liveBalance, Map<Strategy.Ticker, Integer> sellableByTicker, Exception failure) {
+    record AccountQuote(AccountBalance liveBalance, Map<StrategyTicker, Integer> sellableByTicker, Exception failure) {
         static AccountQuote failed(Exception e) { return new AccountQuote(null, Map.of(), e); }
     }
 
@@ -98,13 +100,13 @@ class TradingOrderBudgetAllocator {
                 liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
             }
 
-            Set<Strategy.Ticker> sellTickers = accountCandidates.stream()
+            Set<StrategyTicker> sellTickers = accountCandidates.stream()
                     .flatMap(candidate -> candidate.orders().stream())
                     .filter(order -> order.direction() == SELL)
                     .map(Order::ticker)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-            Map<Strategy.Ticker, Integer> sellableByTicker = new LinkedHashMap<>();
-            for (Strategy.Ticker ticker : sellTickers) {
+            Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
+            for (StrategyTicker ticker : sellTickers) {
                 int sellable = registry.require(toBrokerRef(account), SellableQuantityPort.class)
                         .getSellableQuantity(ticker, toBrokerRef(account))
                         .quantity();
@@ -143,7 +145,7 @@ class TradingOrderBudgetAllocator {
     private SellAllocation allocateSells(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
         Map<AccountTicker, List<SellRequest>> requestsByAccountTicker = new LinkedHashMap<>();
         for (Candidate candidate : candidates) {
-            Map<Strategy.Ticker, List<Order>> sellsByTicker = candidate.orders().stream()
+            Map<StrategyTicker, List<Order>> sellsByTicker = candidate.orders().stream()
                     .filter(order -> order.direction() == SELL)
                     .collect(java.util.stream.Collectors.groupingBy(
                             Order::ticker, LinkedHashMap::new, java.util.stream.Collectors.toList()));
@@ -261,7 +263,7 @@ class TradingOrderBudgetAllocator {
                 .thenComparing(AccountTicker::ticker);
     }
 
-    private int strategyPriority(Strategy.Type type) {
+    private int strategyPriority(StrategyType type) {
         return cycleOrderStrategies.of(type).allocationPriority();
     }
 
@@ -299,7 +301,7 @@ class TradingOrderBudgetAllocator {
                 .toList();
     }
 
-    private record AccountTicker(UUID accountId, Strategy.Ticker ticker) {}
+    private record AccountTicker(UUID accountId, StrategyTicker ticker) {}
 
     private record SellRequest(Candidate candidate, List<Order> orders) {}
 

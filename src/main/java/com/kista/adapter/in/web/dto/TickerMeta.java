@@ -4,6 +4,7 @@ import com.kista.domain.model.strategy.Strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
+import com.kista.sharedkernel.StrategyTicker;
 
 public record TickerMeta(
         @Schema(description = "enum name() 값", example = "SOXL")
@@ -13,7 +14,7 @@ public record TickerMeta(
         @Schema(description = "익절 목표 수익률")
         BigDecimal targetProfitRate    // 익절 목표 수익률
 ) {
-    public static TickerMeta from(Strategy.Ticker t) {
+    public static TickerMeta from(StrategyTicker t) {
         return new TickerMeta(
                 t.name(), t.getDescription(), t.getTargetProfitRate()
         );

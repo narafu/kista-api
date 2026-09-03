@@ -41,6 +41,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @WebMvcTest(TradingCycleController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -187,8 +191,8 @@ class TradingCycleControllerTest {
 
     @Test
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
-        Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
@@ -221,10 +225,10 @@ class TradingCycleControllerTest {
         StrategyDetail detail = new StrategyDetail(
                 new com.kista.domain.model.strategy.Strategy(
                         CYCLE_ID, UUID.randomUUID(),
-                        com.kista.domain.model.strategy.Strategy.Type.INFINITE,
-                        com.kista.domain.model.strategy.Strategy.Status.ACTIVE,
-                        com.kista.domain.model.strategy.Strategy.Ticker.SOXL,
-                        com.kista.domain.model.strategy.Strategy.CycleSeedType.NONE),
+                        com.kista.sharedkernel.StrategyType.INFINITE,
+                        com.kista.sharedkernel.StrategyStatus.ACTIVE,
+                        com.kista.sharedkernel.StrategyTicker.SOXL,
+                        com.kista.sharedkernel.StrategyCycleSeedType.NONE),
                 new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
@@ -281,7 +285,7 @@ class TradingCycleControllerTest {
     void seedPreview_returns200_with_minSeed() throws Exception {
         var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null);
         when(accountStatistics.strategySeedPreview(eq(ACCOUNT_ID), any(),
-                eq(Strategy.Type.INFINITE), eq(Strategy.Ticker.SOXL), eq(20)))
+                eq(StrategyType.INFINITE), eq(StrategyTicker.SOXL), eq(20)))
                 .thenReturn(preview);
 
         mockMvc.perform(get("/api/accounts/{accountId}/strategy-seed-preview", ACCOUNT_ID)
@@ -304,8 +308,8 @@ class TradingCycleControllerTest {
     void register_vr_returns201_withVrField() throws Exception {
         // VR 전략 등록 201 응답 + vr 필드 포함 검증
         Strategy vrStrategy = new com.kista.domain.model.strategy.Strategy(
-                UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
                 new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
                 new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 10,
@@ -337,8 +341,8 @@ class TradingCycleControllerTest {
 
     @Test
     void register_omittedDivisionCount_passesRuntimeDefaultSentinel() throws Exception {
-        Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
@@ -358,8 +362,8 @@ class TradingCycleControllerTest {
     @Test
     void reconfigureVr_success_returns200WithUpdatedVrField() throws Exception {
         // VR 전략 운영 중 재설정 — PUT /api/trading-cycles/{id}/vr-config 200 케이스
-        Strategy vrStrategy = new Strategy(CYCLE_ID, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyDetail.VrSummary vrSummary = new StrategyDetail.VrSummary(
                 new BigDecimal("3000"), new BigDecimal("20.00"), 8, 0,
                 new BigDecimal("1500.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 12,

@@ -6,13 +6,14 @@ import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
 
 public record NextOrdersResponse(
         @Schema(description = "다음 매매 예정일 (KST 기준)")
@@ -34,7 +35,7 @@ public record NextOrdersResponse(
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
-            Ticker ticker,           // 거래 종목
+            StrategyTicker ticker,           // 거래 종목
             @Schema(description = "보유 수량")
             int holdings,            // 보유 수량
             @Schema(description = "평균 매입가 (0회차: 전일종가)")
@@ -73,7 +74,7 @@ public record NextOrdersResponse(
     // tradeDate·status·orderId는 preview에서 의미 없으므로 제외
     public record OrderItem(
             @Schema(description = "거래 종목")
-            Ticker ticker,              // 거래 종목
+            StrategyTicker ticker,              // 거래 종목
             @Schema(description = "주문 유형", example = "LOC")
             Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             @Schema(description = "매수/매도 방향", example = "BUY")
@@ -140,9 +141,9 @@ public record NextOrdersResponse(
                 @Schema(description = "경쟁 전략 ID")
                 UUID strategyId,
                 @Schema(description = "경쟁 전략 타입")
-                Strategy.Type type,
+                StrategyType type,
                 @Schema(description = "경쟁 전략 거래 종목")
-                Ticker ticker,
+                StrategyTicker ticker,
                 @Schema(description = "경쟁 전략 필요 매수금액")
                 BigDecimal requiredBuyUsd,
                 @Schema(description = "예산 배정 우선순위 (작을수록 먼저 승인)")

@@ -3,10 +3,11 @@ package com.kista.stats.domain.model;
 import com.kista.domain.model.strategy.Strategy;
 
 import java.math.BigDecimal;
+import com.kista.sharedkernel.StrategyType;
 
 // 전략 타입별 사이클 성과 집계 — 비율 필드는 종료 사이클이 없으면 null
 public record StrategyTypeStats(
-        Strategy.Type type,
+        StrategyType type,
         int closedCycleCount,
         int activeCycleCount,
         BigDecimal winRate,         // 수익 사이클 비율 0~1 (scale 4)

@@ -7,7 +7,7 @@ import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.support.DomainFixtures;
@@ -27,6 +27,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingSellSufficiencySimulatorTest {
@@ -39,8 +42,8 @@ class TradingSellSufficiencySimulatorTest {
 
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
-    Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.PRIVACY,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAX);
+    Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
 
     @BeforeEach
     void setUp() {
@@ -49,14 +52,14 @@ class TradingSellSufficiencySimulatorTest {
     }
 
     private Order sellOrder(int quantity, BigDecimal price) {
-        return Order.planned(today, Ticker.SOXL, Order.OrderType.LIMIT, Order.OrderDirection.SELL, quantity, price);
+        return Order.planned(today, StrategyTicker.SOXL, Order.OrderType.LIMIT, Order.OrderDirection.SELL, quantity, price);
     }
 
     @Test
     void simulate_sufficient_whenSellableQuantityCoversRequiredAndReserved() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 10));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(2);
         List<Order> sellOrders = List.of(sellOrder(5, new BigDecimal("25.00")));
 
@@ -71,9 +74,9 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenRequiredAloneExceedsSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 2));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
@@ -86,9 +89,9 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenExistingReservationsLeaveNotEnoughQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 5));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(3);
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
@@ -100,9 +103,9 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sumsMultipleSellOrderQuantities_asRequiredQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 20));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
         List<Order> sellOrders = List.of(
                 sellOrder(4, new BigDecimal("25.00")),
@@ -116,7 +119,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 

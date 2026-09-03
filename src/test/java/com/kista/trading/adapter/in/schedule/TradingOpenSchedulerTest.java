@@ -34,6 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.anyList;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingOpenSchedulerTest {
@@ -57,9 +61,9 @@ class TradingOpenSchedulerTest {
         return DomainFixtures.kisAccount(accountId, USER_ID);
     }
 
-    private Strategy mockStrategy(UUID accountId, Strategy.Type type) {
+    private Strategy mockStrategy(UUID accountId, StrategyType type) {
         return new Strategy(UUID.randomUUID(), accountId, type,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
     private StrategyCycle mockCycle(UUID strategyId) {
@@ -93,8 +97,8 @@ class TradingOpenSchedulerTest {
     @Test
     void run_includesBothInfiniteAndPrivacyStrategies() throws InterruptedException {
         // INFINITE + PRIVACY 모두 포함 — 장 개시 스케쥴러 전략 타입 불문 모두 처리
-        Strategy infinite = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
-        Strategy privacy  = mockStrategy(ACCOUNT_ID, Strategy.Type.PRIVACY);
+        Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
+        Strategy privacy  = mockStrategy(ACCOUNT_ID, StrategyType.PRIVACY);
         Account account   = mockAccount(ACCOUNT_ID);
         User user         = mockUser();
         BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), account, user);
@@ -124,7 +128,7 @@ class TradingOpenSchedulerTest {
 
     @Test
     void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
-        Strategy strategy = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
+        Strategy strategy = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
         BatchContext context = new BatchContext(strategy, mockCycle(strategy.id()), mockAccount(ACCOUNT_ID), mockUser());
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
@@ -148,7 +152,7 @@ class TradingOpenSchedulerTest {
 
     @Test
     void run_placeOpenOrdersException_notifiesAdmin() throws InterruptedException {
-        Strategy strategy = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
+        Strategy strategy = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
         BatchContext context = new BatchContext(strategy, mockCycle(strategy.id()), mockAccount(ACCOUNT_ID), mockUser());
         RuntimeException ex = new RuntimeException("KIS API 오류");
 
@@ -174,9 +178,9 @@ class TradingOpenSchedulerTest {
 
     @Test
     void run_invalidPrivacyBase_pausesPrivacyStrategiesAndSkipsThem() throws InterruptedException {
-        Strategy infinite = mockStrategy(ACCOUNT_ID, Strategy.Type.INFINITE);
+        Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
         UUID privacyAccountId = UUID.randomUUID();
-        Strategy privacy = mockStrategy(privacyAccountId, Strategy.Type.PRIVACY);
+        Strategy privacy = mockStrategy(privacyAccountId, StrategyType.PRIVACY);
         Account infiniteAccount = mockAccount(ACCOUNT_ID);
         User user = mockUser();
         BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), infiniteAccount, user);

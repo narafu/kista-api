@@ -2,7 +2,7 @@ package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.ReverseModePosition;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +23,7 @@ class ReverseInfiniteStrategyTest {
     void buildFirstDayOrders_assignsMocSellLeg() {
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), true);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), true);
 
         List<Order> orders = strategy.buildFirstDayOrders(position, TODAY);
 
@@ -36,7 +36,7 @@ class ReverseInfiniteStrategyTest {
     void buildOrders_assignsLocSellAndBuyLegs() {
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), false);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -50,7 +50,7 @@ class ReverseInfiniteStrategyTest {
         // usdDeposit=3.00 → 쿼터매수 예산 소진, holdings=100·divisionCount=20 → calcLocSellQuantity=10
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), false);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 
@@ -68,7 +68,7 @@ class ReverseInfiniteStrategyTest {
         // holdings=5·divisionCount=20 → calcLocSellQuantity=0
         ReverseModePosition position = new ReverseModePosition(
                 5, new BigDecimal("10.00"), new BigDecimal("3.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), false);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         List<Order> orders = strategy.buildOrders(position, TODAY);
 

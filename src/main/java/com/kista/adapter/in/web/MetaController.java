@@ -23,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Tag(name = "메타", description = "UI 렌더링용 enum 메타데이터 (라벨, 설명, 유효값 목록)")
 @RestController
@@ -46,13 +50,13 @@ public class MetaController {
     }
 
     private List<StrategyTypeMeta> getStrategyTypeList() {
-        return Arrays.stream(Strategy.Type.values())
+        return Arrays.stream(StrategyType.values())
                 .map(t -> StrategyTypeMeta.from(t, cycleStrategies.of(t)))
                 .toList();
     }
 
     private List<TickerMeta> getTickerList() {
-        return Arrays.stream(Strategy.Ticker.values())
+        return Arrays.stream(StrategyTicker.values())
                 .map(TickerMeta::from)
                 .toList();
     }
@@ -64,13 +68,13 @@ public class MetaController {
     }
 
     private List<EnumMeta> getStrategyStatusList() {
-        return Arrays.stream(Strategy.Status.values())
+        return Arrays.stream(StrategyStatus.values())
                 .map(s -> new EnumMeta(s.name(), s.getLabel(), null))
                 .toList();
     }
 
     private List<EnumMeta> getCycleSeedTypeList() {
-        return Arrays.stream(Strategy.CycleSeedType.values())
+        return Arrays.stream(StrategyCycleSeedType.values())
                 .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
                 .toList();
     }

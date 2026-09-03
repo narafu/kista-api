@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 바로주문 미리보기에서 계좌 내 활성 전략 전체를 야간 배치와 동일한 우선순위로 시뮬레이션해
 // 대상 전략의 BUY가 실제로 승인될지 근사 판정한다
@@ -40,8 +43,8 @@ class TradingBuyCompetitionSimulator {
     private final PreviewDepositCache depositCache;        // 계좌 단위 라이브 예수금 짧은 TTL 캐시 (preview 전용)
 
     // 정렬 대상 후보 — 대상 전략과 경쟁 전략을 동일한 형태로 취급
-    private record RankedCandidate(UUID strategyId, UUID cycleId, Strategy.Type type,
-                                    Strategy.Ticker ticker, BigDecimal requiredBuyUsd, boolean isCurrent) {}
+    private record RankedCandidate(UUID strategyId, UUID cycleId, StrategyType type,
+                                    StrategyTicker ticker, BigDecimal requiredBuyUsd, boolean isCurrent) {}
 
     // 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 전략별 cycle·당일 주문·매매 계획을
     // 미리 계산해 재사용한다. 대상 전략 N개를 순회할 때마다 경쟁 시뮬레이션을 처음부터 다시 계산하던
@@ -83,7 +86,7 @@ class TradingBuyCompetitionSimulator {
 
         List<Strategy> candidates = context != null ? context.strategies() : strategyPort.findByAccountId(account.id());
         for (Strategy other : candidates) {
-            if (other.id().equals(currentStrategy.id()) || other.status() != Strategy.Status.ACTIVE) {
+            if (other.id().equals(currentStrategy.id()) || other.status() != StrategyStatus.ACTIVE) {
                 continue;
             }
             StrategyCycle otherCycle = context != null

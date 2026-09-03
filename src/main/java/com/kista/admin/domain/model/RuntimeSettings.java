@@ -2,8 +2,8 @@ package com.kista.admin.domain.model;
 
 import com.kista.account.domain.model.Account.Broker;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
-import com.kista.domain.model.strategy.Strategy.Type;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyType;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
@@ -14,19 +14,19 @@ import java.util.Objects;
 public record RuntimeSettings(
         boolean approvalRequired, // 신규 가입 승인 필요 여부
         Map<Broker, BrokerSettings> brokers, // 증권사별 신규 등록 설정
-        Map<Type, StrategyCreationSettings> strategies, // 전략별 신규 생성 설정
+        Map<StrategyType, StrategyCreationSettings> strategies, // 전략별 신규 생성 설정
         BenchmarkSettings benchmarks // ETF 벤치마크 비교 자산 설정
 ) {
     public RuntimeSettings {
         brokers = immutableEnumMap(Broker.class, brokers, "broker");
-        strategies = immutableEnumMap(Type.class, strategies, "strategy");
+        strategies = immutableEnumMap(StrategyType.class, strategies, "strategy");
         // benchmarks 도입 이전에 저장된 행에는 이 필드가 없으므로 역직렬화 시 기본값으로 보충한다.
         if (benchmarks == null) benchmarks = BenchmarkSettings.defaults();
     }
 
     // benchmarks 도입 이전 호출부와의 호환을 위한 생성자 — 기본값을 적용한다.
     public RuntimeSettings(boolean approvalRequired, Map<Broker, BrokerSettings> brokers,
-            Map<Type, StrategyCreationSettings> strategies) {
+            Map<StrategyType, StrategyCreationSettings> strategies) {
         this(approvalRequired, brokers, strategies, null);
     }
 
@@ -38,14 +38,14 @@ public record RuntimeSettings(
         }
 
         // 전략별 현재 생성 옵션과 기본값을 구성한다.
-        Map<Type, StrategyCreationSettings> strategies = new EnumMap<>(Type.class);
-        strategies.put(Type.INFINITE, new StrategyCreationSettings(true,
-                field(true, List.of(Ticker.values()), Ticker.SOXL),
+        Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
+        strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
+                field(true, List.of(StrategyTicker.values()), StrategyTicker.SOXL),
                 field(true, List.of(20, 30, 40), Strategy.DEFAULT_DIVISION_COUNT), null, null, null));
-        strategies.put(Type.PRIVACY, new StrategyCreationSettings(true,
-                field(false, List.of(Ticker.SOXL), Ticker.SOXL), null, null, null, null));
-        strategies.put(Type.VR, new StrategyCreationSettings(true,
-                field(false, List.of(Ticker.TQQQ), Ticker.TQQQ), null,
+        strategies.put(StrategyType.PRIVACY, new StrategyCreationSettings(true,
+                field(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL), null, null, null, null));
+        strategies.put(StrategyType.VR, new StrategyCreationSettings(true,
+                field(false, List.of(StrategyTicker.TQQQ), StrategyTicker.TQQQ), null,
                 field(true, List.of(RecurringMode.values()), RecurringMode.HOLD),
                 field(true, List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
                 field(true, List.of(1, 2, 4), 2)));

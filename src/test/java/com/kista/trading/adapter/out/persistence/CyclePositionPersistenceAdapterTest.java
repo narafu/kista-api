@@ -30,6 +30,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -68,8 +72,8 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void save_infinitePosition_persistsCommonAndDetailRows() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
@@ -107,8 +111,8 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findLatestByCycleId_andDeleteByStrategyId_followPersistedRows() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
@@ -240,8 +244,8 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByCyclePositionIds_returnsDetailsKeyedByPositionId() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(

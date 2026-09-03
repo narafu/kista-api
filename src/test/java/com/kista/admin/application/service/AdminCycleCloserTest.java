@@ -20,6 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminCycleCloser 단위 테스트")
@@ -34,8 +38,8 @@ class AdminCycleCloserTest {
     private final UUID cycleId = UUID.randomUUID();
 
     private Strategy activeStrategy() {
-        return new Strategy(strategyId, UUID.randomUUID(), Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        return new Strategy(strategyId, UUID.randomUUID(), StrategyType.INFINITE, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
 
     private StrategyCycle currentCycle() {
@@ -50,8 +54,8 @@ class AdminCycleCloserTest {
         StrategyCycle cycle = currentCycle();
         AccountBalance balance = new AccountBalance(0, null, BigDecimal.valueOf(500));
         LocalDate tradeDate = LocalDate.of(2026, 7, 17);
-        Strategy pausedStrategy = strategy.withStatus(Strategy.Status.PAUSED);
-        when(strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED))).thenReturn(pausedStrategy);
+        Strategy pausedStrategy = strategy.withStatus(StrategyStatus.PAUSED);
+        when(strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED))).thenReturn(pausedStrategy);
 
         AdminCycleCloser.CycleEndResult result = AdminCycleCloser.closeIfExhausted(
                 strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);
@@ -60,7 +64,7 @@ class AdminCycleCloserTest {
         verify(strategyCyclePort).markEnded(cycle.id(), balance.usdDeposit(), tradeDate);
         ArgumentCaptor<Strategy> savedCaptor = ArgumentCaptor.forClass(Strategy.class);
         verify(strategyPort).save(savedCaptor.capture());
-        assertThat(savedCaptor.getValue().status()).isEqualTo(Strategy.Status.PAUSED);
+        assertThat(savedCaptor.getValue().status()).isEqualTo(StrategyStatus.PAUSED);
         assertThat(result.strategy()).isEqualTo(pausedStrategy);
         assertThat(result.ended()).isTrue();
         assertThat(result.endDate()).isEqualTo(tradeDate);

@@ -5,17 +5,19 @@ import com.kista.domain.model.strategy.Strategy;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Component
 public class VrCreationResolver implements StrategyCreationResolver {
 
     @Override
-    public Strategy.Type type() {
-        return Strategy.Type.VR;
+    public StrategyType type() {
+        return StrategyType.VR;
     }
 
     @Override
-    public ResolvedCreation resolveTypeFields(RegisterStrategyCommand cmd, StrategyCreationSettings settings, Strategy.Ticker ticker) {
+    public ResolvedCreation resolveTypeFields(RegisterStrategyCommand cmd, StrategyCreationSettings settings, StrategyTicker ticker) {
         int recurringAmount = resolveRecurringAmount(cmd, settings);
         BigDecimal bandWidth = settings.bandWidth().resolve(cmd.bandWidth());
         Integer intervalWeeks = settings.intervalWeeks().resolve(cmd.intervalWeeks());

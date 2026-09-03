@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +17,7 @@ class ReverseModePositionTest {
         // usdDeposit=3.00 → 쿼터매수 예산 0.75, buyPrice=19.99 → floor(0.75/19.99)=0
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), false);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         assertThat(position.isQuotaBuyExhausted()).isTrue();
     }
@@ -27,7 +27,7 @@ class ReverseModePositionTest {
     void isQuotaBuyExhausted_falseWhenStarPointMissing() {
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
-                Ticker.SOXL, 20, null, false);
+                StrategyTicker.SOXL, 20, null, false);
 
         assertThat(position.isQuotaBuyExhausted()).isFalse();
     }
@@ -38,7 +38,7 @@ class ReverseModePositionTest {
         // usdDeposit=1000.00 → 쿼터매수 예산 250.00, buyPrice=19.99 → floor(250/19.99)=12 (>0)
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
-                Ticker.SOXL, 20, new BigDecimal("20.00"), false);
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         assertThat(position.isQuotaBuyExhausted()).isFalse();
     }

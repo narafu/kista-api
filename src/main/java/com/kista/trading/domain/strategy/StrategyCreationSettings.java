@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 
@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 // StrategyService.resolveCreationSettings()가 레거시(추후 admin) 타입 → 이 타입으로 매핑해 resolver에 전달한다.
 public record StrategyCreationSettings(
         boolean enabled, // 신규 전략 생성 허용 여부
-        StrategyFieldSettings<Ticker> ticker, // 종목 생성 설정
+        StrategyFieldSettings<StrategyTicker> ticker, // 종목 생성 설정
         StrategyFieldSettings<Integer> divisionCount, // 무한매수 분할 수 설정
         StrategyFieldSettings<RecurringMode> recurringMode, // VR 정기 입출금 방향 설정
         StrategyFieldSettings<BigDecimal> bandWidth, // VR 밴드 폭 설정 (%, StrategyVrDetail.bandWidth와 동일한 BigDecimal 정밀도 유지)

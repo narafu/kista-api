@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,7 +63,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
     @Test
     void saveAll_persistsAndLoadsOrderLeg() {
-        Order order = Order.planned(LocalDate.now(), Ticker.SOXL, Order.OrderType.LOC,
+        Order order = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
                         Order.OrderDirection.BUY, 1, new BigDecimal("22.00"))
                 .withLeg("INFINITE_EARLY_AVG_BUY");
 
@@ -142,7 +142,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         insertOrderForAccount(accountId, cycleId, databaseTradeDate, "SOXL", "BUY", "PLANNED", null, null); // 다른 방향
 
         int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                accountId, domainTradeDate, Ticker.SOXL);
+                accountId, domainTradeDate, StrategyTicker.SOXL);
 
         assertThat(result).isEqualTo(10);
     }
@@ -151,7 +151,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_returnsZeroWhenNoReservationMatches() {
         // SQL COALESCE로 매칭 주문이 없어도 0을 반환한다
         int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                accountId, LocalDate.now().plusDays(1), Ticker.TQQQ);
+                accountId, LocalDate.now().plusDays(1), StrategyTicker.TQQQ);
 
         assertThat(result).isZero();
     }

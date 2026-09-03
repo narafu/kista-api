@@ -2,7 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.adapter.out.persistence.BaseAuditEntity;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -36,7 +36,7 @@ class OrderEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
-    private Ticker ticker;
+    private StrategyTicker ticker;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 10)

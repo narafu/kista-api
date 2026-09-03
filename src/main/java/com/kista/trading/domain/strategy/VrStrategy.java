@@ -16,6 +16,7 @@ import static com.kista.trading.domain.model.Order.OrderTiming.AT_CLOSE;
 import static com.kista.trading.domain.model.Order.OrderTiming.AT_OPEN;
 import static com.kista.trading.domain.model.Order.OrderType.LOC;
 import static com.kista.trading.domain.model.Order.OrderType.LIMIT;
+import com.kista.sharedkernel.StrategyTicker;
 
 // VR(밸류리밸런싱) 전략 — 매수·매도 사다리 주문 생성
 @Component
@@ -31,7 +32,7 @@ public class VrStrategy {
     // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
     // livePrice: 과거 SELL bootstrap 전용 파라미터 — case1(V만 있음) 폐기로 현재 미사용, 시그니처는 호출부 영향 최소화를 위해 유지
     // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
-    public List<Order> buildOrders(VrPosition position, Strategy.Ticker ticker,
+    public List<Order> buildOrders(VrPosition position, StrategyTicker ticker,
                                    BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
         if (position.holdings() == 0 && needsBootstrap(position)) {
             return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
@@ -93,7 +94,7 @@ public class VrStrategy {
     // 호출측(needsBootstrap)이 이미 진입 조건을 보장하므로 여기서는 referencePrice 유효성·잔여예산만 확인한다
     // poolUsed는 실제 체결 금액 기준(orderPort.sumFilledBuyAmountByCycleId)이라 하루 주문이 부분/전액 체결되든
     // 미체결이든 다음날 자동으로 정확한 잔여예산이 재계산된다 — 별도 "며칠째"인지 추적 불필요
-    private List<Order> buildBootstrapBuyOrders(VrPosition position, Strategy.Ticker ticker,
+    private List<Order> buildBootstrapBuyOrders(VrPosition position, StrategyTicker ticker,
                                                  BigDecimal referencePrice, LocalDate tradeDate) {
         if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
         BigDecimal remaining = remainingBudget(position);
@@ -107,7 +108,7 @@ public class VrStrategy {
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
     // 생성 시점 가격 캡은 적용하지 않는다(cap=null) — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 재산정
-    private List<Order> buildBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate) {
+    private List<Order> buildBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate) {
         return buildBuyLadder(position, ticker, tradeDate, null);
     }
 
@@ -117,12 +118,12 @@ public class VrStrategy {
     // 호출하면 안 된다. bootstrap은 value=0인 경우이므로 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
     // 무의미해지고, bootstrap 자체의 캡 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
     // orderType(LOC vs LIMIT)으로 bootstrap 배치를 가려내 이 함수 호출 자체를 막는다.
-    public List<Order> buildCappedBuyOrders(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
+    public List<Order> buildCappedBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
         return buildBuyLadder(position, ticker, tradeDate, cap);
     }
 
     // 매수 사다리 공통 생성 로직 — cap이 null이면 원가 그대로(계획 생성), 비-null이면 캡 적용(접수 전 보정)
-    private List<Order> buildBuyLadder(VrPosition position, Strategy.Ticker ticker, LocalDate tradeDate, BigDecimal cap) {
+    private List<Order> buildBuyLadder(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
         // pool 사용 가능 잔여액 — remainingBudget()으로 bootstrap과 동일 기준(governanceLimit·pool 이중 상한)을 공유한다.
         // 두 경로가 각자 상한을 계산하면 한쪽만 고친 뒤 다른 쪽이 방치되는 drift가 재발할 수 있어 단일 계산으로 통일했다.
         BigDecimal poolBudget = remainingBudget(position);
@@ -155,7 +156,7 @@ public class VrStrategy {
     }
 
     // 연속 동일 가격 BUY 주문 병합 — 1주×N → N주 1건
-    private List<Order> mergeSamePriceOrders(List<Order> rawBuys, Strategy.Ticker ticker,
+    private List<Order> mergeSamePriceOrders(List<Order> rawBuys, StrategyTicker ticker,
                                              LocalDate tradeDate) {
         if (rawBuys.isEmpty()) return List.of();
 
@@ -182,7 +183,7 @@ public class VrStrategy {
     }
 
     // 매도 사다리 생성 — 최대 MAX_RUNGS단, 1주씩 (holdings>MAX_RUNGS이면 마지막 단에 잔여 전량)
-    private List<Order> buildSellOrders(VrPosition position, Strategy.Ticker ticker,
+    private List<Order> buildSellOrders(VrPosition position, StrategyTicker ticker,
                                         LocalDate tradeDate) {
         // holdings=0이면 매도 없음
         if (position.holdings() == 0) return List.of();

@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
@@ -36,6 +36,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // PLANNED → 증권사 접수 → PLACED 마킹 흐름과 가격 보정 호출 조건(currentPrice/position 둘 다 있을 때만) 검증
 @ExtendWith(MockitoExtension.class)
@@ -62,7 +65,7 @@ class TradingOrderExecutorTest {
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
 
     static final InfinitePosition POSITION = new InfinitePosition(
-            new AccountBalance(0, null, new BigDecimal("20000")), Ticker.SOXL, new BigDecimal("10.00"), 20);
+            new AccountBalance(0, null, new BigDecimal("20000")), StrategyTicker.SOXL, new BigDecimal("10.00"), 20);
 
     static final VrPosition VR_POSITION = new VrPosition(
             new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00")),
@@ -70,11 +73,11 @@ class TradingOrderExecutorTest {
 
     // 전략 타입별 상수 — placeOrders 호출 시 캡 분기 결정에 사용
     static final Strategy INFINITE_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
-            Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     static final Strategy PRIVACY_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
-            Strategy.Type.PRIVACY, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            StrategyType.PRIVACY, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
-            Strategy.Type.VR, Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            StrategyType.VR, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
     // 실제 capability 구현체로 CycleOrderStrategies 조립 — priceCapMode() 실제 값 검증
     static final CycleOrderStrategies CYCLE_STRATEGIES = new CycleOrderStrategies(List.of(
@@ -93,7 +96,7 @@ class TradingOrderExecutorTest {
     }
 
     private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
-        return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 

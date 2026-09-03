@@ -5,7 +5,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
@@ -31,6 +31,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // VR N주 사이클 롤오버 단위 테스트
 // due 판정·V′ 계산·markEnded·새 사이클 생성·각종 skip 조건 검증
@@ -77,8 +80,8 @@ class VrCycleRolloverServiceTest {
             Instant.now(), null);
 
     static final Strategy VR_STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR,
-            Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.MAINTAIN);
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
+            StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.MAINTAIN);
 
     // 4주 주기, bandWidth=15, recurringAmount=0 → gradient=10, poolLimitRate=0.50
     // 램프 미개입(gMax=initialGradient, poolLimitFloor=initialPoolLimitRate) — 기존 "고정값" 테스트 전제 유지
@@ -181,7 +184,7 @@ class VrCycleRolloverServiceTest {
         when(marketCalendarPort.isMarketOpen(dueDate.minusDays(2))).thenReturn(false);
         when(marketCalendarPort.isMarketOpen(lastTradingDay)).thenReturn(true);
         BigDecimal holidayEvalPrice = new BigDecimal("60.00");
-        when(brokerPricePort.getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT_REF)).thenReturn(holidayEvalPrice);
+        when(brokerPricePort.getClosingPrice(StrategyTicker.TQQQ, lastTradingDay, ACCOUNT_REF)).thenReturn(holidayEvalPrice);
         when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, lastTradingDay, null, Instant.now(), null));
@@ -189,7 +192,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         // 평가금 = holdings(10) × 직전 거래일 종가(60.00) = 600.00 — due일 자체가 아닌 직전 거래일 종가로 계산됨
-        verify(brokerPricePort).getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT_REF);
+        verify(brokerPricePort).getClosingPrice(StrategyTicker.TQQQ, lastTradingDay, ACCOUNT_REF);
         verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("1600.00")), eq(lastTradingDay));
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 any(), any(), any(), eq(holidayEvalPrice), any(), anyInt(), any(), eq(lastTradingDay));

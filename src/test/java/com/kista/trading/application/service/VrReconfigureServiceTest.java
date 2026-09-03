@@ -9,7 +9,7 @@ import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.domain.model.strategy.StrategyDetail;
@@ -53,6 +53,9 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // VrReconfigureService 단위 테스트 — 순수 파라미터 수정/자본 주입/램프 시계·검증/소유권 분기 검증
 // package-private VrReconfigureService와 같은 패키지에 위치 (application.service.trading)
@@ -97,8 +100,8 @@ class VrReconfigureServiceTest {
     @BeforeEach
     void setUp() {
         account = DomainFixtures.kisAccount(accountId, requesterId);
-        vrStrategy = new Strategy(strategyId, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
                 BigDecimal.valueOf(1000), null, LocalDate.now().minusWeeks(4), null, null, null);
         // 기본 램프: initialGradient=10/gMax=15/gGraceWeeks=gStepWeeks=52,26 / initialPoolLimitRate=0.75/floor=0.50
@@ -122,7 +125,7 @@ class VrReconfigureServiceTest {
         lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
         lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
         lenient().when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(pricePort);
-        lenient().when(pricePort.getPrice(Ticker.TQQQ, toBrokerRef(account))).thenReturn(currentPrice);
+        lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(currentPrice);
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
         lenient().when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(currentCycle));
         lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
@@ -384,8 +387,8 @@ class VrReconfigureServiceTest {
     @Test
     @DisplayName("비-VR 전략 재설정 시도 → IllegalArgumentException")
     void reconfigure_nonVrStrategy_throwsIllegalArgumentException() {
-        Strategy infiniteStrategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy infiniteStrategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(infiniteStrategy);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
 

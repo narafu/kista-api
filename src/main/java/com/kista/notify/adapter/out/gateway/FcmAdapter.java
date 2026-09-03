@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Component
@@ -69,7 +71,7 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(User user, Account account, Strategy.Type strategyType, Strategy.Ticker ticker) {
+    public void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker) {
         String body = String.format("[%s] %s 장 마감 전 예수금 확인 바랍니다.", strategyType.name(), ticker.name());
         send(user.id(), "⚠️ 예수금 부족 — " + account.nickname(), body);
     }

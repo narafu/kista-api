@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Tag(name = "백테스트", description = "과거 일봉 기반 전략 시뮬레이션")
 @RestController
@@ -31,8 +33,8 @@ public class BacktestController {
     @GetMapping
     public BacktestResponse run(
             @AuthenticationPrincipal UUID userId, // 로그인 확인 전용 — 백테스트는 계좌와 무관해 소유권 검증 없음
-            @RequestParam Strategy.Type type,
-            @RequestParam Strategy.Ticker ticker,
+            @RequestParam StrategyType type,
+            @RequestParam StrategyTicker ticker,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") BigDecimal seed,

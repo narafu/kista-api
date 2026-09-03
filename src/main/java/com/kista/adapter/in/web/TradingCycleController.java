@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
 @RestController
@@ -165,8 +167,8 @@ public class TradingCycleController {
     public StrategySeedPreviewResponse seedPreview(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
-            @RequestParam Strategy.Type type,
-            @RequestParam Strategy.Ticker ticker,
+            @RequestParam StrategyType type,
+            @RequestParam StrategyTicker ticker,
             @RequestParam(defaultValue = "20") int divisionCount) {
         return StrategySeedPreviewResponse.from(
                 accountStatistics.strategySeedPreview(accountId, userId, type, ticker, divisionCount));

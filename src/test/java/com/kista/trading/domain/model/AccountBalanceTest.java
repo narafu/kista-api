@@ -4,7 +4,7 @@ import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccountBalanceTest {
 
     private static final LocalDate DATE = LocalDate.of(2026, 1, 1);
-    private static final Ticker TICKER = Ticker.SOXL;
+    private static final StrategyTicker TICKER = StrategyTicker.SOXL;
 
     private static Execution buy(int qty, String price) {
         BigDecimal p = new BigDecimal(price);

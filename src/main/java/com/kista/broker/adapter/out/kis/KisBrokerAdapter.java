@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -59,12 +59,12 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         return kisTradingApi.getSellableQuantity(ticker, account);
     }
 
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         return kisTradingApi.getExecutions(from, to, ticker, account);
     }
 
@@ -79,47 +79,47 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPrice(ticker, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPrices(tickers, account);
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
+    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPriceSnapshot(ticker, account);
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPriceSnapshots(tickers, account);
     }
 
     @Override
-    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
+    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPrevClose(ticker, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPrevCloses(tickers, account);
     }
 
     @Override
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return kisPriceApi.getClosingPrice(ticker, tradeDate, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
+    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         return kisPriceApi.getClosingPrices(tickers, tradeDate, account);
     }
 
     @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
         return kisTradingApi.getBalance(account, ticker);
     }
 }

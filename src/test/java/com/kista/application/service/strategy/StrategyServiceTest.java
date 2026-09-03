@@ -44,6 +44,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StrategyService 단위 테스트")
@@ -74,14 +78,14 @@ class StrategyServiceTest {
 
     // ACTIVE 상태 전략 픽스처
     private static final Strategy ACTIVE_STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
 
     // PAUSED 상태 전략 픽스처
     private static final Strategy PAUSED_STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.PAUSED,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.PAUSED,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
 
     private static final UUID CYCLE_ID = UUID.randomUUID();
@@ -145,24 +149,24 @@ class StrategyServiceTest {
         return DomainFixtures.activeUserWithTelegram(USER_ID);
     }
 
-    private RuntimeSettings settingsWith(Strategy.Type type, StrategyCreationSettings replacement) {
+    private RuntimeSettings settingsWith(StrategyType type, StrategyCreationSettings replacement) {
         RuntimeSettings defaults = RuntimeSettings.defaults();
-        EnumMap<Strategy.Type, StrategyCreationSettings> strategies = new EnumMap<>(defaults.strategies());
+        EnumMap<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(defaults.strategies());
         strategies.put(type, replacement);
         return new RuntimeSettings(defaults.approvalRequired(), defaults.brokers(), strategies);
     }
 
-    private StrategyCreationSettings disabledSettings(Strategy.Type type) {
+    private StrategyCreationSettings disabledSettings(StrategyType type) {
         StrategyCreationSettings current = RuntimeSettings.defaults().strategies().get(type);
         return new StrategyCreationSettings(false, current.ticker(), current.divisionCount(),
                 current.recurringMode(), current.bandWidth(), current.intervalWeeks());
     }
 
-    private Strategy.Ticker defaultTicker(Strategy.Type type) {
+    private StrategyTicker defaultTicker(StrategyType type) {
         return RuntimeSettings.defaults().strategies().get(type).ticker().defaultValue();
     }
 
-    private RegisterStrategyCommand commandFor(Strategy.Type type, Strategy.Ticker ticker, int divisionCount,
+    private RegisterStrategyCommand commandFor(StrategyType type, StrategyTicker ticker, int divisionCount,
                                                 Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
         // 중간부터 시작 입력(initialHoldings/initialAvgPrice) 없음 — holdings=0에서 시작하는 기존 시나리오 전용 헬퍼
         return new RegisterStrategyCommand(type, ticker, null, null, divisionCount,
@@ -170,12 +174,12 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
     }
 
-    private void stubSuccessfulRegistration(Strategy.Type type, Strategy.Ticker ticker) {
+    private void stubSuccessfulRegistration(StrategyType type, StrategyTicker ticker) {
         Account account = ownerAccount();
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
-        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, Strategy.Status.ACTIVE, ticker,
-                Strategy.CycleSeedType.NONE);
+        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, StrategyStatus.ACTIVE, ticker,
+                StrategyCycleSeedType.NONE);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
@@ -189,7 +193,7 @@ class StrategyServiceTest {
                     arg.createdAt(), arg.deletedAt());
         });
         when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        if (type == Strategy.Type.VR) {
+        if (type == StrategyType.VR) {
             when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
             when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("1000000"));
             when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -204,7 +208,7 @@ class StrategyServiceTest {
 
         strategyService.pause(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == Strategy.Status.PAUSED));
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
     }
 
     @Test
@@ -215,7 +219,7 @@ class StrategyServiceTest {
 
         strategyService.resume(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == Strategy.Status.ACTIVE));
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
     }
 
     @Test
@@ -249,16 +253,16 @@ class StrategyServiceTest {
     @Test
     @DisplayName("update() 호출 시 newSeed가 null이면 cycleSeedType만 변경되고 시드는 변경되지 않는다")
     void update_without_newSeed_only_changes_cycleSeedType() {
-        Strategy maintained = ACTIVE_STRATEGY.withCycleSeedType(Strategy.CycleSeedType.MAINTAIN);
+        Strategy maintained = ACTIVE_STRATEGY.withCycleSeedType(StrategyCycleSeedType.MAINTAIN);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.save(any(Strategy.class))).thenReturn(maintained);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
 
         StrategyDetail result = strategyService.update(STRATEGY_ID, USER_ID,
-                new UpdateStrategyCommand(Strategy.CycleSeedType.MAINTAIN, null));
+                new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null));
 
-        assertThat(result.strategy().cycleSeedType()).isEqualTo(Strategy.CycleSeedType.MAINTAIN);
+        assertThat(result.strategy().cycleSeedType()).isEqualTo(StrategyCycleSeedType.MAINTAIN);
         assertThat(result.initialUsdDeposit()).isEqualTo(new BigDecimal("1000"));
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
@@ -322,8 +326,8 @@ class StrategyServiceTest {
     @DisplayName("update() VR 시드 수정은 저장 전에 거절하고 VR 재설정을 안내한다")
     void update_vrSeed_throwsBeforePersistenceMutation() {
         Strategy vrStrategy = new Strategy(
-                STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                STRATEGY_ID, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         CyclePosition opening = new CyclePosition(
                 UUID.randomUUID(), CYCLE_ID, new BigDecimal("1000.00"),
                 null, null, 0, null, null);
@@ -370,8 +374,8 @@ class StrategyServiceTest {
 
         UUID strategyAId = UUID.randomUUID();
         UUID strategyBId = UUID.randomUUID();
-        Strategy strategyA = new Strategy(strategyAId, accountAId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy strategyB = new Strategy(strategyBId, accountBId, Strategy.Type.INFINITE, Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy strategyA = new Strategy(strategyAId, accountAId, StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy strategyB = new Strategy(strategyBId, accountBId, StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(accountA, accountB));
         when(strategyPort.findByAccountIds(List.of(accountAId, accountBId)))
@@ -392,7 +396,7 @@ class StrategyServiceTest {
     void register_disabledStrategyType_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
 
-        for (Strategy.Type type : Strategy.Type.values()) {
+        for (StrategyType type : StrategyType.values()) {
             when(runtimeSettingsPort.load()).thenReturn(settingsWith(type, disabledSettings(type)));
             RegisterStrategyCommand cmd = commandFor(type, defaultTicker(type), 20, 2, new BigDecimal("15"), 0);
 
@@ -407,16 +411,16 @@ class StrategyServiceTest {
     @Test
     @DisplayName("INFINITE register()는 생략한 ticker와 divisionCount에 런타임 기본값을 적용한다")
     void register_infinite_appliesOmittedDefaults() {
-        stubSuccessfulRegistration(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.TQQQ);
         StrategyCreationSettings customized = new StrategyCreationSettings(true,
-                new StrategyFieldSettings<>(true, List.of(Strategy.Ticker.SOXL, Strategy.Ticker.TQQQ), Strategy.Ticker.TQQQ),
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ), StrategyTicker.TQQQ),
                 new StrategyFieldSettings<>(true, List.of(30, 40), 30), null, null, null);
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, customized));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.INFINITE, customized));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, null, 0, null, null, null));
+                commandFor(StrategyType.INFINITE, null, 0, null, null, null));
 
-        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(result.divisionCount()).isEqualTo(30);
         verify(strategyInfiniteDetailPort).save(argThat(detail -> detail.divisionCount() == 30));
     }
@@ -425,17 +429,17 @@ class StrategyServiceTest {
     @DisplayName("INFINITE register()는 ticker와 divisionCount 허용 목록 밖의 값을 거부한다")
     void register_infinite_rejectsDisallowedFields() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        StrategyCreationSettings infinite = RuntimeSettings.defaults().strategies().get(Strategy.Type.INFINITE);
+        StrategyCreationSettings infinite = RuntimeSettings.defaults().strategies().get(StrategyType.INFINITE);
         StrategyCreationSettings restricted = new StrategyCreationSettings(true,
-                new StrategyFieldSettings<>(true, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL),
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL),
                 infinite.divisionCount(), null, null, null);
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, restricted));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.INFINITE, restricted));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.MAGX, 20, null, null, null)))
+                commandFor(StrategyType.INFINITE, StrategyTicker.MAGX, 20, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 25, null, null, null)))
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 25, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -444,20 +448,20 @@ class StrategyServiceTest {
     void register_infinite_nonCustomizableFields_allowDefaultRejectOther() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         StrategyCreationSettings fixed = new StrategyCreationSettings(true,
-                new StrategyFieldSettings<>(false, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL),
+                new StrategyFieldSettings<>(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL),
                 new StrategyFieldSettings<>(false, List.of(30), 30), null, null, null);
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.INFINITE, fixed));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.INFINITE, fixed));
         when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 30, null, null, null)))
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 30, null, null, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이미 해당 종목");
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, 30, null, null, null)))
+                commandFor(StrategyType.INFINITE, StrategyTicker.TQQQ, 30, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 40, null, null, null)))
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 40, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -469,7 +473,7 @@ class StrategyServiceTest {
 
         for (int divisionCount : List.of(30, 40)) {
             assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                    commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, divisionCount, null, null, null)))
+                    commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, divisionCount, null, null, null)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("이미 해당 종목");
         }
@@ -481,24 +485,24 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.PRIVACY, Strategy.Ticker.TQQQ, 20, null, null, null)))
+                commandFor(StrategyType.PRIVACY, StrategyTicker.TQQQ, 20, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, Strategy.Ticker.SOXL, 20, 2, new BigDecimal("15"), 0)))
+                commandFor(StrategyType.VR, StrategyTicker.SOXL, 20, 2, new BigDecimal("15"), 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("VR register()는 생략한 ticker, recurring mode, bandWidth, intervalWeeks 기본값을 적용한다")
     void register_vr_appliesOmittedDefaults() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
-                new RegisterStrategyCommand(Strategy.Type.VR, null, new BigDecimal("1000"), null, 0,
+                new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 0,
                         null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null));
 
-        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.TQQQ);
         verify(strategyVrDetailPort).save(argThat(detail -> detail.intervalWeeks() == 2
                 && detail.bandWidth().compareTo(new BigDecimal("15")) == 0
                 && detail.recurringAmount() == 0));
@@ -510,10 +514,10 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("12"), 0)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("12"), 0)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 3, new BigDecimal("15"), 0)))
+                commandFor(StrategyType.VR, null, 20, 3, new BigDecimal("15"), 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -521,22 +525,22 @@ class StrategyServiceTest {
     @DisplayName("VR 고정 bandWidth와 intervalWeeks는 명시적 기본값만 허용한다")
     void register_vr_nonCustomizableBandAndInterval_allowDefaultRejectOther() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(StrategyType.VR);
         StrategyCreationSettings fixed = new StrategyCreationSettings(true, vr.ticker(), null, vr.recurringMode(),
                 new StrategyFieldSettings<>(false, List.of(new BigDecimal("15")), new BigDecimal("15")),
                 new StrategyFieldSettings<>(false, List.of(2), 2));
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, fixed));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.VR, fixed));
         when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 0, 2, new BigDecimal("15"), 0)))
+                commandFor(StrategyType.VR, null, 0, 2, new BigDecimal("15"), 0)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이미 해당 종목");
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 0, 2, new BigDecimal("10"), 0)))
+                commandFor(StrategyType.VR, null, 0, 2, new BigDecimal("10"), 0)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 0, 4, new BigDecimal("15"), 0)))
+                commandFor(StrategyType.VR, null, 0, 4, new BigDecimal("15"), 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -544,18 +548,18 @@ class StrategyServiceTest {
     @DisplayName("VR recurringMode 허용 목록은 recurringAmount 부호로 검증하고 금액 크기는 제한하지 않는다")
     void register_vr_validatesRecurringModeBySignOnly() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(StrategyType.VR);
         StrategyCreationSettings depositOnly = new StrategyCreationSettings(true, vr.ticker(), null,
                 new StrategyFieldSettings<>(true, List.of(RecurringMode.DEPOSIT), RecurringMode.DEPOSIT),
                 vr.bandWidth(), vr.intervalWeeks());
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, depositOnly));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.VR, depositOnly));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), -999)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), -999)))
                 .isInstanceOf(IllegalArgumentException.class);
         when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 999)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), 999)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이미 해당 종목");
     }
@@ -564,21 +568,21 @@ class StrategyServiceTest {
     @DisplayName("VR recurringMode가 고정이면 생략/0은 허용하고 명시적 nonzero는 거부한다")
     void register_vr_nonCustomizableRecurringMode_forcesHold() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(StrategyType.VR);
         StrategyCreationSettings holdOnly = new StrategyCreationSettings(true, vr.ticker(), null,
                 new StrategyFieldSettings<>(false, List.of(RecurringMode.HOLD), RecurringMode.HOLD),
                 vr.bandWidth(), vr.intervalWeeks());
-        when(runtimeSettingsPort.load()).thenReturn(settingsWith(Strategy.Type.VR, holdOnly));
+        when(runtimeSettingsPort.load()).thenReturn(settingsWith(StrategyType.VR, holdOnly));
         when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), null)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), null)))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 0)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), 0)))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.VR, null, 20, 2, new BigDecimal("15"), 1)))
+                commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -599,12 +603,12 @@ class StrategyServiceTest {
     @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
     void register_duplicateTicker_throws() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(true);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(true);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalStateException.class);
@@ -617,7 +621,7 @@ class StrategyServiceTest {
     void register_seedExceedsFreeCash_throws() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 600 > 500
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("600"), null, 20,
+                StrategyType.INFINITE, StrategyTicker.TQQQ, new BigDecimal("600"), null, 20,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
@@ -625,7 +629,7 @@ class StrategyServiceTest {
                 new BigDecimal("500"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -644,22 +648,22 @@ class StrategyServiceTest {
     void register_uniqueTickerWithinFreeCash_succeeds() {
         // KIS 가용금액 1000, 기존 SOXL 전략이 500 점유 → 예수금 500 / 신규 시드 500 == 500 → 허용
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, new BigDecimal("500"), null, 40,
+                StrategyType.INFINITE, StrategyTicker.TQQQ, new BigDecimal("500"), null, 40,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("500"), null, null, 0, null, null);
         UUID newStrategyId = UUID.randomUUID();
-        Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("500"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), savedCycle.id(),
                 new BigDecimal("500"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -671,7 +675,7 @@ class StrategyServiceTest {
         when(cyclePositionPort.save(any(CyclePosition.class))).thenReturn(savedPosition);
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("500");
         assertThat(result.divisionCount()).isEqualTo(40);
         verify(cyclePositionPort).save(argThat(p ->
@@ -688,22 +692,22 @@ class StrategyServiceTest {
     @DisplayName("VR register() holdings=0이어도 초기 V 입력이 있으면 그 값을 V값으로 저장한다")
     void register_vr_explicitInitialValue_holdingsZero_usesOverrideAsValue() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 null, null, 2, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null,
                 new BigDecimal("5000"));
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 BigDecimal.ZERO, null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -727,21 +731,21 @@ class StrategyServiceTest {
     @DisplayName("VR register() 초기 V 입력이 있어도 실제 포지션·startAmount는 시장가 평가금 기준을 그대로 유지한다")
     void register_vr_explicitInitialValue_withHoldings_keepsEvaluatedAssetsSeparate() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 10, new BigDecimal("100.00"), 2, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null,
                 new BigDecimal("99999"));
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(Strategy.Ticker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
+        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -768,7 +772,7 @@ class StrategyServiceTest {
     void register_vr_explicitInitialValue_doesNotBypassWithdrawalMinimumCheck() {
         // 게이트(V+예수금>0)는 override(100000)로 통과하지만, 인출식 최소자산(실제 평가금 0 + 예수금 100)은 미달
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("100"), null, 20,
+                StrategyType.VR, null, new BigDecimal("100"), null, 20,
                 null, null, 2, new BigDecimal("15.00"), -100,
                 null, null, null, null, null, null, null, null, null,
                 new BigDecimal("100000"));
@@ -790,14 +794,14 @@ class StrategyServiceTest {
     @DisplayName("VR register() 초기 V값이 음수이면 IllegalArgumentException")
     void register_vr_negativeInitialValue_throws() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, null, null, 20,
+                StrategyType.VR, null, null, null, 20,
                 null, null, 2, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null,
                 new BigDecimal("-1"));
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
 
@@ -811,14 +815,14 @@ class StrategyServiceTest {
     void register_vr_success_savesVrDetailsAndPoolLimit() {
         // holdings=0(중간부터 시작 미입력) → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75(recurringAmount=0) → poolLimit = 1500.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
@@ -828,7 +832,7 @@ class StrategyServiceTest {
                 vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -843,8 +847,8 @@ class StrategyServiceTest {
 
         // cycleSeedType NONE 강제 + VR → TQQQ 강제 검증
         verify(strategyPort).save(argThat(s ->
-                s.type() == Strategy.Type.VR && s.ticker() == Strategy.Ticker.TQQQ
-                        && s.cycleSeedType() == Strategy.CycleSeedType.NONE));
+                s.type() == StrategyType.VR && s.ticker() == StrategyTicker.TQQQ
+                        && s.cycleSeedType() == StrategyCycleSeedType.NONE));
         // StrategyVrDetail 저장 검증
         verify(strategyVrDetailPort).save(argThat(d ->
                 d.intervalWeeks() == 4
@@ -866,21 +870,21 @@ class StrategyServiceTest {
     @DisplayName("VR register() holdings=0 허용 — 중간부터 시작 미입력 시 initialSnapshot으로 초기 포지션 저장")
     void register_vr_holdingsZero_allowed() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 2, new BigDecimal("10.00"), 0,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("1000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -904,14 +908,14 @@ class StrategyServiceTest {
     @DisplayName("VR 적립식은 초기 V와 초기 시드가 모두 0이어도 등록 가능")
     void register_vr_recurringDeposit_allowsZeroInitialValueAndSeed() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 null, null, 2, new BigDecimal("15.00"), 200,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
@@ -921,7 +925,7 @@ class StrategyServiceTest {
                 vrCycleId, BigDecimal.ZERO, 10, BigDecimal.ONE);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -943,11 +947,11 @@ class StrategyServiceTest {
     @DisplayName("VR 거치식과 인출식은 초기 V와 초기 시드가 모두 0이면 등록 불가")
     void register_vr_nonDeposit_requiresInitialValueOrSeed() {
         RegisterStrategyCommand hold = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 null, null, 2, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null);
         RegisterStrategyCommand withdraw = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 null, null, 2, new BigDecimal("15.00"), -100,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
@@ -972,7 +976,7 @@ class StrategyServiceTest {
     @DisplayName("VR 인출식은 초기 자산이 월 인출액의 100배 이상이어야 등록 가능")
     void register_vr_withdrawal_requiresMinimumInitialAssets() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 2, new BigDecimal("15.00"), -100,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
@@ -995,21 +999,21 @@ class StrategyServiceTest {
     void register_vr_nullRecurringAmount_defaultsToZero() {
         // holdings=0 → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75 → poolLimit = 1500.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("2000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), null,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -1033,19 +1037,19 @@ class StrategyServiceTest {
     @DisplayName("VR register() 적립식 initialValue null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullInitialValue_defaultsToZero() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, BigDecimal.ZERO, null, 20,
+                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
                 null, null, 4, new BigDecimal("15.00"), 200,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -1064,19 +1068,19 @@ class StrategyServiceTest {
     @DisplayName("VR register() 적립식 initialUsdDeposit null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullPool_defaultsToZero() {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, null, null, 20,
+                StrategyType.VR, null, null, null, 20,
                 null, null, 4, new BigDecimal("15.00"), 200,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
@@ -1095,21 +1099,21 @@ class StrategyServiceTest {
     void register_vr_poolLimitRate_withDeposit() {
         // holdings=0 → V=0, recurringAmount=100(입금) → poolLimitRate=1.0 → poolLimit = 1000 × 1.0 = 1000.00
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 100,
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("1000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
@@ -1132,9 +1136,9 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 램프 8필드 모두 생략 — 거치식(recurringAmount=0) 부호 파생 기본값 저장")
     void register_vr_rampFieldsOmitted_appliesNormalizedDefaults() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null,
                 null);
@@ -1152,10 +1156,10 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 램프 8필드 모두 생략 — 인출식(recurringAmount<0)은 initialGradient=40/gMax=50/initialPoolLimitRate=0.1 기본값 적용")
     void register_vr_rampFieldsOmitted_withdrawal_appliesGradient40() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialUsdDeposit=20000으로 충족
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("20000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("20000"), null, 20,
                 null, null, 2, new BigDecimal("15.00"), -100,
                 null, null, null, null, null, null, null, null,
                 null);
@@ -1171,9 +1175,9 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 램프 8필드 명시 입력 시 정규화 없이 그대로 저장된다")
     void register_vr_rampFieldsExplicit_savedAsProvided() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 12, 10, 5, 18,
                 new BigDecimal("0.60"), 8, 4, new BigDecimal("0.30"),
@@ -1191,9 +1195,9 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(0 초과 요구만 생략)")
     void register_vr_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 null, null, null, null,
                 new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO,
@@ -1209,9 +1213,9 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() gStepWeeks=0 — gradient 램프 비활성화, gGraceWeeks=0·gMax=0을 그대로 저장")
     void register_vr_gStepWeeksZero_disablesRampAndSkipsMaxValidation() {
-        stubSuccessfulRegistration(Strategy.Type.VR, Strategy.Ticker.TQQQ);
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 10, 0, 0, 0,
                 null, null, null, null,
@@ -1228,14 +1232,14 @@ class StrategyServiceTest {
     void register_vr_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 null, null, null, null,
                 new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90"),
@@ -1253,14 +1257,14 @@ class StrategyServiceTest {
     void register_vr_gMaxLessThanInitialGradient_throws() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 15, null, null, 10,
                 null, null, null, null,
@@ -1278,14 +1282,14 @@ class StrategyServiceTest {
     void register_vr_poolLimitFloorGreaterThanInitial_throws() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 4, new BigDecimal("15.00"), 0,
                 null, null, null, null,
                 new BigDecimal("0.50"), null, null, new BigDecimal("0.80"),
@@ -1304,8 +1308,8 @@ class StrategyServiceTest {
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
         UUID vrVersionId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
                 new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
@@ -1352,8 +1356,8 @@ class StrategyServiceTest {
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(
                 vrCycleId, vrStrategyId, UUID.randomUUID(), new BigDecimal("1600.00"),
                 null, LocalDate.now(), null, null, null);
@@ -1377,8 +1381,8 @@ class StrategyServiceTest {
         UUID versionId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         UUID positionId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
                 new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
@@ -1420,8 +1424,8 @@ class StrategyServiceTest {
         UUID strategyId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
                 new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
@@ -1466,8 +1470,8 @@ class StrategyServiceTest {
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         UUID positionId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
@@ -1499,8 +1503,8 @@ class StrategyServiceTest {
     @DisplayName("동등성: 사이클 없는 신규 전략 — getById와 listByUserId 결과가 같다 (모두 null 필드)")
     void equivalence_newStrategyWithoutCycle() {
         UUID strategyId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
         // 단건 경로 — 사이클 없음(Optional.empty), 다른 stub 없이도 lenient 기본값(빈 Optional/Map)으로 처리됨
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
@@ -1531,8 +1535,8 @@ class StrategyServiceTest {
     void equivalence_vrMissingOpeningPosition_bothThrowSameException() {
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, UUID.randomUUID(),
                 new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
 
@@ -1564,10 +1568,10 @@ class StrategyServiceTest {
         UUID strategyBId = UUID.randomUUID();
         UUID cycleAId = UUID.randomUUID();
         UUID cycleBId = UUID.randomUUID();
-        Strategy strategyA = new Strategy(strategyAId, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
-        Strategy strategyB = new Strategy(strategyBId, ACCOUNT_ID, Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategyA = new Strategy(strategyAId, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy strategyB = new Strategy(strategyBId, ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycleA = new StrategyCycle(cycleAId, strategyAId, STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
         StrategyCycle cycleB = new StrategyCycle(cycleBId, strategyBId, STRATEGY_VERSION_ID,
@@ -1600,25 +1604,25 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
-        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1500.00"), null, LocalDate.now(), null, null, null);
 
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("1000"), null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("1000"), null, 20,
                 10, new BigDecimal("45.50"), null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("2000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(Strategy.Ticker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
+        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1640,16 +1644,16 @@ class StrategyServiceTest {
     @DisplayName("PRIVACY register() 중간부터 시작 — CyclePositionInfiniteDetail을 저장하지 않는다")
     void register_privacy_bootstrap_savesPositionWithoutInfiniteDetail() {
         Account account = ownerAccount();
-        Strategy.Ticker ticker = defaultTicker(Strategy.Type.PRIVACY);
+        StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
-        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-                ticker, Strategy.CycleSeedType.NONE);
+        Strategy saved = new Strategy(strategyId, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                ticker, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2200.00"), null, LocalDate.now(), null, null, null);
 
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.PRIVACY, null, new BigDecimal("200"), null, 0,
+                StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0,
                 20, new BigDecimal("95.00"), null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1682,22 +1686,22 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
-        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 5, new BigDecimal("100"), 4, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.TQQQ)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(Strategy.Ticker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("120"));
+        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("120"));
         when(strategyPort.save(any())).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(invocation -> {
             StrategyCycle cycle = invocation.getArgument(0);
@@ -1723,7 +1727,7 @@ class StrategyServiceTest {
     void register_bootstrap_holdingsWithoutAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 10, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1737,7 +1741,7 @@ class StrategyServiceTest {
     void register_bootstrap_holdingsWithZeroAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 10, BigDecimal.ZERO, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1750,7 +1754,7 @@ class StrategyServiceTest {
     void register_bootstrap_negativeHoldings_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 -1, null, null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1763,7 +1767,7 @@ class StrategyServiceTest {
     void register_bootstrap_negativeAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 null, new BigDecimal("-5"), null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1776,16 +1780,16 @@ class StrategyServiceTest {
     void register_bootstrap_priceFetchFailure_throwsIllegalState() {
         Account account = ownerAccount();
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 10, new BigDecimal("45.50"), null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, Strategy.Ticker.SOXL)).thenReturn(false);
+        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(Strategy.Ticker.SOXL, toBrokerRef(account)))
+        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, toBrokerRef(account)))
                 .thenThrow(new RuntimeException("증권사 API 조회 실패"));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -1796,10 +1800,10 @@ class StrategyServiceTest {
     @Test
     @DisplayName("register() holdings=0 하위호환 — 중간부터 시작 미입력 시 시장가 조회 없이 기존 initialSnapshot으로 등록된다")
     void register_holdingsZero_backwardCompatible_skipsMarketPriceFetch() {
-        stubSuccessfulRegistration(Strategy.Type.INFINITE, Strategy.Ticker.SOXL);
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 20, null, null, null));
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null));
 
         assertThat(result.currentHoldings()).isEqualTo(0);
         verify(registry, never()).require(any(), eq(BrokerPricePort.class));
@@ -1811,10 +1815,10 @@ class StrategyServiceTest {
     @Test
     @DisplayName("INFINITE register() scheduledStartDate 명시 시 저장되는 StrategyCycle.startDate가 그 값과 일치한다")
     void register_infinite_withScheduledStartDate_setsCycleStartDate() {
-        stubSuccessfulRegistration(Strategy.Type.INFINITE, Strategy.Ticker.SOXL);
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
         LocalDate scheduledStart = LocalDate.now(TimeZones.KST).plusDays(3);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.INFINITE, Strategy.Ticker.SOXL, null, null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null, scheduledStart);
 
@@ -1830,12 +1834,12 @@ class StrategyServiceTest {
     @Test
     @DisplayName("PRIVACY register() scheduledStartDate 생략(null) 시 저장되는 StrategyCycle.startDate는 오늘(KST)이다")
     void register_privacy_withoutScheduledStartDate_defaultsToToday() {
-        Strategy.Ticker ticker = defaultTicker(Strategy.Type.PRIVACY);
-        stubSuccessfulRegistration(Strategy.Type.PRIVACY, ticker);
+        StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
+        stubSuccessfulRegistration(StrategyType.PRIVACY, ticker);
 
         // commandFor()는 scheduledStartDate 자리에 null을 전달 — 생략 시나리오
         strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(Strategy.Type.PRIVACY, null, 0, null, null, null));
+                commandFor(StrategyType.PRIVACY, null, 0, null, null, null));
 
         ArgumentCaptor<StrategyCycle> captor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(captor.capture());
@@ -1848,7 +1852,7 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         LocalDate yesterday = LocalDate.now(TimeZones.KST).minusDays(1);
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                Strategy.Type.VR, null, new BigDecimal("1000"), null, 20,
+                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
                 null, null, 2, new BigDecimal("15.00"), 0,
                 null, null, null, null, null, null, null, null, yesterday);
 

@@ -33,6 +33,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @WebMvcTest(BacktestController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -84,8 +86,8 @@ class BacktestControllerTest {
         ArgumentCaptor<BacktestCommand> captor = ArgumentCaptor.forClass(BacktestCommand.class);
         verify(backtestUseCase).run(captor.capture());
         BacktestCommand command = captor.getValue();
-        assertThat(command.type()).isEqualTo(Strategy.Type.VR);
-        assertThat(command.ticker()).isEqualTo(Strategy.Ticker.TQQQ);
+        assertThat(command.type()).isEqualTo(StrategyType.VR);
+        assertThat(command.ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(command.from()).isEqualTo(LocalDate.of(2024, 1, 1));
         assertThat(command.to()).isEqualTo(LocalDate.of(2024, 1, 5));
         assertThat(command.seed()).isEqualByComparingTo("1000");

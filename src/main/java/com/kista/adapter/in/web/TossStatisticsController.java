@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.usecase.TossStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,7 +37,7 @@ public class TossStatisticsController {
     public List<TossCandleResponse> getCandles(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker,
+            @Parameter(description = "종목 코드", example = "SOXL") @RequestParam StrategyTicker ticker,
             @Parameter(description = "간격 (1D/1W/1M)", example = "1D") @RequestParam String interval,
             @Parameter(description = "조회 시작일", example = "2025-01-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @Parameter(description = "조회 종료일", example = "2025-01-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -56,7 +56,7 @@ public class TossStatisticsController {
     public TossStockInfoResponse getStockInfo(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "종목 코드", example = "SOXL") @RequestParam Ticker ticker) {
+            @Parameter(description = "종목 코드", example = "SOXL") @RequestParam StrategyTicker ticker) {
         return TossStockInfoResponse.from(tossStatistics.getStockInfo(accountId, userId, ticker));
     }
 

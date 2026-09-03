@@ -5,7 +5,7 @@ import com.kista.broker.domain.model.Currency;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +62,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
 
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(5);
         assertThat(balance.avgPrice()).isEqualByComparingTo("20.00");
@@ -77,7 +77,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00", "USD")));
 
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(0);
         assertThat(balance.avgPrice()).isNull();
@@ -92,7 +92,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
 
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, Ticker.SOXL);
+        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(0);
         assertThat(balance.usdDeposit()).isEqualByComparingTo(BigDecimal.ZERO);

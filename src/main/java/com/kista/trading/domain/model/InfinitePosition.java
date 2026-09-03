@@ -6,10 +6,11 @@ import java.math.BigDecimal;
 
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.sharedkernel.StrategyTicker;
 
 public record InfinitePosition(
         AccountBalance balance,
-        Strategy.Ticker ticker,        // 거래 종목
+        StrategyTicker ticker,        // 거래 종목
         BigDecimal prevClosePrice,     // 최근 종가 — 0회차에서 평단가 대용 (현재가 대신 사용)
         int divisionCount              // 분할 수 (20/30/40) — totalAssets ÷ divisionCount = unitAmount
 ) {

@@ -2,13 +2,16 @@ package com.kista.domain.model.strategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 전략 등록 인바운드 파라미터
 public record RegisterStrategyCommand(
-        Strategy.Type type,
-        Strategy.Ticker ticker,                      // null이면 전략 기본값
+        StrategyType type,
+        StrategyTicker ticker,                      // null이면 전략 기본값
         BigDecimal initialUsdDeposit,                // null 허용 (선택 입력), VR에서는 예수금(초기 pool)으로 재사용
-        Strategy.CycleSeedType cycleSeedType,        // null이면 NONE으로 처리
+        StrategyCycleSeedType cycleSeedType,        // null이면 NONE으로 처리
         int divisionCount,                           // 분할 수 (20/30/40), 0은 미입력 sentinel로 런타임 기본값 적용
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
         Integer initialHoldings,                      // 등록 시점 기존 보유 수량
@@ -31,8 +34,8 @@ public record RegisterStrategyCommand(
         BigDecimal initialVrValue
 ) {
     // 기존 19개 필드 호출부(테스트 등) 호환용 — initialVrValue 생략 시 null(미지정)
-    public RegisterStrategyCommand(Strategy.Type type, Strategy.Ticker ticker, BigDecimal initialUsdDeposit,
-            Strategy.CycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
+    public RegisterStrategyCommand(StrategyType type, StrategyTicker ticker, BigDecimal initialUsdDeposit,
+            StrategyCycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
             Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, Integer initialGradient,
             Integer gGraceWeeks, Integer gStepWeeks, Integer gMax, BigDecimal initialPoolLimitRate,
             Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate) {

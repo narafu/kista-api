@@ -5,7 +5,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.domain.model.strategy.StrategyInfiniteDetail;
 import com.kista.domain.model.strategy.StrategyVersion;
@@ -35,6 +35,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // 사이클 종료 후 재등록(MAINTAIN/MAX) 정책 검증 — 최소금액 가드(InfiniteCycleOrderStrategy.MIN_DEPOSIT_MULTIPLIER=44) 포함
 @ExtendWith(MockitoExtension.class)
@@ -87,9 +90,9 @@ class CycleRotationServiceTest {
                 null, LocalDate.now(), null, Instant.now(), null);
     }
 
-    private Strategy strategy(Strategy.CycleSeedType seedType) {
-        return new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, seedType);
+    private Strategy strategy(StrategyCycleSeedType seedType) {
+        return new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, seedType);
     }
 
 
@@ -98,7 +101,7 @@ class CycleRotationServiceTest {
     void maintain_keepsExistingDeposit() {
         // minRequired = 22 × 44 = 968 — 기존 1000 통과
         BigDecimal deposit = new BigDecimal("1000.00");
-        Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
+        Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
         // MAINTAIN도 실잔고 확인 — actual >= maintainSeed 이면 재등록
         when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
@@ -117,7 +120,7 @@ class CycleRotationServiceTest {
         // minRequired = 22 × 44 = 968 — 기존 500은 미달
         // actual(600) >= maintainSeed(500) → targetSeed=500, 하지만 500 < minRequired(968) → 잔고부족 알림
         BigDecimal deposit = new BigDecimal("500.00");
-        Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
+        Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
         when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("600.00"));
@@ -125,7 +128,7 @@ class CycleRotationServiceTest {
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
-                && ACCOUNT.id().equals(ibe.accountId()) && ibe.b().usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == Ticker.SOXL));
+                && ACCOUNT.id().equals(ibe.accountId()) && ibe.b().usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
@@ -136,7 +139,7 @@ class CycleRotationServiceTest {
         // KIS actual(2000) >= maxSeed(1500) → targetSeed = 1500 (NOT 2000)
         BigDecimal maintainDeposit = new BigDecimal("1000.00");
         BigDecimal maxSeedDeposit = new BigDecimal("1500.00");
-        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), maintainDeposit);
 
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
@@ -155,7 +158,7 @@ class CycleRotationServiceTest {
     @Test
     @DisplayName("MAX — KIS 잔고 조회 실패 시 재등록 중단 + 관리자 오류 알림")
     void max_kisLookupFails_abortsAndNotifiesError() {
-        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         RuntimeException kisError = new RuntimeException("KIS 잔고 조회 실패");
         when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
@@ -171,7 +174,7 @@ class CycleRotationServiceTest {
     @Test
     @DisplayName("MAX — USD 잔고 행이 없으면 재등록 중단 + 오류 알림")
     void max_noUsdMarginRow_abortsAndNotifiesError() {
-        Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         // USD 잔고 없음 → router가 BigDecimal.ZERO 반환
         when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);

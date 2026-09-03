@@ -2,7 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -152,7 +152,7 @@ class KisResponseParserTest {
     @Test
     void streamTickered_tickerPassedToMapper() {
         List<String> rows = List.of("SOXL");
-        List<Ticker> result = KisResponseParser.streamTickered(rows, Function.identity(), (ticker, row) -> ticker);
-        assertThat(result).containsExactly(Ticker.SOXL);
+        List<StrategyTicker> result = KisResponseParser.streamTickered(rows, Function.identity(), (ticker, row) -> ticker);
+        assertThat(result).containsExactly(StrategyTicker.SOXL);
     }
 }

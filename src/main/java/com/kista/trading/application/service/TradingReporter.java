@@ -30,6 +30,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 체결 조회 + 알림 발송 (포지션 저장은 CyclePositionPersistor에 위임)
 @Component
@@ -132,7 +134,7 @@ class TradingReporter {
         }
     }
 
-    private TradingReport buildReport(LocalDate today, Strategy.Type strategyType, Strategy.Ticker ticker, List<Execution> executions) {
+    private TradingReport buildReport(LocalDate today, StrategyType strategyType, StrategyTicker ticker, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
                 .filter(e -> e.direction() == Direction.BUY)
                 .map(Execution::amountUsd)

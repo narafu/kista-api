@@ -1,6 +1,6 @@
 package com.kista.application.usecase;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
 
 import java.time.LocalDate;
@@ -10,9 +10,9 @@ import java.util.UUID;
 // Toss 전용 통계 기능 — Toss 계좌에서만 접근 가능 (비Toss 호출 시 IllegalStateException → 400)
 public interface TossStatisticsUseCase {
     // GET /api/v1/candles — 캔들차트
-    List<TossCandle> getCandles(UUID accountId, UUID requesterId, Ticker ticker, String interval, LocalDate from, LocalDate to);
+    List<TossCandle> getCandles(UUID accountId, UUID requesterId, StrategyTicker ticker, String interval, LocalDate from, LocalDate to);
     // GET /api/v1/stocks — 종목 기본 정보
-    TossStockInfo getStockInfo(UUID accountId, UUID requesterId, Ticker ticker);
+    TossStockInfo getStockInfo(UUID accountId, UUID requesterId, StrategyTicker ticker);
     // GET /api/v1/exchange-rate — 환율 (USD/KRW)
     TossExchangeRate getExchangeRate(UUID accountId, UUID requesterId);
     // GET /api/v1/market-calendar/US — 해외 장 운영 정보

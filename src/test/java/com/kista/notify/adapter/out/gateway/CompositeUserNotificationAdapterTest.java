@@ -18,6 +18,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class CompositeUserNotificationAdapterTest {
@@ -39,7 +41,7 @@ class CompositeUserNotificationAdapterTest {
 
     // 테스트용 TradingReport 생성 헬퍼
     static TradingReport report() {
-        return new TradingReport(LocalDate.now(), Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("500.00"), new BigDecimal("200.00"));
+        return new TradingReport(LocalDate.now(), StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("500.00"), new BigDecimal("200.00"));
     }
 
     @Test

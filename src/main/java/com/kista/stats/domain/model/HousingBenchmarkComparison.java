@@ -5,6 +5,8 @@ import com.kista.domain.model.strategy.Strategy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 public record HousingBenchmarkComparison(
         BenchmarkScope scope,
@@ -16,7 +18,7 @@ public record HousingBenchmarkComparison(
         CurrentExchangeRate currentExchangeRate,
         String emptyReason
 ) {
-    public record StrategyInfo(UUID id, Strategy.Type type, Strategy.Ticker ticker) {}
+    public record StrategyInfo(UUID id, StrategyType type, StrategyTicker ticker) {}
 
     public record Benchmark(
             BenchmarkAssetType assetType,

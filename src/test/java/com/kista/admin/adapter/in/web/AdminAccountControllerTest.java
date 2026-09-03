@@ -30,6 +30,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @WebMvcTest(AdminAccountController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
@@ -75,8 +79,8 @@ class AdminAccountControllerTest {
     void listStrategiesByAccount_adminRole_returns200() throws Exception {
         UUID accountId = UUID.randomUUID();
         when(adminQuery.listStrategies(accountId)).thenReturn(List.of(
-                new Strategy(UUID.randomUUID(), accountId, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-                        Strategy.Ticker.SOXL, Strategy.CycleSeedType.MAX)));
+                new Strategy(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                        StrategyTicker.SOXL, StrategyCycleSeedType.MAX)));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies", accountId)
                         .with(authentication(adminToken(ADMIN_UUID))))

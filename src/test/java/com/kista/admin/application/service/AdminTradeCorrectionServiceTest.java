@@ -39,6 +39,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class AdminTradeCorrectionServiceTest {
@@ -65,8 +69,8 @@ class AdminTradeCorrectionServiceTest {
     void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
         User user = DomainFixtures.activeUserWithTelegram(USER_ID);
         Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
-        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.MAX);
+        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
                 null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
@@ -88,10 +92,10 @@ class AdminTradeCorrectionServiceTest {
 
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.finalHoldings()).isZero();
-        assertThat(result.strategyStatus()).isEqualTo(Strategy.Status.PAUSED);
+        assertThat(result.strategyStatus()).isEqualTo(StrategyStatus.PAUSED);
         verify(orderPort).saveAll(any());
         verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("7200.05"), LocalDate.of(2026, 7, 1));
-        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == Strategy.Status.PAUSED));
+        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.PAUSED));
         // 청산 발생 → 사이클 종료 이벤트 발행
         verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
 
@@ -105,8 +109,8 @@ class AdminTradeCorrectionServiceTest {
     void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
         User user = DomainFixtures.activeUserWithTelegram(USER_ID);
         Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Account.Broker.KIS, null);
-        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-                Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
                 null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),

@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -84,7 +85,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdAndDateRange(UUID strategyId, Instant from, Instant to) {
         // ticker는 strategy에서 한 번만 조회
-        Strategy.Ticker ticker = strategyPort.findById(strategyId)
+        StrategyTicker ticker = strategyPort.findById(strategyId)
                 .map(Strategy::ticker).orElse(null);
         return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to).stream()
                 .map(e -> toEntry(e, ticker))
@@ -124,7 +125,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdWithCursor(UUID strategyId, Instant from,
                                                                        Instant cursor, int limit) {
-        Strategy.Ticker ticker = strategyPort.findById(strategyId)
+        StrategyTicker ticker = strategyPort.findById(strategyId)
                 .map(Strategy::ticker).orElse(null);
         return positionRepo.findByStrategyIdWithCursor(strategyId, from, cursor, PageRequest.of(0, limit))
                 .stream().map(e -> toEntry(e, ticker)).toList();
@@ -158,7 +159,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     // cycle_position 목록에서 strategy_cycle → strategy 경유 ticker 맵 구성
-    private Map<UUID, Strategy.Ticker> buildTickerMapFromPositions(List<CyclePositionEntity> entities) {
+    private Map<UUID, StrategyTicker> buildTickerMapFromPositions(List<CyclePositionEntity> entities) {
         Set<UUID> cycleIds = entities.stream()
                 .map(CyclePositionEntity::getStrategyCycleId)
                 .collect(Collectors.toSet());
@@ -169,7 +170,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         Set<UUID> strategyIds = cycles.stream()
                 .map(StrategyCycleEntity::getStrategyId)
                 .collect(Collectors.toSet());
-        Map<UUID, Strategy.Ticker> strategyTickerMap = strategyPort.findTickersByIds(strategyIds);
+        Map<UUID, StrategyTicker> strategyTickerMap = strategyPort.findTickersByIds(strategyIds);
         // cycleId → ticker 역매핑
         return cycles.stream()
                 .collect(Collectors.toMap(
@@ -180,17 +181,17 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     // 포지션 목록 → 히스토리 entry 목록 (ticker 맵 1회 구성 후 일괄 변환)
     private List<CyclePositionHistoryEntry> toEntries(List<CyclePositionEntity> entities) {
-        Map<UUID, Strategy.Ticker> tickerMap = buildTickerMapFromPositions(entities);
+        Map<UUID, StrategyTicker> tickerMap = buildTickerMapFromPositions(entities);
         return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
     }
 
     // ticker 맵을 이용한 entry 변환
     private CyclePositionHistoryEntry toEntry(CyclePositionEntity e,
-                                              Map<UUID, Strategy.Ticker> tickerMap) {
+                                              Map<UUID, StrategyTicker> tickerMap) {
         return toEntry(e, tickerMap.get(e.getStrategyCycleId()));
     }
 
-    private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, Strategy.Ticker ticker) {
+    private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, StrategyTicker ticker) {
         return new CyclePositionHistoryEntry(
                 e.getId(), ticker,
                 e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),

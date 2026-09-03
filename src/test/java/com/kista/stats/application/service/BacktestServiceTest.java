@@ -34,6 +34,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class BacktestServiceTest {
@@ -50,12 +52,12 @@ class BacktestServiceTest {
     private static final BigDecimal SEED = new BigDecimal("1000");
 
     private static BacktestCommand infinite(Integer divisionCount) {
-        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, FROM, TO, SEED,
+        return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO, SEED,
                 divisionCount, null, null, 0, null);
     }
 
     private static BacktestCommand vr(BigDecimal bandWidth, Integer intervalWeeks, int recurring, String initialValue) {
-        return new BacktestCommand(Strategy.Type.VR, Strategy.Ticker.TQQQ, FROM, TO, SEED,
+        return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, SEED,
                 null, bandWidth, intervalWeeks, recurring,
                 initialValue == null ? null : new BigDecimal(initialValue));
     }
@@ -65,18 +67,18 @@ class BacktestServiceTest {
     }
 
     private static BacktestCommand privacy(LocalDate from, LocalDate to) {
-        return new BacktestCommand(Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, from, to, SEED,
+        return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL, from, to, SEED,
                 null, null, null, 0, null);
     }
 
     private static BacktestCommand infiniteWithPosition(BigDecimal seed, Integer holdings, BigDecimal avgPrice) {
-        return new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, FROM, TO, seed,
+        return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO, seed,
                 null, null, null, 0, null, holdings, avgPrice);
     }
 
     private static BacktestCommand vrWithPosition(BigDecimal seed, int recurring, String initialValue,
                                                    Integer holdings, BigDecimal avgPrice) {
-        return new BacktestCommand(Strategy.Type.VR, Strategy.Ticker.TQQQ, FROM, TO, seed,
+        return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, seed,
                 null, new BigDecimal("15"), 4, recurring,
                 initialValue == null ? null : new BigDecimal(initialValue), holdings, avgPrice);
     }
@@ -90,7 +92,7 @@ class BacktestServiceTest {
 
     @Test
     void 전략이_지원하지_않는_종목이면_거부한다() {
-        BacktestCommand command = new BacktestCommand(Strategy.Type.VR, Strategy.Ticker.SOXL, FROM, TO, SEED,
+        BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.SOXL, FROM, TO, SEED,
                 null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"));
 
         assertThatThrownBy(() -> service.run(command))
@@ -101,7 +103,7 @@ class BacktestServiceTest {
 
     @Test
     void 시드가_0이하면_거부한다() {
-        BacktestCommand command = new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, FROM, TO,
+        BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO,
                 BigDecimal.ZERO, null, null, null, 0, null);
 
         assertThatThrownBy(() -> service.run(command))
@@ -121,7 +123,7 @@ class BacktestServiceTest {
 
     @Test
     void 예수금_없이_기존_보유만으로_시작할_수_있다() {
-        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -152,7 +154,7 @@ class BacktestServiceTest {
 
     @Test
     void 시작일이_종료일보다_늦으면_거부한다() {
-        BacktestCommand command = new BacktestCommand(Strategy.Type.INFINITE, Strategy.Ticker.TQQQ, TO, FROM, SEED,
+        BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, TO, FROM, SEED,
                 null, null, null, 0, null);
 
         assertThatThrownBy(() -> service.run(command))
@@ -179,7 +181,7 @@ class BacktestServiceTest {
 
     @Test
     void INFINITE_허용되지_않는_분할수는_거부한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.availableDivisionCounts()).thenReturn(List.of(20, 30, 40));
 
         assertThatThrownBy(() -> service.run(infinite(25)))
@@ -197,7 +199,7 @@ class BacktestServiceTest {
 
     @Test
     void VR_인출식_최소자산_검증은_보유_포지션_취득원가도_합산한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -222,7 +224,7 @@ class BacktestServiceTest {
 
     @Test
     void INFINITE는_전일종가_확보용_워밍업_프리픽스를_함께_조회한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -238,7 +240,7 @@ class BacktestServiceTest {
 
     @Test
     void VR은_요청_구간_그대로_조회한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -250,7 +252,7 @@ class BacktestServiceTest {
 
     @Test
     void PRIVACY도_요청_구간_그대로_조회한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.PRIVACY)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -265,7 +267,7 @@ class BacktestServiceTest {
 
     @Test
     void PRIVACY_기준표_시작일_이전_구간은_실측_시작일로_경고한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.PRIVACY)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
@@ -280,7 +282,7 @@ class BacktestServiceTest {
 
     @Test
     void PRIVACY_적용_거래일이_다른_기준표는_look_ahead_방지로_버린다() {
-        when(cycleOrderStrategies.of(Strategy.Type.PRIVACY)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100")));
@@ -300,7 +302,7 @@ class BacktestServiceTest {
 
     @Test
     void PRIVACY_월요일_세션도_그날_발행분_기준표를_적용한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.PRIVACY)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         // 캔들 날짜는 US 세션일 — 금(1/5)·월(1/8). 직전 달력일이 일요일이라 월요일엔 "전날 발행분"이 존재하지 않는다
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
@@ -331,7 +333,7 @@ class BacktestServiceTest {
 
     @Test
     void 요약은_시작끝_두_지점만으로_수익률을_계산한다() {
-        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(candlePort.fetchDailyCandles(anyString(), any(), any())).thenReturn(List.of(
                 new DailyCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100")),
                 new DailyCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("110"), bd("90"), bd("110")),
@@ -367,7 +369,7 @@ class BacktestServiceTest {
 
     @Test
     void 항상_체결모델과_주문타이밍_안내를_덧붙인다() {
-        when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -381,7 +383,7 @@ class BacktestServiceTest {
 
     @Test
     void VR_적립식이면_외부_현금흐름_미반영_경고를_덧붙인다() {
-        when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(planner);
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
@@ -404,14 +406,14 @@ class BacktestServiceTest {
     // 적용 거래일이 tradeDate인 기준 매매표 (주문 명세는 비워도 tradeDate 판별에는 1건이면 충분)
     private static PrivacyTradeBase baseFor(LocalDate tradeDate) {
         return new PrivacyTradeBase(UUID.randomUUID(), bd("100"), 0, bd("100"),
-                List.of(new PrivacyTradeBase.PrivacyTrade(tradeDate, Strategy.Ticker.SOXL,
+                List.of(new PrivacyTradeBase.PrivacyTrade(tradeDate, StrategyTicker.SOXL,
                         PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, bd("100"))));
     }
 
     // 지정가 100 매수 1주 — position=null이라 엔진의 캡 재산정 대상에서 제외된다
     private static CycleOrderStrategy.OrderPlan buyOnePlan() {
         Order order = new Order(null, UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2024, 1, 1),
-                Strategy.Ticker.TQQQ, Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN,
+                StrategyTicker.TQQQ, Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN,
                 Order.OrderDirection.BUY, 1, bd("100"), Order.OrderStatus.PLANNED, null, null, null);
         return new CycleOrderStrategy.OrderPlan(null, null, List.of(order));
     }

@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.usecase.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -98,12 +98,12 @@ public class StatisticsController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "조회할 종목 코드 목록 (TQQQ/SOXL/USD)", example = "TQQQ,SOXL,USD")
-            @RequestParam List<Ticker> tickers) {
-        List<Ticker> distinct = tickers.stream().distinct().toList();
+            @RequestParam List<StrategyTicker> tickers) {
+        List<StrategyTicker> distinct = tickers.stream().distinct().toList();
         if (distinct.isEmpty() || distinct.size() > 10) {
             throw new IllegalArgumentException("tickers는 1~10개여야 합니다"); // GlobalExceptionHandler → 400
         }
-        Map<Ticker, BigDecimal> result = accountStatistics.getPrices(accountId, userId, distinct);
+        Map<StrategyTicker, BigDecimal> result = accountStatistics.getPrices(accountId, userId, distinct);
         return MultiPriceResponse.from(result);
     }
 

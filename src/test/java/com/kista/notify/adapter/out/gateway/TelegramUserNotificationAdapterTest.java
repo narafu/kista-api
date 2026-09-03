@@ -29,6 +29,8 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramUserNotificationAdapterTest {
@@ -173,6 +175,6 @@ class TelegramUserNotificationAdapterTest {
 
     // TradingReport 생성 헬퍼
     private TradingReport buildTestReport() {
-        return new TradingReport(LocalDate.of(2024, 6, 15), Strategy.Type.INFINITE, Strategy.Ticker.SOXL, new BigDecimal("66.00"), new BigDecimal("35.00"));
+        return new TradingReport(LocalDate.of(2024, 6, 15), StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("66.00"), new BigDecimal("35.00"));
     }
 }

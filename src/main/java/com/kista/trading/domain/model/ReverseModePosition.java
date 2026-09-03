@@ -6,19 +6,20 @@ import java.math.BigDecimal;
 
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 리버스모드(소진 후) 포지션 — 소진 발동 이후 사이클에서 별지점 기준 매수/매도 계산
 public record ReverseModePosition(
         int holdings,                   // 현재 보유 수량
         BigDecimal avgPrice,            // 평단가
         BigDecimal usdDeposit,          // 가용 잔금
-        Strategy.Ticker ticker,         // 거래 종목
+        StrategyTicker ticker,         // 거래 종목
         int divisionCount,              // 분할 수 (20/30/40)
         BigDecimal starPointPrice,      // 별지점 = 직전 5거래일 종가 평균 (null이면 계산 불가)
         boolean isFirstDay              // 소진 직후 첫날 여부
 ) {
     // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
-    public static ReverseModePosition of(AccountBalance balance, Strategy.Ticker ticker, int divisionCount,
+    public static ReverseModePosition of(AccountBalance balance, StrategyTicker ticker, int divisionCount,
                                          BigDecimal starPointPrice, boolean isFirstDay) {
         return new ReverseModePosition(balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
                 ticker, divisionCount, starPointPrice, isFirstDay);

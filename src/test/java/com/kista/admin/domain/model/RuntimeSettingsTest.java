@@ -9,6 +9,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 class RuntimeSettingsTest {
 
@@ -19,13 +21,13 @@ class RuntimeSettingsTest {
         assertThat(settings.approvalRequired()).isTrue();
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
         assertThat(settings.brokers().values()).allMatch(RuntimeSettings.BrokerSettings::enabled);
-        assertThat(settings.strategies()).containsOnlyKeys(Strategy.Type.values());
+        assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
         assertThat(settings.strategies().values()).allMatch(StrategyCreationSettings::enabled);
-        assertThat(settings.strategies().get(Strategy.Type.INFINITE).divisionCount())
+        assertThat(settings.strategies().get(StrategyType.INFINITE).divisionCount())
                 .isEqualTo(new StrategyFieldSettings<>(true, List.of(20, 30, 40), 20));
-        assertThat(settings.strategies().get(Strategy.Type.PRIVACY).ticker())
-                .isEqualTo(new StrategyFieldSettings<>(false, List.of(Strategy.Ticker.SOXL), Strategy.Ticker.SOXL));
-        assertThat(settings.strategies().get(Strategy.Type.VR).recurringMode().defaultValue())
+        assertThat(settings.strategies().get(StrategyType.PRIVACY).ticker())
+                .isEqualTo(new StrategyFieldSettings<>(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL));
+        assertThat(settings.strategies().get(StrategyType.VR).recurringMode().defaultValue())
                 .isEqualTo(RecurringMode.HOLD);
     }
 
@@ -38,7 +40,7 @@ class RuntimeSettingsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("broker");
         assertThatThrownBy(() -> new RuntimeSettings(true, defaults.brokers(),
-                Map.of(Strategy.Type.INFINITE, defaults.strategies().get(Strategy.Type.INFINITE))))
+                Map.of(StrategyType.INFINITE, defaults.strategies().get(StrategyType.INFINITE))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("strategy");
     }
@@ -74,7 +76,7 @@ class RuntimeSettingsTest {
 
     @Test
     void fixedRecurringModeMustBeHold() {
-        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(Strategy.Type.VR);
+        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(StrategyType.VR);
 
         assertThatThrownBy(() -> new StrategyCreationSettings(true, vr.ticker(), null,
                 new StrategyFieldSettings<>(false, List.of(RecurringMode.DEPOSIT), RecurringMode.DEPOSIT),

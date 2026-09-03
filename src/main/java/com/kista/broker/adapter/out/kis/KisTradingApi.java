@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.common.UsTradeDates;
 import com.kista.broker.domain.model.*;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -40,14 +40,14 @@ class KisTradingApi {
 
     // ── getBalance() ─────────────────────────────────────────────────────────
 
-    public BrokerBalance getBalance(BrokerAccountRef account, Ticker ticker) {
+    public BrokerBalance getBalance(BrokerAccountRef account, StrategyTicker ticker) {
         HoldingResult holding = fetchHolding(account, ticker);
         BigDecimal usdDeposit = getUsdBuyableAmount(account);
         BigDecimal avgPrice = holding.quantity() > 0 ? holding.avgPrice() : null;
         return new BrokerBalance(holding.quantity(), avgPrice, usdDeposit);
     }
 
-    private HoldingResult fetchHolding(BrokerAccountRef account, Ticker ticker) {
+    private HoldingResult fetchHolding(BrokerAccountRef account, StrategyTicker ticker) {
         BalanceResponse response = kisHttpClient.tradingGet(
                 BALANCE_TR_ID, BALANCE_PATH, account, BalanceResponse.class,
                 p -> {
@@ -144,7 +144,7 @@ class KisTradingApi {
     // ── SellableQuantityPort.getSellableQuantity() ────────────────────────────
 
     // TTTS3012R 잔고수량 조회 (CTRP6504R cblc_qty13은 실잔고보다 적게 반환되는 사례 있음)
-    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         int quantity = fetchHolding(account, ticker).quantity();
         log.info("KIS 판매 가능 수량: ticker={}, quantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
@@ -152,7 +152,7 @@ class KisTradingApi {
 
     // ── KisExecutionPort ───────────────────────────────────────────────────────
 
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         ExecutionListResponse response = kisHttpClient.tradingGet(
                 EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
                 p -> {

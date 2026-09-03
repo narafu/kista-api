@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyTicker;
 
 public interface StrategyPort {
     List<Strategy> findByAccountId(UUID accountId);
@@ -35,8 +36,8 @@ public interface StrategyPort {
     Map<UUID, AdminCycleStrategySummary> findSummariesByCycleIds(Collection<UUID> cycleIds);
 
     // strategyId 집합 → ticker 배치 조회 (com.kista.trading의 CyclePositionPersistenceAdapter가 StrategyEntity 직접 접근 불가라 포트 경유)
-    Map<UUID, Strategy.Ticker> findTickersByIds(Collection<UUID> strategyIds);
+    Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> strategyIds);
 
     // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
-    boolean existsByAccountIdAndTicker(UUID accountId, Strategy.Ticker ticker);
+    boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
 }

@@ -4,7 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
@@ -38,6 +38,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
 
 @ExtendWith(MockitoExtension.class)
 class StrategySeedPreviewServiceTest {
@@ -78,11 +79,11 @@ class StrategySeedPreviewServiceTest {
     @Test
     void infinite_uses_prev_close_not_current() {
         // given: 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함 (현재가 API 미사용)
-        when(pricePort.getPrevClose(eq(Strategy.Ticker.SOXL), any(BrokerAccountRef.class)))
+        when(pricePort.getPrevClose(eq(StrategyTicker.SOXL), any(BrokerAccountRef.class)))
                 .thenReturn(new BigDecimal("89.20"));
 
         // when
-        var result = service.strategySeedPreview(accountId, userId, Strategy.Type.INFINITE, Strategy.Ticker.SOXL, 20);
+        var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);
 
         // then: minSeed = 89.20 * (20 * 2.0) = 3568.00
         assertThat(result.basePrice()).isEqualByComparingTo("89.20");
@@ -100,7 +101,7 @@ class StrategySeedPreviewServiceTest {
         when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.empty());
 
         // when
-        var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
+        var result = service.strategySeedPreview(accountId, userId, StrategyType.PRIVACY, StrategyTicker.SOXL, 0);
 
         // then
         assertThat(result.skipReason()).isEqualTo("NO_PRIVACY_BASE");
@@ -111,11 +112,11 @@ class StrategySeedPreviewServiceTest {
     @Test
     void privacy_with_base_returns_min_seed() {
         // given: 기준매매표 있음, currentCycleStart = 5000.00
-        PrivacyCurrentBase base = new PrivacyCurrentBase(Ticker.SOXL, new BigDecimal("5000.00"), null);
+        PrivacyCurrentBase base = new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("5000.00"), null);
         when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(base));
 
         // when
-        var result = service.strategySeedPreview(accountId, userId, Strategy.Type.PRIVACY, Strategy.Ticker.SOXL, 0);
+        var result = service.strategySeedPreview(accountId, userId, StrategyType.PRIVACY, StrategyTicker.SOXL, 0);
 
         // then: PRIVACY minSeed = currentCycleStart / 2
         assertThat(result.basePrice()).isEqualByComparingTo("5000.00");
@@ -126,14 +127,14 @@ class StrategySeedPreviewServiceTest {
     @Test
     void getPrices_returns_prev_close_not_current() {
         // given: 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함 (현재가 API 미사용)
-        when(pricePort.getPrevCloses(eq(List.of(Strategy.Ticker.SOXL)), any(BrokerAccountRef.class)))
-                .thenReturn(Map.of(Strategy.Ticker.SOXL, new BigDecimal("89.20")));
+        when(pricePort.getPrevCloses(eq(List.of(StrategyTicker.SOXL)), any(BrokerAccountRef.class)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("89.20")));
 
         // when
-        var result = service.getPrices(accountId, userId, List.of(Strategy.Ticker.SOXL));
+        var result = service.getPrices(accountId, userId, List.of(StrategyTicker.SOXL));
 
         // then
-        assertThat(result.get(Strategy.Ticker.SOXL)).isEqualByComparingTo("89.20");
+        assertThat(result.get(StrategyTicker.SOXL)).isEqualByComparingTo("89.20");
         verify(pricePort, never()).getPrices(any(), any());
         verify(pricePort, never()).getPriceSnapshots(any(), any());
     }

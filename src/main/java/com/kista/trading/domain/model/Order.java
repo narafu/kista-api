@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,7 +11,7 @@ public record Order(
         UUID accountId,                  // FK → accounts.id
         UUID strategyCycleId,            // FK → strategy_cycle.id (멀티 전략 주문 격리)
         LocalDate tradeDate,             // 거래일
-        Ticker ticker,                   // 거래 종목
+        StrategyTicker ticker,                   // 거래 종목
         OrderType orderType,             // 주문 유형 (LOC/MOC/LIMIT) — 증권사 실행 지시
         OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
         OrderDirection direction,        // 매수/매도 방향
@@ -25,7 +25,7 @@ public record Order(
 ) {
     public static final String UNKNOWN_LEG = "UNKNOWN";
 
-    public Order(UUID id, UUID accountId, UUID strategyCycleId, LocalDate tradeDate, Ticker ticker,
+    public Order(UUID id, UUID accountId, UUID strategyCycleId, LocalDate tradeDate, StrategyTicker ticker,
                  OrderType orderType, OrderTiming timing, OrderDirection direction,
                  Integer quantity, BigDecimal price, OrderStatus status, String externalOrderId,
                  Integer filledQuantity, BigDecimal filledPrice) {
@@ -72,27 +72,27 @@ public record Order(
     }
 
     // 전략 계산용 PLANNED 템플릿 주문 — AT_CLOSE 기본값 (매수·PRIVACY 등 대부분)
-    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+    public static Order planned(LocalDate tradeDate, StrategyTicker ticker, OrderType orderType,
                                  OrderDirection direction, int quantity, BigDecimal price) {
         return planned(tradeDate, ticker, orderType, direction, quantity, price, OrderTiming.AT_CLOSE);
     }
 
     // 전략 계산용 PLANNED 템플릿 주문 — 접수 시점 명시 (INFINITE SELL → AT_OPEN)
-    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+    public static Order planned(LocalDate tradeDate, StrategyTicker ticker, OrderType orderType,
                                  OrderDirection direction, int quantity, BigDecimal price,
                                  OrderTiming timing) {
         return planned(tradeDate, ticker, orderType, direction, quantity, price, timing, UNKNOWN_LEG);
     }
 
     // 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
-    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+    public static Order planned(LocalDate tradeDate, StrategyTicker ticker, OrderType orderType,
                                  OrderDirection direction, int quantity, BigDecimal price,
                                  String orderLeg) {
         return planned(tradeDate, ticker, orderType, direction, quantity, price, OrderTiming.AT_CLOSE, orderLeg);
     }
 
     // 접수 시점과 전략 주문 다리 식별자를 포함한 PLANNED 템플릿 주문
-    public static Order planned(LocalDate tradeDate, Ticker ticker, OrderType orderType,
+    public static Order planned(LocalDate tradeDate, StrategyTicker ticker, OrderType orderType,
                                  OrderDirection direction, int quantity, BigDecimal price,
                                  OrderTiming timing, String orderLeg) {
         return new Order(null, null, null, tradeDate, ticker, orderType, timing, direction,
@@ -101,7 +101,7 @@ public record Order(
 
     // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록
     public static Order filledManual(UUID accountId, UUID strategyCycleId, LocalDate tradeDate,
-                                     Ticker ticker, OrderTiming timing, OrderDirection direction,
+                                     StrategyTicker ticker, OrderTiming timing, OrderDirection direction,
                                      int quantity, BigDecimal price, String externalOrderId) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
                 timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,

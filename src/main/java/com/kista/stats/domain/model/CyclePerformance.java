@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 사이클 1개의 성과 — 진행 중이면 endAmount=최신 스냅샷 평가액, closed=false
 // 근사 한계: 수수료 미반영. VR 적립금(recurringAmount)은 V' 목표값 계산(VrPosition.nextValue)과
@@ -14,8 +16,8 @@ import java.util.UUID;
 public record CyclePerformance(
         UUID cycleId,
         UUID accountId,
-        Strategy.Type strategyType,
-        Strategy.Ticker ticker,
+        StrategyType strategyType,
+        StrategyTicker ticker,
         LocalDate startDate,
         LocalDate endDate,          // 진행 중이면 null
         BigDecimal startAmount,

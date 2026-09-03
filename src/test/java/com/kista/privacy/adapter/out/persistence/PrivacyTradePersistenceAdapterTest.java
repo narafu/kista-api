@@ -3,7 +3,7 @@ package com.kista.privacy.adapter.out.persistence;
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.PrivacyDates;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 class PrivacyTradePersistenceAdapterTest {
 
@@ -31,11 +34,11 @@ class PrivacyTradePersistenceAdapterTest {
         LocalDate expectedReleaseDate = PrivacyDates.releaseDateFor(todayKst);
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
         base.setReleaseDate(expectedReleaseDate);
-        base.setTicker(Ticker.SOXL);
+        base.setTicker(StrategyTicker.SOXL);
         base.setCurrentCycleStart(new BigDecimal("14467.67"));
         base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
 
-        when(baseRepository.findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(expectedReleaseDate, Ticker.SOXL))
+        when(baseRepository.findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(expectedReleaseDate, StrategyTicker.SOXL))
                 .thenReturn(Optional.of(base));
 
         var result = adapter.findSeedPreviewBase();
@@ -43,7 +46,7 @@ class PrivacyTradePersistenceAdapterTest {
         assertThat(result).isPresent();
         assertThat(result.get().currentCycleStart()).isEqualByComparingTo("14467.67");
         assertThat(result.get().tradeDate()).isEqualTo(todayKst); // 발행일 → 적용 거래일 변환 확인
-        verify(baseRepository).findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(expectedReleaseDate, Ticker.SOXL);
+        verify(baseRepository).findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(expectedReleaseDate, StrategyTicker.SOXL);
     }
 
     @Test
@@ -51,7 +54,7 @@ class PrivacyTradePersistenceAdapterTest {
         LocalDate dbReleaseDate = LocalDate.of(2026, 7, 1);
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
         base.setReleaseDate(dbReleaseDate);
-        base.setTicker(Ticker.SOXL);
+        base.setTicker(StrategyTicker.SOXL);
         base.setCurrentCycleStart(new BigDecimal("28.50"));
         base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
 
@@ -70,20 +73,20 @@ class PrivacyTradePersistenceAdapterTest {
         LocalDate dbReleaseDate = LocalDate.of(2026, 7, 14);
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
         base.setReleaseDate(dbReleaseDate);
-        base.setTicker(Ticker.SOXL);
+        base.setTicker(StrategyTicker.SOXL);
         base.setCurrentCycleStart(new BigDecimal("28.50"));
         base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
         base.setHoldings(10);
 
         when(baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL))
+                        PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL))
                 .thenReturn(Optional.of(base));
 
         var result = adapter.findTodayTrade(todayKst);
 
         assertThat(result).isPresent();
         verify(baseRepository).findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL);
+                PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL);
     }
 
     @Test
@@ -100,23 +103,23 @@ class PrivacyTradePersistenceAdapterTest {
         LocalDate todayKst = LocalDate.of(2026, 7, 15);
         LocalDate dbReleaseDate = LocalDate.of(2026, 7, 14);
         Strategy strategy = new Strategy(
-                UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.PRIVACY,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+                UUID.randomUUID(), UUID.randomUUID(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();
         base.setReleaseDate(dbReleaseDate);
-        base.setTicker(Ticker.SOXL);
+        base.setTicker(StrategyTicker.SOXL);
         base.setCurrentCycleStart(new BigDecimal("28.50"));
         base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
         base.setHoldings(10);
 
         when(baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL))
+                        PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL))
                 .thenReturn(Optional.of(base));
 
         var result = adapter.findBaseIfPrivacy(strategy, todayKst);
 
         assertThat(result).isNotNull();
         verify(baseRepository).findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                PrivacyDates.releaseDateFor(todayKst), Ticker.SOXL);
+                PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL);
     }
 }

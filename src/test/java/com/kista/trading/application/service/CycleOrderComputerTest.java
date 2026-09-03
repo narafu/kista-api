@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // CycleOrderComputer 단위 테스트: VR 분기 VrInputs 조립, fail-fast, 비VR null 유지
 @ExtendWith(MockitoExtension.class)
@@ -44,12 +47,12 @@ class CycleOrderComputerTest {
 
     // INFINITE 전략
     static final Strategy INFINITE_STRATEGY = new Strategy(
-            UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     // VR 전략
     static final Strategy VR_STRATEGY = new Strategy(
-            UUID.randomUUID(), ACCOUNT_ID, Strategy.Type.VR,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     // VR 사이클 (strategyVersionId 포함)
     static final StrategyCycle VR_CYCLE = new StrategyCycle(
             UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
@@ -100,7 +103,7 @@ class CycleOrderComputerTest {
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(poolUsed);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
                 .thenReturn(List.of());
 
         computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE);
@@ -110,7 +113,7 @@ class CycleOrderComputerTest {
         verify(strategyVrDetailPort).findByStrategyVersionId(STRATEGY_VERSION_ID);
         verify(orderPort).sumFilledBuyAmountByCycleId(VR_CYCLE.id());
         // buildOrders에 currentPrice 전달 확인
-        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), any(LocalDate.class));
+        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), any(LocalDate.class));
     }
 
     @Test
@@ -130,13 +133,13 @@ class CycleOrderComputerTest {
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
         when(cyclePositionPort.findFirstOne(rolloverCycle.id())).thenReturn(Optional.of(openingPosition));
         when(orderPort.sumFilledBuyAmountByCycleId(rolloverCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
                 .thenReturn(List.of());
 
         computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
 
         var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
-        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
+        verify(vrStrategy).buildOrders(captor.capture(), eq(StrategyTicker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
         assertThat(captor.getValue().poolLimit()).isEqualByComparingTo("500.00");
     }
 
@@ -157,13 +160,13 @@ class CycleOrderComputerTest {
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
         when(cyclePositionPort.findFirstOne(rolloverCycle.id())).thenReturn(Optional.of(openingPosition));
         when(orderPort.sumFilledBuyAmountByCycleId(rolloverCycle.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
                 .thenReturn(List.of());
 
         computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
 
         var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
-        verify(vrStrategy).buildOrders(captor.capture(), eq(Ticker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
+        verify(vrStrategy).buildOrders(captor.capture(), eq(StrategyTicker.SOXL), eq(CURRENT_PRICE), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
         assertThat(captor.getValue().poolLimit()).isEqualByComparingTo("500.01");
         assertThat(captor.getValue().poolLimit().scale()).isEqualTo(2);
     }
@@ -282,14 +285,14 @@ class CycleOrderComputerTest {
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
                 .thenReturn(List.of());
 
         // currentPrice=null (수동 실행·preview 경로)
         computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", null);
 
         // buildOrders에 currentPrice=null 전달 확인
-        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(Ticker.SOXL), isNull(), isNull(), any(LocalDate.class));
+        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), isNull(), isNull(), any(LocalDate.class));
     }
 
     @Test
@@ -304,11 +307,11 @@ class CycleOrderComputerTest {
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(BigDecimal.ZERO);
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
                 .thenReturn(List.of());
 
         computer.compute(BALANCE, VR_STRATEGY, prevClosePrice, LocalDate.now(), VR_CYCLE, null, "preview", null);
 
-        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(prevClosePrice), isNull(), any(LocalDate.class));
+        verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(prevClosePrice), isNull(), any(LocalDate.class));
     }
 }

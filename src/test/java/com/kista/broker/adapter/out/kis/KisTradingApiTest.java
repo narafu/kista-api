@@ -4,7 +4,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.Direction;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ class KisTradingApiTest {
             PresentBalanceResult result = api.getPresentBalance(ACCOUNT);
 
             assertThat(result.items()).hasSize(1);
-            assertThat(result.items().getFirst().ticker()).isEqualTo(Ticker.SOXL);
+            assertThat(result.items().getFirst().ticker()).isEqualTo(StrategyTicker.SOXL);
             assertThat(result.items().getFirst().holdings()).isEqualTo(10);
             assertThat(result.totalAssetUsd()).isEqualByComparingTo("1000.00");
             assertThat(result.totalReturnRate()).isEqualByComparingTo("2.0");
@@ -97,7 +97,7 @@ class KisTradingApiTest {
         void getExecutions_nullResponse_returnsEmptyList() {
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(null);
 
-            List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
+            List<Execution> result = api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
 
             assertThat(result).isEmpty();
         }
@@ -108,7 +108,7 @@ class KisTradingApiTest {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(null);
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
 
-            List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
+            List<Execution> result = api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
 
             assertThat(result).isEmpty();
         }
@@ -123,7 +123,7 @@ class KisTradingApiTest {
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
 
-            List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
+            List<Execution> result = api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
 
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().direction()).isEqualTo(Direction.SELL);
@@ -139,7 +139,7 @@ class KisTradingApiTest {
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
 
-            List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
+            List<Execution> result = api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
 
             assertThat(result).hasSize(1);
             Execution e = result.getFirst();
@@ -148,7 +148,7 @@ class KisTradingApiTest {
             assertThat(e.price()).isEqualByComparingTo("30.50");
             assertThat(e.amountUsd()).isEqualByComparingTo("305.00");
             assertThat(e.externalOrderId()).isEqualTo("ORD002");
-            assertThat(e.ticker()).isEqualTo(Ticker.SOXL);
+            assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
             assertThat(e.tradeDate()).isEqualTo(DATE);
         }
 
@@ -162,7 +162,7 @@ class KisTradingApiTest {
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
 
-            List<Execution> result = api.getExecutions(DATE, DATE, Ticker.SOXL, ACCOUNT);
+            List<Execution> result = api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
 
             // ft_ccld_qty="" → parseIntSafe → 0 → 미체결 필터에 의해 제외
             assertThat(result).isEmpty();

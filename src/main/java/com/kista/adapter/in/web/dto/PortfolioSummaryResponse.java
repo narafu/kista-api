@@ -2,7 +2,7 @@ package com.kista.adapter.in.web.dto;
 
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.PresentBalanceResult.Item;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -22,7 +22,7 @@ public record PortfolioSummaryResponse(
     // 종목별 포지션 — kista-ui PortfolioSnapshot 호환
     public record PositionDto(
             @Schema(description = "종목코드")
-            Ticker ticker,             // pdno: 종목코드
+            StrategyTicker ticker,             // pdno: 종목코드
             @Schema(description = "잔고수량")
             int holdings,              // cblc_qty13: 잔고수량
             @Schema(description = "평균단가 (USD)")

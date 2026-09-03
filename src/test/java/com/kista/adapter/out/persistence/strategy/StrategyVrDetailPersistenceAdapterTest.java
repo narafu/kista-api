@@ -18,6 +18,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -60,8 +64,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     void save_andFindByVersionId_roundTrip() {
         // strategy_version 선행 저장 (FK 필요)
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -92,8 +96,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     void save_andFindByVersionId_roundTrip_withActiveRamp() {
         // 램프가 실제로 개입하는(gMax>initial, floor<initial) 값도 그대로 왕복되는지 검증
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -117,8 +121,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void save_andFindByVersionId_roundTrip_withDisabledGradientRamp() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -150,8 +154,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     void findActiveByStrategyId_returnsLatestActiveVersion() {
         // 활성 버전(deleted_at IS NULL)의 최신 VR 상세 조회
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion v1 = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -177,8 +181,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
         // v2가 soft-delete(deleted_at 설정)된 경우 v1 VR 상세를 반환하는지 검증
         // sv.deleted_at IS NULL 필터 제거 회귀를 잡는 케이스
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion v1 = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -215,8 +219,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     void save_upsert_updatesExistingRecord() {
         // 동일 strategyVersionId로 재저장 시 upsert(update) 동작 확인
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -242,8 +246,8 @@ class StrategyVrDetailPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByStrategyVersionIds_returnsDetailsKeyedByVersionId() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion v1 = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
         StrategyVersion v2 = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 2, null, null));

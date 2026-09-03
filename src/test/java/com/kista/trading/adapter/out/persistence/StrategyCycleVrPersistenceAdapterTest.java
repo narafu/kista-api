@@ -22,6 +22,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -56,8 +60,8 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
 
     private StrategyCycle createCycle() {
         Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));

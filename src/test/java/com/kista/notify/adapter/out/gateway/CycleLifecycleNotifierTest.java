@@ -6,7 +6,7 @@ import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;
@@ -20,6 +20,9 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class CycleLifecycleNotifierTest {
@@ -31,8 +34,8 @@ class CycleLifecycleNotifierTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), USER_ID);
     private static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
-    private static final Strategy STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN);
+    private static final Strategy STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
 
     @Test
     void onCycleCompleted_notifiesUserOfCycleCompletion() {

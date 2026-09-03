@@ -5,6 +5,7 @@ import com.kista.trading.domain.strategy.CycleOrderStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
+import com.kista.sharedkernel.StrategyType;
 
 public record StrategyTypeMeta(
         @Schema(description = "enum name() 값", example = "INFINITE")
@@ -22,7 +23,7 @@ public record StrategyTypeMeta(
         @Schema(description = "분할 수 옵션 (빈 목록이면 분할 개념 없음)")
         List<Integer> divisionCounts   // 분할 수 옵션 — 빈 목록이면 분할 개념 없음
 ) {
-    public static StrategyTypeMeta from(Strategy.Type t, CycleOrderStrategy strategy) {
+    public static StrategyTypeMeta from(StrategyType t, CycleOrderStrategy strategy) {
         List<String> tickers = t.availableTickers().stream().map(Enum::name).toList();
         return new StrategyTypeMeta(
                 t.name(), t.getDescription(), tickers,

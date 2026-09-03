@@ -2,7 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +41,7 @@ class KisPriceApiTest {
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
 
-        PriceSnapshot snapshot = api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
+        PriceSnapshot snapshot = api.getPriceSnapshot(StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(snapshot.current()).isEqualByComparingTo("73.72");
         assertThat(snapshot.prevClose()).isEqualByComparingTo("76.27");
@@ -55,7 +55,7 @@ class KisPriceApiTest {
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
 
-        PriceSnapshot snapshot = api.getPriceSnapshot(Ticker.TQQQ, ACCOUNT);
+        PriceSnapshot snapshot = api.getPriceSnapshot(StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(snapshot.current()).isEqualByComparingTo("73.72");
         assertThat(snapshot.prevClose()).isEqualByComparingTo("73.72");
@@ -70,7 +70,7 @@ class KisPriceApiTest {
                 eq(KisPriceApi.DailyPriceResponse.class), any())).thenReturn(dailyResponse);
 
         // tradeDate(KST)=2026-07-24 → 기대 US 거래일=2026-07-23
-        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+        BigDecimal closingPrice = api.getClosingPrice(StrategyTicker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
 
         assertThat(closingPrice).isEqualByComparingTo("165.10");
     }
@@ -87,7 +87,7 @@ class KisPriceApiTest {
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
 
-        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+        BigDecimal closingPrice = api.getClosingPrice(StrategyTicker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
 
         assertThat(closingPrice).isEqualByComparingTo("165.10"); // 라이브 last 값으로 fallback
     }
@@ -103,7 +103,7 @@ class KisPriceApiTest {
         when(kisHttpClient.pricingGet(eq("HHDFS00000300"), anyString(), eq(ACCOUNT),
                 eq(KisPriceApi.PriceResponse.class), any())).thenReturn(priceResponse);
 
-        BigDecimal closingPrice = api.getClosingPrice(Ticker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
+        BigDecimal closingPrice = api.getClosingPrice(StrategyTicker.TQQQ, java.time.LocalDate.of(2026, 7, 24), ACCOUNT);
 
         assertThat(closingPrice).isEqualByComparingTo("165.10");
     }

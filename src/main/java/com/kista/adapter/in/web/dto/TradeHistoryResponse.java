@@ -1,7 +1,7 @@
 package com.kista.adapter.in.web.dto;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,7 +13,7 @@ public record TradeHistoryResponse(
         @Schema(description = "거래 날짜", example = "2025-01-15")
         LocalDate tradeDate,
         @Schema(description = "거래 종목", example = "SOXL")
-        Ticker ticker,
+        StrategyTicker ticker,
         @Schema(description = "주문 유형 (LOC/MOC/LIMIT)", example = "LOC")
         Order.OrderType orderType,
         @Schema(description = "매매 방향 (BUY/SELL)", example = "BUY")

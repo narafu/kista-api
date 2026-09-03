@@ -8,7 +8,7 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.domain.model.strategy.*;
 import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.*;
@@ -85,9 +85,9 @@ class TradingService {
 
     // 배치 시작 시점 가격·기준표 조회 결과 — executeBatch/placeOpenOrders 공통 (조회 대상 날짜만 다름)
     private record PriceContext(
-            List<Ticker> cycleTickers,
+            List<StrategyTicker> cycleTickers,
             Account priceAccount,
-            Map<Ticker, PriceSnapshot> startPriceSnapshots,
+            Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
             PrivacyTradeBase privacyBase
     ) {}
 
@@ -152,14 +152,14 @@ class TradingService {
         marketEventNotifier.notifyMarketClose();
 
         // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss/MOCK은 일봉 캔들 기반 확정 종가)
-        Map<Ticker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
+        Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
 
         // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
         reportAll(placedStates, closingPrices, today);
     }
 
     // 전략별 후보를 먼저 수집하고 계좌별 예산 배정 후 AT_CLOSE 주문만 저장
-    private List<CycleState> planAll(List<BatchContext> contexts, Map<Ticker, PriceSnapshot> startPriceSnapshots,
+    private List<CycleState> planAll(List<BatchContext> contexts, Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
                                       PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
@@ -184,7 +184,7 @@ class TradingService {
         // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
         // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
         // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
-        Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(states);
+        Map<StrategyTicker, BigDecimal> placementPrices = reloadPlacementPrices(states);
         // groupKey=계좌 id — 같은 계좌 내 사이클끼리만 동시 상한 공유, 다른 계좌는 완전 병렬
         List<TradingParallelRunner.Task<CyclePlacedState>> tasks = states.stream()
                 .map(state -> new TradingParallelRunner.Task<CyclePlacedState>(
@@ -213,7 +213,7 @@ class TradingService {
     }
 
     // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
-    private void reportAll(List<CyclePlacedState> placedStates, Map<Ticker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
+    private void reportAll(List<CyclePlacedState> placedStates, Map<StrategyTicker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
         List<TradingParallelRunner.Task<Void>> tasks = placedStates.stream()
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
@@ -257,7 +257,7 @@ class TradingService {
 
     // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다
     private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
-            Map<Ticker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
+            Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
             LocalDate tradeDate, Set<Order.OrderTiming> creatableTimings) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
@@ -387,7 +387,7 @@ class TradingService {
         if (!placeableStates.isEmpty()) {
             // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
             // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
-            Map<Ticker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
+            Map<StrategyTicker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
             for (CycleState state : placeableStates) {
                 runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
                     BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
@@ -483,8 +483,8 @@ class TradingService {
 
     // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — TradingPriceFetcher.fetchPrices가 ticker당 1회 배치 조회를 보장
     // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) fetchPriceSnapshots가 아닌 fetchPrices 사용
-    private Map<Ticker, BigDecimal> reloadPlacementPrices(List<CycleState> states) {
-        List<Ticker> tickers = states.stream()
+    private Map<StrategyTicker, BigDecimal> reloadPlacementPrices(List<CycleState> states) {
+        List<StrategyTicker> tickers = states.stream()
                 .map(state -> state.ctx().strategy().ticker())
                 .distinct().toList();
         Account priceAccount = selectPriceAccount(states.stream().map(CycleState::ctx).toList());
@@ -503,11 +503,11 @@ class TradingService {
     // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 — executeBatch/placeOpenOrders 공통
     // date: executeBatch는 today(당일), placeOpenOrders는 tradeDate(익일 US 거래일)
     private PriceContext loadPriceContext(List<BatchContext> contexts, LocalDate date) {
-        List<Ticker> cycleTickers = contexts.stream()
+        List<StrategyTicker> cycleTickers = contexts.stream()
                 .map(c -> c.strategy().ticker())
                 .distinct().toList();
         Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
-        Map<Ticker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
+        Map<StrategyTicker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
 
         // 기준 매매표 조회 (PRIVACY)
         boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());

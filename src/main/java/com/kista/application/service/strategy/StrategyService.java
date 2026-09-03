@@ -34,6 +34,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Slf4j
 @Service
@@ -65,7 +69,7 @@ class StrategyService implements StrategyUseCase {
         int initialHoldings = validateBootstrapPosition(cmd);
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
-        Strategy.Ticker resolvedTicker = resolved.ticker();
+        StrategyTicker resolvedTicker = resolved.ticker();
 
         // 종목 중복 + 잔고 검증
         validateUniqueTicker(accountId, resolvedTicker);
@@ -81,7 +85,7 @@ class StrategyService implements StrategyUseCase {
         // 램프 파라미터(gradient/poolLimitRate 경과주수 함수)는 RuntimeSettings 정책 밖 — 요청값 정규화 후 여기서 직접 검증
         VrRampParams ramp = null;
         BigDecimal vrValue = null;
-        if (cmd.type() == Strategy.Type.VR) {
+        if (cmd.type() == StrategyType.VR) {
             int normalizedRecurringAmount = resolved.recurringAmount() != null ? resolved.recurringAmount() : 0;
             vrValue = resolveVrValue(cmd, initialStockValue);
             ramp = normalizeVrRampParams(cmd, normalizedRecurringAmount);
@@ -90,9 +94,9 @@ class StrategyService implements StrategyUseCase {
         }
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
-        Strategy.CycleSeedType seedType = cmd.type() == Strategy.Type.VR
-                ? Strategy.CycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
-                : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : Strategy.CycleSeedType.NONE);
+        StrategyCycleSeedType seedType = cmd.type() == StrategyType.VR
+                ? StrategyCycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
+                : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
         int divisionCount = resolved.divisionCount();
 
@@ -145,7 +149,7 @@ class StrategyService implements StrategyUseCase {
 
     // 중간부터 시작 시 시장가(전일종가) 조회 — startAmount·초기 포지션·VR V값을 동일 기준으로 정합
     // 조회 실패 시 등록 자체가 실패한다 — BrokerCallGuard가 IllegalStateException으로 래핑해 GlobalExceptionHandler 400 매핑
-    private BigDecimal fetchMarketPrice(Account account, Strategy.Ticker ticker) {
+    private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
                 () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevClose(ticker, toBrokerRef(account)));
     }
@@ -285,7 +289,7 @@ class StrategyService implements StrategyUseCase {
     }
 
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
-    private void validateUniqueTicker(UUID accountId, Strategy.Ticker ticker) {
+    private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
         if (strategyPort.existsByAccountIdAndTicker(accountId, ticker)) {
             throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + ticker);
         }
@@ -307,10 +311,10 @@ class StrategyService implements StrategyUseCase {
     // strategy → strategy_versions → 전략 타입별 detail 순 저장
     // ramp: VR 등록일 때만 non-null (register()에서 정규화 완료 후 전달)
     private SavedStrategyAndVersion saveStrategyWithVersion(
-            UUID accountId, Strategy.Type type, Strategy.Ticker ticker,
-            Strategy.CycleSeedType seedType, int divisionCount,
+            UUID accountId, StrategyType type, StrategyTicker ticker,
+            StrategyCycleSeedType seedType, int divisionCount,
             Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
-        Strategy strategy = new Strategy(null, accountId, type, Strategy.Status.ACTIVE, ticker, seedType);
+        Strategy strategy = new Strategy(null, accountId, type, StrategyStatus.ACTIVE, ticker, seedType);
         Strategy saved = strategyPort.save(strategy);
         StrategyVersion version = strategyVersionPort.save(
                 new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
@@ -386,7 +390,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
         }
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        strategyPort.save(strategy.withStatus(Strategy.Status.PAUSED));
+        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
         log.info("전략 중지: strategyId={}", strategyId);
     }
 
@@ -398,7 +402,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
         }
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        strategyPort.save(strategy.withStatus(Strategy.Status.ACTIVE));
+        strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
     }
 
@@ -436,7 +440,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
         }
 
-        Strategy.CycleSeedType seedType = cmd.cycleSeedType() != null
+        StrategyCycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
                 : strategy.cycleSeedType();
         Strategy updated = strategy.withCycleSeedType(seedType);

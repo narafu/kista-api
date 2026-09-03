@@ -1,6 +1,6 @@
 package com.kista.broker.domain.model;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class PresentBalanceResultTest {
     void aggregateToss_singleHolding_computesAllTotals() {
         // 5주 @ 평단 20.00, 현재가 22.00, USD예수금 1000, KRW예수금 140000, 환율 1400
         var holding = new PresentBalanceResult.TossHolding(
-                Ticker.SOXL, 5, new BigDecimal("20.00"), new BigDecimal("22.00"));
+                StrategyTicker.SOXL, 5, new BigDecimal("20.00"), new BigDecimal("22.00"));
 
         PresentBalanceResult result = PresentBalanceResult.aggregateToss(
                 List.of(holding), new BigDecimal("1000.00"), new BigDecimal("140000"), new BigDecimal("1400"));
@@ -26,7 +26,7 @@ class PresentBalanceResultTest {
         // 종목별: eval = 22×5 = 110.00, 손익 = (22-20)×5 = 10.00, 수익률 = 2/20×100 = 10.00%
         assertThat(result.items()).hasSize(1);
         PresentBalanceResult.Item item = result.items().get(0);
-        assertThat(item.ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(item.ticker()).isEqualTo(StrategyTicker.SOXL);
         assertThat(item.holdings()).isEqualTo(5);
         assertThat(item.evalAmountUsd()).isEqualByComparingTo("110.00");
         assertThat(item.profitLossUsd()).isEqualByComparingTo("10.00");
@@ -49,7 +49,7 @@ class PresentBalanceResultTest {
     @DisplayName("환율 0: 총자산은 KRW예수금만, 손익·수익률 0")
     void aggregateToss_zeroRate_fallsBackToKrwDeposit() {
         var holding = new PresentBalanceResult.TossHolding(
-                Ticker.SOXL, 5, new BigDecimal("20.00"), new BigDecimal("22.00"));
+                StrategyTicker.SOXL, 5, new BigDecimal("20.00"), new BigDecimal("22.00"));
 
         PresentBalanceResult result = PresentBalanceResult.aggregateToss(
                 List.of(holding), new BigDecimal("1000.00"), new BigDecimal("50000"), BigDecimal.ZERO);
@@ -69,7 +69,7 @@ class PresentBalanceResultTest {
     @DisplayName("평단가 0: 종목 수익률 0 (0 나눗셈 방지)")
     void aggregateToss_zeroAvgPrice_returnsZeroProfitRate() {
         var holding = new PresentBalanceResult.TossHolding(
-                Ticker.SOXL, 3, BigDecimal.ZERO, new BigDecimal("15.00"));
+                StrategyTicker.SOXL, 3, BigDecimal.ZERO, new BigDecimal("15.00"));
 
         PresentBalanceResult result = PresentBalanceResult.aggregateToss(
                 List.of(holding), new BigDecimal("100.00"), new BigDecimal("14000"), new BigDecimal("1400"));

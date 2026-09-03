@@ -35,6 +35,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class StatsServiceTest {
@@ -59,11 +63,11 @@ class StatsServiceTest {
     private static final LocalDate TO = LocalDate.of(2026, 2, 28);
 
     private static final Strategy STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE, Strategy.Status.ACTIVE,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     private static final Strategy PRIVACY_STRATEGY = new Strategy(
-            PRIVACY_STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+            PRIVACY_STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
     // Account는 record(final) — mock(Account.class) 대신 실제 인스턴스 생성 (AccountServiceTest 패턴)
     private static Account testAccount() {
@@ -155,7 +159,7 @@ class StatsServiceTest {
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("50.00");
         StrategyTypeStats infinite = summary.byType().get(0);
-        assertThat(infinite.type()).isEqualTo(Strategy.Type.INFINITE);
+        assertThat(infinite.type()).isEqualTo(StrategyType.INFINITE);
         assertThat(infinite.closedCycleCount()).isEqualTo(2);
         assertThat(infinite.winRate()).isEqualByComparingTo("0.5");
         assertThat(infinite.avgDurationDays()).isEqualByComparingTo("20.0");
@@ -183,8 +187,8 @@ class StatsServiceTest {
     void 레거시_VR_진행_사이클은_개장_포지션_총자산으로_원금과_미실현손익을_복원한다() {
         UUID vrStrategyId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(
                 UUID.randomUUID(), vrStrategyId, null,
                 new BigDecimal("1000.00"), null,
@@ -206,7 +210,7 @@ class StatsServiceTest {
         assertThat(summary.activePrincipal()).isEqualByComparingTo("1600.00");
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
         assertThat(summary.byType()).singleElement().satisfies(stats -> {
-            assertThat(stats.type()).isEqualTo(Strategy.Type.VR);
+            assertThat(stats.type()).isEqualTo(StrategyType.VR);
             assertThat(stats.unrealizedPnl()).isEqualByComparingTo("100.00");
         });
     }
@@ -215,8 +219,8 @@ class StatsServiceTest {
     void 레거시_VR_개장_보유분에_종가가_없으면_저장된_startAmount를_유지한다() {
         UUID vrStrategyId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(
                 UUID.randomUUID(), vrStrategyId, null,
                 new BigDecimal("1500.00"), null,
@@ -244,8 +248,8 @@ class StatsServiceTest {
     void 레거시_VR_종료_사이클은_개장_포지션_총자산으로_실현손익과_성과를_복원한다() {
         UUID vrStrategyId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, Strategy.Type.VR, Strategy.Status.ACTIVE,
-                Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(
                 UUID.randomUUID(), vrStrategyId, null,
                 new BigDecimal("1000.00"), new BigDecimal("1800.00"),
@@ -261,7 +265,7 @@ class StatsServiceTest {
 
         StatsSummary summary = statsService.getSummary(USER_ID);
         CyclePerformance performance = statsService
-                .getCyclePerformances(USER_ID, Strategy.Type.VR, null, 10)
+                .getCyclePerformances(USER_ID, StrategyType.VR, null, 10)
                 .items().getFirst();
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("200.00");
@@ -309,7 +313,7 @@ class StatsServiceTest {
                 depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
 
         EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, Strategy.Type.PRIVACY,
+                USER_ID, StrategyType.PRIVACY,
                 LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
@@ -713,8 +717,8 @@ class StatsServiceTest {
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
-        assertThat(result.strategy().type()).isEqualTo(Strategy.Type.INFINITE);
-        assertThat(result.strategy().ticker()).isEqualTo(Strategy.Ticker.SOXL);
+        assertThat(result.strategy().type()).isEqualTo(StrategyType.INFINITE);
+        assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.SOXL);
         verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
         verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
     }
@@ -1177,8 +1181,8 @@ class StatsServiceTest {
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
                 "00000000", "key", "secret", null, Account.Broker.MOCK, null);
         UUID mockStrategyId = UUID.randomUUID();
-        Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategyId, null,
                 new BigDecimal("500.00"), new BigDecimal("600.00"),
                 LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"),

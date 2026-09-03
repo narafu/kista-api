@@ -1,6 +1,6 @@
 package com.kista.adapter.in.web.dto;
 
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -14,12 +14,12 @@ public record MultiPriceResponse(
 ) {
     public record TickerPrice(
             @Schema(description = "종목 코드", example = "TQQQ")
-            Ticker ticker,
+            StrategyTicker ticker,
             @Schema(description = "현재가 (USD)", example = "120.50")
             BigDecimal price
     ) {}
 
-    public static MultiPriceResponse from(Map<Ticker, BigDecimal> priceMap) {
+    public static MultiPriceResponse from(Map<StrategyTicker, BigDecimal> priceMap) {
         List<TickerPrice> list = priceMap.entrySet().stream()
                 .map(e -> new TickerPrice(e.getKey(), e.getValue()))
                 .toList();

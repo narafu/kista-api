@@ -7,7 +7,7 @@ import com.kista.broker.domain.model.Currency;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +46,7 @@ class TossHoldingsApi {
     // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
     private final UsdKrwRateCache exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), Instant::now);
 
-    public BrokerBalance getBalance(BrokerAccountRef account, Ticker ticker) {
+    public BrokerBalance getBalance(BrokerAccountRef account, StrategyTicker ticker) {
         // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
         TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
@@ -123,13 +123,13 @@ class TossHoldingsApi {
             rate = await(rateFuture);
         }
 
-        // 5. Ticker 파싱 성공·수량 > 0 항목만 원시 보유값으로 추출 (계산은 도메인 위임)
+        // 5. StrategyTicker 파싱 성공·수량 > 0 항목만 원시 보유값으로 추출 (계산은 도메인 위임)
         List<PresentBalanceResult.TossHolding> holdings = List.of();
         if (holdingsResponse != null && holdingsResponse.items() != null) {
             holdings = holdingsResponse.items().stream()
                     .filter(h -> h.lastPrice() != null && !h.lastPrice().isBlank())
                     .flatMap(h -> {
-                        Optional<Ticker> tickerOpt = Ticker.tryParse(h.symbol());
+                        Optional<StrategyTicker> tickerOpt = StrategyTicker.tryParse(h.symbol());
                         if (tickerOpt.isEmpty()) return Stream.empty();
                         int quantity = Integer.parseInt(h.quantity());
                         if (quantity <= 0) return Stream.empty();
@@ -191,12 +191,12 @@ class TossHoldingsApi {
 
     // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
-    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         return fetchSellableQuantity(ticker, account);
     }
 
     // 내부 헬퍼: Toss 판매 가능 수량 조회
-    private SellableQuantity fetchSellableQuantity(Ticker ticker, BrokerAccountRef account) {
+    private SellableQuantity fetchSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
         TossResult<SellableQuantityResult> wrapper = tossHttpClient.get(

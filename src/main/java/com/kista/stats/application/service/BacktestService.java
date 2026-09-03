@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.kista.sharedkernel.StrategyType;
 
 @Service
 @RequiredArgsConstructor
@@ -58,20 +59,20 @@ class BacktestService implements BacktestUseCase {
 
         // PRIVACY만 날짜별 기준 매매표를 미리 조달한다 — 도메인 엔진은 DB I/O를 할 수 없다
         Map<LocalDate, PrivacyTradeBase> privacyBases = Map.of();
-        if (command.type() == Strategy.Type.PRIVACY) {
+        if (command.type() == StrategyType.PRIVACY) {
             privacyBases = loadPrivacyBases(candles);
             addRangeClampWarning(candles, privacyBases, warnings);
         }
 
         BacktestEngine engine = new BacktestEngine(cycleOrderStrategies); // 무상태 순수 클래스 — Spring 빈 아님
-        BacktestEngine.Output output = command.type() == Strategy.Type.PRIVACY
+        BacktestEngine.Output output = command.type() == StrategyType.PRIVACY
                 ? engine.run(candles, command, privacyBases)
                 : engine.run(candles, command);
 
         warnings.addAll(0, output.warnings()); // 엔진 경고를 앞, 항상 붙는 안내를 뒤로
         warnings.add(FILL_MODEL_WARNING);
         warnings.add(ORDER_TIMING_WARNING);
-        if (command.type() == Strategy.Type.VR && command.vrRecurringAmount() != 0) warnings.add(VR_CASH_FLOW_WARNING);
+        if (command.type() == StrategyType.VR && command.vrRecurringAmount() != 0) warnings.add(VR_CASH_FLOW_WARNING);
 
         return new BacktestResult(output.points(), summarize(output), List.copyOf(warnings));
     }
@@ -94,14 +95,14 @@ class BacktestService implements BacktestUseCase {
         if (command.from().isAfter(command.to())) {
             throw new IllegalArgumentException("시작일(from)이 종료일(to)보다 늦을 수 없습니다");
         }
-        if (command.type() == Strategy.Type.INFINITE && command.divisionCount() != null) {
-            List<Integer> allowed = cycleOrderStrategies.of(Strategy.Type.INFINITE).availableDivisionCounts();
+        if (command.type() == StrategyType.INFINITE && command.divisionCount() != null) {
+            List<Integer> allowed = cycleOrderStrategies.of(StrategyType.INFINITE).availableDivisionCounts();
             if (!allowed.contains(command.divisionCount())) {
                 throw new IllegalArgumentException("지원하지 않는 분할 수(divisionCount)입니다: " + command.divisionCount()
                         + ", 허용값=" + allowed);
             }
         }
-        if (command.type() == Strategy.Type.VR) validateVr(command);
+        if (command.type() == StrategyType.VR) validateVr(command);
     }
 
     private void validateVr(BacktestCommand command) {
@@ -136,7 +137,7 @@ class BacktestService implements BacktestUseCase {
 
     private List<DailyCandle> fetchCandles(BacktestCommand command) {
         // INFINITE만 전일종가 확보용 워밍업 프리픽스를 덧붙인다(엔진이 from 이전 캔들은 시뮬레이션하지 않고 종가만 이월)
-        LocalDate fetchFrom = command.type() == Strategy.Type.INFINITE
+        LocalDate fetchFrom = command.type() == StrategyType.INFINITE
                 ? command.from().minusDays(INFINITE_WARMUP_DAYS)
                 : command.from();
         return candlePort.fetchDailyCandles(command.ticker().name(), fetchFrom, command.to());

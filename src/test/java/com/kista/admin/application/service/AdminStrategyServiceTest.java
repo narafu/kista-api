@@ -17,6 +17,10 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class AdminStrategyServiceTest {
@@ -31,8 +35,8 @@ class AdminStrategyServiceTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final Strategy STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, Strategy.Type.PRIVACY, Strategy.Status.ACTIVE,
-            Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
 
     @Test
@@ -43,19 +47,19 @@ class AdminStrategyServiceTest {
 
         service.pauseStrategy(ADMIN_ID, ACCOUNT_ID, STRATEGY_ID);
 
-        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == Strategy.Status.PAUSED));
+        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.PAUSED));
         verify(auditLogPort).log(ADMIN_ID, "STRATEGY_PAUSE", "STRATEGY", STRATEGY_ID, Map.of("accountId", ACCOUNT_ID.toString()));
     }
 
     @Test
     void resumeStrategy_updatesStatusAndLogs() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY.withStatus(Strategy.Status.PAUSED));
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY.withStatus(StrategyStatus.PAUSED));
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(
                 new Account(ACCOUNT_ID, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Account.Broker.KIS, null));
 
         service.resumeStrategy(ADMIN_ID, ACCOUNT_ID, STRATEGY_ID);
 
-        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == Strategy.Status.ACTIVE));
+        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.ACTIVE));
         verify(auditLogPort).log(ADMIN_ID, "STRATEGY_RESUME", "STRATEGY", STRATEGY_ID, Map.of("accountId", ACCOUNT_ID.toString()));
     }
 }

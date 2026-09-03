@@ -4,7 +4,7 @@ import com.kista.broker.domain.model.DailyTransaction;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.broker.domain.model.Direction;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ public record DailyTransactionResponse(
             @Schema(description = "매수/매도 방향", example = "BUY")
             Direction direction,
             @Schema(description = "종목코드")
-            Ticker ticker,
+            StrategyTicker ticker,
             @Schema(description = "종목명")
             String symbolName,
             @Schema(description = "체결수량")

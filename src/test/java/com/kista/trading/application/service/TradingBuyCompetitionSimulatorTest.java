@@ -5,7 +5,7 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.application.port.output.StrategyPort;
@@ -28,6 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingBuyCompetitionSimulatorTest {
@@ -46,30 +49,30 @@ class TradingBuyCompetitionSimulatorTest {
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
 
-    Strategy currentStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.INFINITE,
-            Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE);
+    Strategy currentStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     StrategyCycle currentCycle = new StrategyCycle(UUID.randomUUID(), currentStrategy.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
 
     @BeforeEach
     void setUp() {
         simulator = new TradingBuyCompetitionSimulator(strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
-        lenient().when(cycleOrderStrategies.of(Strategy.Type.INFINITE)).thenReturn(infiniteOrderStrategy);
-        lenient().when(cycleOrderStrategies.of(Strategy.Type.VR)).thenReturn(vrOrderStrategy);
+        lenient().when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(infiniteOrderStrategy);
+        lenient().when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(vrOrderStrategy);
         lenient().when(infiniteOrderStrategy.allocationPriority()).thenReturn(1);
         lenient().when(vrOrderStrategy.allocationPriority()).thenReturn(0);
     }
 
-    private Order buyOrder(Ticker ticker, int quantity, BigDecimal price) {
+    private Order buyOrder(StrategyTicker ticker, int quantity, BigDecimal price) {
         return Order.planned(today, ticker, Order.OrderType.LOC, Order.OrderDirection.BUY, quantity, price);
     }
 
     @Test
     void simulate_sufficientBudget_whenNoCompetitors() {
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -84,18 +87,18 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_excludesCompetitor_thatAlreadyHasOrdersToday() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today))
-                .thenReturn(List.of(buyOrder(Ticker.TQQQ, 1, new BigDecimal("50.00"))));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+                .thenReturn(List.of(buyOrder(StrategyTicker.TQQQ, 1, new BigDecimal("50.00"))));
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, new BigDecimal("50.00"));
@@ -107,21 +110,21 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_blocksCurrentStrategy_whenHigherPriorityCompetitorConsumesBudget() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
-                null, null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
+                null, null, List.of(buyOrder(StrategyTicker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(vrPlan, null));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -134,19 +137,19 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_treatsFailedCompetitorAsZero_andRecordsUncertain() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenThrow(new IllegalStateException("가격 조회 실패"));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -158,12 +161,12 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_treatsSkippedCompetitorAsZero_andRecordsUncertain() {
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
@@ -171,7 +174,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null,
                         com.kista.trading.domain.model.NextOrdersPreview.SkipReason.NO_CYCLE_HISTORY));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -186,18 +189,18 @@ class TradingBuyCompetitionSimulatorTest {
         // 버그 재현: 배치 사전 계산(planResultsByStrategyId)이 실패해 competitor 항목이 없을 때
         // 과거에는 IllegalStateException으로 즉시 uncertain·0 처리했으나, 이제는 즉시 재계산을 시도해
         // 실제 경쟁 금액을 반영해야 한다.
-        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("500.00"), null, LocalDate.now(), null, null, null);
         CycleOrderStrategy.OrderPlan vrPlan = new CycleOrderStrategy.OrderPlan(
-                null, null, List.of(buyOrder(Ticker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
+                null, null, List.of(buyOrder(StrategyTicker.TQQQ, 10, new BigDecimal("90.00")))); // 900 USD
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(vrPlan, null));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         // planResultsByStrategyId에 vrStrategy 항목이 없는 BatchContext (사전 계산 실패 상황 재현)
         TradingBuyCompetitionSimulator.BatchContext context = new TradingBuyCompetitionSimulator.BatchContext(
@@ -218,13 +221,13 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_excludesPausedStrategy() {
-        Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), Strategy.Type.VR,
-                Strategy.Status.PAUSED, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
+        Strategy pausedVr = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, pausedVr));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -236,9 +239,9 @@ class TradingBuyCompetitionSimulatorTest {
 
     @Test
     void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
-        when(depositCache.getUsdDeposit(account, Ticker.SOXL))
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
-        List<Order> buyOrders = List.of(buyOrder(Ticker.SOXL, 10, new BigDecimal("20.00")));
+        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);

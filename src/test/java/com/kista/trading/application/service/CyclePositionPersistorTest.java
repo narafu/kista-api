@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
@@ -24,6 +24,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 // CyclePositionPersistor 단위 테스트:
 // - VR holdings=0 → markEnded 미호출 + rollIfDue 호출
@@ -63,13 +66,13 @@ class CyclePositionPersistorTest {
     }
 
     private Strategy vrStrategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR,
-                Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.MAINTAIN);
+        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.MAINTAIN);
     }
 
     private Strategy infiniteStrategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.MAINTAIN);
+        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
     }
 
     @BeforeEach

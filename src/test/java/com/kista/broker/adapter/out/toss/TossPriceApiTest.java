@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
@@ -53,9 +53,9 @@ class TossPriceApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
 
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrices(List.of(Ticker.SOXL));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
 
-        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("25.50"));
+        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
     }
 
     @Test
@@ -65,7 +65,7 @@ class TossPriceApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
 
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrices(List.of(Ticker.SOXL));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
 
         assertThat(result).isEmpty();
     }
@@ -78,7 +78,7 @@ class TossPriceApiTest {
             .thenReturn(wrap(item));
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
 
-        PriceSnapshot snapshot = tossPriceApi.getPriceSnapshot(Ticker.SOXL);
+        PriceSnapshot snapshot = tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
 
         assertThat(snapshot.current()).isEqualByComparingTo("25.50");
         assertThat(snapshot.prevClose()).isEqualByComparingTo(snapshot.current());
@@ -94,8 +94,8 @@ class TossPriceApiTest {
                 new BigDecimal("23.50"), new BigDecimal("22.50"), new BigDecimal("23.20"), 900L);
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
-        tossPriceApi.getPriceSnapshot(Ticker.SOXL);
-        tossPriceApi.getPriceSnapshot(Ticker.SOXL);
+        tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
+        tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
 
         verify(tossCandleApi, times(1)).getCandleBefore(eq("SOXL"), eq("1d"), any());
     }
@@ -122,7 +122,7 @@ class TossPriceApiTest {
         when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(tradeDate), eq(tradeDate)))
                 .thenReturn(List.of(candle));
 
-        BigDecimal result = tossPriceApi.getClosingPrice(Ticker.TQQQ, tradeDate);
+        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, tradeDate);
 
         assertThat(result).isEqualByComparingTo("71.05");
     }
@@ -137,7 +137,7 @@ class TossPriceApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
 
-        BigDecimal result = tossPriceApi.getClosingPrice(Ticker.TQQQ, tradeDate);
+        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, tradeDate);
 
         assertThat(result).isEqualByComparingTo("69.09");
     }
@@ -158,7 +158,7 @@ class TossPriceApiTest {
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
 
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrices(List.of(Ticker.SOXL));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
 
         assertThat(result).isEmpty();
     }
@@ -173,7 +173,7 @@ class TossPriceApiTest {
             ));
         when(tossCandleApi.getCandleBefore(any(), eq("1d"), any())).thenReturn(Optional.empty());
 
-        Map<Ticker, PriceSnapshot> snapshots = tossPriceApi.getPriceSnapshots(List.of(Ticker.SOXL, Ticker.TQQQ));
+        Map<StrategyTicker, PriceSnapshot> snapshots = tossPriceApi.getPriceSnapshots(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
 
         assertThat(snapshots).hasSize(2);
         snapshots.forEach((ticker, snap) ->
@@ -183,7 +183,7 @@ class TossPriceApiTest {
     @Test
     @DisplayName("빈 tickers 목록 요청 시 HTTP 미호출 후 빈 Map 반환")
     void getPrices_emptyTickers_returnsEmptyMapWithoutHttpCall() {
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrices(List.of());
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of());
 
         assertThat(result).isEmpty();
     }
@@ -195,9 +195,9 @@ class TossPriceApiTest {
                 new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(Ticker.SOXL));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(StrategyTicker.SOXL));
 
-        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("89.20"));
+        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("89.20"));
         verify(tossHttpClient, never())
                 .getCommon(any(), any(), any(ParameterizedTypeReference.class));
     }
@@ -210,9 +210,9 @@ class TossPriceApiTest {
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
 
-        Map<Ticker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(Ticker.SOXL));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(StrategyTicker.SOXL));
 
-        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("25.50"));
+        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
         verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class));
     }
 
@@ -233,9 +233,9 @@ class TossPriceApiTest {
                 .thenReturn(wrapStocks(stockItem));
 
         // 첫 호출
-        tossPriceApi.getStockInfo(Ticker.SOXL);
+        tossPriceApi.getStockInfo(StrategyTicker.SOXL);
         // 두 번째 호출 (캐시 히트)
-        tossPriceApi.getStockInfo(Ticker.SOXL);
+        tossPriceApi.getStockInfo(StrategyTicker.SOXL);
 
         verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class));
     }
@@ -247,9 +247,9 @@ class TossPriceApiTest {
                 .thenReturn(wrapStocks()); // 빈 목록
 
         // 첫 호출
-        tossPriceApi.getStockInfo(Ticker.SOXL);
+        tossPriceApi.getStockInfo(StrategyTicker.SOXL);
         // 두 번째 호출 (캐시 없음 → 재조회)
-        tossPriceApi.getStockInfo(Ticker.SOXL);
+        tossPriceApi.getStockInfo(StrategyTicker.SOXL);
 
         verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class));
     }

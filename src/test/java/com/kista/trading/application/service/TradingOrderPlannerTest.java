@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class TradingOrderPlannerTest {
 
     private Order template(Order.OrderDirection direction, String price, int quantity) {
         // 전략이 만든 템플릿은 id/accountId/strategyCycleId/status/externalOrderId가 비어있음 (계좌 귀속 전)
-        return new Order(null, null, null, TODAY, Ticker.SOXL, Order.OrderType.LOC,
+        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
                 Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 

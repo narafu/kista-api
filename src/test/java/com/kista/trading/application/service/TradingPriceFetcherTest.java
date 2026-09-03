@@ -4,7 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,28 +44,28 @@ class TradingPriceFetcherTest {
     @Test
     @DisplayName("bulkFetch 결과에 null 값이 섞여 있으면 해당 ticker만 단건 fallback으로 재조회")
     void fetchPrices_bulkResultContainsNull_fallsBackToSingleFetch() {
-        Map<Ticker, BigDecimal> bulkResult = new HashMap<>();
-        bulkResult.put(Ticker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함
-        when(pricePort.getPrices(List.of(Ticker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
-        when(pricePort.getPrice(Ticker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("25.50"));
+        Map<StrategyTicker, BigDecimal> bulkResult = new HashMap<>();
+        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
+        when(pricePort.getPrice(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("25.50"));
 
-        Map<Ticker, BigDecimal> result = priceFetcher.fetchPrices(List.of(Ticker.SOXL), account);
+        Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account);
 
-        assertThat(result).containsEntry(Ticker.SOXL, new BigDecimal("25.50"));
+        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
     }
 
     @Test
     @DisplayName("fetchPriceSnapshots: bulk·단건 fallback 모두 null이면 NPE 없이 결과에서 제외")
     void fetchPriceSnapshots_bothNull_excludedFromResultWithoutThrowing() {
-        Map<Ticker, com.kista.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
-        bulkResult.put(Ticker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(TradingPriceFetcher.java:44-45 NPE 회귀 방지)
-        when(pricePort.getPriceSnapshots(List.of(Ticker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
-        when(pricePort.getPriceSnapshot(Ticker.SOXL, toBrokerRef(account))).thenReturn(null);
+        Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
+        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(TradingPriceFetcher.java:44-45 NPE 회귀 방지)
+        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
+        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(null);
 
-        Map<Ticker, com.kista.trading.domain.model.PriceSnapshot> result =
-                priceFetcher.fetchPriceSnapshots(List.of(Ticker.SOXL), account);
+        Map<StrategyTicker, com.kista.trading.domain.model.PriceSnapshot> result =
+                priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account);
 
-        assertThat(result).doesNotContainKey(Ticker.SOXL);
+        assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
     }
 
     // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)

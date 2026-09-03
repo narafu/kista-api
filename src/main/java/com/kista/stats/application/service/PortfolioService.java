@@ -2,7 +2,7 @@ package com.kista.stats.application.service;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.stats.application.usecase.PortfolioUseCase;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
@@ -30,7 +30,7 @@ class PortfolioService implements PortfolioUseCase {
     }
 
     @Override
-    public List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
+    public List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker) {
         return orderPort.findByUser(userId, from, to, ticker);
     }
 }

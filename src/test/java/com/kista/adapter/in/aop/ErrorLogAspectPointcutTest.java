@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyTicker;
 
 // Spring AOP + CGLIB 환경에서 포인트컷이 NotifyPort 구현 클래스에 실제로 적용되는지 검증
 // proxyTargetClass=true: Spring Boot 기본값과 동일한 CGLIB 방식 — 이 설정에서 NotifyPort+(+없음)는 미매칭
@@ -46,7 +47,7 @@ class ErrorLogAspectPointcutTest {
         NotifyPort notifyPort() {
             return new NotifyPort() {
                 @Override public void notifyMarketClosed() {}
-                @Override public void notifyInsufficientBalance(Account account, AccountBalance b, Strategy.Ticker ticker) {}
+                @Override public void notifyInsufficientBalance(Account account, AccountBalance b, StrategyTicker ticker) {}
                 @Override public void notifyError(Exception e) {} // 실제 발송 없이 포인트컷 매칭만 검증
                 @Override public void notifyInfo(String message) {}
             };

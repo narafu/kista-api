@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.sharedkernel.StrategyType;
 
 @Service
 @RequiredArgsConstructor
@@ -87,7 +88,7 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
         }
         if (!brokerChanges.isEmpty()) payload.put("brokers", brokerChanges);
         Map<String, Boolean> strategyChanges = new LinkedHashMap<>();
-        for (Strategy.Type type : Strategy.Type.values()) {
+        for (StrategyType type : StrategyType.values()) {
             boolean before = previous.strategies().get(type).enabled();
             boolean after = saved.strategies().get(type).enabled();
             if (before != after) strategyChanges.put(type.name(), after);

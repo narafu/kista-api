@@ -12,13 +12,14 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import com.kista.sharedkernel.StrategyType;
 
 // 전략 패턴 진입점 — TradingService/TradingPreviewService/CycleRotationService 의 switch(strategy.type()) 분기를 다형성으로 대체
-// 각 구현체는 cycleType()으로 자기 타입을 선언하며, 서비스는 Map<Strategy.Type, CycleOrderStrategy>로 주입받아 사용
+// 각 구현체는 cycleType()으로 자기 타입을 선언하며, 서비스는 Map<StrategyType, CycleOrderStrategy>로 주입받아 사용
 public interface CycleOrderStrategy {
 
     // 이 전략이 담당하는 사이클 타입
-    Strategy.Type cycleType();
+    StrategyType cycleType();
 
     // 미리보기 실행 전 전일종가 조회 필요 여부 (INFINITE만 true — 0회차 평단가 대용)
     default boolean requiresPrevClose() { return false; }

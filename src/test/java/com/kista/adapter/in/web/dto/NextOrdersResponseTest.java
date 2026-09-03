@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
 
 class NextOrdersResponseTest {
 
@@ -33,7 +34,7 @@ class NextOrdersResponseTest {
         BuyCompetitionPreview competition = new BuyCompetitionPreview(
                 false, new BigDecimal("1000.00"), new BigDecimal("200.00"), new BigDecimal("900.00"),
                 List.of(new BuyCompetitionPreview.CompetingStrategy(
-                        competitorId, Strategy.Type.VR, Ticker.TQQQ, new BigDecimal("900.00"), 0)),
+                        competitorId, StrategyType.VR, StrategyTicker.TQQQ, new BigDecimal("900.00"), 0)),
                 List.of(), false);
         NextOrdersPreview preview = new NextOrdersPreview(
                 LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, competition, null);
@@ -45,7 +46,7 @@ class NextOrdersResponseTest {
         assertThat(response.competition().availableDeposit()).isEqualByComparingTo("1000.00");
         assertThat(response.competition().blockedByHigherPriority()).hasSize(1);
         assertThat(response.competition().blockedByHigherPriority().get(0).strategyId()).isEqualTo(competitorId);
-        assertThat(response.competition().blockedByHigherPriority().get(0).type()).isEqualTo(Strategy.Type.VR);
+        assertThat(response.competition().blockedByHigherPriority().get(0).type()).isEqualTo(StrategyType.VR);
         assertThat(response.competition().liveBalanceUnavailable()).isFalse();
     }
 

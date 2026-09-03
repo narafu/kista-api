@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PresentBalanceResult;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.application.usecase.AccountStatisticsUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
@@ -59,9 +59,9 @@ class StatisticsControllerTest {
 
     @Test
     void prices_returns_200_with_ticker_price_list() throws Exception {
-        Map<Ticker, BigDecimal> priceMap = new LinkedHashMap<>();
-        priceMap.put(Ticker.TQQQ, new BigDecimal("120.50"));
-        priceMap.put(Ticker.SOXL, new BigDecimal("35.20"));
+        Map<StrategyTicker, BigDecimal> priceMap = new LinkedHashMap<>();
+        priceMap.put(StrategyTicker.TQQQ, new BigDecimal("120.50"));
+        priceMap.put(StrategyTicker.SOXL, new BigDecimal("35.20"));
         when(accountStatistics.getPrices(eq(ACCOUNT_ID), any(), any()))
                 .thenReturn(priceMap);
 

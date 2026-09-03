@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Service
@@ -112,7 +113,7 @@ class ManualTradingService {
     // 시세 조회 실패 시 ManualTradingException으로 래핑
     private BigDecimal fetchPrevCloseOrThrow(Strategy strategy, Account account) {
         try {
-            Map<Strategy.Ticker, PriceSnapshot> snapshots =
+            Map<StrategyTicker, PriceSnapshot> snapshots =
                     priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
             return PriceSnapshot.prevCloseOrNull(snapshots.get(strategy.ticker()));
         } catch (Exception e) {

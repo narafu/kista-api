@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +55,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker) {
+    public List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker) {
         // native query는 enum을 name() 문자열로 전달 — DB VARCHAR 컬럼과 매칭
         return toDomainList(repository.findByUserIdAndTradeDateBetweenAndTicker(
                 userId, from, to, ticker.name()));
@@ -112,7 +112,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-            UUID accountId, LocalDate tradeDate, Ticker ticker) {
+            UUID accountId, LocalDate tradeDate, StrategyTicker ticker) {
         // 같은 계좌·거래일(KST)·ticker의 미체결 SELL 예약 수량을 합산한다
         Long quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
                 accountId, tradeDate, ticker.name());

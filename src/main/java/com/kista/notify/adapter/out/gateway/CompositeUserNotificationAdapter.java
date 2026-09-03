@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.function.Consumer;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @Primary
 @Component
@@ -36,7 +38,7 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     @Override public void notifyCycleCompleted(User user, Account account, Strategy strategy)           { route(user, p -> p.notifyCycleCompleted(user, account, strategy)); }
     @Override public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal d) { route(user, p -> p.notifyNewCycleStarted(user, account, strategy, d)); }
     @Override public void notifyTradingReport(User user, Account account, TradingReport report)         { route(user, p -> p.notifyTradingReport(user, account, report)); }
-    @Override public void notifyInsufficientBalance(User user, Account account, Strategy.Type t, Strategy.Ticker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
+    @Override public void notifyInsufficientBalance(User user, Account account, StrategyType t, StrategyTicker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
     @Override public void notifyError(User user, Exception e)                                           { route(user, p -> p.notifyError(user, e)); }
     @Override public void notifyBatchInterrupted(User user, Account account)                        { route(user, p -> p.notifyBatchInterrupted(user, account)); }
     @Override public void notifyMarketOpen(User user)                                                   { route(user, p -> p.notifyMarketOpen(user)); }

@@ -1,7 +1,7 @@
 package com.kista.privacy.adapter.out.persistence;
 
 import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -35,7 +35,7 @@ class PrivacyTradeBaseEntity extends BaseCreatedAtEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
-    private Ticker ticker;                    // 대상 종목 (PRIVACY는 SOXL)
+    private StrategyTicker ticker;                    // 대상 종목 (PRIVACY는 SOXL)
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal currentCycleStart;     // 현재 사이클 시작 시점의 기준 가격

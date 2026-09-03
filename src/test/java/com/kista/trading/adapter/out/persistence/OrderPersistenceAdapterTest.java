@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +40,7 @@ class OrderPersistenceAdapterTest {
 
     @Test
     void saveAll_delegatesToRepository() {
-        Order order = new Order(null, ACCOUNT_ID, STRATEGY_CYCLE_ID, TODAY, Ticker.SOXL,
+        Order order = new Order(null, ACCOUNT_ID, STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, PRICE,
                 Order.OrderStatus.PLANNED, null, null, null);
 
@@ -56,7 +56,7 @@ class OrderPersistenceAdapterTest {
         entity.setAccountId(ACCOUNT_ID);
         entity.setStrategyCycleId(STRATEGY_CYCLE_ID);
         entity.setTradeDate(TODAY); // DB도 KST 저장
-        entity.setTicker(Ticker.SOXL);
+        entity.setTicker(StrategyTicker.SOXL);
         entity.setOrderType(Order.OrderType.LOC);
         entity.setDirection(Order.OrderDirection.BUY);
         entity.setQuantity(5);
@@ -70,7 +70,7 @@ class OrderPersistenceAdapterTest {
         List<Order> result = adapter.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY); // KST로 호출
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().ticker()).isEqualTo(Ticker.SOXL);
+        assertThat(result.getFirst().ticker()).isEqualTo(StrategyTicker.SOXL);
         assertThat(result.getFirst().quantity()).isEqualTo(5);
         assertThat(result.getFirst().status()).isEqualTo(Order.OrderStatus.PLANNED);
         assertThat(result.getFirst().tradeDate()).isEqualTo(TODAY); // toDomain: 변환 없이 그대로 복원
@@ -146,10 +146,10 @@ class OrderPersistenceAdapterTest {
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_delegatesWithTradeDate() {
         // 변환 없이 KST 거래일 그대로 PLANNED/PLACED SELL 예약 수량을 합산한다
         when(repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
-                ACCOUNT_ID, TODAY, Ticker.SOXL.name())).thenReturn(8L);
+                ACCOUNT_ID, TODAY, StrategyTicker.SOXL.name())).thenReturn(8L);
 
         int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                ACCOUNT_ID, TODAY, Ticker.SOXL);
+                ACCOUNT_ID, TODAY, StrategyTicker.SOXL);
 
         assertThat(result).isEqualTo(8);
     }

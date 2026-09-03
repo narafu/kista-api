@@ -29,6 +29,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class AdminQueryServiceTest {
@@ -98,8 +102,8 @@ class AdminQueryServiceTest {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
         LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
         when(orderPort.findByStrategyId(strategyId, tradeDate, tradeDate)).thenReturn(List.of());
 
@@ -114,8 +118,8 @@ class AdminQueryServiceTest {
         UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
         LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
 
         // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException
@@ -127,8 +131,8 @@ class AdminQueryServiceTest {
     void listStrategyTradeDates_계좌ID가_일치하면_거래일_목록을_반환한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
         when(orderPort.findTradeDatesByStrategyId(strategyId)).thenReturn(List.of(LocalDate.of(2026, 7, 1)));
 
@@ -142,8 +146,8 @@ class AdminQueryServiceTest {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        Strategy strategy = new Strategy(strategyId, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE);
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
 
         // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException

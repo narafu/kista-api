@@ -6,7 +6,7 @@ import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +27,7 @@ class PrivacyStrategyTest {
     private static final BigDecimal BASE_CYCLE_START = new BigDecimal("1000"); // 기준 사이클 시작가
     private static final BigDecimal INITIAL_USD_DEPOSIT = new BigDecimal("1000"); // 1배수: 1000/1000=1.00
     private static final LocalDate DATE = LocalDate.of(2026, 5, 26);
-    private static final Ticker TICKER = Ticker.SOXL;
+    private static final StrategyTicker TICKER = StrategyTicker.SOXL;
 
     // 계좌잔고 헬퍼
     private static AccountBalance balance(int holdings) {

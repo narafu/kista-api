@@ -1,7 +1,7 @@
 package com.kista.trading.application.port.output;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,7 +25,7 @@ public interface OrderPort {
     void markPlaced(UUID orderId, String externalOrderId);
 
     // 사용자 스코프 기간+종목 조회 (대시보드 — 본인 데이터만)
-    List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, Ticker ticker);
+    List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker);
 
     // 기간 내 전체 계좌 조회 ticker 필터 없음 (관리자·이상징후 감지용)
     List<Order> findAll(LocalDate from, LocalDate to);
@@ -58,7 +58,7 @@ public interface OrderPort {
     BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
 
     // 계좌·거래일·종목 기준 PLANNED/PLACED SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
-    int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(UUID accountId, LocalDate tradeDate, Ticker ticker);
+    int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(UUID accountId, LocalDate tradeDate, StrategyTicker ticker);
 
     // 계좌 기준 FILLED/PARTIALLY_FILLED 주문 조회 (일별 거래내역 달력용)
     List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to);

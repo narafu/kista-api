@@ -4,7 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,22 +43,22 @@ class PreviewDepositCacheTest {
 
     @Test
     void getUsdDeposit_returnsFreshValue_onFirstCall() {
-        when(liveBalancePort.getLiveBalance(toBrokerRef(account), Ticker.SOXL))
+        when(liveBalancePort.getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL))
                 .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
 
-        BigDecimal result = cache.getUsdDeposit(account, Ticker.SOXL);
+        BigDecimal result = cache.getUsdDeposit(account, StrategyTicker.SOXL);
 
         assertThat(result).isEqualByComparingTo("1000.00");
-        verify(liveBalancePort, times(1)).getLiveBalance(toBrokerRef(account), Ticker.SOXL);
+        verify(liveBalancePort, times(1)).getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL);
     }
 
     @Test
     void getUsdDeposit_reusesCachedValue_forSecondCallWithinTtl() {
-        when(liveBalancePort.getLiveBalance(toBrokerRef(account), Ticker.SOXL))
+        when(liveBalancePort.getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL))
                 .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
 
-        cache.getUsdDeposit(account, Ticker.SOXL);
-        BigDecimal second = cache.getUsdDeposit(account, Ticker.TQQQ); // 다른 ticker로 조회해도 계좌 단위로 캐시 재사용
+        cache.getUsdDeposit(account, StrategyTicker.SOXL);
+        BigDecimal second = cache.getUsdDeposit(account, StrategyTicker.TQQQ); // 다른 ticker로 조회해도 계좌 단위로 캐시 재사용
 
         assertThat(second).isEqualByComparingTo("1000.00");
         verify(liveBalancePort, times(1)).getLiveBalance(any(), any());
@@ -66,14 +66,14 @@ class PreviewDepositCacheTest {
 
     @Test
     void getUsdDeposit_collapsesConcurrentMisses_intoSingleFetch() throws InterruptedException {
-        when(liveBalancePort.getLiveBalance(toBrokerRef(account), Ticker.SOXL))
+        when(liveBalancePort.getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL))
                 .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
         int threadCount = 20;
         ExecutorService pool = Executors.newFixedThreadPool(threadCount);
         AtomicInteger successCount = new AtomicInteger();
 
         IntStream.range(0, threadCount).forEach(i -> pool.submit(() -> {
-            BigDecimal result = cache.getUsdDeposit(account, Ticker.SOXL);
+            BigDecimal result = cache.getUsdDeposit(account, StrategyTicker.SOXL);
             if (result.compareTo(new BigDecimal("1000.00")) == 0) {
                 successCount.incrementAndGet();
             }
@@ -82,21 +82,21 @@ class PreviewDepositCacheTest {
         pool.awaitTermination(5, TimeUnit.SECONDS);
 
         assertThat(successCount.get()).isEqualTo(threadCount);
-        verify(liveBalancePort, times(1)).getLiveBalance(toBrokerRef(account), Ticker.SOXL);
+        verify(liveBalancePort, times(1)).getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL);
     }
 
     @Test
     void getUsdDeposit_doesNotCache_whenFetchFails() {
-        when(liveBalancePort.getLiveBalance(toBrokerRef(account), Ticker.SOXL))
+        when(liveBalancePort.getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL))
                 .thenThrow(new com.kista.broker.domain.model.kis.KisApiException("일시 오류", null))
                 .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
 
-        assertThatThrownBy(() -> cache.getUsdDeposit(account, Ticker.SOXL))
+        assertThatThrownBy(() -> cache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .isInstanceOf(com.kista.broker.domain.model.kis.KisApiException.class);
-        BigDecimal result = cache.getUsdDeposit(account, Ticker.SOXL);
+        BigDecimal result = cache.getUsdDeposit(account, StrategyTicker.SOXL);
 
         assertThat(result).isEqualByComparingTo("1000.00");
-        verify(liveBalancePort, times(2)).getLiveBalance(toBrokerRef(account), Ticker.SOXL);
+        verify(liveBalancePort, times(2)).getLiveBalance(toBrokerRef(account), StrategyTicker.SOXL);
     }
 
     // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)

@@ -28,6 +28,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 @WebMvcTest(StatsController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -49,7 +51,7 @@ class StatsControllerTest {
     void summary를_반환한다() throws Exception {
         when(userStats.getSummary(USER_ID)).thenReturn(new StatsSummary(
                 new BigDecimal("50.00"), new BigDecimal("10.00"), new BigDecimal("1000.00"),
-                List.of(new StrategyTypeStats(Strategy.Type.INFINITE, 2, 1,
+                List.of(new StrategyTypeStats(StrategyType.INFINITE, 2, 1,
                         new BigDecimal("0.5000"), new BigDecimal("0.0250"), new BigDecimal("20.0"),
                         new BigDecimal("50.00"), new BigDecimal("10.00")))));
 
@@ -78,7 +80,7 @@ class StatsControllerTest {
 
     @Test
     void equity_curve는_type_필터를_전달한다() throws Exception {
-        when(userStats.getEquityCurve(eq(USER_ID), eq(Strategy.Type.VR), any(), any()))
+        when(userStats.getEquityCurve(eq(USER_ID), eq(StrategyType.VR), any(), any()))
                 .thenReturn(new EquityCurve(List.of()));
 
         mockMvc.perform(get("/api/stats/equity-curve")
@@ -89,7 +91,7 @@ class StatsControllerTest {
                 .andExpect(status().isOk());
 
         verify(userStats).getEquityCurve(
-                USER_ID, Strategy.Type.VR,
+                USER_ID, StrategyType.VR,
                 LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
     }
 
@@ -98,8 +100,8 @@ class StatsControllerTest {
         var createdAt = java.time.Instant.parse("2026-02-01T00:00:00Z");
         when(userStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), eq(50)))
                 .thenReturn(new CyclePerformancePage(
-                        List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), Strategy.Type.INFINITE,
-                                Strategy.Ticker.SOXL, LocalDate.parse("2026-01-01"),
+                        List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
+                                StrategyTicker.SOXL, LocalDate.parse("2026-01-01"),
                                 LocalDate.parse("2026-01-31"), new BigDecimal("1000.00"),
                                 new BigDecimal("1100.00"), new BigDecimal("100.00"),
                                 new BigDecimal("0.1000"), 30, true, createdAt)),

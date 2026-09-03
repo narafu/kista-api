@@ -16,6 +16,10 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -49,8 +53,8 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void save_infiniteStrategy_persistsCommonAndDetailRows() {
         Strategy strategy = new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
         );
 
         Strategy saved = strategyAdapter.save(strategy);
@@ -84,11 +88,11 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByStrategyVersionIds_returnsDetailsKeyedByVersionId() {
         Strategy strategyA = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.SOXL, Strategy.CycleSeedType.NONE));
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
         Strategy strategyB = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE));
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
         StrategyVersion versionA = strategyVersionAdapter.save(new StrategyVersion(null, strategyA.id(), 1, null, null));
         StrategyVersion versionB = strategyVersionAdapter.save(new StrategyVersion(null, strategyB.id(), 1, null, null));
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionA.id(), 20));
@@ -110,8 +114,8 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void deleteByStrategyId_removesInfiniteDetailRowOnly() {
         Strategy saved = strategyAdapter.save(new Strategy(
-                null, accountId, Strategy.Type.INFINITE,
-                Strategy.Status.ACTIVE, Strategy.Ticker.TQQQ, Strategy.CycleSeedType.NONE
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 30));

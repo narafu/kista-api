@@ -11,6 +11,10 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Entity
 @Table(name = "strategy", schema = "kista")
@@ -30,19 +34,19 @@ class StrategyEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 20)
-    private Strategy.Type type; // 매매 전략 종류 (INFINITE, PRIVACY)
+    private StrategyType type; // 매매 전략 종류 (INFINITE, PRIVACY)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ticker", nullable = false, length = 20)
-    private Strategy.Ticker ticker; // 거래 종목 코드
+    private StrategyTicker ticker; // 거래 종목 코드
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private Strategy.Status status; // 실행 상태 (ACTIVE, PAUSED)
+    private StrategyStatus status; // 실행 상태 (ACTIVE, PAUSED)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cycle_seed_type", nullable = false, length = 20)
-    private Strategy.CycleSeedType cycleSeedType; // 사이클 종료 후 자동 재등록 정책
+    private StrategyCycleSeedType cycleSeedType; // 사이클 종료 후 자동 재등록 정책
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨

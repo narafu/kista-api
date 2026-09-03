@@ -7,7 +7,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.domain.model.strategy.Strategy;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.application.port.output.RealtimeNotificationPort;
@@ -30,6 +30,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import com.kista.sharedkernel.StrategyType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingReportNotifierTest {
@@ -44,15 +45,15 @@ class TradingReportNotifierTest {
     private static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
     private static final LocalDate TODAY = LocalDate.of(2026, 7, 30);
     private static final TradingReport REPORT = new TradingReport(
-            TODAY, Strategy.Type.INFINITE, Ticker.SOXL, new BigDecimal("100.00"), new BigDecimal("50.00"));
+            TODAY, StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("100.00"), new BigDecimal("50.00"));
 
     private static Execution buyExecution() {
-        return new Execution(TODAY, Ticker.SOXL, Direction.BUY,
+        return new Execution(TODAY, StrategyTicker.SOXL, Direction.BUY,
                 3, new BigDecimal("20.00"), new BigDecimal("60.00"), "E-BUY");
     }
 
     private static Execution sellExecution() {
-        return new Execution(TODAY, Ticker.SOXL, Direction.SELL,
+        return new Execution(TODAY, StrategyTicker.SOXL, Direction.SELL,
                 2, new BigDecimal("21.00"), new BigDecimal("42.00"), "E-SELL");
     }
 

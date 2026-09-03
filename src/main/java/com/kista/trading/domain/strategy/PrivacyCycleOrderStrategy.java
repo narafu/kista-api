@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.sharedkernel.StrategyType;
 
 // PRIVACY 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcPrivacy + CycleRotationService.resolveMinRequired(PRIVACY) 이전
@@ -23,7 +24,7 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     private final PrivacyStrategy privacyStrategy;
 
     @Override
-    public Strategy.Type cycleType() { return Strategy.Type.PRIVACY; }
+    public StrategyType cycleType() { return StrategyType.PRIVACY; }
 
     @Override
     public PriceCapMode priceCapMode() { return PriceCapMode.PRIVACY_SIMPLE; }

@@ -2,7 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -59,11 +59,11 @@ final class KisResponseParser {
         catch (DateTimeParseException e) { return fallback; }
     }
 
-    // 응답 행 목록 → null 가드 + Ticker 외 종목 필터링(silent drop) + 도메인 매핑 골격
-    static <T, R> List<R> streamTickered(List<T> rows, Function<T, String> pdnoOf, BiFunction<Ticker, T, R> mapper) {
+    // 응답 행 목록 → null 가드 + StrategyTicker 외 종목 필터링(silent drop) + 도메인 매핑 골격
+    static <T, R> List<R> streamTickered(List<T> rows, Function<T, String> pdnoOf, BiFunction<StrategyTicker, T, R> mapper) {
         if (rows == null) return Collections.emptyList();
         return rows.stream()
-                .flatMap(row -> Ticker.tryParse(pdnoOf.apply(row))
+                .flatMap(row -> StrategyTicker.tryParse(pdnoOf.apply(row))
                         .map(ticker -> mapper.apply(ticker, row))
                         .stream())
                 .toList();

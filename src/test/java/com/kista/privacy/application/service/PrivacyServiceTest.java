@@ -7,7 +7,7 @@ import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.privacy.application.event.PrivacyAlertRaisedEvent;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +51,7 @@ class PrivacyServiceTest {
         UUID baseId = UUID.randomUUID();
         LocalDate receivedDate = LocalDate.now(); // FIDA 송신값 (KST 발행일 원본)
         FidaOrderCommand req = new FidaOrderCommand(
-                receivedDate, Ticker.SOXL, new BigDecimal("500.00"),
+                receivedDate, StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, true));
@@ -69,7 +69,7 @@ class PrivacyServiceTest {
     void executeFidaOrder_returns_existing_when_not_created() {
         UUID baseId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.now(), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of());
 
         when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, false));
@@ -83,7 +83,7 @@ class PrivacyServiceTest {
     void executeFidaOrder_warnsWhenSellIsMissingButStillSaves() {
         UUID baseId = UUID.randomUUID();
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.of(2026, 6, 30), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.of(2026, 6, 30), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 4,
                 List.of(
                         new FidaPlannedOrder(PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, 2, new BigDecimal("234.46")),
@@ -105,7 +105,7 @@ class PrivacyServiceTest {
     @Test
     void executeFidaOrder_rejectsWhenExplicitSellExceedsHoldings() {
         FidaOrderCommand req = new FidaOrderCommand(
-                LocalDate.of(2026, 6, 30), Ticker.SOXL, new BigDecimal("500.00"),
+                LocalDate.of(2026, 6, 30), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 2,
                 List.of(new FidaPlannedOrder(PrivacyOrderDirection.SELL, PrivacyOrderType.LIMIT, 4, new BigDecimal("236.54"))));
 

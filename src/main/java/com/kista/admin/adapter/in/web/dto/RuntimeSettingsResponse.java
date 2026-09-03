@@ -7,7 +7,7 @@ import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.StrategyCreationSettings;
 import com.kista.admin.domain.model.StrategyFieldSettings;
-import com.kista.domain.model.strategy.Strategy.Type;
+import com.kista.sharedkernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.EnumMap;
@@ -22,7 +22,7 @@ public record RuntimeSettingsResponse(
         @Schema(description = "증권사별 공개 설정")
         Map<Broker, BrokerResponse> brokers,
         @Schema(description = "전략 타입별 생성 정책 설정")
-        Map<Type, StrategyResponse> strategies,
+        Map<StrategyType, StrategyResponse> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정")
         BenchmarkResponse benchmarks
 ) {
@@ -30,7 +30,7 @@ public record RuntimeSettingsResponse(
         // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다.
         Map<Broker, BrokerResponse> brokers = new EnumMap<>(Broker.class);
         settings.brokers().forEach((key, value) -> brokers.put(key, new BrokerResponse(value.enabled())));
-        Map<Type, StrategyResponse> strategies = new EnumMap<>(Type.class);
+        Map<StrategyType, StrategyResponse> strategies = new EnumMap<>(StrategyType.class);
         settings.strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
         return new RuntimeSettingsResponse(new AuthResponse(settings.approvalRequired()),
                 Map.copyOf(brokers), Map.copyOf(strategies), BenchmarkResponse.from(settings.benchmarks()));

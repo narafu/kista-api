@@ -2,7 +2,7 @@ package com.kista.trading.domain.model;
 
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.domain.model.strategy.Strategy.Ticker;
+import com.kista.sharedkernel.StrategyTicker;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ class InfinitePositionTest {
     void case_q0() {
         // averagePrice=prevClose=18, purchaseAmount=0, totalAssets=2000, unitAmount=100.00, currentRound=0.0
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("2000"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("18"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("18"), 20);
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("18"); // 최근 종가 기준 (현재가 20 아님)
         assertThat(pos.holdings()).isEqualTo(0);
@@ -39,7 +39,7 @@ class InfinitePositionTest {
     void case_q10() {
         // averagePrice=20, purchaseAmount=200, totalAssets=3000, unitAmount=150.00, currentRound=200/150=1.33
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("2800"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("19"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("19"), 20);
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("20");
         assertThat(pos.holdings()).isEqualTo(10);
@@ -58,7 +58,7 @@ class InfinitePositionTest {
     void case_q100() {
         // averagePrice=5, purchaseAmount=500, totalAssets=2000, unitAmount=100.00, currentRound=500/100=5.0
         AccountBalance balance = new AccountBalance(100, new BigDecimal("5"), new BigDecimal("1500"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("5.8"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("5.8"), 20);
 
         assertThat(pos.averagePrice()).isEqualByComparingTo("5");
         assertThat(pos.holdings()).isEqualTo(100);
@@ -76,7 +76,7 @@ class InfinitePositionTest {
     @DisplayName("TQQQ: targetProfitRate=0.15, targetPrice=A×1.15")
     void case_tqqq_targetProfitRate() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.TQQQ, new BigDecimal("50"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.TQQQ, new BigDecimal("50"), 20);
 
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.1500"); // TQQQ targetProfitRate=0.15
         assertThat(pos.referencePrice()).isEqualByComparingTo("57.50"); // 50×1.15
@@ -114,13 +114,13 @@ class InfinitePositionTest {
         // totalAssets=50+100=150, unitAmount=150/20=7.50 → isFinalRound: 7.50>50? No
         // 소진 조건은 unitAmount > usdDeposit: holdings=18, avg=22, deposit=22 → purchase=396, total=418, unit=20.90 > 22 → true
         AccountBalance balance = new AccountBalance(18, new BigDecimal("22"), new BigDecimal("22"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("22"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("22"), 20);
 
         // unitAmount(20.90) > usdDeposit(22)? No... 재계산
         // totalAssets=22+(22*18)=22+396=418, unitAmount=418/20=20.90 → 20.90 < 22 → isFinalRound=false
         // holdings=19, avg=22, deposit=8 → purchase=418, total=426, unit=21.30 > 8 → true
         AccountBalance balance2 = new AccountBalance(19, new BigDecimal("22"), new BigDecimal("8"));
-        InfinitePosition pos2 = new InfinitePosition(balance2, Ticker.SOXL, new BigDecimal("22"), 20);
+        InfinitePosition pos2 = new InfinitePosition(balance2, StrategyTicker.SOXL, new BigDecimal("22"), 20);
         assertThat(pos2.isFinalRound()).isTrue();
         assertThat(pos2.nextReverseMode(false)).isTrue(); // 소진 발동 → 리버스모드 진입
     }
@@ -131,7 +131,7 @@ class InfinitePositionTest {
         // SOXL targetProfitRate=0.20 → threshold = avgPrice × (1 - 0.20) = 22 × 0.80 = 17.60
         // closingPrice=18.00 ≥ threshold(17.60) → shouldExitReverseMode=true → 일반모드 복귀
         AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("18.00"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("18.00"), 20);
 
         assertThat(pos.nextReverseMode(true)).isFalse(); // 종가 회복 → 일반모드 복귀
     }
@@ -142,7 +142,7 @@ class InfinitePositionTest {
         // SOXL targetProfitRate=0.20 → threshold = 22 × 0.80 = 17.60
         // closingPrice=15.00 < threshold(17.60) → shouldExitReverseMode=false → 리버스모드 유지
         AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
-        InfinitePosition pos = new InfinitePosition(balance, Ticker.SOXL, new BigDecimal("15.00"), 20);
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("15.00"), 20);
 
         assertThat(pos.nextReverseMode(true)).isTrue(); // 종가 미회복 → 리버스모드 유지
     }
