@@ -1,4 +1,4 @@
-package com.kista.application.port.output;
+package com.kista.trading.application.port.output;
 
 // 스케쥴러 정상 실행 신호 — 외부 감시(healthchecks.io)가 시간 내 신호 없으면 알림 (dead-man's switch)
 public interface HeartbeatPort {

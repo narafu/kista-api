@@ -4,7 +4,7 @@ import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
 import com.kista.user.adapter.in.web.security.JwtAuthFilter;
 import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.user.application.usecase.BlacklistUseCase;
-import com.kista.application.usecase.MarketUseCase;
+import com.kista.market.application.usecase.MarketUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
-import com.kista.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.notify.application.port.output.NotifyPort;
 import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.support.DomainFixtures;

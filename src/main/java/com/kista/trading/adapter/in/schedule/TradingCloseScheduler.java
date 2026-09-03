@@ -4,7 +4,7 @@ import com.kista.adapter.in.schedule.SchedulerJobRunner;
 import com.kista.adapter.in.schedule.SchedulerLockService;
 import com.kista.common.TimeZones;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
-import com.kista.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.trading.application.port.output.StrategyLookupPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

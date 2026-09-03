@@ -1,7 +1,7 @@
 package com.kista.market.application.service;
 
 import com.kista.broker.domain.model.toss.TossCandle;
-import com.kista.application.usecase.MarketUseCase;
+import com.kista.market.application.usecase.MarketUseCase;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.CandlePort;
 import lombok.RequiredArgsConstructor;

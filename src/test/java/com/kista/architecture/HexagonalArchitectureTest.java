@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Set;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -26,6 +28,20 @@ class HexagonalArchitectureTest {
     @BeforeAll
     static void setUp() {
         classes = new ClassFileImporter().importPackages("com.kista");
+    }
+
+    @Test
+    @DisplayName("sharedkernel은 다른 com.kista 모듈에 의존하지 않는다 — 전역 공용 어휘 불변식")
+    void sharedkernel_must_not_depend_on_other_modules() {
+        // sharedkernel은 outbound reference 0인 순수 값 타입만 담는다는 전제로 OPEN 선언됨 —
+        // 이 패키지가 다른 모듈을 참조하는 순간 여러 모듈이 공유하는 어휘로서의 전제가 깨진다.
+        // 그동안 package-info 주석에만 있던 불변식을 실제로 강제한다.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.sharedkernel..")
+                .should().dependOnClassesThat(
+                        resideInAPackage("com.kista..")
+                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+        rule.check(classes);
     }
 
     @Test

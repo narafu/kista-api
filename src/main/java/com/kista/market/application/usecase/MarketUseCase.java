@@ -1,4 +1,4 @@
-package com.kista.application.usecase;
+package com.kista.market.application.usecase;
 
 import com.kista.broker.domain.model.toss.TossCandle;
 

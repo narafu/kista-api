@@ -1,6 +1,6 @@
-package com.kista.adapter.out.heartbeat;
+package com.kista.trading.adapter.out.heartbeat;
 
-import com.kista.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.HeartbeatPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

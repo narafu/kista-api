@@ -8,7 +8,7 @@ import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.StrategyRef;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
-import com.kista.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.trading.application.port.output.StrategyLookupPort;

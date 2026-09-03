@@ -1,4 +1,4 @@
-package com.kista.adapter.out.heartbeat;
+package com.kista.trading.adapter.out.heartbeat;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
