@@ -7,6 +7,7 @@ import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.user.User;
 import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.support.DomainFixtures;

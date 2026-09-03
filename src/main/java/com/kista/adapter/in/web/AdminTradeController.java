@@ -16,7 +16,7 @@ import com.kista.application.usecase.AdminQueryUseCase;
 import com.kista.application.usecase.AdminReorderUseCase;
 import com.kista.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.application.usecase.AdminUserUseCase;
-import com.kista.application.port.output.MarketCalendarPort;
+import com.kista.market.application.port.output.MarketCalendarPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

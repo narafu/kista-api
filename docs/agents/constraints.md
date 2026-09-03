@@ -13,6 +13,7 @@
 - notify 애그리게이트(Telegram/FCM 알림)는 `com.kista.notify`로 이미 옮겨졌다 — 신규 notify 관련 코드도 레거시 최상위가 아닌 `com.kista.notify` 안에 추가. finance와 달리 자체 domain/model 레이어가 없는 얇은 게이트웨이 모듈이라 `application/port/output`(공개 계약, "port" NamedInterface) + `adapter/{in,out}`만 구성 — UseCase가 필요하면 레거시 `application.usecase`를 그대로 참조
 - 브로커 애그리게이트(KIS/Toss/Mock 연동)는 `com.kista.broker`로 이미 옮겨졌다 — 신규 KIS/Toss/Mock 코드는 `com.kista.broker.adapter.out.*` 안에 추가. finance/notify와 달리 이 adapter/out은 NamedInterface로 공개되지 않아 모듈 밖에서 완전히 접근 불가 — 레거시 코드가 새 기능을 호출해야 하면 adapter 패키지에 직접 접근하지 말고 `com.kista.broker.application.port.output`에 신규 `*Port` 인터페이스를 만들어 노출한다("port" NamedInterface로 공개)
 - 매매 코어 애그리게이트(주문/사이클 실행 이력/주문생성 전략)는 `com.kista.trading`으로 이미 옮겨졌다 — 신규 trading 관련 코드도 레거시 최상위가 아닌 `com.kista.trading` 안에 추가. `domain/{model,strategy}`가 "domain"으로, `application/usecase`가 "usecase"로, `application/port/output`이 "port"로, `application/event`가 "event"로, `adapter/in/schedule`이 "schedule"로 NamedInterface 공개 — `application/service`·`adapter/out/*`은 비공개(internal)
+- 시장 공개 참조 데이터(공포탐욕지수·미국 시장 휴장일 캘린더) 애그리게이트는 `com.kista.market`으로 이미 옮겨졌다 — 신규 관련 코드도 레거시 최상위가 아닌 `com.kista.market` 안에 추가. `domain/model`이 "domain"으로, `application/port/output`이 "port"로, `application/event`가 "event"로 NamedInterface 공개 — `application/{usecase,service}`·`adapter/*`는 비공개(internal). 단 `MarketUseCase`는 예외적으로 레거시 `com.kista.application.usecase`에 잔류(market 내부의 `MarketHolidayService`/`MarketHolidayController`가 구현·소비) — 다음 이전 대상 후보 결정 시 참고
 
 ### 모듈 경계 포트 시그니처 — 각 모듈은 자기 소유 타입만 사용
 - broker/notify 포트(둘 다 `application/port/output/*Port`)는 시그니처(파라미터·반환 타입)에 trading 타입을 직접 참조하지 않는다 — 각 모듈이 경계에서 자기 소유 타입을 쓰고, trading이 양쪽을 매핑한다
@@ -22,7 +23,7 @@
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
 - 다른 패키지 adapter에서 DB 조작이 필요하면 아웃바운드 포트(`application/port/output/`) 경유 필수
-- 패턴: `AlpacaCalendarAdapter`(adapter.out.alpaca) → `MarketHolidayStorePort`(application.port.output) → `MarketCalendarPersistenceAdapter`(persistence.calendar)
+- 패턴: `com.kista.market.adapter.out.alpaca.AlpacaCalendarAdapter` → `com.kista.market.application.port.output.MarketHolidayStorePort` → `com.kista.market.adapter.out.persistence.calendar.MarketCalendarPersistenceAdapter`
 - 참고: `com.kista.broker.adapter.out.kis.KisAuthApi` → `com.kista.broker.application.port.output.BrokerTokenCachePort` → `com.kista.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
 
 

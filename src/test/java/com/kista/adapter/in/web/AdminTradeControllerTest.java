@@ -12,7 +12,7 @@ import com.kista.application.usecase.AdminReorderUseCase;
 import com.kista.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.application.usecase.AdminUserUseCase;
 import com.kista.application.usecase.BlacklistUseCase;
-import com.kista.application.port.output.MarketCalendarPort;
+import com.kista.market.application.port.output.MarketCalendarPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
